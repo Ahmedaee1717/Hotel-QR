@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Details - Paradise Resort</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+    </div>
+
+    <div id="content" class="hidden">
+        <div class="gradient-bg text-white py-4 px-4 sticky top-0 z-10 shadow-lg">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <button onclick="window.history.back()" class="bg-white/20 px-4 py-2 rounded-lg hover:bg-white/30">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <h1 class="text-xl font-bold">Activity Details</h1>
+                <div class="w-20"></div>
+            </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto px-4 py-8">
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+                <div class="h-96 bg-gradient-to-r from-blue-400 to-green-400"></div>
+                <div class="p-6">
+                    <h2 id="title" class="text-3xl font-bold mb-2"></h2>
+                    <p id="vendor" class="text-gray-600 mb-4"></p>
+                    <div class="flex items-end gap-4 mb-6">
+                        <div>
+                            <span id="price" class="text-4xl font-bold text-blue-600"></span>
+                            <span class="text-gray-600">/person</span>
+                        </div>
+                        <div class="flex gap-4 text-sm text-gray-600">
+                            <span><i class="far fa-clock mr-1"></i><span id="duration"></span></span>
+                            <span><i class="far fa-user mr-1"></i>Max <span id="capacity"></span></span>
+                        </div>
+                    </div>
+                    <button onclick="openBookingModal()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-4 rounded-lg text-lg font-semibold">
+                        <i class="fas fa-calendar-check mr-2"></i>Book This Activity Now
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-2xl font-bold mb-4">About This Activity</h3>
+                <p id="description" class="text-gray-700 whitespace-pre-line leading-relaxed"></p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-2xl font-bold mb-4"><i class="fas fa-check-circle text-green-500 mr-2"></i>What's Included</h3>
+                <ul id="includes" class="space-y-3"></ul>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-2xl font-bold mb-4"><i class="fas fa-info-circle text-blue-500 mr-2"></i>Requirements</h3>
+                <div id="requirements"></div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold mb-4">About the Vendor</h3>
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-store text-blue-600 text-2xl"></i>
+                    </div>
+                    <div>
+                        <p id="vendorName" class="font-bold text-lg"></p>
+                        <div id="rating" class="text-yellow-500 text-sm"></div>
+                    </div>
+                </div>
+                <p id="vendorDesc" class="text-gray-700 mb-4"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Complete Your Booking</h2>
+                    <button onclick="closeBookingModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <div id="bookingStep1" class="space-y-4">
+                    <h3 class="text-lg font-semibold">Step 1: Select Date & Time</h3>
+                    <div>
+                        <label class="block font-medium mb-2">Date</label>
+                        <input type="date" id="bookingDate" class="w-full px-4 py-3 border rounded-lg" onchange="loadAvailability()">
+                    </div>
+                    <div id="timeSlots" class="space-y-2"></div>
+                    <button onclick="goToStep(2)" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600">
+                        Continue to Participants
+                    </button>
+                </div>
+
+                <div id="bookingStep2" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Step 2: Number of Participants</h3>
+                    <div class="flex items-center justify-center gap-6 py-4">
+                        <button onclick="changeParticipants(-1)" class="w-14 h-14 bg-gray-200 rounded-lg text-2xl hover:bg-gray-300">-</button>
+                        <span id="participantsCount" class="text-4xl font-bold">1</span>
+                        <button onclick="changeParticipants(1)" class="w-14 h-14 bg-gray-200 rounded-lg text-2xl hover:bg-gray-300">+</button>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <p class="text-sm text-gray-700">Total Price:</p>
+                        <p id="totalPrice" class="text-3xl font-bold text-blue-600"></p>
+                    </div>
+                    <div class="flex gap-4">
+                        <button onclick="goToStep(1)" class="flex-1 bg-gray-200 py-3 rounded-lg hover:bg-gray-300">Back</button>
+                        <button onclick="goToStep(3)" class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600">Continue</button>
+                    </div>
+                </div>
+
+                <div id="bookingStep3" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Step 3: Your Information</h3>
+                    <input type="text" id="firstName" placeholder="First Name *" class="w-full px-4 py-3 border rounded-lg">
+                    <input type="text" id="lastName" placeholder="Last Name *" class="w-full px-4 py-3 border rounded-lg">
+                    <input type="email" id="email" placeholder="Email *" class="w-full px-4 py-3 border rounded-lg">
+                    <input type="tel" id="phone" placeholder="Phone Number *" class="w-full px-4 py-3 border rounded-lg">
+                    <textarea id="notes" placeholder="Special requests (optional)" class="w-full px-4 py-3 border rounded-lg" rows="3"></textarea>
+                    <div class="flex gap-4">
+                        <button onclick="goToStep(2)" class="flex-1 bg-gray-200 py-3 rounded-lg hover:bg-gray-300">Back</button>
+                        <button onclick="goToStep(4)" class="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600">Continue</button>
+                    </div>
+                </div>
+
+                <div id="bookingStep4" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Step 4: Payment Method</h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-4 border-2 rounded-lg cursor-pointer hover:border-blue-500">
+                            <input type="radio" name="payment" value="stripe" class="mr-3">
+                            <div class="flex-1">
+                                <p class="font-semibold">Pay Online with Card</p>
+                                <p class="text-sm text-gray-600">Credit/Debit, Apple Pay, Google Pay</p>
+                            </div>
+                            <i class="fas fa-credit-card text-2xl text-blue-500"></i>
+                        </label>
+                        <label class="flex items-center p-4 border-2 rounded-lg cursor-pointer hover:border-green-500 border-green-300">
+                            <input type="radio" name="payment" value="pay_at_vendor" checked class="mr-3">
+                            <div class="flex-1">
+                                <p class="font-semibold">Pay at Venue</p>
+                                <p class="text-sm text-gray-600">Pay when you arrive at the activity</p>
+                            </div>
+                            <i class="fas fa-money-bill-wave text-2xl text-green-500"></i>
+                        </label>
+                    </div>
+                    <div class="flex gap-4">
+                        <button onclick="goToStep(3)" class="flex-1 bg-gray-200 py-3 rounded-lg hover:bg-gray-300">Back</button>
+                        <button onclick="confirmBooking()" class="flex-1 bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 font-semibold">
+                            <i class="fas fa-check mr-2"></i>Confirm Booking
+                        </button>
+                    </div>
+                </div>
+
+                <div id="bookingSuccess" class="hidden text-center space-y-4">
+                    <div class="text-green-500 text-6xl mb-4">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold">Booking Confirmed!</h3>
+                    <p class="text-gray-600">Your booking reference:</p>
+                    <p id="bookingRef" class="text-3xl font-bold text-blue-600"></p>
+                    <div class="bg-gray-100 p-6 rounded-lg text-left">
+                        <p class="text-sm text-gray-600 mb-2">Booking Details:</p>
+                        <p id="confirmDetails" class="text-sm"></p>
+                    </div>
+                    <p class="text-sm text-gray-600">A confirmation email has been sent to your email address.</p>
+                    <button onclick="closeBookingModal(); window.location.reload();" class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let activity = null;
+        let activityId = null;
+        let sessionToken = '';
+        let selectedDate = null;
+        let selectedTime = null;
+        let participants = 1;
+
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            activityId = params.get('id');
+            sessionToken = params.get('token') || localStorage.getItem('session_token') || '';
+
+            if (!activityId) {
+                alert('Activity ID not provided');
+                window.location.href = '/';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/activities/${activityId}?lang=en`);
+                const data = await response.json();
+                activity = data.activity;
+
+                displayActivity();
+                
+                const today = new Date().toISOString().split('T')[0];
+                document.getElementById('bookingDate').min = today;
+                document.getElementById('bookingDate').value = today;
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading activity:', error);
+                alert('Failed to load activity');
+            }
+        }
+
+        function displayActivity() {
+            document.getElementById('title').textContent = activity.title;
+            document.getElementById('vendor').textContent = activity.vendor_name;
+            document.getElementById('price').textContent = `${activity.currency} ${activity.price}`;
+            document.getElementById('duration').textContent = `${activity.duration_minutes} min`;
+            document.getElementById('capacity').textContent = activity.capacity_per_slot;
+            document.getElementById('description').textContent = activity.full_description;
+
+            const includes = activity.includes || [];
+            document.getElementById('includes').innerHTML = includes.map(item => `
+                <li class="flex items-start gap-3">
+                    <i class="fas fa-check text-green-500 mt-1"></i>
+                    <span class="text-gray-700">${item}</span>
+                </li>
+            `).join('');
+
+            const req = activity.requirements || {};
+            let reqHtml = '<div class="space-y-2 text-gray-700">';
+            if (req.age_min) reqHtml += `<p><strong>Minimum Age:</strong> ${req.age_min} years</p>`;
+            if (req.health_restrictions) reqHtml += `<p><strong>Health Restrictions:</strong> ${req.health_restrictions.join(', ')}</p>`;
+            if (req.skill_level) reqHtml += `<p><strong>Skill Level:</strong> ${req.skill_level}</p>`;
+            reqHtml += '</div>';
+            document.getElementById('requirements').innerHTML = reqHtml;
+
+            document.getElementById('vendorName').textContent = activity.vendor_name;
+            document.getElementById('rating').textContent = '⭐⭐⭐⭐⭐ ' + (activity.vendor_safety_rating || '5.0');
+        }
+
+        function openBookingModal() {
+            document.getElementById('bookingModal').classList.remove('hidden');
+            loadAvailability();
+        }
+
+        function closeBookingModal() {
+            document.getElementById('bookingModal').classList.add('hidden');
+            goToStep(1);
+        }
+
+        async function loadAvailability() {
+            const date = document.getElementById('bookingDate').value;
+            if (!date) return;
+
+            try {
+                const response = await fetch(`/api/availability/${activityId}?date=${date}`);
+                const data = await response.json();
+
+                if (!data.slots || data.slots.length === 0) {
+                    document.getElementById('timeSlots').innerHTML = '<p class="text-center text-gray-500 py-4">No availability for this date</p>';
+                    return;
+                }
+
+                const html = data.slots.map(slot => `
+                    <button onclick="selectTime('${slot.time}', ${slot.available})" 
+                            class="time-slot w-full p-3 border-2 rounded-lg hover:border-blue-500 transition ${slot.available <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-50'}"
+                            ${slot.available <= 0 ? 'disabled' : ''}>
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">${slot.time}</span>
+                            <span class="text-sm ${slot.available > 0 ? 'text-green-600' : 'text-red-600'}">
+                                ${slot.available > 0 ? `${slot.available} spots available` : 'Fully booked'}
+                            </span>
+                        </div>
+                    </button>
+                `).join('');
+
+                document.getElementById('timeSlots').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading availability:', error);
+                document.getElementById('timeSlots').innerHTML = '<p class="text-center text-red-500 py-4">Error loading availability</p>';
+            }
+        }
+
+        function selectTime(time, available) {
+            if (available <= 0) return;
+            
+            selectedTime = time;
+            selectedDate = document.getElementById('bookingDate').value;
+            
+            document.querySelectorAll('.time-slot').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+            event.target.closest('button').classList.add('border-blue-500', 'bg-blue-50');
+        }
+
+        function goToStep(step) {
+            if (step === 2 && !selectedTime) {
+                alert('Please select a time slot');
+                return;
+            }
+            if (step === 3 && participants < 1) {
+                alert('Please select number of participants');
+                return;
+            }
+            if (step === 4) {
+                const firstName = document.getElementById('firstName').value;
+                const lastName = document.getElementById('lastName').value;
+                const email = document.getElementById('email').value;
+                const phone = document.getElementById('phone').value;
+                
+                if (!firstName || !lastName || !email || !phone) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+            }
+
+            document.querySelectorAll('[id^="bookingStep"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`bookingStep${step}`).classList.remove('hidden');
+
+            if (step === 2) updateTotalPrice();
+        }
+
+        function changeParticipants(delta) {
+            participants = Math.max(1, Math.min(activity.capacity_per_slot, participants + delta));
+            document.getElementById('participantsCount').textContent = participants;
+            updateTotalPrice();
+        }
+
+        function updateTotalPrice() {
+            const total = activity.price * participants;
+            document.getElementById('totalPrice').textContent = `${activity.currency} ${total}`;
+        }
+
+        async function confirmBooking() {
+            const firstName = document.getElementById('firstName').value;
+            const lastName = document.getElementById('lastName').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            const notes = document.getElementById('notes').value;
+            const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
+
+            try {
+                const response = await fetch('/api/bookings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_token: sessionToken,
+                        activity_id: activityId,
+                        activity_date: selectedDate,
+                        activity_time: selectedTime,
+                        num_participants: participants,
+                        payment_method: paymentMethod,
+                        guest_notes: notes,
+                        guest_info: { first_name: firstName, last_name: lastName, email, phone, preferred_language: 'en' }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.querySelectorAll('[id^="bookingStep"]').forEach(el => el.classList.add('hidden'));
+                    document.getElementById('bookingSuccess').classList.remove('hidden');
+                    document.getElementById('bookingRef').textContent = data.booking_reference;
+                    document.getElementById('confirmDetails').innerHTML = `
+                        <strong>${activity.title}</strong><br>
+                        ${selectedDate} at ${selectedTime}<br>
+                        ${participants} participant(s)<br>
+                        Total: ${activity.currency} ${activity.price * participants}<br>
+                        Payment: ${paymentMethod === 'pay_at_vendor' ? 'Pay at venue' : 'Online payment'}
+                    `;
+                } else {
+                    alert('Booking failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to create booking. Please try again.');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

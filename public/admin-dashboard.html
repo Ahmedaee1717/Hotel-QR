@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Paradise Resort</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+        .tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="gradient-bg text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+                <p class="text-sm opacity-90" id="userName"></p>
+            </div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Tab Navigation -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="flex overflow-x-auto">
+                <button onclick="showTab('dashboard')" class="tab-btn px-6 py-4 font-semibold whitespace-nowrap tab-active">
+                    <i class="fas fa-chart-line mr-2"></i>Dashboard
+                </button>
+                <button onclick="showTab('rooms')" class="tab-btn px-6 py-4 font-semibold whitespace-nowrap">
+                    <i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes
+                </button>
+                <button onclick="showTab('vendors')" class="tab-btn px-6 py-4 font-semibold whitespace-nowrap">
+                    <i class="fas fa-store mr-2"></i>Vendors
+                </button>
+                <button onclick="showTab('bookings')" class="tab-btn px-6 py-4 font-semibold whitespace-nowrap">
+                    <i class="fas fa-calendar-check mr-2"></i>Bookings
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-600 text-sm">Today's Bookings</p>
+                            <p class="text-3xl font-bold" id="todayBookings">-</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-lg">
+                            <i class="fas fa-calendar-day text-blue-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-600 text-sm">Month Revenue</p>
+                            <p class="text-3xl font-bold" id="monthRevenue">-</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-lg">
+                            <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-600 text-sm">Active Vendors</p>
+                            <p class="text-3xl font-bold" id="activeVendors">-</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-lg">
+                            <i class="fas fa-store text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-gray-600 text-sm">Engagement Rate</p>
+                            <p class="text-3xl font-bold" id="engagementRate">-</p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-lg">
+                            <i class="fas fa-chart-line text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rooms & QR Codes Tab -->
+        <div id="roomsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Rooms & QR Codes</h2>
+                    <button onclick="addRoom()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-plus mr-2"></i>Add New Room
+                    </button>
+                </div>
+                <div id="roomsList" class="overflow-x-auto"></div>
+            </div>
+        </div>
+
+        <!-- Vendors Tab -->
+        <div id="vendorsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Manage Vendors</h2>
+                    <button onclick="addVendor()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-plus mr-2"></i>Add New Vendor
+                    </button>
+                </div>
+                <div id="vendorsList" class="overflow-x-auto"></div>
+            </div>
+        </div>
+
+        <!-- Bookings Tab -->
+        <div id="bookingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6">All Bookings</h2>
+                <div id="bookingsList" class="overflow-x-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Room Modal -->
+    <div id="addRoomModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 class="text-xl font-bold mb-4">Add New Room</h3>
+            <form onsubmit="createRoom(event)" class="space-y-4">
+                <div>
+                    <label class="block font-medium mb-2">Room Number</label>
+                    <input type="text" id="newRoomNumber" required class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., 501">
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Room Type</label>
+                    <select id="newRoomType" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="standard">Standard</option>
+                        <option value="deluxe">Deluxe</option>
+                        <option value="suite">Suite</option>
+                        <option value="villa">Villa</option>
+                    </select>
+                </div>
+                <div class="flex gap-4">
+                    <button type="button" onclick="closeModal('addRoomModal')" class="flex-1 bg-gray-200 py-2 rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 bg-blue-500 text-white py-2 rounded-lg">Create Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let adminUser = null;
+        let adminToken = null;
+
+        function init() {
+            adminToken = localStorage.getItem('admin_token');
+            const userStr = localStorage.getItem('admin_user');
+            
+            if (!adminToken || !userStr) {
+                window.location.href = '/admin-login.html';
+                return;
+            }
+
+            adminUser = JSON.parse(userStr);
+            document.getElementById('userName').textContent = `${adminUser.first_name} ${adminUser.last_name}`;
+
+            loadDashboard();
+            loadRooms();
+            loadVendors();
+            loadBookings();
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('tab-active'));
+            
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            event.target.classList.add('tab-active');
+        }
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/admin/dashboard', {
+                    headers: { 'X-Property-ID': adminUser.property_id }
+                });
+                const data = await response.json();
+                const kpis = data.kpis;
+
+                document.getElementById('todayBookings').textContent = kpis.today_bookings;
+                document.getElementById('monthRevenue').textContent = '$' + kpis.month_revenue.toFixed(2);
+                document.getElementById('activeVendors').textContent = kpis.active_vendors;
+                document.getElementById('engagementRate').textContent = kpis.engagement_rate + '%';
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadRooms() {
+            try {
+                const response = await fetch('/api/admin/rooms', {
+                    headers: { 'X-Property-ID': adminUser.property_id }
+                });
+                const data = await response.json();
+
+                const html = `
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Room #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">QR Code</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${data.rooms.map(room => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap font-medium">${room.room_number}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${room.room_type}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full ${room.status === 'vacant' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                            ${room.status}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <button onclick="showQRCode('${room.qr_code_data}', '${room.room_number}')" class="text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-qrcode mr-1"></i>View QR
+                                        </button>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                                        <button onclick="regenerateQR(${room.room_id})" class="text-orange-600 hover:text-orange-800">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById('roomsList').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading rooms:', error);
+            }
+        }
+
+        async function loadVendors() {
+            try {
+                const response = await fetch('/api/admin/vendors');
+                const data = await response.json();
+
+                const html = `
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${data.vendors.map(vendor => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap font-medium">${vendor.business_name}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${vendor.email}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${vendor.category_name || '-'}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full ${
+                                            vendor.status === 'active' ? 'bg-green-100 text-green-800' : 
+                                            vendor.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                            'bg-red-100 text-red-800'
+                                        }">
+                                            ${vendor.status}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${vendor.commission_rate}%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                                        ${vendor.status === 'pending' ? `
+                                            <button onclick="approveVendor(${vendor.vendor_id})" class="text-green-600 hover:text-green-800">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        ` : ''}
+                                        ${vendor.status === 'active' ? `
+                                            <button onclick="suspendVendor(${vendor.vendor_id})" class="text-red-600 hover:text-red-800">
+                                                <i class="fas fa-ban"></i> Suspend
+                                            </button>
+                                        ` : ''}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById('vendorsList').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading vendors:', error);
+            }
+        }
+
+        async function loadBookings() {
+            try {
+                const response = await fetch('/api/admin/bookings', {
+                    headers: { 'X-Property-ID': adminUser.property_id }
+                });
+                const data = await response.json();
+
+                const html = `
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Guest</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Activity</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${data.bookings.slice(0, 50).map(booking => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap font-mono text-sm">${booking.booking_reference}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${booking.first_name} ${booking.last_name}</td>
+                                    <td class="px-6 py-4">${booking.activity_title}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">${booking.activity_date} ${booking.activity_time}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs rounded-full ${
+                                            booking.booking_status === 'confirmed' ? 'bg-green-100 text-green-800' : 
+                                            booking.booking_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                            'bg-red-100 text-red-800'
+                                        }">
+                                            ${booking.booking_status}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap font-semibold">${booking.currency} ${booking.total_price}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById('bookingsList').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading bookings:', error);
+            }
+        }
+
+        function showQRCode(qrData, roomNumber) {
+            const url = `${window.location.origin}/welcome/paradise-resort/${qrData}`;
+            alert(`QR Code for Room ${roomNumber}:\n\nURL: ${url}\n\nCopy this URL to generate a QR code or share directly with guests.`);
+        }
+
+        async function regenerateQR(roomId) {
+            if (!confirm('Are you sure you want to regenerate the QR code for this room? The old QR code will no longer work.')) return;
+
+            try {
+                const response = await fetch(`/api/admin/rooms/${roomId}/regenerate-qr`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('QR code regenerated successfully!');
+                    loadRooms();
+                } else {
+                    alert('Failed to regenerate QR code');
+                }
+            } catch (error) {
+                console.error('Error regenerating QR:', error);
+                alert('Failed to regenerate QR code');
+            }
+        }
+
+        function addRoom() {
+            document.getElementById('addRoomModal').classList.remove('hidden');
+        }
+
+        async function createRoom(e) {
+            e.preventDefault();
+            
+            const roomNumber = document.getElementById('newRoomNumber').value;
+            const roomType = document.getElementById('newRoomType').value;
+
+            try {
+                const response = await fetch('/api/admin/rooms', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': adminUser.property_id
+                    },
+                    body: JSON.stringify({ room_number: roomNumber, room_type: roomType })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('Room created successfully!');
+                    closeModal('addRoomModal');
+                    loadRooms();
+                } else {
+                    alert('Failed to create room');
+                }
+            } catch (error) {
+                console.error('Error creating room:', error);
+                alert('Failed to create room');
+            }
+        }
+
+        async function approveVendor(vendorId) {
+            try {
+                const response = await fetch(`/api/admin/vendors/${vendorId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'active' })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('Vendor approved successfully!');
+                    loadVendors();
+                }
+            } catch (error) {
+                console.error('Error approving vendor:', error);
+            }
+        }
+
+        async function suspendVendor(vendorId) {
+            if (!confirm('Are you sure you want to suspend this vendor?')) return;
+
+            try {
+                const response = await fetch(`/api/admin/vendors/${vendorId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'suspended' })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('Vendor suspended successfully!');
+                    loadVendors();
+                }
+            } catch (error) {
+                console.error('Error suspending vendor:', error);
+            }
+        }
+
+        function addVendor() {
+            alert('Vendor registration form coming soon! For now, vendors can register via vendor portal.');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_user');
+            window.location.href = '/admin-login.html';
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -1346,6 +1346,938 @@ app.get('/browse', async (c) => {
 })
 
 // ============================================
+// HTML PAGE ROUTES
+// ============================================
+
+// Vendor login page
+app.get('/vendor/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vendor Login - Paradise Resort</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <div class="min-h-screen flex items-center justify-center px-4">
+            <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+                <h1 class="text-2xl font-bold mb-6 text-center">Vendor Portal Login</h1>
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Email</label>
+                        <input type="email" id="email" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="password" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+                        <i class="fas fa-sign-in-alt mr-2"></i>Login
+                    </button>
+                </form>
+            </div>
+        </div>
+        <script>
+          document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+              const response = await fetch('/api/vendor/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+              });
+              
+              const data = await response.json();
+              
+              if (data.success) {
+                localStorage.setItem('vendor_id', data.vendor_id);
+                localStorage.setItem('vendor_token', data.token || data.vendor_id);
+                window.location.href = '/vendor/dashboard';
+              } else {
+                alert('Login failed: ' + (data.error || 'Invalid credentials'));
+              }
+            } catch (error) {
+              console.error('Login error:', error);
+              alert('Login failed. Please try again.');
+            }
+          });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// Admin login page
+app.get('/admin/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Login - Paradise Resort</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-900">
+        <div class="min-h-screen flex items-center justify-center px-4">
+            <div class="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
+                <div class="text-center mb-6">
+                    <i class="fas fa-shield-alt text-4xl text-blue-600 mb-2"></i>
+                    <h1 class="text-2xl font-bold">Admin Portal</h1>
+                </div>
+                <form id="adminLoginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Email</label>
+                        <input type="email" id="adminEmail" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Password</label>
+                        <input type="password" id="adminPassword" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        <i class="fas fa-lock mr-2"></i>Secure Login
+                    </button>
+                </form>
+            </div>
+        </div>
+        <script>
+          document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            try {
+              const response = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+              });
+              
+              const data = await response.json();
+              
+              if (data.success) {
+                localStorage.setItem('admin_user', JSON.stringify(data.user));
+                localStorage.setItem('admin_token', data.token || data.user.user_id);
+                window.location.href = '/admin/dashboard';
+              } else {
+                alert('Login failed: ' + (data.error || 'Invalid credentials'));
+              }
+            } catch (error) {
+              console.error('Login error:', error);
+              alert('Login failed. Please try again.');
+            }
+          });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// Vendor Dashboard page
+app.get('/vendor/dashboard', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-600 to-green-600 text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div><h1 class="text-2xl font-bold">Vendor Portal</h1></div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-start">
+                    <div><p class="text-gray-600 text-sm">Today's Bookings</p><p class="text-3xl font-bold" id="todayBookings">0</p></div>
+                    <div class="bg-blue-100 p-3 rounded-lg"><i class="fas fa-calendar-day text-blue-600 text-xl"></i></div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-start">
+                    <div><p class="text-gray-600 text-sm">Weekly Revenue</p><p class="text-3xl font-bold" id="weekRevenue">$0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg"><i class="fas fa-dollar-sign text-green-600 text-xl"></i></div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-start">
+                    <div><p class="text-gray-600 text-sm">Pending Confirmations</p><p class="text-3xl font-bold" id="pendingBookings">0</p></div>
+                    <div class="bg-yellow-100 p-3 rounded-lg"><i class="fas fa-clock text-yellow-600 text-xl"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Activity Form -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add New Activity</h2>
+            <form id="addActivityForm" class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium mb-2">Activity Title</label><input type="text" id="title" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Category</label><select id="category" required class="w-full px-4 py-2 border rounded-lg"><option value="">Select category...</option></select></div>
+                    <div><label class="block text-sm font-medium mb-2">Price (USD)</label><input type="number" id="price" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Duration (minutes)</label><input type="number" id="duration" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Capacity per Slot</label><input type="number" id="capacity" required class="w-full px-4 py-2 border rounded-lg"></div>
+                </div>
+                <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
+                <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
+                <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"><i class="fas fa-save mr-2"></i>Create Activity</button>
+            </form>
+        </div>
+
+        <!-- Activities List -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-list mr-2 text-green-600"></i>My Activities</h2>
+            <div id="activitiesList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+      const vendorId = localStorage.getItem('vendor_id');
+      if (!vendorId) { window.location.href = '/vendor/login'; }
+
+      async function loadDashboard() {
+        try {
+          const [bookings, activities, categories] = await Promise.all([
+            fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
+            fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
+            fetch('/api/categories').then(r => r.json())
+          ]);
+
+          const today = new Date().toISOString().split('T')[0];
+          const todayBookings = bookings.bookings.filter(b => b.activity_date === today);
+          document.getElementById('todayBookings').textContent = todayBookings.length;
+          document.getElementById('pendingBookings').textContent = bookings.bookings.filter(b => b.status === 'pending').length;
+
+          const categorySelect = document.getElementById('category');
+          categories.categories.forEach(cat => {
+            categorySelect.innerHTML += '<option value="' + cat.category_id + '">' + cat.name + '</option>';
+          });
+
+          displayActivities(activities.activities);
+        } catch (error) {
+          console.error('Dashboard load error:', error);
+        }
+      }
+
+      function displayActivities(activities) {
+        const list = document.getElementById('activitiesList');
+        if (activities.length === 0) {
+          list.innerHTML = '<p class="text-gray-500 text-center py-8">No activities yet. Create your first activity above!</p>';
+          return;
+        }
+        
+        list.innerHTML = activities.map(a => \`
+          <div class="border rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <h3 class="text-xl font-bold">\${a.title_en}</h3>
+                <p class="text-gray-600 text-sm mt-1">\${a.short_description_en}</p>
+                <div class="flex gap-4 mt-3 text-sm text-gray-600">
+                  <span><i class="fas fa-tag mr-1"></i>\${a.currency} \${a.price}</span>
+                  <span><i class="far fa-clock mr-1"></i>\${a.duration_minutes} min</span>
+                  <span><i class="far fa-user mr-1"></i>Max \${a.capacity_per_slot}</span>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      document.getElementById('addActivityForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch('/api/vendor/activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Vendor-ID': vendorId },
+            body: JSON.stringify({
+              category_id: document.getElementById('category').value,
+              title_en: document.getElementById('title').value,
+              short_description_en: document.getElementById('shortDesc').value,
+              full_description_en: document.getElementById('fullDesc').value,
+              price: parseFloat(document.getElementById('price').value),
+              duration_minutes: parseInt(document.getElementById('duration').value),
+              capacity_per_slot: parseInt(document.getElementById('capacity').value),
+              images: [],
+              requirements: {},
+              includes: [],
+              status: 'active'
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert('Activity created successfully!');
+            window.location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Failed to create activity'));
+          }
+        } catch (error) {
+          console.error('Create activity error:', error);
+          alert('Failed to create activity');
+        }
+      });
+
+      function logout() {
+        localStorage.removeItem('vendor_id');
+        localStorage.removeItem('vendor_token');
+        window.location.href = '/vendor/login';
+      }
+
+      loadDashboard();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Browse Activities page
+app.get('/browse', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Activities</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-500 to-green-500 text-white py-4 px-4 shadow-lg sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold"><i class="fas fa-compass mr-2"></i>Browse Activities</h1>
+            <span id="roomDisplay" class="text-sm bg-white/20 px-3 py-1 rounded-full"></span>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <div class="grid md:grid-cols-3 gap-4">
+                <select id="categoryFilter" class="px-4 py-2 border rounded-lg"><option value="">All Categories</option></select>
+                <select id="sortFilter" class="px-4 py-2 border rounded-lg">
+                    <option value="popular">Most Popular</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                </select>
+                <input type="search" id="searchBox" placeholder="Search activities..." class="px-4 py-2 border rounded-lg">
+            </div>
+        </div>
+
+        <!-- Activities Grid -->
+        <div id="activitiesGrid" class="grid md:grid-cols-3 gap-6"></div>
+
+        <div id="loadingSpinner" class="text-center py-8"><div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mx-auto"></div></div>
+    </div>
+
+    <script>
+      let activities = [];
+      let categories = [];
+      const sessionToken = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('session_token');
+      const propertyId = new URLSearchParams(window.location.search).get('property') || '1';
+
+      async function loadData() {
+        try {
+          const [activitiesRes, categoriesRes] = await Promise.all([
+            fetch('/api/activities?property_id=' + propertyId + '&lang=en'),
+            fetch('/api/categories?lang=en')
+          ]);
+
+          const activitiesData = await activitiesRes.json();
+          const categoriesData = await categoriesRes.json();
+
+          activities = activitiesData.activities;
+          categories = categoriesData.categories;
+
+          const categoryFilter = document.getElementById('categoryFilter');
+          categories.forEach(cat => {
+            categoryFilter.innerHTML += '<option value="' + cat.category_id + '">' + cat.name + '</option>';
+          });
+
+          displayActivities();
+          document.getElementById('loadingSpinner').style.display = 'none';
+        } catch (error) {
+          console.error('Load error:', error);
+          alert('Failed to load activities');
+        }
+      }
+
+      function displayActivities() {
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const sortFilter = document.getElementById('sortFilter').value;
+        const searchText = document.getElementById('searchBox').value.toLowerCase();
+
+        let filtered = activities.filter(a => {
+          if (categoryFilter && a.category_id != categoryFilter) return false;
+          if (searchText && !a.title.toLowerCase().includes(searchText)) return false;
+          return true;
+        });
+
+        if (sortFilter === 'price_low') filtered.sort((a, b) => a.price - b.price);
+        else if (sortFilter === 'price_high') filtered.sort((a, b) => b.price - a.price);
+        else filtered.sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0));
+
+        const grid = document.getElementById('activitiesGrid');
+        if (filtered.length === 0) {
+          grid.innerHTML = '<div class="col-span-3 text-center py-12 text-gray-500"><i class="fas fa-search text-4xl mb-4"></i><p>No activities found</p></div>';
+          return;
+        }
+
+        grid.innerHTML = filtered.map(a => \`
+          <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition cursor-pointer" onclick="viewActivity(\${a.activity_id})">
+            <div class="h-48 bg-gradient-to-br from-blue-400 to-green-400 flex items-center justify-center">
+              <i class="fas fa-hiking text-white text-6xl opacity-75"></i>
+            </div>
+            <div class="p-4">
+              <h3 class="font-bold text-lg mb-2">\${a.title}</h3>
+              <p class="text-gray-600 text-sm mb-3 line-clamp-2">\${a.short_description}</p>
+              <div class="flex justify-between items-center mb-3">
+                <span class="text-blue-600 font-bold text-xl">\${a.currency} \${a.price}</span>
+                <span class="text-gray-600 text-sm"><i class="far fa-clock mr-1"></i>\${a.duration_minutes} min</span>
+              </div>
+              <div class="text-sm text-gray-600 mb-3">
+                <i class="fas fa-store mr-1"></i>\${a.vendor_name}
+              </div>
+              <button class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+                <i class="fas fa-calendar-check mr-2"></i>View Details & Book
+              </button>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      function viewActivity(id) {
+        window.location.href = '/activity?id=' + id + '&token=' + sessionToken;
+      }
+
+      document.getElementById('categoryFilter').addEventListener('change', displayActivities);
+      document.getElementById('sortFilter').addEventListener('change', displayActivities);
+      document.getElementById('searchBox').addEventListener('input', displayActivities);
+
+      loadData();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Activity Detail page
+app.get('/activity', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+    </div>
+
+    <div id="content" class="hidden">
+        <div class="bg-gradient-to-r from-blue-500 to-green-500 text-white py-4 px-4 sticky top-0 z-10 shadow-lg">
+            <div class="max-w-4xl mx-auto flex items-center justify-between">
+                <button onclick="history.back()" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30"><i class="fas fa-arrow-left mr-2"></i>Back</button>
+                <h1 class="text-xl font-bold">Activity Details</h1>
+                <div class="w-20"></div>
+            </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto px-4 py-8">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 id="activityTitle" class="text-3xl font-bold mb-2"></h2>
+                <p id="vendorName" class="text-gray-600 mb-4"></p>
+                <div class="flex items-end gap-4 mb-4">
+                    <div><span id="price" class="text-4xl font-bold text-blue-600"></span><span class="text-gray-600">/person</span></div>
+                    <div class="flex gap-4 text-sm text-gray-600">
+                        <span><i class="far fa-clock mr-1"></i><span id="duration"></span></span>
+                        <span><i class="far fa-user mr-1"></i>Max <span id="capacity"></span></span>
+                    </div>
+                </div>
+                <button onclick="startBooking()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-lg font-semibold">
+                    <i class="fas fa-calendar-check mr-2"></i>Book Now
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-3">About This Activity</h3>
+                <p id="description" class="text-gray-700"></p>
+            </div>
+        </div>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold">Book This Activity</h2>
+                    <button onclick="closeBookingModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+                </div>
+                
+                <div id="step1" class="space-y-4">
+                    <h3 class="text-lg font-semibold">Select Date & Time</h3>
+                    <div><label class="block text-sm font-medium mb-2">Date</label><input type="date" id="bookingDate" class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div id="timeSlots" class="space-y-2"></div>
+                    <button onclick="nextStep(2)" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold">Continue</button>
+                </div>
+
+                <div id="step2" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Number of Participants</h3>
+                    <div class="flex items-center gap-4">
+                        <button onclick="changeParticipants(-1)" class="w-12 h-12 bg-gray-200 rounded-lg text-xl">-</button>
+                        <span id="participantsCount" class="text-3xl font-bold">1</span>
+                        <button onclick="changeParticipants(1)" class="w-12 h-12 bg-gray-200 rounded-lg text-xl">+</button>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg"><p class="text-sm text-gray-700">Total: <span id="totalPrice" class="font-bold text-xl text-blue-600"></span></p></div>
+                    <div class="flex gap-4">
+                        <button onclick="nextStep(1)" class="flex-1 bg-gray-200 py-3 rounded-lg">Back</button>
+                        <button onclick="nextStep(3)" class="flex-1 bg-blue-500 text-white py-3 rounded-lg">Continue</button>
+                    </div>
+                </div>
+
+                <div id="step3" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Your Information</h3>
+                    <input type="text" id="firstName" placeholder="First Name" required class="w-full px-4 py-2 border rounded-lg">
+                    <input type="text" id="lastName" placeholder="Last Name" required class="w-full px-4 py-2 border rounded-lg">
+                    <input type="email" id="email" placeholder="Email" required class="w-full px-4 py-2 border rounded-lg">
+                    <input type="tel" id="phone" placeholder="Phone" required class="w-full px-4 py-2 border rounded-lg">
+                    <textarea id="notes" placeholder="Special requests (optional)" class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                    <div class="flex gap-4">
+                        <button onclick="nextStep(2)" class="flex-1 bg-gray-200 py-3 rounded-lg">Back</button>
+                        <button onclick="nextStep(4)" class="flex-1 bg-blue-500 text-white py-3 rounded-lg">Continue</button>
+                    </div>
+                </div>
+
+                <div id="step4" class="hidden space-y-4">
+                    <h3 class="text-lg font-semibold">Payment Method</h3>
+                    <label class="flex items-center p-4 border-2 rounded-lg cursor-pointer hover:border-blue-500">
+                        <input type="radio" name="payment" value="pay_at_vendor" checked class="mr-3">
+                        <div class="flex-1"><p class="font-semibold">Pay at Venue</p><p class="text-sm text-gray-600">Pay when you arrive</p></div>
+                        <i class="fas fa-money-bill-wave text-2xl text-green-500"></i>
+                    </label>
+                    <div class="flex gap-4">
+                        <button onclick="nextStep(3)" class="flex-1 bg-gray-200 py-3 rounded-lg">Back</button>
+                        <button onclick="confirmBooking()" class="flex-1 bg-green-500 text-white py-3 rounded-lg"><i class="fas fa-check mr-2"></i>Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      let activity = null;
+      let selectedDate = null;
+      let selectedTime = null;
+      let participants = 1;
+      const activityId = new URLSearchParams(window.location.search).get('id');
+      const sessionToken = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('session_token');
+
+      async function init() {
+        if (!activityId) { alert('Activity not found'); return; }
+        try {
+          const response = await fetch('/api/activities/' + activityId + '?lang=en');
+          const data = await response.json();
+          activity = data.activity;
+
+          document.getElementById('activityTitle').textContent = activity.title;
+          document.getElementById('vendorName').textContent = activity.vendor_name;
+          document.getElementById('price').textContent = activity.currency + ' ' + activity.price;
+          document.getElementById('duration').textContent = activity.duration_minutes + ' min';
+          document.getElementById('capacity').textContent = activity.capacity_per_slot;
+          document.getElementById('description').textContent = activity.full_description;
+
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('bookingDate').min = today;
+          document.getElementById('bookingDate').value = today;
+
+          document.getElementById('loading').classList.add('hidden');
+          document.getElementById('content').classList.remove('hidden');
+        } catch (error) {
+          console.error('Load error:', error);
+          alert('Failed to load activity');
+        }
+      }
+
+      function startBooking() {
+        document.getElementById('bookingModal').classList.remove('hidden');
+        loadTimeSlots();
+      }
+
+      function closeBookingModal() {
+        document.getElementById('bookingModal').classList.add('hidden');
+      }
+
+      async function loadTimeSlots() {
+        const date = document.getElementById('bookingDate').value;
+        if (!date) return;
+        try {
+          const response = await fetch('/api/availability/' + activityId + '?date=' + date);
+          const data = await response.json();
+          const slotsHtml = data.slots.map(slot => '<button onclick="selectTime(\\'' + slot.time + '\\')" class="w-full p-3 border rounded-lg hover:border-blue-500"><div class="flex justify-between"><span>' + slot.time + '</span><span class="text-sm ' + (slot.available > 0 ? 'text-green-600' : 'text-red-600') + '">' + (slot.available > 0 ? slot.available + ' spots' : 'Full') + '</span></div></button>').join('');
+          document.getElementById('timeSlots').innerHTML = slotsHtml;
+        } catch (error) {
+          console.error('Load slots error:', error);
+        }
+      }
+
+      function selectTime(time) {
+        selectedTime = time;
+        document.querySelectorAll('#timeSlots button').forEach(btn => btn.classList.remove('border-blue-500', 'border-2'));
+        event.target.closest('button').classList.add('border-blue-500', 'border-2');
+      }
+
+      function nextStep(step) {
+        if (step === 2 && !selectedTime) { alert('Please select a time slot'); return; }
+        document.querySelectorAll('[id^="step"]').forEach(el => el.classList.add('hidden'));
+        document.getElementById('step' + step).classList.remove('hidden');
+        if (step === 2) updateTotalPrice();
+      }
+
+      function changeParticipants(delta) {
+        participants = Math.max(1, Math.min(activity.capacity_per_slot, participants + delta));
+        document.getElementById('participantsCount').textContent = participants;
+        updateTotalPrice();
+      }
+
+      function updateTotalPrice() {
+        const total = activity.price * participants;
+        document.getElementById('totalPrice').textContent = activity.currency + ' ' + total;
+      }
+
+      async function confirmBooking() {
+        const firstName = document.getElementById('firstName').value;
+        const lastName = document.getElementById('lastName').value;
+        const email = document.getElementById('email').value;
+        const phone = document.getElementById('phone').value;
+        if (!firstName || !lastName || !email || !phone) { alert('Please fill all fields'); return; }
+
+        try {
+          const response = await fetch('/api/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_token: sessionToken,
+              activity_id: activityId,
+              activity_date: document.getElementById('bookingDate').value,
+              activity_time: selectedTime,
+              num_participants: participants,
+              payment_method: 'pay_at_vendor',
+              guest_notes: document.getElementById('notes').value,
+              guest_info: { first_name: firstName, last_name: lastName, email, phone }
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert('Booking confirmed! Reference: ' + data.booking_reference);
+            window.location.href = '/browse?token=' + sessionToken;
+          } else {
+            alert('Booking failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Booking error:', error);
+          alert('Failed to create booking');
+        }
+      }
+
+      document.getElementById('bookingDate').addEventListener('change', loadTimeSlots);
+      init();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Admin Dashboard page
+app.get('/admin/dashboard', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>.tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }</style>
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div><h1 class="text-2xl font-bold">Admin Dashboard</h1></div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="flex overflow-x-auto">
+                <button onclick="showTab('rooms')" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
+                <button onclick="showTab('vendors')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
+                <button onclick="showTab('activities')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
+            </div>
+        </div>
+
+        <!-- Rooms Tab -->
+        <div id="roomsTab" class="tab-content">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-door-open mr-2 text-blue-600"></i>Add New Room & Generate QR Code</h2>
+                <form id="addRoomForm" class="grid md:grid-cols-3 gap-4">
+                    <input type="text" id="roomNumber" placeholder="Room Number (e.g., 101)" required class="px-4 py-2 border rounded-lg">
+                    <select id="roomType" required class="px-4 py-2 border rounded-lg">
+                        <option value="">Select Type...</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Deluxe">Deluxe</option>
+                        <option value="Suite">Suite</option>
+                        <option value="Villa">Villa</option>
+                    </select>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"><i class="fas fa-plus mr-2"></i>Create Room & QR Code</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">Rooms & QR Codes</h2>
+                <div id="roomsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Vendors Tab -->
+        <div id="vendorsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-user-plus mr-2 text-green-600"></i>Add New Vendor</h2>
+                <form id="addVendorForm" class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <input type="text" id="businessName" placeholder="Business Name" required class="px-4 py-2 border rounded-lg">
+                        <input type="email" id="vendorEmail" placeholder="Email" required class="px-4 py-2 border rounded-lg">
+                        <input type="text" id="vendorPhone" placeholder="Phone" required class="px-4 py-2 border rounded-lg">
+                        <input type="password" id="vendorPassword" placeholder="Password" required class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"><i class="fas fa-check mr-2"></i>Add Vendor</button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Vendors</h2>
+                <div id="vendorsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Activities Tab -->
+        <div id="activitiesTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Activities</h2>
+                <div id="activitiesList" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
+      if (!user.user_id) { window.location.href = '/admin/login'; }
+
+      let currentTab = 'rooms';
+      function showTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
+        document.getElementById(tab + 'Tab').classList.remove('hidden');
+        event.target.closest('button').classList.add('tab-active');
+        
+        if (tab === 'rooms') loadRooms();
+        if (tab === 'vendors') loadVendors();
+        if (tab === 'activities') loadActivities();
+      }
+
+      async function loadRooms() {
+        try {
+          const response = await fetch('/api/admin/rooms?property_id=1');
+          const data = await response.json();
+          const list = document.getElementById('roomsList');
+          
+          list.innerHTML = data.rooms.map(r => \`
+            <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
+              <div>
+                <span class="font-bold text-lg">Room \${r.room_number}</span>
+                <span class="text-gray-600 ml-3">\${r.room_type}</span>
+              </div>
+              <div class="flex gap-2">
+                <a href="/welcome/paradise-resort/\${r.qr_code_data}" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a>
+                <button onclick="regenerateQR(\${r.room_id})" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button>
+              </div>
+            </div>
+          \`).join('');
+        } catch (error) {
+          console.error('Load rooms error:', error);
+        }
+      }
+
+      async function loadVendors() {
+        try {
+          const response = await fetch('/api/admin/vendors?property_id=1');
+          const data = await response.json();
+          const list = document.getElementById('vendorsList');
+          
+          list.innerHTML = data.vendors.map(v => \`
+            <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
+              <div>
+                <div class="font-bold text-lg">\${v.business_name}</div>
+                <div class="text-sm text-gray-600">\${v.email} • \${v.phone}</div>
+              </div>
+              <div class="flex gap-2">
+                <span class="px-3 py-1 rounded-full text-sm \${v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">\${v.status}</span>
+                <button onclick="removeVendor(\${v.vendor_id})" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200"><i class="fas fa-trash mr-2"></i>Remove</button>
+              </div>
+            </div>
+          \`).join('');
+        } catch (error) {
+          console.error('Load vendors error:', error);
+        }
+      }
+
+      async function loadActivities() {
+        try {
+          const response = await fetch('/api/admin/activities/all?property_id=1');
+          const data = await response.json();
+          const list = document.getElementById('activitiesList');
+          
+          list.innerHTML = data.activities.map(a => \`
+            <div class="border rounded-lg p-4 hover:shadow-md transition">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="text-lg font-bold">\${a.title_en}</h3>
+                  <p class="text-sm text-gray-600">by \${a.vendor_name}</p>
+                  <div class="flex gap-4 mt-2 text-sm text-gray-600">
+                    <span><i class="fas fa-tag mr-1"></i>USD \${a.price}</span>
+                    <span><i class="far fa-clock mr-1"></i>\${a.duration_minutes} min</span>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+              </div>
+            </div>
+          \`).join('');
+        } catch (error) {
+          console.error('Load activities error:', error);
+        }
+      }
+
+      document.getElementById('addRoomForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch('/api/admin/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              room_number: document.getElementById('roomNumber').value,
+              room_type: document.getElementById('roomType').value
+            })
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Room created with QR code!');
+            document.getElementById('addRoomForm').reset();
+            loadRooms();
+          }
+        } catch (error) {
+          console.error('Add room error:', error);
+          alert('Failed to create room');
+        }
+      });
+
+      document.getElementById('addVendorForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch('/api/admin/vendors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              business_name: document.getElementById('businessName').value,
+              email: document.getElementById('vendorEmail').value,
+              phone: document.getElementById('vendorPhone').value,
+              password: document.getElementById('vendorPassword').value
+            })
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Vendor added successfully!');
+            document.getElementById('addVendorForm').reset();
+            loadVendors();
+          }
+        } catch (error) {
+          console.error('Add vendor error:', error);
+          alert('Failed to add vendor');
+        }
+      });
+
+      async function regenerateQR(roomId) {
+        if (!confirm('Regenerate QR code for this room?')) return;
+        try {
+          const response = await fetch(\`/api/admin/rooms/\${roomId}/regenerate-qr\`, { method: 'POST' });
+          const data = await response.json();
+          if (data.success) {
+            alert('QR code regenerated!');
+            loadRooms();
+          }
+        } catch (error) {
+          console.error('Regenerate QR error:', error);
+        }
+      }
+
+      async function removeVendor(vendorId) {
+        if (!confirm('Remove this vendor? This will deactivate all their activities.')) return;
+        try {
+          const response = await fetch(\`/api/admin/vendors/\${vendorId}\`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: 1 })
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Vendor removed successfully');
+            loadVendors();
+          }
+        } catch (error) {
+          console.error('Remove vendor error:', error);
+          alert('Failed to remove vendor');
+        }
+      });
+
+      function logout() {
+        localStorage.removeItem('admin_user');
+        localStorage.removeItem('admin_token');
+        window.location.href = '/admin/login';
+      }
+
+      loadRooms();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ============================================
 // DEFAULT ROUTE - Guest Landing Page
 // ============================================
 
@@ -1378,7 +2310,9 @@ app.get('/', (c) => {
                     <div class="bg-white/20 backdrop-blur-sm rounded-lg p-6 max-w-md mx-auto">
                         <i class="fas fa-qrcode text-4xl mb-4"></i>
                         <p class="text-lg mb-2">Scan the QR code in your room</p>
-                        <p class="text-sm opacity-90">Or visit: yourresort.com/welcome</p>
+                        <div class="mt-4 space-y-2">
+                            <a href="/browse?property=1" class="block bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100">Browse All Activities</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1450,7 +2384,11 @@ app.get('/', (c) => {
             <!-- Footer -->
             <footer class="bg-gray-800 text-white py-8 px-4">
                 <div class="max-w-4xl mx-auto text-center">
-                    <p class="mb-2">© 2025 Paradise Resort & Spa. All rights reserved.</p>
+                    <p class="mb-3">© 2025 Paradise Resort & Spa. All rights reserved.</p>
+                    <div class="mb-3 flex justify-center gap-4">
+                        <a href="/vendor/login" class="text-sm text-blue-400 hover:text-blue-300"><i class="fas fa-store mr-1"></i>Vendor Login</a>
+                        <a href="/admin/login" class="text-sm text-blue-400 hover:text-blue-300"><i class="fas fa-shield-alt mr-1"></i>Admin Login</a>
+                    </div>
                     <p class="text-sm text-gray-400">
                         <a href="#" class="hover:text-white">Privacy Policy</a> | 
                         <a href="#" class="hover:text-white">Terms of Service</a> | 
