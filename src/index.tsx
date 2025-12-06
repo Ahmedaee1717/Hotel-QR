@@ -12,9 +12,6 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Enable CORS for API routes
 app.use('/api/*', cors())
 
-// Serve static files
-app.use('/static/*', serveStatic({ root: './public' }))
-
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -1113,6 +1110,239 @@ app.get('/api/admin/bookings', async (c) => {
     console.error('Admin bookings error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
+})
+
+// ============================================
+// GUEST WELCOME PAGE - QR Code Entry
+// ============================================
+
+app.get('/welcome/:property_slug/:room_token', async (c) => {
+  const { property_slug, room_token } = c.req.param()
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome - Paradise Resort</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+          body { font-family: 'Inter', system-ui, sans-serif; }
+          .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+          .activity-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+                <p class="mt-4 text-gray-600">Loading...</p>
+            </div>
+        </div>
+
+        <div id="content" class="hidden">
+            <div class="gradient-bg text-white py-8 px-4 sticky top-0 z-10 shadow-lg">
+                <div class="max-w-6xl mx-auto">
+                    <h1 class="text-3xl font-bold" id="propertyName">Paradise Resort</h1>
+                    <p class="text-sm opacity-90">Room <span id="roomNumber">---</span></p>
+                </div>
+            </div>
+
+            <div class="max-w-6xl mx-auto px-4 py-8">
+                <h2 class="text-2xl font-bold mb-6">Featured Activities</h2>
+                <div id="activities" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                
+                <div class="mt-12 text-center">
+                    <a href="/browse?property=1&token=" id="browseAll" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold">
+                        Browse All Activities
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        let sessionToken = '';
+        
+        async function init() {
+            try {
+                const response = await fetch('/api/welcome/${property_slug}/${room_token}');
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert('Invalid QR code');
+                    return;
+                }
+                
+                sessionToken = data.session_token;
+                document.getElementById('propertyName').textContent = data.property.name;
+                document.getElementById('roomNumber').textContent = data.room.number;
+                document.getElementById('browseAll').href += sessionToken;
+                
+                displayActivities(data.featured_activities);
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+            } catch (error) {
+                console.error(error);
+                alert('Error loading page');
+            }
+        }
+        
+        function displayActivities(activities) {
+            const html = activities.map(a => \`
+                <div class="activity-card bg-white rounded-lg shadow-lg overflow-hidden transition cursor-pointer" 
+                     onclick="bookActivity(\${a.activity_id})">
+                    <div class="h-48 bg-gradient-to-r from-blue-400 to-green-400"></div>
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold mb-2">\${a.title_en || a.title}</h3>
+                        <p class="text-sm text-gray-600 mb-3">\${a.vendor_name}</p>
+                        <p class="text-sm text-gray-700 mb-4">\${(a.short_description_en || a.short_description || '').substring(0, 100)}...</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-blue-600">\${a.currency} \${a.price}</span>
+                            <button class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                                Book
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+            
+            document.getElementById('activities').innerHTML = html;
+        }
+        
+        function bookActivity(id) {
+            alert('Booking activity ' + id + '. Full booking interface will be available in the next update!\\n\\nFor now, you can use the API directly to create bookings.');
+        }
+        
+        window.addEventListener('DOMContentLoaded', init);
+        </script>
+    </body>
+    </html>
+  `)
+})
+
+// ============================================
+// BROWSE ACTIVITIES PAGE
+// ============================================
+
+app.get('/browse', async (c) => {
+  const propertyId = c.req.query('property') || '1'
+  const token = c.req.query('token') || ''
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Browse Activities - Paradise Resort</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+          body { font-family: 'Inter', system-ui, sans-serif; }
+          .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <div class="gradient-bg text-white py-4 px-4 sticky top-0 z-10 shadow-lg">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Browse Activities</h1>
+                <button onclick="window.history.back()" class="bg-white/20 px-4 py-2 rounded-lg">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto px-4 py-8">
+            <div class="mb-6 flex gap-4 overflow-x-auto pb-4" id="categories"></div>
+            
+            <div class="mb-6 flex justify-between items-center">
+                <h2 class="text-2xl font-bold">All Activities</h2>
+                <select id="sortSelect" onchange="loadActivities()" class="px-4 py-2 border rounded-lg">
+                    <option value="popularity">Most Popular</option>
+                    <option value="price">Lowest Price</option>
+                    <option value="duration">Shortest Duration</option>
+                </select>
+            </div>
+            
+            <div id="activities" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </div>
+
+        <script>
+        const propertyId = '${propertyId}';
+        const token = '${token}';
+        let currentCategory = null;
+        
+        async function init() {
+            await loadCategories();
+            await loadActivities();
+        }
+        
+        async function loadCategories() {
+            const response = await fetch('/api/categories?lang=en');
+            const data = await response.json();
+            
+            const html = '<button onclick="filterCategory(null)" class="flex-shrink-0 px-6 py-3 bg-white rounded-lg shadow">All</button>' +
+                data.categories.map(c => \`
+                    <button onclick="filterCategory('\${c.slug}')" 
+                            class="flex-shrink-0 px-6 py-3 bg-white rounded-lg shadow hover:shadow-lg">
+                        <i class="fas \${c.icon_name} text-blue-500"></i> \${c.name}
+                    </button>
+                \`).join('');
+            
+            document.getElementById('categories').innerHTML = html;
+        }
+        
+        async function loadActivities() {
+            const sort = document.getElementById('sortSelect').value;
+            let url = \`/api/activities?property_id=\${propertyId}&sort=\${sort}&lang=en\`;
+            if (currentCategory) url += \`&category=\${currentCategory}\`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            const html = data.activities.map(a => \`
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition cursor-pointer"
+                     onclick="viewActivity(\${a.activity_id})">
+                    <div class="h-48 bg-gradient-to-r from-blue-400 to-green-400"></div>
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold">\${a.title}</h3>
+                            \${a.is_featured ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">Featured</span>' : ''}
+                        </div>
+                        <p class="text-sm text-gray-600 mb-2">\${a.vendor_name}</p>
+                        <p class="text-sm text-gray-700 mb-3">\${a.short_description}</p>
+                        <div class="flex justify-between items-center text-sm text-gray-600 mb-3">
+                            <span><i class="far fa-clock"></i> \${a.duration_minutes} min</span>
+                            <span><i class="far fa-user"></i> Max \${a.capacity_per_slot}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-2xl font-bold text-blue-600">\${a.currency} \${a.price}</span>
+                            <button class="bg-blue-500 text-white px-4 py-2 rounded-lg">Book</button>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+            
+            document.getElementById('activities').innerHTML = html;
+        }
+        
+        function filterCategory(slug) {
+            currentCategory = slug;
+            loadActivities();
+        }
+        
+        function viewActivity(id) {
+            alert('Activity details for ID: ' + id + '\\n\\nFull detail page coming soon!\\n\\nFor now, use API endpoint: /api/activities/' + id);
+        }
+        
+        window.addEventListener('DOMContentLoaded', init);
+        </script>
+    </body>
+    </html>
+  `)
 })
 
 // ============================================

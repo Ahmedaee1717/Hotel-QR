@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Paradise Resort</title>
+    <meta name="description" content="Book amazing resort activities">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0EA5E9">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+        .activity-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .activity-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Loading Spinner -->
+    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading your activities...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="content" class="hidden min-h-screen">
+        <!-- Header -->
+        <div class="gradient-bg text-white py-8 px-4 sticky top-0 z-10 shadow-lg">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold" id="propertyName">Paradise Resort</h1>
+                        <p class="text-sm opacity-90">Room <span id="roomNumber">---</span></p>
+                    </div>
+                    <div class="flex gap-4">
+                        <button onclick="toggleLanguage()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg backdrop-blur-sm">
+                            <i class="fas fa-language"></i>
+                            <span id="langToggle">عربي</span>
+                        </button>
+                        <button onclick="showMyBookings()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg backdrop-blur-sm">
+                            <i class="fas fa-calendar-check"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <h2 class="text-2xl font-bold mb-4">Browse by Category</h2>
+            <div id="categories" class="flex gap-4 overflow-x-auto pb-4">
+                <!-- Categories will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Featured Activities -->
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <h2 class="text-2xl font-bold mb-4">Featured Activities</h2>
+            <div id="featuredActivities" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Featured activities will be inserted here -->
+            </div>
+        </div>
+
+        <!-- All Activities -->
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold">All Activities</h2>
+                <select id="sortSelect" onchange="loadActivities()" class="px-4 py-2 border rounded-lg">
+                    <option value="popularity">Most Popular</option>
+                    <option value="price">Lowest Price</option>
+                    <option value="duration">Shortest Duration</option>
+                </select>
+            </div>
+            <div id="allActivities" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- All activities will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-8 px-4 mt-12">
+            <div class="max-w-6xl mx-auto text-center">
+                <p class="mb-2">© 2025 Paradise Resort & Spa. All rights reserved.</p>
+                <p class="text-sm text-gray-400">
+                    <a href="#" class="hover:text-white">Privacy Policy</a> | 
+                    <a href="#" class="hover:text-white">Terms of Service</a> | 
+                    <a href="mailto:info@paradiseresort.com" class="hover:text-white">Contact Us</a>
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        let currentLang = 'en';
+        let sessionToken = '';
+        let propertyId = 1;
+        let currentCategory = null;
+
+        // Parse URL to get QR token
+        function getQRToken() {
+            const path = window.location.pathname;
+            const parts = path.split('/');
+            // Expected format: /welcome/{property_slug}/{room_token}
+            if (parts.length >= 4) {
+                return {
+                    propertySlug: parts[2],
+                    roomToken: parts[3]
+                };
+            }
+            // Try query params as fallback
+            const urlParams = new URLSearchParams(window.location.search);
+            return {
+                propertySlug: urlParams.get('property') || 'paradise-resort',
+                roomToken: urlParams.get('token') || 'qr-101-f8d3c2a1-9b7e-4f5d-8c3a-1e2f3d4c5b6a'
+            };
+        }
+
+        // Initialize the page
+        async function init() {
+            try {
+                const { propertySlug, roomToken } = getQRToken();
+                
+                // Call welcome API
+                const response = await fetch(`/api/welcome/${propertySlug}/${roomToken}`);
+                if (!response.ok) {
+                    throw new Error('Invalid QR code or property');
+                }
+                
+                const data = await response.json();
+                sessionToken = data.session_token;
+                localStorage.setItem('session_token', sessionToken);
+                
+                // Update UI with property info
+                document.getElementById('propertyName').textContent = data.property.name;
+                document.getElementById('roomNumber').textContent = data.room.number;
+                
+                // Store property ID
+                propertyId = data.property.property_id || 1;
+                
+                // Load categories
+                await loadCategories();
+                
+                // Display featured activities
+                displayActivities(data.featured_activities, 'featuredActivities');
+                
+                // Load all activities
+                await loadActivities();
+                
+                // Hide loading, show content
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Invalid QR Code</h2>
+                        <p class="text-gray-600 mb-4">Please scan a valid QR code from your room.</p>
+                        <a href="/" class="bg-blue-500 text-white px-6 py-2 rounded-lg inline-block">Go to Homepage</a>
+                    </div>
+                `;
+            }
+        }
+
+        // Load categories
+        async function loadCategories() {
+            try {
+                const response = await fetch(`/api/categories?lang=${currentLang}`);
+                const data = await response.json();
+                
+                const categoriesHtml = data.categories.map(cat => `
+                    <button onclick="filterByCategory('${cat.slug}')" 
+                            class="flex-shrink-0 px-6 py-3 bg-white rounded-lg shadow hover:shadow-lg transition ${currentCategory === cat.slug ? 'ring-2 ring-blue-500' : ''}">
+                        <i class="fas ${cat.icon_name} text-2xl mb-2 text-blue-500"></i>
+                        <p class="text-sm font-semibold">${cat.name}</p>
+                    </button>
+                `).join('');
+                
+                document.getElementById('categories').innerHTML = `
+                    <button onclick="filterByCategory(null)" 
+                            class="flex-shrink-0 px-6 py-3 bg-white rounded-lg shadow hover:shadow-lg transition ${currentCategory === null ? 'ring-2 ring-blue-500' : ''}">
+                        <i class="fas fa-th text-2xl mb-2 text-blue-500"></i>
+                        <p class="text-sm font-semibold">All</p>
+                    </button>
+                    ${categoriesHtml}
+                `;
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        // Load all activities
+        async function loadActivities() {
+            try {
+                const sort = document.getElementById('sortSelect').value;
+                let url = `/api/activities?property_id=${propertyId}&sort=${sort}&lang=${currentLang}`;
+                if (currentCategory) {
+                    url += `&category=${currentCategory}`;
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                displayActivities(data.activities, 'allActivities');
+            } catch (error) {
+                console.error('Error loading activities:', error);
+            }
+        }
+
+        // Display activities in a container
+        function displayActivities(activities, containerId) {
+            if (!activities || activities.length === 0) {
+                document.getElementById(containerId).innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">No activities found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const html = activities.map(activity => {
+                const images = activity.images ? JSON.parse(activity.images) : [];
+                const image = images[0] || '/static/images/placeholder.jpg';
+                
+                return `
+                    <div class="activity-card bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer" 
+                         onclick="viewActivity(${activity.activity_id})">
+                        <div class="h-48 bg-gray-200 overflow-hidden">
+                            <img src="${image}" alt="${activity.title}" 
+                                 class="w-full h-full object-cover"
+                                 onerror="this.src='/static/images/placeholder.jpg'">
+                        </div>
+                        <div class="p-4">
+                            <div class="flex items-start justify-between mb-2">
+                                <h3 class="text-lg font-bold text-gray-800 flex-1">${activity.title}</h3>
+                                ${activity.is_featured ? '<span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded">Featured</span>' : ''}
+                            </div>
+                            <p class="text-sm text-gray-500 mb-2">${activity.vendor_name}</p>
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">${activity.short_description}</p>
+                            <div class="flex items-center justify-between text-sm text-gray-500 mb-3">
+                                <span><i class="far fa-clock mr-1"></i>${activity.duration_minutes} min</span>
+                                <span><i class="far fa-user mr-1"></i>Max ${activity.capacity_per_slot}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-2xl font-bold text-blue-600">${activity.currency} ${activity.price}</span>
+                                    <span class="text-sm text-gray-500">/person</span>
+                                </div>
+                                <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                                    Book Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById(containerId).innerHTML = html;
+        }
+
+        // Filter by category
+        function filterByCategory(slug) {
+            currentCategory = slug;
+            loadActivities();
+        }
+
+        // View activity details
+        function viewActivity(activityId) {
+            window.location.href = `/activity.html?id=${activityId}&token=${sessionToken}&lang=${currentLang}`;
+        }
+
+        // Toggle language
+        function toggleLanguage() {
+            currentLang = currentLang === 'en' ? 'ar' : 'en';
+            document.getElementById('langToggle').textContent = currentLang === 'en' ? 'عربي' : 'EN';
+            if (currentLang === 'ar') {
+                document.documentElement.dir = 'rtl';
+            } else {
+                document.documentElement.dir = 'ltr';
+            }
+            loadCategories();
+            loadActivities();
+        }
+
+        // Show my bookings
+        function showMyBookings() {
+            window.location.href = `/bookings.html?token=${sessionToken}&lang=${currentLang}`;
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
