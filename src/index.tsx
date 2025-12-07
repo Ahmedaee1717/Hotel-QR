@@ -3453,17 +3453,26 @@ app.get('/hotel/:property_slug', async (c) => {
             
             console.log('🌐 Changing language to:', newLang);
             
+            // CRITICAL: Update currentLanguage BEFORE any operations
             currentLanguage = newLang;
             localStorage.setItem('preferredLanguage', newLang);
             
             console.log('✅ Saved to localStorage:', localStorage.getItem('preferredLanguage'));
             console.log('✅ Current language now:', currentLanguage);
             
+            // Force selector to stay on selected value
+            selector.value = newLang;
+            
             // Reload content in new language
             init().then(() => {
-                // Ensure selector stays at selected language after reload
-                selector.value = newLang;
-                console.log('✅ Language selector updated to:', selector.value);
+                // CRITICAL: Re-lock selector after init completes
+                setTimeout(() => {
+                    selector.value = newLang;
+                    console.log('✅ Language selector locked to:', selector.value);
+                }, 100);
+            }).catch(error => {
+                console.error('Init error:', error);
+                selector.value = newLang; // Keep selector even if init fails
             });
         }
 
@@ -4382,14 +4391,27 @@ app.get('/hotel/:property_slug', async (c) => {
 
         // Initialize on DOM ready
         document.addEventListener('DOMContentLoaded', function() {
+            // CRITICAL: Re-read language from localStorage on page load
+            const savedLang = localStorage.getItem('preferredLanguage');
+            if (savedLang) {
+                currentLanguage = savedLang;
+                console.log('📖 Loaded language from localStorage:', savedLang);
+            }
+            
             // Set language selector value after DOM is loaded
             const languageSelector = document.getElementById('languageSelector');
             if (languageSelector) {
                 languageSelector.value = currentLanguage;
+                console.log('🎯 Language selector initialized to:', currentLanguage);
             }
             
             // Initialize the page
-            init();
+            init().then(() => {
+                // Double-check selector value after init
+                if (languageSelector) {
+                    languageSelector.value = currentLanguage;
+                }
+            });
         });
         </script>
     </body>
