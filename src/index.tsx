@@ -3217,28 +3217,55 @@ app.get('/hotel/:property_slug', async (c) => {
           const lang = currentLanguage;
           const t = translations[lang] || translations.en;
           
+          // Always show "All" pill
           let pillsHTML = \`
             <button onclick="filterOfferings('all')" class="category-pill bg-blue-500 text-white" data-category="all">
               <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">\${t.all}</span>
             </button>
-            <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
-              <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">\${t.restaurants}</span>
-            </button>
-            <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
-              <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">\${t.events}</span>
-            </button>
-            <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
-              <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">\${t.spa}</span>
-            </button>
-            <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
-              <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">\${t.services}</span>
-            </button>
-            <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
-              <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">\${t.activities}</span>
-            </button>
           \`;
           
-          // Add custom section pills
+          // Add default section pills only if visible
+          if (propertyData?.show_restaurants === 1) {
+            pillsHTML += \`
+              <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
+                <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">\${t.restaurants}</span>
+              </button>
+            \`;
+          }
+          
+          if (propertyData?.show_events === 1) {
+            pillsHTML += \`
+              <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
+                <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">\${t.events}</span>
+              </button>
+            \`;
+          }
+          
+          if (propertyData?.show_spa === 1) {
+            pillsHTML += \`
+              <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
+                <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">\${t.spa}</span>
+              </button>
+            \`;
+          }
+          
+          if (propertyData?.show_service === 1) {
+            pillsHTML += \`
+              <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
+                <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">\${t.services}</span>
+              </button>
+            \`;
+          }
+          
+          if (propertyData?.show_activities === 1) {
+            pillsHTML += \`
+              <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
+                <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">\${t.activities}</span>
+              </button>
+            \`;
+          }
+          
+          // Add custom section pills only if visible
           customSections.forEach(section => {
             if (section.is_visible === 1) {
               const sectionName = section[\`section_name_\${lang}\`] || section.section_name_en;
