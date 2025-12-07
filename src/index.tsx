@@ -1913,12 +1913,13 @@ app.get('/api/admin/bookings', async (c) => {
   }
 })
 
-// Create hotel offering (Admin)
+// Create hotel offering (Admin) - with auto-translation
 app.post('/api/admin/offerings', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
   try {
+    // Insert the offering first
     const result = await DB.prepare(`
       INSERT INTO hotel_offerings (
         property_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
@@ -1942,9 +1943,67 @@ app.post('/api/admin/offerings', async (c) => {
       data.event_end_time
     ).run()
     
+    const offering_id = result.meta.last_row_id
+    
+    // Auto-translate to all languages in background
+    const apiKey = c.env.OPENAI_API_KEY
+    if (apiKey) {
+      // Translate in background (don't wait for it)
+      c.executionCtx.waitUntil((async () => {
+        try {
+          const languages = ['es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'zh']
+          const translations: any = {}
+          
+          for (const lang of languages) {
+            const textsToTranslate = [
+              data.title_en,
+              data.short_description_en || '',
+              data.full_description_en || ''
+            ]
+            
+            const translated = await translateWithAI(textsToTranslate, lang, apiKey)
+            
+            translations['title_' + lang] = translated[0] || data.title_en
+            translations['short_description_' + lang] = translated[1] || data.short_description_en
+            translations['full_description_' + lang] = translated[2] || data.full_description_en
+          }
+          
+          // Update database with translations
+          await DB.prepare(`
+            UPDATE hotel_offerings SET
+              title_es = ?, short_description_es = ?, full_description_es = ?,
+              title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+              title_de = ?, short_description_de = ?, full_description_de = ?,
+              title_it = ?, short_description_it = ?, full_description_it = ?,
+              title_pt = ?, short_description_pt = ?, full_description_pt = ?,
+              title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+              title_ar = ?, short_description_ar = ?, full_description_ar = ?,
+              title_zh = ?, short_description_zh = ?, full_description_zh = ?,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE offering_id = ?
+          `).bind(
+            translations.title_es, translations.short_description_es, translations.full_description_es,
+            translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+            translations.title_de, translations.short_description_de, translations.full_description_de,
+            translations.title_it, translations.short_description_it, translations.full_description_it,
+            translations.title_pt, translations.short_description_pt, translations.full_description_pt,
+            translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+            translations.title_ar, translations.short_description_ar, translations.full_description_ar,
+            translations.title_zh, translations.short_description_zh, translations.full_description_zh,
+            offering_id
+          ).run()
+          
+          console.log('Auto-translated offering ' + offering_id + ' to 8 languages')
+        } catch (error) {
+          console.error('Background translation error:', error)
+        }
+      })())
+    }
+    
     return c.json({ 
       success: true,
-      offering_id: result.meta.last_row_id
+      offering_id: offering_id,
+      message: apiKey ? 'Offering created and being translated to 8 languages' : 'Offering created'
     })
   } catch (error) {
     console.error('Create offering error:', error)
@@ -2976,6 +3035,25 @@ app.get('/hotel/:property_slug', async (c) => {
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
+        // Helper function to get translated field
+        function getTranslatedField(item, fieldName) {
+            if (!item) return '';
+            
+            // If English, use _en field
+            if (currentLanguage === 'en') {
+                return item[fieldName + '_en'] || item[fieldName] || '';
+            }
+            
+            // Try translated field first (e.g., title_es, title_fr)
+            const translatedField = item[fieldName + '_' + currentLanguage];
+            if (translatedField) {
+                return translatedField;
+            }
+            
+            // Fallback to English
+            return item[fieldName + '_en'] || item[fieldName] || '';
+        }
+        
         // Change language function
         function changeLanguage() {
             const newLang = document.getElementById('languageSelector').value;
@@ -3544,19 +3622,22 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = restaurants.map(r => \`
+            grid.innerHTML = restaurants.map(r => {
+                const title = getTranslatedField(r, 'title');
+                const description = getTranslatedField(r, 'short_description');
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${r.offering_id})">
                     <div class="relative">
                         <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${r.title}" 
+                             alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute top-3 right-3">
                             \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>Reservations</span>' : ''}
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${r.title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${r.short_description}</p>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
                             <span>\${r.location}</span>
@@ -3567,7 +3648,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
         function renderEvents() {
@@ -3584,11 +3666,14 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = events.map(e => \`
+            grid.innerHTML = events.map(e => {
+                const title = getTranslatedField(e, 'title');
+                const description = getTranslatedField(e, 'short_description');
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${e.offering_id})">
                     <div class="relative">
                         <img src="\${e.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${e.title}" 
+                             alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                         <div class="absolute bottom-3 left-3 right-3">
@@ -3596,8 +3681,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${e.title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${e.short_description}</p>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center gap-3 text-sm text-gray-500 mb-4">
                             \${e.event_start_time ? '<span><i class="fas fa-clock mr-2 text-gray-400"></i>' + e.event_start_time + '</span>' : ''}
                         </div>
@@ -3607,7 +3692,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
         function renderSpa() {
@@ -3624,17 +3710,20 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = spa.map(s => \`
+            grid.innerHTML = spa.map(s => {
+                const title = getTranslatedField(s, 'title');
+                const description = getTranslatedField(s, 'short_description');
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${s.title}" 
+                             alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-emerald-900/40 via-transparent to-transparent"></div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${s.title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${s.short_description}</p>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
                             <span>\${s.duration_minutes} minutes</span>
@@ -3645,7 +3734,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
         function renderServices() {
@@ -3662,17 +3752,20 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = services.map(s => \`
+            grid.innerHTML = services.map(s => {
+                const title = getTranslatedField(s, 'title');
+                const description = getTranslatedField(s, 'short_description');
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${s.title}" 
+                             alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-transparent"></div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${s.title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${s.short_description}</p>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + s.location + '</span></div>' : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">View Details</span>
@@ -3680,7 +3773,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
         function renderActivities() {
@@ -3743,11 +3837,14 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             // Render as elegant cards (similar to other sections)
-            grid.innerHTML = sectionOfferings.map(o => \`
+            grid.innerHTML = sectionOfferings.map(o => {
+                const title = getTranslatedField(o, 'title');
+                const description = getTranslatedField(o, 'short_description');
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${o.offering_id})">
                     <div class="relative">
                         <img src="\${o.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${o.title}" 
+                             alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         <div class="absolute top-3 right-3">
@@ -3755,8 +3852,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${o.title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${o.short_description}</p>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         \${o.location ? \`
                             <div class="flex items-center text-sm text-gray-500 mb-4">
                                 <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
@@ -3770,7 +3867,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
 
         function renderHotelMap() {
