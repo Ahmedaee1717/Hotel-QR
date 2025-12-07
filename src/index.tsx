@@ -1212,7 +1212,7 @@ app.get('/api/admin/dashboard', async (c) => {
 // Get all rooms
 app.get('/api/admin/rooms', async (c) => {
   const { DB } = c.env
-  const property_id = c.req.header('X-Property-ID')
+  const property_id = c.req.query('property_id') || c.req.header('X-Property-ID')
 
   try {
     const rooms = await DB.prepare(`
@@ -1220,7 +1220,7 @@ app.get('/api/admin/rooms', async (c) => {
       ORDER BY room_number
     `).bind(property_id).all()
 
-    return c.json({ rooms: rooms.results })
+    return c.json(rooms.results)
   } catch (error) {
     console.error('Get rooms error:', error)
     return c.json({ error: 'Internal server error' }, 500)
@@ -1290,18 +1290,32 @@ app.post('/api/admin/rooms/:room_id/regenerate-qr', async (c) => {
 // Get all vendors
 app.get('/api/admin/vendors', async (c) => {
   const { DB } = c.env
+  const property_id = c.req.query('property_id')
 
   try {
-    const vendors = await DB.prepare(`
+    let query = `
       SELECT 
         v.*,
         c.name_en as category_name
       FROM vendors v
       LEFT JOIN categories c ON v.category_id = c.category_id
-      ORDER BY v.created_at DESC
-    `).all()
+    `
+    
+    // If property_id provided, filter by vendor-property relationship
+    if (property_id) {
+      query += `
+        INNER JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+        WHERE vp.property_id = ?
+      `
+    }
+    
+    query += ` ORDER BY v.created_at DESC`
+    
+    const vendors = property_id 
+      ? await DB.prepare(query).bind(property_id).all()
+      : await DB.prepare(query).all()
 
-    return c.json({ vendors: vendors.results })
+    return c.json(vendors.results)
   } catch (error) {
     console.error('Get vendors error:', error)
     return c.json({ error: 'Internal server error' }, 500)
@@ -1541,10 +1555,7 @@ app.get('/api/admin/activities', async (c) => {
       ORDER BY a.created_at DESC
     `).bind(property_id).all()
     
-    return c.json({ 
-      success: true,
-      activities: activities.results 
-    })
+    return c.json(activities.results)
   } catch (error) {
     console.error('Get activities error:', error)
     return c.json({ error: 'Failed to get activities' }, 500)
