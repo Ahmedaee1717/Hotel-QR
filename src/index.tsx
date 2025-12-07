@@ -2603,6 +2603,21 @@ app.get('/hotel/:property_slug', async (c) => {
         </div>
 
         <div id="content" class="hidden">
+            <!-- Language Selector (Floating) -->
+            <div class="fixed top-4 right-4 z-50">
+                <select id="languageSelector" class="px-4 py-2 bg-white text-gray-800 rounded-lg shadow-lg border-2 border-gray-300 cursor-pointer hover:border-blue-500 focus:outline-none focus:border-blue-600 transition" onchange="changeLanguage()">
+                    <option value="en" data-flag="🇬🇧">🇬🇧 English</option>
+                    <option value="ar" data-flag="🇸🇦">🇸🇦 العربية</option>
+                    <option value="de" data-flag="🇩🇪">🇩🇪 Deutsch</option>
+                    <option value="ru" data-flag="🇷🇺">🇷🇺 Русский</option>
+                    <option value="pl" data-flag="🇵🇱">🇵🇱 Polski</option>
+                    <option value="it" data-flag="🇮🇹">🇮🇹 Italiano</option>
+                    <option value="fr" data-flag="🇫🇷">🇫🇷 Français</option>
+                    <option value="cs" data-flag="🇨🇿">🇨🇿 Čeština</option>
+                    <option value="uk" data-flag="🇺🇦">🇺🇦 Українська</option>
+                </select>
+            </div>
+            
             <!-- Hero Header -->
             <div class="gradient-hero text-white py-12 px-4">
                 <div class="max-w-6xl mx-auto text-center">
@@ -2713,6 +2728,20 @@ app.get('/hotel/:property_slug', async (c) => {
         let allOfferings = [];
         let allActivities = [];
         let currentFilter = 'all';
+        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        
+        // Set language on page load
+        document.getElementById('languageSelector').value = currentLanguage;
+        
+        // Change language function
+        function changeLanguage() {
+            const newLang = document.getElementById('languageSelector').value;
+            currentLanguage = newLang;
+            localStorage.setItem('preferredLanguage', newLang);
+            
+            // Reload content in new language
+            init();
+        }
 
         function applyDesignSettings(settings) {
           // Font family mapping
@@ -3014,13 +3043,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Apply design settings
                 applyDesignSettings(propertyData);
                 
-                // Load hotel offerings
-                const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}\`);
+                // Load hotel offerings with language
+                const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const offeringsData = await offeringsResponse.json();
                 allOfferings = offeringsData.offerings || [];
                 
-                // Load vendor activities
-                const activitiesResponse = await fetch(\`/api/property-vendor-activities/\${propertyData.property_id}\`);
+                // Load vendor activities with language
+                const activitiesResponse = await fetch(\`/api/property-vendor-activities/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const activitiesData = await activitiesResponse.json();
                 allActivities = activitiesData.activities || [];
                 
