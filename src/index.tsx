@@ -1544,7 +1544,7 @@ app.get('/api/admin/property-settings', async (c) => {
       SELECT 
         slug, brand_logo_url, hero_image_url,
         primary_color, secondary_color, accent_color,
-        layout_style, font_family, button_style, card_style, header_style
+        layout_style, font_family, button_style, card_style, header_style, use_gradient
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
@@ -1574,6 +1574,7 @@ app.put('/api/admin/property-settings', async (c) => {
           button_style = ?,
           card_style = ?,
           header_style = ?,
+          use_gradient = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE property_id = ?
     `).bind(
@@ -1587,6 +1588,7 @@ app.put('/api/admin/property-settings', async (c) => {
       data.button_style,
       data.card_style,
       data.header_style,
+      data.use_gradient,
       data.property_id
     ).run()
     
@@ -2429,6 +2431,7 @@ app.get('/hotel/:property_slug', async (c) => {
           const buttonStyle = settings.button_style || 'rounded';
           const cardStyle = settings.card_style || 'shadow';
           const headerStyle = settings.header_style || 'transparent';
+          const useGradient = settings.use_gradient || 0;
           
           // Logo
           if (settings.brand_logo_url) {
@@ -2436,85 +2439,250 @@ app.get('/hotel/:property_slug', async (c) => {
             document.getElementById('propertyName').insertAdjacentHTML('beforebegin', logoHtml);
           }
           
-          // Button style classes
-          let buttonRadius = 'rounded-lg';
-          if (buttonStyle === 'square') buttonRadius = 'rounded-none';
-          if (buttonStyle === 'pill') buttonRadius = 'rounded-full';
+          // Gradient or solid color
+          const heroBackground = useGradient ? 
+            \`linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%)\` : 
+            primaryColor;
           
-          // Card style classes
-          let cardClasses = 'shadow-sm';
-          if (cardStyle === 'border') cardClasses = 'border border-gray-200';
-          if (cardStyle === 'elevated') cardClasses = 'shadow-lg';
-          if (cardStyle === 'flat') cardClasses = 'border-0';
+          // Generate dynamic CSS based on layout style
+          let dynamicCSS = '';
           
-          // Generate dynamic CSS
-          const dynamicCSS = \`
-            body {
-              font-family: \${fontFamily};
-            }
-            
-            .gradient-hero {
-              \${headerStyle === 'transparent' ? \`
-                background: linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%);
-                opacity: 0.95;
-              \` : headerStyle === 'solid' ? \`
-                background: \${primaryColor};
-              \` : \`
-                background: linear-gradient(to right, \${primaryColor}, \${secondaryColor});
-              \`}
-              \${settings.hero_image_url ? \`
-                background-image: url('\${settings.hero_image_url}');
-                background-size: cover;
-                background-position: center;
-                background-blend-mode: overlay;
-              \` : ''}
-            }
-            
-            .category-pill.bg-blue-500 {
-              background-color: \${primaryColor} !important;
-            }
-            
-            .text-blue-500, .text-blue-600 {
-              color: \${primaryColor} !important;
-            }
-            
-            .bg-blue-600 {
-              background-color: \${primaryColor} !important;
-            }
-            
-            .bg-blue-600:hover {
-              background-color: \${secondaryColor} !important;
-            }
-            
-            .text-green-600 {
-              color: \${secondaryColor} !important;
-            }
-            
-            .bg-green-100 {
-              background-color: \${secondaryColor}22 !important;
-              color: \${secondaryColor} !important;
-            }
-            
-            .bg-blue-100 {
-              background-color: \${primaryColor}22 !important;
-              color: \${primaryColor} !important;
-            }
-            
-            .text-orange-600 {
-              color: \${accentColor} !important;
-            }
-            
-            button, .btn {
-              border-radius: \${buttonRadius === 'rounded-full' ? '9999px' : buttonRadius === 'rounded-none' ? '0' : '0.5rem'};
-            }
-            
-            .offering-card {
-              \${cardClasses.includes('shadow') ? 'box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : ''}
-              \${cardClasses.includes('border') ? 'border: 1px solid #e5e7eb;' : ''}
-              \${cardStyle === 'elevated' ? 'box-shadow: 0 10px 15px rgba(0,0,0,0.1);' : ''}
-              border-radius: \${layoutStyle === 'minimal' ? '0.5rem' : layoutStyle === 'elegant' ? '0.75rem' : '1rem'};
-            }
-          \`;
+          if (layoutStyle === 'modern') {
+            // Modern: Rounded cards, soft shadows, vibrant colors
+            dynamicCSS = \`
+              body {
+                font-family: \${fontFamily};
+                background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
+              }
+              
+              .gradient-hero {
+                background: \${heroBackground};
+                padding: 4rem 1rem;
+                border-radius: 0 0 2rem 2rem;
+                \${settings.hero_image_url ? \`
+                  background-image: url('\${settings.hero_image_url}');
+                  background-size: cover;
+                  background-position: center;
+                  background-blend-mode: overlay;
+                \` : ''}
+              }
+              
+              .offering-card {
+                background: white;
+                border-radius: 1.5rem;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                overflow: hidden;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+              }
+              
+              .offering-card:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+              }
+              
+              .offering-card img {
+                border-radius: 0;
+              }
+              
+              .category-pill {
+                border-radius: 9999px;
+                padding: 0.75rem 1.5rem;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              }
+              
+              .category-pill.bg-blue-500 {
+                background: \${useGradient ? heroBackground : primaryColor} !important;
+              }
+              
+              button, .btn {
+                border-radius: \${buttonStyle === 'pill' ? '9999px' : '0.75rem'};
+                font-weight: 600;
+                transition: all 0.3s ease;
+              }
+              
+              .text-blue-500, .text-blue-600 {
+                color: \${primaryColor} !important;
+              }
+              
+              .bg-blue-600 {
+                background: \${useGradient ? heroBackground : primaryColor} !important;
+              }
+              
+              .bg-blue-600:hover {
+                background: \${secondaryColor} !important;
+                transform: scale(1.05);
+              }
+              
+              .text-green-600 { color: \${secondaryColor} !important; }
+              .text-orange-600 { color: \${accentColor} !important; }
+              .bg-green-100 { background-color: \${secondaryColor}22 !important; color: \${secondaryColor} !important; }
+              .bg-blue-100 { background-color: \${primaryColor}22 !important; color: \${primaryColor} !important; }
+            \`;
+          } else if (layoutStyle === 'elegant') {
+            // Elegant: Borders, subtle colors, refined typography
+            dynamicCSS = \`
+              body {
+                font-family: \${fontFamily};
+                background: #fafafa;
+              }
+              
+              .gradient-hero {
+                background: \${heroBackground};
+                padding: 5rem 1rem;
+                border-bottom: 3px solid \${accentColor};
+                \${settings.hero_image_url ? \`
+                  background-image: url('\${settings.hero_image_url}');
+                  background-size: cover;
+                  background-position: center;
+                  background-blend-mode: overlay;
+                \` : ''}
+              }
+              
+              .gradient-hero h1 {
+                font-size: 3rem;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                font-weight: 300;
+              }
+              
+              .offering-card {
+                background: white;
+                border-radius: 0.25rem;
+                border: 2px solid #e5e7eb;
+                overflow: hidden;
+                transition: border-color 0.3s ease, box-shadow 0.3s ease;
+              }
+              
+              .offering-card:hover {
+                border-color: \${primaryColor};
+                box-shadow: 0 0 0 1px \${primaryColor};
+              }
+              
+              .offering-card img {
+                border-bottom: 1px solid #e5e7eb;
+              }
+              
+              .category-pill {
+                border-radius: 0.25rem;
+                padding: 0.5rem 1.25rem;
+                border: 1px solid currentColor;
+                background: transparent !important;
+                color: #374151;
+                font-weight: 500;
+                letter-spacing: 0.05em;
+              }
+              
+              .category-pill.bg-blue-500 {
+                background: \${primaryColor} !important;
+                color: white !important;
+                border-color: \${primaryColor} !important;
+              }
+              
+              button, .btn {
+                border-radius: 0.25rem;
+                font-weight: 500;
+                letter-spacing: 0.05em;
+                border: 1px solid currentColor;
+              }
+              
+              .text-blue-500, .text-blue-600 {
+                color: \${primaryColor} !important;
+              }
+              
+              .bg-blue-600 {
+                background: \${primaryColor} !important;
+                border-color: \${primaryColor} !important;
+              }
+              
+              .bg-blue-600:hover {
+                background: white !important;
+                color: \${primaryColor} !important;
+              }
+              
+              .text-green-600 { color: \${secondaryColor} !important; }
+              .text-orange-600 { color: \${accentColor} !important; }
+              .bg-green-100 { background-color: transparent !important; color: \${secondaryColor} !important; border: 1px solid \${secondaryColor}; }
+              .bg-blue-100 { background-color: transparent !important; color: \${primaryColor} !important; border: 1px solid \${primaryColor}; }
+            \`;
+          } else if (layoutStyle === 'minimal') {
+            // Minimal: Flat, clean, lots of whitespace
+            dynamicCSS = \`
+              body {
+                font-family: \${fontFamily};
+                background: white;
+              }
+              
+              .gradient-hero {
+                background: \${heroBackground};
+                padding: 6rem 1rem 3rem;
+                \${settings.hero_image_url ? \`
+                  background-image: url('\${settings.hero_image_url}');
+                  background-size: cover;
+                  background-position: center;
+                  background-blend-mode: overlay;
+                \` : ''}
+              }
+              
+              .gradient-hero h1 {
+                font-size: 2.5rem;
+                font-weight: 700;
+                letter-spacing: -0.02em;
+              }
+              
+              .offering-card {
+                background: #f9fafb;
+                border-radius: 0.5rem;
+                border: 1px solid #e5e7eb;
+                overflow: hidden;
+                transition: background-color 0.2s ease;
+              }
+              
+              .offering-card:hover {
+                background: white;
+              }
+              
+              .offering-card img {
+                border-radius: 0;
+              }
+              
+              .category-pill {
+                border-radius: 0.375rem;
+                padding: 0.5rem 1rem;
+                background: #f3f4f6 !important;
+                color: #374151;
+                font-weight: 500;
+                font-size: 0.875rem;
+              }
+              
+              .category-pill.bg-blue-500 {
+                background: \${primaryColor} !important;
+                color: white !important;
+              }
+              
+              button, .btn {
+                border-radius: 0.5rem;
+                font-weight: 600;
+                padding: 0.75rem 1.5rem;
+              }
+              
+              .text-blue-500, .text-blue-600 {
+                color: \${primaryColor} !important;
+              }
+              
+              .bg-blue-600 {
+                background: \${primaryColor} !important;
+              }
+              
+              .bg-blue-600:hover {
+                opacity: 0.9;
+              }
+              
+              .text-green-600 { color: \${secondaryColor} !important; }
+              .text-orange-600 { color: \${accentColor} !important; }
+              .bg-green-100 { background-color: \${secondaryColor}11 !important; color: \${secondaryColor} !important; }
+              .bg-blue-100 { background-color: \${primaryColor}11 !important; color: \${primaryColor} !important; }
+            \`;
+          }
           
           document.getElementById('dynamic-styles').textContent = dynamicCSS;
         }
@@ -4933,28 +5101,33 @@ app.get('/admin/dashboard', (c) => {
                     <div class="border-b pb-6">
                         <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-fill-drip mr-2"></i>Color Scheme</h3>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="space-y-6">
                             <div>
                                 <label class="block text-sm font-medium mb-2">Primary Color</label>
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 mb-2">
                                     <input type="color" id="primaryColor" class="w-16 h-10 border rounded cursor-pointer" />
                                     <input type="text" id="primaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#3B82F6" />
                                 </div>
+                                <label class="flex items-center text-sm text-gray-600 cursor-pointer">
+                                    <input type="checkbox" id="primaryGradient" class="mr-2" />
+                                    <span>Use gradient (Primary → Secondary)</span>
+                                </label>
+                                <div id="primaryGradientPreview" class="hidden mt-2 h-8 rounded-lg" style="background: linear-gradient(135deg, #3B82F6, #10B981);"></div>
                                 <p class="text-xs text-gray-500 mt-1">Main brand color (headers, buttons)</p>
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium mb-2">Secondary Color</label>
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 mb-2">
                                     <input type="color" id="secondaryColor" class="w-16 h-10 border rounded cursor-pointer" />
                                     <input type="text" id="secondaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#10B981" />
                                 </div>
-                                <p class="text-xs text-gray-500 mt-1">Secondary elements</p>
+                                <p class="text-xs text-gray-500 mt-1">Secondary elements & gradient partner</p>
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium mb-2">Accent Color</label>
-                                <div class="flex gap-2">
+                                <div class="flex gap-2 mb-2">
                                     <input type="color" id="accentColor" class="w-16 h-10 border rounded cursor-pointer" />
                                     <input type="text" id="accentColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#F59E0B" />
                                 </div>
@@ -4968,35 +5141,50 @@ app.get('/admin/dashboard', (c) => {
                         <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-th-large mr-2"></i>Layout Style</h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <label class="relative cursor-pointer">
+                            <label class="relative cursor-pointer group">
                                 <input type="radio" name="layoutStyle" value="modern" class="peer sr-only" />
                                 <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                    <div class="text-center">
+                                    <div class="text-center mb-3">
                                         <i class="fas fa-layer-group text-3xl mb-2 text-blue-600"></i>
                                         <h4 class="font-semibold">Modern</h4>
                                         <p class="text-xs text-gray-500 mt-1">Clean cards with shadows</p>
                                     </div>
-                                </div>
-                            </label>
-                            
-                            <label class="relative cursor-pointer">
-                                <input type="radio" name="layoutStyle" value="elegant" class="peer sr-only" />
-                                <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                    <div class="text-center">
-                                        <i class="fas fa-gem text-3xl mb-2 text-purple-600"></i>
-                                        <h4 class="font-semibold">Elegant</h4>
-                                        <p class="text-xs text-gray-500 mt-1">Luxury with borders</p>
+                                    <!-- Mini Preview -->
+                                    <div class="bg-gray-100 p-3 rounded space-y-2">
+                                        <div class="bg-white rounded-xl shadow-md p-2 h-16"></div>
+                                        <div class="bg-white rounded-xl shadow-md p-2 h-12"></div>
                                     </div>
                                 </div>
                             </label>
                             
-                            <label class="relative cursor-pointer">
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="layoutStyle" value="elegant" class="peer sr-only" />
+                                <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                    <div class="text-center mb-3">
+                                        <i class="fas fa-gem text-3xl mb-2 text-purple-600"></i>
+                                        <h4 class="font-semibold">Elegant</h4>
+                                        <p class="text-xs text-gray-500 mt-1">Luxury with borders</p>
+                                    </div>
+                                    <!-- Mini Preview -->
+                                    <div class="bg-gray-100 p-3 rounded space-y-2">
+                                        <div class="bg-white rounded-sm border-2 border-gray-300 p-2 h-16"></div>
+                                        <div class="bg-white rounded-sm border-2 border-gray-300 p-2 h-12"></div>
+                                    </div>
+                                </div>
+                            </label>
+                            
+                            <label class="relative cursor-pointer group">
                                 <input type="radio" name="layoutStyle" value="minimal" class="peer sr-only" />
                                 <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
-                                    <div class="text-center">
+                                    <div class="text-center mb-3">
                                         <i class="fas fa-minus text-3xl mb-2 text-gray-600"></i>
                                         <h4 class="font-semibold">Minimal</h4>
                                         <p class="text-xs text-gray-500 mt-1">Simple and flat</p>
+                                    </div>
+                                    <!-- Mini Preview -->
+                                    <div class="bg-gray-100 p-3 rounded space-y-2">
+                                        <div class="bg-white rounded-md p-2 h-16 border border-gray-200"></div>
+                                        <div class="bg-white rounded-md p-2 h-12 border border-gray-200"></div>
                                     </div>
                                 </div>
                             </label>
@@ -5598,15 +5786,41 @@ app.get('/admin/dashboard', (c) => {
           
           document.getElementById('accentColor').addEventListener('input', (e) => {
             document.getElementById('accentColorText').value = e.target.value;
+            updateGradientPreview();
           });
           document.getElementById('accentColorText').addEventListener('input', (e) => {
             document.getElementById('accentColor').value = e.target.value;
+            updateGradientPreview();
           });
+          
+          // Gradient checkbox
+          document.getElementById('primaryGradient').checked = settings.use_gradient === 1;
+          if (settings.use_gradient === 1) {
+            document.getElementById('primaryGradientPreview').classList.remove('hidden');
+          }
+          
+          document.getElementById('primaryGradient').addEventListener('change', (e) => {
+            if (e.target.checked) {
+              document.getElementById('primaryGradientPreview').classList.remove('hidden');
+              updateGradientPreview();
+            } else {
+              document.getElementById('primaryGradientPreview').classList.add('hidden');
+            }
+          });
+          
+          updateGradientPreview();
           
         } catch (error) {
           console.error('Load settings error:', error);
           alert('Failed to load settings');
         }
+      }
+      
+      function updateGradientPreview() {
+        const primary = document.getElementById('primaryColorText').value || '#3B82F6';
+        const secondary = document.getElementById('secondaryColorText').value || '#10B981';
+        const preview = document.getElementById('primaryGradientPreview');
+        preview.style.background = 'linear-gradient(135deg, ' + primary + ', ' + secondary + ')';
       }
       
       function copyHomepageUrl() {
@@ -5637,7 +5851,8 @@ app.get('/admin/dashboard', (c) => {
           font_family: document.getElementById('fontFamily').value,
           button_style: document.getElementById('buttonStyle').value,
           card_style: document.getElementById('cardStyle').value,
-          header_style: document.getElementById('headerStyle').value
+          header_style: document.getElementById('headerStyle').value,
+          use_gradient: document.getElementById('primaryGradient').checked ? 1 : 0
         };
         
         try {
