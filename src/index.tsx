@@ -6507,7 +6507,7 @@ app.get('/activity', (c) => {
           'min': 'Min'
         },
         fr: {
-          'activity-details': 'Détails de l\'activité',
+          'activity-details': 'Détails de l\\'activité',
           'back': 'Retour',
           'book-now': 'Réserver maintenant',
           'request-callback': 'Demander un rappel',
