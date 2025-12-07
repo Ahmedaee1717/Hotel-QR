@@ -178,7 +178,15 @@ app.get('/', (c) => {
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center">
-                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect Logo" class="h-12 w-auto">
+                    <!-- GuestConnect Logo -->
+                    <div class="flex items-center gap-2">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="8" fill="#1F2937"/>
+                            <path d="M12 20C12 15.5817 15.5817 12 20 12C24.4183 12 28 15.5817 28 20C28 24.4183 24.4183 28 20 28C15.5817 28 12 24.4183 12 20Z" stroke="white" stroke-width="2"/>
+                            <path d="M16 20H24M20 16V24" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span class="text-xl font-semibold text-gray-900">GuestConnect</span>
+                    </div>
                 </div>
                 <div class="hidden md:flex items-center space-x-10">
                     <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">How It Works</a>
@@ -566,7 +574,14 @@ app.get('/', (c) => {
         <div class="max-w-7xl mx-auto">
             <div class="grid md:grid-cols-4 gap-12 mb-12">
                 <div class="md:col-span-2">
-                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect" class="h-10 mb-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="8" fill="#1F2937"/>
+                            <path d="M12 20C12 15.5817 15.5817 12 20 12C24.4183 12 28 15.5817 28 20C28 24.4183 24.4183 28 20 28C15.5817 28 12 24.4183 12 20Z" stroke="white" stroke-width="2"/>
+                            <path d="M16 20H24M20 16V24" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <span class="text-xl font-semibold text-gray-900">GuestConnect</span>
+                    </div>
                     <p class="text-sm text-gray-600 leading-relaxed max-w-md">
                         Digital guest experience platform for hotels and resorts. QR-powered in-room access to everything your property offers.
                     </p>
