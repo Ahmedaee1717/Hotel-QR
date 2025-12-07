@@ -4220,37 +4220,37 @@ app.get('/offering-detail', async (c) => {
             const useGradient = settings.use_gradient || 0;
             
             const heroBackground = useGradient ? 
-                \`linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%)\` : 
+                'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + secondaryColor + ' 100%)' : 
                 primaryColor;
             
             // Apply dynamic CSS
             const style = document.createElement('style');
-            style.textContent = \`
+            style.textContent = \\\`
                 body {
-                    font-family: \${fontFamily};
+                    font-family: \\\${fontFamily};
                 }
                 
                 #offeringHeader {
-                    background: \${heroBackground} !important;
+                    background: \\\${heroBackground} !important;
                 }
                 
                 .text-blue-500, .text-blue-600 {
-                    color: \${primaryColor} !important;
+                    color: \\\${primaryColor} !important;
                 }
                 
                 .bg-blue-600 {
-                    background: \${useGradient ? heroBackground : primaryColor} !important;
+                    background: \\\${useGradient ? heroBackground : primaryColor} !important;
                 }
                 
                 .bg-blue-600:hover {
-                    background: \${secondaryColor} !important;
+                    background: \\\${secondaryColor} !important;
                     transform: scale(1.05);
                 }
                 
                 .bg-blue-50 {
-                    background: \${primaryColor}15 !important;
+                    background: \\\${primaryColor}15 !important;
                 }
-            \`;
+            \\\`;
             document.head.appendChild(style);
         }
 
