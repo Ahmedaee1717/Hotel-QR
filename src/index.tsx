@@ -3761,6 +3761,13 @@ app.get('/hotel/:property_slug', async (c) => {
           });
         }
 
+        // Global HTML escape function to prevent syntax errors
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
         function renderCategoryPills() {
           const container = document.getElementById('category-pills-container');
           if (!container) return;
@@ -4167,21 +4174,28 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = allActivities.map(a => \`
+            grid.innerHTML = allActivities.map(a => {
+                // Use global escapeHtml to prevent syntax errors from special characters
+                const safeTitle = escapeHtml(a.title);
+                const safeDescription = escapeHtml(a.short_description);
+                const safeBusinessName = escapeHtml(a.business_name);
+                const safeCategoryName = escapeHtml(a.category_name);
+                
+                return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewActivity(\${a.activity_id})">
                     <div class="relative">
                         <img src="\${a.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${a.title}" 
+                             alt="\${safeTitle}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-orange-900/40 via-transparent to-transparent"></div>
                         <div class="absolute top-3 right-3">
-                            <span class="bg-white/95 backdrop-blur-sm text-orange-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">\${a.category_name}</span>
+                            <span class="bg-white/95 backdrop-blur-sm text-orange-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">\${safeCategoryName}</span>
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-1 text-gray-800">\${a.title}</h3>
-                        <p class="text-xs text-gray-500 mb-3">Curated by \${a.business_name}</p>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${a.short_description}</p>
+                        <h3 class="font-bold text-xl mb-1 text-gray-800">\${safeTitle}</h3>
+                        <p class="text-xs text-gray-500 mb-3">Curated by \${safeBusinessName}</p>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${safeDescription}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
                             <span>\${a.duration_minutes} minutes</span>
@@ -4192,7 +4206,8 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
         
         function renderCustomSection(sectionKey) {
