@@ -6375,23 +6375,23 @@ app.get('/admin/dashboard', (c) => {
             return;
           }
           
-          list.innerHTML = data.sections.map(s => `
+          list.innerHTML = data.sections.map(s => \`
             <div class="border rounded-lg p-4 hover:shadow-md transition">
               <div class="flex justify-between items-start">
                 <div>
                   <h3 class="font-bold text-lg">
-                    <i class="${s.icon_class} mr-2 text-${s.color_class}-600"></i>
-                    ${s.section_name_en}
+                    <i class="\${s.icon_class} mr-2" style="color: var(--primary-color);"></i>
+                    \${s.section_name_en}
                   </h3>
-                  <p class="text-sm text-gray-600">Key: <code class="bg-gray-100 px-2 py-1 rounded">${s.section_key}</code></p>
-                  <p class="text-sm text-gray-500 mt-1">Order: ${s.display_order} | Visible: ${s.is_visible ? '✅ Yes' : '❌ No'}</p>
+                  <p class="text-sm text-gray-600">Key: <code class="bg-gray-100 px-2 py-1 rounded">\${s.section_key}</code></p>
+                  <p class="text-sm text-gray-500 mt-1">Order: \${s.display_order} | Visible: \${s.is_visible ? '✅ Yes' : '❌ No'}</p>
                 </div>
-                <button onclick="deleteCustomSection(${s.section_id})" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200">
+                <button onclick="deleteCustomSection(\${s.section_id})" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200">
                   <i class="fas fa-trash mr-1"></i>Delete
                 </button>
               </div>
             </div>
-          `).join('');
+          \`).join('');
         } catch (error) {
           console.error('Load custom sections error:', error);
         }
