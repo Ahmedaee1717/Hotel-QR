@@ -6263,6 +6263,13 @@ app.get('/activity', (c) => {
                 <select id="languageSelector" class="px-3 py-1.5 bg-white/20 text-white rounded-lg text-sm border border-white/30">
                     <option value="en">🇬🇧 EN</option>
                     <option value="ar">🇸🇦 AR</option>
+                    <option value="de">🇩🇪 DE</option>
+                    <option value="fr">🇫🇷 FR</option>
+                    <option value="it">🇮🇹 IT</option>
+                    <option value="ru">🇷🇺 RU</option>
+                    <option value="pl">🇵🇱 PL</option>
+                    <option value="cs">🇨🇿 CS</option>
+                    <option value="uk">🇺🇦 UK</option>
                 </select>
             </div>
         </div>
@@ -6393,7 +6400,7 @@ app.get('/activity', (c) => {
       let currentLanguage = urlParams.get('lang') || localStorage.getItem('language') || 'en';
       localStorage.setItem('language', currentLanguage);
       
-      // Translation dictionary
+      // Translation dictionary - ALL LANGUAGES
       const translations = {
         en: {
           'activity-details': 'Activity Details',
@@ -6414,11 +6421,108 @@ app.get('/activity', (c) => {
           'per-person': '/شخص',
           'max': 'الحد الأقصى',
           'min': 'دقيقة'
+        },
+        de: {
+          'activity-details': 'Aktivitätsdetails',
+          'back': 'Zurück',
+          'book-now': 'Jetzt buchen',
+          'request-callback': 'Rückruf anfordern',
+          'about-activity': 'Über diese Aktivität',
+          'per-person': '/Person',
+          'max': 'Max',
+          'min': 'Min'
+        },
+        fr: {
+          'activity-details': 'Détails de l\'activité',
+          'back': 'Retour',
+          'book-now': 'Réserver maintenant',
+          'request-callback': 'Demander un rappel',
+          'about-activity': 'À propos de cette activité',
+          'per-person': '/personne',
+          'max': 'Max',
+          'min': 'min'
+        },
+        it: {
+          'activity-details': 'Dettagli attività',
+          'back': 'Indietro',
+          'book-now': 'Prenota ora',
+          'request-callback': 'Richiedi richiamata',
+          'about-activity': 'Informazioni su questa attività',
+          'per-person': '/persona',
+          'max': 'Max',
+          'min': 'min'
+        },
+        ru: {
+          'activity-details': 'Детали мероприятия',
+          'back': 'Назад',
+          'book-now': 'Забронировать',
+          'request-callback': 'Запросить звонок',
+          'about-activity': 'Об этом мероприятии',
+          'per-person': '/человек',
+          'max': 'Макс',
+          'min': 'мин'
+        },
+        pl: {
+          'activity-details': 'Szczegóły aktywności',
+          'back': 'Wstecz',
+          'book-now': 'Zarezerwuj teraz',
+          'request-callback': 'Poproś o telefon zwrotny',
+          'about-activity': 'O tej aktywności',
+          'per-person': '/osoba',
+          'max': 'Maks',
+          'min': 'min'
+        },
+        cs: {
+          'activity-details': 'Detaily aktivity',
+          'back': 'Zpět',
+          'book-now': 'Rezervovat nyní',
+          'request-callback': 'Požádat o zpětné volání',
+          'about-activity': 'O této aktivitě',
+          'per-person': '/osoba',
+          'max': 'Max',
+          'min': 'min'
+        },
+        uk: {
+          'activity-details': 'Деталі заходу',
+          'back': 'Назад',
+          'book-now': 'Забронювати',
+          'request-callback': 'Замовити дзвінок',
+          'about-activity': 'Про цей захід',
+          'per-person': '/особа',
+          'max': 'Макс',
+          'min': 'хв'
         }
       };
       
       function t(key) {
         return translations[currentLanguage]?.[key] || translations['en'][key] || key;
+      }
+      
+      // AI Translation function for activity content
+      async function translateText(text, targetLang) {
+        if (targetLang === 'en' || !text) return text;
+        
+        try {
+          const response = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: text,
+              target_lang: targetLang,
+              context: 'activity_description',
+              persona: 'adventure_travel'
+            })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            return data.translated_text || text;
+          }
+        } catch (error) {
+          console.error('Translation error:', error);
+        }
+        
+        return text; // Fallback to original
       }
       
       function updateLanguageSelector() {
@@ -6447,12 +6551,29 @@ app.get('/activity', (c) => {
           const data = await response.json();
           activity = data.activity;
 
-          document.getElementById('activityTitle').textContent = activity.title;
+          // Set basic info
           document.getElementById('vendorName').textContent = activity.vendor_name;
           document.getElementById('price').textContent = activity.currency + ' ' + activity.price;
           document.getElementById('duration').textContent = activity.duration_minutes + ' min';
           document.getElementById('capacity').textContent = activity.capacity_per_slot;
-          document.getElementById('description').textContent = activity.full_description;
+
+          // Translate title and description if needed
+          let title = activity.title;
+          let description = activity.full_description;
+          
+          // If language is not EN/AR, use AI translation
+          if (currentLanguage !== 'en' && currentLanguage !== 'ar') {
+            // Show loading state
+            document.getElementById('activityTitle').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+            document.getElementById('description').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+            
+            // Translate both title and description
+            title = await translateText(activity.title_en || activity.title, currentLanguage);
+            description = await translateText(activity.full_description_en || activity.full_description, currentLanguage);
+          }
+          
+          document.getElementById('activityTitle').textContent = title;
+          document.getElementById('description').textContent = description;
 
           const today = new Date().toISOString().split('T')[0];
           document.getElementById('bookingDate').min = today;
