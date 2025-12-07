@@ -2877,6 +2877,7 @@ app.get('/hotel/:property_slug', async (c) => {
         let propertyData = null;
         let allOfferings = [];
         let allActivities = [];
+        let customSections = [];
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
@@ -3208,6 +3209,50 @@ app.get('/hotel/:property_slug', async (c) => {
           });
         }
 
+        function renderCategoryPills() {
+          const container = document.getElementById('category-pills-container');
+          if (!container) return;
+          
+          const lang = currentLanguage;
+          const t = translations[lang] || translations.en;
+          
+          let pillsHTML = \`
+            <button onclick="filterOfferings('all')" class="category-pill bg-blue-500 text-white" data-category="all">
+              <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">\${t.all}</span>
+            </button>
+            <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
+              <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">\${t.restaurants}</span>
+            </button>
+            <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
+              <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">\${t.events}</span>
+            </button>
+            <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
+              <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">\${t.spa}</span>
+            </button>
+            <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
+              <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">\${t.services}</span>
+            </button>
+            <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
+              <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">\${t.activities}</span>
+            </button>
+          \`;
+          
+          // Add custom section pills
+          customSections.forEach(section => {
+            if (section.is_visible === 1) {
+              const sectionName = section[\`section_name_\${lang}\`] || section.section_name_en;
+              const icon = section.icon_class || 'fas fa-star';
+              pillsHTML += \`
+                <button onclick="filterOfferings('\${section.section_key}')" class="category-pill bg-gray-200 text-gray-700" data-category="\${section.section_key}">
+                  <i class="\${icon} mr-2"></i><span>\${sectionName}</span>
+                </button>
+              \`;
+            }
+          });
+          
+          container.innerHTML = pillsHTML;
+        }
+
         async function init() {
             try {
                 // Get property details
@@ -3240,6 +3285,14 @@ app.get('/hotel/:property_slug', async (c) => {
                 const activitiesResponse = await fetch(\`/api/property-vendor-activities/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const activitiesData = await activitiesResponse.json();
                 allActivities = activitiesData.activities || [];
+                
+                // Load custom sections
+                const customSectionsResponse = await fetch(\`/api/admin/custom-sections?property_id=\${propertyData.property_id}\`);
+                const customSectionsData = await customSectionsResponse.json();
+                customSections = customSectionsData.sections || [];
+                
+                // Render category pills including custom sections
+                renderCategoryPills();
                 
                 // Render all content
                 renderContent();
@@ -3283,6 +3336,36 @@ app.get('/hotel/:property_slug', async (c) => {
               'hotel-map': document.getElementById('hotel-map-section')
             };
             
+            // Create and add custom section elements dynamically
+            customSections.forEach(section => {
+              if (section.is_visible === 1) {
+                let customSectionEl = document.getElementById(\`custom-section-\${section.section_key}\`);
+                
+                // Create if doesn't exist
+                if (!customSectionEl) {
+                  customSectionEl = document.createElement('section');
+                  customSectionEl.id = \`custom-section-\${section.section_key}\`;
+                  customSectionEl.className = 'mb-12';
+                  
+                  const lang = currentLanguage;
+                  const sectionName = section[\`section_name_\${lang}\`] || section.section_name_en;
+                  const icon = section.icon_class || 'fas fa-star';
+                  
+                  customSectionEl.innerHTML = \`
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                      <i class="\${icon} text-blue-500 mr-3"></i>
+                      <span>\${sectionName}</span>
+                    </h2>
+                    <div id="custom-grid-\${section.section_key}" class="grid grid-cols-1 gap-4">
+                      <!-- Loaded dynamically -->
+                    </div>
+                  \`;
+                }
+                
+                sectionElements[section.section_key] = customSectionEl;
+              }
+            });
+            
             // Detach all sections
             Object.values(sectionElements).forEach(el => {
               if (el && el.parentNode) {
@@ -3309,6 +3392,14 @@ app.get('/hotel/:property_slug', async (c) => {
             renderServices();
             renderActivities();
             renderHotelMap();
+            
+            // Render custom sections
+            customSections.forEach(section => {
+              if (section.is_visible === 1) {
+                renderCustomSection(section.section_key);
+              }
+            });
+            
             updateSectionVisibility();
         }
 
@@ -3505,6 +3596,55 @@ app.get('/hotel/:property_slug', async (c) => {
                 </div>
             \`).join('');
         }
+        
+        function renderCustomSection(sectionKey) {
+            // Filter offerings by custom_section_key
+            const sectionOfferings = allOfferings.filter(o => 
+              o.offering_type === 'custom' && o.custom_section_key === sectionKey
+            );
+            
+            const grid = document.getElementById(\`custom-grid-\${sectionKey}\`);
+            
+            if (!grid) {
+                console.error(\`custom-grid-\${sectionKey} element not found\`);
+                return;
+            }
+            
+            if (sectionOfferings.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No items available in this section</p>';
+                return;
+            }
+            
+            // Render as elegant cards (similar to other sections)
+            grid.innerHTML = sectionOfferings.map(o => \`
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${o.offering_id})">
+                    <div class="relative">
+                        <img src="\${o.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${o.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                        <div class="absolute top-3 right-3">
+                            \${o.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>Reservations</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${o.title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${o.short_description}</p>
+                        \${o.location ? \`
+                            <div class="flex items-center text-sm text-gray-500 mb-4">
+                                <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
+                                <span>\${o.location}</span>
+                            </div>
+                        \` : ''}
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-sm text-blue-600 font-medium hover:text-blue-700 transition">
+                                <i class="fas fa-arrow-right mr-1"></i>Explore More
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
 
         function renderHotelMap() {
             const mapSection = document.getElementById('hotel-map-section');
@@ -3547,73 +3687,34 @@ app.get('/hotel/:property_slug', async (c) => {
 
         function updateSectionVisibility() {
             const sections = {
-                'restaurants': document.getElementById('restaurants-section'),
-                'events': document.getElementById('events-section'),
-                'spa': document.getElementById('spa-section'),
-                'service': document.getElementById('service-section'),
-                'activities': document.getElementById('activities-section')
+                'restaurants': { el: document.getElementById('restaurants-section'), visible: propertyData?.show_restaurants === 1 },
+                'events': { el: document.getElementById('events-section'), visible: propertyData?.show_events === 1 },
+                'spa': { el: document.getElementById('spa-section'), visible: propertyData?.show_spa === 1 },
+                'service': { el: document.getElementById('service-section'), visible: propertyData?.show_service === 1 },
+                'activities': { el: document.getElementById('activities-section'), visible: propertyData?.show_activities === 1 }
             };
             
-            // First, apply visibility settings from property data
-            if (propertyData) {
-                if (propertyData.show_restaurants === 0 && sections.restaurants) {
-                    sections.restaurants.style.display = 'none';
-                }
-                if (propertyData.show_events === 0 && sections.events) {
-                    sections.events.style.display = 'none';
-                }
-                if (propertyData.show_spa === 0 && sections.spa) {
-                    sections.spa.style.display = 'none';
-                }
-                if (propertyData.show_service === 0 && sections.service) {
-                    sections.service.style.display = 'none';
-                }
-                if (propertyData.show_activities === 0 && sections.activities) {
-                    sections.activities.style.display = 'none';
-                }
-            }
+            // Add custom sections
+            customSections.forEach(cs => {
+                sections[cs.section_key] = {
+                    el: document.getElementById(\`custom-section-\${cs.section_key}\`),
+                    visible: cs.is_visible === 1
+                };
+            });
             
-            // Then apply category filter on top
-            if (currentFilter === 'all') {
-                // Show all sections that are enabled
-                if (propertyData) {
-                    if (propertyData.show_restaurants === 1 && sections.restaurants) sections.restaurants.style.display = 'block';
-                    if (propertyData.show_events === 1 && sections.events) sections.events.style.display = 'block';
-                    if (propertyData.show_spa === 1 && sections.spa) sections.spa.style.display = 'block';
-                    if (propertyData.show_service === 1 && sections.service) sections.service.style.display = 'block';
-                    if (propertyData.show_activities === 1 && sections.activities) sections.activities.style.display = 'block';
+            // Apply filter
+            Object.keys(sections).forEach(key => {
+                const section = sections[key];
+                if (!section.el) return;
+                
+                if (currentFilter === 'all') {
+                    // Show if enabled in settings
+                    section.el.style.display = section.visible ? 'block' : 'none';
+                } else {
+                    // Show only the filtered section (if enabled)
+                    section.el.style.display = (key === currentFilter && section.visible) ? 'block' : 'none';
                 }
-            } else if (currentFilter === 'restaurant') {
-                if (sections.restaurants) sections.restaurants.style.display = (propertyData && propertyData.show_restaurants === 1) ? 'block' : 'none';
-                if (sections.events) sections.events.style.display = 'none';
-                if (sections.spa) sections.spa.style.display = 'none';
-                if (sections.service) sections.service.style.display = 'none';
-                if (sections.activities) sections.activities.style.display = 'none';
-            } else if (currentFilter === 'event') {
-                if (sections.restaurants) sections.restaurants.style.display = 'none';
-                if (sections.events) sections.events.style.display = (propertyData && propertyData.show_events === 1) ? 'block' : 'none';
-                if (sections.spa) sections.spa.style.display = 'none';
-                if (sections.service) sections.service.style.display = 'none';
-                if (sections.activities) sections.activities.style.display = 'none';
-            } else if (currentFilter === 'spa') {
-                if (sections.restaurants) sections.restaurants.style.display = 'none';
-                if (sections.events) sections.events.style.display = 'none';
-                if (sections.spa) sections.spa.style.display = (propertyData && propertyData.show_spa === 1) ? 'block' : 'none';
-                if (sections.service) sections.service.style.display = 'none';
-                if (sections.activities) sections.activities.style.display = 'none';
-            } else if (currentFilter === 'service') {
-                if (sections.restaurants) sections.restaurants.style.display = 'none';
-                if (sections.events) sections.events.style.display = 'none';
-                if (sections.spa) sections.spa.style.display = 'none';
-                if (sections.service) sections.service.style.display = (propertyData && propertyData.show_service === 1) ? 'block' : 'none';
-                if (sections.activities) sections.activities.style.display = 'none';
-            } else if (currentFilter === 'activities') {
-                if (sections.restaurants) sections.restaurants.style.display = 'none';
-                if (sections.events) sections.events.style.display = 'none';
-                if (sections.spa) sections.spa.style.display = 'none';
-                if (sections.service) sections.service.style.display = 'none';
-                if (sections.activities) sections.activities.style.display = (propertyData && propertyData.show_activities === 1) ? 'block' : 'none';
-            }
+            });
         }
 
         function filterOfferings(category) {
