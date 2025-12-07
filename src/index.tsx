@@ -1784,39 +1784,50 @@ app.put('/api/admin/custom-sections/:section_id', async (c) => {
   const data = await c.req.json()
   
   try {
-    await DB.prepare(`
-      UPDATE custom_sections
-      SET section_name_en = ?,
-          section_name_ar = ?,
-          section_name_de = ?,
-          section_name_ru = ?,
-          section_name_pl = ?,
-          section_name_it = ?,
-          section_name_fr = ?,
-          section_name_cs = ?,
-          section_name_uk = ?,
-          icon_class = ?,
-          color_class = ?,
-          display_order = ?,
-          is_visible = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE section_id = ?
-    `).bind(
-      data.section_name_en,
-      data.section_name_ar || null,
-      data.section_name_de || null,
-      data.section_name_ru || null,
-      data.section_name_pl || null,
-      data.section_name_it || null,
-      data.section_name_fr || null,
-      data.section_name_cs || null,
-      data.section_name_uk || null,
-      data.icon_class,
-      data.color_class,
-      data.display_order,
-      data.is_visible,
-      section_id
-    ).run()
+    // Support partial updates - only update if_visible if that's all that's provided
+    if (Object.keys(data).length === 1 && data.hasOwnProperty('is_visible')) {
+      await DB.prepare(`
+        UPDATE custom_sections
+        SET is_visible = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE section_id = ?
+      `).bind(data.is_visible, section_id).run()
+    } else {
+      // Full update
+      await DB.prepare(`
+        UPDATE custom_sections
+        SET section_name_en = ?,
+            section_name_ar = ?,
+            section_name_de = ?,
+            section_name_ru = ?,
+            section_name_pl = ?,
+            section_name_it = ?,
+            section_name_fr = ?,
+            section_name_cs = ?,
+            section_name_uk = ?,
+            icon_class = ?,
+            color_class = ?,
+            display_order = ?,
+            is_visible = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE section_id = ?
+      `).bind(
+        data.section_name_en,
+        data.section_name_ar || null,
+        data.section_name_de || null,
+        data.section_name_ru || null,
+        data.section_name_pl || null,
+        data.section_name_it || null,
+        data.section_name_fr || null,
+        data.section_name_cs || null,
+        data.section_name_uk || null,
+        data.icon_class,
+        data.color_class,
+        data.display_order,
+        data.is_visible,
+        section_id
+      ).run()
+    }
     
     return c.json({ success: true })
   } catch (error) {
@@ -6124,31 +6135,8 @@ app.get('/admin/dashboard', (c) => {
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
                             <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-eye mr-2 text-green-600"></i>Section Visibility</h4>
                             <p class="text-xs text-gray-500 mb-3">Toggle which sections appear on your homepage</p>
-                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
-                                    <input type="checkbox" id="showRestaurants" class="mr-2 w-4 h-4" checked />
-                                    <span class="text-sm font-medium">🍽️ Restaurants</span>
-                                </label>
-                                
-                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
-                                    <input type="checkbox" id="showEvents" class="mr-2 w-4 h-4" checked />
-                                    <span class="text-sm font-medium">🎉 Events</span>
-                                </label>
-                                
-                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
-                                    <input type="checkbox" id="showSpa" class="mr-2 w-4 h-4" checked />
-                                    <span class="text-sm font-medium">💆 Spa</span>
-                                </label>
-                                
-                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
-                                    <input type="checkbox" id="showService" class="mr-2 w-4 h-4" checked />
-                                    <span class="text-sm font-medium">🛎️ Services</span>
-                                </label>
-                                
-                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
-                                    <input type="checkbox" id="showActivities" class="mr-2 w-4 h-4" checked />
-                                    <span class="text-sm font-medium">🏃 Activities</span>
-                                </label>
+                            <div id="sectionVisibilityGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                <!-- Will be populated dynamically with default + custom sections -->
                             </div>
                         </div>
                         
@@ -6874,6 +6862,11 @@ app.get('/admin/dashboard', (c) => {
           // Load homepage layout settings
           document.getElementById('hotelMapUrl').value = settings.hotel_map_url || '';
           document.getElementById('showHotelMap').checked = settings.show_hotel_map === 1;
+          
+          // Render section visibility checkboxes dynamically
+          await renderSectionVisibility();
+          
+          // Set visibility values after rendering
           document.getElementById('showRestaurants').checked = settings.show_restaurants === 1;
           document.getElementById('showEvents').checked = settings.show_events === 1;
           document.getElementById('showSpa').checked = settings.show_spa === 1;
@@ -6890,6 +6883,55 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load settings error:', error);
           alert('Failed to load settings');
         }
+      }
+      
+      async function renderSectionVisibility() {
+        // Load custom sections
+        let customSections = [];
+        try {
+          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const data = await response.json();
+          customSections = data.sections || [];
+        } catch (error) {
+          console.error('Failed to load custom sections for visibility:', error);
+        }
+        
+        const defaultSections = [
+          { key: 'restaurants', icon: '🍽️', name: 'Restaurants' },
+          { key: 'events', icon: '🎉', name: 'Events' },
+          { key: 'spa', icon: '💆', name: 'Spa' },
+          { key: 'service', icon: '🛎️', name: 'Services' },
+          { key: 'activities', icon: '🏃', name: 'Activities' }
+        ];
+        
+        const grid = document.getElementById('sectionVisibilityGrid');
+        grid.innerHTML = '';
+        
+        // Render default sections
+        defaultSections.forEach(section => {
+          const label = document.createElement('label');
+          label.className = 'flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition';
+          label.innerHTML = \`
+            <input type="checkbox" id="show\${section.key.charAt(0).toUpperCase() + section.key.slice(1)}" 
+                   class="mr-2 w-4 h-4" checked data-section-key="\${section.key}" />
+            <span class="text-sm font-medium">\${section.icon} \${section.name}</span>
+          \`;
+          grid.appendChild(label);
+        });
+        
+        // Render custom sections
+        customSections.forEach(section => {
+          const label = document.createElement('label');
+          label.className = 'flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition';
+          const icon = section.icon_class ? \`<i class="\${section.icon_class} mr-1"></i>\` : '✨ ';
+          label.innerHTML = \`
+            <input type="checkbox" id="showCustom\${section.section_id}" 
+                   class="mr-2 w-4 h-4" checked data-section-key="\${section.section_key}" 
+                   data-custom="true" data-section-id="\${section.section_id}" />
+            <span class="text-sm font-medium">\${icon}\${section.section_name_en}</span>
+          \`;
+          grid.appendChild(label);
+        });
       }
       
       async function renderSectionOrder(order) {
@@ -7054,17 +7096,34 @@ app.get('/admin/dashboard', (c) => {
         };
         
         try {
+          // Save main settings
           const response = await fetch('/api/admin/property-settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
           });
           
-          if (response.ok) {
-            alert('Design settings saved successfully! Visit your homepage to see the changes.');
-          } else {
+          if (!response.ok) {
             alert('Failed to save settings');
+            return;
           }
+          
+          // Save custom section visibility
+          const customCheckboxes = document.querySelectorAll('#sectionVisibilityGrid input[data-custom="true"]');
+          for (const checkbox of customCheckboxes) {
+            const sectionId = checkbox.getAttribute('data-section-id');
+            const isVisible = checkbox.checked ? 1 : 0;
+            
+            await fetch('/api/admin/custom-sections/' + sectionId, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                is_visible: isVisible
+              })
+            });
+          }
+          
+          alert('Design settings saved successfully! Visit your homepage to see the changes.');
         } catch (error) {
           console.error('Save settings error:', error);
           alert('Failed to save settings');
