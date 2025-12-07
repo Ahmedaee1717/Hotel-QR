@@ -1625,7 +1625,12 @@ app.get('/api/admin/property-settings', async (c) => {
         primary_color, secondary_color, accent_color,
         layout_style, font_family, button_style, card_style, header_style, use_gradient,
         hotel_map_url, homepage_section_order, 
-        show_restaurants, show_events, show_spa, show_service, show_activities, show_hotel_map
+        show_restaurants, show_events, show_spa, show_service, show_activities, show_hotel_map,
+        section_restaurants_en, section_restaurants_ar, section_restaurants_de, section_restaurants_ru, section_restaurants_pl, section_restaurants_it, section_restaurants_fr, section_restaurants_cs, section_restaurants_uk,
+        section_events_en, section_events_ar, section_events_de, section_events_ru, section_events_pl, section_events_it, section_events_fr, section_events_cs, section_events_uk,
+        section_spa_en, section_spa_ar, section_spa_de, section_spa_ru, section_spa_pl, section_spa_it, section_spa_fr, section_spa_cs, section_spa_uk,
+        section_service_en, section_service_ar, section_service_de, section_service_ru, section_service_pl, section_service_it, section_service_fr, section_service_cs, section_service_uk,
+        section_activities_en, section_activities_ar, section_activities_de, section_activities_ru, section_activities_pl, section_activities_it, section_activities_fr, section_activities_cs, section_activities_uk
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
@@ -1834,6 +1839,25 @@ app.delete('/api/admin/custom-sections/:section_id', async (c) => {
   } catch (error) {
     console.error('Delete custom section error:', error)
     return c.json({ error: 'Failed to delete custom section' }, 500)
+  }
+})
+
+// Get custom sections for hotel homepage (public)
+app.get('/api/custom-sections/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const sections = await DB.prepare(`
+      SELECT * FROM custom_sections
+      WHERE property_id = ? AND is_visible = 1
+      ORDER BY display_order ASC, section_id ASC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, sections: sections.results })
+  } catch (error) {
+    console.error('Get custom sections error:', error)
+    return c.json({ error: 'Failed to get custom sections' }, 500)
   }
 })
 
@@ -2743,24 +2767,24 @@ app.get('/hotel/:property_slug', async (c) => {
 
             <!-- Category Filter Pills -->
             <div class="sticky-nav py-4 px-4 overflow-x-auto">
-                <div class="max-w-6xl mx-auto flex gap-2 whitespace-nowrap">
+                <div class="max-w-6xl mx-auto flex gap-2 whitespace-nowrap" id="category-pills-container">
                     <button onclick="filterOfferings('all')" class="category-pill bg-blue-500 text-white" data-category="all">
-                        <i class="fas fa-th-large mr-2"></i>All
+                        <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">All</span>
                     </button>
                     <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
-                        <i class="fas fa-utensils mr-2"></i>Restaurants
+                        <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">Restaurants</span>
                     </button>
                     <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
-                        <i class="fas fa-calendar-star mr-2"></i>Events
+                        <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">Events</span>
                     </button>
                     <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
-                        <i class="fas fa-spa mr-2"></i>Spa
+                        <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">Spa</span>
                     </button>
                     <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
-                        <i class="fas fa-concierge-bell mr-2"></i>Services
+                        <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">Services</span>
                     </button>
                     <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
-                        <i class="fas fa-hiking mr-2"></i>Activities
+                        <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">Activities</span>
                     </button>
                 </div>
             </div>
@@ -2772,7 +2796,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="restaurants-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-utensils text-blue-500 mr-3"></i>
-                        Our Restaurants
+                        <span id="section-heading-restaurants">Our Restaurants</span>
                     </h2>
                     <div id="restaurants-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
@@ -2783,7 +2807,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="events-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-calendar-star text-purple-500 mr-3"></i>
-                        Upcoming Events
+                        <span id="section-heading-events">Upcoming Events</span>
                     </h2>
                     <div id="events-grid" class="grid grid-cols-1 gap-4">
                         <!-- Loaded dynamically -->
@@ -2794,7 +2818,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="spa-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-spa text-green-500 mr-3"></i>
-                        Spa & Wellness
+                        <span id="section-heading-spa">Spa & Wellness</span>
                     </h2>
                     <div id="spa-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
@@ -2805,7 +2829,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="service-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-concierge-bell text-indigo-500 mr-3"></i>
-                        Hotel Services
+                        <span id="section-heading-service">Hotel Services</span>
                     </h2>
                     <div id="service-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
@@ -2816,7 +2840,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="activities-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-hiking text-orange-500 mr-3"></i>
-                        Activities & Experiences
+                        <span id="section-heading-activities">Activities & Experiences</span>
                     </h2>
                     <p class="text-gray-600 mb-4 text-sm">Curated experiences from our trusted partners</p>
                     <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3135,6 +3159,44 @@ app.get('/hotel/:property_slug', async (c) => {
           document.getElementById('dynamic-styles').textContent = dynamicCSS;
         }
 
+        // Translation helpers
+        const translations = {
+          en: { all: 'All', restaurants: 'Restaurants', events: 'Events', spa: 'Spa', services: 'Services', activities: 'Activities' },
+          ar: { all: 'الكل', restaurants: 'مطاعم', events: 'فعاليات', spa: 'سبا', services: 'خدمات', activities: 'أنشطة' },
+          de: { all: 'Alle', restaurants: 'Restaurants', events: 'Veranstaltungen', spa: 'Spa', services: 'Dienstleistungen', activities: 'Aktivitäten' },
+          ru: { all: 'Все', restaurants: 'Рестораны', events: 'События', spa: 'Спа', services: 'Услуги', activities: 'Мероприятия' },
+          pl: { all: 'Wszystko', restaurants: 'Restauracje', events: 'Wydarzenia', spa: 'Spa', services: 'Usługi', activities: 'Zajęcia' },
+          it: { all: 'Tutti', restaurants: 'Ristoranti', events: 'Eventi', spa: 'Spa', services: 'Servizi', activities: 'Attività' },
+          fr: { all: 'Tout', restaurants: 'Restaurants', events: 'Événements', spa: 'Spa', services: 'Services', activities: 'Activités' },
+          cs: { all: 'Vše', restaurants: 'Restaurace', events: 'Akce', spa: 'Spa', services: 'Služby', activities: 'Aktivity' },
+          uk: { all: 'Все', restaurants: 'Ресторани', events: 'Події', spa: 'Спа', services: 'Послуги', activities: 'Заходи' }
+        };
+
+        function applySectionTranslations(propertyData) {
+          const lang = currentLanguage;
+          
+          // Update section headings
+          const sections = ['restaurants', 'events', 'spa', 'service', 'activities'];
+          sections.forEach(section => {
+            const headingEl = document.getElementById(\`section-heading-\${section}\`);
+            if (headingEl) {
+              const key = \`section_\${section}_\${lang}\`;
+              headingEl.textContent = propertyData[key] || propertyData[\`section_\${section}_en\`] || headingEl.textContent;
+            }
+          });
+          
+          // Update category pills
+          document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (key === 'pill-all') el.textContent = translations[lang].all;
+            if (key === 'pill-restaurants') el.textContent = translations[lang].restaurants;
+            if (key === 'pill-events') el.textContent = translations[lang].events;
+            if (key === 'pill-spa') el.textContent = translations[lang].spa;
+            if (key === 'pill-services') el.textContent = translations[lang].services;
+            if (key === 'pill-activities') el.textContent = translations[lang].activities;
+          });
+        }
+
         async function init() {
             try {
                 // Get property details
@@ -3154,6 +3216,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 // Apply design settings
                 applyDesignSettings(propertyData);
+                
+                // Apply translations to section headings
+                applySectionTranslations(propertyData);
                 
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
