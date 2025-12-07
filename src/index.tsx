@@ -949,7 +949,7 @@ app.post('/api/vendor/activities', async (c) => {
   try {
     const {
       category_id, title_en, title_ar, short_description_en, short_description_ar,
-      full_description_en, full_description_ar, images, duration_minutes,
+      full_description_en, full_description_ar, images, video_url, duration_minutes,
       capacity_per_slot, price, currency, price_type, requirements,
       includes, cancellation_policy_hours, status
     } = body
@@ -957,15 +957,15 @@ app.post('/api/vendor/activities', async (c) => {
     const activity = await DB.prepare(`
       INSERT INTO activities (
         vendor_id, category_id, title_en, title_ar, short_description_en, short_description_ar,
-        full_description_en, full_description_ar, images, duration_minutes, capacity_per_slot,
+        full_description_en, full_description_ar, images, video_url, duration_minutes, capacity_per_slot,
         price, currency, price_type, requirements, includes, cancellation_policy_hours, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING activity_id
     `).bind(
       vendor_id, category_id, title_en, title_ar || title_en,
       short_description_en, short_description_ar || short_description_en,
       full_description_en, full_description_ar || full_description_en,
-      JSON.stringify(images), duration_minutes, capacity_per_slot,
+      JSON.stringify(images), video_url || null, duration_minutes, capacity_per_slot,
       price, currency || 'USD', price_type || 'per_person',
       JSON.stringify(requirements), JSON.stringify(includes),
       cancellation_policy_hours || 24, status || 'draft'
@@ -1950,9 +1950,9 @@ app.post('/api/admin/offerings', async (c) => {
     const result = await DB.prepare(`
       INSERT INTO hotel_offerings (
         property_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
-        images, price, currency, duration_minutes, requires_booking, location,
+        images, video_url, price, currency, duration_minutes, requires_booking, location,
         event_date, event_start_time, event_end_time, status, display_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
     `).bind(
       data.property_id,
       data.offering_type,
@@ -1961,6 +1961,7 @@ app.post('/api/admin/offerings', async (c) => {
       data.short_description_en,
       data.full_description_en,
       data.images,
+      data.video_url || null,
       data.price || 0,
       data.duration_minutes,
       data.requires_booking ? 1 : 0,
@@ -2050,7 +2051,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       UPDATE hotel_offerings SET
         title_en = ?, short_description_en = ?, full_description_en = ?,
         price = ?, location = ?, duration_minutes = ?,
-        requires_booking = ?, images = ?,
+        requires_booking = ?, images = ?, video_url = ?,
         event_date = ?, event_start_time = ?, event_end_time = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE offering_id = ?
@@ -2063,6 +2064,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       data.duration_minutes,
       data.requires_booking ? 1 : 0,
       data.images,
+      data.video_url || null,
       data.event_date,
       data.event_start_time,
       data.event_end_time,
@@ -5838,6 +5840,7 @@ app.get('/vendor/dashboard', (c) => {
                     <div><label class="block text-sm font-medium mb-2">Duration (minutes)</label><input type="number" id="duration" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Capacity per Slot</label><input type="number" id="capacity" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Activity Image</label><input type="file" id="activityImage" accept="image/*" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Upload activity image (optional)</p></div>
+                    <div><label class="block text-sm font-medium mb-2">Video URL</label><input type="url" id="videoUrl" placeholder="https://example.com/video.mp4" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity video (optional)</p></div>
                 </div>
                 <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
                 <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
@@ -6057,6 +6060,7 @@ app.get('/vendor/dashboard', (c) => {
               duration_minutes: parseInt(document.getElementById('duration').value),
               capacity_per_slot: parseInt(document.getElementById('capacity').value),
               images: imageUrl ? [imageUrl] : [],
+              video_url: document.getElementById('videoUrl').value || null,
               requirements: {},
               includes: [],
               status: 'active'
@@ -6391,9 +6395,18 @@ app.get('/activity', (c) => {
         </div>
 
         <div class="max-w-4xl mx-auto px-4 py-8">
+            <!-- Video Section (if available) -->
+            <div id="videoSection" class="hidden mb-6">
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <video id="activityVideo" controls class="w-full" style="max-height: 500px;">
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h2 id="activityTitle" class="text-3xl font-bold mb-2"></h2>
-                <p id="vendorName" class="text-gray-600 mb-4"></p>
                 <div class="flex items-end gap-4 mb-4">
                     <div><span id="price" class="text-4xl font-bold text-blue-600"></span><span class="text-gray-600" data-i18n="per-person">/person</span></div>
                     <div class="flex gap-4 text-sm text-gray-600">
@@ -6414,6 +6427,31 @@ app.get('/activity', (c) => {
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold mb-3" data-i18n="about-activity">About This Activity</h3>
                 <p id="description" class="text-gray-700"></p>
+            </div>
+
+            <!-- Vendor Information Card -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-4"><i class="fas fa-user-tie mr-2 text-blue-500"></i>Activity Provider</h3>
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <h4 id="vendorBusinessName" class="text-lg font-semibold text-gray-800 mb-2"></h4>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <p><i class="fas fa-phone mr-2 text-green-500"></i><span id="vendorPhone"></span></p>
+                            <p><i class="fas fa-envelope mr-2 text-blue-500"></i><span id="vendorEmail"></span></p>
+                            <div id="vendorCertifications" class="hidden">
+                                <p><i class="fas fa-certificate mr-2 text-yellow-500"></i><span id="vendorCert"></span></p>
+                            </div>
+                            <div id="vendorSafety" class="hidden">
+                                <p><i class="fas fa-shield-alt mr-2 text-green-500"></i>Safety Rating: <span id="vendorSafetyRating" class="font-semibold"></span>/5</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a id="vendorProfileLink" href="#" class="inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition">
+                            <i class="fas fa-user-circle mr-2"></i>View Profile
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -6668,7 +6706,6 @@ app.get('/activity', (c) => {
           activity = data.activity;
 
           // Set basic info
-          document.getElementById('vendorName').textContent = activity.vendor_name;
           document.getElementById('price').textContent = activity.currency + ' ' + activity.price;
           document.getElementById('duration').textContent = activity.duration_minutes + ' min';
           document.getElementById('capacity').textContent = activity.capacity_per_slot;
@@ -6690,6 +6727,31 @@ app.get('/activity', (c) => {
           
           document.getElementById('activityTitle').textContent = title;
           document.getElementById('description').textContent = description;
+
+          // Display video if available
+          if (activity.video_url) {
+            document.getElementById('videoSection').classList.remove('hidden');
+            document.getElementById('activityVideo').querySelector('source').src = activity.video_url;
+            document.getElementById('activityVideo').load();
+          }
+
+          // Display vendor information
+          document.getElementById('vendorBusinessName').textContent = activity.vendor_name;
+          document.getElementById('vendorPhone').textContent = activity.vendor_phone || 'Not provided';
+          document.getElementById('vendorEmail').textContent = activity.vendor_email || 'Not provided';
+          
+          if (activity.vendor_certifications) {
+            document.getElementById('vendorCertifications').classList.remove('hidden');
+            document.getElementById('vendorCert').textContent = activity.vendor_certifications;
+          }
+          
+          if (activity.vendor_safety_rating) {
+            document.getElementById('vendorSafety').classList.remove('hidden');
+            document.getElementById('vendorSafetyRating').textContent = activity.vendor_safety_rating;
+          }
+          
+          // Set vendor profile link
+          document.getElementById('vendorProfileLink').href = '/vendor/' + activity.vendor_slug;
 
           const today = new Date().toISOString().split('T')[0];
           document.getElementById('bookingDate').min = today;
@@ -7014,6 +7076,9 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                     <div class="grid md:grid-cols-2 gap-4">
                         <input type="text" id="offeringImages" placeholder="Image URL (comma-separated for multiple)" class="px-4 py-2 border rounded-lg">
+                        <input type="url" id="offeringVideoUrl" placeholder="Video URL (direct link to MP4)" class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
                         <label class="flex items-center px-4 py-2 border rounded-lg">
                             <input type="checkbox" id="offeringRequiresBooking" class="mr-2">
                             <span>Requires Booking</span>
@@ -7923,6 +7988,7 @@ app.get('/admin/dashboard', (c) => {
         document.getElementById('offeringLocation').value = offering.location || '';
         document.getElementById('offeringDuration').value = offering.duration_minutes || '';
         document.getElementById('offeringImages').value = offering.images ? offering.images.join(', ') : '';
+        document.getElementById('offeringVideoUrl').value = offering.video_url || '';
         document.getElementById('offeringRequiresBooking').checked = offering.requires_booking === 1;
         
         if (offering.offering_type === 'event') {
@@ -7951,6 +8017,7 @@ app.get('/admin/dashboard', (c) => {
                 duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
                 requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
                 images: JSON.stringify(images),
+                video_url: document.getElementById('offeringVideoUrl').value || null,
                 event_date: document.getElementById('eventDate').value || null,
                 event_start_time: document.getElementById('eventStartTime').value || null,
                 event_end_time: document.getElementById('eventEndTime').value || null
@@ -8031,6 +8098,7 @@ app.get('/admin/dashboard', (c) => {
             duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
             requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
             images: JSON.stringify(images),
+            video_url: document.getElementById('offeringVideoUrl').value || null,
             event_date: document.getElementById('eventDate').value || null,
             event_start_time: document.getElementById('eventStartTime').value || null,
             event_end_time: document.getElementById('eventEndTime').value || null
