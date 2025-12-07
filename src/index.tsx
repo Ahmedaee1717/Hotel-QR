@@ -3017,8 +3017,9 @@ app.get('/hotel/:property_slug', async (c) => {
             <!-- Hero Header -->
             <div class="gradient-hero text-white py-12 px-4">
                 <div class="max-w-6xl mx-auto text-center">
-                    <h1 class="text-4xl md:text-5xl font-bold mb-3" id="propertyName">Paradise Resort</h1>
-                    <p class="text-lg opacity-90" id="propertyTagline">Discover all we have to offer</p>
+                    <div id="propertyLogo" class="mb-4"></div>
+                    <h1 class="text-xl md:text-2xl font-light tracking-widest mb-2" id="propertyName" style="letter-spacing: 0.25em; font-weight: 300;">Paradise Resort</h1>
+                    <p class="text-xs md:text-sm opacity-75 font-light tracking-wide" id="propertyTagline" style="letter-spacing: 0.1em;">Discover all we have to offer</p>
                 </div>
             </div>
 
@@ -3130,6 +3131,12 @@ app.get('/hotel/:property_slug', async (c) => {
         // Translation dictionaries for UI elements
         const uiTranslations = {
             en: {
+                'pill-all': 'All',
+                'pill-restaurants': 'Restaurants',
+                'pill-events': 'Events',
+                'pill-spa': 'Spa',
+                'pill-services': 'Services',
+                'pill-activities': 'Activities',
                 'book-now': 'BOOK NOW',
                 'reservations': 'Reservations',
                 'explore-menu': 'Explore Menu',
@@ -4271,7 +4278,7 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function viewActivity(activityId) {
-            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id;
+            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
         }
 
         // Initialize on DOM ready
@@ -6363,11 +6370,16 @@ app.get('/activity', (c) => {
       let participants = 1;
       const activityId = new URLSearchParams(window.location.search).get('id');
       const sessionToken = new URLSearchParams(window.location.search).get('token') || localStorage.getItem('session_token');
+      
+      // Get language from URL or localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      let currentLanguage = urlParams.get('lang') || localStorage.getItem('language') || 'en';
+      localStorage.setItem('language', currentLanguage);
 
       async function init() {
         if (!activityId) { alert('Activity not found'); return; }
         try {
-          const response = await fetch('/api/activities/' + activityId + '?lang=en');
+          const response = await fetch('/api/activities/' + activityId + '?lang=' + currentLanguage);
           const data = await response.json();
           activity = data.activity;
 
