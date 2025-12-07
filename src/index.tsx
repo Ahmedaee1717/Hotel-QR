@@ -2698,22 +2698,38 @@ app.get('/admin/dashboard', (c) => {
 // DEFAULT ROUTE - Guest Landing Page
 // ============================================
 
-app.get('/', (c) => {
-  return c.html(`
+// Property-specific homepage
+app.get('/:property_slug?', async (c) => {
+  const { DB } = c.env
+  const property_slug = c.req.param('property_slug') || 'paradise-resort'
+  
+  try {
+    const property = await DB.prepare(`
+      SELECT * FROM properties WHERE slug = ? AND status = 'active'
+    `).bind(property_slug).first()
+    
+    if (!property) {
+      return c.html('<html><body><h1>Property not found</h1><p>Please check the URL or visit <a href="/">homepage</a></p></body></html>', 404)
+    }
+    
+    const primaryColor = property.primary_color || '#0EA5E9'
+    const secondaryColor = property.secondary_color || '#10B981'
+    
+    return c.html(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Paradise Resort - Activity Booking</title>
+        <title>${property.name} - Activity Booking</title>
         <meta name="description" content="Book amazing resort activities instantly">
         <link rel="manifest" href="/static/manifest.json">
-        <meta name="theme-color" content="#0EA5E9">
+        <meta name="theme-color" content="${primaryColor}">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <style>
           body { font-family: 'Inter', system-ui, sans-serif; }
-          .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
+          .gradient-bg { background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%); }
         </style>
     </head>
     <body class="bg-gray-50">
@@ -2722,13 +2738,13 @@ app.get('/', (c) => {
             <div class="gradient-bg text-white py-20 px-4">
                 <div class="max-w-4xl mx-auto text-center">
                     <i class="fas fa-umbrella-beach text-6xl mb-6"></i>
-                    <h1 class="text-5xl font-bold mb-4">Paradise Resort</h1>
+                    <h1 class="text-5xl font-bold mb-4">${property.name}</h1>
                     <p class="text-xl mb-8">Discover & Book Amazing Activities</p>
                     <div class="bg-white/20 backdrop-blur-sm rounded-lg p-6 max-w-md mx-auto">
                         <i class="fas fa-qrcode text-4xl mb-4"></i>
                         <p class="text-lg mb-2">Scan the QR code in your room</p>
                         <div class="mt-4 space-y-2">
-                            <a href="/browse?property=1" class="block bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100">Browse All Activities</a>
+                            <a href="/browse?property=${property.property_id}" class="block bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100">Browse All Activities</a>
                         </div>
                     </div>
                 </div>
@@ -2801,7 +2817,7 @@ app.get('/', (c) => {
             <!-- Footer -->
             <footer class="bg-gray-800 text-white py-8 px-4">
                 <div class="max-w-4xl mx-auto text-center">
-                    <p class="mb-3">© 2025 Paradise Resort & Spa. All rights reserved.</p>
+                    <p class="mb-3">© 2025 ${property.name}. All rights reserved.</p>
                     <div class="mb-3 flex justify-center gap-4">
                         <a href="/vendor/login" class="text-sm text-blue-400 hover:text-blue-300"><i class="fas fa-store mr-1"></i>Vendor Login</a>
                         <a href="/admin/login" class="text-sm text-blue-400 hover:text-blue-300"><i class="fas fa-shield-alt mr-1"></i>Admin Login</a>
@@ -2817,6 +2833,10 @@ app.get('/', (c) => {
     </body>
     </html>
   `)
+  } catch (error) {
+    console.error('Homepage error:', error)
+    return c.html('<html><body><h1>Error</h1><p>Failed to load homepage</p></body></html>', 500)
+  }
 })
 
 export default app
