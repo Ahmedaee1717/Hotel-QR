@@ -3703,17 +3703,29 @@ app.get('/hotel/:property_slug', async (c) => {
                 };
             });
             
+            // Map filter values to section keys (handle singular/plural)
+            const filterToSectionMap = {
+                'all': 'all',
+                'restaurant': 'restaurants',
+                'event': 'events',
+                'spa': 'spa',
+                'service': 'service',
+                'activities': 'activities'
+            };
+            
+            const mappedFilter = filterToSectionMap[currentFilter] || currentFilter;
+            
             // Apply filter
             Object.keys(sections).forEach(key => {
                 const section = sections[key];
                 if (!section.el) return;
                 
-                if (currentFilter === 'all') {
+                if (mappedFilter === 'all') {
                     // Show if enabled in settings
                     section.el.style.display = section.visible ? 'block' : 'none';
                 } else {
                     // Show only the filtered section (if enabled)
-                    section.el.style.display = (key === currentFilter && section.visible) ? 'block' : 'none';
+                    section.el.style.display = (key === mappedFilter && section.visible) ? 'block' : 'none';
                 }
             });
         }
