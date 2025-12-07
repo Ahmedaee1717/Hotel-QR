@@ -178,7 +178,7 @@ app.get('/', (c) => {
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center">
-                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect" class="h-11 w-auto">
+                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect Logo" class="h-12 w-auto">
                 </div>
                 <div class="hidden md:flex items-center space-x-10">
                     <a href="#how-it-works" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition">How It Works</a>
@@ -215,32 +215,48 @@ app.get('/', (c) => {
                 </div>
             </div>
 
-            <!-- Hero Visual: QR Code Concept -->
+            <!-- Hero Visual: QR Code in Hotel Room -->
             <div class="max-w-5xl mx-auto">
-                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-12 border border-gray-200">
-                    <div class="grid md:grid-cols-2 gap-12 items-center">
-                        <!-- QR Code -->
-                        <div class="text-center">
-                            <div class="bg-white p-8 rounded-xl shadow-sm inline-block">
-                                <div class="w-48 h-48 mx-auto">
-                                    <svg viewBox="0 0 100 100" class="w-full h-full">
-                                        <rect width="100" height="100" fill="white"/>
-                                        <rect x="10" y="10" width="25" height="25" fill="black"/>
-                                        <rect x="65" y="10" width="25" height="25" fill="black"/>
-                                        <rect x="10" y="65" width="25" height="25" fill="black"/>
-                                        <rect x="15" y="15" width="15" height="15" fill="white"/>
-                                        <rect x="70" y="15" width="15" height="15" fill="white"/>
-                                        <rect x="15" y="70" width="15" height="15" fill="white"/>
-                                        <rect x="20" y="20" width="5" height="5" fill="black"/>
-                                        <rect x="75" y="20" width="5" height="5" fill="black"/>
-                                        <rect x="20" y="75" width="5" height="5" fill="black"/>
-                                        <rect x="45" y="15" width="5" height="5" fill="black"/>
-                                        <rect x="55" y="20" width="5" height="5" fill="black"/>
-                                        <rect x="40" y="25" width="5" height="5" fill="black"/>
-                                        <rect x="50" y="30" width="5" height="5" fill="black"/>
-                                    </svg>
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl overflow-hidden border border-gray-200 shadow-lg">
+                    <div class="relative">
+                        <!-- Beautiful Hotel Room Image with QR Code -->
+                        <img src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=1400&q=80" 
+                             alt="Luxury hotel room with QR code on nightstand" 
+                             class="w-full h-[500px] object-cover">
+                        
+                        <!-- Overlay with QR Code Card -->
+                        <div class="absolute inset-0 bg-black/20 flex items-center justify-center">
+                            <div class="bg-white p-8 rounded-xl shadow-2xl transform hover:scale-105 transition-transform duration-300">
+                                <div class="text-center">
+                                    <div class="w-48 h-48 mx-auto mb-4">
+                                        <svg viewBox="0 0 100 100" class="w-full h-full">
+                                            <rect width="100" height="100" fill="white"/>
+                                            <!-- QR Code Pattern -->
+                                            <rect x="10" y="10" width="25" height="25" fill="black"/>
+                                            <rect x="65" y="10" width="25" height="25" fill="black"/>
+                                            <rect x="10" y="65" width="25" height="25" fill="black"/>
+                                            <rect x="15" y="15" width="15" height="15" fill="white"/>
+                                            <rect x="70" y="15" width="15" height="15" fill="white"/>
+                                            <rect x="15" y="70" width="15" height="15" fill="white"/>
+                                            <rect x="20" y="20" width="5" height="5" fill="black"/>
+                                            <rect x="75" y="20" width="5" height="5" fill="black"/>
+                                            <rect x="20" y="75" width="5" height="5" fill="black"/>
+                                            <!-- Additional QR patterns -->
+                                            <rect x="45" y="15" width="5" height="5" fill="black"/>
+                                            <rect x="55" y="20" width="5" height="5" fill="black"/>
+                                            <rect x="40" y="25" width="5" height="5" fill="black"/>
+                                            <rect x="50" y="30" width="5" height="5" fill="black"/>
+                                            <rect x="60" y="35" width="5" height="5" fill="black"/>
+                                            <rect x="45" y="40" width="5" height="5" fill="black"/>
+                                            <rect x="55" y="45" width="5" height="5" fill="black"/>
+                                            <rect x="40" y="50" width="5" height="5" fill="black"/>
+                                            <rect x="50" y="55" width="5" height="5" fill="black"/>
+                                            <rect x="60" y="60" width="5" height="5" fill="black"/>
+                                        </svg>
+                                    </div>
+                                    <p class="text-base font-semibold text-gray-900 mb-1">Scan to Explore</p>
+                                    <p class="text-sm text-gray-600">Room 305</p>
                                 </div>
-                                <p class="text-sm text-gray-500 mt-4 font-medium">Room 305</p>
                             </div>
                             <p class="text-sm text-gray-600 mt-6">Unique QR code per room</p>
                         </div>
