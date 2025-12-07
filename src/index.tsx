@@ -3029,29 +3029,26 @@ app.get('/hotel/:property_slug', async (c) => {
                 </select>
             </div>
             
-            <!-- Hero Header - Social Media Profile Style -->
-            <div class="relative">
+            <!-- Hero Header - Facebook Profile Style -->
+            <div class="relative bg-white">
                 <!-- Cover Photo -->
-                <div class="gradient-hero h-64 md:h-80"></div>
-                
-                <!-- Profile Section -->
-                <div class="relative -mt-16 md:-mt-20 pb-6 bg-white">
-                    <div class="max-w-6xl mx-auto px-4">
-                        <!-- Profile Picture Container -->
-                        <div class="flex justify-center mb-4">
-                            <div id="propertyLogo" class="relative">
-                                <!-- Logo placeholder - will be replaced if logo exists -->
-                                <div class="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white shadow-2xl border-4 border-white flex items-center justify-center">
-                                    <i class="fas fa-hotel text-4xl md:text-5xl text-gray-400"></i>
-                                </div>
+                <div class="gradient-hero h-64 md:h-96 relative">
+                    <!-- Profile Picture - Overlaps at bottom left of cover -->
+                    <div class="absolute bottom-0 left-4 md:left-8 translate-y-1/2">
+                        <div id="propertyLogo" class="relative">
+                            <!-- Logo placeholder - will be replaced if logo exists -->
+                            <div class="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white shadow-lg border-4 border-white flex items-center justify-center">
+                                <i class="fas fa-hotel text-2xl md:text-3xl text-gray-400"></i>
                             </div>
                         </div>
-                        
-                        <!-- Profile Info -->
-                        <div class="text-center">
-                            <h1 class="text-xl md:text-2xl font-semibold mb-2 text-gray-900" id="propertyName">Paradise Resort</h1>
-                            <p class="text-sm md:text-base text-gray-600 mb-4" id="propertyTagline">Discover all we have to offer</p>
-                        </div>
+                    </div>
+                </div>
+                
+                <!-- Profile Info Section -->
+                <div class="pt-14 md:pt-20 pb-6 px-4 md:px-8">
+                    <div class="max-w-6xl mx-auto">
+                        <h1 class="text-2xl md:text-3xl font-bold mb-2 text-gray-900" id="propertyName">Paradise Resort</h1>
+                        <p class="text-sm md:text-base text-gray-600 mb-4" id="propertyTagline">Discover all we have to offer</p>
                     </div>
                 </div>
             </div>
@@ -3423,12 +3420,12 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroImageEffect = settings.hero_image_effect || 'none';
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
-          // Logo - add to propertyLogo container (Social Media Profile Style)
+          // Logo - add to propertyLogo container (Facebook Profile Style)
           const logoContainer = document.getElementById('propertyLogo');
           if (logoContainer) {
             if (settings.brand_logo_url) {
               // Replace placeholder with actual logo
-              logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover shadow-2xl border-4 border-white bg-white" />';
+              logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover shadow-lg border-4 border-white bg-white" />';
             }
             // If no logo, keep the placeholder (hotel icon)
           }
