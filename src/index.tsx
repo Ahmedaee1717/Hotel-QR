@@ -615,7 +615,11 @@ app.get('/api/vendors/:vendor_slug', async (c) => {
         ...vendor,
         cover_images: vendor.cover_images ? JSON.parse(vendor.cover_images) : [],
         certifications: vendor.certifications ? JSON.parse(vendor.certifications) : [],
-        working_hours: vendor.working_hours ? JSON.parse(vendor.working_hours) : {}
+        working_hours: vendor.working_hours ? JSON.parse(vendor.working_hours) : {},
+        operating_hours: vendor.operating_hours ? JSON.parse(vendor.operating_hours) : {},
+        social_media: vendor.social_media ? JSON.parse(vendor.social_media) : {},
+        specialties: vendor.specialties ? JSON.parse(vendor.specialties) : [],
+        languages_spoken: vendor.languages_spoken ? JSON.parse(vendor.languages_spoken) : []
       },
       activities: activities.results
     })
@@ -895,6 +899,113 @@ app.post('/api/vendor/upload-image', async (c) => {
     })
   } catch (error) {
     console.error('Image upload error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get vendor profile
+app.get('/api/vendor/profile', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  
+  try {
+    const profile = await DB.prepare(`
+      SELECT 
+        vendor_id, business_name, slug, email, phone, website,
+        profile_image, description, address, city, country,
+        operating_hours, social_media, specialties, years_experience,
+        languages_spoken, safety_rating, status
+      FROM vendors
+      WHERE vendor_id = ?
+    `).bind(vendor_id).first()
+    
+    if (!profile) {
+      return c.json({ error: 'Vendor not found' }, 404)
+    }
+    
+    return c.json({ profile })
+  } catch (error) {
+    console.error('Get vendor profile error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Update vendor profile
+app.put('/api/vendor/profile', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  const body = await c.req.json()
+  
+  try {
+    const {
+      business_name, phone, website, description, address, city, country,
+      operating_hours, social_media, specialties, years_experience, languages_spoken
+    } = body
+    
+    await DB.prepare(`
+      UPDATE vendors
+      SET business_name = ?,
+          phone = ?,
+          website = ?,
+          description = ?,
+          address = ?,
+          city = ?,
+          country = ?,
+          operating_hours = ?,
+          social_media = ?,
+          specialties = ?,
+          years_experience = ?,
+          languages_spoken = ?,
+          updated_at = datetime('now')
+      WHERE vendor_id = ?
+    `).bind(
+      business_name, phone, website || null, description || null,
+      address || null, city || null, country || null,
+      operating_hours ? JSON.stringify(operating_hours) : null,
+      social_media ? JSON.stringify(social_media) : null,
+      specialties ? JSON.stringify(specialties) : null,
+      years_experience || null,
+      languages_spoken ? JSON.stringify(languages_spoken) : null,
+      vendor_id
+    ).run()
+    
+    return c.json({ success: true, message: 'Profile updated successfully' })
+  } catch (error) {
+    console.error('Update vendor profile error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Upload vendor profile image
+app.post('/api/vendor/upload-profile-image', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  
+  try {
+    const formData = await c.req.formData()
+    const image = formData.get('image')
+    
+    if (!image) {
+      return c.json({ error: 'No image provided' }, 400)
+    }
+    
+    // Generate placeholder image URL (production: upload to R2)
+    const timestamp = Date.now()
+    const imageUrl = `/static/vendors/${vendor_id}_profile_${timestamp}.jpg`
+    
+    // Update vendor profile image
+    await DB.prepare(`
+      UPDATE vendors SET profile_image = ?, updated_at = datetime('now')
+      WHERE vendor_id = ?
+    `).bind(imageUrl, vendor_id).run()
+    
+    return c.json({
+      success: true,
+      image_url: imageUrl,
+      message: 'Profile image uploaded successfully'
+    })
+  } catch (error) {
+    console.error('Profile image upload error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -1716,6 +1827,47 @@ app.get('/vendor/dashboard', (c) => {
             <div id="bookingsList" class="space-y-3"></div>
         </div>
 
+        <!-- Vendor Profile -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-user-circle mr-2 text-indigo-600"></i>My Profile</h2>
+            <form id="profileForm" class="space-y-4">
+                <div class="flex items-center gap-6 mb-6">
+                    <div class="relative">
+                        <img id="profileImagePreview" src="https://via.placeholder.com/150" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-gray-200">
+                        <label for="profileImageInput" class="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700">
+                            <i class="fas fa-camera"></i>
+                            <input type="file" id="profileImageInput" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-xl font-bold" id="profileBusinessName">Business Name</h3>
+                        <p class="text-gray-600" id="profileEmail">email@example.com</p>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium mb-2">Business Name</label><input type="text" id="businessNameInput" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Phone</label><input type="tel" id="phoneInput" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Website</label><input type="url" id="websiteInput" placeholder="https://" class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Years of Experience</label><input type="number" id="yearsExpInput" min="0" class="w-full px-4 py-2 border rounded-lg"></div>
+                </div>
+                
+                <div><label class="block text-sm font-medium mb-2">Description</label><textarea id="descriptionInput" rows="4" placeholder="Tell guests about your business..." class="w-full px-4 py-2 border rounded-lg"></textarea></div>
+                
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div><label class="block text-sm font-medium mb-2">Address</label><input type="text" id="addressInput" class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">City</label><input type="text" id="cityInput" class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Country</label><input type="text" id="countryInput" class="w-full px-4 py-2 border rounded-lg"></div>
+                </div>
+                
+                <div><label class="block text-sm font-medium mb-2">Specialties (comma-separated)</label><input type="text" id="specialtiesInput" placeholder="Diving, Snorkeling, PADI Certified" class="w-full px-4 py-2 border rounded-lg"></div>
+                
+                <div><label class="block text-sm font-medium mb-2">Languages Spoken (comma-separated)</label><input type="text" id="languagesInput" placeholder="English, Arabic, French" class="w-full px-4 py-2 border rounded-lg"></div>
+                
+                <button type="submit" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-semibold"><i class="fas fa-save mr-2"></i>Update Profile</button>
+            </form>
+        </div>
+
         <!-- Add Activity Form -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add New Activity</h2>
@@ -1747,10 +1899,11 @@ app.get('/vendor/dashboard', (c) => {
 
       async function loadDashboard() {
         try {
-          const [bookings, activities, categories] = await Promise.all([
+          const [bookings, activities, categories, profile] = await Promise.all([
             fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
             fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
-            fetch('/api/categories').then(r => r.json())
+            fetch('/api/categories').then(r => r.json()),
+            fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json())
           ]);
 
           const today = new Date().toISOString().split('T')[0];
@@ -1766,8 +1919,32 @@ app.get('/vendor/dashboard', (c) => {
 
           displayBookings(bookings.bookings);
           displayActivities(activities.activities);
+          displayProfile(profile.profile);
         } catch (error) {
           console.error('Dashboard load error:', error);
+        }
+      }
+
+      function displayProfile(profile) {
+        document.getElementById('profileBusinessName').textContent = profile.business_name;
+        document.getElementById('profileEmail').textContent = profile.email;
+        document.getElementById('businessNameInput').value = profile.business_name || '';
+        document.getElementById('phoneInput').value = profile.phone || '';
+        document.getElementById('websiteInput').value = profile.website || '';
+        document.getElementById('descriptionInput').value = profile.description || '';
+        document.getElementById('addressInput').value = profile.address || '';
+        document.getElementById('cityInput').value = profile.city || '';
+        document.getElementById('countryInput').value = profile.country || '';
+        document.getElementById('yearsExpInput').value = profile.years_experience || '';
+        
+        const specialties = profile.specialties ? JSON.parse(profile.specialties) : [];
+        document.getElementById('specialtiesInput').value = specialties.join(', ');
+        
+        const languages = profile.languages_spoken ? JSON.parse(profile.languages_spoken) : [];
+        document.getElementById('languagesInput').value = languages.join(', ');
+        
+        if (profile.profile_image) {
+          document.getElementById('profileImagePreview').src = profile.profile_image;
         }
       }
 
@@ -1820,6 +1997,71 @@ app.get('/vendor/dashboard', (c) => {
           </div>
         \`).join('');
       }
+
+      // Profile form submission
+      document.getElementById('profileForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const specialties = document.getElementById('specialtiesInput').value.split(',').map(s => s.trim()).filter(s => s);
+          const languages = document.getElementById('languagesInput').value.split(',').map(s => s.trim()).filter(s => s);
+          
+          const response = await fetch('/api/vendor/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Vendor-ID': vendorId },
+            body: JSON.stringify({
+              business_name: document.getElementById('businessNameInput').value,
+              phone: document.getElementById('phoneInput').value,
+              website: document.getElementById('websiteInput').value,
+              description: document.getElementById('descriptionInput').value,
+              address: document.getElementById('addressInput').value,
+              city: document.getElementById('cityInput').value,
+              country: document.getElementById('countryInput').value,
+              years_experience: parseInt(document.getElementById('yearsExpInput').value) || null,
+              specialties,
+              languages_spoken: languages,
+              operating_hours: null,
+              social_media: null
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert('Profile updated successfully!');
+            location.reload();
+          } else {
+            alert('Error: ' + (data.error || 'Failed to update profile'));
+          }
+        } catch (error) {
+          console.error('Profile update error:', error);
+          alert('Failed to update profile');
+        }
+      });
+
+      // Profile image upload
+      document.getElementById('profileImageInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          
+          const response = await fetch('/api/vendor/upload-profile-image', {
+            method: 'POST',
+            headers: { 'X-Vendor-ID': vendorId },
+            body: formData
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            document.getElementById('profileImagePreview').src = data.image_url;
+            alert('Profile image updated!');
+          }
+        } catch (error) {
+          console.error('Image upload error:', error);
+          alert('Failed to upload image');
+        }
+      });
 
       document.getElementById('addActivityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -2017,6 +2259,140 @@ app.get('/browse', (c) => {
 </body>
 </html>
   `)
+})
+
+// Vendor Profile page (public)
+app.get('/vendor/:vendor_slug', async (c) => {
+  const { DB } = c.env
+  const { vendor_slug } = c.req.param()
+  const property_id = c.req.query('property') || '1'
+  
+  try {
+    const vendor = await DB.prepare(`
+      SELECT v.* FROM vendors v
+      JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+      WHERE v.slug = ? AND vp.property_id = ? AND v.status = 'active'
+    `).bind(vendor_slug, property_id).first()
+    
+    if (!vendor) {
+      return c.html('<html><body><h1>Vendor not found</h1></body></html>', 404)
+    }
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${vendor.business_name} - Vendor Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-500 to-green-500 text-white py-6 px-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <button onclick="history.back()" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30"><i class="fas fa-arrow-left mr-2"></i>Back</button>
+            <h1 class="text-2xl font-bold">Vendor Profile</h1>
+            <div class="w-20"></div>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-xl overflow-hidden mb-6">
+            <div class="bg-gradient-to-r from-blue-500 to-green-500 h-32"></div>
+            <div class="px-6 pb-6">
+                <div class="flex items-end gap-6 -mt-16 mb-6">
+                    <img src="${vendor.profile_image || 'https://via.placeholder.com/150'}" alt="${vendor.business_name}" class="w-32 h-32 rounded-full border-4 border-white object-cover">
+                    <div class="flex-1 pt-16">
+                        <h2 class="text-3xl font-bold">${vendor.business_name}</h2>
+                        <div class="flex gap-4 mt-2 text-gray-600">
+                            ${vendor.city ? '<span><i class="fas fa-map-marker-alt mr-1"></i>' + vendor.city + (vendor.country ? ', ' + vendor.country : '') + '</span>' : ''}
+                            ${vendor.years_experience ? '<span><i class="fas fa-award mr-1"></i>' + vendor.years_experience + ' years experience</span>' : ''}
+                            ${vendor.safety_rating ? '<span><i class="fas fa-star mr-1 text-yellow-500"></i>' + vendor.safety_rating + '/5.0</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+
+                ${vendor.description ? '<div class="mb-6"><h3 class="text-xl font-bold mb-3">About Us</h3><p class="text-gray-700">' + vendor.description + '</p></div>' : ''}
+
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Contact Information</h3>
+                        <div class="space-y-2 text-gray-700">
+                            ${vendor.phone ? '<p><i class="fas fa-phone mr-2 text-blue-600"></i>' + vendor.phone + '</p>' : ''}
+                            ${vendor.email ? '<p><i class="fas fa-envelope mr-2 text-blue-600"></i>' + vendor.email + '</p>' : ''}
+                            ${vendor.website ? '<p><i class="fas fa-globe mr-2 text-blue-600"></i><a href="' + vendor.website + '" target="_blank" class="text-blue-600 hover:underline">' + vendor.website + '</a></p>' : ''}
+                            ${vendor.address ? '<p><i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>' + vendor.address + '</p>' : ''}
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xl font-bold mb-3">Details</h3>
+                        <div class="space-y-2 text-gray-700" id="vendorDetails">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold mb-3">Our Activities</h3>
+                    <div id="activitiesList" class="grid md:grid-cols-3 gap-4">
+                        <p class="text-gray-500 col-span-3 text-center py-4">Loading activities...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const vendorSlug = '${vendor_slug}';
+      const propertyId = '${property_id}';
+      
+      async function loadVendorData() {
+        try {
+          const response = await fetch(\`/api/vendors/\${vendorSlug}?property_id=\${propertyId}\`);
+          const data = await response.json();
+          
+          // Display specialties
+          const details = document.getElementById('vendorDetails');
+          if (data.vendor.specialties && data.vendor.specialties.length > 0) {
+            details.innerHTML += '<p><i class="fas fa-certificate mr-2 text-blue-600"></i><strong>Specialties:</strong> ' + data.vendor.specialties.join(', ') + '</p>';
+          }
+          
+          if (data.vendor.languages_spoken && data.vendor.languages_spoken.length > 0) {
+            details.innerHTML += '<p><i class="fas fa-language mr-2 text-blue-600"></i><strong>Languages:</strong> ' + data.vendor.languages_spoken.join(', ') + '</p>';
+          }
+          
+          // Display activities
+          const activitiesList = document.getElementById('activitiesList');
+          if (data.activities.length === 0) {
+            activitiesList.innerHTML = '<p class="text-gray-500 col-span-3 text-center py-4">No activities available</p>';
+          } else {
+            activitiesList.innerHTML = data.activities.map(a => \`
+              <a href="/activity?id=\${a.activity_id}" class="block bg-white border rounded-lg p-4 hover:shadow-lg transition">
+                <h4 class="font-bold mb-2">\${a.title}</h4>
+                <p class="text-sm text-gray-600 mb-3 line-clamp-2">\${a.short_description}</p>
+                <div class="flex justify-between items-center">
+                  <span class="text-blue-600 font-bold">\${a.currency} \${a.price}</span>
+                  <span class="text-sm text-gray-600">\${a.duration_minutes} min</span>
+                </div>
+              </a>
+            \`).join('');
+          }
+        } catch (error) {
+          console.error('Load vendor data error:', error);
+        }
+      }
+      
+      loadVendorData();
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Vendor profile page error:', error)
+    return c.html('<html><body><h1>Error</h1><p>Failed to load vendor profile</p></body></html>', 500)
+  }
 })
 
 // Activity Detail page
