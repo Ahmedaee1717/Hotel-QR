@@ -1095,6 +1095,150 @@ app.post('/api/callback-request', async (c) => {
   }
 })
 
+// ============================================
+// SUPER ADMIN API ENDPOINTS
+// ============================================
+
+// Get platform stats
+app.get('/api/superadmin/stats', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const hotels = await DB.prepare('SELECT COUNT(*) as count FROM properties').first()
+    const vendors = await DB.prepare('SELECT COUNT(*) as count FROM vendors').first()
+    const bookings = await DB.prepare('SELECT COUNT(*) as count, SUM(total_amount) as revenue FROM bookings').first()
+    
+    return c.json({
+      total_hotels: hotels.count,
+      total_vendors: vendors.count,
+      total_bookings: bookings.count,
+      total_revenue: bookings.revenue || 0
+    })
+  } catch (error) {
+    console.error('Stats error:', error)
+    return c.json({ error: 'Failed to load stats' }, 500)
+  }
+})
+
+// Get all hotels
+app.get('/api/superadmin/hotels', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const hotels = await DB.prepare(`
+      SELECT property_id, property_name, slug, contact_email, contact_phone, 
+             location, status, created_at
+      FROM properties
+      ORDER BY created_at DESC
+    `).all()
+    
+    return c.json(hotels.results)
+  } catch (error) {
+    console.error('Get hotels error:', error)
+    return c.json({ error: 'Failed to load hotels' }, 500)
+  }
+})
+
+// Add new hotel
+app.post('/api/superadmin/hotels', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    // Create hotel property
+    const property = await DB.prepare(`
+      INSERT INTO properties (property_name, slug, contact_email, contact_phone, location, status)
+      VALUES (?, ?, ?, ?, ?, 'active')
+    `).bind(
+      data.property_name,
+      data.slug,
+      data.contact_email,
+      data.contact_phone || null,
+      data.location || null
+    ).run()
+    
+    // Create admin user for the hotel
+    const adminResult = await DB.prepare(`
+      INSERT INTO guests (email, name, phone, language_preference)
+      VALUES (?, ?, ?, 'en')
+    `).bind(data.contact_email, data.property_name + ' Admin', data.contact_phone || '').run()
+    
+    // Generate registration code for the hotel
+    const code = Math.random().toString(36).substring(2, 10).toUpperCase()
+    const expiry = new Date()
+    expiry.setDate(expiry.getDate() + 30)
+    
+    await DB.prepare(`
+      UPDATE properties 
+      SET registration_code = ?, registration_code_expires_at = ?
+      WHERE property_id = ?
+    `).bind(code, expiry.toISOString(), property.meta.last_row_id).run()
+    
+    return c.json({
+      success: true,
+      property_id: property.meta.last_row_id,
+      registration_code: code,
+      message: 'Hotel created successfully'
+    })
+  } catch (error) {
+    console.error('Create hotel error:', error)
+    return c.json({ error: 'Failed to create hotel' }, 500)
+  }
+})
+
+// Get all vendors
+app.get('/api/superadmin/vendors', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const vendors = await DB.prepare(`
+      SELECT 
+        v.*,
+        COUNT(DISTINCT vp.property_id) as property_count
+      FROM vendors v
+      LEFT JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+      GROUP BY v.vendor_id
+      ORDER BY v.created_at DESC
+    `).all()
+    
+    return c.json(vendors.results)
+  } catch (error) {
+    console.error('Get vendors error:', error)
+    return c.json({ error: 'Failed to load vendors' }, 500)
+  }
+})
+
+// Get all bookings
+app.get('/api/superadmin/bookings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const bookings = await DB.prepare(`
+      SELECT 
+        b.*,
+        a.title_en as activity_title,
+        g.name as guest_name,
+        g.email as guest_email,
+        p.property_name
+      FROM bookings b
+      JOIN activities a ON b.activity_id = a.activity_id
+      JOIN guests g ON b.guest_id = g.guest_id
+      JOIN properties p ON b.property_id = p.property_id
+      ORDER BY b.created_at DESC
+      LIMIT 100
+    `).all()
+    
+    return c.json(bookings.results)
+  } catch (error) {
+    console.error('Get bookings error:', error)
+    return c.json({ error: 'Failed to load bookings' }, 500)
+  }
+})
+
+// ============================================
+// HOTEL ADMIN API ENDPOINTS
+// ============================================
+
 // Get callback requests (Admin)
 app.get('/api/admin/callback-requests', async (c) => {
   const { DB } = c.env
@@ -2950,6 +3094,423 @@ app.get('/vendor/login', (c) => {
 })
 
 // Admin login page
+// ============================================
+// GUESTCONNECT PLATFORM SUPER ADMIN
+// ============================================
+
+// Super Admin Login
+app.get('/superadmin/login', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuestConnect Platform Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mb-4">
+                <i class="fas fa-crown text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">GuestConnect</h1>
+            <p class="text-gray-600 mt-2">Platform Super Admin</p>
+        </div>
+
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" id="email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" id="password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            </div>
+            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition">
+                <i class="fas fa-sign-in-alt mr-2"></i>Login to Platform Admin
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <a href="/admin/login" class="text-sm text-gray-600 hover:text-purple-600">
+                <i class="fas fa-hotel mr-1"></i>Hotel Admin Login
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Super admin credentials (hardcoded for now - you should change this!)
+            if (email === 'superadmin@guestconnect.com' && password === 'GuestConnect2024!') {
+                localStorage.setItem('superadmin_user', JSON.stringify({
+                    user_id: 1,
+                    email: email,
+                    role: 'superadmin',
+                    name: 'Platform Administrator'
+                }));
+                window.location.href = '/superadmin/dashboard';
+            } else {
+                alert('Invalid credentials');
+            }
+        });
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Super Admin Dashboard
+app.get('/superadmin/dashboard', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuestConnect Platform Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+      .tab-active { border-bottom: 3px solid #9333EA; color: #9333EA; }
+      .hidden { display: none !important; }
+      .tab-content { display: block; }
+      .tab-btn { cursor: pointer; transition: all 0.3s; }
+      .tab-btn:hover { background-color: rgba(147, 51, 234, 0.1); }
+      .stat-card { transition: transform 0.2s; }
+      .stat-card:hover { transform: translateY(-4px); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-700 to-blue-700 text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-crown mr-3"></i>GuestConnect Platform Admin
+                </h1>
+                <p class="text-purple-100 text-sm">Manage all hotels and platform settings</p>
+            </div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+            </button>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Platform Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Hotels</p>
+                        <p class="text-3xl font-bold text-purple-600" id="totalHotels">0</p>
+                    </div>
+                    <div class="bg-purple-100 p-4 rounded-full">
+                        <i class="fas fa-hotel text-purple-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Vendors</p>
+                        <p class="text-3xl font-bold text-blue-600" id="totalVendors">0</p>
+                    </div>
+                    <div class="bg-blue-100 p-4 rounded-full">
+                        <i class="fas fa-store text-blue-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Bookings</p>
+                        <p class="text-3xl font-bold text-green-600" id="totalBookings">0</p>
+                    </div>
+                    <div class="bg-green-100 p-4 rounded-full">
+                        <i class="fas fa-calendar-check text-green-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Platform Revenue</p>
+                        <p class="text-3xl font-bold text-indigo-600" id="totalRevenue">$0</p>
+                    </div>
+                    <div class="bg-indigo-100 p-4 rounded-full">
+                        <i class="fas fa-dollar-sign text-indigo-600 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="flex overflow-x-auto">
+                <button data-tab="hotels" class="tab-btn px-6 py-4 font-semibold tab-active">
+                    <i class="fas fa-hotel mr-2"></i>Hotels
+                </button>
+                <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-store mr-2"></i>Vendors
+                </button>
+                <button data-tab="bookings" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-calendar-alt mr-2"></i>All Bookings
+                </button>
+                <button data-tab="analytics" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-chart-line mr-2"></i>Analytics
+                </button>
+                <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-cog mr-2"></i>Platform Settings
+                </button>
+            </div>
+        </div>
+
+        <!-- Hotels Tab -->
+        <div id="hotelsTab" class="tab-content">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-plus-circle mr-2 text-purple-600"></i>Add New Hotel
+                </h2>
+                <form id="addHotelForm" class="grid md:grid-cols-3 gap-4">
+                    <input type="text" id="hotelName" placeholder="Hotel Name" required class="px-4 py-2 border rounded-lg">
+                    <input type="email" id="hotelEmail" placeholder="Admin Email" required class="px-4 py-2 border rounded-lg">
+                    <input type="text" id="hotelSlug" placeholder="URL Slug (e.g., paradise-resort)" required class="px-4 py-2 border rounded-lg">
+                    <input type="text" id="hotelPhone" placeholder="Phone" class="px-4 py-2 border rounded-lg">
+                    <input type="text" id="hotelLocation" placeholder="Location/City" class="px-4 py-2 border rounded-lg">
+                    <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-check mr-2"></i>Add Hotel
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Hotels</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Hotel Name</th>
+                                <th class="px-4 py-3 text-left">Slug</th>
+                                <th class="px-4 py-3 text-left">Admin Email</th>
+                                <th class="px-4 py-3 text-left">Location</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-left">Created</th>
+                                <th class="px-4 py-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hotelsList"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vendors Tab -->
+        <div id="vendorsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Vendors Across Platform</h2>
+                <div id="vendorsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Bookings Tab -->
+        <div id="bookingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">Recent Bookings</h2>
+                <div id="bookingsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analyticsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">Platform Analytics</h2>
+                <p class="text-gray-600">Analytics dashboard coming soon...</p>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">Platform Settings</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Platform Name</label>
+                        <input type="text" value="GuestConnect" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Default Currency</label>
+                        <select class="w-full px-4 py-2 border rounded-lg">
+                            <option>USD</option>
+                            <option>EUR</option>
+                            <option>GBP</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Commission Rate (%)</label>
+                        <input type="number" value="10" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-save mr-2"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const user = JSON.parse(localStorage.getItem('superadmin_user') || '{}');
+        if (!user.user_id || user.role !== 'superadmin') {
+            window.location.href = '/superadmin/login';
+        }
+
+        let currentTab = 'hotels';
+
+        function showTab(tab, clickedButton) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            if (clickedButton) {
+                clickedButton.classList.add('tab-active');
+            }
+
+            if (tab === 'hotels') loadHotels();
+            if (tab === 'vendors') loadVendors();
+            if (tab === 'bookings') loadBookings();
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.getAttribute('data-tab');
+                showTab(tab, this);
+            });
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/superadmin/stats');
+                const stats = await response.json();
+                document.getElementById('totalHotels').textContent = stats.total_hotels || 0;
+                document.getElementById('totalVendors').textContent = stats.total_vendors || 0;
+                document.getElementById('totalBookings').textContent = stats.total_bookings || 0;
+                document.getElementById('totalRevenue').textContent = '$' + (stats.total_revenue || 0).toLocaleString();
+            } catch (error) {
+                console.error('Load stats error:', error);
+            }
+        }
+
+        async function loadHotels() {
+            try {
+                const response = await fetch('/api/superadmin/hotels');
+                const hotels = await response.json();
+                const list = document.getElementById('hotelsList');
+                
+                if (!hotels || hotels.length === 0) {
+                    list.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No hotels yet</td></tr>';
+                    return;
+                }
+                
+                list.innerHTML = hotels.map(h => '<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3 font-medium">' + h.property_name + '</td><td class="px-4 py-3"><code class="bg-gray-100 px-2 py-1 rounded text-sm">' + h.slug + '</code></td><td class="px-4 py-3">' + (h.contact_email || 'N/A') + '</td><td class="px-4 py-3">' + (h.location || 'N/A') + '</td><td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ' + (h.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800') + '">' + h.status + '</span></td><td class="px-4 py-3 text-sm text-gray-500">' + new Date(h.created_at).toLocaleDateString() + '</td><td class="px-4 py-3"><a href="/admin/dashboard?property_id=' + h.property_id + '" target="_blank" class="text-purple-600 hover:underline text-sm"><i class="fas fa-external-link-alt mr-1"></i>View Admin</a></td></tr>').join('');
+            } catch (error) {
+                console.error('Load hotels error:', error);
+            }
+        }
+
+        async function loadVendors() {
+            try {
+                const response = await fetch('/api/superadmin/vendors');
+                const vendors = await response.json();
+                const list = document.getElementById('vendorsList');
+                
+                if (!vendors || vendors.length === 0) {
+                    list.innerHTML = '<p class="text-gray-500 text-center py-8">No vendors yet</p>';
+                    return;
+                }
+                
+                list.innerHTML = vendors.map(v => '<div class="border rounded-lg p-4"><div class="flex justify-between items-start"><div><h3 class="font-bold">' + v.business_name + '</h3><p class="text-sm text-gray-600">' + v.email + ' • ' + v.phone + '</p><p class="text-xs text-gray-500 mt-1">Connected to: ' + (v.property_count || 0) + ' hotel(s)</p></div><span class="px-3 py-1 rounded-full text-sm ' + (v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800') + '">' + v.status + '</span></div></div>').join('');
+            } catch (error) {
+                console.error('Load vendors error:', error);
+            }
+        }
+
+        async function loadBookings() {
+            try {
+                const response = await fetch('/api/superadmin/bookings');
+                const bookings = await response.json();
+                const list = document.getElementById('bookingsList');
+                
+                if (!bookings || bookings.length === 0) {
+                    list.innerHTML = '<p class="text-gray-500 text-center py-8">No bookings yet</p>';
+                    return;
+                }
+                
+                list.innerHTML = bookings.map(b => '<div class="border rounded-lg p-4"><div class="flex justify-between items-start"><div><h3 class="font-bold">' + b.activity_title + '</h3><p class="text-sm text-gray-600">Guest: ' + b.guest_name + ' (' + b.guest_email + ')</p><p class="text-sm text-gray-600">Hotel: ' + b.property_name + '</p><p class="text-xs text-gray-500 mt-1">' + new Date(b.booking_date).toLocaleString() + '</p></div><div class="text-right"><span class="text-lg font-bold text-blue-600">$' + (b.total_amount || 0) + '</span><br><span class="px-2 py-1 rounded text-xs ' + (b.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') + '">' + b.payment_status + '</span></div></div></div>').join('');
+            } catch (error) {
+                console.error('Load bookings error:', error);
+            }
+        }
+
+        document.getElementById('addHotelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const hotelData = {
+                property_name: document.getElementById('hotelName').value,
+                slug: document.getElementById('hotelSlug').value,
+                contact_email: document.getElementById('hotelEmail').value,
+                contact_phone: document.getElementById('hotelPhone').value,
+                location: document.getElementById('hotelLocation').value
+            };
+
+            try {
+                const response = await fetch('/api/superadmin/hotels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(hotelData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Hotel added successfully! Admin credentials:\\nEmail: ' + hotelData.contact_email + '\\nPassword: admin123\\n\\nPlease ask the hotel to change their password.');
+                    e.target.reset();
+                    loadHotels();
+                    loadStats();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to add hotel'));
+                }
+            } catch (error) {
+                console.error('Add hotel error:', error);
+                alert('Failed to add hotel');
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('superadmin_user');
+            window.location.href = '/superadmin/login';
+        }
+
+        loadStats();
+        loadHotels();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ============================================
+// HOTEL ADMIN (existing)
+// ============================================
+
 app.get('/admin/login', (c) => {
   return c.html(`
     <!DOCTYPE html>
