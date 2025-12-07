@@ -1951,7 +1951,8 @@ app.post('/api/admin/offerings', async (c) => {
       // Translate in background (don't wait for it)
       c.executionCtx.waitUntil((async () => {
         try {
-          const languages = ['es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'zh']
+          // Only translate to languages that exist in DB schema
+          const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
           const translations: any = {}
           
           for (const lang of languages) {
@@ -1968,28 +1969,28 @@ app.post('/api/admin/offerings', async (c) => {
             translations['full_description_' + lang] = translated[2] || data.full_description_en
           }
           
-          // Update database with translations
+          // Update database with translations (ar, de, ru, pl, it, fr, cs, uk)
           await DB.prepare(`
             UPDATE hotel_offerings SET
-              title_es = ?, short_description_es = ?, full_description_es = ?,
-              title_fr = ?, short_description_fr = ?, full_description_fr = ?,
-              title_de = ?, short_description_de = ?, full_description_de = ?,
-              title_it = ?, short_description_it = ?, full_description_it = ?,
-              title_pt = ?, short_description_pt = ?, full_description_pt = ?,
-              title_ru = ?, short_description_ru = ?, full_description_ru = ?,
               title_ar = ?, short_description_ar = ?, full_description_ar = ?,
-              title_zh = ?, short_description_zh = ?, full_description_zh = ?,
+              title_de = ?, short_description_de = ?, full_description_de = ?,
+              title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+              title_pl = ?, short_description_pl = ?, full_description_pl = ?,
+              title_it = ?, short_description_it = ?, full_description_it = ?,
+              title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+              title_cs = ?, short_description_cs = ?, full_description_cs = ?,
+              title_uk = ?, short_description_uk = ?, full_description_uk = ?,
               updated_at = CURRENT_TIMESTAMP
             WHERE offering_id = ?
           `).bind(
-            translations.title_es, translations.short_description_es, translations.full_description_es,
-            translations.title_fr, translations.short_description_fr, translations.full_description_fr,
-            translations.title_de, translations.short_description_de, translations.full_description_de,
-            translations.title_it, translations.short_description_it, translations.full_description_it,
-            translations.title_pt, translations.short_description_pt, translations.full_description_pt,
-            translations.title_ru, translations.short_description_ru, translations.full_description_ru,
             translations.title_ar, translations.short_description_ar, translations.full_description_ar,
-            translations.title_zh, translations.short_description_zh, translations.full_description_zh,
+            translations.title_de, translations.short_description_de, translations.full_description_de,
+            translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+            translations.title_pl, translations.short_description_pl, translations.full_description_pl,
+            translations.title_it, translations.short_description_it, translations.full_description_it,
+            translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+            translations.title_cs, translations.short_description_cs, translations.full_description_cs,
+            translations.title_uk, translations.short_description_uk, translations.full_description_uk,
             offering_id
           ).run()
           
@@ -2137,6 +2138,97 @@ app.post('/api/admin/offerings/:offering_id/translate', async (c) => {
   } catch (error) {
     console.error('Translation error:', error)
     return c.json({ error: 'Translation failed: ' + error }, 500)
+  }
+})
+
+// Batch translate ALL offerings to all languages (Admin)
+app.post('/api/admin/offerings/translate-all', async (c) => {
+  const { DB } = c.env
+  const { property_id, openai_api_key } = await c.req.json()
+  
+  if (!openai_api_key) {
+    return c.json({ error: 'OpenAI API key required' }, 400)
+  }
+  
+  try {
+    // Get all offerings for this property
+    const offerings: any = await DB.prepare(`
+      SELECT offering_id, title_en, short_description_en, full_description_en
+      FROM hotel_offerings 
+      WHERE property_id = ?
+    `).bind(property_id).all()
+    
+    if (!offerings.results || offerings.results.length === 0) {
+      return c.json({ error: 'No offerings found' }, 404)
+    }
+    
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    let translatedCount = 0
+    let failedCount = 0
+    
+    // Translate each offering
+    for (const offering of offerings.results) {
+      try {
+        const translations: any = {}
+        
+        // Translate to all languages
+        for (const lang of languages) {
+          const textsToTranslate = [
+            offering.title_en,
+            offering.short_description_en || '',
+            offering.full_description_en || ''
+          ]
+          
+          const translated = await translateWithAI(textsToTranslate, lang, openai_api_key)
+          
+          translations['title_' + lang] = translated[0] || offering.title_en
+          translations['short_description_' + lang] = translated[1] || offering.short_description_en
+          translations['full_description_' + lang] = translated[2] || offering.full_description_en
+        }
+        
+        // Update database with translations
+        await DB.prepare(`
+          UPDATE hotel_offerings SET
+            title_ar = ?, short_description_ar = ?, full_description_ar = ?,
+            title_de = ?, short_description_de = ?, full_description_de = ?,
+            title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+            title_pl = ?, short_description_pl = ?, full_description_pl = ?,
+            title_it = ?, short_description_it = ?, full_description_it = ?,
+            title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+            title_cs = ?, short_description_cs = ?, full_description_cs = ?,
+            title_uk = ?, short_description_uk = ?, full_description_uk = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE offering_id = ?
+        `).bind(
+          translations.title_ar, translations.short_description_ar, translations.full_description_ar,
+          translations.title_de, translations.short_description_de, translations.full_description_de,
+          translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+          translations.title_pl, translations.short_description_pl, translations.full_description_pl,
+          translations.title_it, translations.short_description_it, translations.full_description_it,
+          translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+          translations.title_cs, translations.short_description_cs, translations.full_description_cs,
+          translations.title_uk, translations.short_description_uk, translations.full_description_uk,
+          offering.offering_id
+        ).run()
+        
+        translatedCount++
+        console.log('Translated offering ' + offering.offering_id)
+      } catch (error) {
+        failedCount++
+        console.error('Failed to translate offering ' + offering.offering_id + ':', error)
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      total: offerings.results.length,
+      translated: translatedCount,
+      failed: failedCount,
+      message: 'Translated ' + translatedCount + ' offerings to 8 languages'
+    })
+  } catch (error) {
+    console.error('Batch translation error:', error)
+    return c.json({ error: 'Batch translation failed: ' + error }, 500)
   }
 })
 
@@ -6625,7 +6717,15 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4">All Hotel Offerings</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">All Hotel Offerings</h2>
+                    <button 
+                        onclick="translateAllOfferings()" 
+                        id="translateAllBtn"
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all">
+                        <i class="fas fa-language mr-2"></i>Translate All to 8 Languages
+                    </button>
+                </div>
                 <div class="mb-4 flex gap-2">
                     <button onclick="filterOfferings('all')" class="offering-filter-btn px-4 py-2 rounded bg-blue-500 text-white" data-type="all">All</button>
                     <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant">Restaurants</button>
@@ -7448,6 +7548,48 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Delete offering error:', error);
           alert('Failed to delete offering');
+        }
+      }
+      
+      async function translateAllOfferings() {
+        const btn = document.getElementById('translateAllBtn');
+        const originalText = btn.innerHTML;
+        
+        if (!confirm('This will translate ALL offerings to 8 languages (Arabic, German, Russian, Polish, Italian, French, Czech, Ukrainian).\\n\\nThis may take 2-3 minutes depending on the number of offerings.\\n\\nProceed?')) {
+          return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Translating...';
+        
+        try {
+          const response = await fetch('/api/admin/offerings/translate-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              openai_api_key: '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'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Translation Complete!\\n\\n' + 
+                  'Total offerings: ' + data.total + '\\n' +
+                  'Successfully translated: ' + data.translated + '\\n' +
+                  'Failed: ' + data.failed + '\\n\\n' +
+                  'All offerings now available in 8 languages!');
+            loadOfferings();
+          } else {
+            alert('Translation failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Batch translation error:', error);
+          alert('Translation failed: ' + error.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
         }
       }
       
