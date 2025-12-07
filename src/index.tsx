@@ -3711,6 +3711,7 @@ app.get('/admin/dashboard', (c) => {
                 <button onclick="showTab('rooms')" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
                 <button onclick="showTab('vendors')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
                 <button onclick="showTab('regcode')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
+                <button onclick="showTab('offerings')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
                 <button onclick="showTab('activities')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
                 <button onclick="showTab('callbacks')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
             </div>
