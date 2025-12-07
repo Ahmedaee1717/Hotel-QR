@@ -869,6 +869,142 @@ app.post('/api/vendor/activities', async (c) => {
   }
 })
 
+// Upload activity image (simulated - returns data URL for now)
+app.post('/api/vendor/upload-image', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  
+  try {
+    // In production, this would upload to Cloudflare R2
+    // For now, we'll return a placeholder URL
+    const formData = await c.req.formData()
+    const image = formData.get('image')
+    
+    if (!image) {
+      return c.json({ error: 'No image provided' }, 400)
+    }
+    
+    // Generate placeholder image URL
+    const timestamp = Date.now()
+    const imageUrl = `/static/uploads/${vendor_id}_${timestamp}.jpg`
+    
+    return c.json({
+      success: true,
+      image_url: imageUrl,
+      message: 'Image uploaded successfully'
+    })
+  } catch (error) {
+    console.error('Image upload error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Vendor registration with hotel code
+app.post('/api/vendor/register', async (c) => {
+  const { DB } = c.env
+  const { registration_code, business_name, email, phone, password } = await c.req.json()
+  
+  try {
+    // Validate registration code
+    const property = await DB.prepare(`
+      SELECT property_id, registration_code_expires_at 
+      FROM properties 
+      WHERE registration_code = ? AND status = 'active'
+    `).bind(registration_code).first()
+    
+    if (!property) {
+      return c.json({ error: 'Invalid registration code' }, 400)
+    }
+    
+    // Check if code is expired
+    const expiresAt = new Date(property.registration_code_expires_at)
+    if (expiresAt < new Date()) {
+      return c.json({ error: 'Registration code has expired' }, 400)
+    }
+    
+    // Check if email already exists
+    const existing = await DB.prepare(`
+      SELECT vendor_id FROM vendors WHERE email = ?
+    `).bind(email).first()
+    
+    if (existing) {
+      return c.json({ error: 'Email already registered' }, 400)
+    }
+    
+    // Create vendor
+    const slug = business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const vendor = await DB.prepare(`
+      INSERT INTO vendors (business_name, slug, email, phone, password_hash, status)
+      VALUES (?, ?, ?, ?, ?, 'active')
+      RETURNING vendor_id
+    `).bind(business_name, slug, email, phone, password).first()
+    
+    // Link vendor to property
+    await DB.prepare(`
+      INSERT INTO vendor_properties (vendor_id, property_id, registration_code_used, joined_via, commission_rate)
+      VALUES (?, ?, ?, 'registration_code', 15)
+    `).bind(vendor.vendor_id, property.property_id, registration_code).run()
+    
+    return c.json({
+      success: true,
+      vendor_id: vendor.vendor_id,
+      message: 'Vendor registered successfully'
+    })
+  } catch (error) {
+    console.error('Vendor registration error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// ============================================
+// GUEST CALLBACK REQUESTS
+// ============================================
+
+// Submit callback request
+app.post('/api/callback-request', async (c) => {
+  const { DB } = c.env
+  const { property_id, first_name, last_name, phone, email, preferred_time, message } = await c.req.json()
+  
+  try {
+    const request = await DB.prepare(`
+      INSERT INTO callback_requests (
+        property_id, first_name, last_name, phone, email, preferred_time, message, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+      RETURNING request_id
+    `).bind(property_id, first_name, last_name, phone, email || null, preferred_time || 'anytime', message || null).first()
+    
+    return c.json({
+      success: true,
+      request_id: request.request_id,
+      message: 'Callback request submitted. We will contact you soon!'
+    })
+  } catch (error) {
+    console.error('Callback request error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get callback requests (Admin)
+app.get('/api/admin/callback-requests', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  const status = c.req.query('status') || 'pending'
+  
+  try {
+    const requests = await DB.prepare(`
+      SELECT * FROM callback_requests
+      WHERE property_id = ? AND status = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(property_id, status).all()
+    
+    return c.json({ requests: requests.results })
+  } catch (error) {
+    console.error('Get callback requests error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // ============================================
 // ADMIN API ROUTES
 // ============================================
@@ -1077,6 +1213,57 @@ app.patch('/api/admin/vendors/:vendor_id', async (c) => {
     return c.json({ success: true, message: 'Vendor updated successfully' })
   } catch (error) {
     console.error('Update vendor error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get property registration code
+app.get('/api/admin/registration-code', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const property = await DB.prepare(`
+      SELECT registration_code, registration_code_expires_at
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    return c.json({
+      registration_code: property.registration_code,
+      expires_at: property.registration_code_expires_at
+    })
+  } catch (error) {
+    console.error('Get registration code error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Regenerate property registration code
+app.post('/api/admin/regenerate-registration-code', async (c) => {
+  const { DB } = c.env
+  const { property_id } = await c.req.json()
+  
+  try {
+    // Generate new 8-character code
+    const newCode = Math.random().toString(36).substring(2, 10).toUpperCase()
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + 30) // Expires in 30 days
+    
+    await DB.prepare(`
+      UPDATE properties
+      SET registration_code = ?,
+          registration_code_expires_at = ?
+      WHERE property_id = ?
+    `).bind(newCode, expiresAt.toISOString(), property_id).run()
+    
+    return c.json({
+      success: true,
+      registration_code: newCode,
+      expires_at: expiresAt.toISOString()
+    })
+  } catch (error) {
+    console.error('Regenerate registration code error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -1511,8 +1698,8 @@ app.get('/vendor/dashboard', (c) => {
             </div>
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex justify-between items-start">
-                    <div><p class="text-gray-600 text-sm">Weekly Revenue</p><p class="text-3xl font-bold" id="weekRevenue">$0</p></div>
-                    <div class="bg-green-100 p-3 rounded-lg"><i class="fas fa-dollar-sign text-green-600 text-xl"></i></div>
+                    <div><p class="text-gray-600 text-sm">Total Bookings</p><p class="text-3xl font-bold" id="totalBookings">0</p></div>
+                    <div class="bg-green-100 p-3 rounded-lg"><i class="fas fa-list text-green-600 text-xl"></i></div>
                 </div>
             </div>
             <div class="bg-white rounded-lg shadow-lg p-6">
@@ -1521,6 +1708,12 @@ app.get('/vendor/dashboard', (c) => {
                     <div class="bg-yellow-100 p-3 rounded-lg"><i class="fas fa-clock text-yellow-600 text-xl"></i></div>
                 </div>
             </div>
+        </div>
+
+        <!-- Bookings History -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-history mr-2 text-purple-600"></i>Booking History</h2>
+            <div id="bookingsList" class="space-y-3"></div>
         </div>
 
         <!-- Add Activity Form -->
@@ -1533,6 +1726,7 @@ app.get('/vendor/dashboard', (c) => {
                     <div><label class="block text-sm font-medium mb-2">Price (USD)</label><input type="number" id="price" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Duration (minutes)</label><input type="number" id="duration" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Capacity per Slot</label><input type="number" id="capacity" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><label class="block text-sm font-medium mb-2">Activity Image</label><input type="file" id="activityImage" accept="image/*" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Upload activity image (optional)</p></div>
                 </div>
                 <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
                 <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
@@ -1562,6 +1756,7 @@ app.get('/vendor/dashboard', (c) => {
           const today = new Date().toISOString().split('T')[0];
           const todayBookings = bookings.bookings.filter(b => b.activity_date === today);
           document.getElementById('todayBookings').textContent = todayBookings.length;
+          document.getElementById('totalBookings').textContent = bookings.bookings.length;
           document.getElementById('pendingBookings').textContent = bookings.bookings.filter(b => b.status === 'pending').length;
 
           const categorySelect = document.getElementById('category');
@@ -1569,10 +1764,36 @@ app.get('/vendor/dashboard', (c) => {
             categorySelect.innerHTML += '<option value="' + cat.category_id + '">' + cat.name + '</option>';
           });
 
+          displayBookings(bookings.bookings);
           displayActivities(activities.activities);
         } catch (error) {
           console.error('Dashboard load error:', error);
         }
+      }
+
+      function displayBookings(bookings) {
+        const list = document.getElementById('bookingsList');
+        if (bookings.length === 0) {
+          list.innerHTML = '<p class="text-gray-500 text-center py-4">No bookings yet</p>';
+          return;
+        }
+        
+        list.innerHTML = bookings.slice(0, 10).map(b => \`
+          <div class="border rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <h3 class="font-bold">\${b.activity_title}</h3>
+                <p class="text-sm text-gray-600">\${b.first_name} \${b.last_name} • \${b.email}</p>
+                <div class="flex gap-4 mt-2 text-sm text-gray-600">
+                  <span><i class="far fa-calendar mr-1"></i>\${b.activity_date}</span>
+                  <span><i class="far fa-clock mr-1"></i>\${b.activity_time}</span>
+                  <span><i class="far fa-user mr-1"></i>\${b.num_participants} people</span>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-xs \${b.booking_status === 'confirmed' ? 'bg-green-100 text-green-800' : b.booking_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">\${b.booking_status}</span>
+            </div>
+          </div>
+        \`).join('');
       }
 
       function displayActivities(activities) {
@@ -1603,6 +1824,26 @@ app.get('/vendor/dashboard', (c) => {
       document.getElementById('addActivityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
+          // Handle image upload if present
+          const imageFile = document.getElementById('activityImage').files[0];
+          let imageUrl = '';
+          
+          if (imageFile) {
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            
+            const uploadResponse = await fetch('/api/vendor/upload-image', {
+              method: 'POST',
+              headers: { 'X-Vendor-ID': vendorId },
+              body: formData
+            });
+            
+            if (uploadResponse.ok) {
+              const uploadData = await uploadResponse.json();
+              imageUrl = uploadData.image_url;
+            }
+          }
+
           const response = await fetch('/api/vendor/activities', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Vendor-ID': vendorId },
@@ -1614,7 +1855,7 @@ app.get('/vendor/dashboard', (c) => {
               price: parseFloat(document.getElementById('price').value),
               duration_minutes: parseInt(document.getElementById('duration').value),
               capacity_per_slot: parseInt(document.getElementById('capacity').value),
-              images: [],
+              images: imageUrl ? [imageUrl] : [],
               requirements: {},
               includes: [],
               status: 'active'
@@ -1815,14 +2056,47 @@ app.get('/activity', (c) => {
                         <span><i class="far fa-user mr-1"></i>Max <span id="capacity"></span></span>
                     </div>
                 </div>
-                <button onclick="startBooking()" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-lg font-semibold">
-                    <i class="fas fa-calendar-check mr-2"></i>Book Now
-                </button>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="startBooking()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-lg font-semibold">
+                        <i class="fas fa-calendar-check mr-2"></i>Book Now
+                    </button>
+                    <button onclick="showCallbackForm()" class="bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-lg font-semibold">
+                        <i class="fas fa-phone mr-2"></i>Request Callback
+                    </button>
+                </div>
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold mb-3">About This Activity</h3>
                 <p id="description" class="text-gray-700"></p>
+            </div>
+        </div>
+
+        <!-- Callback Request Modal -->
+        <div id="callbackModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg max-w-md w-full p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold">Request Callback</h2>
+                    <button onclick="closeCallbackModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+                </div>
+                <form id="callbackForm" class="space-y-4">
+                    <div><input type="text" id="cbFirstName" placeholder="First Name" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><input type="text" id="cbLastName" placeholder="Last Name" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><input type="tel" id="cbPhone" placeholder="Phone Number" required class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div><input type="email" id="cbEmail" placeholder="Email (optional)" class="w-full px-4 py-2 border rounded-lg"></div>
+                    <div>
+                        <select id="cbPreferredTime" class="w-full px-4 py-2 border rounded-lg">
+                            <option value="anytime">Anytime</option>
+                            <option value="morning">Morning (9AM-12PM)</option>
+                            <option value="afternoon">Afternoon (12PM-5PM)</option>
+                            <option value="evening">Evening (5PM-8PM)</option>
+                        </select>
+                    </div>
+                    <div><textarea id="cbMessage" placeholder="Your message or questions (optional)" rows="3" class="w-full px-4 py-2 border rounded-lg"></textarea></div>
+                    <button type="submit" class="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 font-semibold">
+                        <i class="fas fa-paper-plane mr-2"></i>Submit Request
+                    </button>
+                </form>
             </div>
         </div>
 
@@ -2000,6 +2274,45 @@ app.get('/activity', (c) => {
         }
       }
 
+      function showCallbackForm() {
+        document.getElementById('callbackModal').classList.remove('hidden');
+      }
+
+      function closeCallbackModal() {
+        document.getElementById('callbackModal').classList.add('hidden');
+      }
+
+      document.getElementById('callbackForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const response = await fetch('/api/callback-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              first_name: document.getElementById('cbFirstName').value,
+              last_name: document.getElementById('cbLastName').value,
+              phone: document.getElementById('cbPhone').value,
+              email: document.getElementById('cbEmail').value || null,
+              preferred_time: document.getElementById('cbPreferredTime').value,
+              message: document.getElementById('cbMessage').value || null
+            })
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            alert('Callback request submitted! We will contact you soon.');
+            closeCallbackModal();
+            document.getElementById('callbackForm').reset();
+          } else {
+            alert('Error: ' + (data.error || 'Failed to submit request'));
+          }
+        } catch (error) {
+          console.error('Callback request error:', error);
+          alert('Failed to submit request');
+        }
+      });
+
       document.getElementById('bookingDate').addEventListener('change', loadTimeSlots);
       init();
     </script>
@@ -2035,7 +2348,9 @@ app.get('/admin/dashboard', (c) => {
             <div class="flex overflow-x-auto">
                 <button onclick="showTab('rooms')" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
                 <button onclick="showTab('vendors')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
+                <button onclick="showTab('regcode')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
                 <button onclick="showTab('activities')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
+                <button onclick="showTab('callbacks')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
             </div>
         </div>
 
@@ -2083,11 +2398,50 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
 
+        <!-- Registration Code Tab -->
+        <div id="regcodeTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-key mr-2 text-purple-600"></i>Vendor Registration Code</h2>
+                <p class="text-gray-600 mb-4">Share this code with vendors so they can self-register to your hotel</p>
+                
+                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <p class="text-sm text-gray-600 mb-2">Current Registration Code</p>
+                            <p class="text-4xl font-bold text-blue-600" id="regCode">Loading...</p>
+                        </div>
+                        <button onclick="regenerateRegCode()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-sync mr-2"></i>Regenerate Code
+                        </button>
+                    </div>
+                    <p class="text-sm text-gray-600">Expires: <span id="regCodeExpiry">Loading...</span></p>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-bold mb-2">How it works:</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                        <li>Share this registration code with your vendors</li>
+                        <li>Vendors visit the registration page at <code class="bg-white px-2 py-1 rounded">/vendor/register</code></li>
+                        <li>They enter the code along with their business details</li>
+                        <li>Once registered, they can immediately add activities to your hotel</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
         <!-- Activities Tab -->
         <div id="activitiesTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">All Activities</h2>
                 <div id="activitiesList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Callbacks Tab -->
+        <div id="callbacksTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-phone mr-2 text-orange-600"></i>Callback Requests</h2>
+                <div id="callbacksList" class="space-y-3"></div>
             </div>
         </div>
     </div>
@@ -2106,7 +2460,70 @@ app.get('/admin/dashboard', (c) => {
         
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
+        if (tab === 'regcode') loadRegCode();
         if (tab === 'activities') loadActivities();
+        if (tab === 'callbacks') loadCallbacks();
+      }
+
+      async function loadRegCode() {
+        try {
+          const response = await fetch('/api/admin/registration-code?property_id=1');
+          const data = await response.json();
+          document.getElementById('regCode').textContent = data.registration_code;
+          const expiry = new Date(data.expires_at);
+          document.getElementById('regCodeExpiry').textContent = expiry.toLocaleDateString();
+        } catch (error) {
+          console.error('Load reg code error:', error);
+        }
+      }
+
+      async function regenerateRegCode() {
+        if (!confirm('Regenerate registration code? The old code will no longer work.')) return;
+        try {
+          const response = await fetch('/api/admin/regenerate-registration-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: 1 })
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('New registration code generated!');
+            loadRegCode();
+          }
+        } catch (error) {
+          console.error('Regenerate code error:', error);
+        }
+      }
+
+      async function loadCallbacks() {
+        try {
+          const response = await fetch('/api/admin/callback-requests?property_id=1');
+          const data = await response.json();
+          const list = document.getElementById('callbacksList');
+          
+          if (data.requests.length === 0) {
+            list.innerHTML = '<p class="text-gray-500 text-center py-4">No callback requests</p>';
+            return;
+          }
+          
+          list.innerHTML = data.requests.map(r => \`
+            <div class="border rounded-lg p-4 hover:shadow-md transition">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-bold">\${r.first_name} \${r.last_name}</h3>
+                  <p class="text-sm text-gray-600"><i class="fas fa-phone mr-1"></i>\${r.phone}</p>
+                  \${r.email ? '<p class="text-sm text-gray-600"><i class="fas fa-envelope mr-1"></i>' + r.email + '</p>' : ''}
+                  <p class="text-sm text-gray-600 mt-2">Preferred: \${r.preferred_time}</p>
+                  \${r.message ? '<p class="text-sm mt-2">' + r.message + '</p>' : ''}
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">\${r.status}</span>
+              </div>
+              <p class="text-xs text-gray-400 mt-2">\${new Date(r.created_at).toLocaleString()}</p>
+            </div>
+          \`).join('');
+        } catch (error) {
+          console.error('Load callbacks error:', error);
+        }
       }
 
       async function loadRooms() {
