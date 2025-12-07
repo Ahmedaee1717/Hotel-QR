@@ -6209,6 +6209,9 @@ app.get('/admin/dashboard', (c) => {
           showTab(tab, this);
         });
       });
+      
+      // Initialize: Load rooms tab by default (it's marked as tab-active)
+      loadRooms();
 
       async function loadRegCode() {
         try {
