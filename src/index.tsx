@@ -3448,12 +3448,23 @@ app.get('/hotel/:property_slug', async (c) => {
         
         // Change language function
         function changeLanguage() {
-            const newLang = document.getElementById('languageSelector').value;
+            const selector = document.getElementById('languageSelector');
+            const newLang = selector.value;
+            
+            console.log('🌐 Changing language to:', newLang);
+            
             currentLanguage = newLang;
             localStorage.setItem('preferredLanguage', newLang);
             
+            console.log('✅ Saved to localStorage:', localStorage.getItem('preferredLanguage'));
+            console.log('✅ Current language now:', currentLanguage);
+            
             // Reload content in new language
-            init();
+            init().then(() => {
+                // Ensure selector stays at selected language after reload
+                selector.value = newLang;
+                console.log('✅ Language selector updated to:', selector.value);
+            });
         }
 
         function applyDesignSettings(settings) {
