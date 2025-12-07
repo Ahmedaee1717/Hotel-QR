@@ -3751,12 +3751,12 @@ app.get('/admin/dashboard', (c) => {
         <!-- Tabs -->
         <div class="bg-white rounded-lg shadow mb-6">
             <div class="flex overflow-x-auto">
-                <button onclick="showTab('rooms', event)" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
-                <button onclick="showTab('vendors', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
-                <button onclick="showTab('regcode', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
-                <button onclick="showTab('offerings', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
-                <button onclick="showTab('activities', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
-                <button onclick="showTab('callbacks', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
+                <button data-tab="rooms" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
+                <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
+                <button data-tab="regcode" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
+                <button data-tab="offerings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
+                <button data-tab="activities" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
+                <button data-tab="callbacks" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
             </div>
         </div>
 
@@ -3912,13 +3912,14 @@ app.get('/admin/dashboard', (c) => {
       if (!user.user_id) { window.location.href = '/admin/login'; }
 
       let currentTab = 'rooms';
-      function showTab(tab, evt) {
+      
+      function showTab(tab, clickedButton) {
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
         document.getElementById(tab + 'Tab').classList.remove('hidden');
-        if (evt && evt.target) {
-          evt.target.closest('button').classList.add('tab-active');
+        if (clickedButton) {
+          clickedButton.classList.add('tab-active');
         }
         
         if (tab === 'rooms') loadRooms();
@@ -3928,6 +3929,14 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
       }
+      
+      // Add event listeners to tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const tab = this.getAttribute('data-tab');
+          showTab(tab, this);
+        });
+      });
 
       async function loadRegCode() {
         try {
