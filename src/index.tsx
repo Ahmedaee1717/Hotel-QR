@@ -6398,7 +6398,7 @@ app.get('/admin/dashboard', (c) => {
       }
 
       async function deleteCustomSection(sectionId) {
-        if (!confirm('Delete this custom section? All offerings linked to this section will remain but won\'t be displayed.')) return;
+        if (!confirm('Delete this custom section? All offerings linked to this section will remain but will not be displayed.')) return;
         try {
           const response = await fetch('/api/admin/custom-sections/' + sectionId, {
             method: 'DELETE'
