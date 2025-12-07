@@ -3202,7 +3202,7 @@ app.get('/hotel/:property_slug', async (c) => {
         <!-- Floating Map Button (appears when map available) -->
         <button id="mapFloatingBtn" 
                 onclick="openMapModal()" 
-                class="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-50 hidden">
+                class="fixed bottom-6 right-6 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-50 hidden">
             <i class="fas fa-map-marked-alt mr-2"></i>
             <span class="font-semibold">Hotel Map</span>
         </button>
@@ -3216,7 +3216,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </button>
                 <div class="p-6">
                     <h2 class="text-3xl font-bold mb-4 flex items-center">
-                        <i class="fas fa-map text-indigo-500 mr-3"></i>
+                        <i id="mapModalIcon" class="fas fa-map mr-3"></i>
                         Hotel Map & Layout
                     </h2>
                     <div id="hotel-map-container" class="rounded-xl overflow-hidden">
@@ -3615,6 +3615,17 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: \${secondaryColor}22 !important; color: \${secondaryColor} !important; }
               .bg-blue-100 { background-color: \${primaryColor}22 !important; color: \${primaryColor} !important; }
+              
+              /* Floating Map Button */
+              #mapFloatingBtn {
+                background: \${primaryColor} !important;
+              }
+              #mapFloatingBtn:hover {
+                background: \${secondaryColor} !important;
+              }
+              #mapModalIcon {
+                color: \${primaryColor} !important;
+              }
             \`;
           } else if (layoutStyle === 'elegant') {
             // Elegant: Borders, subtle colors, refined typography
@@ -3688,6 +3699,17 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: transparent !important; color: \${secondaryColor} !important; border: 1px solid \${secondaryColor}; }
               .bg-blue-100 { background-color: transparent !important; color: \${primaryColor} !important; border: 1px solid \${primaryColor}; }
+              
+              /* Floating Map Button */
+              #mapFloatingBtn {
+                background: \${primaryColor} !important;
+              }
+              #mapFloatingBtn:hover {
+                background: \${secondaryColor} !important;
+              }
+              #mapModalIcon {
+                color: \${primaryColor} !important;
+              }
             \`;
           } else if (layoutStyle === 'minimal') {
             // Minimal: Flat, clean, lots of whitespace
@@ -3756,6 +3778,17 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: \${secondaryColor}11 !important; color: \${secondaryColor} !important; }
               .bg-blue-100 { background-color: \${primaryColor}11 !important; color: \${primaryColor} !important; }
+              
+              /* Floating Map Button */
+              #mapFloatingBtn {
+                background: \${primaryColor} !important;
+              }
+              #mapFloatingBtn:hover {
+                background: \${secondaryColor} !important;
+              }
+              #mapModalIcon {
+                color: \${primaryColor} !important;
+              }
             \`;
           }
           
