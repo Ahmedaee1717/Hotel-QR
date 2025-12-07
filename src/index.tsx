@@ -3453,27 +3453,21 @@ app.get('/hotel/:property_slug', async (c) => {
             
             console.log('🌐 Changing language to:', newLang);
             
-            // CRITICAL: Update currentLanguage BEFORE any operations
-            currentLanguage = newLang;
+            // CRITICAL: Save to localStorage FIRST
             localStorage.setItem('preferredLanguage', newLang);
             
-            console.log('✅ Saved to localStorage:', localStorage.getItem('preferredLanguage'));
-            console.log('✅ Current language now:', currentLanguage);
+            // Verify it's saved
+            const saved = localStorage.getItem('preferredLanguage');
+            console.log('✅ Saved to localStorage:', saved);
             
-            // Force selector to stay on selected value
-            selector.value = newLang;
+            if (saved !== newLang) {
+                console.error('❌ localStorage save FAILED!');
+                return;
+            }
             
-            // Reload content in new language
-            init().then(() => {
-                // CRITICAL: Re-lock selector after init completes
-                setTimeout(() => {
-                    selector.value = newLang;
-                    console.log('✅ Language selector locked to:', selector.value);
-                }, 100);
-            }).catch(error => {
-                console.error('Init error:', error);
-                selector.value = newLang; // Keep selector even if init fails
-            });
+            // RELOAD THE ENTIRE PAGE - cleanest approach
+            console.log('🔄 Reloading page with new language...');
+            window.location.reload();
         }
 
         function applyDesignSettings(settings) {
