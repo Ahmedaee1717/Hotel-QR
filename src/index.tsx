@@ -3297,6 +3297,11 @@ app.get('/hotel/:property_slug', async (c) => {
             const mapSection = document.getElementById('hotel-map-section');
             const mapContainer = document.getElementById('hotel-map-container');
             
+            if (!mapSection || !mapContainer) {
+                console.error('hotel-map elements not found');
+                return;
+            }
+            
             if (propertyData.show_hotel_map === 1 && propertyData.hotel_map_url) {
                 mapSection.style.display = 'block';
                 mapContainer.innerHTML = \`
@@ -3315,10 +3320,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 \`;
                 
                 // Make map clickable to open in new window
-                mapContainer.querySelector('img').addEventListener('click', () => {
-                    window.open(propertyData.hotel_map_url, '_blank');
-                });
-                mapContainer.querySelector('img').style.cursor = 'pointer';
+                const mapImg = mapContainer.querySelector('img');
+                if (mapImg) {
+                    mapImg.addEventListener('click', () => {
+                        window.open(propertyData.hotel_map_url, '_blank');
+                    });
+                    mapImg.style.cursor = 'pointer';
+                }
             } else {
                 mapSection.style.display = 'none';
             }
@@ -3335,19 +3343,19 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // First, apply visibility settings from property data
             if (propertyData) {
-                if (propertyData.show_restaurants === 0) {
+                if (propertyData.show_restaurants === 0 && sections.restaurants) {
                     sections.restaurants.style.display = 'none';
                 }
-                if (propertyData.show_events === 0) {
+                if (propertyData.show_events === 0 && sections.events) {
                     sections.events.style.display = 'none';
                 }
-                if (propertyData.show_spa === 0) {
+                if (propertyData.show_spa === 0 && sections.spa) {
                     sections.spa.style.display = 'none';
                 }
-                if (propertyData.show_service === 0) {
+                if (propertyData.show_service === 0 && sections.service) {
                     sections.service.style.display = 'none';
                 }
-                if (propertyData.show_activities === 0) {
+                if (propertyData.show_activities === 0 && sections.activities) {
                     sections.activities.style.display = 'none';
                 }
             }
@@ -3356,42 +3364,42 @@ app.get('/hotel/:property_slug', async (c) => {
             if (currentFilter === 'all') {
                 // Show all sections that are enabled
                 if (propertyData) {
-                    if (propertyData.show_restaurants === 1) sections.restaurants.style.display = 'block';
-                    if (propertyData.show_events === 1) sections.events.style.display = 'block';
-                    if (propertyData.show_spa === 1) sections.spa.style.display = 'block';
-                    if (propertyData.show_service === 1) sections.service.style.display = 'block';
-                    if (propertyData.show_activities === 1) sections.activities.style.display = 'block';
+                    if (propertyData.show_restaurants === 1 && sections.restaurants) sections.restaurants.style.display = 'block';
+                    if (propertyData.show_events === 1 && sections.events) sections.events.style.display = 'block';
+                    if (propertyData.show_spa === 1 && sections.spa) sections.spa.style.display = 'block';
+                    if (propertyData.show_service === 1 && sections.service) sections.service.style.display = 'block';
+                    if (propertyData.show_activities === 1 && sections.activities) sections.activities.style.display = 'block';
                 }
             } else if (currentFilter === 'restaurant') {
-                sections.restaurants.style.display = (propertyData && propertyData.show_restaurants === 1) ? 'block' : 'none';
-                sections.events.style.display = 'none';
-                sections.spa.style.display = 'none';
-                sections.service.style.display = 'none';
-                sections.activities.style.display = 'none';
+                if (sections.restaurants) sections.restaurants.style.display = (propertyData && propertyData.show_restaurants === 1) ? 'block' : 'none';
+                if (sections.events) sections.events.style.display = 'none';
+                if (sections.spa) sections.spa.style.display = 'none';
+                if (sections.service) sections.service.style.display = 'none';
+                if (sections.activities) sections.activities.style.display = 'none';
             } else if (currentFilter === 'event') {
-                sections.restaurants.style.display = 'none';
-                sections.events.style.display = (propertyData && propertyData.show_events === 1) ? 'block' : 'none';
-                sections.spa.style.display = 'none';
-                sections.service.style.display = 'none';
-                sections.activities.style.display = 'none';
+                if (sections.restaurants) sections.restaurants.style.display = 'none';
+                if (sections.events) sections.events.style.display = (propertyData && propertyData.show_events === 1) ? 'block' : 'none';
+                if (sections.spa) sections.spa.style.display = 'none';
+                if (sections.service) sections.service.style.display = 'none';
+                if (sections.activities) sections.activities.style.display = 'none';
             } else if (currentFilter === 'spa') {
-                sections.restaurants.style.display = 'none';
-                sections.events.style.display = 'none';
-                sections.spa.style.display = (propertyData && propertyData.show_spa === 1) ? 'block' : 'none';
-                sections.service.style.display = 'none';
-                sections.activities.style.display = 'none';
+                if (sections.restaurants) sections.restaurants.style.display = 'none';
+                if (sections.events) sections.events.style.display = 'none';
+                if (sections.spa) sections.spa.style.display = (propertyData && propertyData.show_spa === 1) ? 'block' : 'none';
+                if (sections.service) sections.service.style.display = 'none';
+                if (sections.activities) sections.activities.style.display = 'none';
             } else if (currentFilter === 'service') {
-                sections.restaurants.style.display = 'none';
-                sections.events.style.display = 'none';
-                sections.spa.style.display = 'none';
-                sections.service.style.display = (propertyData && propertyData.show_service === 1) ? 'block' : 'none';
-                sections.activities.style.display = 'none';
+                if (sections.restaurants) sections.restaurants.style.display = 'none';
+                if (sections.events) sections.events.style.display = 'none';
+                if (sections.spa) sections.spa.style.display = 'none';
+                if (sections.service) sections.service.style.display = (propertyData && propertyData.show_service === 1) ? 'block' : 'none';
+                if (sections.activities) sections.activities.style.display = 'none';
             } else if (currentFilter === 'activities') {
-                sections.restaurants.style.display = 'none';
-                sections.events.style.display = 'none';
-                sections.spa.style.display = 'none';
-                sections.service.style.display = 'none';
-                sections.activities.style.display = (propertyData && propertyData.show_activities === 1) ? 'block' : 'none';
+                if (sections.restaurants) sections.restaurants.style.display = 'none';
+                if (sections.events) sections.events.style.display = 'none';
+                if (sections.spa) sections.spa.style.display = 'none';
+                if (sections.service) sections.service.style.display = 'none';
+                if (sections.activities) sections.activities.style.display = (propertyData && propertyData.show_activities === 1) ? 'block' : 'none';
             }
         }
 
