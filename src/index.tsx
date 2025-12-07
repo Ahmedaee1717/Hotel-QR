@@ -4077,7 +4077,7 @@ app.get('/admin/dashboard', (c) => {
       async function deactivateActivity(activityId) {
         if (!confirm('Deactivate this activity? It will no longer be visible to guests.')) return;
         try {
-          const response = await fetch(\`/api/admin/activities/\${activityId}\`, {
+          const response = await fetch('/api/admin/activities/' + activityId, {
             method: 'DELETE'
           });
           const data = await response.json();
@@ -4171,7 +4171,7 @@ app.get('/admin/dashboard', (c) => {
       async function deleteOffering(offeringId) {
         if (!confirm('Delete this offering?')) return;
         try {
-          const response = await fetch(\`/api/admin/offerings/\${offeringId}\`, {
+          const response = await fetch('/api/admin/offerings/' + offeringId, {
             method: 'DELETE'
           });
           const data = await response.json();
@@ -4214,7 +4214,7 @@ app.get('/admin/dashboard', (c) => {
           const images = document.getElementById('offeringImages').value.split(',').map(url => url.trim()).filter(Boolean);
           
           try {
-            const response = await fetch(\`/api/admin/offerings/\${offeringId}\`, {
+            const response = await fetch('/api/admin/offerings/' + offeringId, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -4353,7 +4353,7 @@ app.get('/admin/dashboard', (c) => {
       async function regenerateQR(roomId) {
         if (!confirm('Regenerate QR code for this room?')) return;
         try {
-          const response = await fetch(\`/api/admin/rooms/\${roomId}/regenerate-qr\`, { method: 'POST' });
+          const response = await fetch('/api/admin/rooms/' + roomId + '/regenerate-qr', { method: 'POST' });
           const data = await response.json();
           if (data.success) {
             alert('QR code regenerated!');
@@ -4367,7 +4367,7 @@ app.get('/admin/dashboard', (c) => {
       async function removeVendor(vendorId) {
         if (!confirm('Remove this vendor? This will deactivate all their activities.')) return;
         try {
-          const response = await fetch(\`/api/admin/vendors/\${vendorId}\`, {
+          const response = await fetch('/api/admin/vendors/' + vendorId, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ property_id: 1 })
@@ -4688,7 +4688,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadRestaurant() {
         try {
-          const response = await fetch(\`/api/hotel-offerings/1\`);
+          const response = await fetch('/api/hotel-offerings/1');
           const data = await response.json();
           const restaurant = data.offerings.find(o => o.offering_id == offeringId);
           if (restaurant) {
@@ -4702,7 +4702,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadTables() {
         try {
-          const response = await fetch(\`/api/restaurant/\${offeringId}/tables\`);
+          const response = await fetch('/api/restaurant/' + offeringId + '/tables');
           const data = await response.json();
           tables = data.tables || [];
           renderTables();
@@ -4782,7 +4782,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function updateTablePosition(table) {
         try {
-          await fetch(\`/api/admin/restaurant/table/\${table.table_id}\`, {
+          await fetch('/api/admin/restaurant/table/' + table.table_id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(table)
@@ -4868,7 +4868,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm(\`Delete table \${selectedTable.table_number}?\`)) return;
         
         try {
-          const response = await fetch(\`/api/admin/restaurant/table/\${selectedTable.table_id}\`, {
+          const response = await fetch('/api/admin/restaurant/table/' + selectedTable.table_id, {
             method: 'DELETE'
           });
           
