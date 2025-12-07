@@ -1911,13 +1911,14 @@ app.post('/api/admin/offerings', async (c) => {
   try {
     const result = await DB.prepare(`
       INSERT INTO hotel_offerings (
-        property_id, offering_type, title_en, short_description_en, full_description_en,
+        property_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
         images, price, currency, duration_minutes, requires_booking, location,
         event_date, event_start_time, event_end_time, status, display_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
     `).bind(
       data.property_id,
       data.offering_type,
+      data.custom_section_key || null,
       data.title_en,
       data.short_description_en,
       data.full_description_en,
