@@ -3415,7 +3415,12 @@ app.get('/hotel/:property_slug', async (c) => {
         
         // Update section headings based on language
         function updateSectionHeadings() {
-            if (!propertyData) return;
+            if (!propertyData) {
+              console.error('❌ propertyData is null!');
+              return;
+            }
+            
+            console.log('📰 Updating section headings with language:', currentLanguage);
             
             // Update default section headings
             const sections = ['restaurants', 'events', 'spa', 'service', 'activities'];
@@ -3424,6 +3429,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 if (el) {
                     const fieldName = 'section_' + section;
                     const translated = getTranslatedField(propertyData, fieldName);
+                    console.log('  ' + section + ': "' + translated + '"');
                     if (translated) {
                         el.textContent = translated;
                     }
@@ -3784,10 +3790,16 @@ app.get('/hotel/:property_slug', async (c) => {
 
         function renderCategoryPills() {
           const container = document.getElementById('category-pills-container');
-          if (!container) return;
+          if (!container) {
+            console.error('❌ category-pills-container NOT FOUND!');
+            return;
+          }
           
           const lang = currentLanguage;
           const t = translations[lang] || translations.en;
+          
+          console.log('🏷️ Rendering pills with language:', lang);
+          console.log('🏷️ Translations:', t);
           
           // Always show "All" pill
           let pillsHTML = \`
