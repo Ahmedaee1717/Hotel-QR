@@ -5867,8 +5867,9 @@ app.get('/vendor/login', (c) => {
               const data = await response.json();
               
               if (data.success) {
-                localStorage.setItem('vendor_id', data.vendor_id);
-                localStorage.setItem('vendor_token', data.token || data.vendor_id);
+                localStorage.setItem('vendor_id', data.vendor.vendor_id);
+                localStorage.setItem('vendor_token', data.token);
+                localStorage.setItem('vendor_business_name', data.vendor.business_name);
                 window.location.href = '/vendor/dashboard';
               } else {
                 alert('Login failed: ' + (data.error || 'Invalid credentials'));
