@@ -3059,10 +3059,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 
             } catch (error) {
                 console.error('Initialization error:', error);
+                console.error('Error details:', error.message, error.stack);
                 document.getElementById('loading').innerHTML = \`
                     <div class="text-center">
                         <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
                         <p class="text-gray-600">Unable to load content</p>
+                        <p class="text-sm text-red-600 mt-2">Error: \${error.message || 'Unknown error'}</p>
                         <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg">
                             Try Again
                         </button>
@@ -3123,6 +3125,11 @@ app.get('/hotel/:property_slug', async (c) => {
             const restaurants = allOfferings.filter(o => o.offering_type === 'restaurant');
             const grid = document.getElementById('restaurants-grid');
             
+            if (!grid) {
+                console.error('restaurants-grid element not found');
+                return;
+            }
+            
             if (restaurants.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500 col-span-full">No restaurants available</p>';
                 return;
@@ -3154,6 +3161,11 @@ app.get('/hotel/:property_slug', async (c) => {
             const events = allOfferings.filter(o => o.offering_type === 'event');
             const grid = document.getElementById('events-grid');
             
+            if (!grid) {
+                console.error('events-grid element not found');
+                return;
+            }
+            
             if (events.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500">No upcoming events</p>';
                 return;
@@ -3183,6 +3195,11 @@ app.get('/hotel/:property_slug', async (c) => {
             const spa = allOfferings.filter(o => o.offering_type === 'spa');
             const grid = document.getElementById('spa-grid');
             
+            if (!grid) {
+                console.error('spa-grid element not found');
+                return;
+            }
+            
             if (spa.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500 col-span-full">No spa services available</p>';
                 return;
@@ -3211,6 +3228,11 @@ app.get('/hotel/:property_slug', async (c) => {
             const services = allOfferings.filter(o => o.offering_type === 'service');
             const grid = document.getElementById('service-grid');
             
+            if (!grid) {
+                console.error('service-grid element not found');
+                return;
+            }
+            
             if (services.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500 col-span-full">No services available</p>';
                 return;
@@ -3237,6 +3259,11 @@ app.get('/hotel/:property_slug', async (c) => {
 
         function renderActivities() {
             const grid = document.getElementById('activities-grid');
+            
+            if (!grid) {
+                console.error('activities-grid element not found');
+                return;
+            }
             
             if (allActivities.length === 0) {
                 grid.innerHTML = '<p class="text-gray-500 col-span-full">No activities available</p>';
