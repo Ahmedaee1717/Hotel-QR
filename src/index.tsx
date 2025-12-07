@@ -1448,6 +1448,43 @@ app.post('/api/admin/offerings', async (c) => {
   }
 })
 
+// Update hotel offering (Admin)
+app.put('/api/admin/offerings/:offering_id', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE hotel_offerings SET
+        title_en = ?, short_description_en = ?, full_description_en = ?,
+        price = ?, location = ?, duration_minutes = ?,
+        requires_booking = ?, images = ?,
+        event_date = ?, event_start_time = ?, event_end_time = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE offering_id = ?
+    `).bind(
+      data.title_en,
+      data.short_description_en,
+      data.full_description_en,
+      data.price || 0,
+      data.location,
+      data.duration_minutes,
+      data.requires_booking ? 1 : 0,
+      data.images,
+      data.event_date,
+      data.event_start_time,
+      data.event_end_time,
+      offering_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update offering error:', error)
+    return c.json({ error: 'Failed to update offering' }, 500)
+  }
+})
+
 // Delete hotel offering (Admin)
 app.delete('/api/admin/offerings/:offering_id', async (c) => {
   const { DB } = c.env
@@ -1462,6 +1499,72 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
   } catch (error) {
     console.error('Delete offering error:', error)
     return c.json({ error: 'Failed to delete offering' }, 500)
+  }
+})
+
+// Remove vendor from hotel (Admin)
+app.delete('/api/admin/vendors/:vendor_id/remove', async (c) => {
+  const { DB } = c.env
+  const { vendor_id } = c.req.param()
+  const property_id = c.req.query('property_id')
+  
+  try {
+    // Remove vendor-property link
+    await DB.prepare(`
+      DELETE FROM vendor_properties 
+      WHERE vendor_id = ? AND property_id = ?
+    `).bind(vendor_id, property_id).run()
+    
+    return c.json({ success: true, message: 'Vendor removed from hotel' })
+  } catch (error) {
+    console.error('Remove vendor error:', error)
+    return c.json({ error: 'Failed to remove vendor' }, 500)
+  }
+})
+
+// Get all activities (Admin)
+app.get('/api/admin/activities', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const activities = await DB.prepare(`
+      SELECT 
+        a.*,
+        v.business_name,
+        c.name_en as category_name
+      FROM activities a
+      JOIN vendors v ON a.vendor_id = v.vendor_id
+      JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+      JOIN categories c ON a.category_id = c.category_id
+      WHERE vp.property_id = ?
+      ORDER BY a.created_at DESC
+    `).bind(property_id).all()
+    
+    return c.json({ 
+      success: true,
+      activities: activities.results 
+    })
+  } catch (error) {
+    console.error('Get activities error:', error)
+    return c.json({ error: 'Failed to get activities' }, 500)
+  }
+})
+
+// Delete activity (Admin)
+app.delete('/api/admin/activities/:activity_id', async (c) => {
+  const { DB } = c.env
+  const { activity_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE activities SET status = 'inactive' WHERE activity_id = ?
+    `).bind(activity_id).run()
+    
+    return c.json({ success: true, message: 'Activity deactivated' })
+  } catch (error) {
+    console.error('Delete activity error:', error)
+    return c.json({ error: 'Failed to delete activity' }, 500)
   }
 })
 
@@ -3878,27 +3981,55 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadActivities() {
         try {
-          const response = await fetch('/api/admin/activities/all?property_id=1');
+          const response = await fetch('/api/admin/activities?property_id=1');
           const data = await response.json();
           const list = document.getElementById('activitiesList');
+          
+          if (!data.activities || data.activities.length === 0) {
+            list.innerHTML = '<p class="text-gray-500 text-center py-4">No activities yet. Add vendors to start!</p>';
+            return;
+          }
           
           list.innerHTML = data.activities.map(a => \`
             <div class="border rounded-lg p-4 hover:shadow-md transition">
               <div class="flex justify-between items-start">
                 <div>
                   <h3 class="text-lg font-bold">\${a.title_en}</h3>
-                  <p class="text-sm text-gray-600">by \${a.vendor_name}</p>
+                  <p class="text-sm text-gray-600">by \${a.business_name} • \${a.category_name}</p>
                   <div class="flex gap-4 mt-2 text-sm text-gray-600">
                     <span><i class="fas fa-tag mr-1"></i>USD \${a.price}</span>
                     <span><i class="far fa-clock mr-1"></i>\${a.duration_minutes} min</span>
+                    <span><i class="fas fa-users mr-1"></i>Capacity: \${a.capacity_per_slot}</span>
                   </div>
                 </div>
-                <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+                <div class="flex flex-col gap-2 items-end">
+                  <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+                  <button onclick="deactivateActivity(\${a.activity_id})" class="text-red-600 hover:text-red-800 text-sm">
+                    <i class="fas fa-ban mr-1"></i>Deactivate
+                  </button>
+                </div>
               </div>
             </div>
           \`).join('');
         } catch (error) {
           console.error('Load activities error:', error);
+        }
+      }
+
+      async function deactivateActivity(activityId) {
+        if (!confirm('Deactivate this activity? It will no longer be visible to guests.')) return;
+        try {
+          const response = await fetch(\`/api/admin/activities/\${activityId}\`, {
+            method: 'DELETE'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Activity deactivated!');
+            loadActivities();
+          }
+        } catch (error) {
+          console.error('Deactivate activity error:', error);
+          alert('Failed to deactivate activity');
         }
       }
 
@@ -3993,6 +4124,90 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Delete offering error:', error);
           alert('Failed to delete offering');
+        }
+      }
+      
+      async function editOffering(offeringId) {
+        const offering = allOfferings.find(o => o.offering_id === offeringId);
+        if (!offering) return;
+        
+        // Populate form with existing data
+        document.getElementById('offeringType').value = offering.offering_type;
+        document.getElementById('offeringTitle').value = offering.title_en;
+        document.getElementById('offeringDescription').value = offering.short_description_en;
+        document.getElementById('offeringFullDescription').value = offering.full_description_en || '';
+        document.getElementById('offeringPrice').value = offering.price || '';
+        document.getElementById('offeringLocation').value = offering.location || '';
+        document.getElementById('offeringDuration').value = offering.duration_minutes || '';
+        document.getElementById('offeringImages').value = offering.images ? offering.images.join(', ') : '';
+        document.getElementById('offeringRequiresBooking').checked = offering.requires_booking === 1;
+        
+        if (offering.offering_type === 'event') {
+          document.getElementById('eventFields').classList.remove('hidden');
+          document.getElementById('eventDate').value = offering.event_date || '';
+          document.getElementById('eventStartTime').value = offering.event_start_time || '';
+          document.getElementById('eventEndTime').value = offering.event_end_time || '';
+        }
+        
+        // Change form submit to update instead of create
+        const form = document.getElementById('addOfferingForm');
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const images = document.getElementById('offeringImages').value.split(',').map(url => url.trim()).filter(Boolean);
+          
+          try {
+            const response = await fetch(\`/api/admin/offerings/\${offeringId}\`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title_en: document.getElementById('offeringTitle').value,
+                short_description_en: document.getElementById('offeringDescription').value,
+                full_description_en: document.getElementById('offeringFullDescription').value,
+                price: parseFloat(document.getElementById('offeringPrice').value) || 0,
+                location: document.getElementById('offeringLocation').value,
+                duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
+                requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
+                images: JSON.stringify(images),
+                event_date: document.getElementById('eventDate').value || null,
+                event_start_time: document.getElementById('eventStartTime').value || null,
+                event_end_time: document.getElementById('eventEndTime').value || null
+              })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+              alert('Offering updated successfully!');
+              form.reset();
+              document.getElementById('eventFields').classList.add('hidden');
+              // Reset form back to create mode
+              form.onsubmit = null;
+              loadOfferings();
+            }
+          } catch (error) {
+            console.error('Update offering error:', error);
+            alert('Failed to update offering');
+          }
+        };
+        
+        // Scroll to form
+        form.scrollIntoView({ behavior: 'smooth' });
+      }
+
+      async function removeVendor(vendorId) {
+        if (!confirm('Remove this vendor from your hotel? Their activities will no longer be displayed.')) return;
+        try {
+          const response = await fetch(\`/api/admin/vendors/\${vendorId}/remove?property_id=1\`, {
+            method: 'DELETE'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Vendor removed!');
+            loadVendors();
+            loadActivities(); // Refresh activities list
+          }
+        } catch (error) {
+          console.error('Remove vendor error:', error);
+          alert('Failed to remove vendor');
         }
       }
       
