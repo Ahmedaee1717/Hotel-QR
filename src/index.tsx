@@ -3694,7 +3694,13 @@ app.get('/admin/dashboard', (c) => {
     <title>Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <style>.tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }</style>
+    <style>
+      .tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }
+      .hidden { display: none !important; }
+      .tab-content { display: block; }
+      .tab-btn { cursor: pointer; transition: all 0.3s; }
+      .tab-btn:hover { background-color: rgba(59, 130, 246, 0.1); }
+    </style>
 </head>
 <body class="bg-gray-50">
     <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
@@ -3708,12 +3714,12 @@ app.get('/admin/dashboard', (c) => {
         <!-- Tabs -->
         <div class="bg-white rounded-lg shadow mb-6">
             <div class="flex overflow-x-auto">
-                <button onclick="showTab('rooms')" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
-                <button onclick="showTab('vendors')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
-                <button onclick="showTab('regcode')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
-                <button onclick="showTab('offerings')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
-                <button onclick="showTab('activities')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
-                <button onclick="showTab('callbacks')" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
+                <button onclick="showTab('rooms', event)" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
+                <button onclick="showTab('vendors', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
+                <button onclick="showTab('regcode', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
+                <button onclick="showTab('offerings', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
+                <button onclick="showTab('activities', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
+                <button onclick="showTab('callbacks', event)" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
             </div>
         </div>
 
@@ -3869,12 +3875,14 @@ app.get('/admin/dashboard', (c) => {
       if (!user.user_id) { window.location.href = '/admin/login'; }
 
       let currentTab = 'rooms';
-      function showTab(tab) {
+      function showTab(tab, evt) {
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
         document.getElementById(tab + 'Tab').classList.remove('hidden');
-        event.target.closest('button').classList.add('tab-active');
+        if (evt && evt.target) {
+          evt.target.closest('button').classList.add('tab-active');
+        }
         
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();

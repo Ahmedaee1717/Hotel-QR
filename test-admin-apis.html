@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin APIs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Admin API Tests</h1>
+        
+        <div class="bg-white rounded-lg p-6 mb-4">
+            <h2 class="text-xl font-bold mb-4">Rooms API</h2>
+            <button onclick="testRooms()" class="bg-blue-500 text-white px-4 py-2 rounded">Test Rooms</button>
+            <pre id="roomsResult" class="mt-4 p-4 bg-gray-100 rounded overflow-auto"></pre>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 mb-4">
+            <h2 class="text-xl font-bold mb-4">Vendors API</h2>
+            <button onclick="testVendors()" class="bg-blue-500 text-white px-4 py-2 rounded">Test Vendors</button>
+            <pre id="vendorsResult" class="mt-4 p-4 bg-gray-100 rounded overflow-auto"></pre>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 mb-4">
+            <h2 class="text-xl font-bold mb-4">Activities API</h2>
+            <button onclick="testActivities()" class="bg-blue-500 text-white px-4 py-2 rounded">Test Activities</button>
+            <pre id="activitiesResult" class="mt-4 p-4 bg-gray-100 rounded overflow-auto"></pre>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 mb-4">
+            <h2 class="text-xl font-bold mb-4">Hotel Offerings API</h2>
+            <button onclick="testOfferings()" class="bg-blue-500 text-white px-4 py-2 rounded">Test Offerings</button>
+            <pre id="offeringsResult" class="mt-4 p-4 bg-gray-100 rounded overflow-auto"></pre>
+        </div>
+    </div>
+    
+    <script>
+        async function testRooms() {
+            try {
+                const response = await fetch('/api/admin/rooms?property_id=1');
+                const data = await response.json();
+                document.getElementById('roomsResult').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('roomsResult').textContent = 'ERROR: ' + error.message;
+            }
+        }
+        
+        async function testVendors() {
+            try {
+                const response = await fetch('/api/admin/vendors?property_id=1');
+                const data = await response.json();
+                document.getElementById('vendorsResult').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('vendorsResult').textContent = 'ERROR: ' + error.message;
+            }
+        }
+        
+        async function testActivities() {
+            try {
+                const response = await fetch('/api/admin/activities?property_id=1');
+                const data = await response.json();
+                document.getElementById('activitiesResult').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('activitiesResult').textContent = 'ERROR: ' + error.message;
+            }
+        }
+        
+        async function testOfferings() {
+            try {
+                const response = await fetch('/api/hotel-offerings/1');
+                const data = await response.json();
+                document.getElementById('offeringsResult').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('offeringsResult').textContent = 'ERROR: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
