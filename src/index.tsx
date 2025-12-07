@@ -3821,7 +3821,7 @@ app.get('/offering-detail', async (c) => {
                         </div>
                     </div>
 
-                    <div class="border-t pt-6">
+                    <div id="bookingSection" class="border-t pt-6">
                         <h3 class="font-bold text-lg mb-4">Book Your Experience</h3>
                         <form id="bookingForm" class="space-y-4">
                             <div class="grid md:grid-cols-2 gap-4">
@@ -3905,6 +3905,14 @@ app.get('/offering-detail', async (c) => {
             document.getElementById('offeringImage').src = (offeringData.images && offeringData.images[0]) || '/static/placeholder.jpg';
             document.getElementById('offeringDescription').textContent = offeringData.full_description || offeringData.short_description;
             document.getElementById('priceDisplay').textContent = (offeringData.currency || 'USD') + ' ' + (offeringData.price || '0');
+
+            // Show/hide booking section based on requires_booking
+            const bookingSection = document.getElementById('bookingSection');
+            if (offeringData.requires_booking === 0) {
+                bookingSection.classList.add('hidden');
+            } else {
+                bookingSection.classList.remove('hidden');
+            }
 
             // Show event details if it's an event
             if (offeringData.offering_type === 'event' && offeringData.event_date) {
