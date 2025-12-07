@@ -1542,7 +1542,8 @@ app.get('/api/admin/property-settings', async (c) => {
   try {
     const property = await DB.prepare(`
       SELECT 
-        slug, brand_logo_url, hero_image_url,
+        slug, name, tagline, contact_email, contact_phone, address,
+        brand_logo_url, hero_image_url, hero_image_effect, hero_overlay_opacity,
         primary_color, secondary_color, accent_color,
         layout_style, font_family, button_style, card_style, header_style, use_gradient
       FROM properties
@@ -1564,8 +1565,15 @@ app.put('/api/admin/property-settings', async (c) => {
   try {
     await DB.prepare(`
       UPDATE properties
-      SET brand_logo_url = ?,
+      SET name = ?,
+          tagline = ?,
+          contact_email = ?,
+          contact_phone = ?,
+          address = ?,
+          brand_logo_url = ?,
           hero_image_url = ?,
+          hero_image_effect = ?,
+          hero_overlay_opacity = ?,
           primary_color = ?,
           secondary_color = ?,
           accent_color = ?,
@@ -1578,8 +1586,15 @@ app.put('/api/admin/property-settings', async (c) => {
           updated_at = CURRENT_TIMESTAMP
       WHERE property_id = ?
     `).bind(
+      data.name,
+      data.tagline,
+      data.contact_email,
+      data.contact_phone,
+      data.address,
       data.brand_logo_url,
       data.hero_image_url,
+      data.hero_image_effect,
+      data.hero_overlay_opacity,
       data.primary_color,
       data.secondary_color,
       data.accent_color,
@@ -2331,7 +2346,7 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="gradient-hero text-white py-12 px-4">
                 <div class="max-w-6xl mx-auto text-center">
                     <h1 class="text-4xl md:text-5xl font-bold mb-3" id="propertyName">Paradise Resort</h1>
-                    <p class="text-lg opacity-90">Discover all we have to offer</p>
+                    <p class="text-lg opacity-90" id="propertyTagline">Discover all we have to offer</p>
                 </div>
             </div>
 
@@ -2432,10 +2447,12 @@ app.get('/hotel/:property_slug', async (c) => {
           const cardStyle = settings.card_style || 'shadow';
           const headerStyle = settings.header_style || 'transparent';
           const useGradient = settings.use_gradient || 0;
+          const heroImageEffect = settings.hero_image_effect || 'none';
+          const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
           // Logo
           if (settings.brand_logo_url) {
-            const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-12 mx-auto mb-3" />\`;
+            const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-16 mx-auto mb-3" />\`;
             document.getElementById('propertyName').insertAdjacentHTML('beforebegin', logoHtml);
           }
           
@@ -2443,6 +2460,22 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroBackground = useGradient ? 
             \`linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%)\` : 
             primaryColor;
+          
+          // Hero image filter effects
+          let heroFilter = '';
+          if (heroImageEffect === 'grayscale') heroFilter = 'grayscale(100%)';
+          else if (heroImageEffect === 'sepia') heroFilter = 'sepia(80%)';
+          else if (heroImageEffect === 'blur') heroFilter = 'blur(4px)';
+          
+          // Hero background with image and overlay
+          const heroImageCSS = settings.hero_image_url ? \`
+            background-image: 
+              linear-gradient(rgba(0,0,0,\${heroOverlay}), rgba(0,0,0,\${heroOverlay})),
+              url('\${settings.hero_image_url}');
+            background-size: cover;
+            background-position: center;
+            \${heroFilter ? 'filter: ' + heroFilter + ';' : ''}
+          \` : '';
           
           // Generate dynamic CSS based on layout style
           let dynamicCSS = '';
@@ -2459,12 +2492,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 background: \${heroBackground};
                 padding: 4rem 1rem;
                 border-radius: 0 0 2rem 2rem;
-                \${settings.hero_image_url ? \`
-                  background-image: url('\${settings.hero_image_url}');
-                  background-size: cover;
-                  background-position: center;
-                  background-blend-mode: overlay;
-                \` : ''}
+                position: relative;
+                \${heroImageCSS}
               }
               
               .offering-card {
@@ -2530,12 +2559,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 background: \${heroBackground};
                 padding: 5rem 1rem;
                 border-bottom: 3px solid \${accentColor};
-                \${settings.hero_image_url ? \`
-                  background-image: url('\${settings.hero_image_url}');
-                  background-size: cover;
-                  background-position: center;
-                  background-blend-mode: overlay;
-                \` : ''}
+                position: relative;
+                \${heroImageCSS}
               }
               
               .gradient-hero h1 {
@@ -2615,12 +2640,8 @@ app.get('/hotel/:property_slug', async (c) => {
               .gradient-hero {
                 background: \${heroBackground};
                 padding: 6rem 1rem 3rem;
-                \${settings.hero_image_url ? \`
-                  background-image: url('\${settings.hero_image_url}');
-                  background-size: cover;
-                  background-position: center;
-                  background-blend-mode: overlay;
-                \` : ''}
+                position: relative;
+                \${heroImageCSS}
               }
               
               .gradient-hero h1 {
@@ -2699,6 +2720,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 propertyData = propData.properties[0];
                 document.getElementById('propertyName').textContent = propertyData.name;
+                if (propertyData.tagline) {
+                  document.getElementById('propertyTagline').textContent = propertyData.tagline;
+                }
                 document.title = propertyData.name;
                 
                 // Apply design settings
@@ -5078,21 +5102,105 @@ app.get('/admin/dashboard', (c) => {
                 </div>
 
                 <form id="settingsForm" class="space-y-6">
-                    <!-- Branding Section -->
+                    <!-- Basic Information Section -->
                     <div class="border-b pb-6">
-                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-palette mr-2"></i>Branding</h3>
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-hotel mr-2"></i>Basic Information</h3>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-medium mb-2">Hotel Logo URL</label>
-                                <input type="url" id="brandLogoUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/logo.png" />
-                                <p class="text-xs text-gray-500 mt-1">Recommended: PNG or SVG, transparent background</p>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium mb-2">Hotel Name</label>
+                                <input type="text" id="hotelName" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Paradise Resort & Spa" required />
+                                <p class="text-xs text-gray-500 mt-1">This name appears on your homepage and everywhere</p>
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-medium mb-2">Hero Image URL</label>
+                                <label class="block text-sm font-medium mb-2">Tagline / Slogan</label>
+                                <input type="text" id="hotelTagline" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Discover all we have to offer" />
+                                <p class="text-xs text-gray-500 mt-1">Appears below hotel name on hero</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Contact Email</label>
+                                <input type="email" id="hotelEmail" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="info@hotel.com" />
+                                <p class="text-xs text-gray-500 mt-1">Displayed in footer</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Contact Phone</label>
+                                <input type="tel" id="hotelPhone" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="+1 234 567 8900" />
+                                <p class="text-xs text-gray-500 mt-1">Displayed in footer</p>
+                            </div>
+                            
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium mb-2">Address</label>
+                                <input type="text" id="hotelAddress" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="123 Beach Road, Paradise City" />
+                                <p class="text-xs text-gray-500 mt-1">Full hotel address</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Branding Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-palette mr-2"></i>Visual Branding</h3>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hotel Logo URL</label>
+                                <input type="url" id="brandLogoUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/logo.png" />
+                                <p class="text-xs text-gray-500 mt-1">Recommended: PNG or SVG, transparent background, max height 80px</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hero Background Image URL</label>
                                 <input type="url" id="heroImageUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/hero.jpg" />
-                                <p class="text-xs text-gray-500 mt-1">Recommended: 1920x600px, high quality</p>
+                                <p class="text-xs text-gray-500 mt-1">Recommended: 1920x600px, high quality, landscape orientation</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hero Image Effect</label>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="heroImageEffect" value="none" class="peer sr-only" checked />
+                                        <div class="border-2 border-gray-300 rounded-lg p-3 text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                            <div class="w-full h-12 bg-gradient-to-r from-blue-400 to-green-400 rounded mb-2"></div>
+                                            <span class="text-xs font-medium">Original</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="heroImageEffect" value="grayscale" class="peer sr-only" />
+                                        <div class="border-2 border-gray-300 rounded-lg p-3 text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                            <div class="w-full h-12 bg-gradient-to-r from-gray-400 to-gray-500 rounded mb-2"></div>
+                                            <span class="text-xs font-medium">Grayscale</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="heroImageEffect" value="sepia" class="peer sr-only" />
+                                        <div class="border-2 border-gray-300 rounded-lg p-3 text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                            <div class="w-full h-12 bg-gradient-to-r from-yellow-700 to-orange-600 rounded mb-2"></div>
+                                            <span class="text-xs font-medium">Sepia</span>
+                                        </div>
+                                    </label>
+                                    
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="heroImageEffect" value="blur" class="peer sr-only" />
+                                        <div class="border-2 border-gray-300 rounded-lg p-3 text-center peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                            <div class="w-full h-12 bg-gradient-to-r from-blue-300 to-purple-300 rounded mb-2 opacity-60"></div>
+                                            <span class="text-xs font-medium">Blur</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">Choose how your hero background image appears</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hero Overlay Opacity</label>
+                                <div class="flex items-center gap-4">
+                                    <input type="range" id="heroOverlayOpacity" min="0" max="100" value="30" class="flex-1" />
+                                    <span id="heroOverlayValue" class="text-sm font-medium w-12 text-center">30%</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Dark overlay to improve text readability (0% = no overlay, 100% = completely dark)</p>
                             </div>
                         </div>
                     </div>
@@ -5746,8 +5854,29 @@ app.get('/admin/dashboard', (c) => {
           document.getElementById('visitHomepage').href = homepageUrl;
           
           // Load current settings
+          document.getElementById('hotelName').value = settings.name || '';
+          document.getElementById('hotelTagline').value = settings.tagline || '';
+          document.getElementById('hotelEmail').value = settings.contact_email || '';
+          document.getElementById('hotelPhone').value = settings.contact_phone || '';
+          document.getElementById('hotelAddress').value = settings.address || '';
+          
           document.getElementById('brandLogoUrl').value = settings.brand_logo_url || '';
           document.getElementById('heroImageUrl').value = settings.hero_image_url || '';
+          document.getElementById('heroOverlayOpacity').value = settings.hero_overlay_opacity || 30;
+          document.getElementById('heroOverlayValue').textContent = (settings.hero_overlay_opacity || 30) + '%';
+          
+          // Set hero image effect radio
+          const effectRadios = document.querySelectorAll('input[name="heroImageEffect"]');
+          effectRadios.forEach(radio => {
+            if (radio.value === (settings.hero_image_effect || 'none')) {
+              radio.checked = true;
+            }
+          });
+          
+          // Hero overlay opacity slider
+          document.getElementById('heroOverlayOpacity').addEventListener('input', (e) => {
+            document.getElementById('heroOverlayValue').textContent = e.target.value + '%';
+          });
           
           document.getElementById('primaryColor').value = settings.primary_color || '#3B82F6';
           document.getElementById('primaryColorText').value = settings.primary_color || '#3B82F6';
@@ -5839,11 +5968,19 @@ app.get('/admin/dashboard', (c) => {
         e.preventDefault();
         
         const layoutStyle = document.querySelector('input[name="layoutStyle"]:checked').value;
+        const heroEffect = document.querySelector('input[name="heroImageEffect"]:checked').value;
         
         const settings = {
           property_id: 1,
+          name: document.getElementById('hotelName').value,
+          tagline: document.getElementById('hotelTagline').value,
+          contact_email: document.getElementById('hotelEmail').value,
+          contact_phone: document.getElementById('hotelPhone').value,
+          address: document.getElementById('hotelAddress').value,
           brand_logo_url: document.getElementById('brandLogoUrl').value,
           hero_image_url: document.getElementById('heroImageUrl').value,
+          hero_image_effect: heroEffect,
+          hero_overlay_opacity: parseInt(document.getElementById('heroOverlayOpacity').value),
           primary_color: document.getElementById('primaryColorText').value,
           secondary_color: document.getElementById('secondaryColorText').value,
           accent_color: document.getElementById('accentColorText').value,
