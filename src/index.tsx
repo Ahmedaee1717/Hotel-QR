@@ -1547,7 +1547,7 @@ app.get('/api/admin/property-settings', async (c) => {
         primary_color, secondary_color, accent_color,
         layout_style, font_family, button_style, card_style, header_style, use_gradient,
         hotel_map_url, homepage_section_order, 
-        show_restaurants, show_events, show_spa, show_activities, show_hotel_map
+        show_restaurants, show_events, show_spa, show_service, show_activities, show_hotel_map
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
@@ -1558,9 +1558,10 @@ app.get('/api/admin/property-settings', async (c) => {
       show_restaurants: property.show_restaurants ?? 1,
       show_events: property.show_events ?? 1,
       show_spa: property.show_spa ?? 1,
+      show_service: property.show_service ?? 1,
       show_activities: property.show_activities ?? 1,
       show_hotel_map: property.show_hotel_map ?? 0,
-      homepage_section_order: property.homepage_section_order || JSON.stringify(['restaurants', 'events', 'spa', 'activities'])
+      homepage_section_order: property.homepage_section_order || JSON.stringify(['restaurants', 'events', 'spa', 'service', 'activities'])
     }
     
     return c.json(settingsWithDefaults)
@@ -1601,6 +1602,7 @@ app.put('/api/admin/property-settings', async (c) => {
           show_restaurants = ?,
           show_events = ?,
           show_spa = ?,
+          show_service = ?,
           show_activities = ?,
           show_hotel_map = ?,
           updated_at = CURRENT_TIMESTAMP
@@ -1629,6 +1631,7 @@ app.put('/api/admin/property-settings', async (c) => {
       data.show_restaurants,
       data.show_events,
       data.show_spa,
+      data.show_service,
       data.show_activities,
       data.show_hotel_map,
       data.property_id
@@ -2392,6 +2395,9 @@ app.get('/hotel/:property_slug', async (c) => {
                     <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
                         <i class="fas fa-spa mr-2"></i>Spa
                     </button>
+                    <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
+                        <i class="fas fa-concierge-bell mr-2"></i>Services
+                    </button>
                     <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
                         <i class="fas fa-hiking mr-2"></i>Activities
                     </button>
@@ -2430,6 +2436,17 @@ app.get('/hotel/:property_slug', async (c) => {
                         Spa & Wellness
                     </h2>
                     <div id="spa-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
+
+                <!-- Hotel Services Section -->
+                <section id="service-section" class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-concierge-bell text-indigo-500 mr-3"></i>
+                        Hotel Services
+                    </h2>
+                    <div id="service-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
                     </div>
                 </section>
@@ -2801,7 +2818,7 @@ app.get('/hotel/:property_slug', async (c) => {
             // Get section order from property settings
             const sectionOrder = propertyData.homepage_section_order ? 
               JSON.parse(propertyData.homepage_section_order) : 
-              ['restaurants', 'events', 'spa', 'activities'];
+              ['restaurants', 'events', 'spa', 'service', 'activities'];
             
             // Get container
             const container = document.querySelector('.max-w-6xl.mx-auto.px-4.py-6');
@@ -2811,6 +2828,7 @@ app.get('/hotel/:property_slug', async (c) => {
               'restaurants': document.getElementById('restaurants-section'),
               'events': document.getElementById('events-section'),
               'spa': document.getElementById('spa-section'),
+              'service': document.getElementById('service-section'),
               'activities': document.getElementById('activities-section'),
               'hotel-map': document.getElementById('hotel-map-section')
             };
@@ -2838,6 +2856,7 @@ app.get('/hotel/:property_slug', async (c) => {
             renderRestaurants();
             renderEvents();
             renderSpa();
+            renderServices();
             renderActivities();
             renderHotelMap();
             updateSectionVisibility();
@@ -2931,6 +2950,34 @@ app.get('/hotel/:property_slug', async (c) => {
             \`).join('');
         }
 
+        function renderServices() {
+            const services = allOfferings.filter(o => o.offering_type === 'service');
+            const grid = document.getElementById('service-grid');
+            
+            if (services.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No services available</p>';
+                return;
+            }
+            
+            grid.innerHTML = services.map(s => \`
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${s.offering_id})">
+                    <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
+                         alt="\${s.title}" 
+                         class="w-full h-40 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg mb-2">\${s.title}</h3>
+                        <p class="text-sm text-gray-600 mb-3">\${s.short_description}</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">
+                                <i class="fas fa-concierge-bell mr-1"></i>\${s.location || 'Hotel Service'}
+                            </span>
+                            <span class="font-semibold text-indigo-600">\${s.price ? s.currency + ' ' + s.price : 'Complimentary'}</span>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
         function renderActivities() {
             const grid = document.getElementById('activities-grid');
             
@@ -2998,6 +3045,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 'restaurants': document.getElementById('restaurants-section'),
                 'events': document.getElementById('events-section'),
                 'spa': document.getElementById('spa-section'),
+                'service': document.getElementById('service-section'),
                 'activities': document.getElementById('activities-section')
             };
             
@@ -3012,6 +3060,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 if (propertyData.show_spa === 0) {
                     sections.spa.style.display = 'none';
                 }
+                if (propertyData.show_service === 0) {
+                    sections.service.style.display = 'none';
+                }
                 if (propertyData.show_activities === 0) {
                     sections.activities.style.display = 'none';
                 }
@@ -3024,27 +3075,38 @@ app.get('/hotel/:property_slug', async (c) => {
                     if (propertyData.show_restaurants === 1) sections.restaurants.style.display = 'block';
                     if (propertyData.show_events === 1) sections.events.style.display = 'block';
                     if (propertyData.show_spa === 1) sections.spa.style.display = 'block';
+                    if (propertyData.show_service === 1) sections.service.style.display = 'block';
                     if (propertyData.show_activities === 1) sections.activities.style.display = 'block';
                 }
             } else if (currentFilter === 'restaurant') {
                 sections.restaurants.style.display = (propertyData && propertyData.show_restaurants === 1) ? 'block' : 'none';
                 sections.events.style.display = 'none';
                 sections.spa.style.display = 'none';
+                sections.service.style.display = 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'event') {
                 sections.restaurants.style.display = 'none';
                 sections.events.style.display = (propertyData && propertyData.show_events === 1) ? 'block' : 'none';
                 sections.spa.style.display = 'none';
+                sections.service.style.display = 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'spa') {
                 sections.restaurants.style.display = 'none';
                 sections.events.style.display = 'none';
                 sections.spa.style.display = (propertyData && propertyData.show_spa === 1) ? 'block' : 'none';
+                sections.service.style.display = 'none';
+                sections.activities.style.display = 'none';
+            } else if (currentFilter === 'service') {
+                sections.restaurants.style.display = 'none';
+                sections.events.style.display = 'none';
+                sections.spa.style.display = 'none';
+                sections.service.style.display = (propertyData && propertyData.show_service === 1) ? 'block' : 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'activities') {
                 sections.restaurants.style.display = 'none';
                 sections.events.style.display = 'none';
                 sections.spa.style.display = 'none';
+                sections.service.style.display = 'none';
                 sections.activities.style.display = (propertyData && propertyData.show_activities === 1) ? 'block' : 'none';
             }
         }
@@ -5508,7 +5570,7 @@ app.get('/admin/dashboard', (c) => {
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
                             <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-eye mr-2 text-green-600"></i>Section Visibility</h4>
                             <p class="text-xs text-gray-500 mb-3">Toggle which sections appear on your homepage</p>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                                 <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
                                     <input type="checkbox" id="showRestaurants" class="mr-2 w-4 h-4" checked />
                                     <span class="text-sm font-medium">🍽️ Restaurants</span>
@@ -5522,6 +5584,11 @@ app.get('/admin/dashboard', (c) => {
                                 <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
                                     <input type="checkbox" id="showSpa" class="mr-2 w-4 h-4" checked />
                                     <span class="text-sm font-medium">💆 Spa</span>
+                                </label>
+                                
+                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
+                                    <input type="checkbox" id="showService" class="mr-2 w-4 h-4" checked />
+                                    <span class="text-sm font-medium">🛎️ Services</span>
                                 </label>
                                 
                                 <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
@@ -6135,12 +6202,13 @@ app.get('/admin/dashboard', (c) => {
           document.getElementById('showRestaurants').checked = settings.show_restaurants === 1;
           document.getElementById('showEvents').checked = settings.show_events === 1;
           document.getElementById('showSpa').checked = settings.show_spa === 1;
+          document.getElementById('showService').checked = settings.show_service === 1;
           document.getElementById('showActivities').checked = settings.show_activities === 1;
           
           // Load section order
           const sectionOrder = settings.homepage_section_order ? 
             JSON.parse(settings.homepage_section_order) : 
-            ['restaurants', 'events', 'spa', 'activities'];
+            ['restaurants', 'events', 'spa', 'service', 'activities'];
           renderSectionOrder(sectionOrder);
           
         } catch (error) {
@@ -6154,6 +6222,7 @@ app.get('/admin/dashboard', (c) => {
           'restaurants': '🍽️ Restaurants',
           'events': '🎉 Events',
           'spa': '💆 Spa & Wellness',
+          'service': '🛎️ Hotel Services',
           'activities': '🏃 Activities & Experiences'
         };
         
@@ -6279,6 +6348,7 @@ app.get('/admin/dashboard', (c) => {
           show_restaurants: document.getElementById('showRestaurants').checked ? 1 : 0,
           show_events: document.getElementById('showEvents').checked ? 1 : 0,
           show_spa: document.getElementById('showSpa').checked ? 1 : 0,
+          show_service: document.getElementById('showService').checked ? 1 : 0,
           show_activities: document.getElementById('showActivities').checked ? 1 : 0,
           homepage_section_order: JSON.stringify(getSectionOrder())
         };
