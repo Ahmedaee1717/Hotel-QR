@@ -5451,7 +5451,27 @@ app.get('/offering-detail', async (c) => {
             
             document.getElementById('offeringTitle').textContent = title;
             document.getElementById('offeringLocation').textContent = location || '';
-            document.getElementById('offeringImage').src = (offeringData.images && offeringData.images[0]) || '/static/placeholder.jpg';
+            
+            // Handle images - ensure it's an array
+            let imageUrl = '/static/placeholder.jpg';
+            if (offeringData.images) {
+                console.log('Raw images data:', offeringData.images, 'Type:', typeof offeringData.images);
+                // If images is a string, parse it
+                if (typeof offeringData.images === 'string') {
+                    try {
+                        const parsedImages = JSON.parse(offeringData.images);
+                        imageUrl = parsedImages[0] || imageUrl;
+                    } catch (e) {
+                        console.error('Failed to parse images:', e);
+                        imageUrl = offeringData.images; // Use as-is if not JSON
+                    }
+                } else if (Array.isArray(offeringData.images) && offeringData.images.length > 0) {
+                    imageUrl = offeringData.images[0];
+                }
+            }
+            console.log('Setting image URL:', imageUrl);
+            document.getElementById('offeringImage').src = imageUrl;
+            
             document.getElementById('offeringDescription').textContent = description;
             document.getElementById('priceDisplay').textContent = (offeringData.currency || 'USD') + ' ' + (offeringData.price || '0');
 
