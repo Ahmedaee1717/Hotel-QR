@@ -2987,6 +2987,21 @@ app.get('/hotel/:property_slug', async (c) => {
             background: white;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           }
+          
+          /* Social Media Profile Style */
+          .gradient-hero {
+            position: relative;
+            background-size: cover;
+            background-position: center;
+          }
+          
+          #propertyLogo img {
+            transition: transform 0.3s ease;
+          }
+          
+          #propertyLogo img:hover {
+            transform: scale(1.05);
+          }
         </style>
     </head>
     <body class="bg-gray-50">
@@ -3014,12 +3029,27 @@ app.get('/hotel/:property_slug', async (c) => {
                 </select>
             </div>
             
-            <!-- Hero Header -->
-            <div class="gradient-hero text-white py-12 px-4">
-                <div class="max-w-6xl mx-auto text-center">
-                    <div id="propertyLogo" class="mb-4 flex justify-center"></div>
-                    <h1 class="text-lg md:text-xl font-light mb-2" id="propertyName" style="letter-spacing: 0.15em; font-weight: 300;">Paradise Resort</h1>
-                    <p class="text-xs md:text-sm opacity-75 font-light" id="propertyTagline" style="letter-spacing: 0.05em;">Discover all we have to offer</p>
+            <!-- Hero Header - Social Media Profile Style -->
+            <div class="relative">
+                <!-- Cover Photo -->
+                <div class="gradient-hero h-48 md:h-64"></div>
+                
+                <!-- Profile Section -->
+                <div class="relative -mt-16 md:-mt-20 pb-6 bg-white">
+                    <div class="max-w-6xl mx-auto px-4">
+                        <!-- Profile Picture Container -->
+                        <div class="flex justify-center mb-4">
+                            <div id="propertyLogo" class="relative">
+                                <!-- Logo will be inserted here with circular styling -->
+                            </div>
+                        </div>
+                        
+                        <!-- Profile Info -->
+                        <div class="text-center">
+                            <h1 class="text-xl md:text-2xl font-semibold mb-2 text-gray-900" id="propertyName">Paradise Resort</h1>
+                            <p class="text-sm md:text-base text-gray-600 mb-4" id="propertyTagline">Discover all we have to offer</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3390,11 +3420,11 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroImageEffect = settings.hero_image_effect || 'none';
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
-          // Logo - add to propertyLogo container
+          // Logo - add to propertyLogo container (Social Media Profile Style)
           if (settings.brand_logo_url) {
             const logoContainer = document.getElementById('propertyLogo');
             if (logoContainer && !logoContainer.hasChildNodes()) {
-              logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-20 h-20 rounded-full object-cover mx-auto shadow-lg border-4 border-white" />';
+              logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover shadow-2xl border-4 border-white bg-white" />';
             }
           }
           
@@ -3432,22 +3462,8 @@ app.get('/hotel/:property_slug', async (c) => {
               
               .gradient-hero {
                 background: \${heroBackground};
-                padding: 4rem 1rem;
-                border-radius: 0 0 2rem 2rem;
                 position: relative;
                 \${heroImageCSS}
-              }
-              
-              .gradient-hero h1 {
-                font-size: 1.25rem;
-                font-weight: 300;
-                letter-spacing: 0.15em;
-              }
-              
-              @media (min-width: 768px) {
-                .gradient-hero h1 {
-                  font-size: 1.5rem;
-                }
               }
               
               .offering-card {
@@ -3511,22 +3527,8 @@ app.get('/hotel/:property_slug', async (c) => {
               
               .gradient-hero {
                 background: \${heroBackground};
-                padding: 5rem 1rem;
-                border-bottom: 3px solid \${accentColor};
                 position: relative;
                 \${heroImageCSS}
-              }
-              
-              .gradient-hero h1 {
-                font-size: 1.25rem;
-                letter-spacing: 0.15em;
-                font-weight: 300;
-              }
-              
-              @media (min-width: 768px) {
-                .gradient-hero h1 {
-                  font-size: 1.5rem;
-                }
               }
               
               .offering-card {
@@ -3601,18 +3603,6 @@ app.get('/hotel/:property_slug', async (c) => {
                 padding: 6rem 1rem 3rem;
                 position: relative;
                 \${heroImageCSS}
-              }
-              
-              .gradient-hero h1 {
-                font-size: 1.25rem;
-                font-weight: 300;
-                letter-spacing: 0.15em;
-              }
-              
-              @media (min-width: 768px) {
-                .gradient-hero h1 {
-                  font-size: 1.5rem;
-                }
               }
               
               .offering-card {
