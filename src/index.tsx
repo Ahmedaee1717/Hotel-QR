@@ -1798,7 +1798,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     <div class="p-4">
                         <div class="flex items-center justify-between mb-2">
                             <h3 class="font-bold text-lg">\${r.title}</h3>
-                            ${r.requires_booking ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Booking Required</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Walk-in Welcome</span>'}
+                            \${r.requires_booking ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Booking Required</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Walk-in Welcome</span>'}
                         </div>
                         <p class="text-sm text-gray-600 mb-3">\${r.short_description}</p>
                         <div class="flex items-center justify-between text-sm">
