@@ -3438,6 +3438,18 @@ app.get('/hotel/:property_slug', async (c) => {
                 \${heroImageCSS}
               }
               
+              .gradient-hero h1 {
+                font-size: 1.25rem;
+                font-weight: 300;
+                letter-spacing: 0.15em;
+              }
+              
+              @media (min-width: 768px) {
+                .gradient-hero h1 {
+                  font-size: 1.5rem;
+                }
+              }
+              
               .offering-card {
                 background: white;
                 border-radius: 1.5rem;
@@ -3506,10 +3518,15 @@ app.get('/hotel/:property_slug', async (c) => {
               }
               
               .gradient-hero h1 {
-                font-size: 3rem;
-                letter-spacing: 0.05em;
-                text-transform: uppercase;
+                font-size: 1.25rem;
+                letter-spacing: 0.15em;
                 font-weight: 300;
+              }
+              
+              @media (min-width: 768px) {
+                .gradient-hero h1 {
+                  font-size: 1.5rem;
+                }
               }
               
               .offering-card {
@@ -3587,9 +3604,15 @@ app.get('/hotel/:property_slug', async (c) => {
               }
               
               .gradient-hero h1 {
-                font-size: 2.5rem;
-                font-weight: 700;
-                letter-spacing: -0.02em;
+                font-size: 1.25rem;
+                font-weight: 300;
+                letter-spacing: 0.15em;
+              }
+              
+              @media (min-width: 768px) {
+                .gradient-hero h1 {
+                  font-size: 1.5rem;
+                }
               }
               
               .offering-card {
