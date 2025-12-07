@@ -3992,9 +3992,23 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadRooms() {
         try {
+          console.log('🔄 Loading rooms...');
           const response = await fetch('/api/admin/rooms?property_id=1');
+          console.log('📡 Response status:', response.status);
           const rooms = await response.json();
+          console.log('📦 Rooms received:', rooms.length, rooms);
           const list = document.getElementById('roomsList');
+          console.log('📍 List element:', list);
+          
+          if (!list) {
+            console.error('❌ roomsList element not found!');
+            return;
+          }
+          
+          if (!rooms || rooms.length === 0) {
+            list.innerHTML = '<p class="text-gray-500 p-4">No rooms found. Add rooms below.</p>';
+            return;
+          }
           
           list.innerHTML = rooms.map(r => \`
             <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
