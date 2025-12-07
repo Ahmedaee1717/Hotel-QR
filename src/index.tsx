@@ -1861,6 +1861,54 @@ app.post('/api/restaurant/reserve', async (c) => {
   }
 })
 
+// Create offering booking (General bookings for restaurants, events, spa)
+app.post('/api/offering-booking', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    // Create guest record if doesn't exist
+    let guest = await DB.prepare(`
+      SELECT guest_id FROM guests WHERE email = ?
+    `).bind(data.guest_email).first()
+    
+    let guestId = guest?.guest_id
+    
+    if (!guestId) {
+      const newGuest = await DB.prepare(`
+        INSERT INTO guests (email, name, phone, language_preference)
+        VALUES (?, ?, ?, 'en')
+      `).bind(data.guest_email, data.guest_name, data.guest_phone).run()
+      guestId = newGuest.meta.last_row_id
+    }
+    
+    // Create offering booking record
+    const result = await DB.prepare(`
+      INSERT INTO offering_bookings (
+        offering_id, guest_id, property_id, booking_date,
+        num_guests, total_amount, special_requests, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(
+      data.offering_id,
+      guestId,
+      data.property_id,
+      data.booking_date,
+      data.num_guests,
+      data.total_amount,
+      data.special_requests || null
+    ).run()
+    
+    return c.json({
+      success: true,
+      booking_id: result.meta.last_row_id,
+      message: 'Booking request submitted! We will contact you shortly.'
+    })
+  } catch (error) {
+    console.error('Create offering booking error:', error)
+    return c.json({ error: 'Failed to create booking' }, 500)
+  }
+})
+
 // Get reservations (Admin)
 app.get('/api/admin/restaurant/reservations', async (c) => {
   const { DB } = c.env
@@ -2381,11 +2429,11 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function viewOffering(offeringId) {
-            window.location.href = \`/offering-detail?id=\${offeringId}&property=\${propertyData.property_id}\`;
+            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id;
         }
 
         function viewActivity(activityId) {
-            window.location.href = \`/activity?id=\${activityId}&property=\${propertyData.property_id}\`;
+            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id;
         }
 
         // Initialize on load
@@ -2397,6 +2445,210 @@ app.get('/hotel/:property_slug', async (c) => {
 })
 
 // ============================================
+// OFFERING DETAIL PAGE - Booking page for restaurants, events, spa
+app.get('/offering-detail', async (c) => {
+  const offering_id = c.req.query('id')
+  const property_id = c.req.query('property')
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Now</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+    </div>
+
+    <div id="content" class="hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-6 px-4">
+            <div class="max-w-4xl mx-auto">
+                <a href="/hotel/paradise-resort" class="text-white/80 hover:text-white mb-2 inline-block">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to hotel
+                </a>
+                <h1 class="text-3xl font-bold" id="offeringTitle">Loading...</h1>
+                <p class="text-white/80" id="offeringLocation"></p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto px-4 py-6">
+            <!-- Offering Details -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
+                <img id="offeringImage" src="" alt="" class="w-full h-64 object-cover">
+                <div class="p-6">
+                    <div class="flex items-center gap-2 mb-4" id="offeringMeta"></div>
+                    <h2 class="text-2xl font-bold mb-3">About</h2>
+                    <p class="text-gray-600 mb-6" id="offeringDescription"></p>
+                    
+                    <div id="eventDetails" class="hidden mb-6">
+                        <h3 class="font-bold text-lg mb-2">Event Details</h3>
+                        <div class="space-y-2 text-gray-700">
+                            <div><i class="fas fa-calendar mr-2 text-blue-500"></i><span id="eventDate"></span></div>
+                            <div><i class="fas fa-clock mr-2 text-blue-500"></i><span id="eventTime"></span></div>
+                        </div>
+                    </div>
+
+                    <div class="border-t pt-6">
+                        <h3 class="font-bold text-lg mb-4">Book Your Experience</h3>
+                        <form id="bookingForm" class="space-y-4">
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Your Name</label>
+                                    <input type="text" id="guestName" required class="w-full px-4 py-2 border rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Phone Number</label>
+                                    <input type="tel" id="guestPhone" required class="w-full px-4 py-2 border rounded-lg">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Email</label>
+                                <input type="email" id="guestEmail" required class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div id="restaurantFields" class="hidden">
+                                <label class="block text-sm font-medium mb-2">Preferred Date & Time</label>
+                                <input type="datetime-local" id="bookingDateTime" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Number of Guests</label>
+                                <input type="number" id="numGuests" min="1" value="2" required class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Special Requests (Optional)</label>
+                                <textarea id="specialRequests" rows="3" class="w-full px-4 py-2 border rounded-lg"></textarea>
+                            </div>
+                            
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="font-medium">Price per person:</span>
+                                    <span class="text-xl font-bold text-blue-600" id="priceDisplay"></span>
+                                </div>
+                                <div class="flex justify-between items-center text-gray-700">
+                                    <span>Total:</span>
+                                    <span class="text-2xl font-bold" id="totalPrice">$0</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700">
+                                <i class="fas fa-check-circle mr-2"></i>Confirm Booking
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let offeringData = null;
+        const offeringId = '${offering_id}';
+        const propertyId = '${property_id}';
+
+        async function init() {
+            try {
+                const response = await fetch('/api/hotel-offerings/' + propertyId);
+                const data = await response.json();
+                const offerings = data.offerings || [];
+                offeringData = offerings.find(o => o.offering_id == offeringId);
+
+                if (!offeringData) {
+                    alert('Offering not found');
+                    window.location.href = '/hotel/paradise-resort';
+                    return;
+                }
+
+                renderOffering();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading offering:', error);
+                alert('Failed to load offering details');
+            }
+        }
+
+        function renderOffering() {
+            document.getElementById('offeringTitle').textContent = offeringData.title;
+            document.getElementById('offeringLocation').textContent = offeringData.location || '';
+            document.getElementById('offeringImage').src = (offeringData.images && offeringData.images[0]) || '/static/placeholder.jpg';
+            document.getElementById('offeringDescription').textContent = offeringData.full_description || offeringData.short_description;
+            document.getElementById('priceDisplay').textContent = (offeringData.currency || 'USD') + ' ' + (offeringData.price || '0');
+
+            // Show event details if it's an event
+            if (offeringData.offering_type === 'event' && offeringData.event_date) {
+                document.getElementById('eventDetails').classList.remove('hidden');
+                const date = new Date(offeringData.event_date);
+                document.getElementById('eventDate').textContent = date.toLocaleDateString();
+                if (offeringData.event_start_time) {
+                    document.getElementById('eventTime').textContent = offeringData.event_start_time + (offeringData.event_end_time ? ' - ' + offeringData.event_end_time : '');
+                }
+            }
+
+            // Show restaurant-specific fields
+            if (offeringData.offering_type === 'restaurant') {
+                document.getElementById('restaurantFields').classList.remove('hidden');
+            }
+
+            updateTotalPrice();
+        }
+
+        function updateTotalPrice() {
+            const numGuests = parseInt(document.getElementById('numGuests').value) || 1;
+            const pricePerPerson = parseFloat(offeringData.price) || 0;
+            const total = numGuests * pricePerPerson;
+            document.getElementById('totalPrice').textContent = (offeringData.currency || 'USD') + ' ' + total.toFixed(2);
+        }
+
+        document.getElementById('numGuests').addEventListener('input', updateTotalPrice);
+
+        document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const bookingData = {
+                offering_id: offeringData.offering_id,
+                property_id: propertyId,
+                guest_name: document.getElementById('guestName').value,
+                guest_email: document.getElementById('guestEmail').value,
+                guest_phone: document.getElementById('guestPhone').value,
+                num_guests: parseInt(document.getElementById('numGuests').value),
+                booking_date: document.getElementById('bookingDateTime')?.value || new Date().toISOString(),
+                special_requests: document.getElementById('specialRequests').value,
+                total_amount: parseFloat(document.getElementById('totalPrice').textContent.replace(/[^0-9.]/g, ''))
+            };
+
+            try {
+                const response = await fetch('/api/offering-booking', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Booking confirmed! We will contact you shortly.');
+                    window.location.href = '/hotel/paradise-resort';
+                } else {
+                    alert('Booking failed: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to submit booking. Please try again.');
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>
+  `)
+})
+
 // GUEST WELCOME PAGE - QR Code Entry
 // ============================================
 
@@ -4019,7 +4271,7 @@ app.get('/admin/dashboard', (c) => {
             return;
           }
           
-          list.innerHTML = rooms.map(r => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><span class="font-bold text-lg">Room ' + r.room_number + '</span><span class="text-gray-600 ml-3">' + r.room_type + '</span></div><div class="flex gap-2"><a href="/welcome/paradise-resort/' + r.qr_code_data + '" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a><button onclick="regenerateQR(' + r.room_id + ')" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button></div></div>').join('');
+          list.innerHTML = rooms.map(r => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><span class="font-bold text-lg">Room ' + r.room_number + '</span><span class="text-gray-600 ml-3">' + r.room_type + '</span></div><div class="flex gap-2"><a href="/hotel/paradise-resort" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a><button onclick="regenerateQR(' + r.room_id + ')" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button></div></div>').join('');
         } catch (error) {
           console.error('Load rooms error:', error);
         }
