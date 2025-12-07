@@ -1410,6 +1410,560 @@ app.get('/api/admin/bookings', async (c) => {
   }
 })
 
+// Create hotel offering (Admin)
+app.post('/api/admin/offerings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO hotel_offerings (
+        property_id, offering_type, title_en, short_description_en, full_description_en,
+        images, price, currency, duration_minutes, requires_booking, location,
+        event_date, event_start_time, event_end_time, status, display_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
+    `).bind(
+      data.property_id,
+      data.offering_type,
+      data.title_en,
+      data.short_description_en,
+      data.full_description_en,
+      data.images,
+      data.price || 0,
+      data.duration_minutes,
+      data.requires_booking ? 1 : 0,
+      data.location,
+      data.event_date,
+      data.event_start_time,
+      data.event_end_time
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      offering_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Create offering error:', error)
+    return c.json({ error: 'Failed to create offering' }, 500)
+  }
+})
+
+// Delete hotel offering (Admin)
+app.delete('/api/admin/offerings/:offering_id', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM hotel_offerings WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete offering error:', error)
+    return c.json({ error: 'Failed to delete offering' }, 500)
+  }
+})
+
+// ============================================
+// HOTEL LANDING PAGE & APIs
+// ============================================
+
+// API: Get property details
+app.get('/api/properties', async (c) => {
+  const { DB } = c.env
+  const slug = c.req.query('slug')
+  const property_id = c.req.query('property_id')
+  
+  try {
+    let properties;
+    
+    if (slug) {
+      properties = await DB.prepare(`
+        SELECT * FROM properties WHERE slug = ? AND status = 'active'
+      `).bind(slug).all()
+    } else if (property_id) {
+      properties = await DB.prepare(`
+        SELECT * FROM properties WHERE property_id = ? AND status = 'active'
+      `).bind(property_id).all()
+    } else {
+      properties = await DB.prepare(`
+        SELECT * FROM properties WHERE status = 'active' ORDER BY name
+      `).all()
+    }
+    
+    return c.json({ 
+      success: true,
+      properties: properties.results
+    })
+  } catch (error) {
+    console.error('Get properties error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// API: Get hotel offerings by property
+app.get('/api/hotel-offerings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const lang = c.req.query('lang') || 'en'
+  const offering_type = c.req.query('type') // optional filter
+  
+  try {
+    let query = `
+      SELECT 
+        ho.*,
+        CASE WHEN ? = 'ar' THEN ho.title_ar ELSE ho.title_en END as title,
+        CASE WHEN ? = 'ar' THEN ho.short_description_ar ELSE ho.short_description_en END as short_description,
+        CASE WHEN ? = 'ar' THEN ho.full_description_ar ELSE ho.full_description_en END as full_description
+      FROM hotel_offerings ho
+      WHERE ho.property_id = ?
+        AND ho.status = 'active'
+        ${offering_type ? 'AND ho.offering_type = ?' : ''}
+      ORDER BY ho.is_featured DESC, ho.display_order ASC, ho.created_at DESC
+    `
+    
+    const params = offering_type 
+      ? [lang, lang, lang, property_id, offering_type]
+      : [lang, lang, lang, property_id]
+    
+    const offerings = await DB.prepare(query).bind(...params).all()
+    
+    return c.json({ 
+      success: true,
+      offerings: offerings.results.map(o => ({
+        ...o,
+        images: o.images ? JSON.parse(o.images) : [],
+        includes: o.includes ? JSON.parse(o.includes) : []
+      }))
+    })
+  } catch (error) {
+    console.error('Get hotel offerings error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// API: Get linked vendor activities for a property
+app.get('/api/property-vendor-activities/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const lang = c.req.query('lang') || 'en'
+  
+  try {
+    const activities = await DB.prepare(`
+      SELECT 
+        a.*,
+        v.business_name,
+        v.slug as vendor_slug,
+        c.name_en as category_name,
+        CASE WHEN ? = 'ar' THEN a.title_ar ELSE a.title_en END as title,
+        CASE WHEN ? = 'ar' THEN a.short_description_ar ELSE a.short_description_en END as short_description
+      FROM activities a
+      JOIN vendors v ON a.vendor_id = v.vendor_id
+      JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+      JOIN categories c ON a.category_id = c.category_id
+      WHERE vp.property_id = ?
+        AND vp.status = 'active'
+        AND a.status = 'active'
+        AND v.status = 'active'
+      ORDER BY a.is_featured DESC, a.popularity_score DESC
+      LIMIT 50
+    `).bind(lang, lang, property_id).all()
+    
+    return c.json({ 
+      success: true,
+      activities: activities.results.map(a => ({
+        ...a,
+        images: a.images ? JSON.parse(a.images) : []
+      }))
+    })
+  } catch (error) {
+    console.error('Get property vendor activities error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Hotel Landing Page - Main QR entry point
+app.get('/hotel/:property_slug', async (c) => {
+  const { property_slug } = c.req.param()
+  
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="mobile-web-app-capable" content="yes">
+        <title>Welcome</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+          body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+          }
+          .gradient-hero { 
+            background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); 
+          }
+          .offering-card {
+            transition: all 0.3s ease;
+          }
+          .offering-card:active {
+            transform: scale(0.98);
+          }
+          .category-pill {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s;
+          }
+          .category-pill:active {
+            transform: scale(0.95);
+          }
+          .sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          }
+        </style>
+    </head>
+    <body class="bg-gray-50">
+        <!-- Loading Spinner -->
+        <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+            <div class="text-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
+                <p class="mt-4 text-gray-600">Loading your experience...</p>
+            </div>
+        </div>
+
+        <div id="content" class="hidden">
+            <!-- Hero Header -->
+            <div class="gradient-hero text-white py-12 px-4">
+                <div class="max-w-6xl mx-auto text-center">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-3" id="propertyName">Paradise Resort</h1>
+                    <p class="text-lg opacity-90">Discover all we have to offer</p>
+                </div>
+            </div>
+
+            <!-- Category Filter Pills -->
+            <div class="sticky-nav py-4 px-4 overflow-x-auto">
+                <div class="max-w-6xl mx-auto flex gap-2 whitespace-nowrap">
+                    <button onclick="filterOfferings('all')" class="category-pill bg-blue-500 text-white" data-category="all">
+                        <i class="fas fa-th-large mr-2"></i>All
+                    </button>
+                    <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
+                        <i class="fas fa-utensils mr-2"></i>Restaurants
+                    </button>
+                    <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
+                        <i class="fas fa-calendar-star mr-2"></i>Events
+                    </button>
+                    <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
+                        <i class="fas fa-spa mr-2"></i>Spa
+                    </button>
+                    <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
+                        <i class="fas fa-hiking mr-2"></i>Activities
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="max-w-6xl mx-auto px-4 py-6 pb-20">
+                
+                <!-- Hotel Restaurants Section -->
+                <section id="restaurants-section" class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-utensils text-blue-500 mr-3"></i>
+                        Our Restaurants
+                    </h2>
+                    <div id="restaurants-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
+
+                <!-- Upcoming Events Section -->
+                <section id="events-section" class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-calendar-star text-purple-500 mr-3"></i>
+                        Upcoming Events
+                    </h2>
+                    <div id="events-grid" class="grid grid-cols-1 gap-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
+
+                <!-- Spa & Wellness Section -->
+                <section id="spa-section" class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-spa text-green-500 mr-3"></i>
+                        Spa & Wellness
+                    </h2>
+                    <div id="spa-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
+
+                <!-- Vendor Activities Section -->
+                <section id="activities-section" class="mb-12">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-hiking text-orange-500 mr-3"></i>
+                        Activities & Experiences
+                    </h2>
+                    <p class="text-gray-600 mb-4 text-sm">Curated experiences from our trusted partners</p>
+                    <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <script>
+        const propertySlug = '${property_slug}';
+        let propertyData = null;
+        let allOfferings = [];
+        let allActivities = [];
+        let currentFilter = 'all';
+
+        async function init() {
+            try {
+                // Get property details
+                const propResponse = await fetch(\`/api/properties?slug=\${propertySlug}\`);
+                const propData = await propResponse.json();
+                
+                if (!propData.properties || propData.properties.length === 0) {
+                    throw new Error('Property not found');
+                }
+                
+                propertyData = propData.properties[0];
+                document.getElementById('propertyName').textContent = propertyData.name;
+                document.title = propertyData.name;
+                
+                // Load hotel offerings
+                const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}\`);
+                const offeringsData = await offeringsResponse.json();
+                allOfferings = offeringsData.offerings || [];
+                
+                // Load vendor activities
+                const activitiesResponse = await fetch(\`/api/property-vendor-activities/\${propertyData.property_id}\`);
+                const activitiesData = await activitiesResponse.json();
+                allActivities = activitiesData.activities || [];
+                
+                // Render all content
+                renderContent();
+                
+                // Hide loading, show content
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('loading').innerHTML = \`
+                    <div class="text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
+                        <p class="text-gray-600">Unable to load content</p>
+                        <button onclick="location.reload()" class="mt-4 px-6 py-2 bg-blue-500 text-white rounded-lg">
+                            Try Again
+                        </button>
+                    </div>
+                \`;
+            }
+        }
+
+        function renderContent() {
+            renderRestaurants();
+            renderEvents();
+            renderSpa();
+            renderActivities();
+            updateSectionVisibility();
+        }
+
+        function renderRestaurants() {
+            const restaurants = allOfferings.filter(o => o.offering_type === 'restaurant');
+            const grid = document.getElementById('restaurants-grid');
+            
+            if (restaurants.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No restaurants available</p>';
+                return;
+            }
+            
+            grid.innerHTML = restaurants.map(r => \`
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${r.offering_id})">
+                    <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
+                         alt="\${r.title}" 
+                         class="w-full h-40 object-cover">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-lg">\${r.title}</h3>
+                            ${r.requires_booking ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Booking Required</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Walk-in Welcome</span>'}
+                        </div>
+                        <p class="text-sm text-gray-600 mb-3">\${r.short_description}</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">
+                                <i class="fas fa-map-marker-alt mr-1"></i>\${r.location}
+                            </span>
+                            <span class="font-semibold text-blue-600">\${r.price ? r.currency + ' ' + r.price : 'Free'}</span>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        function renderEvents() {
+            const events = allOfferings.filter(o => o.offering_type === 'event');
+            const grid = document.getElementById('events-grid');
+            
+            if (events.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500">No upcoming events</p>';
+                return;
+            }
+            
+            grid.innerHTML = events.map(e => \`
+                <div class="offering-card bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-sm p-4" onclick="viewOffering(\${e.offering_id})">
+                    <div class="flex gap-4">
+                        <img src="\${e.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${e.title}" 
+                             class="w-24 h-24 rounded-lg object-cover flex-shrink-0">
+                        <div class="flex-1">
+                            <h3 class="font-bold text-lg mb-1">\${e.title}</h3>
+                            <p class="text-sm text-gray-600 mb-2">\${e.short_description}</p>
+                            <div class="flex items-center gap-3 text-sm text-gray-700">
+                                \${e.event_date ? '<span><i class="fas fa-calendar mr-1"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
+                                \${e.event_start_time ? '<span><i class="fas fa-clock mr-1"></i>' + e.event_start_time + '</span>' : ''}
+                                <span class="font-semibold text-purple-600">\${e.currency} \${e.price}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        function renderSpa() {
+            const spa = allOfferings.filter(o => o.offering_type === 'spa');
+            const grid = document.getElementById('spa-grid');
+            
+            if (spa.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No spa services available</p>';
+                return;
+            }
+            
+            grid.innerHTML = spa.map(s => \`
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${s.offering_id})">
+                    <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
+                         alt="\${s.title}" 
+                         class="w-full h-40 object-cover">
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg mb-2">\${s.title}</h3>
+                        <p class="text-sm text-gray-600 mb-3">\${s.short_description}</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">
+                                <i class="fas fa-clock mr-1"></i>\${s.duration_minutes} min
+                            </span>
+                            <span class="font-semibold text-green-600">\${s.currency} \${s.price}</span>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        function renderActivities() {
+            const grid = document.getElementById('activities-grid');
+            
+            if (allActivities.length === 0) {
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">No activities available</p>';
+                return;
+            }
+            
+            grid.innerHTML = allActivities.map(a => \`
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewActivity(\${a.activity_id})">
+                    <img src="\${a.images[0] || '/static/placeholder.jpg'}" 
+                         alt="\${a.title}" 
+                         class="w-full h-40 object-cover">
+                    <div class="p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="font-bold text-lg">\${a.title}</h3>
+                            <span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">\${a.category_name}</span>
+                        </div>
+                        <p class="text-sm text-gray-500 mb-1">by \${a.business_name}</p>
+                        <p class="text-sm text-gray-600 mb-3">\${a.short_description}</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-500">
+                                <i class="fas fa-clock mr-1"></i>\${a.duration_minutes} min
+                            </span>
+                            <span class="font-semibold text-orange-600">\${a.currency} \${a.price}</span>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        function updateSectionVisibility() {
+            const sections = {
+                'restaurants': document.getElementById('restaurants-section'),
+                'events': document.getElementById('events-section'),
+                'spa': document.getElementById('spa-section'),
+                'activities': document.getElementById('activities-section')
+            };
+            
+            if (currentFilter === 'all') {
+                Object.values(sections).forEach(s => s.style.display = 'block');
+            } else if (currentFilter === 'restaurant') {
+                sections.restaurants.style.display = 'block';
+                sections.events.style.display = 'none';
+                sections.spa.style.display = 'none';
+                sections.activities.style.display = 'none';
+            } else if (currentFilter === 'event') {
+                sections.restaurants.style.display = 'none';
+                sections.events.style.display = 'block';
+                sections.spa.style.display = 'none';
+                sections.activities.style.display = 'none';
+            } else if (currentFilter === 'spa') {
+                sections.restaurants.style.display = 'none';
+                sections.events.style.display = 'none';
+                sections.spa.style.display = 'block';
+                sections.activities.style.display = 'none';
+            } else if (currentFilter === 'activities') {
+                sections.restaurants.style.display = 'none';
+                sections.events.style.display = 'none';
+                sections.spa.style.display = 'none';
+                sections.activities.style.display = 'block';
+            }
+        }
+
+        function filterOfferings(category) {
+            currentFilter = category;
+            
+            // Update pill styles
+            document.querySelectorAll('.category-pill').forEach(pill => {
+                if (pill.dataset.category === category) {
+                    pill.className = 'category-pill bg-blue-500 text-white';
+                } else {
+                    pill.className = 'category-pill bg-gray-200 text-gray-700';
+                }
+            });
+            
+            updateSectionVisibility();
+        }
+
+        function viewOffering(offeringId) {
+            window.location.href = \`/offering-detail?id=\${offeringId}&property=\${propertyData.property_id}\`;
+        }
+
+        function viewActivity(activityId) {
+            window.location.href = \`/activity?id=\${activityId}&property=\${propertyData.property_id}\`;
+        }
+
+        // Initialize on load
+        init();
+        </script>
+    </body>
+    </html>
+  `)
+})
+
 // ============================================
 // GUEST WELCOME PAGE - QR Code Entry
 // ============================================
@@ -2805,6 +3359,61 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
 
+        <!-- Hotel Offerings Tab -->
+        <div id="offeringsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-green-600"></i>Add New Hotel Offering</h2>
+                <form id="addOfferingForm" class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <select id="offeringType" required class="px-4 py-2 border rounded-lg">
+                            <option value="">Select Type...</option>
+                            <option value="restaurant">Restaurant</option>
+                            <option value="event">Event</option>
+                            <option value="spa">Spa/Wellness</option>
+                            <option value="service">Other Service</option>
+                        </select>
+                        <input type="text" id="offeringTitle" placeholder="Title (English)" required class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <textarea id="offeringDescription" placeholder="Short description" required class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
+                    <textarea id="offeringFullDescription" placeholder="Full description" class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <input type="number" id="offeringPrice" placeholder="Price" step="0.01" class="px-4 py-2 border rounded-lg">
+                        <input type="text" id="offeringLocation" placeholder="Location" class="px-4 py-2 border rounded-lg">
+                        <input type="number" id="offeringDuration" placeholder="Duration (minutes)" class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <input type="text" id="offeringImages" placeholder="Image URL (comma-separated for multiple)" class="px-4 py-2 border rounded-lg">
+                        <label class="flex items-center px-4 py-2 border rounded-lg">
+                            <input type="checkbox" id="offeringRequiresBooking" class="mr-2">
+                            <span>Requires Booking</span>
+                        </label>
+                    </div>
+                    
+                    <!-- Event-specific fields (hidden by default) -->
+                    <div id="eventFields" class="hidden grid md:grid-cols-3 gap-4">
+                        <input type="date" id="eventDate" placeholder="Event Date" class="px-4 py-2 border rounded-lg">
+                        <input type="time" id="eventStartTime" placeholder="Start Time" class="px-4 py-2 border rounded-lg">
+                        <input type="time" id="eventEndTime" placeholder="End Time" class="px-4 py-2 border rounded-lg">
+                    </div>
+                    
+                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-check mr-2"></i>Add Offering
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Hotel Offerings</h2>
+                <div class="mb-4 flex gap-2">
+                    <button onclick="filterOfferings('all')" class="offering-filter-btn px-4 py-2 rounded bg-blue-500 text-white" data-type="all">All</button>
+                    <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant">Restaurants</button>
+                    <button onclick="filterOfferings('event')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="event">Events</button>
+                    <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa">Spa</button>
+                </div>
+                <div id="offeringsList" class="space-y-3"></div>
+            </div>
+        </div>
+
         <!-- Activities Tab -->
         <div id="activitiesTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
@@ -2837,6 +3446,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
+        if (tab === 'offerings') loadOfferings();
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
       }
@@ -2974,6 +3584,109 @@ app.get('/admin/dashboard', (c) => {
         }
       }
 
+      // Hotel Offerings Management
+      let allOfferings = [];
+      let currentOfferingFilter = 'all';
+      
+      async function loadOfferings() {
+        try {
+          const response = await fetch('/api/hotel-offerings/1');
+          const data = await response.json();
+          allOfferings = data.offerings || [];
+          displayOfferings();
+        } catch (error) {
+          console.error('Load offerings error:', error);
+        }
+      }
+      
+      function displayOfferings() {
+        const filteredOfferings = currentOfferingFilter === 'all' 
+          ? allOfferings 
+          : allOfferings.filter(o => o.offering_type === currentOfferingFilter);
+        
+        const list = document.getElementById('offeringsList');
+        if (filteredOfferings.length === 0) {
+          list.innerHTML = '<p class="text-gray-500">No offerings found</p>';
+          return;
+        }
+        
+        list.innerHTML = filteredOfferings.map(o => {
+          const typeColors = {
+            restaurant: 'bg-blue-100 text-blue-700',
+            event: 'bg-purple-100 text-purple-700',
+            spa: 'bg-green-100 text-green-700',
+            service: 'bg-gray-100 text-gray-700'
+          };
+          
+          return \`
+            <div class="border rounded-lg p-4 hover:shadow-md">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <h3 class="font-bold text-lg">\${o.title}</h3>
+                  <span class="inline-block px-2 py-1 rounded text-xs \${typeColors[o.offering_type] || typeColors.service}">
+                    \${o.offering_type.toUpperCase()}
+                  </span>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="editOffering(\${o.offering_id})" class="text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button onclick="deleteOffering(\${o.offering_id})" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+              <p class="text-sm text-gray-600 mb-2">\${o.short_description}</p>
+              <div class="flex flex-wrap gap-3 text-sm text-gray-700">
+                <span><i class="fas fa-dollar-sign mr-1"></i>\${o.currency} \${o.price || 'Free'}</span>
+                <span><i class="fas fa-map-marker-alt mr-1"></i>\${o.location || 'N/A'}</span>
+                \${o.duration_minutes ? \`<span><i class="fas fa-clock mr-1"></i>\${o.duration_minutes} min</span>\` : ''}
+                \${o.event_date ? \`<span><i class="fas fa-calendar mr-1"></i>\${o.event_date}</span>\` : ''}
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+      
+      function filterOfferings(type) {
+        currentOfferingFilter = type;
+        document.querySelectorAll('.offering-filter-btn').forEach(btn => {
+          if (btn.dataset.type === type) {
+            btn.className = 'offering-filter-btn px-4 py-2 rounded bg-blue-500 text-white';
+          } else {
+            btn.className = 'offering-filter-btn px-4 py-2 rounded bg-gray-200';
+          }
+        });
+        displayOfferings();
+      }
+      
+      async function deleteOffering(offeringId) {
+        if (!confirm('Delete this offering?')) return;
+        try {
+          const response = await fetch(\`/api/admin/offerings/\${offeringId}\`, {
+            method: 'DELETE'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Offering deleted!');
+            loadOfferings();
+          }
+        } catch (error) {
+          console.error('Delete offering error:', error);
+          alert('Failed to delete offering');
+        }
+      }
+      
+      // Show/hide event-specific fields based on offering type
+      document.getElementById('offeringType').addEventListener('change', (e) => {
+        const eventFields = document.getElementById('eventFields');
+        if (e.target.value === 'event') {
+          eventFields.classList.remove('hidden');
+        } else {
+          eventFields.classList.add('hidden');
+        }
+      });
+
       document.getElementById('addRoomForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
@@ -2995,6 +3708,44 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Add room error:', error);
           alert('Failed to create room');
+        }
+      });
+
+      document.getElementById('addOfferingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          const images = document.getElementById('offeringImages').value.split(',').map(url => url.trim()).filter(Boolean);
+          
+          const response = await fetch('/api/admin/offerings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              offering_type: document.getElementById('offeringType').value,
+              title_en: document.getElementById('offeringTitle').value,
+              short_description_en: document.getElementById('offeringDescription').value,
+              full_description_en: document.getElementById('offeringFullDescription').value,
+              price: parseFloat(document.getElementById('offeringPrice').value) || 0,
+              location: document.getElementById('offeringLocation').value,
+              duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
+              requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
+              images: JSON.stringify(images),
+              event_date: document.getElementById('eventDate').value || null,
+              event_start_time: document.getElementById('eventStartTime').value || null,
+              event_end_time: document.getElementById('eventEndTime').value || null
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Hotel offering added successfully!');
+            document.getElementById('addOfferingForm').reset();
+            document.getElementById('eventFields').classList.add('hidden');
+            loadOfferings();
+          }
+        } catch (error) {
+          console.error('Add offering error:', error);
+          alert('Failed to add offering');
         }
       });
 
