@@ -6437,13 +6437,6 @@ app.get('/activity', (c) => {
                         <h4 id="vendorBusinessName" class="text-lg font-semibold text-gray-800 mb-2"></h4>
                         <div class="space-y-2 text-sm text-gray-600">
                             <p><i class="fas fa-phone mr-2 text-green-500"></i><span id="vendorPhone"></span></p>
-                            <p><i class="fas fa-envelope mr-2 text-blue-500"></i><span id="vendorEmail"></span></p>
-                            <div id="vendorCertifications" class="hidden">
-                                <p><i class="fas fa-certificate mr-2 text-yellow-500"></i><span id="vendorCert"></span></p>
-                            </div>
-                            <div id="vendorSafety" class="hidden">
-                                <p><i class="fas fa-shield-alt mr-2 text-green-500"></i>Safety Rating: <span id="vendorSafetyRating" class="font-semibold"></span>/5</p>
-                            </div>
                         </div>
                     </div>
                     <div>
@@ -6738,17 +6731,6 @@ app.get('/activity', (c) => {
           // Display vendor information
           document.getElementById('vendorBusinessName').textContent = activity.vendor_name;
           document.getElementById('vendorPhone').textContent = activity.vendor_phone || 'Not provided';
-          document.getElementById('vendorEmail').textContent = activity.vendor_email || 'Not provided';
-          
-          if (activity.vendor_certifications) {
-            document.getElementById('vendorCertifications').classList.remove('hidden');
-            document.getElementById('vendorCert').textContent = activity.vendor_certifications;
-          }
-          
-          if (activity.vendor_safety_rating) {
-            document.getElementById('vendorSafety').classList.remove('hidden');
-            document.getElementById('vendorSafetyRating').textContent = activity.vendor_safety_rating;
-          }
           
           // Set vendor profile link
           document.getElementById('vendorProfileLink').href = '/vendor/' + activity.vendor_slug;
