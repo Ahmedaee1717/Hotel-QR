@@ -3683,6 +3683,43 @@ app.get('/activity', (c) => {
   `)
 })
 
+// SIMPLE TEST DASHBOARD
+app.get('/admin/test', async (c) => {
+  const { DB } = c.env
+  const rooms = await DB.prepare(`SELECT * FROM rooms WHERE property_id = 1 ORDER BY room_number`).all()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <h1 class="text-3xl font-bold mb-4">SIMPLE API TEST</h1>
+    <div class="bg-white p-6 rounded shadow">
+        <h2 class="text-xl mb-4">Rooms from Database:</h2>
+        <div id="roomsList"></div>
+    </div>
+    <script>
+        async function loadRooms() {
+            const response = await fetch('/api/admin/rooms?property_id=1');
+            const rooms = await response.json();
+            const list = document.getElementById('roomsList');
+            list.innerHTML = rooms.map(r => \`
+                <div class="border p-4 mb-2">
+                    <strong>Room \${r.room_number}</strong> (\${r.room_type})
+                    <br>QR: \${r.qr_code_data}
+                </div>
+            \`).join('');
+        }
+        loadRooms();
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Admin Dashboard page
 app.get('/admin/dashboard', (c) => {
   return c.html(`
