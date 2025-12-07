@@ -2127,6 +2127,90 @@ app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
   }
 })
 
+// Real-time translation API for guest-facing pages (no auth required)
+app.post('/api/translate', async (c) => {
+  try {
+    const { text, target_lang, context, persona } = await c.req.json()
+    
+    if (!text || !target_lang) {
+      return c.json({ error: 'Missing text or target_lang' }, 400)
+    }
+    
+    // For English, return as-is
+    if (target_lang === 'en') {
+      return c.json({ translated_text: text })
+    }
+    
+    // Get OpenAI API key from environment variable if configured
+    // For now, return original text (hotel admin should use batch translation)
+    // This is a fallback - ideally translations should be pre-stored in DB
+    const apiKey = c.env.OPENAI_API_KEY
+    
+    if (!apiKey) {
+      // No API key, return original text
+      return c.json({ translated_text: text })
+    }
+    
+    const languageNames: Record<string, string> = {
+      'es': 'Spanish',
+      'fr': 'French',
+      'de': 'German',
+      'it': 'Italian',
+      'pt': 'Portuguese',
+      'ru': 'Russian',
+      'ar': 'Modern Standard Arabic',
+      'zh': 'Simplified Chinese'
+    }
+    
+    const contextPrompts: Record<string, string> = {
+      'hotel_offering_description': 'You are translating hotel offering descriptions (restaurants, spa, events, services). Maintain luxury hospitality tone.',
+      'luxury_hospitality': 'You are translating luxury hotel content. Use elegant, professional language appropriate for high-end hospitality.'
+    }
+    
+    const systemPrompt = `You are a professional hospitality translator.
+${contextPrompts[context] || contextPrompts['luxury_hospitality']}
+
+CRITICAL REQUIREMENTS:
+- Translate with 100% accuracy to ${languageNames[target_lang] || target_lang}
+- Maintain tourism marketing tone and appeal
+- Preserve formatting, punctuation, and special characters  
+- Keep proper nouns (hotel names, locations) unchanged
+- Use appropriate formality level for luxury hospitality
+- Ensure cultural appropriateness for ${languageNames[target_lang] || target_lang} speakers
+- Output ONLY the translation, NO explanations or notes`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.2,
+        max_tokens: 1000
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Translation API error:', await response.text())
+      return c.json({ translated_text: text }) // Fallback
+    }
+    
+    const data: any = await response.json()
+    const translatedText = data.choices?.[0]?.message?.content?.trim()
+    
+    return c.json({ translated_text: translatedText || text })
+  } catch (error) {
+    console.error('Translation error:', error)
+    return c.json({ translated_text: text }, 200) // Fallback to original
+  }
+})
+
 // Remove vendor from hotel (Admin)
 app.delete('/api/admin/vendors/:vendor_id/remove', async (c) => {
   const { DB } = c.env
@@ -3827,6 +3911,10 @@ app.get('/offering-detail', async (c) => {
     <title>Book Now</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+      /* Dynamic styles will be injected here */
+      #dynamicStyles { }
+    </style>
 </head>
 <body class="bg-gray-50">
     <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
@@ -3834,11 +3922,26 @@ app.get('/offering-detail', async (c) => {
     </div>
 
     <div id="content" class="hidden">
+        <!-- Language Selector -->
+        <div class="fixed top-4 right-4 z-50">
+            <select id="languageSelector" class="px-4 py-2 border rounded-lg bg-white shadow-md">
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português</option>
+                <option value="ru">Русский</option>
+                <option value="ar">العربية</option>
+                <option value="zh">中文</option>
+            </select>
+        </div>
+
         <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-6 px-4">
+        <div id="offeringHeader" class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-6 px-4">
             <div class="max-w-4xl mx-auto">
-                <a href="/hotel/paradise-resort" class="text-white/80 hover:text-white mb-2 inline-block">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to hotel
+                <a id="backLink" href="#" class="text-white/80 hover:text-white mb-2 inline-block">
+                    <i class="fas fa-arrow-left mr-2"></i><span data-i18n="back-to-hotel">Back to hotel</span>
                 </a>
                 <h1 class="text-3xl font-bold" id="offeringTitle">Loading...</h1>
                 <p class="text-white/80" id="offeringLocation"></p>
@@ -3852,11 +3955,11 @@ app.get('/offering-detail', async (c) => {
                 <img id="offeringImage" src="" alt="" class="w-full h-64 object-cover">
                 <div class="p-6">
                     <div class="flex items-center gap-2 mb-4" id="offeringMeta"></div>
-                    <h2 class="text-2xl font-bold mb-3">About</h2>
+                    <h2 class="text-2xl font-bold mb-3" data-i18n="about">About</h2>
                     <p class="text-gray-600 mb-6" id="offeringDescription"></p>
                     
                     <div id="eventDetails" class="hidden mb-6">
-                        <h3 class="font-bold text-lg mb-2">Event Details</h3>
+                        <h3 class="font-bold text-lg mb-2" data-i18n="event-details">Event Details</h3>
                         <div class="space-y-2 text-gray-700">
                             <div><i class="fas fa-calendar mr-2 text-blue-500"></i><span id="eventDate"></span></div>
                             <div><i class="fas fa-clock mr-2 text-blue-500"></i><span id="eventTime"></span></div>
@@ -3864,48 +3967,48 @@ app.get('/offering-detail', async (c) => {
                     </div>
 
                     <div id="bookingSection" class="border-t pt-6">
-                        <h3 class="font-bold text-lg mb-4">Book Your Experience</h3>
+                        <h3 class="font-bold text-lg mb-4" data-i18n="book-experience">Book Your Experience</h3>
                         <form id="bookingForm" class="space-y-4">
                             <div class="grid md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium mb-2">Your Name</label>
+                                    <label class="block text-sm font-medium mb-2" data-i18n="your-name">Your Name</label>
                                     <input type="text" id="guestName" required class="w-full px-4 py-2 border rounded-lg">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium mb-2">Phone Number</label>
+                                    <label class="block text-sm font-medium mb-2" data-i18n="phone-number">Phone Number</label>
                                     <input type="tel" id="guestPhone" required class="w-full px-4 py-2 border rounded-lg">
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">Email</label>
+                                <label class="block text-sm font-medium mb-2" data-i18n="email">Email</label>
                                 <input type="email" id="guestEmail" required class="w-full px-4 py-2 border rounded-lg">
                             </div>
                             <div id="restaurantFields" class="hidden">
-                                <label class="block text-sm font-medium mb-2">Preferred Date & Time</label>
+                                <label class="block text-sm font-medium mb-2" data-i18n="preferred-datetime">Preferred Date & Time</label>
                                 <input type="datetime-local" id="bookingDateTime" class="w-full px-4 py-2 border rounded-lg">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">Number of Guests</label>
+                                <label class="block text-sm font-medium mb-2" data-i18n="num-guests">Number of Guests</label>
                                 <input type="number" id="numGuests" min="1" value="2" required class="w-full px-4 py-2 border rounded-lg">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">Special Requests (Optional)</label>
+                                <label class="block text-sm font-medium mb-2" data-i18n="special-requests">Special Requests (Optional)</label>
                                 <textarea id="specialRequests" rows="3" class="w-full px-4 py-2 border rounded-lg"></textarea>
                             </div>
                             
                             <div class="bg-blue-50 p-4 rounded-lg">
                                 <div class="flex justify-between items-center mb-2">
-                                    <span class="font-medium">Price per person:</span>
+                                    <span class="font-medium" data-i18n="price-per-person">Price per person:</span>
                                     <span class="text-xl font-bold text-blue-600" id="priceDisplay"></span>
                                 </div>
                                 <div class="flex justify-between items-center text-gray-700">
-                                    <span>Total:</span>
+                                    <span data-i18n="total">Total:</span>
                                     <span class="text-2xl font-bold" id="totalPrice">$0</span>
                                 </div>
                             </div>
 
                             <button type="submit" class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700">
-                                <i class="fas fa-check-circle mr-2"></i>Confirm Booking
+                                <i class="fas fa-check-circle mr-2"></i><span data-i18n="confirm-booking">Confirm Booking</span>
                             </button>
                         </form>
                     </div>
@@ -3916,11 +4019,166 @@ app.get('/offering-detail', async (c) => {
 
     <script>
         let offeringData = null;
+        let propertyData = null;
+        let currentLanguage = 'en';
         const offeringId = '${offering_id}';
         const propertyId = '${property_id}';
 
+        // Translation dictionary for UI elements
+        const translations = {
+            en: {
+                'back-to-hotel': 'Back to hotel',
+                'about': 'About',
+                'event-details': 'Event Details',
+                'book-experience': 'Book Your Experience',
+                'your-name': 'Your Name',
+                'phone-number': 'Phone Number',
+                'email': 'Email',
+                'preferred-datetime': 'Preferred Date & Time',
+                'num-guests': 'Number of Guests',
+                'special-requests': 'Special Requests (Optional)',
+                'price-per-person': 'Price per person:',
+                'total': 'Total:',
+                'confirm-booking': 'Confirm Booking'
+            },
+            es: {
+                'back-to-hotel': 'Volver al hotel',
+                'about': 'Acerca de',
+                'event-details': 'Detalles del evento',
+                'book-experience': 'Reserva tu experiencia',
+                'your-name': 'Tu nombre',
+                'phone-number': 'Número de teléfono',
+                'email': 'Correo electrónico',
+                'preferred-datetime': 'Fecha y hora preferidas',
+                'num-guests': 'Número de huéspedes',
+                'special-requests': 'Solicitudes especiales (opcional)',
+                'price-per-person': 'Precio por persona:',
+                'total': 'Total:',
+                'confirm-booking': 'Confirmar reserva'
+            },
+            fr: {
+                'back-to-hotel': 'Retour à l\'hôtel',
+                'about': 'À propos',
+                'event-details': 'Détails de l\'événement',
+                'book-experience': 'Réservez votre expérience',
+                'your-name': 'Votre nom',
+                'phone-number': 'Numéro de téléphone',
+                'email': 'Email',
+                'preferred-datetime': 'Date et heure préférées',
+                'num-guests': 'Nombre d\'invités',
+                'special-requests': 'Demandes spéciales (facultatif)',
+                'price-per-person': 'Prix par personne:',
+                'total': 'Total:',
+                'confirm-booking': 'Confirmer la réservation'
+            },
+            de: {
+                'back-to-hotel': 'Zurück zum Hotel',
+                'about': 'Über',
+                'event-details': 'Veranstaltungsdetails',
+                'book-experience': 'Buchen Sie Ihr Erlebnis',
+                'your-name': 'Ihr Name',
+                'phone-number': 'Telefonnummer',
+                'email': 'E-Mail',
+                'preferred-datetime': 'Bevorzugtes Datum und Uhrzeit',
+                'num-guests': 'Anzahl der Gäste',
+                'special-requests': 'Besondere Wünsche (optional)',
+                'price-per-person': 'Preis pro Person:',
+                'total': 'Gesamt:',
+                'confirm-booking': 'Buchung bestätigen'
+            },
+            it: {
+                'back-to-hotel': 'Torna all\'hotel',
+                'about': 'Informazioni',
+                'event-details': 'Dettagli dell\'evento',
+                'book-experience': 'Prenota la tua esperienza',
+                'your-name': 'Il tuo nome',
+                'phone-number': 'Numero di telefono',
+                'email': 'Email',
+                'preferred-datetime': 'Data e ora preferite',
+                'num-guests': 'Numero di ospiti',
+                'special-requests': 'Richieste speciali (facoltativo)',
+                'price-per-person': 'Prezzo per persona:',
+                'total': 'Totale:',
+                'confirm-booking': 'Conferma prenotazione'
+            },
+            pt: {
+                'back-to-hotel': 'Voltar ao hotel',
+                'about': 'Sobre',
+                'event-details': 'Detalhes do evento',
+                'book-experience': 'Reserve sua experiência',
+                'your-name': 'Seu nome',
+                'phone-number': 'Número de telefone',
+                'email': 'Email',
+                'preferred-datetime': 'Data e hora preferidas',
+                'num-guests': 'Número de hóspedes',
+                'special-requests': 'Solicitações especiais (opcional)',
+                'price-per-person': 'Preço por pessoa:',
+                'total': 'Total:',
+                'confirm-booking': 'Confirmar reserva'
+            },
+            ru: {
+                'back-to-hotel': 'Вернуться в отель',
+                'about': 'О нас',
+                'event-details': 'Детали мероприятия',
+                'book-experience': 'Забронируйте свой опыт',
+                'your-name': 'Ваше имя',
+                'phone-number': 'Номер телефона',
+                'email': 'Электронная почта',
+                'preferred-datetime': 'Предпочтительные дата и время',
+                'num-guests': 'Количество гостей',
+                'special-requests': 'Особые пожелания (необязательно)',
+                'price-per-person': 'Цена за человека:',
+                'total': 'Итого:',
+                'confirm-booking': 'Подтвердить бронирование'
+            },
+            ar: {
+                'back-to-hotel': 'العودة إلى الفندق',
+                'about': 'حول',
+                'event-details': 'تفاصيل الحدث',
+                'book-experience': 'احجز تجربتك',
+                'your-name': 'اسمك',
+                'phone-number': 'رقم الهاتف',
+                'email': 'البريد الإلكتروني',
+                'preferred-datetime': 'التاريخ والوقت المفضل',
+                'num-guests': 'عدد الضيوف',
+                'special-requests': 'الطلبات الخاصة (اختياري)',
+                'price-per-person': 'السعر لكل شخص:',
+                'total': 'المجموع:',
+                'confirm-booking': 'تأكيد الحجز'
+            },
+            zh: {
+                'back-to-hotel': '返回酒店',
+                'about': '关于',
+                'event-details': '活动详情',
+                'book-experience': '预订您的体验',
+                'your-name': '您的姓名',
+                'phone-number': '电话号码',
+                'email': '电子邮件',
+                'preferred-datetime': '首选日期和时间',
+                'num-guests': '客人数量',
+                'special-requests': '特殊要求（可选）',
+                'price-per-person': '每人价格：',
+                'total': '总计：',
+                'confirm-booking': '确认预订'
+            }
+        };
+
         async function init() {
             try {
+                // Fetch property data for settings and slug
+                const propResponse = await fetch('/api/properties?property_id=' + propertyId);
+                const propData = await propResponse.json();
+                propertyData = propData.properties && propData.properties[0];
+
+                if (!propertyData) {
+                    alert('Property not found');
+                    return;
+                }
+
+                // Update back link with correct slug
+                document.getElementById('backLink').href = '/hotel/' + (propertyData.slug || 'paradise-resort');
+
+                // Fetch offering data
                 const response = await fetch('/api/hotel-offerings/' + propertyId);
                 const data = await response.json();
                 const offerings = data.offerings || [];
@@ -3928,11 +4186,17 @@ app.get('/offering-detail', async (c) => {
 
                 if (!offeringData) {
                     alert('Offering not found');
-                    window.location.href = '/hotel/paradise-resort';
+                    window.location.href = '/hotel/' + (propertyData.slug || 'paradise-resort');
                     return;
                 }
 
+                // Apply design settings
+                applyDesignSettings(propertyData);
+
+                // Render offering with current language
                 renderOffering();
+                updateTranslations();
+
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
             } catch (error) {
@@ -3941,11 +4205,120 @@ app.get('/offering-detail', async (c) => {
             }
         }
 
-        function renderOffering() {
-            document.getElementById('offeringTitle').textContent = offeringData.title;
-            document.getElementById('offeringLocation').textContent = offeringData.location || '';
+        function applyDesignSettings(settings) {
+            const fontMap = {
+                'inter': "'Inter', system-ui, sans-serif",
+                'poppins': "'Poppins', sans-serif",
+                'playfair': "'Playfair Display', serif",
+                'montserrat': "'Montserrat', sans-serif",
+                'lora': "'Lora', serif"
+            };
+            
+            const primaryColor = settings.primary_color || '#3B82F6';
+            const secondaryColor = settings.secondary_color || '#10B981';
+            const fontFamily = fontMap[settings.font_family] || fontMap['inter'];
+            const useGradient = settings.use_gradient || 0;
+            
+            const heroBackground = useGradient ? 
+                \`linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%)\` : 
+                primaryColor;
+            
+            // Apply dynamic CSS
+            const style = document.createElement('style');
+            style.textContent = \`
+                body {
+                    font-family: \${fontFamily};
+                }
+                
+                #offeringHeader {
+                    background: \${heroBackground} !important;
+                }
+                
+                .text-blue-500, .text-blue-600 {
+                    color: \${primaryColor} !important;
+                }
+                
+                .bg-blue-600 {
+                    background: \${useGradient ? heroBackground : primaryColor} !important;
+                }
+                
+                .bg-blue-600:hover {
+                    background: \${secondaryColor} !important;
+                    transform: scale(1.05);
+                }
+                
+                .bg-blue-50 {
+                    background: \${primaryColor}15 !important;
+                }
+            \`;
+            document.head.appendChild(style);
+        }
+
+        function updateTranslations() {
+            const lang = currentLanguage;
+            const dict = translations[lang] || translations['en'];
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (dict[key]) {
+                    el.textContent = dict[key];
+                }
+            });
+        }
+
+        async function translateContent(text, targetLang) {
+            if (!text || targetLang === 'en') return text;
+            
+            try {
+                // Call translation API
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        target_lang: targetLang,
+                        context: 'hotel_offering_description',
+                        persona: 'luxury_hospitality'
+                    })
+                });
+                const data = await response.json();
+                return data.translated_text || text;
+            } catch (error) {
+                console.error('Translation error:', error);
+                return text;
+            }
+        }
+
+        async function renderOffering() {
+            // Get language-specific field names
+            const langSuffix = currentLanguage === 'en' ? '_en' : ('_' + currentLanguage);
+            const titleField = 'title' + langSuffix;
+            const shortDescField = 'short_description' + langSuffix;
+            const fullDescField = 'full_description' + langSuffix;
+            
+            // Try to get translated content from database first
+            let title = offeringData[titleField] || offeringData.title || offeringData.title_en;
+            let description = offeringData[fullDescField] || offeringData[shortDescField] || offeringData.full_description || offeringData.short_description;
+            let location = offeringData.location;
+            
+            // If no translation exists in database and language is not English, use AI translation
+            if (currentLanguage !== 'en') {
+                if (!offeringData[titleField]) {
+                    title = await translateContent(offeringData.title || offeringData.title_en, currentLanguage);
+                }
+                if (!offeringData[fullDescField] && !offeringData[shortDescField]) {
+                    const originalDesc = offeringData.full_description || offeringData.short_description;
+                    description = await translateContent(originalDesc, currentLanguage);
+                }
+                if (offeringData.location) {
+                    location = await translateContent(offeringData.location, currentLanguage);
+                }
+            }
+            
+            document.getElementById('offeringTitle').textContent = title;
+            document.getElementById('offeringLocation').textContent = location || '';
             document.getElementById('offeringImage').src = (offeringData.images && offeringData.images[0]) || '/static/placeholder.jpg';
-            document.getElementById('offeringDescription').textContent = offeringData.full_description || offeringData.short_description;
+            document.getElementById('offeringDescription').textContent = description;
             document.getElementById('priceDisplay').textContent = (offeringData.currency || 'USD') + ' ' + (offeringData.price || '0');
 
             // Show/hide booking section based on requires_booking
@@ -3982,6 +4355,13 @@ app.get('/offering-detail', async (c) => {
         }
 
         document.getElementById('numGuests').addEventListener('input', updateTotalPrice);
+
+        // Language selector
+        document.getElementById('languageSelector').addEventListener('change', async (e) => {
+            currentLanguage = e.target.value;
+            await renderOffering();
+            updateTranslations();
+        });
 
         document.getElementById('bookingForm').addEventListener('submit', async (e) => {
             e.preventDefault();
