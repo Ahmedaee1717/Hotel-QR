@@ -3014,25 +3014,24 @@ app.get('/hotel/:property_slug', async (c) => {
         </div>
 
         <div id="content" class="hidden">
-            <!-- Language Selector (Floating) -->
-            <div class="fixed top-4 right-4 z-50">
-                <select id="languageSelector" class="px-4 py-2 bg-white text-gray-800 rounded-lg shadow-lg border-2 border-gray-300 cursor-pointer hover:border-blue-500 focus:outline-none focus:border-blue-600 transition" onchange="changeLanguage()">
-                    <option value="en" data-flag="🇬🇧">🇬🇧 English</option>
-                    <option value="ar" data-flag="🇸🇦">🇸🇦 العربية</option>
-                    <option value="de" data-flag="🇩🇪">🇩🇪 Deutsch</option>
-                    <option value="ru" data-flag="🇷🇺">🇷🇺 Русский</option>
-                    <option value="pl" data-flag="🇵🇱">🇵🇱 Polski</option>
-                    <option value="it" data-flag="🇮🇹">🇮🇹 Italiano</option>
-                    <option value="fr" data-flag="🇫🇷">🇫🇷 Français</option>
-                    <option value="cs" data-flag="🇨🇿">🇨🇿 Čeština</option>
-                    <option value="uk" data-flag="🇺🇦">🇺🇦 Українська</option>
-                </select>
-            </div>
-            
             <!-- Hero Header - Facebook Profile Style -->
             <div class="relative bg-white">
                 <!-- Cover Photo -->
                 <div class="gradient-hero h-64 md:h-96 relative">
+                    <!-- Language Selector - Top Right on Cover -->
+                    <div class="absolute top-4 right-4 z-10">
+                        <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
+                            <option value="en">🇬🇧 English</option>
+                            <option value="ar">🇸🇦 العربية</option>
+                            <option value="de">🇩🇪 Deutsch</option>
+                            <option value="ru">🇷🇺 Русский</option>
+                            <option value="pl">🇵🇱 Polski</option>
+                            <option value="it">🇮🇹 Italiano</option>
+                            <option value="fr">🇫🇷 Français</option>
+                            <option value="cs">🇨🇿 Čeština</option>
+                            <option value="uk">🇺🇦 Українська</option>
+                        </select>
+                    </div>
                     <!-- Profile Picture - Overlaps at bottom left of cover -->
                     <div class="absolute bottom-0 left-4 md:left-8 translate-y-1/2">
                         <div id="propertyLogo" class="relative">
@@ -6260,8 +6259,11 @@ app.get('/activity', (c) => {
         <div class="bg-gradient-to-r from-blue-500 to-green-500 text-white py-4 px-4 sticky top-0 z-10 shadow-lg">
             <div class="max-w-4xl mx-auto flex items-center justify-between">
                 <button onclick="history.back()" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30"><i class="fas fa-arrow-left mr-2"></i>Back</button>
-                <h1 class="text-xl font-bold">Activity Details</h1>
-                <div class="w-20"></div>
+                <h1 class="text-xl font-bold" data-i18n="activity-details">Activity Details</h1>
+                <select id="languageSelector" class="px-3 py-1.5 bg-white/20 text-white rounded-lg text-sm border border-white/30">
+                    <option value="en">🇬🇧 EN</option>
+                    <option value="ar">🇸🇦 AR</option>
+                </select>
             </div>
         </div>
 
@@ -6270,24 +6272,24 @@ app.get('/activity', (c) => {
                 <h2 id="activityTitle" class="text-3xl font-bold mb-2"></h2>
                 <p id="vendorName" class="text-gray-600 mb-4"></p>
                 <div class="flex items-end gap-4 mb-4">
-                    <div><span id="price" class="text-4xl font-bold text-blue-600"></span><span class="text-gray-600">/person</span></div>
+                    <div><span id="price" class="text-4xl font-bold text-blue-600"></span><span class="text-gray-600" data-i18n="per-person">/person</span></div>
                     <div class="flex gap-4 text-sm text-gray-600">
                         <span><i class="far fa-clock mr-1"></i><span id="duration"></span></span>
-                        <span><i class="far fa-user mr-1"></i>Max <span id="capacity"></span></span>
+                        <span><i class="far fa-user mr-1"></i><span data-i18n="max">Max</span> <span id="capacity"></span></span>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <button onclick="startBooking()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-lg font-semibold">
-                        <i class="fas fa-calendar-check mr-2"></i>Book Now
+                        <i class="fas fa-calendar-check mr-2"></i><span data-i18n="book-now">Book Now</span>
                     </button>
                     <button onclick="showCallbackForm()" class="bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg text-lg font-semibold">
-                        <i class="fas fa-phone mr-2"></i>Request Callback
+                        <i class="fas fa-phone mr-2"></i><span data-i18n="request-callback">Request Callback</span>
                     </button>
                 </div>
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h3 class="text-xl font-bold mb-3">About This Activity</h3>
+                <h3 class="text-xl font-bold mb-3" data-i18n="about-activity">About This Activity</h3>
                 <p id="description" class="text-gray-700"></p>
             </div>
         </div>
@@ -6390,6 +6392,53 @@ app.get('/activity', (c) => {
       const urlParams = new URLSearchParams(window.location.search);
       let currentLanguage = urlParams.get('lang') || localStorage.getItem('language') || 'en';
       localStorage.setItem('language', currentLanguage);
+      
+      // Translation dictionary
+      const translations = {
+        en: {
+          'activity-details': 'Activity Details',
+          'back': 'Back',
+          'book-now': 'Book Now',
+          'request-callback': 'Request Callback',
+          'about-activity': 'About This Activity',
+          'per-person': '/person',
+          'max': 'Max',
+          'min': 'min'
+        },
+        ar: {
+          'activity-details': 'تفاصيل النشاط',
+          'back': 'رجوع',
+          'book-now': 'احجز الآن',
+          'request-callback': 'طلب معاودة الاتصال',
+          'about-activity': 'حول هذا النشاط',
+          'per-person': '/شخص',
+          'max': 'الحد الأقصى',
+          'min': 'دقيقة'
+        }
+      };
+      
+      function t(key) {
+        return translations[currentLanguage]?.[key] || translations['en'][key] || key;
+      }
+      
+      function updateLanguageSelector() {
+        const selector = document.getElementById('languageSelector');
+        if (selector) {
+          selector.value = currentLanguage;
+          selector.addEventListener('change', function() {
+            currentLanguage = this.value;
+            localStorage.setItem('language', currentLanguage);
+            window.location.href = '/activity?id=' + activityId + '&lang=' + currentLanguage;
+          });
+        }
+      }
+      
+      function updateUITranslations() {
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.getAttribute('data-i18n');
+          el.textContent = t(key);
+        });
+      }
 
       async function init() {
         if (!activityId) { alert('Activity not found'); return; }
@@ -6408,6 +6457,10 @@ app.get('/activity', (c) => {
           const today = new Date().toISOString().split('T')[0];
           document.getElementById('bookingDate').min = today;
           document.getElementById('bookingDate').value = today;
+
+          // Update language selector and translations
+          updateLanguageSelector();
+          updateUITranslations();
 
           document.getElementById('loading').classList.add('hidden');
           document.getElementById('content').classList.remove('hidden');
