@@ -3921,6 +3921,13 @@ app.get('/offering-detail', async (c) => {
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
     </div>
 
+    <div id="translating" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-xl shadow-2xl flex items-center gap-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-blue-500"></div>
+            <span class="text-lg font-medium">Translating content...</span>
+        </div>
+    </div>
+
     <div id="content" class="hidden">
         <!-- Language Selector -->
         <div class="fixed top-4 right-4 z-50">
@@ -4270,6 +4277,11 @@ app.get('/offering-detail', async (c) => {
         }
 
         async function renderOffering() {
+            // Show translating overlay if not English
+            if (currentLanguage !== 'en') {
+                document.getElementById('translating').classList.remove('hidden');
+            }
+            
             // Get language-specific field names
             const langSuffix = currentLanguage === 'en' ? '_en' : ('_' + currentLanguage);
             const titleField = 'title' + langSuffix;
@@ -4281,18 +4293,33 @@ app.get('/offering-detail', async (c) => {
             let description = offeringData[fullDescField] || offeringData[shortDescField] || offeringData.full_description || offeringData.short_description;
             let location = offeringData.location;
             
-            // If no translation exists in database and language is not English, use AI translation
-            if (currentLanguage !== 'en') {
-                if (!offeringData[titleField]) {
-                    title = await translateContent(offeringData.title || offeringData.title_en, currentLanguage);
+            try {
+                // If no translation exists in database and language is not English, use AI translation
+                if (currentLanguage !== 'en') {
+                    console.log('Translating to', currentLanguage);
+                    
+                    if (!offeringData[titleField]) {
+                        console.log('Translating title:', offeringData.title || offeringData.title_en);
+                        title = await translateContent(offeringData.title || offeringData.title_en, currentLanguage);
+                        console.log('Translated title:', title);
+                    }
+                    if (!offeringData[fullDescField] && !offeringData[shortDescField]) {
+                        const originalDesc = offeringData.full_description || offeringData.short_description;
+                        console.log('Translating description:', originalDesc);
+                        description = await translateContent(originalDesc, currentLanguage);
+                        console.log('Translated description:', description);
+                    }
+                    if (offeringData.location) {
+                        console.log('Translating location:', offeringData.location);
+                        location = await translateContent(offeringData.location, currentLanguage);
+                        console.log('Translated location:', location);
+                    }
                 }
-                if (!offeringData[fullDescField] && !offeringData[shortDescField]) {
-                    const originalDesc = offeringData.full_description || offeringData.short_description;
-                    description = await translateContent(originalDesc, currentLanguage);
-                }
-                if (offeringData.location) {
-                    location = await translateContent(offeringData.location, currentLanguage);
-                }
+            } catch (error) {
+                console.error('Translation rendering error:', error);
+            } finally {
+                // Hide translating overlay
+                document.getElementById('translating').classList.add('hidden');
             }
             
             document.getElementById('offeringTitle').textContent = title;
