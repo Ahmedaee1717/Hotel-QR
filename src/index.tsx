@@ -1126,8 +1126,8 @@ app.get('/api/superadmin/hotels', async (c) => {
   
   try {
     const hotels = await DB.prepare(`
-      SELECT property_id, property_name, slug, contact_email, contact_phone, 
-             location, status, created_at
+      SELECT property_id, name as property_name, slug, contact_email, contact_phone, 
+             address as location, status, created_at
       FROM properties
       ORDER BY created_at DESC
     `).all()
@@ -1147,21 +1147,21 @@ app.post('/api/superadmin/hotels', async (c) => {
   try {
     // Create hotel property
     const property = await DB.prepare(`
-      INSERT INTO properties (property_name, slug, contact_email, contact_phone, location, status)
+      INSERT INTO properties (name, slug, contact_email, contact_phone, address, status)
       VALUES (?, ?, ?, ?, ?, 'active')
     `).bind(
-      data.property_name,
+      data.name,
       data.slug,
       data.contact_email,
       data.contact_phone || null,
-      data.location || null
+      data.address || null
     ).run()
     
     // Create admin user for the hotel
     const adminResult = await DB.prepare(`
       INSERT INTO guests (email, name, phone, language_preference)
       VALUES (?, ?, ?, 'en')
-    `).bind(data.contact_email, data.property_name + ' Admin', data.contact_phone || '').run()
+    `).bind(data.contact_email, data.name + ' Admin', data.contact_phone || '').run()
     
     // Generate registration code for the hotel
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
@@ -1217,12 +1217,9 @@ app.get('/api/superadmin/bookings', async (c) => {
       SELECT 
         b.*,
         a.title_en as activity_title,
-        g.name as guest_name,
-        g.email as guest_email,
-        p.property_name
-      FROM bookings b
+        p.name as property_name
+      FROM activity_bookings b
       JOIN activities a ON b.activity_id = a.activity_id
-      JOIN guests g ON b.guest_id = g.guest_id
       JOIN properties p ON b.property_id = p.property_id
       ORDER BY b.created_at DESC
       LIMIT 100
