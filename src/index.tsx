@@ -1667,6 +1667,11 @@ app.put('/api/admin/property-settings', async (c) => {
           contact_email = ?,
           contact_phone = ?,
           address = ?,
+          section_restaurants_en = ?,
+          section_events_en = ?,
+          section_spa_en = ?,
+          section_service_en = ?,
+          section_activities_en = ?,
           brand_logo_url = ?,
           hero_image_url = ?,
           hero_image_effect = ?,
@@ -1696,6 +1701,11 @@ app.put('/api/admin/property-settings', async (c) => {
       data.contact_email,
       data.contact_phone,
       data.address,
+      data.section_restaurants_en,
+      data.section_events_en,
+      data.section_spa_en,
+      data.section_service_en,
+      data.section_activities_en,
       data.brand_logo_url,
       data.hero_image_url,
       data.hero_image_effect,
@@ -2914,10 +2924,15 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroImageEffect = settings.hero_image_effect || 'none';
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
-          // Logo
+          // Logo - only add if not already present
           if (settings.brand_logo_url) {
-            const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-16 mx-auto mb-3" />\`;
-            document.getElementById('propertyName').insertAdjacentHTML('beforebegin', logoHtml);
+            const propertyNameEl = document.getElementById('propertyName');
+            // Check if logo already exists (look for img tag before propertyName)
+            const existingLogo = propertyNameEl.previousElementSibling;
+            if (!existingLogo || existingLogo.tagName !== 'IMG') {
+              const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-16 mx-auto mb-3" />\`;
+              propertyNameEl.insertAdjacentHTML('beforebegin', logoHtml);
+            }
           }
           
           // Gradient or solid color
@@ -6280,6 +6295,35 @@ app.get('/admin/dashboard', (c) => {
                             </div>
                         </div>
                         
+                        <!-- Section Names (Customization) -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-i-cursor mr-2 text-blue-600"></i>Section Names (Customize Labels)</h4>
+                            <p class="text-xs text-gray-500 mb-3">Rename default sections to match your brand (appears on guest homepage)</p>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">🍽️ Restaurants Section Name</label>
+                                    <input type="text" id="sectionNameRestaurants" placeholder="e.g., Dining Options" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">🎉 Events Section Name</label>
+                                    <input type="text" id="sectionNameEvents" placeholder="e.g., Special Events" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">💆 Spa Section Name</label>
+                                    <input type="text" id="sectionNameSpa" placeholder="e.g., Wellness Center" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">🛎️ Services Section Name</label>
+                                    <input type="text" id="sectionNameService" placeholder="e.g., Hotel Amenities" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">🏃 Activities Section Name</label>
+                                    <input type="text" id="sectionNameActivities" placeholder="e.g., Things To Do" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-2"><i class="fas fa-info-circle mr-1"></i>Leave blank to use default names. Changes apply to English version only.</p>
+                        </div>
+                        
                         <!-- Section Visibility -->
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
                             <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-eye mr-2 text-green-600"></i>Section Visibility</h4>
@@ -6929,6 +6973,13 @@ app.get('/admin/dashboard', (c) => {
           document.getElementById('hotelPhone').value = settings.contact_phone || '';
           document.getElementById('hotelAddress').value = settings.address || '';
           
+          // Load section names (custom labels)
+          document.getElementById('sectionNameRestaurants').value = settings.section_restaurants_en || '';
+          document.getElementById('sectionNameEvents').value = settings.section_events_en || '';
+          document.getElementById('sectionNameSpa').value = settings.section_spa_en || '';
+          document.getElementById('sectionNameService').value = settings.section_service_en || '';
+          document.getElementById('sectionNameActivities').value = settings.section_activities_en || '';
+          
           document.getElementById('brandLogoUrl').value = settings.brand_logo_url || '';
           document.getElementById('heroImageUrl').value = settings.hero_image_url || '';
           document.getElementById('heroOverlayOpacity').value = settings.hero_overlay_opacity || 30;
@@ -7221,6 +7272,11 @@ app.get('/admin/dashboard', (c) => {
           contact_email: document.getElementById('hotelEmail').value,
           contact_phone: document.getElementById('hotelPhone').value,
           address: document.getElementById('hotelAddress').value,
+          section_restaurants_en: document.getElementById('sectionNameRestaurants').value || null,
+          section_events_en: document.getElementById('sectionNameEvents').value || null,
+          section_spa_en: document.getElementById('sectionNameSpa').value || null,
+          section_service_en: document.getElementById('sectionNameService').value || null,
+          section_activities_en: document.getElementById('sectionNameActivities').value || null,
           brand_logo_url: document.getElementById('brandLogoUrl').value,
           hero_image_url: document.getElementById('heroImageUrl').value,
           hero_image_effect: heroEffect,
