@@ -3196,16 +3196,33 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </section>
                 
-                <!-- Hotel Map Section -->
-                <section id="hotel-map-section" class="mb-12" style="display: none;">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+            </div>
+        </div>
+
+        <!-- Floating Map Button (appears when map available) -->
+        <button id="mapFloatingBtn" 
+                onclick="openMapModal()" 
+                class="fixed bottom-6 right-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-50 hidden">
+            <i class="fas fa-map-marked-alt mr-2"></i>
+            <span class="font-semibold">Hotel Map</span>
+        </button>
+
+        <!-- Map Modal -->
+        <div id="mapModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-auto">
+                <button onclick="closeMapModal()" 
+                        class="absolute top-4 right-4 bg-white hover:bg-gray-100 text-gray-800 w-10 h-10 rounded-full shadow-lg z-10 flex items-center justify-center">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+                <div class="p-6">
+                    <h2 class="text-3xl font-bold mb-4 flex items-center">
                         <i class="fas fa-map text-indigo-500 mr-3"></i>
                         Hotel Map & Layout
                     </h2>
-                    <div id="hotel-map-container" class="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div id="hotel-map-container" class="rounded-xl overflow-hidden">
                         <!-- Loaded dynamically -->
                     </div>
-                </section>
+                </div>
             </div>
         </div>
 
@@ -4295,42 +4312,39 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function renderHotelMap() {
-            const mapSection = document.getElementById('hotel-map-section');
+            const mapFloatingBtn = document.getElementById('mapFloatingBtn');
             const mapContainer = document.getElementById('hotel-map-container');
             
-            if (!mapSection || !mapContainer) {
-                console.error('hotel-map elements not found');
+            if (!mapFloatingBtn || !mapContainer) {
+                console.error('map elements not found');
                 return;
             }
             
             if (propertyData.show_hotel_map === 1 && propertyData.hotel_map_url) {
-                mapSection.style.display = 'block';
-                mapContainer.innerHTML = \`
-                    <div class="relative">
-                        <img src="\${propertyData.hotel_map_url}" 
-                             alt="Hotel Map" 
-                             class="w-full h-auto"
-                             style="max-height: 600px; object-fit: contain;">
-                        <div class="absolute top-4 right-4 bg-white bg-opacity-90 rounded-lg p-3 shadow-lg">
-                            <p class="text-xs text-gray-600 font-medium">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Click to view full size
-                            </p>
-                        </div>
-                    </div>
-                \`;
+                // Show floating button
+                mapFloatingBtn.classList.remove('hidden');
                 
-                // Make map clickable to open in new window
-                const mapImg = mapContainer.querySelector('img');
-                if (mapImg) {
-                    mapImg.addEventListener('click', () => {
-                        window.open(propertyData.hotel_map_url, '_blank');
-                    });
-                    mapImg.style.cursor = 'pointer';
-                }
+                // Populate map container
+                mapContainer.innerHTML = \`
+                    <img src="\${propertyData.hotel_map_url}" 
+                         alt="Hotel Map" 
+                         class="w-full h-auto rounded-lg"
+                         style="max-height: 80vh; object-fit: contain;">
+                \`;
             } else {
-                mapSection.style.display = 'none';
+                // Hide floating button if no map
+                mapFloatingBtn.classList.add('hidden');
             }
+        }
+        
+        function openMapModal() {
+            document.getElementById('mapModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeMapModal() {
+            document.getElementById('mapModal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
         }
 
         function updateSectionVisibility() {
@@ -7453,8 +7467,9 @@ app.get('/admin/dashboard', (c) => {
                                 
                                 <label class="flex items-center cursor-pointer">
                                     <input type="checkbox" id="showHotelMap" class="mr-2 w-4 h-4" />
-                                    <span class="text-sm font-medium">Show Hotel Map on Homepage</span>
+                                    <span class="text-sm font-medium">Enable Hotel Map (Floating Button)</span>
                                 </label>
+                                <p class="text-xs text-gray-500 ml-6">When enabled, a convenient floating "Hotel Map" button appears in the bottom-right corner</p>
                             </div>
                         </div>
                         
