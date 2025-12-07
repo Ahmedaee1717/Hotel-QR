@@ -3796,15 +3796,18 @@ app.get('/hotel/:property_slug', async (c) => {
           }
           
           const lang = currentLanguage;
+          console.log('🏷️ currentLanguage VALUE:', currentLanguage);
+          console.log('🏷️ Using lang:', lang);
+          console.log('🏷️ translations object has these langs:', Object.keys(translations));
           const t = translations[lang] || translations.en;
-          
-          console.log('🏷️ Rendering pills with language:', lang);
-          console.log('🏷️ Translations:', t);
+          console.log('🏷️ Selected translations t:', t);
+          console.log('🏷️ t.all =', t.all);
+          console.log('🏷️ t.restaurants =', t.restaurants);
           
           // Always show "All" pill
           let pillsHTML = \`
             <button onclick="filterOfferings('all')" class="category-pill bg-blue-500 text-white" data-category="all">
-              <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">\${t.all}</span>
+              <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">\${t.all}</span> <small style="color:yellow">[Lang:\${lang}]</small>
             </button>
           \`;
           
@@ -3862,7 +3865,18 @@ app.get('/hotel/:property_slug', async (c) => {
             }
           });
           
-          container.innerHTML = pillsHTML;
+          // FORCE CLEAR FIRST
+          container.innerHTML = '';
+          container.style.backgroundColor = 'lime'; // GREEN = JS IS UPDATING
+          
+          // Then set new content
+          setTimeout(() => {
+            container.innerHTML = pillsHTML;
+            container.style.border = '5px solid red';
+            container.style.backgroundColor = '';
+            console.log('✅ PILLS UPDATED! innerHTML length:', pillsHTML.length);
+            console.log('✅ First pill should show:', pillsHTML.substring(0, 200));
+          }, 100);
         }
 
         async function init() {
