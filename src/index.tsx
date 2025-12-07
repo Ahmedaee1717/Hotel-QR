@@ -106,6 +106,33 @@ CRITICAL REQUIREMENTS:
   }
 }
 
+// Helper function to translate activity content
+async function translateActivityContent(
+  titleEn: string,
+  shortDescriptionEn: string,
+  targetLang: string,
+  apiKey: string
+): Promise<{ title: string; short_description: string }> {
+  try {
+    const translated = await translateWithAI(
+      [titleEn, shortDescriptionEn],
+      targetLang,
+      apiKey
+    );
+    
+    return {
+      title: translated[0] || titleEn,
+      short_description: translated[1] || shortDescriptionEn
+    };
+  } catch (error) {
+    console.error('Activity translation error:', error);
+    return {
+      title: titleEn,
+      short_description: shortDescriptionEn
+    };
+  }
+}
+
 // ============================================
 // GUEST API ROUTES
 // ============================================
@@ -2915,7 +2942,9 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
         v.slug as vendor_slug,
         c.name_en as category_name,
         CASE WHEN ? = 'ar' THEN a.title_ar ELSE a.title_en END as title,
-        CASE WHEN ? = 'ar' THEN a.short_description_ar ELSE a.short_description_en END as short_description
+        CASE WHEN ? = 'ar' THEN a.short_description_ar ELSE a.short_description_en END as short_description,
+        a.title_en, a.title_ar,
+        a.short_description_en, a.short_description_ar
       FROM activities a
       JOIN vendors v ON a.vendor_id = v.vendor_id
       JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
@@ -2928,9 +2957,39 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
       LIMIT 50
     `).bind(lang, lang, property_id).all()
     
+    // For non-EN/AR languages, translate using AI if API key is available
+    let translatedActivities = activities.results;
+    
+    if (lang !== 'en' && lang !== 'ar') {
+      // Try to get API key from environment
+      const openai_api_key = process.env.OPENAI_API_KEY;
+      
+      if (openai_api_key) {
+        try {
+          translatedActivities = await Promise.all(activities.results.map(async (activity) => {
+            const translated = await translateActivityContent(
+              activity.title_en,
+              activity.short_description_en,
+              lang,
+              openai_api_key
+            );
+            
+            return {
+              ...activity,
+              title: translated.title || activity.title,
+              short_description: translated.short_description || activity.short_description
+            };
+          }));
+        } catch (translationError) {
+          console.warn('Translation failed, using English:', translationError);
+          // Fall back to English if translation fails
+        }
+      }
+    }
+    
     return c.json({ 
       success: true,
-      activities: activities.results.map(a => ({
+      activities: translatedActivities.map(a => ({
         ...a,
         images: a.images ? JSON.parse(a.images) : []
       }))
