@@ -3017,9 +3017,9 @@ app.get('/hotel/:property_slug', async (c) => {
             <!-- Hero Header -->
             <div class="gradient-hero text-white py-12 px-4">
                 <div class="max-w-6xl mx-auto text-center">
-                    <div id="propertyLogo" class="mb-4"></div>
-                    <h1 class="text-xl md:text-2xl font-light tracking-widest mb-2" id="propertyName" style="letter-spacing: 0.25em; font-weight: 300;">Paradise Resort</h1>
-                    <p class="text-xs md:text-sm opacity-75 font-light tracking-wide" id="propertyTagline" style="letter-spacing: 0.1em;">Discover all we have to offer</p>
+                    <div id="propertyLogo" class="mb-4 flex justify-center"></div>
+                    <h1 class="text-lg md:text-xl font-light mb-2" id="propertyName" style="letter-spacing: 0.15em; font-weight: 300;">Paradise Resort</h1>
+                    <p class="text-xs md:text-sm opacity-75 font-light" id="propertyTagline" style="letter-spacing: 0.05em;">Discover all we have to offer</p>
                 </div>
             </div>
 
@@ -3100,7 +3100,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <i class="fas fa-hiking text-orange-500 mr-3"></i>
                         <span id="section-heading-activities">Activities & Experiences</span>
                     </h2>
-                    <p class="text-gray-600 mb-4 text-sm">Curated experiences from our trusted partners</p>
+                    <p class="text-gray-600 mb-4 text-sm" data-i18n="curated-experiences">Curated experiences from our trusted partners</p>
                     <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
                     </div>
@@ -3342,11 +3342,14 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
             });
             
-            // Update activities description
-            const activitiesDesc = document.querySelector('#activities-section p');
-            if (activitiesDesc) {
-                activitiesDesc.textContent = t('curated-experiences');
-            }
+            // Update all data-i18n elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const translated = t(key);
+                if (translated && translated !== key) {
+                    el.textContent = translated;
+                }
+            });
             
             // Update hotel map heading
             const mapHeading = document.querySelector('#hotel-map-section h2 span');
@@ -3387,14 +3390,11 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroImageEffect = settings.hero_image_effect || 'none';
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
-          // Logo - only add if not already present
+          // Logo - add to propertyLogo container
           if (settings.brand_logo_url) {
-            const propertyNameEl = document.getElementById('propertyName');
-            // Check if logo already exists (look for img tag before propertyName)
-            const existingLogo = propertyNameEl.previousElementSibling;
-            if (!existingLogo || existingLogo.tagName !== 'IMG') {
-              const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-16 mx-auto mb-3" />\`;
-              propertyNameEl.insertAdjacentHTML('beforebegin', logoHtml);
+            const logoContainer = document.getElementById('propertyLogo');
+            if (logoContainer && !logoContainer.hasChildNodes()) {
+              logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-20 h-20 rounded-full object-cover mx-auto shadow-lg border-4 border-white" />';
             }
           }
           
