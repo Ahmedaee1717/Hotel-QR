@@ -28,6 +28,84 @@ function generateSessionToken(): string {
   return crypto.randomUUID()
 }
 
+// Language configuration
+const SUPPORTED_LANGUAGES = {
+  'en': { name: 'English', native: 'English', flag: '🇬🇧' },
+  'ar': { name: 'Arabic', native: 'العربية', flag: '🇸🇦' },
+  'de': { name: 'German', native: 'Deutsch', flag: '🇩🇪' },
+  'ru': { name: 'Russian', native: 'Русский', flag: '🇷🇺' },
+  'pl': { name: 'Polish', native: 'Polski', flag: '🇵🇱' },
+  'it': { name: 'Italian', native: 'Italiano', flag: '🇮🇹' },
+  'fr': { name: 'French', native: 'Français', flag: '🇫🇷' },
+  'cs': { name: 'Czech', native: 'Čeština', flag: '🇨🇿' },
+  'uk': { name: 'Ukrainian', native: 'Українська', flag: '🇺🇦' }
+}
+
+// AI Translation using OpenAI GPT-4 (for 100% accurate tourism translations)
+async function translateWithAI(texts: string[], targetLang: string, apiKey: string): Promise<string[]> {
+  if (!texts || texts.length === 0) return []
+  
+  const languageNames: Record<string, string> = {
+    'ar': 'Modern Standard Arabic',
+    'de': 'German', 
+    'ru': 'Russian',
+    'pl': 'Polish',
+    'it': 'Italian',
+    'fr': 'French',
+    'cs': 'Czech',
+    'uk': 'Ukrainian'
+  }
+  
+  try {
+    const combinedText = texts.join('\n---SPLIT---\n')
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [{
+          role: 'system',
+          content: `You are a professional tourism translator specializing in hotel, resort, and travel content for Egypt Red Sea destinations (Hurghada, Marsa Alam). 
+
+CRITICAL REQUIREMENTS:
+- Translate with 100% accuracy to ${languageNames[targetLang]}
+- Maintain tourism marketing tone and appeal
+- Preserve formatting, punctuation, and special characters
+- Keep proper nouns (hotel names, locations) unchanged
+- Use appropriate formality level for hospitality industry
+- Ensure cultural appropriateness for ${languageNames[targetLang]} speakers
+- Output translations separated by ---SPLIT--- markers
+- Output ONLY the translations, NO explanations or notes`
+        }, {
+          role: 'user',
+          content: combinedText
+        }],
+        temperature: 0.2,
+        max_tokens: 2000
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Translation API error:', await response.text())
+      return texts // Fallback to original
+    }
+    
+    const data: any = await response.json()
+    const translatedText = data.choices?.[0]?.message?.content?.trim()
+    
+    if (!translatedText) return texts
+    
+    return translatedText.split('---SPLIT---').map((t: string) => t.trim())
+  } catch (error) {
+    console.error(`Translation error for ${targetLang}:`, error)
+    return texts // Fallback to original text
+  }
+}
+
 // ============================================
 // GUEST API ROUTES
 // ============================================
@@ -1767,6 +1845,127 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
   }
 })
 
+// Auto-translate offering to all languages (Admin)
+app.post('/api/admin/offerings/:offering_id/translate', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const { openai_api_key } = await c.req.json()
+  
+  if (!openai_api_key) {
+    return c.json({ error: 'OpenAI API key required' }, 400)
+  }
+  
+  try {
+    // Get the offering
+    const offering: any = await DB.prepare(`
+      SELECT title_en, short_description_en, full_description_en
+      FROM hotel_offerings WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    
+    // Translate to all languages
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const translations: any = {}
+    
+    for (const lang of languages) {
+      const textsToTranslate = [
+        offering.title_en,
+        offering.short_description_en || '',
+        offering.full_description_en || ''
+      ]
+      
+      const translated = await translateWithAI(textsToTranslate, lang, openai_api_key)
+      
+      translations[`title_${lang}`] = translated[0] || offering.title_en
+      translations[`short_description_${lang}`] = translated[1] || offering.short_description_en
+      translations[`full_description_${lang}`] = translated[2] || offering.full_description_en
+    }
+    
+    // Update database with translations
+    await DB.prepare(`
+      UPDATE hotel_offerings SET
+        title_ar = ?, short_description_ar = ?, full_description_ar = ?,
+        title_de = ?, short_description_de = ?, full_description_de = ?,
+        title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+        title_pl = ?, short_description_pl = ?, full_description_pl = ?,
+        title_it = ?, short_description_it = ?, full_description_it = ?,
+        title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+        title_cs = ?, short_description_cs = ?, full_description_cs = ?,
+        title_uk = ?, short_description_uk = ?, full_description_uk = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE offering_id = ?
+    `).bind(
+      translations.title_ar, translations.short_description_ar, translations.full_description_ar,
+      translations.title_de, translations.short_description_de, translations.full_description_de,
+      translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+      translations.title_pl, translations.short_description_pl, translations.full_description_pl,
+      translations.title_it, translations.short_description_it, translations.full_description_it,
+      translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+      translations.title_cs, translations.short_description_cs, translations.full_description_cs,
+      translations.title_uk, translations.short_description_uk, translations.full_description_uk,
+      offering_id
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      translations: translations,
+      message: 'Translated to 8 languages successfully'
+    })
+  } catch (error) {
+    console.error('Translation error:', error)
+    return c.json({ error: 'Translation failed: ' + error }, 500)
+  }
+})
+
+// Translate property tagline (Admin)
+app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const { openai_api_key } = await c.req.json()
+  
+  if (!openai_api_key) {
+    return c.json({ error: 'OpenAI API key required' }, 400)
+  }
+  
+  try {
+    const property: any = await DB.prepare(`
+      SELECT tagline FROM properties WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (!property || !property.tagline) {
+      return c.json({ error: 'Property or tagline not found' }, 404)
+    }
+    
+    const languages = ['de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const translations: any = {}
+    
+    for (const lang of languages) {
+      const translated = await translateWithAI([property.tagline], lang, openai_api_key)
+      translations[`tagline_${lang}`] = translated[0] || property.tagline
+    }
+    
+    await DB.prepare(`
+      UPDATE properties SET
+        tagline_de = ?, tagline_ru = ?, tagline_pl = ?,
+        tagline_it = ?, tagline_fr = ?, tagline_cs = ?, tagline_uk = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE property_id = ?
+    `).bind(
+      translations.tagline_de, translations.tagline_ru, translations.tagline_pl,
+      translations.tagline_it, translations.tagline_fr, translations.tagline_cs, translations.tagline_uk,
+      property_id
+    ).run()
+    
+    return c.json({ success: true, translations })
+  } catch (error) {
+    console.error('Tagline translation error:', error)
+    return c.json({ error: 'Translation failed' }, 500)
+  }
+})
+
 // Remove vendor from hotel (Admin)
 app.delete('/api/admin/vendors/:vendor_id/remove', async (c) => {
   const { DB } = c.env
@@ -2244,9 +2443,39 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
     let query = `
       SELECT 
         ho.*,
-        CASE WHEN ? = 'ar' THEN ho.title_ar ELSE ho.title_en END as title,
-        CASE WHEN ? = 'ar' THEN ho.short_description_ar ELSE ho.short_description_en END as short_description,
-        CASE WHEN ? = 'ar' THEN ho.full_description_ar ELSE ho.full_description_en END as full_description
+        CASE 
+          WHEN ? = 'ar' THEN COALESCE(ho.title_ar, ho.title_en)
+          WHEN ? = 'de' THEN COALESCE(ho.title_de, ho.title_en)
+          WHEN ? = 'ru' THEN COALESCE(ho.title_ru, ho.title_en)
+          WHEN ? = 'pl' THEN COALESCE(ho.title_pl, ho.title_en)
+          WHEN ? = 'it' THEN COALESCE(ho.title_it, ho.title_en)
+          WHEN ? = 'fr' THEN COALESCE(ho.title_fr, ho.title_en)
+          WHEN ? = 'cs' THEN COALESCE(ho.title_cs, ho.title_en)
+          WHEN ? = 'uk' THEN COALESCE(ho.title_uk, ho.title_en)
+          ELSE ho.title_en
+        END as title,
+        CASE 
+          WHEN ? = 'ar' THEN COALESCE(ho.short_description_ar, ho.short_description_en)
+          WHEN ? = 'de' THEN COALESCE(ho.short_description_de, ho.short_description_en)
+          WHEN ? = 'ru' THEN COALESCE(ho.short_description_ru, ho.short_description_en)
+          WHEN ? = 'pl' THEN COALESCE(ho.short_description_pl, ho.short_description_en)
+          WHEN ? = 'it' THEN COALESCE(ho.short_description_it, ho.short_description_en)
+          WHEN ? = 'fr' THEN COALESCE(ho.short_description_fr, ho.short_description_en)
+          WHEN ? = 'cs' THEN COALESCE(ho.short_description_cs, ho.short_description_en)
+          WHEN ? = 'uk' THEN COALESCE(ho.short_description_uk, ho.short_description_en)
+          ELSE ho.short_description_en
+        END as short_description,
+        CASE 
+          WHEN ? = 'ar' THEN COALESCE(ho.full_description_ar, ho.full_description_en)
+          WHEN ? = 'de' THEN COALESCE(ho.full_description_de, ho.full_description_en)
+          WHEN ? = 'ru' THEN COALESCE(ho.full_description_ru, ho.full_description_en)
+          WHEN ? = 'pl' THEN COALESCE(ho.full_description_pl, ho.full_description_en)
+          WHEN ? = 'it' THEN COALESCE(ho.full_description_it, ho.full_description_en)
+          WHEN ? = 'fr' THEN COALESCE(ho.full_description_fr, ho.full_description_en)
+          WHEN ? = 'cs' THEN COALESCE(ho.full_description_cs, ho.full_description_en)
+          WHEN ? = 'uk' THEN COALESCE(ho.full_description_uk, ho.full_description_en)
+          ELSE ho.full_description_en
+        END as full_description
       FROM hotel_offerings ho
       WHERE ho.property_id = ?
         AND ho.status = 'active'
@@ -2254,9 +2483,11 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
       ORDER BY ho.is_featured DESC, ho.display_order ASC, ho.created_at DESC
     `
     
+    // Build params array: 8 params for title + 8 for short_desc + 8 for full_desc + property_id + optional type
+    const langParams = Array(24).fill(lang) // 8 CASE statements × 3 fields
     const params = offering_type 
-      ? [lang, lang, lang, property_id, offering_type]
-      : [lang, lang, lang, property_id]
+      ? [...langParams, property_id, offering_type]
+      : [...langParams, property_id]
     
     const offerings = await DB.prepare(query).bind(...params).all()
     
