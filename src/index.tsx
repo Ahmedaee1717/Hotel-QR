@@ -2566,7 +2566,36 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
       return c.json({ error: 'Offering not found' }, 404)
     }
     
-    // Delete the offering
+    // Check for related bookings
+    const bookings = await DB.prepare(`
+      SELECT COUNT(*) as count FROM offering_bookings WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    if (bookings && bookings.count > 0) {
+      return c.json({ 
+        error: `Cannot delete offering with ${bookings.count} existing booking(s). Please cancel or complete bookings first.`,
+        has_bookings: true,
+        booking_count: bookings.count
+      }, 400)
+    }
+    
+    // Delete related records in correct order (child tables first)
+    // 1. Delete restaurant tables (if any)
+    await DB.prepare(`
+      DELETE FROM restaurant_tables WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 2. Delete offering schedules
+    await DB.prepare(`
+      DELETE FROM offering_schedule WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 3. Delete dining sessions (if any)
+    await DB.prepare(`
+      DELETE FROM dining_sessions WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 4. Finally delete the offering itself
     const result = await DB.prepare(`
       DELETE FROM hotel_offerings WHERE offering_id = ?
     `).bind(offering_id).run()
@@ -2575,7 +2604,7 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
     
     return c.json({ 
       success: true, 
-      message: `Deleted ${existing.offering_type}: ${existing.title_en}` 
+      message: `Successfully deleted ${existing.offering_type}: ${existing.title_en}` 
     })
   } catch (error) {
     console.error('Delete offering error:', error)
