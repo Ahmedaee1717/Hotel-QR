@@ -3947,10 +3947,10 @@ app.get('/admin/dashboard', (c) => {
       async function loadRooms() {
         try {
           const response = await fetch('/api/admin/rooms?property_id=1');
-          const data = await response.json();
+          const rooms = await response.json();
           const list = document.getElementById('roomsList');
           
-          list.innerHTML = data.rooms.map(r => \`
+          list.innerHTML = rooms.map(r => \`
             <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
               <div>
                 <span class="font-bold text-lg">Room \${r.room_number}</span>
@@ -3970,10 +3970,10 @@ app.get('/admin/dashboard', (c) => {
       async function loadVendors() {
         try {
           const response = await fetch('/api/admin/vendors?property_id=1');
-          const data = await response.json();
+          const vendors = await response.json();
           const list = document.getElementById('vendorsList');
           
-          list.innerHTML = data.vendors.map(v => \`
+          list.innerHTML = vendors.map(v => \`
             <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
               <div>
                 <div class="font-bold text-lg">\${v.business_name}</div>
@@ -3993,15 +3993,15 @@ app.get('/admin/dashboard', (c) => {
       async function loadActivities() {
         try {
           const response = await fetch('/api/admin/activities?property_id=1');
-          const data = await response.json();
+          const activities = await response.json();
           const list = document.getElementById('activitiesList');
           
-          if (!data.activities || data.activities.length === 0) {
+          if (!activities || activities.length === 0) {
             list.innerHTML = '<p class="text-gray-500 text-center py-4">No activities yet. Add vendors to start!</p>';
             return;
           }
           
-          list.innerHTML = data.activities.map(a => \`
+          list.innerHTML = activities.map(a => \`
             <div class="border rounded-lg p-4 hover:shadow-md transition">
               <div class="flex justify-between items-start">
                 <div>
