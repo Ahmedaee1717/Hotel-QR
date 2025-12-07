@@ -2730,9 +2730,6 @@ app.get('/hotel/:property_slug', async (c) => {
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
-        // Set language on page load
-        document.getElementById('languageSelector').value = currentLanguage;
-        
         // Change language function
         function changeLanguage() {
             const newLang = document.getElementById('languageSelector').value;
@@ -3394,8 +3391,17 @@ app.get('/hotel/:property_slug', async (c) => {
             window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id;
         }
 
-        // Initialize on load
-        init();
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set language selector value after DOM is loaded
+            const languageSelector = document.getElementById('languageSelector');
+            if (languageSelector) {
+                languageSelector.value = currentLanguage;
+            }
+            
+            // Initialize the page
+            init();
+        });
         </script>
     </body>
     </html>
