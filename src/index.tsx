@@ -6466,35 +6466,62 @@ app.get('/vendor/dashboard', (c) => {
 
       async function loadDashboard() {
         try {
-          const [bookings, activities, categories, profile] = await Promise.all([
-            fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
-            fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json()),
-            fetch('/api/categories').then(r => r.json()),
-            fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } }).then(r => r.json())
+          const [bookingsRes, activitiesRes, categoriesRes, profileRes] = await Promise.all([
+            fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }),
+            fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }),
+            fetch('/api/categories'),
+            fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } })
           ]);
 
+          // Check if all responses are OK
+          if (!bookingsRes.ok) {
+            console.error('Bookings fetch failed:', bookingsRes.status, await bookingsRes.text());
+          }
+          if (!activitiesRes.ok) {
+            console.error('Activities fetch failed:', activitiesRes.status, await activitiesRes.text());
+          }
+          if (!categoriesRes.ok) {
+            console.error('Categories fetch failed:', categoriesRes.status, await categoriesRes.text());
+          }
+          if (!profileRes.ok) {
+            console.error('Profile fetch failed:', profileRes.status, await profileRes.text());
+          }
+
+          const bookings = bookingsRes.ok ? await bookingsRes.json() : { bookings: [] };
+          const activities = activitiesRes.ok ? await activitiesRes.json() : { activities: [] };
+          const categories = categoriesRes.ok ? await categoriesRes.json() : { categories: [] };
+          const profile = profileRes.ok ? await profileRes.json() : { profile: null };
+
           const today = new Date().toISOString().split('T')[0];
-          const todayBookings = bookings.bookings.filter(b => b.activity_date === today);
+          const bookingsList = bookings.bookings || [];
+          const todayBookings = bookingsList.filter(b => b.activity_date === today);
           document.getElementById('todayBookings').textContent = todayBookings.length;
-          document.getElementById('totalBookings').textContent = bookings.bookings.length;
-          document.getElementById('pendingBookings').textContent = bookings.bookings.filter(b => b.status === 'pending').length;
+          document.getElementById('totalBookings').textContent = bookingsList.length;
+          document.getElementById('pendingBookings').textContent = bookingsList.filter(b => b.status === 'pending').length;
 
           const categorySelect = document.getElementById('category');
-          categories.categories.forEach(cat => {
+          const categoriesList = categories.categories || [];
+          categoriesList.forEach(cat => {
             categorySelect.innerHTML += '<option value="' + cat.category_id + '">' + cat.name + '</option>';
           });
 
-          displayBookings(bookings.bookings);
-          displayActivities(activities.activities);
+          displayBookings(bookingsList);
+          displayActivities(activities.activities || []);
           displayProfile(profile.profile);
         } catch (error) {
           console.error('Dashboard load error:', error);
+          alert('Failed to load dashboard. Please try refreshing the page.');
         }
       }
 
       function displayProfile(profile) {
-        document.getElementById('profileBusinessName').textContent = profile.business_name;
-        document.getElementById('profileEmail').textContent = profile.email;
+        if (!profile) {
+          console.error('Profile data is missing');
+          return;
+        }
+        
+        document.getElementById('profileBusinessName').textContent = profile.business_name || 'N/A';
+        document.getElementById('profileEmail').textContent = profile.email || 'N/A';
         document.getElementById('businessNameInput').value = profile.business_name || '';
         document.getElementById('phoneInput').value = profile.phone || '';
         document.getElementById('websiteInput').value = profile.website || '';
@@ -6504,11 +6531,21 @@ app.get('/vendor/dashboard', (c) => {
         document.getElementById('countryInput').value = profile.country || '';
         document.getElementById('yearsExpInput').value = profile.years_experience || '';
         
-        const specialties = profile.specialties ? JSON.parse(profile.specialties) : [];
-        document.getElementById('specialtiesInput').value = specialties.join(', ');
+        try {
+          const specialties = profile.specialties ? JSON.parse(profile.specialties) : [];
+          document.getElementById('specialtiesInput').value = specialties.join(', ');
+        } catch (e) {
+          console.error('Failed to parse specialties:', e);
+          document.getElementById('specialtiesInput').value = '';
+        }
         
-        const languages = profile.languages_spoken ? JSON.parse(profile.languages_spoken) : [];
-        document.getElementById('languagesInput').value = languages.join(', ');
+        try {
+          const languages = profile.languages_spoken ? JSON.parse(profile.languages_spoken) : [];
+          document.getElementById('languagesInput').value = languages.join(', ');
+        } catch (e) {
+          console.error('Failed to parse languages:', e);
+          document.getElementById('languagesInput').value = '';
+        }
         
         if (profile.profile_image) {
           document.getElementById('profileImagePreview').src = profile.profile_image;
