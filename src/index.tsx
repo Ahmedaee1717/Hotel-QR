@@ -1306,6 +1306,12 @@ app.get('/api/vendor/bookings', async (c) => {
   const date_from = c.req.query('date_from')
   const date_to = c.req.query('date_to')
 
+  console.log('GET /api/vendor/bookings - vendor_id:', vendor_id)
+
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+
   try {
     let query = `
       SELECT 
@@ -1344,10 +1350,12 @@ app.get('/api/vendor/bookings', async (c) => {
 
     const bookings = await DB.prepare(query).bind(...params).all()
 
-    return c.json({ bookings: bookings.results })
+    console.log('Bookings query returned:', bookings.results?.length || 0, 'bookings')
+
+    return c.json({ bookings: bookings.results || [] })
   } catch (error) {
     console.error('Vendor bookings error:', error)
-    return c.json({ error: 'Internal server error' }, 500)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
@@ -1388,6 +1396,12 @@ app.get('/api/vendor/activities', async (c) => {
   const { DB } = c.env
   const vendor_id = c.req.header('X-Vendor-ID')
 
+  console.log('GET /api/vendor/activities - vendor_id:', vendor_id)
+
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+
   try {
     const activities = await DB.prepare(`
       SELECT 
@@ -1399,10 +1413,12 @@ app.get('/api/vendor/activities', async (c) => {
       ORDER BY a.created_at DESC
     `).bind(vendor_id).all()
 
-    return c.json({ activities: activities.results })
+    console.log('Activities query returned:', activities.results?.length || 0, 'activities')
+
+    return c.json({ activities: activities.results || [] })
   } catch (error) {
     console.error('Vendor activities error:', error)
-    return c.json({ error: 'Internal server error' }, 500)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
@@ -1479,6 +1495,12 @@ app.get('/api/vendor/profile', async (c) => {
   const { DB } = c.env
   const vendor_id = c.req.header('X-Vendor-ID')
   
+  console.log('GET /api/vendor/profile - vendor_id:', vendor_id)
+  
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+  
   try {
     const profile = await DB.prepare(`
       SELECT 
@@ -1490,6 +1512,8 @@ app.get('/api/vendor/profile', async (c) => {
       WHERE vendor_id = ?
     `).bind(vendor_id).first()
     
+    console.log('Profile query result:', profile)
+    
     if (!profile) {
       return c.json({ error: 'Vendor not found' }, 404)
     }
@@ -1497,7 +1521,7 @@ app.get('/api/vendor/profile', async (c) => {
     return c.json({ profile })
   } catch (error) {
     console.error('Get vendor profile error:', error)
-    return c.json({ error: 'Internal server error' }, 500)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
