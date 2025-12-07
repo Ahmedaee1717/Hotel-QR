@@ -6459,8 +6459,36 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           allOfferings = data.offerings || [];
           displayOfferings();
+          
+          // Also load custom sections for the dropdown
+          await loadCustomSectionsDropdown();
         } catch (error) {
           console.error('Load offerings error:', error);
+        }
+      }
+      
+      async function loadCustomSectionsDropdown() {
+        try {
+          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const data = await response.json();
+          const dropdown = document.getElementById('offeringType');
+          
+          // Remove any previously added custom section options
+          const existingOptions = dropdown.querySelectorAll('option[data-custom="true"]');
+          existingOptions.forEach(opt => opt.remove());
+          
+          // Add custom sections to dropdown
+          if (data.sections && data.sections.length > 0) {
+            data.sections.forEach(section => {
+              const option = document.createElement('option');
+              option.value = section.section_key;
+              option.textContent = section.section_name_en;
+              option.setAttribute('data-custom', 'true');
+              dropdown.appendChild(option);
+            });
+          }
+        } catch (error) {
+          console.error('Load custom sections dropdown error:', error);
         }
       }
       
@@ -6648,25 +6676,31 @@ app.get('/admin/dashboard', (c) => {
         e.preventDefault();
         try {
           const images = document.getElementById('offeringImages').value.split(',').map(url => url.trim()).filter(Boolean);
+          const selectedType = document.getElementById('offeringType').value;
+          const selectedOption = document.getElementById('offeringType').selectedOptions[0];
+          const isCustomSection = selectedOption.getAttribute('data-custom') === 'true';
+          
+          const payload = {
+            property_id: 1,
+            offering_type: isCustomSection ? 'custom' : selectedType,
+            custom_section_key: isCustomSection ? selectedType : null,
+            title_en: document.getElementById('offeringTitle').value,
+            short_description_en: document.getElementById('offeringDescription').value,
+            full_description_en: document.getElementById('offeringFullDescription').value,
+            price: parseFloat(document.getElementById('offeringPrice').value) || 0,
+            location: document.getElementById('offeringLocation').value,
+            duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
+            requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
+            images: JSON.stringify(images),
+            event_date: document.getElementById('eventDate').value || null,
+            event_start_time: document.getElementById('eventStartTime').value || null,
+            event_end_time: document.getElementById('eventEndTime').value || null
+          };
           
           const response = await fetch('/api/admin/offerings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              property_id: 1,
-              offering_type: document.getElementById('offeringType').value,
-              title_en: document.getElementById('offeringTitle').value,
-              short_description_en: document.getElementById('offeringDescription').value,
-              full_description_en: document.getElementById('offeringFullDescription').value,
-              price: parseFloat(document.getElementById('offeringPrice').value) || 0,
-              location: document.getElementById('offeringLocation').value,
-              duration_minutes: parseInt(document.getElementById('offeringDuration').value) || null,
-              requires_booking: document.getElementById('offeringRequiresBooking').checked ? 1 : 0,
-              images: JSON.stringify(images),
-              event_date: document.getElementById('eventDate').value || null,
-              event_start_time: document.getElementById('eventStartTime').value || null,
-              event_end_time: document.getElementById('eventEndTime').value || null
-            })
+            body: JSON.stringify(payload)
           });
           
           const data = await response.json();
@@ -6850,7 +6884,7 @@ app.get('/admin/dashboard', (c) => {
           const sectionOrder = settings.homepage_section_order ? 
             JSON.parse(settings.homepage_section_order) : 
             ['restaurants', 'events', 'spa', 'service', 'activities'];
-          renderSectionOrder(sectionOrder);
+          await renderSectionOrder(sectionOrder);
           
         } catch (error) {
           console.error('Load settings error:', error);
@@ -6858,7 +6892,17 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
-      function renderSectionOrder(order) {
+      async function renderSectionOrder(order) {
+        // Load custom sections first
+        let customSections = [];
+        try {
+          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const data = await response.json();
+          customSections = data.sections || [];
+        } catch (error) {
+          console.error('Failed to load custom sections for ordering:', error);
+        }
+        
         const sectionNames = {
           'restaurants': '🍽️ Restaurants',
           'events': '🎉 Events',
@@ -6866,6 +6910,20 @@ app.get('/admin/dashboard', (c) => {
           'service': '🛎️ Hotel Services',
           'activities': '🏃 Activities & Experiences'
         };
+        
+        // Add custom sections to sectionNames
+        customSections.forEach(cs => {
+          sectionNames[cs.section_key] = cs.icon_class ? 
+            '<i class="' + cs.icon_class + ' mr-1"></i>' + cs.section_name_en :
+            '✨ ' + cs.section_name_en;
+        });
+        
+        // Add any custom sections that aren't in the order yet
+        customSections.forEach(cs => {
+          if (!order.includes(cs.section_key)) {
+            order.push(cs.section_key);
+          }
+        });
         
         const list = document.getElementById('sectionOrderList');
         list.innerHTML = '';
@@ -6876,8 +6934,9 @@ app.get('/admin/dashboard', (c) => {
           item.draggable = true;
           item.dataset.section = section;
           
+          const displayName = sectionNames[section] || '❓ ' + section;
           item.innerHTML = '<i class="fas fa-grip-vertical text-gray-400"></i>' +
-                          '<span class="flex-1 font-medium">' + (index + 1) + '. ' + sectionNames[section] + '</span>' +
+                          '<span class="flex-1 font-medium">' + (index + 1) + '. ' + displayName + '</span>' +
                           '<i class="fas fa-arrows-alt-v text-gray-400"></i>';
           
           // Drag events
