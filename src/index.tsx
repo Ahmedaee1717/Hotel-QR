@@ -3035,6 +3035,178 @@ app.get('/hotel/:property_slug', async (c) => {
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
+        // Translation dictionaries for UI elements
+        const uiTranslations = {
+            en: {
+                'book-now': 'BOOK NOW',
+                'reservations': 'Reservations',
+                'explore-menu': 'Explore Menu',
+                'learn-more': 'Learn More',
+                'discover': 'Discover',
+                'view-details': 'View Details',
+                'explore-more': 'Explore More',
+                'activities-experiences': 'Activities & Experiences',
+                'curated-experiences': 'Curated experiences from our trusted partners',
+                'hotel-map': 'Hotel Map & Layout',
+                'no-restaurants': 'No restaurants available',
+                'no-events': 'No upcoming events',
+                'no-spa': 'No spa services available',
+                'no-services': 'No services available',
+                'no-activities': 'No activities available',
+                'no-items': 'No items available in this section'
+            },
+            es: {
+                'book-now': 'RESERVAR AHORA',
+                'reservations': 'Reservas',
+                'explore-menu': 'Explorar Men\u00fa',
+                'learn-more': 'Saber M\u00e1s',
+                'discover': 'Descubrir',
+                'view-details': 'Ver Detalles',
+                'explore-more': 'Explorar M\u00e1s',
+                'activities-experiences': 'Actividades y Experiencias',
+                'curated-experiences': 'Experiencias seleccionadas de nuestros socios de confianza',
+                'hotel-map': 'Mapa y Dise\u00f1o del Hotel',
+                'no-restaurants': 'No hay restaurantes disponibles',
+                'no-events': 'No hay eventos pr\u00f3ximos',
+                'no-spa': 'No hay servicios de spa disponibles',
+                'no-services': 'No hay servicios disponibles',
+                'no-activities': 'No hay actividades disponibles',
+                'no-items': 'No hay elementos disponibles en esta secci\u00f3n'
+            },
+            fr: {
+                'book-now': 'R\u00c9SERVER MAINTENANT',
+                'reservations': 'R\u00e9servations',
+                'explore-menu': 'Explorer le Menu',
+                'learn-more': 'En Savoir Plus',
+                'discover': 'D\u00e9couvrir',
+                'view-details': 'Voir les D\u00e9tails',
+                'explore-more': 'Explorer Plus',
+                'activities-experiences': 'Activit\u00e9s et Exp\u00e9riences',
+                'curated-experiences': 'Exp\u00e9riences s\u00e9lectionn\u00e9es par nos partenaires de confiance',
+                'hotel-map': 'Plan et Agencement de l\\'H\u00f4tel',
+                'no-restaurants': 'Aucun restaurant disponible',
+                'no-events': 'Aucun \u00e9v\u00e9nement \u00e0 venir',
+                'no-spa': 'Aucun service de spa disponible',
+                'no-services': 'Aucun service disponible',
+                'no-activities': 'Aucune activit\u00e9 disponible',
+                'no-items': 'Aucun \u00e9l\u00e9ment disponible dans cette section'
+            },
+            de: {
+                'book-now': 'JETZT BUCHEN',
+                'reservations': 'Reservierungen',
+                'explore-menu': 'Men\u00fc Erkunden',
+                'learn-more': 'Mehr Erfahren',
+                'discover': 'Entdecken',
+                'view-details': 'Details Anzeigen',
+                'explore-more': 'Mehr Erkunden',
+                'activities-experiences': 'Aktivit\u00e4ten und Erlebnisse',
+                'curated-experiences': 'Ausgew\u00e4hlte Erlebnisse von unseren vertrauensw\u00fcrdigen Partnern',
+                'hotel-map': 'Hotelplan und Layout',
+                'no-restaurants': 'Keine Restaurants verf\u00fcgbar',
+                'no-events': 'Keine bevorstehenden Veranstaltungen',
+                'no-spa': 'Keine Spa-Dienstleistungen verf\u00fcgbar',
+                'no-services': 'Keine Dienstleistungen verf\u00fcgbar',
+                'no-activities': 'Keine Aktivit\u00e4ten verf\u00fcgbar',
+                'no-items': 'Keine Elemente in diesem Bereich verf\u00fcgbar'
+            },
+            it: {
+                'book-now': 'PRENOTA ORA',
+                'reservations': 'Prenotazioni',
+                'explore-menu': 'Esplora il Menu',
+                'learn-more': 'Scopri di Pi\u00f9',
+                'discover': 'Scopri',
+                'view-details': 'Vedi Dettagli',
+                'explore-more': 'Esplora di Pi\u00f9',
+                'activities-experiences': 'Attivit\u00e0 ed Esperienze',
+                'curated-experiences': 'Esperienze selezionate dai nostri partner fidati',
+                'hotel-map': 'Mappa e Layout dell\\'Hotel',
+                'no-restaurants': 'Nessun ristorante disponibile',
+                'no-events': 'Nessun evento in arrivo',
+                'no-spa': 'Nessun servizio spa disponibile',
+                'no-services': 'Nessun servizio disponibile',
+                'no-activities': 'Nessuna attivit\u00e0 disponibile',
+                'no-items': 'Nessun elemento disponibile in questa sezione'
+            },
+            pt: {
+                'book-now': 'RESERVAR AGORA',
+                'reservations': 'Reservas',
+                'explore-menu': 'Explorar Menu',
+                'learn-more': 'Saiba Mais',
+                'discover': 'Descobrir',
+                'view-details': 'Ver Detalhes',
+                'explore-more': 'Explorar Mais',
+                'activities-experiences': 'Atividades e Experi\u00eancias',
+                'curated-experiences': 'Experi\u00eancias selecionadas de nossos parceiros confi\u00e1veis',
+                'hotel-map': 'Mapa e Layout do Hotel',
+                'no-restaurants': 'Nenhum restaurante dispon\u00edvel',
+                'no-events': 'Nenhum evento pr\u00f3ximo',
+                'no-spa': 'Nenhum servi\u00e7o de spa dispon\u00edvel',
+                'no-services': 'Nenhum servi\u00e7o dispon\u00edvel',
+                'no-activities': 'Nenhuma atividade dispon\u00edvel',
+                'no-items': 'Nenhum item dispon\u00edvel nesta se\u00e7\u00e3o'
+            },
+            ru: {
+                'book-now': '\u0417\u0410\u0411\u0420\u041e\u041d\u0418\u0420\u041e\u0412\u0410\u0422\u042c \u0421\u0415\u0419\u0427\u0410\u0421',
+                'reservations': '\u0411\u0440\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f',
+                'explore-menu': '\u041f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u043c\u0435\u043d\u044e',
+                'learn-more': '\u0423\u0437\u043d\u0430\u0442\u044c \u0431\u043e\u043b\u044c\u0448\u0435',
+                'discover': '\u041e\u0442\u043a\u0440\u044b\u0442\u044c',
+                'view-details': '\u041f\u043e\u0434\u0440\u043e\u0431\u043d\u043e\u0441\u0442\u0438',
+                'explore-more': '\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u044c \u0431\u043e\u043b\u044c\u0448\u0435',
+                'activities-experiences': '\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u0438 \u043e\u043f\u044b\u0442',
+                'curated-experiences': '\u0422\u0449\u0430\u0442\u0435\u043b\u044c\u043d\u043e \u043e\u0442\u043e\u0431\u0440\u0430\u043d\u043d\u044b\u0435 \u0432\u043f\u0435\u0447\u0430\u0442\u043b\u0435\u043d\u0438\u044f \u043e\u0442 \u043d\u0430\u0448\u0438\u0445 \u043d\u0430\u0434\u0435\u0436\u043d\u044b\u0445 \u043f\u0430\u0440\u0442\u043d\u0435\u0440\u043e\u0432',
+                'hotel-map': '\u041a\u0430\u0440\u0442\u0430 \u0438 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u043a\u0430 \u043e\u0442\u0435\u043b\u044f',
+                'no-restaurants': '\u0420\u0435\u0441\u0442\u043e\u0440\u0430\u043d\u044b \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b',
+                'no-events': '\u041d\u0435\u0442 \u043f\u0440\u0435\u0434\u0441\u0442\u043e\u044f\u0449\u0438\u0445 \u0441\u043e\u0431\u044b\u0442\u0438\u0439',
+                'no-spa': '\u0421\u043f\u0430-\u0443\u0441\u043b\u0443\u0433\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b',
+                'no-services': '\u0423\u0441\u043b\u0443\u0433\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b',
+                'no-activities': '\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b',
+                'no-items': '\u041d\u0435\u0442 \u044d\u043b\u0435\u043c\u0435\u043d\u0442\u043e\u0432 \u0432 \u044d\u0442\u043e\u043c \u0440\u0430\u0437\u0434\u0435\u043b\u0435'
+            },
+            ar: {
+                'book-now': '\u0627\u062d\u062c\u0632 \u0627\u0644\u0622\u0646',
+                'reservations': '\u0627\u0644\u062d\u062c\u0648\u0632\u0627\u062a',
+                'explore-menu': '\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
+                'learn-more': '\u0627\u0639\u0631\u0641 \u0627\u0644\u0645\u0632\u064a\u062f',
+                'discover': '\u0627\u0643\u062a\u0634\u0641',
+                'view-details': '\u0639\u0631\u0636 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644',
+                'explore-more': '\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0645\u0632\u064a\u062f',
+                'activities-experiences': '\u0627\u0644\u0623\u0646\u0634\u0637\u0629 \u0648\u0627\u0644\u062a\u062c\u0627\u0631\u0628',
+                'curated-experiences': '\u062a\u062c\u0627\u0631\u0628 \u0645\u0646\u062a\u0642\u0627\u0629 \u0645\u0646 \u0634\u0631\u0643\u0627\u0626\u0646\u0627 \u0627\u0644\u0645\u0648\u062b\u0648\u0642\u064a\u0646',
+                'hotel-map': '\u062e\u0631\u064a\u0637\u0629 \u0648\u062a\u0635\u0645\u064a\u0645 \u0627\u0644\u0641\u0646\u062f\u0642',
+                'no-restaurants': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0637\u0627\u0639\u0645 \u0645\u062a\u0627\u062d\u0629',
+                'no-events': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0642\u0627\u062f\u0645\u0629',
+                'no-spa': '\u0644\u0627 \u062a\u0648\u062c\u062f \u062e\u062f\u0645\u0627\u062a \u0633\u0628\u0627 \u0645\u062a\u0627\u062d\u0629',
+                'no-services': '\u0644\u0627 \u062a\u0648\u062c\u062f \u062e\u062f\u0645\u0627\u062a \u0645\u062a\u0627\u062d\u0629',
+                'no-activities': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0623\u0646\u0634\u0637\u0629 \u0645\u062a\u0627\u062d\u0629',
+                'no-items': '\u0644\u0627 \u062a\u0648\u062c\u062f \u0639\u0646\u0627\u0635\u0631 \u0645\u062a\u0627\u062d\u0629 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0642\u0633\u0645'
+            },
+            zh: {
+                'book-now': '\u7acb\u5373\u9884\u8ba2',
+                'reservations': '\u9884\u8ba2',
+                'explore-menu': '\u63a2\u7d22\u83dc\u5355',
+                'learn-more': '\u4e86\u89e3\u66f4\u591a',
+                'discover': '\u53d1\u73b0',
+                'view-details': '\u67e5\u770b\u8be6\u60c5',
+                'explore-more': '\u63a2\u7d22\u66f4\u591a',
+                'activities-experiences': '\u6d3b\u52a8\u548c\u4f53\u9a8c',
+                'curated-experiences': '\u7531\u6211\u4eec\u7684\u53ef\u4fe1\u8d56\u5408\u4f5c\u4f19\u4f34\u7cbe\u9009\u7684\u4f53\u9a8c',
+                'hotel-map': '\u9152\u5e97\u5730\u56fe\u548c\u5e03\u5c40',
+                'no-restaurants': '\u6ca1\u6709\u53ef\u7528\u7684\u9910\u5385',
+                'no-events': '\u6ca1\u6709\u5373\u5c06\u4e3e\u884c\u7684\u6d3b\u52a8',
+                'no-spa': '\u6ca1\u6709\u53ef\u7528\u7684\u6c34\u7597\u670d\u52a1',
+                'no-services': '\u6ca1\u6709\u53ef\u7528\u7684\u670d\u52a1',
+                'no-activities': '\u6ca1\u6709\u53ef\u7528\u7684\u6d3b\u52a8',
+                'no-items': '\u6b64\u90e8\u5206\u4e2d\u6ca1\u6709\u53ef\u7528\u9879\u76ee'
+            }
+        };
+        
+        // Get UI translation
+        function t(key) {
+            const dict = uiTranslations[currentLanguage] || uiTranslations['en'];
+            return dict[key] || uiTranslations['en'][key] || key;
+        }
+        
         // Helper function to get translated field
         function getTranslatedField(item, fieldName) {
             if (!item) return '';
@@ -3052,6 +3224,36 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // Fallback to English
             return item[fieldName + '_en'] || item[fieldName] || '';
+        }
+        
+        // Update section headings based on language
+        function updateSectionHeadings() {
+            if (!propertyData) return;
+            
+            // Update default section headings
+            const sections = ['restaurants', 'events', 'spa', 'service', 'activities'];
+            sections.forEach(section => {
+                const el = document.getElementById('section-heading-' + section);
+                if (el) {
+                    const fieldName = 'section_' + section;
+                    const translated = getTranslatedField(propertyData, fieldName);
+                    if (translated) {
+                        el.textContent = translated;
+                    }
+                }
+            });
+            
+            // Update activities description
+            const activitiesDesc = document.querySelector('#activities-section p');
+            if (activitiesDesc) {
+                activitiesDesc.textContent = t('curated-experiences');
+            }
+            
+            // Update hotel map heading
+            const mapHeading = document.querySelector('#hotel-map-section h2 span');
+            if (mapHeading) {
+                mapHeading.textContent = t('hotel-map');
+            }
         }
         
         // Change language function
@@ -3502,6 +3704,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Render all content
                 renderContent();
                 
+                // Update section headings with translations
+                updateSectionHeadings();
+                
                 // Hide loading, show content
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
@@ -3632,7 +3837,7 @@ app.get('/hotel/:property_slug', async (c) => {
                              alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute top-3 right-3">
-                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>Reservations</span>' : ''}
+                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + t('reservations') + '</span>' : ''}
                         </div>
                     </div>
                     <div class="p-5">
@@ -3643,7 +3848,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             <span>\${r.location}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Explore Menu</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('explore-menu')}</span>
                             <i class="fas fa-arrow-right text-blue-600"></i>
                         </div>
                     </div>
@@ -3687,7 +3892,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             \${e.event_start_time ? '<span><i class="fas fa-clock mr-2 text-gray-400"></i>' + e.event_start_time + '</span>' : ''}
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Learn More</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('learn-more')}</span>
                             <i class="fas fa-arrow-right text-purple-600"></i>
                         </div>
                     </div>
@@ -3729,7 +3934,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             <span>\${s.duration_minutes} minutes</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Discover</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('discover')}</span>
                             <i class="fas fa-arrow-right text-green-600"></i>
                         </div>
                     </div>
@@ -3768,7 +3973,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + s.location + '</span></div>' : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">View Details</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('view-details')}</span>
                             <i class="fas fa-arrow-right text-indigo-600"></i>
                         </div>
                     </div>
@@ -3810,7 +4015,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             <span>\${a.duration_minutes} minutes</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Book Now</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('book-now')}</span>
                             <i class="fas fa-arrow-right text-orange-600"></i>
                         </div>
                     </div>
@@ -3848,7 +4053,7 @@ app.get('/hotel/:property_slug', async (c) => {
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         <div class="absolute top-3 right-3">
-                            \${o.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>Reservations</span>' : ''}
+                            \${o.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + t('reservations') + '</span>' : ''}
                         </div>
                     </div>
                     <div class="p-5">
@@ -3862,7 +4067,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         \` : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-sm text-blue-600 font-medium hover:text-blue-700 transition">
-                                <i class="fas fa-arrow-right mr-1"></i>Explore More
+                                <i class="fas fa-arrow-right mr-1"></i>\${t('explore-more')}
                             </span>
                         </div>
                     </div>
@@ -3970,7 +4175,7 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function viewOffering(offeringId) {
-            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id;
+            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
         }
 
         function viewActivity(activityId) {
@@ -4123,9 +4328,18 @@ app.get('/offering-detail', async (c) => {
     </div>
 
     <script>
+        // Get language from URL or localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const langFromUrl = urlParams.get('lang');
+        let currentLanguage = langFromUrl || localStorage.getItem('preferredLanguage') || 'en';
+        
+        // Save to localStorage for persistence
+        if (langFromUrl) {
+            localStorage.setItem('preferredLanguage', langFromUrl);
+        }
+        
         let offeringData = null;
         let propertyData = null;
-        let currentLanguage = 'en';
         const offeringId = '${offering_id}';
         const propertyId = '${property_id}';
 
