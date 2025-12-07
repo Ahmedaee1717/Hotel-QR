@@ -4057,15 +4057,15 @@ app.get('/offering-detail', async (c) => {
                 'confirm-booking': 'Confirmar reserva'
             },
             fr: {
-                'back-to-hotel': 'Retour à l\'hôtel',
+                'back-to-hotel': 'Retour à l\\'hôtel',
                 'about': 'À propos',
-                'event-details': 'Détails de l\'événement',
+                'event-details': 'Détails de l\\'événement',
                 'book-experience': 'Réservez votre expérience',
                 'your-name': 'Votre nom',
                 'phone-number': 'Numéro de téléphone',
                 'email': 'Email',
                 'preferred-datetime': 'Date et heure préférées',
-                'num-guests': 'Nombre d\'invités',
+                'num-guests': 'Nombre d\\'invités',
                 'special-requests': 'Demandes spéciales (facultatif)',
                 'price-per-person': 'Prix par personne:',
                 'total': 'Total:',
@@ -4087,9 +4087,9 @@ app.get('/offering-detail', async (c) => {
                 'confirm-booking': 'Buchung bestätigen'
             },
             it: {
-                'back-to-hotel': 'Torna all\'hotel',
+                'back-to-hotel': 'Torna all\\'hotel',
                 'about': 'Informazioni',
-                'event-details': 'Dettagli dell\'evento',
+                'event-details': 'Dettagli dell\\'evento',
                 'book-experience': 'Prenota la tua esperienza',
                 'your-name': 'Il tuo nome',
                 'phone-number': 'Numero di telefono',
@@ -4225,32 +4225,12 @@ app.get('/offering-detail', async (c) => {
             
             // Apply dynamic CSS
             const style = document.createElement('style');
-            style.textContent = \\\`
-                body {
-                    font-family: \\\${fontFamily};
-                }
-                
-                #offeringHeader {
-                    background: \\\${heroBackground} !important;
-                }
-                
-                .text-blue-500, .text-blue-600 {
-                    color: \\\${primaryColor} !important;
-                }
-                
-                .bg-blue-600 {
-                    background: \\\${useGradient ? heroBackground : primaryColor} !important;
-                }
-                
-                .bg-blue-600:hover {
-                    background: \\\${secondaryColor} !important;
-                    transform: scale(1.05);
-                }
-                
-                .bg-blue-50 {
-                    background: \\\${primaryColor}15 !important;
-                }
-            \\\`;
+            style.textContent = 'body { font-family: ' + fontFamily + '; }' +
+                '#offeringHeader { background: ' + heroBackground + ' !important; }' +
+                '.text-blue-500, .text-blue-600 { color: ' + primaryColor + ' !important; }' +
+                '.bg-blue-600 { background: ' + (useGradient ? heroBackground : primaryColor) + ' !important; }' +
+                '.bg-blue-600:hover { background: ' + secondaryColor + ' !important; transform: scale(1.05); }' +
+                '.bg-blue-50 { background: ' + primaryColor + '15 !important; }';
             document.head.appendChild(style);
         }
 
