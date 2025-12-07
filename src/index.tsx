@@ -4010,18 +4010,7 @@ app.get('/admin/dashboard', (c) => {
             return;
           }
           
-          list.innerHTML = rooms.map(r => \`
-            <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
-              <div>
-                <span class="font-bold text-lg">Room \${r.room_number}</span>
-                <span class="text-gray-600 ml-3">\${r.room_type}</span>
-              </div>
-              <div class="flex gap-2">
-                <a href="/welcome/paradise-resort/\${r.qr_code_data}" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a>
-                <button onclick="regenerateQR(\${r.room_id})" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button>
-              </div>
-            </div>
-          \`).join('');
+          list.innerHTML = rooms.map(r => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><span class="font-bold text-lg">Room ' + r.room_number + '</span><span class="text-gray-600 ml-3">' + r.room_type + '</span></div><div class="flex gap-2"><a href="/welcome/paradise-resort/' + r.qr_code_data + '" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a><button onclick="regenerateQR(' + r.room_id + ')" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button></div></div>').join('');
         } catch (error) {
           console.error('Load rooms error:', error);
         }
@@ -4033,18 +4022,7 @@ app.get('/admin/dashboard', (c) => {
           const vendors = await response.json();
           const list = document.getElementById('vendorsList');
           
-          list.innerHTML = vendors.map(v => \`
-            <div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition">
-              <div>
-                <div class="font-bold text-lg">\${v.business_name}</div>
-                <div class="text-sm text-gray-600">\${v.email} • \${v.phone}</div>
-              </div>
-              <div class="flex gap-2">
-                <span class="px-3 py-1 rounded-full text-sm \${v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">\${v.status}</span>
-                <button onclick="removeVendor(\${v.vendor_id})" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200"><i class="fas fa-trash mr-2"></i>Remove</button>
-              </div>
-            </div>
-          \`).join('');
+          list.innerHTML = vendors.map(v => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><div class="font-bold text-lg">' + v.business_name + '</div><div class="text-sm text-gray-600">' + v.email + ' • ' + v.phone + '</div></div><div class="flex gap-2"><span class="px-3 py-1 rounded-full text-sm ' + (v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') + '">' + v.status + '</span><button onclick="removeVendor(' + v.vendor_id + ')" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200"><i class="fas fa-trash mr-2"></i>Remove</button></div></div>').join('');
         } catch (error) {
           console.error('Load vendors error:', error);
         }
