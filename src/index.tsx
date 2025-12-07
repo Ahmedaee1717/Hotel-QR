@@ -1466,6 +1466,324 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
 })
 
 // ============================================
+// RESTAURANT TABLE BOOKING APIs
+// ============================================
+
+// Get all tables for a restaurant
+app.get('/api/restaurant/:offering_id/tables', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const tables = await DB.prepare(`
+      SELECT * FROM restaurant_tables 
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY table_number
+    `).bind(offering_id).all()
+    
+    return c.json({ 
+      success: true,
+      tables: tables.results.map(t => ({
+        ...t,
+        features: t.features ? JSON.parse(t.features) : []
+      }))
+    })
+  } catch (error) {
+    console.error('Get tables error:', error)
+    return c.json({ error: 'Failed to get tables' }, 500)
+  }
+})
+
+// Create table (Admin)
+app.post('/api/admin/restaurant/table', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO restaurant_tables (
+        offering_id, table_number, table_name, capacity,
+        position_x, position_y, width, height, shape, table_type, features
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.offering_id,
+      data.table_number,
+      data.table_name || null,
+      data.capacity,
+      data.position_x || 0,
+      data.position_y || 0,
+      data.width || 100,
+      data.height || 80,
+      data.shape || 'rectangle',
+      data.table_type || 'standard',
+      JSON.stringify(data.features || [])
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      table_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Create table error:', error)
+    return c.json({ error: 'Failed to create table' }, 500)
+  }
+})
+
+// Update table (Admin)
+app.put('/api/admin/restaurant/table/:table_id', async (c) => {
+  const { DB } = c.env
+  const { table_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE restaurant_tables SET
+        table_number = ?, table_name = ?, capacity = ?,
+        position_x = ?, position_y = ?, width = ?, height = ?,
+        shape = ?, table_type = ?, features = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE table_id = ?
+    `).bind(
+      data.table_number,
+      data.table_name || null,
+      data.capacity,
+      data.position_x,
+      data.position_y,
+      data.width,
+      data.height,
+      data.shape,
+      data.table_type,
+      JSON.stringify(data.features || []),
+      table_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update table error:', error)
+    return c.json({ error: 'Failed to update table' }, 500)
+  }
+})
+
+// Delete table (Admin)
+app.delete('/api/admin/restaurant/table/:table_id', async (c) => {
+  const { DB } = c.env
+  const { table_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE restaurant_tables SET is_active = 0 WHERE table_id = ?
+    `).bind(table_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete table error:', error)
+    return c.json({ error: 'Failed to delete table' }, 500)
+  }
+})
+
+// Get dining sessions for a restaurant
+app.get('/api/restaurant/:offering_id/sessions', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    const sessions = await DB.prepare(`
+      SELECT * FROM dining_sessions 
+      WHERE offering_id = ? AND session_date = ?
+      ORDER BY session_time
+    `).bind(offering_id, date).all()
+    
+    return c.json({ 
+      success: true,
+      sessions: sessions.results
+    })
+  } catch (error) {
+    console.error('Get sessions error:', error)
+    return c.json({ error: 'Failed to get sessions' }, 500)
+  }
+})
+
+// Create dining session (Admin)
+app.post('/api/admin/restaurant/session', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO dining_sessions (
+        offering_id, session_date, session_time, session_type,
+        duration_minutes, max_capacity, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.offering_id,
+      data.session_date,
+      data.session_time,
+      data.session_type,
+      data.duration_minutes || 90,
+      data.max_capacity,
+      'available'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      session_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Create session error:', error)
+    return c.json({ error: 'Failed to create session' }, 500)
+  }
+})
+
+// Get table availability for a session
+app.get('/api/restaurant/session/:session_id/availability', async (c) => {
+  const { DB } = c.env
+  const { session_id } = c.req.param()
+  
+  try {
+    // Get session details
+    const session = await DB.prepare(`
+      SELECT * FROM dining_sessions WHERE session_id = ?
+    `).bind(session_id).first()
+    
+    if (!session) {
+      return c.json({ error: 'Session not found' }, 404)
+    }
+    
+    // Get all tables for this restaurant
+    const tables = await DB.prepare(`
+      SELECT * FROM restaurant_tables 
+      WHERE offering_id = ? AND is_active = 1
+    `).bind(session.offering_id).all()
+    
+    // Get reserved tables for this session
+    const reservations = await DB.prepare(`
+      SELECT table_id FROM table_reservations 
+      WHERE session_id = ? AND status != 'cancelled'
+    `).bind(session_id).all()
+    
+    const reservedTableIds = new Set(reservations.results.map(r => r.table_id))
+    
+    const availableTables = tables.results.map(t => ({
+      ...t,
+      features: t.features ? JSON.parse(t.features) : [],
+      is_available: !reservedTableIds.has(t.table_id)
+    }))
+    
+    return c.json({ 
+      success: true,
+      session: session,
+      tables: availableTables
+    })
+  } catch (error) {
+    console.error('Get availability error:', error)
+    return c.json({ error: 'Failed to get availability' }, 500)
+  }
+})
+
+// Create table reservation
+app.post('/api/restaurant/reserve', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    // Validate table capacity
+    const table = await DB.prepare(`
+      SELECT capacity FROM restaurant_tables WHERE table_id = ?
+    `).bind(data.table_id).first()
+    
+    if (!table) {
+      return c.json({ error: 'Table not found' }, 404)
+    }
+    
+    if (data.num_guests > table.capacity) {
+      return c.json({ error: `Table capacity is ${table.capacity} guests` }, 400)
+    }
+    
+    // Check if table is already booked
+    const existing = await DB.prepare(`
+      SELECT reservation_id FROM table_reservations 
+      WHERE session_id = ? AND table_id = ? AND status != 'cancelled'
+    `).bind(data.session_id, data.table_id).first()
+    
+    if (existing) {
+      return c.json({ error: 'Table is already reserved' }, 400)
+    }
+    
+    // Create reservation
+    const result = await DB.prepare(`
+      INSERT INTO table_reservations (
+        session_id, table_id, guest_id, property_id,
+        reservation_date, reservation_time, num_guests,
+        special_requests, dietary_requirements, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+    `).bind(
+      data.session_id,
+      data.table_id,
+      data.guest_id,
+      data.property_id,
+      data.reservation_date,
+      data.reservation_time,
+      data.num_guests,
+      data.special_requests || null,
+      data.dietary_requirements || null
+    ).run()
+    
+    // Update session booking count
+    await DB.prepare(`
+      UPDATE dining_sessions 
+      SET current_bookings = current_bookings + ?
+      WHERE session_id = ?
+    `).bind(data.num_guests, data.session_id).run()
+    
+    return c.json({ 
+      success: true,
+      reservation_id: result.meta.last_row_id,
+      message: 'Table reserved successfully!'
+    })
+  } catch (error) {
+    console.error('Create reservation error:', error)
+    return c.json({ error: 'Failed to create reservation' }, 500)
+  }
+})
+
+// Get reservations (Admin)
+app.get('/api/admin/restaurant/reservations', async (c) => {
+  const { DB } = c.env
+  const offering_id = c.req.query('offering_id')
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    const reservations = await DB.prepare(`
+      SELECT 
+        tr.*,
+        rt.table_number,
+        rt.table_name,
+        ds.session_time,
+        ds.session_type,
+        g.first_name,
+        g.last_name,
+        g.email,
+        g.phone
+      FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN dining_sessions ds ON tr.session_id = ds.session_id
+      JOIN guests g ON tr.guest_id = g.guest_id
+      WHERE rt.offering_id = ? AND tr.reservation_date = ?
+      ORDER BY ds.session_time, rt.table_number
+    `).bind(offering_id, date).all()
+    
+    return c.json({ 
+      success: true,
+      reservations: reservations.results
+    })
+  } catch (error) {
+    console.error('Get reservations error:', error)
+    return c.json({ error: 'Failed to get reservations' }, 500)
+  }
+})
+
+// ============================================
 // HOTEL LANDING PAGE & APIs
 // ============================================
 
@@ -3628,6 +3946,7 @@ app.get('/admin/dashboard', (c) => {
                   </span>
                 </div>
                 <div class="flex gap-2">
+                  \${o.offering_type === 'restaurant' ? \`<a href="/admin/restaurant/\${o.offering_id}" class="text-green-600 hover:text-green-800" title="Manage Tables"><i class="fas fa-chair"></i></a>\` : ''}
                   <button onclick="editOffering(\${o.offering_id})" class="text-blue-600 hover:text-blue-800">
                     <i class="fas fa-edit"></i>
                   </button>
@@ -3964,6 +4283,367 @@ app.get('/:property_slug?', async (c) => {
     console.error('Homepage error:', error)
     return c.html('<html><body><h1>Error</h1><p>Failed to load homepage</p></body></html>', 500)
   }
+})
+
+// Restaurant Table Management Page
+app.get('/admin/restaurant/:offering_id', (c) => {
+  const { offering_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Table Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+      .table-item {
+        position: absolute;
+        cursor: move;
+        border: 2px solid #3B82F6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        user-select: none;
+      }
+      .table-item:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+      .table-item.selected { border-color: #10B981; border-width: 3px; }
+      .table-rectangle { border-radius: 8px; }
+      .table-circle { border-radius: 50%; }
+      .table-square { border-radius: 8px; }
+      #canvas { position: relative; background: #F3F4F6; border: 2px dashed #9CA3AF; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <a href="/admin/dashboard" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                </a>
+                <h1 class="text-2xl font-bold">Restaurant Table Management</h1>
+            </div>
+            <span id="restaurantName" class="text-lg"></span>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="grid md:grid-cols-3 gap-6">
+            <!-- Left Panel: Table Controls -->
+            <div class="space-y-6">
+                <!-- Add Table Form -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add Table</h2>
+                    <form id="addTableForm" class="space-y-3">
+                        <input type="text" id="tableNumber" placeholder="Table Number (e.g., T1)" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="text" id="tableName" placeholder="Table Name (optional)" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="number" id="capacity" placeholder="Capacity" required min="1" max="12" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        
+                        <select id="shape" class="w-full px-3 py-2 border rounded-lg text-sm">
+                            <option value="rectangle">Rectangle</option>
+                            <option value="circle">Circle</option>
+                            <option value="square">Square</option>
+                        </select>
+                        
+                        <select id="tableType" class="w-full px-3 py-2 border rounded-lg text-sm">
+                            <option value="standard">Standard</option>
+                            <option value="booth">Booth</option>
+                            <option value="bar">Bar/High-Top</option>
+                            <option value="outdoor">Outdoor</option>
+                            <option value="vip">VIP</option>
+                        </select>
+                        
+                        <div class="border rounded-lg p-2 max-h-32 overflow-y-auto">
+                            <p class="text-xs font-semibold mb-2">Features:</p>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="window_view" class="mr-2">Window View</label>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="beachfront" class="mr-2">Beachfront</label>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="sunset_view" class="mr-2">Sunset View</label>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="quiet" class="mr-2">Quiet Section</label>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="couples" class="mr-2">Couples</label>
+                            <label class="flex items-center text-sm mb-1"><input type="checkbox" name="features" value="family_friendly" class="mr-2">Family Friendly</label>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>Add to Floor Plan
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Selected Table Info -->
+                <div id="selectedTableInfo" class="bg-white rounded-lg shadow-lg p-6 hidden">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
+                    <div id="tableDetails"></div>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="deleteSelectedTable()" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                            <i class="fas fa-trash mr-2"></i>Delete
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tables List -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4">All Tables (<span id="tableCount">0</span>)</h2>
+                    <div id="tablesList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <!-- Center: Floor Plan Canvas -->
+            <div class="md:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold"><i class="fas fa-th mr-2 text-purple-600"></i>Floor Plan Designer</h2>
+                        <div class="flex gap-2">
+                            <button onclick="saveLayout()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                <i class="fas fa-save mr-2"></i>Save Layout
+                            </button>
+                            <button onclick="clearCanvas()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                                <i class="fas fa-eraser mr-2"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="canvas" style="width: 100%; height: 600px; overflow: auto;"></div>
+                    
+                    <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
+                        <span><i class="fas fa-chair mr-2"></i>Drag tables to position them</span>
+                        <span>Total Capacity: <strong id="totalCapacity">0</strong> seats</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const offeringId = '${offering_id}';
+      let tables = [];
+      let selectedTable = null;
+      let isDragging = false;
+      let dragOffset = { x: 0, y: 0 };
+
+      async function init() {
+        await loadRestaurant();
+        await loadTables();
+      }
+
+      async function loadRestaurant() {
+        try {
+          const response = await fetch(\`/api/hotel-offerings/1\`);
+          const data = await response.json();
+          const restaurant = data.offerings.find(o => o.offering_id == offeringId);
+          if (restaurant) {
+            document.getElementById('restaurantName').textContent = restaurant.title;
+            document.title = \`\${restaurant.title} - Table Management\`;
+          }
+        } catch (error) {
+          console.error('Load restaurant error:', error);
+        }
+      }
+
+      async function loadTables() {
+        try {
+          const response = await fetch(\`/api/restaurant/\${offeringId}/tables\`);
+          const data = await response.json();
+          tables = data.tables || [];
+          renderTables();
+          updateTablesList();
+        } catch (error) {
+          console.error('Load tables error:', error);
+        }
+      }
+
+      function renderTables() {
+        const canvas = document.getElementById('canvas');
+        canvas.innerHTML = '';
+        
+        let totalCap = 0;
+        
+        tables.forEach(table => {
+          totalCap += table.capacity;
+          const div = document.createElement('div');
+          div.className = \`table-item table-\${table.shape}\`;
+          div.id = \`table-\${table.table_id}\`;
+          div.style.left = table.position_x + 'px';
+          div.style.top = table.position_y + 'px';
+          div.style.width = table.width + 'px';
+          div.style.height = table.height + 'px';
+          div.innerHTML = \`<div class="text-center"><div class="text-sm">\${table.table_number}</div><div class="text-xs text-gray-600">\${table.capacity}p</div></div>\`;
+          
+          div.addEventListener('mousedown', (e) => startDrag(e, table));
+          div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectTable(table);
+          });
+          
+          canvas.appendChild(div);
+        });
+        
+        document.getElementById('tableCount').textContent = tables.length;
+        document.getElementById('totalCapacity').textContent = totalCap;
+      }
+
+      function startDrag(e, table) {
+        e.preventDefault();
+        isDragging = true;
+        selectedTable = table;
+        const div = document.getElementById(\`table-\${table.table_id}\`);
+        const rect = div.getBoundingClientRect();
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+        
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+      }
+
+      function onDrag(e) {
+        if (!isDragging || !selectedTable) return;
+        
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        const x = e.clientX - canvasRect.left - dragOffset.x;
+        const y = e.clientY - canvasRect.top - dragOffset.y;
+        
+        selectedTable.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedTable.width));
+        selectedTable.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedTable.height));
+        
+        const div = document.getElementById(\`table-\${selectedTable.table_id}\`);
+        div.style.left = selectedTable.position_x + 'px';
+        div.style.top = selectedTable.position_y + 'px';
+      }
+
+      function stopDrag() {
+        if (isDragging && selectedTable) {
+          updateTablePosition(selectedTable);
+        }
+        isDragging = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', stopDrag);
+      }
+
+      async function updateTablePosition(table) {
+        try {
+          await fetch(\`/api/admin/restaurant/table/\${table.table_id}\`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(table)
+          });
+        } catch (error) {
+          console.error('Update position error:', error);
+        }
+      }
+
+      function selectTable(table) {
+        document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
+        document.getElementById(\`table-\${table.table_id}\`).classList.add('selected');
+        selectedTable = table;
+        
+        const infoPanel = document.getElementById('selectedTableInfo');
+        const details = document.getElementById('tableDetails');
+        
+        details.innerHTML = \`
+          <div class="space-y-2 text-sm">
+            <div><strong>Number:</strong> \${table.table_number}</div>
+            <div><strong>Name:</strong> \${table.table_name || 'N/A'}</div>
+            <div><strong>Capacity:</strong> \${table.capacity} seats</div>
+            <div><strong>Type:</strong> \${table.table_type}</div>
+            <div><strong>Shape:</strong> \${table.shape}</div>
+            <div><strong>Features:</strong> \${table.features.length > 0 ? table.features.join(', ') : 'None'}</div>
+          </div>
+        \`;
+        
+        infoPanel.classList.remove('hidden');
+      }
+
+      function updateTablesList() {
+        const list = document.getElementById('tablesList');
+        list.innerHTML = tables.map(t => \`
+          <div class="flex items-center justify-between p-2 border rounded hover:bg-gray-50 cursor-pointer" onclick='selectTable(\${JSON.stringify(t)})'>
+            <div>
+              <div class="font-semibold text-sm">\${t.table_number}</div>
+              <div class="text-xs text-gray-600">\${t.capacity} seats</div>
+            </div>
+            <span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">\${t.table_type}</span>
+          </div>
+        \`).join('');
+      }
+
+      document.getElementById('addTableForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const features = Array.from(document.querySelectorAll('input[name="features"]:checked')).map(cb => cb.value);
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              offering_id: offeringId,
+              table_number: document.getElementById('tableNumber').value,
+              table_name: document.getElementById('tableName').value || null,
+              capacity: parseInt(document.getElementById('capacity').value),
+              shape: document.getElementById('shape').value,
+              table_type: document.getElementById('tableType').value,
+              features: features,
+              position_x: 50,
+              position_y: 50,
+              width: document.getElementById('shape').value === 'circle' ? 100 : 120,
+              height: document.getElementById('shape').value === 'circle' ? 100 : 80
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Table added successfully!');
+            document.getElementById('addTableForm').reset();
+            await loadTables();
+          }
+        } catch (error) {
+          console.error('Add table error:', error);
+          alert('Failed to add table');
+        }
+      });
+
+      async function deleteSelectedTable() {
+        if (!selectedTable) return;
+        if (!confirm(\`Delete table \${selectedTable.table_number}?\`)) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/restaurant/table/\${selectedTable.table_id}\`, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Table deleted!');
+            selectedTable = null;
+            document.getElementById('selectedTableInfo').classList.add('hidden');
+            await loadTables();
+          }
+        } catch (error) {
+          console.error('Delete table error:', error);
+          alert('Failed to delete table');
+        }
+      }
+
+      function saveLayout() {
+        alert('Layout auto-saves when you move tables!');
+      }
+
+      function clearCanvas() {
+        if (!confirm('Delete all tables? This cannot be undone.')) return;
+        // Implementation for bulk delete
+        alert('Please delete tables individually for now');
+      }
+
+      init();
+    </script>
+</body>
+</html>
+  `)
 })
 
 export default app
