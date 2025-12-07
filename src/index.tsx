@@ -5625,6 +5625,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
                 <button data-tab="regcode" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
                 <button data-tab="offerings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
+                <button data-tab="customsections" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-layer-group mr-2"></i>Custom Sections</button>
                 <button data-tab="activities" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
                 <button data-tab="callbacks" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
                 <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-cog mr-2"></i>Design Settings</button>
@@ -5758,6 +5759,56 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa">Spa</button>
                 </div>
                 <div id="offeringsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Custom Sections Tab -->
+        <div id="customsectionsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-plus-circle mr-2 text-blue-600"></i>
+                    Add Custom Section
+                </h2>
+                <p class="text-gray-600 mb-4">Create additional sections for your hotel homepage (e.g., Pool Bar, Kids Club, Rooftop Lounge)</p>
+                <form id="addCustomSectionForm" class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <input type="text" id="sectionKey" placeholder="Section Key (e.g., pool-bar)" required class="px-4 py-2 border rounded-lg">
+                        <input type="text" id="sectionNameEn" placeholder="Section Name (English)" required class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <select id="sectionIcon" class="px-4 py-2 border rounded-lg">
+                            <option value="fas fa-star">⭐ Star</option>
+                            <option value="fas fa-swimming-pool">🏊 Pool</option>
+                            <option value="fas fa-cocktail">🍹 Bar</option>
+                            <option value="fas fa-child">👶 Kids</option>
+                            <option value="fas fa-gamepad">🎮 Gaming</option>
+                            <option value="fas fa-dumbbell">🏋️ Fitness</option>
+                            <option value="fas fa-graduation-cap">🎓 Business Center</option>
+                            <option value="fas fa-gift">🎁 Gift Shop</option>
+                            <option value="fas fa-coffee">☕ Cafe</option>
+                            <option value="fas fa-music">🎵 Entertainment</option>
+                        </select>
+                        <select id="sectionColor" class="px-4 py-2 border rounded-lg">
+                            <option value="blue">Blue</option>
+                            <option value="purple">Purple</option>
+                            <option value="green">Green</option>
+                            <option value="orange">Orange</option>
+                            <option value="red">Red</option>
+                            <option value="pink">Pink</option>
+                            <option value="indigo">Indigo</option>
+                            <option value="teal">Teal</option>
+                        </select>
+                        <input type="number" id="sectionOrder" placeholder="Display Order" value="10" class="px-4 py-2 border rounded-lg">
+                    </div>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-check mr-2"></i>Create Section
+                    </button>
+                </form>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">All Custom Sections</h2>
+                <div id="customSectionsList" class="space-y-3"></div>
             </div>
         </div>
 
@@ -6145,6 +6196,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
         if (tab === 'offerings') loadOfferings();
+        if (tab === 'customsections') loadCustomSections();
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
         if (tab === 'settings') loadSettings();
@@ -6310,6 +6362,89 @@ app.get('/admin/dashboard', (c) => {
           alert('Failed to deactivate activity');
         }
       }
+
+      // Custom Sections Management
+      async function loadCustomSections() {
+        try {
+          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const data = await response.json();
+          const list = document.getElementById('customSectionsList');
+          
+          if (!data.sections || data.sections.length === 0) {
+            list.innerHTML = '<p class="text-gray-500 text-center py-4">No custom sections yet. Create your first custom section above!</p>';
+            return;
+          }
+          
+          list.innerHTML = data.sections.map(s => `
+            <div class="border rounded-lg p-4 hover:shadow-md transition">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-bold text-lg">
+                    <i class="${s.icon_class} mr-2 text-${s.color_class}-600"></i>
+                    ${s.section_name_en}
+                  </h3>
+                  <p class="text-sm text-gray-600">Key: <code class="bg-gray-100 px-2 py-1 rounded">${s.section_key}</code></p>
+                  <p class="text-sm text-gray-500 mt-1">Order: ${s.display_order} | Visible: ${s.is_visible ? '✅ Yes' : '❌ No'}</p>
+                </div>
+                <button onclick="deleteCustomSection(${s.section_id})" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200">
+                  <i class="fas fa-trash mr-1"></i>Delete
+                </button>
+              </div>
+            </div>
+          `).join('');
+        } catch (error) {
+          console.error('Load custom sections error:', error);
+        }
+      }
+
+      async function deleteCustomSection(sectionId) {
+        if (!confirm('Delete this custom section? All offerings linked to this section will remain but won\'t be displayed.')) return;
+        try {
+          const response = await fetch('/api/admin/custom-sections/' + sectionId, {
+            method: 'DELETE'
+          });
+          if (response.ok) {
+            alert('Custom section deleted!');
+            loadCustomSections();
+          }
+        } catch (error) {
+          console.error('Delete custom section error:', error);
+          alert('Failed to delete custom section');
+        }
+      }
+
+      document.getElementById('addCustomSectionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const data = {
+          property_id: 1,
+          section_key: document.getElementById('sectionKey').value,
+          section_name_en: document.getElementById('sectionNameEn').value,
+          icon_class: document.getElementById('sectionIcon').value,
+          color_class: document.getElementById('sectionColor').value,
+          display_order: parseInt(document.getElementById('sectionOrder').value),
+          is_visible: 1
+        };
+        
+        try {
+          const response = await fetch('/api/admin/custom-sections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          
+          if (response.ok) {
+            alert('Custom section created! Now add offerings to this section.');
+            loadCustomSections();
+            e.target.reset();
+          } else {
+            alert('Failed to create custom section. Make sure the section key is unique.');
+          }
+        } catch (error) {
+          console.error('Create custom section error:', error);
+          alert('Failed to create custom section');
+        }
+      });
 
       // Hotel Offerings Management
       let allOfferings = [];
