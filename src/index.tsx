@@ -3136,21 +3136,25 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             grid.innerHTML = restaurants.map(r => \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${r.offering_id})">
-                    <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
-                         alt="\${r.title}" 
-                         class="w-full h-40 object-cover">
-                    <div class="p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="font-bold text-lg">\${r.title}</h3>
-                            \${r.requires_booking ? '<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Booking Required</span>' : '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Walk-in Welcome</span>'}
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${r.offering_id})">
+                    <div class="relative">
+                        <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${r.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="absolute top-3 right-3">
+                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>Reservations</span>' : ''}
                         </div>
-                        <p class="text-sm text-gray-600 mb-3">\${r.short_description}</p>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-500">
-                                <i class="fas fa-map-marker-alt mr-1"></i>\${r.location}
-                            </span>
-                            <span class="font-semibold text-blue-600">\${r.price ? r.currency + ' ' + r.price : 'Free'}</span>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${r.title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${r.short_description}</p>
+                        <div class="flex items-center text-sm text-gray-500 mb-4">
+                            <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
+                            <span>\${r.location}</span>
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Explore Menu</span>
+                            <i class="fas fa-arrow-right text-blue-600"></i>
                         </div>
                     </div>
                 </div>
@@ -3172,19 +3176,25 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             grid.innerHTML = events.map(e => \`
-                <div class="offering-card bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-sm p-4" onclick="viewOffering(\${e.offering_id})">
-                    <div class="flex gap-4">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${e.offering_id})">
+                    <div class="relative">
                         <img src="\${e.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${e.title}" 
-                             class="w-24 h-24 rounded-lg object-cover flex-shrink-0">
-                        <div class="flex-1">
-                            <h3 class="font-bold text-lg mb-1">\${e.title}</h3>
-                            <p class="text-sm text-gray-600 mb-2">\${e.short_description}</p>
-                            <div class="flex items-center gap-3 text-sm text-gray-700">
-                                \${e.event_date ? '<span><i class="fas fa-calendar mr-1"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
-                                \${e.event_start_time ? '<span><i class="fas fa-clock mr-1"></i>' + e.event_start_time + '</span>' : ''}
-                                <span class="font-semibold text-purple-600">\${e.currency} \${e.price}</span>
-                            </div>
+                             class="w-full h-48 object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                        <div class="absolute bottom-3 left-3 right-3">
+                            \${e.event_date ? '<span class="bg-white/95 backdrop-blur-sm text-purple-600 px-3 py-1.5 rounded-full text-xs font-medium inline-block shadow-lg"><i class="fas fa-calendar mr-1"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${e.title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${e.short_description}</p>
+                        <div class="flex items-center gap-3 text-sm text-gray-500 mb-4">
+                            \${e.event_start_time ? '<span><i class="fas fa-clock mr-2 text-gray-400"></i>' + e.event_start_time + '</span>' : ''}
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Learn More</span>
+                            <i class="fas fa-arrow-right text-purple-600"></i>
                         </div>
                     </div>
                 </div>
@@ -3206,18 +3216,23 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             grid.innerHTML = spa.map(s => \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${s.offering_id})">
-                    <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                         alt="\${s.title}" 
-                         class="w-full h-40 object-cover">
-                    <div class="p-4">
-                        <h3 class="font-bold text-lg mb-2">\${s.title}</h3>
-                        <p class="text-sm text-gray-600 mb-3">\${s.short_description}</p>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-500">
-                                <i class="fas fa-clock mr-1"></i>\${s.duration_minutes} min
-                            </span>
-                            <span class="font-semibold text-green-600">\${s.currency} \${s.price}</span>
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
+                    <div class="relative">
+                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${s.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-emerald-900/40 via-transparent to-transparent"></div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${s.title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${s.short_description}</p>
+                        <div class="flex items-center text-sm text-gray-500 mb-4">
+                            <i class="fas fa-clock mr-2 text-gray-400"></i>
+                            <span>\${s.duration_minutes} minutes</span>
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Discover</span>
+                            <i class="fas fa-arrow-right text-green-600"></i>
                         </div>
                     </div>
                 </div>
@@ -3239,18 +3254,20 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             grid.innerHTML = services.map(s => \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewOffering(\${s.offering_id})">
-                    <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                         alt="\${s.title}" 
-                         class="w-full h-40 object-cover">
-                    <div class="p-4">
-                        <h3 class="font-bold text-lg mb-2">\${s.title}</h3>
-                        <p class="text-sm text-gray-600 mb-3">\${s.short_description}</p>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-500">
-                                <i class="fas fa-concierge-bell mr-1"></i>\${s.location || 'Hotel Service'}
-                            </span>
-                            <span class="font-semibold text-indigo-600">\${s.price ? s.currency + ' ' + s.price : 'Complimentary'}</span>
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
+                    <div class="relative">
+                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${s.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-transparent"></div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${s.title}</h3>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${s.short_description}</p>
+                        \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + s.location + '</span></div>' : ''}
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">View Details</span>
+                            <i class="fas fa-arrow-right text-indigo-600"></i>
                         </div>
                     </div>
                 </div>
@@ -3271,22 +3288,27 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             grid.innerHTML = allActivities.map(a => \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden" onclick="viewActivity(\${a.activity_id})">
-                    <img src="\${a.images[0] || '/static/placeholder.jpg'}" 
-                         alt="\${a.title}" 
-                         class="w-full h-40 object-cover">
-                    <div class="p-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="font-bold text-lg">\${a.title}</h3>
-                            <span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">\${a.category_name}</span>
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewActivity(\${a.activity_id})">
+                    <div class="relative">
+                        <img src="\${a.images[0] || '/static/placeholder.jpg'}" 
+                             alt="\${a.title}" 
+                             class="w-full h-48 object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-orange-900/40 via-transparent to-transparent"></div>
+                        <div class="absolute top-3 right-3">
+                            <span class="bg-white/95 backdrop-blur-sm text-orange-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">\${a.category_name}</span>
                         </div>
-                        <p class="text-sm text-gray-500 mb-1">by \${a.business_name}</p>
-                        <p class="text-sm text-gray-600 mb-3">\${a.short_description}</p>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-500">
-                                <i class="fas fa-clock mr-1"></i>\${a.duration_minutes} min
-                            </span>
-                            <span class="font-semibold text-orange-600">\${a.currency} \${a.price}</span>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="font-bold text-xl mb-1 text-gray-800">\${a.title}</h3>
+                        <p class="text-xs text-gray-500 mb-3">Curated by \${a.business_name}</p>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${a.short_description}</p>
+                        <div class="flex items-center text-sm text-gray-500 mb-4">
+                            <i class="fas fa-clock mr-2 text-gray-400"></i>
+                            <span>\${a.duration_minutes} minutes</span>
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">Book Now</span>
+                            <i class="fas fa-arrow-right text-orange-600"></i>
                         </div>
                     </div>
                 </div>
