@@ -1545,12 +1545,25 @@ app.get('/api/admin/property-settings', async (c) => {
         slug, name, tagline, contact_email, contact_phone, address,
         brand_logo_url, hero_image_url, hero_image_effect, hero_overlay_opacity,
         primary_color, secondary_color, accent_color,
-        layout_style, font_family, button_style, card_style, header_style, use_gradient
+        layout_style, font_family, button_style, card_style, header_style, use_gradient,
+        hotel_map_url, homepage_section_order, 
+        show_restaurants, show_events, show_spa, show_activities, show_hotel_map
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
     
-    return c.json(property)
+    // Provide defaults for visibility settings
+    const settingsWithDefaults = {
+      ...property,
+      show_restaurants: property.show_restaurants ?? 1,
+      show_events: property.show_events ?? 1,
+      show_spa: property.show_spa ?? 1,
+      show_activities: property.show_activities ?? 1,
+      show_hotel_map: property.show_hotel_map ?? 0,
+      homepage_section_order: property.homepage_section_order || JSON.stringify(['restaurants', 'events', 'spa', 'activities'])
+    }
+    
+    return c.json(settingsWithDefaults)
   } catch (error) {
     console.error('Get property settings error:', error)
     return c.json({ error: 'Internal server error' }, 500)
@@ -1583,6 +1596,13 @@ app.put('/api/admin/property-settings', async (c) => {
           card_style = ?,
           header_style = ?,
           use_gradient = ?,
+          hotel_map_url = ?,
+          homepage_section_order = ?,
+          show_restaurants = ?,
+          show_events = ?,
+          show_spa = ?,
+          show_activities = ?,
+          show_hotel_map = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE property_id = ?
     `).bind(
@@ -1604,6 +1624,13 @@ app.put('/api/admin/property-settings', async (c) => {
       data.card_style,
       data.header_style,
       data.use_gradient,
+      data.hotel_map_url,
+      data.homepage_section_order,
+      data.show_restaurants,
+      data.show_events,
+      data.show_spa,
+      data.show_activities,
+      data.show_hotel_map,
       data.property_id
     ).run()
     
@@ -2418,6 +2445,17 @@ app.get('/hotel/:property_slug', async (c) => {
                         <!-- Loaded dynamically -->
                     </div>
                 </section>
+                
+                <!-- Hotel Map Section -->
+                <section id="hotel-map-section" class="mb-12" style="display: none;">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-map text-indigo-500 mr-3"></i>
+                        Hotel Map & Layout
+                    </h2>
+                    <div id="hotel-map-container" class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </section>
             </div>
         </div>
 
@@ -2760,10 +2798,48 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function renderContent() {
+            // Get section order from property settings
+            const sectionOrder = propertyData.homepage_section_order ? 
+              JSON.parse(propertyData.homepage_section_order) : 
+              ['restaurants', 'events', 'spa', 'activities'];
+            
+            // Get container
+            const container = document.querySelector('.max-w-6xl.mx-auto.px-4.py-6');
+            
+            // Collect all section elements
+            const sectionElements = {
+              'restaurants': document.getElementById('restaurants-section'),
+              'events': document.getElementById('events-section'),
+              'spa': document.getElementById('spa-section'),
+              'activities': document.getElementById('activities-section'),
+              'hotel-map': document.getElementById('hotel-map-section')
+            };
+            
+            // Detach all sections
+            Object.values(sectionElements).forEach(el => {
+              if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
+              }
+            });
+            
+            // Re-append in specified order
+            sectionOrder.forEach(section => {
+              if (sectionElements[section]) {
+                container.appendChild(sectionElements[section]);
+              }
+            });
+            
+            // Always append hotel map at the end
+            if (sectionElements['hotel-map']) {
+              container.appendChild(sectionElements['hotel-map']);
+            }
+            
+            // Render each section's content
             renderRestaurants();
             renderEvents();
             renderSpa();
             renderActivities();
+            renderHotelMap();
             updateSectionVisibility();
         }
 
@@ -2886,6 +2962,37 @@ app.get('/hotel/:property_slug', async (c) => {
             \`).join('');
         }
 
+        function renderHotelMap() {
+            const mapSection = document.getElementById('hotel-map-section');
+            const mapContainer = document.getElementById('hotel-map-container');
+            
+            if (propertyData.show_hotel_map === 1 && propertyData.hotel_map_url) {
+                mapSection.style.display = 'block';
+                mapContainer.innerHTML = \`
+                    <div class="relative">
+                        <img src="\${propertyData.hotel_map_url}" 
+                             alt="Hotel Map" 
+                             class="w-full h-auto"
+                             style="max-height: 600px; object-fit: contain;">
+                        <div class="absolute top-4 right-4 bg-white bg-opacity-90 rounded-lg p-3 shadow-lg">
+                            <p class="text-xs text-gray-600 font-medium">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Click to view full size
+                            </p>
+                        </div>
+                    </div>
+                \`;
+                
+                // Make map clickable to open in new window
+                mapContainer.querySelector('img').addEventListener('click', () => {
+                    window.open(propertyData.hotel_map_url, '_blank');
+                });
+                mapContainer.querySelector('img').style.cursor = 'pointer';
+            } else {
+                mapSection.style.display = 'none';
+            }
+        }
+
         function updateSectionVisibility() {
             const sections = {
                 'restaurants': document.getElementById('restaurants-section'),
@@ -2894,28 +3001,51 @@ app.get('/hotel/:property_slug', async (c) => {
                 'activities': document.getElementById('activities-section')
             };
             
+            // First, apply visibility settings from property data
+            if (propertyData) {
+                if (propertyData.show_restaurants === 0) {
+                    sections.restaurants.style.display = 'none';
+                }
+                if (propertyData.show_events === 0) {
+                    sections.events.style.display = 'none';
+                }
+                if (propertyData.show_spa === 0) {
+                    sections.spa.style.display = 'none';
+                }
+                if (propertyData.show_activities === 0) {
+                    sections.activities.style.display = 'none';
+                }
+            }
+            
+            // Then apply category filter on top
             if (currentFilter === 'all') {
-                Object.values(sections).forEach(s => s.style.display = 'block');
+                // Show all sections that are enabled
+                if (propertyData) {
+                    if (propertyData.show_restaurants === 1) sections.restaurants.style.display = 'block';
+                    if (propertyData.show_events === 1) sections.events.style.display = 'block';
+                    if (propertyData.show_spa === 1) sections.spa.style.display = 'block';
+                    if (propertyData.show_activities === 1) sections.activities.style.display = 'block';
+                }
             } else if (currentFilter === 'restaurant') {
-                sections.restaurants.style.display = 'block';
+                sections.restaurants.style.display = (propertyData && propertyData.show_restaurants === 1) ? 'block' : 'none';
                 sections.events.style.display = 'none';
                 sections.spa.style.display = 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'event') {
                 sections.restaurants.style.display = 'none';
-                sections.events.style.display = 'block';
+                sections.events.style.display = (propertyData && propertyData.show_events === 1) ? 'block' : 'none';
                 sections.spa.style.display = 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'spa') {
                 sections.restaurants.style.display = 'none';
                 sections.events.style.display = 'none';
-                sections.spa.style.display = 'block';
+                sections.spa.style.display = (propertyData && propertyData.show_spa === 1) ? 'block' : 'none';
                 sections.activities.style.display = 'none';
             } else if (currentFilter === 'activities') {
                 sections.restaurants.style.display = 'none';
                 sections.events.style.display = 'none';
                 sections.spa.style.display = 'none';
-                sections.activities.style.display = 'block';
+                sections.activities.style.display = (propertyData && propertyData.show_activities === 1) ? 'block' : 'none';
             }
         }
 
@@ -5352,6 +5482,66 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                     </div>
 
+                    <!-- Homepage Layout Control Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-th-list mr-2"></i>Homepage Layout Control</h3>
+                        <p class="text-sm text-gray-600 mb-4">Control what appears on your homepage and in what order</p>
+                        
+                        <!-- Hotel Map -->
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-map mr-2 text-blue-600"></i>Hotel/Resort Map</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Hotel Map Image URL</label>
+                                    <input type="url" id="hotelMapUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/hotel-map.jpg" />
+                                    <p class="text-xs text-gray-500 mt-1">Upload your hotel/resort map (floor plan, grounds map, etc.)</p>
+                                </div>
+                                
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="showHotelMap" class="mr-2 w-4 h-4" />
+                                    <span class="text-sm font-medium">Show Hotel Map on Homepage</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Section Visibility -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                            <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-eye mr-2 text-green-600"></i>Section Visibility</h4>
+                            <p class="text-xs text-gray-500 mb-3">Toggle which sections appear on your homepage</p>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
+                                    <input type="checkbox" id="showRestaurants" class="mr-2 w-4 h-4" checked />
+                                    <span class="text-sm font-medium">🍽️ Restaurants</span>
+                                </label>
+                                
+                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
+                                    <input type="checkbox" id="showEvents" class="mr-2 w-4 h-4" checked />
+                                    <span class="text-sm font-medium">🎉 Events</span>
+                                </label>
+                                
+                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
+                                    <input type="checkbox" id="showSpa" class="mr-2 w-4 h-4" checked />
+                                    <span class="text-sm font-medium">💆 Spa</span>
+                                </label>
+                                
+                                <label class="flex items-center cursor-pointer p-3 bg-white rounded border hover:border-blue-400 transition">
+                                    <input type="checkbox" id="showActivities" class="mr-2 w-4 h-4" checked />
+                                    <span class="text-sm font-medium">🏃 Activities</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Section Order -->
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-sort mr-2 text-purple-600"></i>Section Order</h4>
+                            <p class="text-xs text-gray-500 mb-3">Drag to reorder how sections appear on your homepage</p>
+                            <div id="sectionOrderList" class="space-y-2">
+                                <!-- Will be populated dynamically -->
+                            </div>
+                            <p class="text-xs text-gray-400 mt-3"><i class="fas fa-info-circle mr-1"></i>Drag sections up/down to change their display order</p>
+                        </div>
+                    </div>
+
                     <!-- Preview & Save -->
                     <div class="flex gap-4">
                         <button type="button" onclick="previewDesign()" class="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold">
@@ -5939,10 +6129,104 @@ app.get('/admin/dashboard', (c) => {
           
           updateGradientPreview();
           
+          // Load homepage layout settings
+          document.getElementById('hotelMapUrl').value = settings.hotel_map_url || '';
+          document.getElementById('showHotelMap').checked = settings.show_hotel_map === 1;
+          document.getElementById('showRestaurants').checked = settings.show_restaurants === 1;
+          document.getElementById('showEvents').checked = settings.show_events === 1;
+          document.getElementById('showSpa').checked = settings.show_spa === 1;
+          document.getElementById('showActivities').checked = settings.show_activities === 1;
+          
+          // Load section order
+          const sectionOrder = settings.homepage_section_order ? 
+            JSON.parse(settings.homepage_section_order) : 
+            ['restaurants', 'events', 'spa', 'activities'];
+          renderSectionOrder(sectionOrder);
+          
         } catch (error) {
           console.error('Load settings error:', error);
           alert('Failed to load settings');
         }
+      }
+      
+      function renderSectionOrder(order) {
+        const sectionNames = {
+          'restaurants': '🍽️ Restaurants',
+          'events': '🎉 Events',
+          'spa': '💆 Spa & Wellness',
+          'activities': '🏃 Activities & Experiences'
+        };
+        
+        const list = document.getElementById('sectionOrderList');
+        list.innerHTML = '';
+        
+        order.forEach((section, index) => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-300 cursor-move hover:border-purple-400 transition';
+          item.draggable = true;
+          item.dataset.section = section;
+          
+          item.innerHTML = '<i class="fas fa-grip-vertical text-gray-400"></i>' +
+                          '<span class="flex-1 font-medium">' + (index + 1) + '. ' + sectionNames[section] + '</span>' +
+                          '<i class="fas fa-arrows-alt-v text-gray-400"></i>';
+          
+          // Drag events
+          item.addEventListener('dragstart', handleDragStart);
+          item.addEventListener('dragover', handleDragOver);
+          item.addEventListener('drop', handleDrop);
+          item.addEventListener('dragend', handleDragEnd);
+          
+          list.appendChild(item);
+        });
+      }
+      
+      let draggedElement = null;
+      
+      function handleDragStart(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+      }
+      
+      function handleDragOver(e) {
+        e.preventDefault();
+        return false;
+      }
+      
+      function handleDrop(e) {
+        e.preventDefault();
+        if (draggedElement !== this) {
+          const allItems = Array.from(document.getElementById('sectionOrderList').children);
+          const draggedIndex = allItems.indexOf(draggedElement);
+          const targetIndex = allItems.indexOf(this);
+          
+          if (draggedIndex < targetIndex) {
+            this.parentNode.insertBefore(draggedElement, this.nextSibling);
+          } else {
+            this.parentNode.insertBefore(draggedElement, this);
+          }
+          
+          updateSectionNumbers();
+        }
+        return false;
+      }
+      
+      function handleDragEnd() {
+        this.style.opacity = '1';
+        draggedElement = null;
+      }
+      
+      function updateSectionNumbers() {
+        const items = document.getElementById('sectionOrderList').children;
+        Array.from(items).forEach((item, index) => {
+          const span = item.querySelector('span');
+          const text = span.textContent;
+          span.textContent = (index + 1) + text.substring(text.indexOf('.'));
+        });
+      }
+      
+      function getSectionOrder() {
+        const items = document.getElementById('sectionOrderList').children;
+        return Array.from(items).map(item => item.dataset.section);
       }
       
       function updateGradientPreview() {
@@ -5989,7 +6273,14 @@ app.get('/admin/dashboard', (c) => {
           button_style: document.getElementById('buttonStyle').value,
           card_style: document.getElementById('cardStyle').value,
           header_style: document.getElementById('headerStyle').value,
-          use_gradient: document.getElementById('primaryGradient').checked ? 1 : 0
+          use_gradient: document.getElementById('primaryGradient').checked ? 1 : 0,
+          hotel_map_url: document.getElementById('hotelMapUrl').value,
+          show_hotel_map: document.getElementById('showHotelMap').checked ? 1 : 0,
+          show_restaurants: document.getElementById('showRestaurants').checked ? 1 : 0,
+          show_events: document.getElementById('showEvents').checked ? 1 : 0,
+          show_spa: document.getElementById('showSpa').checked ? 1 : 0,
+          show_activities: document.getElementById('showActivities').checked ? 1 : 0,
+          homepage_section_order: JSON.stringify(getSectionOrder())
         };
         
         try {
