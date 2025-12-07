@@ -3032,7 +3032,7 @@ app.get('/hotel/:property_slug', async (c) => {
             <!-- Hero Header - Social Media Profile Style -->
             <div class="relative">
                 <!-- Cover Photo -->
-                <div class="gradient-hero h-48 md:h-64"></div>
+                <div class="gradient-hero h-64 md:h-80"></div>
                 
                 <!-- Profile Section -->
                 <div class="relative -mt-16 md:-mt-20 pb-6 bg-white">
@@ -3040,7 +3040,10 @@ app.get('/hotel/:property_slug', async (c) => {
                         <!-- Profile Picture Container -->
                         <div class="flex justify-center mb-4">
                             <div id="propertyLogo" class="relative">
-                                <!-- Logo will be inserted here with circular styling -->
+                                <!-- Logo placeholder - will be replaced if logo exists -->
+                                <div class="w-32 h-32 md:w-40 md:h-40 rounded-full bg-white shadow-2xl border-4 border-white flex items-center justify-center">
+                                    <i class="fas fa-hotel text-4xl md:text-5xl text-gray-400"></i>
+                                </div>
                             </div>
                         </div>
                         
@@ -3421,11 +3424,13 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
           // Logo - add to propertyLogo container (Social Media Profile Style)
-          if (settings.brand_logo_url) {
-            const logoContainer = document.getElementById('propertyLogo');
-            if (logoContainer && !logoContainer.hasChildNodes()) {
+          const logoContainer = document.getElementById('propertyLogo');
+          if (logoContainer) {
+            if (settings.brand_logo_url) {
+              // Replace placeholder with actual logo
               logoContainer.innerHTML = '<img src="' + settings.brand_logo_url + '" alt="Logo" class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover shadow-2xl border-4 border-white bg-white" />';
             }
+            // If no logo, keep the placeholder (hotel icon)
           }
           
           // Gradient or solid color
