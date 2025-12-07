@@ -4251,24 +4251,7 @@ app.get('/admin/dashboard', (c) => {
         form.scrollIntoView({ behavior: 'smooth' });
       }
 
-      async function removeVendor(vendorId) {
-        if (!confirm('Remove this vendor from your hotel? Their activities will no longer be displayed.')) return;
-        try {
-          const response = await fetch(\`/api/admin/vendors/\${vendorId}/remove?property_id=1\`, {
-            method: 'DELETE'
-          });
-          const data = await response.json();
-          if (data.success) {
-            alert('Vendor removed!');
-            loadVendors();
-            loadActivities(); // Refresh activities list
-          }
-        } catch (error) {
-          console.error('Remove vendor error:', error);
-          alert('Failed to remove vendor');
-        }
-      }
-      
+
       // Show/hide event-specific fields based on offering type
       document.getElementById('offeringType').addEventListener('change', (e) => {
         const eventFields = document.getElementById('eventFields');
@@ -4398,7 +4381,7 @@ app.get('/admin/dashboard', (c) => {
           console.error('Remove vendor error:', error);
           alert('Failed to remove vendor');
         }
-      });
+      }
 
       function logout() {
         localStorage.removeItem('admin_user');
