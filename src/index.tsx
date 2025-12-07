@@ -2548,15 +2548,38 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
   const { DB } = c.env
   const { offering_id } = c.req.param()
   
+  console.log('DELETE request for offering_id:', offering_id)
+  
+  if (!offering_id) {
+    return c.json({ error: 'Offering ID is required' }, 400)
+  }
+  
   try {
-    await DB.prepare(`
+    // First check if offering exists
+    const existing = await DB.prepare(`
+      SELECT offering_id, title_en, offering_type FROM hotel_offerings WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    console.log('Found offering to delete:', existing)
+    
+    if (!existing) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    
+    // Delete the offering
+    const result = await DB.prepare(`
       DELETE FROM hotel_offerings WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    return c.json({ success: true })
+    console.log('Delete result:', result)
+    
+    return c.json({ 
+      success: true, 
+      message: `Deleted ${existing.offering_type}: ${existing.title_en}` 
+    })
   } catch (error) {
     console.error('Delete offering error:', error)
-    return c.json({ error: 'Failed to delete offering' }, 500)
+    return c.json({ error: 'Failed to delete offering: ' + error.message }, 500)
   }
 })
 
@@ -8412,19 +8435,39 @@ app.get('/admin/dashboard', (c) => {
       }
       
       async function deleteOffering(offeringId) {
-        if (!confirm('Delete this offering?')) return;
+        if (!confirm('Delete this offering? This action cannot be undone.')) return;
+        
+        console.log('Attempting to delete offering:', offeringId);
+        
         try {
           const response = await fetch('/api/admin/offerings/' + offeringId, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
+          
+          console.log('Delete response status:', response.status);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Delete failed with status:', response.status, errorText);
+            alert('Failed to delete offering: ' + response.status + ' ' + errorText);
+            return;
+          }
+          
           const data = await response.json();
+          console.log('Delete response data:', data);
+          
           if (data.success) {
-            alert('Offering deleted!');
+            alert('Offering deleted successfully!');
             loadOfferings();
+          } else {
+            alert('Failed to delete offering: ' + (data.error || 'Unknown error'));
           }
         } catch (error) {
           console.error('Delete offering error:', error);
-          alert('Failed to delete offering');
+          alert('Failed to delete offering: ' + error.message);
         }
       }
       
