@@ -144,90 +144,78 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GuestConnect - Your Resort, Connected</title>
+    <title>GuestConnect - Digital Guest Experience Platform for Hotels & Resorts</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        .fade-in-up {
-            animation: fadeInUp 0.8s ease-out;
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         .gradient-text {
-            background: linear-gradient(135deg, #2c5f7f 0%, #6b9cb8 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #475569 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .feature-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+<body class="bg-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full bg-white/80 backdrop-blur-lg border-b border-gray-200 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav class="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 z-50">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
-                <div class="flex items-center space-x-3">
-                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect" class="h-12 w-auto">
+                <div class="flex items-center">
+                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect" class="h-11 w-auto">
                 </div>
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#features" class="text-gray-700 hover:text-blue-600 font-medium transition">Features</a>
-                    <a href="#benefits" class="text-gray-700 hover:text-blue-600 font-medium transition">Benefits</a>
-                    <a href="#pricing" class="text-gray-700 hover:text-blue-600 font-medium transition">Pricing</a>
-                    <a href="/admin/dashboard" class="text-gray-700 hover:text-blue-600 font-medium transition">Admin Login</a>
-                    <a href="/vendor/login" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition font-semibold shadow-lg">
-                        Vendor Login
+                <div class="hidden md:flex items-center space-x-10">
+                    <a href="#platform" class="text-sm font-medium text-gray-700 hover:text-gray-900 transition">Platform</a>
+                    <a href="#features" class="text-sm font-medium text-gray-700 hover:text-gray-900 transition">Features</a>
+                    <a href="/admin/dashboard" class="text-sm font-medium text-gray-700 hover:text-gray-900 transition">Login</a>
+                    <a href="/admin/dashboard" class="bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 transition text-sm font-medium">
+                        Get Started
                     </a>
                 </div>
-                <button class="md:hidden text-gray-700">
-                    <i class="fas fa-bars text-2xl"></i>
-                </button>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="pt-32 pb-20 px-4">
+    <section class="pt-32 pb-24 px-6">
         <div class="max-w-7xl mx-auto">
-            <div class="grid md:grid-cols-2 gap-12 items-center">
-                <div class="fade-in-up">
-                    <h1 class="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                        Transform Your
-                        <span class="gradient-text block">Guest Experience</span>
-                    </h1>
-                    <p class="text-xl text-gray-600 mb-8 leading-relaxed">
-                        The all-in-one platform connecting hotels, activities, and guests. Streamline operations, boost revenue, and deliver unforgettable experiences.
-                    </p>
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <a href="/admin/dashboard" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 transition font-semibold shadow-xl text-center">
-                            <i class="fas fa-rocket mr-2"></i>Get Started Free
-                        </a>
-                        <a href="#demo" class="bg-white text-gray-700 px-8 py-4 rounded-xl hover:bg-gray-50 transition font-semibold shadow-lg border border-gray-200 text-center">
-                            <i class="fas fa-play-circle mr-2"></i>Watch Demo
-                        </a>
-                    </div>
-                    <div class="flex items-center gap-8 mt-8 text-sm text-gray-600">
-                        <div><i class="fas fa-check-circle text-green-500 mr-2"></i>No credit card required</div>
-                        <div><i class="fas fa-check-circle text-green-500 mr-2"></i>14-day free trial</div>
-                    </div>
+            <div class="max-w-4xl mx-auto text-center mb-20">
+                <h1 class="text-6xl md:text-7xl font-light text-gray-900 mb-8 leading-tight tracking-tight">
+                    Your hotel's digital<br/>guest experience platform
+                </h1>
+                <p class="text-xl text-gray-600 mb-12 leading-relaxed font-light max-w-2xl mx-auto">
+                    Complete control over in-room guest experiences. QR-powered access to activities, dining, services—all under your brand.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="/admin/dashboard" class="bg-gray-900 text-white px-8 py-4 rounded-lg hover:bg-gray-800 transition font-medium">
+                        Start Building
+                    </a>
+                    <a href="#platform" class="bg-white text-gray-900 px-8 py-4 rounded-lg hover:bg-gray-50 transition font-medium border border-gray-200">
+                        See How It Works
+                    </a>
                 </div>
-                <div class="fade-in-up" style="animation-delay: 0.2s;">
-                    <div class="relative">
-                        <div class="absolute -inset-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl opacity-20 blur-2xl"></div>
-                        <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800" alt="Hotel Dashboard" class="relative rounded-2xl shadow-2xl w-full">
-                    </div>
+            </div>
+
+            <!-- Hero Image -->
+            <div class="relative">
+                <div class="rounded-xl overflow-hidden shadow-2xl border border-gray-200">
+                    <img src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=1400" alt="GuestConnect Platform" class="w-full">
                 </div>
             </div>
         </div>
