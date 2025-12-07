@@ -2579,28 +2579,48 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
       }, 400)
     }
     
-    // Delete related records in correct order (child tables first)
-    // 1. Delete restaurant tables (if any)
+    // Delete related records in correct order (deepest child tables first)
+    console.log('Deleting related records for offering_id:', offering_id)
+    
+    // 1. Delete table_reservations (references dining_sessions and restaurant_tables)
+    const reservationsResult = await DB.prepare(`
+      DELETE FROM table_reservations 
+      WHERE session_id IN (SELECT session_id FROM dining_sessions WHERE offering_id = ?)
+         OR table_id IN (SELECT table_id FROM restaurant_tables WHERE offering_id = ?)
+    `).bind(offering_id, offering_id).run()
+    console.log('Deleted table_reservations:', reservationsResult)
+    
+    // 2. Delete session_templates
     await DB.prepare(`
-      DELETE FROM restaurant_tables WHERE offering_id = ?
+      DELETE FROM session_templates WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 2. Delete offering schedules
+    // 3. Delete restaurant_layouts
     await DB.prepare(`
-      DELETE FROM offering_schedule WHERE offering_id = ?
+      DELETE FROM restaurant_layouts WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 3. Delete dining sessions (if any)
+    // 4. Delete dining_sessions
     await DB.prepare(`
       DELETE FROM dining_sessions WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 4. Finally delete the offering itself
+    // 5. Delete restaurant_tables
+    await DB.prepare(`
+      DELETE FROM restaurant_tables WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 6. Delete offering_schedule
+    await DB.prepare(`
+      DELETE FROM offering_schedule WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 7. Finally delete the offering itself
     const result = await DB.prepare(`
       DELETE FROM hotel_offerings WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    console.log('Delete result:', result)
+    console.log('Delete offering result:', result)
     
     return c.json({ 
       success: true, 
