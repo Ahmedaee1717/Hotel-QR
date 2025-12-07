@@ -1722,6 +1722,121 @@ app.put('/api/admin/property-settings', async (c) => {
   }
 })
 
+// ============================================
+// CUSTOM SECTIONS APIs
+// ============================================
+
+// Get all custom sections for a property
+app.get('/api/admin/custom-sections', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const sections = await DB.prepare(`
+      SELECT * FROM custom_sections
+      WHERE property_id = ?
+      ORDER BY display_order ASC, section_id ASC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, sections: sections.results })
+  } catch (error) {
+    console.error('Get custom sections error:', error)
+    return c.json({ error: 'Failed to get custom sections' }, 500)
+  }
+})
+
+// Create new custom section
+app.post('/api/admin/custom-sections', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO custom_sections (
+        property_id, section_key, section_name_en, icon_class, color_class, display_order, is_visible
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.property_id,
+      data.section_key,
+      data.section_name_en,
+      data.icon_class || 'fas fa-star',
+      data.color_class || 'blue',
+      data.display_order || 0,
+      data.is_visible !== undefined ? data.is_visible : 1
+    ).run()
+    
+    return c.json({ success: true, section_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create custom section error:', error)
+    return c.json({ error: 'Failed to create custom section' }, 500)
+  }
+})
+
+// Update custom section
+app.put('/api/admin/custom-sections/:section_id', async (c) => {
+  const { DB } = c.env
+  const { section_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE custom_sections
+      SET section_name_en = ?,
+          section_name_ar = ?,
+          section_name_de = ?,
+          section_name_ru = ?,
+          section_name_pl = ?,
+          section_name_it = ?,
+          section_name_fr = ?,
+          section_name_cs = ?,
+          section_name_uk = ?,
+          icon_class = ?,
+          color_class = ?,
+          display_order = ?,
+          is_visible = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE section_id = ?
+    `).bind(
+      data.section_name_en,
+      data.section_name_ar || null,
+      data.section_name_de || null,
+      data.section_name_ru || null,
+      data.section_name_pl || null,
+      data.section_name_it || null,
+      data.section_name_fr || null,
+      data.section_name_cs || null,
+      data.section_name_uk || null,
+      data.icon_class,
+      data.color_class,
+      data.display_order,
+      data.is_visible,
+      section_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update custom section error:', error)
+    return c.json({ error: 'Failed to update custom section' }, 500)
+  }
+})
+
+// Delete custom section
+app.delete('/api/admin/custom-sections/:section_id', async (c) => {
+  const { DB } = c.env
+  const { section_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM custom_sections WHERE section_id = ?
+    `).bind(section_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete custom section error:', error)
+    return c.json({ error: 'Failed to delete custom section' }, 500)
+  }
+})
+
 // Get all bookings (admin view)
 app.get('/api/admin/bookings', async (c) => {
   const { DB } = c.env
