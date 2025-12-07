@@ -1534,6 +1534,69 @@ app.post('/api/admin/regenerate-registration-code', async (c) => {
   }
 })
 
+// Get property design settings
+app.get('/api/admin/property-settings', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const property = await DB.prepare(`
+      SELECT 
+        slug, brand_logo_url, hero_image_url,
+        primary_color, secondary_color, accent_color,
+        layout_style, font_family, button_style, card_style, header_style
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    return c.json(property)
+  } catch (error) {
+    console.error('Get property settings error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Update property design settings
+app.put('/api/admin/property-settings', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE properties
+      SET brand_logo_url = ?,
+          hero_image_url = ?,
+          primary_color = ?,
+          secondary_color = ?,
+          accent_color = ?,
+          layout_style = ?,
+          font_family = ?,
+          button_style = ?,
+          card_style = ?,
+          header_style = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE property_id = ?
+    `).bind(
+      data.brand_logo_url,
+      data.hero_image_url,
+      data.primary_color,
+      data.secondary_color,
+      data.accent_color,
+      data.layout_style,
+      data.font_family,
+      data.button_style,
+      data.card_style,
+      data.header_style,
+      data.property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update property settings error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // Get all bookings (admin view)
 app.get('/api/admin/bookings', async (c) => {
   const { DB } = c.env
@@ -2219,13 +2282,12 @@ app.get('/hotel/:property_slug', async (c) => {
         <title>Welcome</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <style id="dynamic-styles">
+          /* Dynamic styles will be injected here */
+        </style>
         <style>
           body { 
-            font-family: 'Inter', system-ui, sans-serif; 
             -webkit-font-smoothing: antialiased;
-          }
-          .gradient-hero { 
-            background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); 
           }
           .offering-card {
             transition: all 0.3s ease;
@@ -2349,6 +2411,114 @@ app.get('/hotel/:property_slug', async (c) => {
         let allActivities = [];
         let currentFilter = 'all';
 
+        function applyDesignSettings(settings) {
+          // Font family mapping
+          const fontMap = {
+            'inter': "'Inter', system-ui, sans-serif",
+            'poppins': "'Poppins', sans-serif",
+            'playfair': "'Playfair Display', serif",
+            'montserrat': "'Montserrat', sans-serif",
+            'lora': "'Lora', serif"
+          };
+          
+          const primaryColor = settings.primary_color || '#3B82F6';
+          const secondaryColor = settings.secondary_color || '#10B981';
+          const accentColor = settings.accent_color || '#F59E0B';
+          const fontFamily = fontMap[settings.font_family] || fontMap['inter'];
+          const layoutStyle = settings.layout_style || 'modern';
+          const buttonStyle = settings.button_style || 'rounded';
+          const cardStyle = settings.card_style || 'shadow';
+          const headerStyle = settings.header_style || 'transparent';
+          
+          // Logo
+          if (settings.brand_logo_url) {
+            const logoHtml = \`<img src="\${settings.brand_logo_url}" alt="Logo" class="h-12 mx-auto mb-3" />\`;
+            document.getElementById('propertyName').insertAdjacentHTML('beforebegin', logoHtml);
+          }
+          
+          // Button style classes
+          let buttonRadius = 'rounded-lg';
+          if (buttonStyle === 'square') buttonRadius = 'rounded-none';
+          if (buttonStyle === 'pill') buttonRadius = 'rounded-full';
+          
+          // Card style classes
+          let cardClasses = 'shadow-sm';
+          if (cardStyle === 'border') cardClasses = 'border border-gray-200';
+          if (cardStyle === 'elevated') cardClasses = 'shadow-lg';
+          if (cardStyle === 'flat') cardClasses = 'border-0';
+          
+          // Generate dynamic CSS
+          const dynamicCSS = \`
+            body {
+              font-family: \${fontFamily};
+            }
+            
+            .gradient-hero {
+              \${headerStyle === 'transparent' ? \`
+                background: linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%);
+                opacity: 0.95;
+              \` : headerStyle === 'solid' ? \`
+                background: \${primaryColor};
+              \` : \`
+                background: linear-gradient(to right, \${primaryColor}, \${secondaryColor});
+              \`}
+              \${settings.hero_image_url ? \`
+                background-image: url('\${settings.hero_image_url}');
+                background-size: cover;
+                background-position: center;
+                background-blend-mode: overlay;
+              \` : ''}
+            }
+            
+            .category-pill.bg-blue-500 {
+              background-color: \${primaryColor} !important;
+            }
+            
+            .text-blue-500, .text-blue-600 {
+              color: \${primaryColor} !important;
+            }
+            
+            .bg-blue-600 {
+              background-color: \${primaryColor} !important;
+            }
+            
+            .bg-blue-600:hover {
+              background-color: \${secondaryColor} !important;
+            }
+            
+            .text-green-600 {
+              color: \${secondaryColor} !important;
+            }
+            
+            .bg-green-100 {
+              background-color: \${secondaryColor}22 !important;
+              color: \${secondaryColor} !important;
+            }
+            
+            .bg-blue-100 {
+              background-color: \${primaryColor}22 !important;
+              color: \${primaryColor} !important;
+            }
+            
+            .text-orange-600 {
+              color: \${accentColor} !important;
+            }
+            
+            button, .btn {
+              border-radius: \${buttonRadius === 'rounded-full' ? '9999px' : buttonRadius === 'rounded-none' ? '0' : '0.5rem'};
+            }
+            
+            .offering-card {
+              \${cardClasses.includes('shadow') ? 'box-shadow: 0 1px 3px rgba(0,0,0,0.1);' : ''}
+              \${cardClasses.includes('border') ? 'border: 1px solid #e5e7eb;' : ''}
+              \${cardStyle === 'elevated' ? 'box-shadow: 0 10px 15px rgba(0,0,0,0.1);' : ''}
+              border-radius: \${layoutStyle === 'minimal' ? '0.5rem' : layoutStyle === 'elegant' ? '0.75rem' : '1rem'};
+            }
+          \`;
+          
+          document.getElementById('dynamic-styles').textContent = dynamicCSS;
+        }
+
         async function init() {
             try {
                 // Get property details
@@ -2362,6 +2532,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 propertyData = propData.properties[0];
                 document.getElementById('propertyName').textContent = propertyData.name;
                 document.title = propertyData.name;
+                
+                // Apply design settings
+                applyDesignSettings(propertyData);
                 
                 // Load hotel offerings
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}\`);
@@ -4567,6 +4740,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="offerings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
                 <button data-tab="activities" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
                 <button data-tab="callbacks" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
+                <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-cog mr-2"></i>Design Settings</button>
             </div>
         </div>
 
@@ -4715,6 +4889,185 @@ app.get('/admin/dashboard', (c) => {
                 <div id="callbacksList" class="space-y-3"></div>
             </div>
         </div>
+
+        <!-- Settings Tab -->
+        <div id="settingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6"><i class="fas fa-cog mr-2 text-purple-600"></i>Hotel Design Settings</h2>
+                
+                <!-- Hotel Homepage Link -->
+                <div class="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="text-lg font-semibold mb-2 text-blue-800"><i class="fas fa-link mr-2"></i>Your Hotel Homepage</h3>
+                    <div class="flex items-center gap-4">
+                        <input type="text" id="homepageUrl" readonly class="flex-1 px-4 py-2 border rounded-lg bg-white font-mono text-sm" />
+                        <button onclick="copyHomepageUrl()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-copy mr-2"></i>Copy Link
+                        </button>
+                        <a id="visitHomepage" href="#" target="_blank" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-external-link-alt mr-2"></i>Visit
+                        </a>
+                    </div>
+                </div>
+
+                <form id="settingsForm" class="space-y-6">
+                    <!-- Branding Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-palette mr-2"></i>Branding</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hotel Logo URL</label>
+                                <input type="url" id="brandLogoUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/logo.png" />
+                                <p class="text-xs text-gray-500 mt-1">Recommended: PNG or SVG, transparent background</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Hero Image URL</label>
+                                <input type="url" id="heroImageUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/hero.jpg" />
+                                <p class="text-xs text-gray-500 mt-1">Recommended: 1920x600px, high quality</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Colors Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-fill-drip mr-2"></i>Color Scheme</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Primary Color</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="primaryColor" class="w-16 h-10 border rounded cursor-pointer" />
+                                    <input type="text" id="primaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#3B82F6" />
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Main brand color (headers, buttons)</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Secondary Color</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="secondaryColor" class="w-16 h-10 border rounded cursor-pointer" />
+                                    <input type="text" id="secondaryColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#10B981" />
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Secondary elements</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Accent Color</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="accentColor" class="w-16 h-10 border rounded cursor-pointer" />
+                                    <input type="text" id="accentColorText" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" placeholder="#F59E0B" />
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Highlights and badges</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Layout Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-th-large mr-2"></i>Layout Style</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="layoutStyle" value="modern" class="peer sr-only" />
+                                <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                    <div class="text-center">
+                                        <i class="fas fa-layer-group text-3xl mb-2 text-blue-600"></i>
+                                        <h4 class="font-semibold">Modern</h4>
+                                        <p class="text-xs text-gray-500 mt-1">Clean cards with shadows</p>
+                                    </div>
+                                </div>
+                            </label>
+                            
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="layoutStyle" value="elegant" class="peer sr-only" />
+                                <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                    <div class="text-center">
+                                        <i class="fas fa-gem text-3xl mb-2 text-purple-600"></i>
+                                        <h4 class="font-semibold">Elegant</h4>
+                                        <p class="text-xs text-gray-500 mt-1">Luxury with borders</p>
+                                    </div>
+                                </div>
+                            </label>
+                            
+                            <label class="relative cursor-pointer">
+                                <input type="radio" name="layoutStyle" value="minimal" class="peer sr-only" />
+                                <div class="border-2 border-gray-300 rounded-lg p-4 peer-checked:border-blue-600 peer-checked:bg-blue-50 hover:border-blue-400 transition">
+                                    <div class="text-center">
+                                        <i class="fas fa-minus text-3xl mb-2 text-gray-600"></i>
+                                        <h4 class="font-semibold">Minimal</h4>
+                                        <p class="text-xs text-gray-500 mt-1">Simple and flat</p>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Typography Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-font mr-2"></i>Typography</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Font Family</label>
+                                <select id="fontFamily" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="inter">Inter (Modern Sans)</option>
+                                    <option value="poppins">Poppins (Geometric)</option>
+                                    <option value="playfair">Playfair Display (Elegant Serif)</option>
+                                    <option value="montserrat">Montserrat (Bold Sans)</option>
+                                    <option value="lora">Lora (Classic Serif)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Button Style</label>
+                                <select id="buttonStyle" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="rounded">Rounded</option>
+                                    <option value="square">Square</option>
+                                    <option value="pill">Pill (Fully Rounded)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- UI Elements Section -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800"><i class="fas fa-cube mr-2"></i>UI Elements</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Card Style</label>
+                                <select id="cardStyle" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="shadow">Shadow</option>
+                                    <option value="border">Border Only</option>
+                                    <option value="elevated">Elevated</option>
+                                    <option value="flat">Flat</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Header Style</label>
+                                <select id="headerStyle" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                                    <option value="transparent">Transparent Overlay</option>
+                                    <option value="solid">Solid Background</option>
+                                    <option value="gradient">Gradient</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview & Save -->
+                    <div class="flex gap-4">
+                        <button type="button" onclick="previewDesign()" class="flex-1 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold">
+                            <i class="fas fa-eye mr-2"></i>Preview Changes
+                        </button>
+                        <button type="submit" class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save Design Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -4738,6 +5091,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'offerings') loadOfferings();
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
+        if (tab === 'settings') loadSettings();
       }
       
       // Add event listeners to tab buttons
@@ -5192,6 +5546,117 @@ app.get('/admin/dashboard', (c) => {
           alert('Failed to remove vendor');
         }
       }
+
+      async function loadSettings() {
+        try {
+          const response = await fetch('/api/admin/property-settings?property_id=1');
+          const settings = await response.json();
+          
+          // Set homepage URL
+          const homepageUrl = window.location.origin + '/hotel/' + settings.slug;
+          document.getElementById('homepageUrl').value = homepageUrl;
+          document.getElementById('visitHomepage').href = homepageUrl;
+          
+          // Load current settings
+          document.getElementById('brandLogoUrl').value = settings.brand_logo_url || '';
+          document.getElementById('heroImageUrl').value = settings.hero_image_url || '';
+          
+          document.getElementById('primaryColor').value = settings.primary_color || '#3B82F6';
+          document.getElementById('primaryColorText').value = settings.primary_color || '#3B82F6';
+          document.getElementById('secondaryColor').value = settings.secondary_color || '#10B981';
+          document.getElementById('secondaryColorText').value = settings.secondary_color || '#10B981';
+          document.getElementById('accentColor').value = settings.accent_color || '#F59E0B';
+          document.getElementById('accentColorText').value = settings.accent_color || '#F59E0B';
+          
+          document.getElementById('fontFamily').value = settings.font_family || 'inter';
+          document.getElementById('buttonStyle').value = settings.button_style || 'rounded';
+          document.getElementById('cardStyle').value = settings.card_style || 'shadow';
+          document.getElementById('headerStyle').value = settings.header_style || 'transparent';
+          
+          // Set layout style radio
+          const layoutRadios = document.querySelectorAll('input[name="layoutStyle"]');
+          layoutRadios.forEach(radio => {
+            if (radio.value === (settings.layout_style || 'modern')) {
+              radio.checked = true;
+            }
+          });
+          
+          // Sync color pickers with text inputs
+          document.getElementById('primaryColor').addEventListener('input', (e) => {
+            document.getElementById('primaryColorText').value = e.target.value;
+          });
+          document.getElementById('primaryColorText').addEventListener('input', (e) => {
+            document.getElementById('primaryColor').value = e.target.value;
+          });
+          
+          document.getElementById('secondaryColor').addEventListener('input', (e) => {
+            document.getElementById('secondaryColorText').value = e.target.value;
+          });
+          document.getElementById('secondaryColorText').addEventListener('input', (e) => {
+            document.getElementById('secondaryColor').value = e.target.value;
+          });
+          
+          document.getElementById('accentColor').addEventListener('input', (e) => {
+            document.getElementById('accentColorText').value = e.target.value;
+          });
+          document.getElementById('accentColorText').addEventListener('input', (e) => {
+            document.getElementById('accentColor').value = e.target.value;
+          });
+          
+        } catch (error) {
+          console.error('Load settings error:', error);
+          alert('Failed to load settings');
+        }
+      }
+      
+      function copyHomepageUrl() {
+        const input = document.getElementById('homepageUrl');
+        input.select();
+        document.execCommand('copy');
+        alert('Homepage URL copied to clipboard!');
+      }
+      
+      function previewDesign() {
+        const homepageUrl = document.getElementById('visitHomepage').href;
+        window.open(homepageUrl, '_blank');
+      }
+      
+      document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const layoutStyle = document.querySelector('input[name="layoutStyle"]:checked').value;
+        
+        const settings = {
+          property_id: 1,
+          brand_logo_url: document.getElementById('brandLogoUrl').value,
+          hero_image_url: document.getElementById('heroImageUrl').value,
+          primary_color: document.getElementById('primaryColorText').value,
+          secondary_color: document.getElementById('secondaryColorText').value,
+          accent_color: document.getElementById('accentColorText').value,
+          layout_style: layoutStyle,
+          font_family: document.getElementById('fontFamily').value,
+          button_style: document.getElementById('buttonStyle').value,
+          card_style: document.getElementById('cardStyle').value,
+          header_style: document.getElementById('headerStyle').value
+        };
+        
+        try {
+          const response = await fetch('/api/admin/property-settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+          });
+          
+          if (response.ok) {
+            alert('Design settings saved successfully! Visit your homepage to see the changes.');
+          } else {
+            alert('Failed to save settings');
+          }
+        } catch (error) {
+          console.error('Save settings error:', error);
+          alert('Failed to save settings');
+        }
+      });
 
       function logout() {
         localStorage.removeItem('admin_user');
