@@ -3343,6 +3343,190 @@ app.get('/api/custom-sections/:property_id', async (c) => {
   }
 })
 
+// ============================================
+// INFO PAGES API ENDPOINTS
+// ============================================
+
+// Get all info pages for a property (admin)
+app.get('/api/admin/info-pages', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const pages = await DB.prepare(`
+      SELECT * FROM info_pages
+      WHERE property_id = ?
+      ORDER BY display_order ASC, page_id DESC
+    `).bind(property_id).all()
+    
+    return c.json(pages.results)
+  } catch (error) {
+    console.error('Get info pages error:', error)
+    return c.json({ error: 'Failed to get info pages' }, 500)
+  }
+})
+
+// Get single info page by ID (admin)
+app.get('/api/admin/info-pages/:page_id', async (c) => {
+  const { DB } = c.env
+  const { page_id } = c.req.param()
+  
+  try {
+    const page = await DB.prepare(`
+      SELECT * FROM info_pages WHERE page_id = ?
+    `).bind(page_id).first()
+    
+    if (!page) {
+      return c.json({ error: 'Info page not found' }, 404)
+    }
+    
+    return c.json(page)
+  } catch (error) {
+    console.error('Get info page error:', error)
+    return c.json({ error: 'Failed to get info page' }, 500)
+  }
+})
+
+// Create new info page
+app.post('/api/admin/info-pages', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO info_pages (
+        property_id, page_key, title_en, content_en, 
+        icon_class, color_theme, layout_type, is_published, 
+        display_order, show_in_menu
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.property_id,
+      data.page_key || 'page-' + Date.now(),
+      data.title_en,
+      data.content_en,
+      data.icon_class || 'fas fa-info-circle',
+      data.color_theme || 'blue',
+      data.layout_type || 'single-column',
+      data.is_published !== undefined ? data.is_published : 1,
+      data.display_order || 0,
+      data.show_in_menu !== undefined ? data.show_in_menu : 1
+    ).run()
+    
+    return c.json({ success: true, page_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create info page error:', error)
+    return c.json({ error: 'Failed to create info page' }, 500)
+  }
+})
+
+// Update info page
+app.put('/api/admin/info-pages/:page_id', async (c) => {
+  const { DB } = c.env
+  const { page_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    // Build update query dynamically based on provided fields
+    const updates = []
+    const values = []
+    
+    if (data.title_en !== undefined) { updates.push('title_en = ?'); values.push(data.title_en); }
+    if (data.content_en !== undefined) { updates.push('content_en = ?'); values.push(data.content_en); }
+    if (data.icon_class !== undefined) { updates.push('icon_class = ?'); values.push(data.icon_class); }
+    if (data.color_theme !== undefined) { updates.push('color_theme = ?'); values.push(data.color_theme); }
+    if (data.layout_type !== undefined) { updates.push('layout_type = ?'); values.push(data.layout_type); }
+    if (data.is_published !== undefined) { updates.push('is_published = ?'); values.push(data.is_published); }
+    if (data.display_order !== undefined) { updates.push('display_order = ?'); values.push(data.display_order); }
+    if (data.show_in_menu !== undefined) { updates.push('show_in_menu = ?'); values.push(data.show_in_menu); }
+    
+    // Add multilingual fields
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh'];
+    languages.forEach(lang => {
+      if (data[`title_${lang}`] !== undefined) {
+        updates.push(`title_${lang} = ?`);
+        values.push(data[`title_${lang}`]);
+      }
+      if (data[`content_${lang}`] !== undefined) {
+        updates.push(`content_${lang} = ?`);
+        values.push(data[`content_${lang}`]);
+      }
+    });
+    
+    updates.push('updated_at = datetime(\'now\')');
+    values.push(page_id);
+    
+    await DB.prepare(`
+      UPDATE info_pages SET ${updates.join(', ')} WHERE page_id = ?
+    `).bind(...values).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update info page error:', error)
+    return c.json({ error: 'Failed to update info page' }, 500)
+  }
+})
+
+// Delete info page
+app.delete('/api/admin/info-pages/:page_id', async (c) => {
+  const { DB } = c.env
+  const { page_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM info_pages WHERE page_id = ?
+    `).bind(page_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete info page error:', error)
+    return c.json({ error: 'Failed to delete info page' }, 500)
+  }
+})
+
+// Get published info pages for guests (public)
+app.get('/api/info-pages/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const pages = await DB.prepare(`
+      SELECT page_id, page_key, title_en, title_ar, title_de, title_ru, 
+             title_pl, title_it, title_fr, title_cs, title_uk, title_zh,
+             icon_class, color_theme, display_order
+      FROM info_pages
+      WHERE property_id = ? AND is_published = 1 AND show_in_menu = 1
+      ORDER BY display_order ASC, page_id ASC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, pages: pages.results })
+  } catch (error) {
+    console.error('Get info pages error:', error)
+    return c.json({ error: 'Failed to get info pages' }, 500)
+  }
+})
+
+// Get single info page content for display (public)
+app.get('/api/info-page/:property_id/:page_key', async (c) => {
+  const { DB } = c.env
+  const { property_id, page_key } = c.req.param()
+  
+  try {
+    const page = await DB.prepare(`
+      SELECT * FROM info_pages
+      WHERE property_id = ? AND page_key = ? AND is_published = 1
+    `).bind(property_id, page_key).first()
+    
+    if (!page) {
+      return c.json({ error: 'Info page not found' }, 404)
+    }
+    
+    return c.json({ success: true, page })
+  } catch (error) {
+    console.error('Get info page error:', error)
+    return c.json({ error: 'Failed to get info page' }, 500)
+  }
+})
+
 // Get all bookings (admin view)
 app.get('/api/admin/bookings', async (c) => {
   const { DB } = c.env
@@ -10334,6 +10518,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="regcode" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-key mr-2"></i><span>Code</span></button>
                 <button data-tab="offerings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-utensils mr-2"></i><span>Offerings</span></button>
                 <button data-tab="customsections" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-layer-group mr-2"></i><span>Sections</span></button>
+                <button data-tab="infopages" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-file-alt mr-2"></i><span>Info Pages</span></button>
                 <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
                 <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
@@ -10829,6 +11014,217 @@ app.get('/admin/dashboard', (c) => {
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">All Custom Sections</h2>
                 <div id="customSectionsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Info Pages Tab -->
+        <div id="infopagesTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2 text-purple-600"></i>Info Pages Management</h2>
+                        <p class="text-gray-600 mt-1">Create standalone information pages for your guests (not displayed on homepage)</p>
+                    </div>
+                    <button onclick="showInfoPageModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                        <i class="fas fa-plus mr-2"></i>Create New Page
+                    </button>
+                </div>
+
+                <!-- Info Pages List -->
+                <div id="infoPagesContainer" class="space-y-4">
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-3xl"></i>
+                        <p class="mt-2">Loading info pages...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Page Editor Modal -->
+        <div id="infoPageModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 overflow-y-auto">
+            <div class="min-h-screen px-4 flex items-center justify-center">
+                <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">
+                    <!-- Modal Header -->
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 rounded-t-xl flex justify-between items-center">
+                        <h3 class="text-2xl font-bold" id="infoPageModalTitle">
+                            <i class="fas fa-file-alt mr-2"></i>Create Info Page
+                        </h3>
+                        <button onclick="closeInfoPageModal()" class="text-white hover:text-gray-200">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                        <form id="infoPageForm" class="space-y-6">
+                            <input type="hidden" id="infoPageId" />
+                            
+                            <!-- Basic Info -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-bold mb-2">
+                                        <i class="fas fa-heading mr-1 text-purple-600"></i>Page Title (English) *
+                                    </label>
+                                    <input type="text" id="infoPageTitle" required 
+                                           class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                                           placeholder="e.g., Room Phone Extensions">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-bold mb-2">
+                                        <i class="fas fa-key mr-1 text-purple-600"></i>Page Key
+                                    </label>
+                                    <input type="text" id="infoPageKey" 
+                                           class="w-full p-3 border rounded-lg bg-gray-50"
+                                           placeholder="Auto-generated" readonly>
+                                    <p class="text-xs text-gray-500 mt-1">Used in URL (auto-generated from title)</p>
+                                </div>
+                            </div>
+
+                            <!-- Visual Settings -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-bold mb-2">
+                                        <i class="fas fa-icons mr-1 text-purple-600"></i>Icon
+                                    </label>
+                                    <select id="infoPageIcon" class="w-full p-3 border rounded-lg">
+                                        <option value="fas fa-info-circle">ℹ️ Info</option>
+                                        <option value="fas fa-phone">📞 Phone</option>
+                                        <option value="fas fa-wifi">📶 WiFi</option>
+                                        <option value="fas fa-utensils">🍽️ Dining</option>
+                                        <option value="fas fa-clock">🕐 Hours</option>
+                                        <option value="fas fa-parking">🅿️ Parking</option>
+                                        <option value="fas fa-swimming-pool">🏊 Pool</option>
+                                        <option value="fas fa-dumbbell">💪 Gym</option>
+                                        <option value="fas fa-spa">💆 Spa</option>
+                                        <option value="fas fa-concierge-bell">🛎️ Concierge</option>
+                                        <option value="fas fa-hotel">🏨 Hotel</option>
+                                        <option value="fas fa-shield-alt">🛡️ Policy</option>
+                                        <option value="fas fa-map-marked-alt">🗺️ Map</option>
+                                        <option value="fas fa-question-circle">❓ FAQ</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold mb-2">
+                                        <i class="fas fa-palette mr-1 text-purple-600"></i>Color Theme
+                                    </label>
+                                    <select id="infoPageColor" class="w-full p-3 border rounded-lg">
+                                        <option value="blue">🔵 Blue</option>
+                                        <option value="purple">🟣 Purple</option>
+                                        <option value="green">🟢 Green</option>
+                                        <option value="orange">🟠 Orange</option>
+                                        <option value="red">🔴 Red</option>
+                                        <option value="pink">🩷 Pink</option>
+                                        <option value="indigo">🟣 Indigo</option>
+                                        <option value="teal">🔷 Teal</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-bold mb-2">
+                                        <i class="fas fa-columns mr-1 text-purple-600"></i>Layout
+                                    </label>
+                                    <select id="infoPageLayout" class="w-full p-3 border rounded-lg">
+                                        <option value="single-column">Single Column</option>
+                                        <option value="two-column">Two Columns</option>
+                                        <option value="card-grid">Card Grid</option>
+                                        <option value="table">Table</option>
+                                        <option value="accordion">Accordion</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Rich Content Editor -->
+                            <div>
+                                <label class="block text-sm font-bold mb-2">
+                                    <i class="fas fa-edit mr-1 text-purple-600"></i>Page Content *
+                                </label>
+                                
+                                <!-- Formatting Toolbar -->
+                                <div class="bg-gray-100 p-3 rounded-t-lg border border-b-0 flex flex-wrap gap-2">
+                                    <button type="button" onclick="formatText('bold')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Bold">
+                                        <i class="fas fa-bold"></i>
+                                    </button>
+                                    <button type="button" onclick="formatText('italic')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Italic">
+                                        <i class="fas fa-italic"></i>
+                                    </button>
+                                    <button type="button" onclick="formatText('underline')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Underline">
+                                        <i class="fas fa-underline"></i>
+                                    </button>
+                                    <span class="border-r mx-1"></span>
+                                    <button type="button" onclick="formatText('h2')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Heading 2">
+                                        <strong>H2</strong>
+                                    </button>
+                                    <button type="button" onclick="formatText('h3')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Heading 3">
+                                        <strong>H3</strong>
+                                    </button>
+                                    <span class="border-r mx-1"></span>
+                                    <button type="button" onclick="formatText('ul')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Bullet List">
+                                        <i class="fas fa-list-ul"></i>
+                                    </button>
+                                    <button type="button" onclick="formatText('ol')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Numbered List">
+                                        <i class="fas fa-list-ol"></i>
+                                    </button>
+                                    <span class="border-r mx-1"></span>
+                                    <button type="button" onclick="insertTable()" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Insert Table">
+                                        <i class="fas fa-table"></i>
+                                    </button>
+                                    <button type="button" onclick="insertCallout('info')" class="px-3 py-1 bg-blue-100 border rounded hover:bg-blue-200" title="Info Box">
+                                        <i class="fas fa-info-circle text-blue-600"></i>
+                                    </button>
+                                    <button type="button" onclick="insertCallout('warning')" class="px-3 py-1 bg-yellow-100 border rounded hover:bg-yellow-200" title="Warning Box">
+                                        <i class="fas fa-exclamation-triangle text-yellow-600"></i>
+                                    </button>
+                                    <button type="button" onclick="insertCallout('success')" class="px-3 py-1 bg-green-100 border rounded hover:bg-green-200" title="Success Box">
+                                        <i class="fas fa-check-circle text-green-600"></i>
+                                    </button>
+                                    <span class="border-r mx-1"></span>
+                                    <button type="button" onclick="insertDivider()" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Divider">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Content Textarea -->
+                                <textarea id="infoPageContent" rows="15" required
+                                          class="w-full p-4 border rounded-b-lg font-mono text-sm focus:ring-2 focus:ring-purple-500"
+                                          placeholder="Enter your content here... You can use HTML or plain text.&#10;&#10;Use the toolbar above to format your content."></textarea>
+                                
+                                <div class="mt-2 flex justify-between items-center">
+                                    <p class="text-xs text-gray-500">
+                                        <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                                        Tip: Use the toolbar to add formatting, tables, and callout boxes!
+                                    </p>
+                                    <button type="button" onclick="previewContent()" class="text-purple-600 hover:text-purple-800 text-sm font-semibold">
+                                        <i class="fas fa-eye mr-1"></i>Preview
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Publish Settings -->
+                            <div class="flex gap-6">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="infoPagePublished" checked class="mr-2 w-5 h-5 text-purple-600">
+                                    <span class="font-semibold"><i class="fas fa-globe mr-1 text-purple-600"></i>Published (visible to guests)</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="infoPageShowMenu" checked class="mr-2 w-5 h-5 text-purple-600">
+                                    <span class="font-semibold"><i class="fas fa-bars mr-1 text-purple-600"></i>Show in Info Menu</span>
+                                </label>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="bg-gray-50 px-6 py-4 rounded-b-xl flex justify-end gap-3">
+                        <button onclick="closeInfoPageModal()" class="px-6 py-3 border rounded-lg hover:bg-gray-100 font-semibold">
+                            <i class="fas fa-times mr-2"></i>Cancel
+                        </button>
+                        <button onclick="saveInfoPage()" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save Page
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -11518,6 +11914,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'regcode') loadRegCode();
         if (tab === 'offerings') loadOfferings();
         if (tab === 'customsections') loadCustomSections();
+        if (tab === 'infopages') loadInfoPages();
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
         if (tab === 'settings') loadSettings();
@@ -12026,6 +12423,288 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load vendors error:', error);
         }
       }
+
+      // INFO PAGES MANAGEMENT
+      let currentInfoPageId = null;
+
+      async function loadInfoPages() {
+        try {
+          const response = await fetch('/api/admin/info-pages?property_id=1');
+          const pages = await response.json();
+          
+          const container = document.getElementById('infoPagesContainer');
+          
+          if (pages.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fas fa-file-alt text-5xl mb-4"></i><p class="text-lg">No info pages yet</p><p class="text-sm">Click "Create New Page" to get started!</p></div>';
+            return;
+          }
+          
+          let html = '';
+          pages.forEach(page => {
+            const colorClasses = {
+              blue: 'bg-blue-100 text-blue-800 border-blue-300',
+              purple: 'bg-purple-100 text-purple-800 border-purple-300',
+              green: 'bg-green-100 text-green-800 border-green-300',
+              orange: 'bg-orange-100 text-orange-800 border-orange-300',
+              red: 'bg-red-100 text-red-800 border-red-300',
+              pink: 'bg-pink-100 text-pink-800 border-pink-300',
+              indigo: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+              teal: 'bg-teal-100 text-teal-800 border-teal-300'
+            };
+            const colorClass = colorClasses[page.color_theme] || colorClasses.blue;
+            const publishStatus = page.is_published ? '<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs"><i class="fas fa-check mr-1"></i>Published</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"><i class="fas fa-eye-slash mr-1"></i>Draft</span>';
+            
+            html += '<div class="border rounded-lg p-4 hover:shadow-lg transition flex justify-between items-center">' +
+              '<div class="flex items-center gap-4 flex-1">' +
+              '<div class="w-16 h-16 ' + colorClass + ' rounded-lg flex items-center justify-center text-2xl border-2">' +
+              '<i class="' + page.icon_class + '"></i>' +
+              '</div>' +
+              '<div class="flex-1">' +
+              '<h3 class="font-bold text-lg">' + page.title_en + '</h3>' +
+              '<div class="flex gap-2 mt-1 text-sm text-gray-600">' +
+              '<span><i class="fas fa-columns mr-1"></i>' + page.layout_type + '</span>' +
+              '<span>•</span>' +
+              publishStatus +
+              '</div>' +
+              '</div>' +
+              '</div>' +
+              '<div class="flex gap-2">' +
+              '<button onclick="editInfoPage(' + page.page_id + ')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i class="fas fa-edit mr-1"></i>Edit</button>' +
+              '<button onclick="deleteInfoPage(' + page.page_id + ', \'' + page.title_en + '\')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"><i class="fas fa-trash mr-1"></i>Delete</button>' +
+              '</div>' +
+              '</div>';
+          });
+          
+          container.innerHTML = html;
+        } catch (error) {
+          console.error('Load info pages error:', error);
+        }
+      }
+
+      window.showInfoPageModal = function() {
+        currentInfoPageId = null;
+        document.getElementById('infoPageForm').reset();
+        document.getElementById('infoPageId').value = '';
+        document.getElementById('infoPageModalTitle').innerHTML = '<i class="fas fa-file-alt mr-2"></i>Create Info Page';
+        document.getElementById('infoPageModal').classList.remove('hidden');
+      }
+
+      window.closeInfoPageModal = function() {
+        document.getElementById('infoPageModal').classList.add('hidden');
+        currentInfoPageId = null;
+      }
+
+      window.editInfoPage = async function(pageId) {
+        try {
+          const response = await fetch('/api/admin/info-pages/' + pageId);
+          const page = await response.json();
+          
+          currentInfoPageId = pageId;
+          document.getElementById('infoPageId').value = pageId;
+          document.getElementById('infoPageTitle').value = page.title_en;
+          document.getElementById('infoPageKey').value = page.page_key;
+          document.getElementById('infoPageIcon').value = page.icon_class;
+          document.getElementById('infoPageColor').value = page.color_theme;
+          document.getElementById('infoPageLayout').value = page.layout_type;
+          document.getElementById('infoPageContent').value = page.content_en || '';
+          document.getElementById('infoPagePublished').checked = page.is_published === 1;
+          document.getElementById('infoPageShowMenu').checked = page.show_in_menu === 1;
+          
+          document.getElementById('infoPageModalTitle').innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Info Page';
+          document.getElementById('infoPageModal').classList.remove('hidden');
+        } catch (error) {
+          console.error('Edit info page error:', error);
+          alert('Failed to load page details');
+        }
+      }
+
+      window.saveInfoPage = async function() {
+        const title = document.getElementById('infoPageTitle').value.trim();
+        const content = document.getElementById('infoPageContent').value.trim();
+        
+        if (!title || !content) {
+          alert('Please fill in title and content');
+          return;
+        }
+        
+        const data = {
+          property_id: 1,
+          page_key: document.getElementById('infoPageKey').value || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+          title_en: title,
+          content_en: content,
+          icon_class: document.getElementById('infoPageIcon').value,
+          color_theme: document.getElementById('infoPageColor').value,
+          layout_type: document.getElementById('infoPageLayout').value,
+          is_published: document.getElementById('infoPagePublished').checked ? 1 : 0,
+          show_in_menu: document.getElementById('infoPageShowMenu').checked ? 1 : 0
+        };
+        
+        try {
+          const pageId = document.getElementById('infoPageId').value;
+          const url = pageId ? '/api/admin/info-pages/' + pageId : '/api/admin/info-pages';
+          const method = pageId ? 'PUT' : 'POST';
+          
+          const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert(pageId ? 'Page updated successfully!' : 'Page created successfully!');
+            closeInfoPageModal();
+            loadInfoPages();
+          } else {
+            alert('Failed to save page: ' + (result.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Save info page error:', error);
+          alert('Failed to save page');
+        }
+      }
+
+      window.deleteInfoPage = async function(pageId, title) {
+        if (!confirm('Delete info page "' + title + '"?' + String.fromCharCode(10) + String.fromCharCode(10) + 'This cannot be undone.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/info-pages/' + pageId, {
+            method: 'DELETE'
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('Page deleted successfully!');
+            loadInfoPages();
+          } else {
+            alert('Failed to delete page');
+          }
+        } catch (error) {
+          console.error('Delete info page error:', error);
+          alert('Failed to delete page');
+        }
+      }
+
+      // Rich Text Editor Functions
+      window.formatText = function(command) {
+        const textarea = document.getElementById('infoPageContent');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selected = textarea.value.substring(start, end);
+        const before = textarea.value.substring(0, start);
+        const after = textarea.value.substring(end);
+        
+        let formatted = '';
+        
+        switch(command) {
+          case 'bold':
+            formatted = '<strong>' + selected + '</strong>';
+            break;
+          case 'italic':
+            formatted = '<em>' + selected + '</em>';
+            break;
+          case 'underline':
+            formatted = '<u>' + selected + '</u>';
+            break;
+          case 'h2':
+            formatted = '<h2 class="text-2xl font-bold mb-3 mt-6">' + selected + '</h2>';
+            break;
+          case 'h3':
+            formatted = '<h3 class="text-xl font-bold mb-2 mt-4">' + selected + '</h3>';
+            break;
+          case 'ul':
+            formatted = '<ul class="list-disc list-inside space-y-1 mb-4">' + String.fromCharCode(10) + '  <li>' + selected + '</li>' + String.fromCharCode(10) + '</ul>';
+            break;
+          case 'ol':
+            formatted = '<ol class="list-decimal list-inside space-y-1 mb-4">' + String.fromCharCode(10) + '  <li>' + selected + '</li>' + String.fromCharCode(10) + '</ol>';
+            break;
+        }
+        
+        textarea.value = before + formatted + after;
+        textarea.focus();
+        textarea.selectionStart = start;
+        textarea.selectionEnd = start + formatted.length;
+      }
+
+      window.insertTable = function() {
+        const table = '<table class="w-full border-collapse border border-gray-300 mb-4">' + String.fromCharCode(10) +
+          '  <thead>' + String.fromCharCode(10) +
+          '    <tr class="bg-gray-100">' + String.fromCharCode(10) +
+          '      <th class="border border-gray-300 px-4 py-2">Header 1</th>' + String.fromCharCode(10) +
+          '      <th class="border border-gray-300 px-4 py-2">Header 2</th>' + String.fromCharCode(10) +
+          '    </tr>' + String.fromCharCode(10) +
+          '  </thead>' + String.fromCharCode(10) +
+          '  <tbody>' + String.fromCharCode(10) +
+          '    <tr>' + String.fromCharCode(10) +
+          '      <td class="border border-gray-300 px-4 py-2">Data 1</td>' + String.fromCharCode(10) +
+          '      <td class="border border-gray-300 px-4 py-2">Data 2</td>' + String.fromCharCode(10) +
+          '    </tr>' + String.fromCharCode(10) +
+          '  </tbody>' + String.fromCharCode(10) +
+          '</table>';
+        
+        const textarea = document.getElementById('infoPageContent');
+        textarea.value += String.fromCharCode(10) + table;
+      }
+
+      window.insertCallout = function(type) {
+        const colors = {
+          info: 'bg-blue-50 border-blue-300 text-blue-800',
+          warning: 'bg-yellow-50 border-yellow-300 text-yellow-800',
+          success: 'bg-green-50 border-green-300 text-green-800'
+        };
+        const icons = {
+          info: 'fas fa-info-circle',
+          warning: 'fas fa-exclamation-triangle',
+          success: 'fas fa-check-circle'
+        };
+        
+        const callout = '<div class="border-l-4 p-4 mb-4 ' + colors[type] + '">' + String.fromCharCode(10) +
+          '  <div class="flex items-start">' + String.fromCharCode(10) +
+          '    <i class="' + icons[type] + ' text-xl mr-3 mt-1"></i>' + String.fromCharCode(10) +
+          '    <div>' + String.fromCharCode(10) +
+          '      <p class="font-semibold">Important Note</p>' + String.fromCharCode(10) +
+          '      <p>Your message here...</p>' + String.fromCharCode(10) +
+          '    </div>' + String.fromCharCode(10) +
+          '  </div>' + String.fromCharCode(10) +
+          '</div>';
+        
+        const textarea = document.getElementById('infoPageContent');
+        textarea.value += String.fromCharCode(10) + callout;
+      }
+
+      window.insertDivider = function() {
+        const textarea = document.getElementById('infoPageContent');
+        textarea.value += String.fromCharCode(10) + '<hr class="my-6 border-gray-300">' + String.fromCharCode(10);
+      }
+
+      window.previewContent = function() {
+        const content = document.getElementById('infoPageContent').value;
+        const title = document.getElementById('infoPageTitle').value || 'Preview';
+        const icon = document.getElementById('infoPageIcon').value;
+        
+        const win = window.open('', '_blank', 'width=800,height=600');
+        win.document.write('<html><head><title>' + title + '</title>');
+        win.document.write('<script src="https://cdn.tailwindcss.com"></script>');
+        win.document.write('<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">');
+        win.document.write('</head><body class="bg-gray-50 p-8">');
+        win.document.write('<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">');
+        win.document.write('<h1 class="text-3xl font-bold mb-6"><i class="' + icon + ' mr-3 text-purple-600"></i>' + title + '</h1>');
+        win.document.write('<div class="prose max-w-none">' + content + '</div>');
+        win.document.write('</div></body></html>');
+        win.document.close();
+      }
+
+      // Auto-generate page key from title
+      document.getElementById('infoPageTitle').addEventListener('input', (e) => {
+        if (!currentInfoPageId) {
+          const key = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          document.getElementById('infoPageKey').value = key;
+        }
+      });
 
       async function loadActivities() {
         try {
