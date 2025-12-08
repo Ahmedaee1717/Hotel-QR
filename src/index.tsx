@@ -5978,13 +5978,13 @@ app.post('/api/admin/beach/settings', async (c) => {
             updated_at = CURRENT_TIMESTAMP
         WHERE property_id = ?
       `).bind(
-        beach_booking_enabled,
-        beach_map_image_url,
-        opening_time,
-        closing_time,
-        advance_booking_days,
-        max_booking_duration_hours,
-        free_for_hotel_guests,
+        beach_booking_enabled || 0,
+        beach_map_image_url || null,
+        opening_time || '08:00',
+        closing_time || '18:00',
+        advance_booking_days || 7,
+        max_booking_duration_hours || 12,
+        free_for_hotel_guests || 1,
         property_id
       ).run()
     } else {
@@ -5997,13 +5997,13 @@ app.post('/api/admin/beach/settings', async (c) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
-        beach_booking_enabled,
-        beach_map_image_url,
-        opening_time,
-        closing_time,
-        advance_booking_days,
-        max_booking_duration_hours,
-        free_for_hotel_guests
+        beach_booking_enabled || 0,
+        beach_map_image_url || null,
+        opening_time || '08:00',
+        closing_time || '18:00',
+        advance_booking_days || 7,
+        max_booking_duration_hours || 12,
+        free_for_hotel_guests || 1
       ).run()
     }
     
