@@ -12902,7 +12902,7 @@ app.get('/admin/dashboard', (c) => {
         
         const win = window.open('', '_blank', 'width=800,height=600');
         win.document.write('<html><head><title>' + title + '</title>');
-        win.document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+        win.document.write('<script src="https://cdn.tailwindcss.com"><\\/script>');
         win.document.write('<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">');
         win.document.write('</head><body class="bg-gray-50 p-8">');
         win.document.write('<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">');
