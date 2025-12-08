@@ -10022,6 +10022,12 @@ app.get('/admin/dashboard', (c) => {
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div><h1 class="text-lg md:text-2xl font-bold">Admin Dashboard</h1></div>
             <div class="flex items-center gap-2 md:gap-3">
+                <button onclick="openSupportModal()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Get Support">
+                  <i class="fas fa-life-ring"></i><span class="hidden md:inline ml-2">Support</span>
+                </button>
+                <button onclick="openLiveChat()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Live Chat">
+                  <i class="fas fa-comments"></i><span class="hidden md:inline ml-2">Chat</span>
+                </button>
                 <button onclick="toggleDarkMode()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Toggle Dark Mode">
                   <i id="darkModeIcon" class="fas fa-moon"></i><span class="hidden md:inline ml-2" id="darkModeText">Dark</span>
                 </button>
@@ -10770,6 +10776,77 @@ app.get('/admin/dashboard', (c) => {
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Support Ticket Modal -->
+    <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold"><i class="fas fa-ticket-alt mr-2 text-orange-600"></i>Create Support Ticket</h3>
+                <button onclick="closeSupportModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="supportTicketForm" class="space-y-4">
+                <div>
+                    <label class="block font-medium mb-2">Subject *</label>
+                    <input type="text" id="ticketSubject" required class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Category</label>
+                    <select id="ticketCategory" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="general">General Inquiry</option>
+                        <option value="technical">Technical Issue</option>
+                        <option value="billing">Billing Question</option>
+                        <option value="feature_request">Feature Request</option>
+                        <option value="bug_report">Bug Report</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Priority</label>
+                    <select id="ticketPriority" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Description *</label>
+                    <textarea id="ticketDescription" required class="w-full px-4 py-2 border rounded-lg" rows="5" placeholder="Please describe your issue or question in detail..."></textarea>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeSupportModal()" class="px-6 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700">
+                        <i class="fas fa-paper-plane mr-2"></i>Submit Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live Chat Widget -->
+    <div id="chatWidget" class="hidden fixed bottom-4 right-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-50">
+        <div class="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl flex justify-between items-center">
+            <div>
+                <h4 class="font-bold"><i class="fas fa-comments mr-2"></i>Live Support Chat</h4>
+                <p class="text-xs text-blue-100">We're here to help!</p>
+            </div>
+            <button onclick="closeLiveChat()" class="text-white/80 hover:text-white">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4" id="widgetChatMessages" style="max-height: 360px;">
+            <div class="text-center text-gray-500 text-sm">Starting chat...</div>
+        </div>
+        <div class="p-3 border-t">
+            <div class="flex gap-2">
+                <input type="text" id="widgetChatInput" placeholder="Type your message..." class="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                <button onclick="sendWidgetMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -12030,6 +12107,152 @@ app.get('/admin/dashboard', (c) => {
       
       // Apply dark mode immediately
       initDarkMode();
+
+      // Support Ticket Functions
+      function openSupportModal() {
+        document.getElementById('supportModal').classList.remove('hidden');
+      }
+      
+      function closeSupportModal() {
+        document.getElementById('supportModal').classList.add('hidden');
+        document.getElementById('supportTicketForm').reset();
+      }
+      
+      document.getElementById('supportTicketForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+          const response = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subject: document.getElementById('ticketSubject').value,
+              description: document.getElementById('ticketDescription').value,
+              priority: document.getElementById('ticketPriority').value,
+              category: document.getElementById('ticketCategory').value,
+              created_by_type: 'hotel',
+              created_by_id: user.property_id || 1,
+              created_by_email: user.email || 'admin@hotel.com',
+              created_by_name: user.name || 'Hotel Admin',
+              property_id: user.property_id || 1
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Support ticket created! Ticket #: ' + data.ticket_number + '. Our team will respond soon.');
+            closeSupportModal();
+          } else {
+            alert('Failed to create ticket: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Create ticket error:', error);
+          alert('Failed to create support ticket');
+        }
+      });
+      
+      // Live Chat Functions
+      let widgetChatRoomId = null;
+      let widgetChatInterval = null;
+      
+      async function openLiveChat() {
+        document.getElementById('chatWidget').classList.remove('hidden');
+        
+        // Get or create chat room with super admin
+        try {
+          const response = await fetch('/api/chat/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              room_type: 'hotel_support',
+              room_name: 'Hotel Support Chat',
+              participant1_type: 'hotel',
+              participant1_id: user.property_id || 1,
+              participant1_name: user.name || 'Hotel Admin',
+              property_id: user.property_id || 1
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            widgetChatRoomId = data.room_id;
+            loadWidgetMessages();
+            
+            // Auto-refresh messages every 3 seconds
+            if (widgetChatInterval) clearInterval(widgetChatInterval);
+            widgetChatInterval = setInterval(loadWidgetMessages, 3000);
+          }
+        } catch (error) {
+          console.error('Open chat error:', error);
+        }
+      }
+      
+      function closeLiveChat() {
+        document.getElementById('chatWidget').classList.add('hidden');
+        if (widgetChatInterval) clearInterval(widgetChatInterval);
+      }
+      
+      async function loadWidgetMessages() {
+        if (!widgetChatRoomId) return;
+        
+        try {
+          const response = await fetch('/api/chat/rooms/' + widgetChatRoomId + '/messages?limit=50');
+          const data = await response.json();
+          const messages = data.messages || [];
+          
+          const html = messages.map(msg => {
+            const isMe = msg.sender_type === 'hotel';
+            return '<div class="flex ' + (isMe ? 'justify-end' : 'justify-start') + ' mb-3">' +
+              '<div class="max-w-[80%] ' + (isMe ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800') + ' px-3 py-2 rounded-lg">' +
+                '<div class="text-xs mb-1 ' + (isMe ? 'text-blue-200' : 'text-gray-500') + '">' +
+                  msg.sender_name + ' · ' + new Date(msg.created_at).toLocaleTimeString() +
+                '</div>' +
+                '<div class="text-sm">' + msg.message + '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+          
+          const container = document.getElementById('widgetChatMessages');
+          container.innerHTML = html || '<div class="text-center text-gray-500 text-sm">No messages yet. Start the conversation!</div>';
+          container.scrollTop = container.scrollHeight;
+        } catch (error) {
+          console.error('Load widget messages error:', error);
+        }
+      }
+      
+      async function sendWidgetMessage() {
+        const input = document.getElementById('widgetChatInput');
+        const message = input.value.trim();
+        if (!message || !widgetChatRoomId) return;
+        
+        try {
+          const response = await fetch('/api/chat/rooms/' + widgetChatRoomId + '/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              sender_type: 'hotel',
+              sender_id: user.property_id || 1,
+              sender_name: user.name || 'Hotel Admin'
+            })
+          });
+          
+          if (response.ok) {
+            input.value = '';
+            loadWidgetMessages();
+          }
+        } catch (error) {
+          console.error('Send message error:', error);
+        }
+      }
+      
+      // Allow Enter key to send messages
+      document.getElementById('widgetChatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendWidgetMessage();
+        }
+      });
 
       function logout() {
         localStorage.removeItem('admin_user');
