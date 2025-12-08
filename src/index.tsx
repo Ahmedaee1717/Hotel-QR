@@ -5865,15 +5865,27 @@ app.get('/hotel/:property_slug', async (c) => {
             }
           });
           
-          // Update category pills
+          // Update category pills with custom section names from propertyData
           document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            if (key === 'pill-all') el.textContent = translations[lang].all;
-            if (key === 'pill-restaurants') el.textContent = translations[lang].restaurants;
-            if (key === 'pill-events') el.textContent = translations[lang].events;
-            if (key === 'pill-spa') el.textContent = translations[lang].spa;
-            if (key === 'pill-services') el.textContent = translations[lang].services;
-            if (key === 'pill-activities') el.textContent = translations[lang].activities;
+            if (key === 'pill-all') {
+              el.textContent = translations[lang].all;
+            } else if (key === 'pill-restaurants') {
+              const customName = getTranslatedField(propertyData, 'section_restaurants');
+              el.textContent = customName || translations[lang].restaurants;
+            } else if (key === 'pill-events') {
+              const customName = getTranslatedField(propertyData, 'section_events');
+              el.textContent = customName || translations[lang].events;
+            } else if (key === 'pill-spa') {
+              const customName = getTranslatedField(propertyData, 'section_spa');
+              el.textContent = customName || translations[lang].spa;
+            } else if (key === 'pill-services') {
+              const customName = getTranslatedField(propertyData, 'section_service');
+              el.textContent = customName || translations[lang].services;
+            } else if (key === 'pill-activities') {
+              const customName = getTranslatedField(propertyData, 'section_activities');
+              el.textContent = customName || translations[lang].activities;
+            }
           });
         }
 
