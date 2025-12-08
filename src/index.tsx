@@ -5363,6 +5363,147 @@ app.post('/api/admin/chatbot/settings', async (c) => {
   }
 })
 
+// API: Auto-sync hotel data into chatbot knowledge base
+app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { property_id } = body
+    
+    let totalDocuments = 0
+    let totalChunks = 0
+    
+    // 1. Sync all hotel offerings (restaurants, spa, events)
+    const offerings = await DB.prepare(`
+      SELECT offering_id, offering_type, title_en, short_description_en, full_description_en,
+             location, cuisine_type, meal_type, price, duration_minutes, includes
+      FROM hotel_offerings
+      WHERE property_id = ? AND status = 'active'
+    `).bind(property_id).all()
+    
+    for (const offering of offerings.results) {
+      // Build document content
+      let content = `${offering.title_en}\n\n`
+      content += offering.short_description_en ? offering.short_description_en + '\n\n' : ''
+      content += offering.full_description_en ? offering.full_description_en + '\n\n' : ''
+      if (offering.location) content += `Location: ${offering.location}\n`
+      if (offering.cuisine_type) content += `Cuisine: ${offering.cuisine_type}\n`
+      if (offering.meal_type) content += `Meal Type: ${offering.meal_type}\n`
+      if (offering.price) content += `Price: ${offering.price} USD\n`
+      if (offering.duration_minutes) content += `Duration: ${offering.duration_minutes} minutes\n`
+      if (offering.includes) content += `Includes: ${offering.includes}\n`
+      
+      // Check if document already exists
+      const existing = await DB.prepare(`
+        SELECT document_id FROM chatbot_documents
+        WHERE property_id = ? AND document_type = ? AND title = ?
+      `).bind(property_id, offering.offering_type, offering.title_en).first()
+      
+      let documentId = existing?.document_id
+      
+      if (!documentId) {
+        // Insert new document
+        const result = await DB.prepare(`
+          INSERT INTO chatbot_documents (property_id, title, content, document_type, created_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(property_id, offering.title_en, content, offering.offering_type).run()
+        
+        documentId = result.meta.last_row_id
+        totalDocuments++
+      } else {
+        // Update existing document
+        await DB.prepare(`
+          UPDATE chatbot_documents
+          SET content = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE document_id = ?
+        `).bind(content, documentId).run()
+        
+        // Delete old chunks
+        await DB.prepare(`DELETE FROM chatbot_chunks WHERE document_id = ?`).bind(documentId).run()
+      }
+      
+      // Create chunks
+      const chunks = chunkText(content, 500)
+      for (let i = 0; i < chunks.length; i++) {
+        await DB.prepare(`
+          INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(documentId, property_id, chunks[i], i, chunks[i], chunks[i].split(/\s+/).length).run()
+        totalChunks++
+      }
+    }
+    
+    // 2. Sync all activities
+    const activities = await DB.prepare(`
+      SELECT a.activity_id, a.title_en, a.short_description_en, a.full_description_en,
+             a.duration_minutes, a.price, a.currency, a.requirements, a.includes,
+             c.name_en as category_name
+      FROM activities a
+      JOIN vendors v ON a.vendor_id = v.vendor_id
+      JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
+      JOIN categories c ON a.category_id = c.category_id
+      WHERE vp.property_id = ? AND a.status = 'active'
+    `).bind(property_id).all()
+    
+    for (const activity of activities.results) {
+      let content = `${activity.title_en}\n\n`
+      content += `Category: ${activity.category_name}\n\n`
+      content += activity.short_description_en ? activity.short_description_en + '\n\n' : ''
+      content += activity.full_description_en ? activity.full_description_en + '\n\n' : ''
+      content += `Duration: ${activity.duration_minutes} minutes\n`
+      content += `Price: ${activity.price} ${activity.currency}\n`
+      if (activity.requirements) content += `Requirements: ${activity.requirements}\n`
+      if (activity.includes) content += `Includes: ${activity.includes}\n`
+      
+      const existing = await DB.prepare(`
+        SELECT document_id FROM chatbot_documents
+        WHERE property_id = ? AND document_type = 'activity' AND title = ?
+      `).bind(property_id, activity.title_en).first()
+      
+      let documentId = existing?.document_id
+      
+      if (!documentId) {
+        const result = await DB.prepare(`
+          INSERT INTO chatbot_documents (property_id, title, content, document_type, created_at)
+          VALUES (?, ?, ?, 'activity', CURRENT_TIMESTAMP)
+        `).bind(property_id, activity.title_en, content).run()
+        
+        documentId = result.meta.last_row_id
+        totalDocuments++
+      } else {
+        await DB.prepare(`
+          UPDATE chatbot_documents
+          SET content = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE document_id = ?
+        `).bind(content, documentId).run()
+        
+        await DB.prepare(`DELETE FROM chatbot_chunks WHERE document_id = ?`).bind(documentId).run()
+      }
+      
+      const chunks = chunkText(content, 500)
+      for (let i = 0; i < chunks.length; i++) {
+        await DB.prepare(`
+          INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(documentId, property_id, chunks[i], i, chunks[i], chunks[i].split(/\s+/).length).run()
+        totalChunks++
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      total_documents: totalDocuments,
+      total_chunks: totalChunks,
+      message: `Successfully synced ${totalDocuments} new documents with ${totalChunks} searchable chunks`
+    })
+    
+  } catch (error) {
+    console.error('Sync knowledge base error:', error)
+    return c.json({ error: 'Failed to sync knowledge base', details: error.message }, 500)
+  }
+})
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
@@ -13012,6 +13153,28 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                 </div>
 
+                <!-- Auto-Sync Knowledge Base -->
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold mb-2">
+                                <i class="fas fa-sync-alt mr-2 text-blue-600"></i>Auto-Sync Hotel Data
+                            </h3>
+                            <p class="text-gray-700 mb-4">
+                                Automatically import all your hotel's offerings (restaurants, spa, events) and activities into the AI chatbot's knowledge base. 
+                                This ensures guests can ask about everything you offer!
+                            </p>
+                            <button onclick="syncKnowledgeBase()" id="syncBtn" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition font-semibold shadow-lg">
+                                <i class="fas fa-sync-alt mr-2"></i>Sync All Hotel Data Now
+                            </button>
+                            <p class="text-sm text-gray-500 mt-3">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                This will sync: Restaurants, Spa Services, Events, Activities, and more. Run this whenever you add new offerings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Add New Document -->
                 <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
                     <h3 class="text-xl font-bold mb-4"><i class="fas fa-file-upload mr-2 text-green-600"></i>Add Knowledge Document</h3>
@@ -14804,6 +14967,38 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Save settings error:', error);
           alert('❌ Error saving settings');
+        }
+      };
+      
+      // Sync knowledge base with all hotel data
+      window.syncKnowledgeBase = async function() {
+        const syncBtn = document.getElementById('syncBtn');
+        const originalHTML = syncBtn.innerHTML;
+        
+        try {
+          syncBtn.disabled = true;
+          syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing... Please wait';
+          
+          const response = await fetch('/api/admin/chatbot/sync-knowledge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: 1 })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Successfully synced ' + data.total_documents + ' documents with ' + data.total_chunks + ' searchable chunks! Your AI chatbot now knows about all your restaurants, activities, spa services, and events. Guests can ask questions immediately.');
+            loadChatbotDocuments(); // Reload documents list
+          } else {
+            alert('Sync failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Sync error:', error);
+          alert('❌ Error during sync: ' + error.message);
+        } finally {
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = originalHTML;
         }
       };
       
