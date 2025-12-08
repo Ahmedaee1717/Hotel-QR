@@ -5814,6 +5814,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Apply translations to section headings
                 applySectionTranslations(propertyData);
                 
+                // Load info pages after property data is loaded
+                loadInfoPages();
+                
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const offeringsData = await offeringsResponse.json();
@@ -6468,6 +6471,10 @@ app.get('/hotel/:property_slug', async (c) => {
 
         async function loadInfoPages() {
           try {
+            if (!propertyData || !propertyData.property_id) {
+              console.log('⏳ Property data not loaded yet, skipping info pages load');
+              return;
+            }
             const response = await fetch('/api/info-pages/' + propertyData.property_id);
             const data = await response.json();
             if (data.success) {
@@ -6551,8 +6558,7 @@ app.get('/hotel/:property_slug', async (c) => {
           document.getElementById('infoPageModal').classList.add('hidden');
         }
 
-        // Load info pages on init
-        loadInfoPages();
+        // Info pages will be loaded after propertyData is loaded (in main init)
         
         </script>
 
@@ -7037,6 +7043,29 @@ app.get('/offering-detail', async (c) => {
                 '.bg-blue-600:hover { background: ' + secondaryColor + ' !important; transform: scale(1.05); }' +
                 '.bg-blue-50 { background: ' + primaryColor + '15 !important; }';
             document.head.appendChild(style);
+            
+            // Apply colors to Info button and modal (if they exist on this page)
+            const infoButton = document.getElementById('infoButton');
+            const infoModalHeader = document.getElementById('infoModalHeader');
+            
+            if (infoButton) {
+                infoButton.style.background = primaryColor;
+                infoButton.style.borderColor = primaryColor;
+                infoButton.onmouseover = function() { this.style.opacity = '0.9'; };
+                infoButton.onmouseout = function() { this.style.opacity = '1'; };
+            }
+            
+            if (infoModalHeader) {
+                infoModalHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, #ffffff 100%)';
+                const modalTitle = infoModalHeader.querySelector('h2');
+                const modalCloseBtn = infoModalHeader.querySelector('button');
+                if (modalTitle) {
+                    modalTitle.style.color = primaryColor;
+                }
+                if (modalCloseBtn) {
+                    modalCloseBtn.style.color = primaryColor;
+                }
+            }
         }
 
         function updateTranslations() {
