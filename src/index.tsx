@@ -4918,7 +4918,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <div class="gradient-hero h-64 md:h-96 relative">
                     <!-- Info Button & Language Selector - Top Right on Cover -->
                     <div class="absolute top-4 right-4 z-10 flex gap-2">
-                        <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" title="Hotel Information">
+                        <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" style="background-color: #8B5CF6;" title="Hotel Information">
                             <i class="fas fa-info-circle"></i>
                             <span class="hidden sm:inline">Info</span>
                         </button>
@@ -6543,7 +6543,7 @@ app.get('/hotel/:property_slug', async (c) => {
         <div id="infoMenuModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden animate-scale-up">
                 <!-- Header -->
-                <div id="infoModalHeader" class="bg-gradient-to-r from-purple-600 to-white text-white p-6 flex justify-between items-center">
+                <div id="infoModalHeader" class="p-6 flex justify-between items-center" style="background: linear-gradient(135deg, #8B5CF6 0%, #ffffff 100%);">
                     <h2 class="text-2xl font-bold" style="color: #8B5CF6;"><i class="fas fa-info-circle mr-2"></i>Hotel Information</h2>
                     <button onclick="closeInfoMenu()" class="hover:opacity-80 transition" style="color: #8B5CF6;">
                         <i class="fas fa-times text-2xl"></i>
