@@ -5044,7 +5044,16 @@ function calculateRelevanceScore(query: string, text: string): number {
     'restaurant': ['dining', 'food', 'eat', 'restaurant', 'cuisine'],
     'dining': ['restaurant', 'food', 'eat', 'dining', 'cuisine'],
     'pool': ['swimming', 'swim', 'beach', 'pool'],
-    'spa': ['wellness', 'massage', 'treatment', 'spa', 'therapy']
+    'spa': ['wellness', 'massage', 'treatment', 'spa', 'therapy'],
+    'event': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment'],
+    'events': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment'],
+    'party': ['event', 'celebration', 'gala', 'dinner', 'party', 'festive'],
+    'celebration': ['event', 'party', 'gala', 'dinner', 'celebration', 'festive'],
+    'snorkel': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
+    'snorkeling': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
+    'dive': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
+    'diving': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
+    'scuba': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel']
   }
   
   let score = 0
@@ -7485,12 +7494,12 @@ app.get('/hotel/:property_slug', async (c) => {
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
-          <button id="chatbotButton" class="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-50" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-50" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
             <i class="fas fa-comments"></i>
           </button>
           
           <!-- Chat Window -->
-          <div id="chatWindow" class="hidden fixed bottom-24 right-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
+          <div id="chatWindow" class="hidden fixed bottom-24 left-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
             <!-- Header -->
             <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
@@ -13382,7 +13391,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Live Chat Widget -->
-    <div id="chatWidget" class="hidden fixed bottom-4 right-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-50">
+    <div id="chatWidget" class="hidden fixed bottom-4 left-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-50">
         <div class="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl flex justify-between items-center">
             <div>
                 <h4 class="font-bold"><i class="fas fa-comments mr-2"></i>Live Support Chat</h4>
