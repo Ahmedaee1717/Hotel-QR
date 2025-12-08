@@ -3013,6 +3013,28 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       offering_id
     ).run()
     
+    // Update restaurant menus if provided
+    if (data.offering_type === 'restaurant' && data.menu_urls !== undefined) {
+      // Delete existing menus
+      await DB.prepare(`
+        DELETE FROM restaurant_menus WHERE offering_id = ?
+      `).bind(offering_id).run()
+      
+      // Insert new menus
+      if (data.menu_urls && data.menu_urls.length > 0) {
+        for (let i = 0; i < data.menu_urls.length; i++) {
+          const menuUrl = data.menu_urls[i].trim()
+          if (menuUrl) {
+            await DB.prepare(`
+              INSERT INTO restaurant_menus (
+                offering_id, menu_name, menu_url, menu_type, display_order, is_active
+              ) VALUES (?, ?, ?, 'full', ?, 1)
+            `).bind(offering_id, 'Menu ' + (i + 1), menuUrl, i).run()
+          }
+        }
+      }
+    }
+    
     return c.json({ success: true })
   } catch (error) {
     console.error('Update offering error:', error)
@@ -3092,7 +3114,12 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
       DELETE FROM offering_schedule WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 7. Finally delete the offering itself
+    // 7. Delete restaurant_menus
+    await DB.prepare(`
+      DELETE FROM restaurant_menus WHERE offering_id = ?
+    `).bind(offering_id).run()
+    
+    // 8. Finally delete the offering itself
     const result = await DB.prepare(`
       DELETE FROM hotel_offerings WHERE offering_id = ?
     `).bind(offering_id).run()
@@ -10352,17 +10379,47 @@ app.get('/admin/dashboard', (c) => {
           document.getElementById('eventEndTime').value = offering.event_end_time || '';
         }
         
+        // Load and show restaurant menus if restaurant type
+        if (offering.offering_type === 'restaurant') {
+          document.getElementById('restaurantFields').classList.remove('hidden');
+          
+          // Load existing menus
+          fetch('/api/offerings/' + offeringId + '/menus')
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.menus) {
+                const menuUrls = data.menus.map(m => m.menu_url).join(String.fromCharCode(10));
+                document.getElementById('menuUrls').value = menuUrls;
+              }
+            })
+            .catch(err => console.error('Error loading menus for edit:', err));
+        }
+        
         // Change form submit to update instead of create
         const form = document.getElementById('addOfferingForm');
         form.onsubmit = async (e) => {
           e.preventDefault();
           const images = document.getElementById('offeringImages').value.split(String.fromCharCode(10)).map(url => url.trim()).filter(Boolean);
           
+          // Get menu URLs if restaurant
+          const menuUrls = [];
+          const offeringType = document.getElementById('offeringType').value;
+          if (offeringType === 'restaurant') {
+            const menuUrlsText = document.getElementById('menuUrls').value;
+            if (menuUrlsText) {
+              menuUrlsText.split(String.fromCharCode(10)).forEach(url => {
+                const trimmedUrl = url.trim();
+                if (trimmedUrl) menuUrls.push(trimmedUrl);
+              });
+            }
+          }
+          
           try {
             const response = await fetch('/api/admin/offerings/' + offeringId, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                offering_type: offeringType,
                 title_en: document.getElementById('offeringTitle').value,
                 short_description_en: document.getElementById('offeringDescription').value,
                 full_description_en: document.getElementById('offeringFullDescription').value,
@@ -10374,7 +10431,8 @@ app.get('/admin/dashboard', (c) => {
                 video_url: document.getElementById('offeringVideoUrl').value || null,
                 event_date: document.getElementById('eventDate').value || null,
                 event_start_time: document.getElementById('eventStartTime').value || null,
-                event_end_time: document.getElementById('eventEndTime').value || null
+                event_end_time: document.getElementById('eventEndTime').value || null,
+                menu_urls: menuUrls.length > 0 ? menuUrls : null
               })
             });
             
@@ -10383,6 +10441,8 @@ app.get('/admin/dashboard', (c) => {
               alert('Offering updated successfully!');
               form.reset();
               document.getElementById('eventFields').classList.add('hidden');
+              document.getElementById('restaurantFields').classList.add('hidden');
+              document.getElementById('menuUrls').value = '';
               // Reset form back to create mode
               form.onsubmit = null;
               loadOfferings();
