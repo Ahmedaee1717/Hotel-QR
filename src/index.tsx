@@ -8323,9 +8323,7 @@ app.get('/admin/dashboard', (c) => {
         h3 { font-size: 1rem !important; }
         
         /* Make all form inputs stack on mobile */
-        .grid.md\\:grid-cols-2,
-        .grid.md\\:grid-cols-3,
-        .grid.md\\:grid-cols-4 {
+        .grid {
           grid-template-columns: 1fr !important;
         }
         
