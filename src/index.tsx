@@ -4559,7 +4559,6 @@ app.get('/hotel/:property_slug', async (c) => {
         <title>Welcome</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <script src="/static/seasonal-effects.js"></script>
         <style id="dynamic-styles">
           /* Dynamic styles will be injected here */
         </style>
@@ -6056,11 +6055,95 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 
                 // Initialize seasonal effects
-                if (window.initSeasonalEffects && propertyData) {
-                    window.initSeasonalEffects(propertyData.property_id);
-                }
+                initSeasonalEffects();
             });
         });
+        
+        // Seasonal Effects (inline)
+        async function initSeasonalEffects() {
+          if (!propertyData) return;
+          
+          try {
+            const response = await fetch('/api/seasonal-settings/' + propertyData.property_id);
+            const data = await response.json();
+            
+            if (data.success && data.settings && data.settings.is_active) {
+              const s = data.settings;
+              
+              // Custom message banner
+              if (s.custom_message) {
+                const banner = document.createElement('div');
+                banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;padding:12px;font-size:18px;font-weight:bold;z-index:10000;box-shadow:0 2px 10px rgba(0,0,0,0.2);animation:slideDown 0.5s';
+                banner.textContent = s.custom_message;
+                document.body.appendChild(banner);
+                document.body.style.paddingTop = '48px';
+              }
+              
+              // Snow effect
+              if (s.enable_snow) {
+                const snow = document.createElement('div');
+                snow.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden';
+                for (let i = 0; i < 30; i++) {
+                  const flake = document.createElement('div');
+                  flake.innerHTML = '❄';
+                  flake.style.cssText = 'position:absolute;color:#fff;font-size:' + (Math.random() * 10 + 10) + 'px;left:' + (Math.random() * 100) + '%;animation:snowfall ' + (Math.random() * 3 + 2) + 's linear infinite;opacity:' + (Math.random() * 0.6 + 0.4);
+                  flake.style.animationDelay = Math.random() * 2 + 's';
+                  snow.appendChild(flake);
+                }
+                document.body.appendChild(snow);
+                if (!document.getElementById('snow-style')) {
+                  const style = document.createElement('style');
+                  style.id = 'snow-style';
+                  style.textContent = '@keyframes snowfall{0%{top:-10%;transform:translateX(0) rotate(0deg)}100%{top:110%;transform:translateX(50px) rotate(360deg)}}@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}';
+                  document.head.appendChild(style);
+                }
+              }
+              
+              // Confetti effect
+              if (s.enable_confetti) {
+                const confetti = document.createElement('div');
+                confetti.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;overflow:hidden';
+                const colors = ['#f44336','#e91e63','#9c27b0','#3f51b5','#2196f3','#4caf50','#ffeb3b','#ff9800'];
+                for (let i = 0; i < 50; i++) {
+                  setTimeout(() => {
+                    const piece = document.createElement('div');
+                    piece.style.cssText = 'position:absolute;width:' + (Math.random() * 6 + 4) + 'px;height:' + (Math.random() * 10 + 5) + 'px;background:' + colors[Math.floor(Math.random() * colors.length)] + ';left:' + (Math.random() * 100) + '%;animation:confettifall ' + (Math.random() * 3 + 2) + 's linear infinite';
+                    confetti.appendChild(piece);
+                  }, i * 30);
+                }
+                document.body.appendChild(confetti);
+                if (!document.getElementById('confetti-style')) {
+                  const style = document.createElement('style');
+                  style.id = 'confetti-style';
+                  style.textContent = '@keyframes confettifall{0%{top:-10%;transform:rotate(0deg)}100%{top:110%;transform:rotate(720deg)}}';
+                  document.head.appendChild(style);
+                }
+              }
+              
+              // Festive lights
+              if (s.enable_lights) {
+                const lights = document.createElement('div');
+                lights.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:50px;pointer-events:none;z-index:9996;display:flex;justify-content:space-around';
+                const colors = ['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff'];
+                for (let i = 0; i < 15; i++) {
+                  const light = document.createElement('div');
+                  light.style.cssText = 'width:10px;height:10px;border-radius:50%;background:' + colors[i % colors.length] + ';animation:twinkle ' + (Math.random() * 2 + 1) + 's ease-in-out infinite;box-shadow:0 0 10px ' + colors[i % colors.length];
+                  light.style.animationDelay = Math.random() + 's';
+                  lights.appendChild(light);
+                }
+                document.body.appendChild(lights);
+                if (!document.getElementById('lights-style')) {
+                  const style = document.createElement('style');
+                  style.id = 'lights-style';
+                  style.textContent = '@keyframes twinkle{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.8)}}';
+                  document.head.appendChild(style);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Seasonal effects error:', error);
+          }
+        }
         </script>
     </body>
     </html>
@@ -10143,7 +10226,6 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
                 <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
-                <button data-tab="seasonal" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-snowflake mr-2"></i><span>Seasonal</span></button>
             </div>
         </div>
 
@@ -10870,11 +10952,9 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                 </form>
             </div>
-        </div>
-    </div>
-
-        <!-- Seasonal Effects Tab -->
-        <div id="seasonalTab" class="tab-content hidden">
+            
+            <!-- Seasonal Effects Section (inside Settings) -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-6"><i class="fas fa-snowflake mr-2 text-blue-600"></i>Seasonal Effects & Decorations</h2>
                 <p class="text-gray-600 mb-6">Add festive effects and decorations to delight your guests during special occasions!</p>
@@ -11094,6 +11174,7 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </div>
         </div>
+    </div>
 
     <!-- Support Ticket Modal -->
     <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -12734,10 +12815,10 @@ app.get('/admin/dashboard', (c) => {
         }
       });
       
-      // Load seasonal settings when seasonal tab is opened
+      // Load seasonal settings when settings tab is opened
       document.querySelectorAll('[data-tab]').forEach(btn => {
         btn.addEventListener('click', () => {
-          if (btn.dataset.tab === 'seasonal') {
+          if (btn.dataset.tab === 'settings') {
             loadSeasonalSettings();
           }
         });
