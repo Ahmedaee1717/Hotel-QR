@@ -4293,6 +4293,92 @@ app.get('/api/properties', async (c) => {
   }
 })
 
+// ============================================
+// SEASONAL EFFECTS API
+// ============================================
+
+// Get seasonal settings for a property
+app.get('/api/seasonal-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT * FROM seasonal_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (!settings) {
+      // Create default settings if none exist
+      await DB.prepare(`
+        INSERT INTO seasonal_settings (property_id, active_theme) VALUES (?, 'none')
+      `).bind(property_id).run()
+      
+      const newSettings = await DB.prepare(`
+        SELECT * FROM seasonal_settings WHERE property_id = ?
+      `).bind(property_id).first()
+      
+      return c.json({ success: true, settings: newSettings })
+    }
+    
+    return c.json({ success: true, settings })
+  } catch (error) {
+    console.error('Get seasonal settings error:', error)
+    return c.json({ error: 'Failed to get settings' }, 500)
+  }
+})
+
+// Update seasonal settings (Admin)
+app.put('/api/admin/seasonal-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE seasonal_settings SET
+        active_theme = ?,
+        is_active = ?,
+        enable_snow = ?,
+        enable_fireworks = ?,
+        enable_confetti = ?,
+        enable_lights = ?,
+        enable_overlay = ?,
+        overlay_type = ?,
+        overlay_position = ?,
+        custom_decorations = ?,
+        theme_primary_color = ?,
+        theme_secondary_color = ?,
+        custom_message = ?,
+        auto_activate_start = ?,
+        auto_activate_end = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE property_id = ?
+    `).bind(
+      data.active_theme || 'none',
+      data.is_active ? 1 : 0,
+      data.enable_snow ? 1 : 0,
+      data.enable_fireworks ? 1 : 0,
+      data.enable_confetti ? 1 : 0,
+      data.enable_lights ? 1 : 0,
+      data.enable_overlay ? 1 : 0,
+      data.overlay_type || null,
+      data.overlay_position || 'top-right',
+      data.custom_decorations || null,
+      data.theme_primary_color || null,
+      data.theme_secondary_color || null,
+      data.custom_message || null,
+      data.auto_activate_start || null,
+      data.auto_activate_end || null,
+      property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update seasonal settings error:', error)
+    return c.json({ error: 'Failed to update settings' }, 500)
+  }
+})
+
 // API: Get hotel offerings by property
 app.get('/api/hotel-offerings/:property_id', async (c) => {
   const { DB } = c.env
@@ -4473,6 +4559,7 @@ app.get('/hotel/:property_slug', async (c) => {
         <title>Welcome</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="/static/seasonal-effects.js"></script>
         <style id="dynamic-styles">
           /* Dynamic styles will be injected here */
         </style>
@@ -5966,6 +6053,11 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Double-check selector value after init
                 if (languageSelector) {
                     languageSelector.value = currentLanguage;
+                }
+                
+                // Initialize seasonal effects
+                if (window.initSeasonalEffects && propertyData) {
+                    window.initSeasonalEffects(propertyData.property_id);
                 }
             });
         });
@@ -10051,6 +10143,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
                 <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
+                <button data-tab="seasonal" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-snowflake mr-2"></i><span>Seasonal</span></button>
             </div>
         </div>
 
@@ -10779,6 +10872,228 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
     </div>
+
+        <!-- Seasonal Effects Tab -->
+        <div id="seasonalTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6"><i class="fas fa-snowflake mr-2 text-blue-600"></i>Seasonal Effects & Decorations</h2>
+                <p class="text-gray-600 mb-6">Add festive effects and decorations to delight your guests during special occasions!</p>
+                
+                <form id="seasonalForm" class="space-y-6">
+                    <!-- Theme Selection -->
+                    <div class="border-2 border-dashed border-purple-300 rounded-lg p-6 bg-purple-50">
+                        <h3 class="font-bold text-lg mb-4 flex items-center text-purple-800">
+                            <i class="fas fa-palette mr-2"></i>Choose Theme
+                        </h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="none" class="hidden theme-radio" checked>
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-ban text-3xl mb-2 text-gray-500"></i>
+                                    <div class="font-semibold">None</div>
+                                    <div class="text-xs text-gray-500">No effects</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="christmas" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-tree text-3xl mb-2 text-green-600"></i>
+                                    <div class="font-semibold">Christmas</div>
+                                    <div class="text-xs text-gray-500">Snow & decorations</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="newyear" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-champagne-glasses text-3xl mb-2 text-yellow-600"></i>
+                                    <div class="font-semibold">New Year</div>
+                                    <div class="text-xs text-gray-500">Fireworks & confetti</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="easter" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-egg text-3xl mb-2 text-pink-600"></i>
+                                    <div class="font-semibold">Easter</div>
+                                    <div class="text-xs text-gray-500">Spring colors</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="ramadan" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-moon text-3xl mb-2 text-indigo-600"></i>
+                                    <div class="font-semibold">Ramadan</div>
+                                    <div class="text-xs text-gray-500">Lanterns & stars</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="eid" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-star-and-crescent text-3xl mb-2 text-green-700"></i>
+                                    <div class="font-semibold">Eid</div>
+                                    <div class="text-xs text-gray-500">Celebration mode</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="halloween" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-ghost text-3xl mb-2 text-orange-600"></i>
+                                    <div class="font-semibold">Halloween</div>
+                                    <div class="text-xs text-gray-500">Spooky vibes</div>
+                                </div>
+                            </label>
+                            
+                            <label class="theme-option cursor-pointer">
+                                <input type="radio" name="theme" value="valentines" class="hidden theme-radio">
+                                <div class="theme-card border-2 rounded-lg p-4 text-center hover:shadow-lg transition">
+                                    <i class="fas fa-heart text-3xl mb-2 text-red-600"></i>
+                                    <div class="font-semibold">Valentine's</div>
+                                    <div class="text-xs text-gray-500">Hearts & love</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Effects Toggle -->
+                    <div class="border rounded-lg p-6 bg-gray-50">
+                        <h3 class="font-bold text-lg mb-4"><i class="fas fa-magic mr-2 text-purple-600"></i>Visual Effects</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-white cursor-pointer">
+                                <input type="checkbox" id="enableSnow" class="mr-3 w-5 h-5 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-semibold"><i class="fas fa-snowflake mr-2 text-blue-400"></i>Snow Effect</div>
+                                    <div class="text-xs text-gray-500">Falling snowflakes animation</div>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-white cursor-pointer">
+                                <input type="checkbox" id="enableFireworks" class="mr-3 w-5 h-5 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-semibold"><i class="fas fa-burst mr-2 text-yellow-500"></i>Fireworks</div>
+                                    <div class="text-xs text-gray-500">Celebration fireworks</div>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-white cursor-pointer">
+                                <input type="checkbox" id="enableConfetti" class="mr-3 w-5 h-5 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-semibold"><i class="fas fa-wand-magic-sparkles mr-2 text-purple-500"></i>Confetti</div>
+                                    <div class="text-xs text-gray-500">Colorful confetti rain</div>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center p-3 border rounded-lg hover:bg-white cursor-pointer">
+                                <input type="checkbox" id="enableLights" class="mr-3 w-5 h-5 text-blue-600">
+                                <div class="flex-1">
+                                    <div class="font-semibold"><i class="fas fa-lightbulb mr-2 text-yellow-400"></i>Festive Lights</div>
+                                    <div class="text-xs text-gray-500">Twinkling string lights</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Message -->
+                    <div class="border rounded-lg p-6">
+                        <h3 class="font-bold text-lg mb-4"><i class="fas fa-comment-dots mr-2 text-green-600"></i>Custom Greeting Message</h3>
+                        <input type="text" id="customMessage" placeholder="e.g., Merry Christmas! 🎄 or Happy Eid! 🌙" class="w-full px-4 py-3 border rounded-lg text-lg">
+                        <p class="text-xs text-gray-500 mt-2">This message will appear prominently on your hotel page</p>
+                    </div>
+                    
+                    <!-- Profile Overlay -->
+                    <div class="border rounded-lg p-6 bg-gradient-to-r from-orange-50 to-pink-50">
+                        <h3 class="font-bold text-lg mb-4"><i class="fas fa-hat-wizard mr-2 text-orange-600"></i>Fun Profile Overlays</h3>
+                        <label class="flex items-center mb-3">
+                            <input type="checkbox" id="enableOverlay" class="mr-3 w-5 h-5">
+                            <span class="font-medium">Enable overlay decorations</span>
+                        </label>
+                        <div id="overlayOptions" class="hidden grid grid-cols-3 md:grid-cols-5 gap-3 mt-4">
+                            <label class="overlay-choice cursor-pointer">
+                                <input type="radio" name="overlay" value="santa_hat" class="hidden">
+                                <div class="border-2 rounded-lg p-3 text-center hover:shadow-lg transition">
+                                    <div class="text-2xl mb-1">🎅</div>
+                                    <div class="text-xs">Santa Hat</div>
+                                </div>
+                            </label>
+                            <label class="overlay-choice cursor-pointer">
+                                <input type="radio" name="overlay" value="party_hat" class="hidden">
+                                <div class="border-2 rounded-lg p-3 text-center hover:shadow-lg transition">
+                                    <div class="text-2xl mb-1">🎉</div>
+                                    <div class="text-xs">Party Hat</div>
+                                </div>
+                            </label>
+                            <label class="overlay-choice cursor-pointer">
+                                <input type="radio" name="overlay" value="bunny_ears" class="hidden">
+                                <div class="border-2 rounded-lg p-3 text-center hover:shadow-lg transition">
+                                    <div class="text-2xl mb-1">🐰</div>
+                                    <div class="text-xs">Bunny Ears</div>
+                                </div>
+                            </label>
+                            <label class="overlay-choice cursor-pointer">
+                                <input type="radio" name="overlay" value="crown" class="hidden">
+                                <div class="border-2 rounded-lg p-3 text-center hover:shadow-lg transition">
+                                    <div class="text-2xl mb-1">👑</div>
+                                    <div class="text-xs">Crown</div>
+                                </div>
+                            </label>
+                            <label class="overlay-choice cursor-pointer">
+                                <input type="radio" name="overlay" value="halo" class="hidden">
+                                <div class="border-2 rounded-lg p-3 text-center hover:shadow-lg transition">
+                                    <div class="text-2xl mb-1">😇</div>
+                                    <div class="text-xs">Halo</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview & Actions -->
+                    <div class="flex justify-between items-center pt-4 border-t">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="isActive" class="mr-2 w-5 h-5 text-green-600">
+                                <span class="font-semibold text-lg">🎯 Activate Effects Now</span>
+                            </label>
+                            <p class="text-xs text-gray-500 ml-7">Turn on/off all seasonal effects</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button type="button" onclick="previewSeasonalEffects()" class="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-semibold">
+                                <i class="fas fa-eye mr-2"></i>Preview
+                            </button>
+                            <button type="submit" class="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold">
+                                <i class="fas fa-save mr-2"></i>Save Settings
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Quick Presets -->
+                <div class="mt-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+                    <h3 class="font-bold mb-3"><i class="fas fa-bolt mr-2 text-yellow-500"></i>Quick Presets</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="applyPreset('christmas')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            🎄 Christmas Mode
+                        </button>
+                        <button onclick="applyPreset('newyear')" class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700">
+                            🎆 New Year Mode
+                        </button>
+                        <button onclick="applyPreset('ramadan')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            🌙 Ramadan Mode
+                        </button>
+                        <button onclick="applyPreset('eid')" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                            ⭐ Eid Mode
+                        </button>
+                        <button onclick="applyPreset('none')" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                            🚫 Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
     <!-- Support Ticket Modal -->
     <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -12252,6 +12567,180 @@ app.get('/admin/dashboard', (c) => {
           e.preventDefault();
           sendWidgetMessage();
         }
+      });
+
+      // ============================================
+      // SEASONAL EFFECTS FUNCTIONS
+      // ============================================
+      let seasonalSettings = {};
+      
+      async function loadSeasonalSettings() {
+        try {
+          const response = await fetch('/api/seasonal-settings/1');
+          const data = await response.json();
+          if (data.success) {
+            seasonalSettings = data.settings;
+            populateSeasonalForm(seasonalSettings);
+          }
+        } catch (error) {
+          console.error('Load seasonal settings error:', error);
+        }
+      }
+      
+      function populateSeasonalForm(settings) {
+        // Set theme
+        document.querySelector('input[name="theme"][value="' + (settings.active_theme || 'none') + '"]').checked = true;
+        updateThemeSelection();
+        
+        // Set effects
+        document.getElementById('enableSnow').checked = settings.enable_snow === 1;
+        document.getElementById('enableFireworks').checked = settings.enable_fireworks === 1;
+        document.getElementById('enableConfetti').checked = settings.enable_confetti === 1;
+        document.getElementById('enableLights').checked = settings.enable_lights === 1;
+        
+        // Set overlay
+        document.getElementById('enableOverlay').checked = settings.enable_overlay === 1;
+        if (settings.enable_overlay && settings.overlay_type) {
+          document.querySelector('input[name="overlay"][value="' + settings.overlay_type + '"]').checked = true;
+          document.getElementById('overlayOptions').classList.remove('hidden');
+        }
+        
+        // Set message
+        document.getElementById('customMessage').value = settings.custom_message || '';
+        
+        // Set active status
+        document.getElementById('isActive').checked = settings.is_active === 1;
+      }
+      
+      function updateThemeSelection() {
+        document.querySelectorAll('.theme-card').forEach(card => {
+          card.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+        const selected = document.querySelector('input[name="theme"]:checked');
+        if (selected) {
+          selected.closest('.theme-option').querySelector('.theme-card').classList.add('border-blue-500', 'bg-blue-50');
+        }
+      }
+      
+      // Theme selection handler
+      document.querySelectorAll('input[name="theme"]').forEach(radio => {
+        radio.addEventListener('change', updateThemeSelection);
+      });
+      
+      // Overlay toggle handler
+      document.getElementById('enableOverlay').addEventListener('change', (e) => {
+        if (e.target.checked) {
+          document.getElementById('overlayOptions').classList.remove('hidden');
+        } else {
+          document.getElementById('overlayOptions').classList.add('hidden');
+        }
+      });
+      
+      // Overlay selection handler
+      document.querySelectorAll('.overlay-choice').forEach(choice => {
+        choice.addEventListener('click', () => {
+          document.querySelectorAll('.overlay-choice div').forEach(div => {
+            div.classList.remove('border-blue-500', 'bg-blue-50');
+          });
+          choice.querySelector('div').classList.add('border-blue-500', 'bg-blue-50');
+        });
+      });
+      
+      function applyPreset(preset) {
+        // Reset all
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        
+        if (preset === 'none') {
+          document.querySelector('input[name="theme"][value="none"]').checked = true;
+          document.getElementById('customMessage').value = '';
+        } else if (preset === 'christmas') {
+          document.querySelector('input[name="theme"][value="christmas"]').checked = true;
+          document.getElementById('enableSnow').checked = true;
+          document.getElementById('enableLights').checked = true;
+          document.getElementById('enableOverlay').checked = true;
+          document.getElementById('overlayOptions').classList.remove('hidden');
+          document.querySelector('input[name="overlay"][value="santa_hat"]').checked = true;
+          document.getElementById('customMessage').value = 'Merry Christmas! 🎄✨';
+          document.getElementById('isActive').checked = true;
+        } else if (preset === 'newyear') {
+          document.querySelector('input[name="theme"][value="newyear"]').checked = true;
+          document.getElementById('enableFireworks').checked = true;
+          document.getElementById('enableConfetti').checked = true;
+          document.getElementById('enableOverlay').checked = true;
+          document.getElementById('overlayOptions').classList.remove('hidden');
+          document.querySelector('input[name="overlay"][value="party_hat"]').checked = true;
+          document.getElementById('customMessage').value = 'Happy New Year! 🎆🥳';
+          document.getElementById('isActive').checked = true;
+        } else if (preset === 'ramadan') {
+          document.querySelector('input[name="theme"][value="ramadan"]').checked = true;
+          document.getElementById('enableLights').checked = true;
+          document.getElementById('customMessage').value = 'Ramadan Kareem! 🌙⭐';
+          document.getElementById('isActive').checked = true;
+        } else if (preset === 'eid') {
+          document.querySelector('input[name="theme"][value="eid"]').checked = true;
+          document.getElementById('enableConfetti').checked = true;
+          document.getElementById('enableLights').checked = true;
+          document.getElementById('customMessage').value = 'Eid Mubarak! ⭐🌙';
+          document.getElementById('isActive').checked = true;
+        }
+        
+        updateThemeSelection();
+      }
+      
+      function previewSeasonalEffects() {
+        const theme = document.querySelector('input[name="theme"]:checked').value;
+        const message = document.getElementById('customMessage').value;
+        
+        // Open hotel page in new tab with preview parameter
+        const previewUrl = '/hotel/paradise-resort?preview=seasonal&theme=' + theme + '&message=' + encodeURIComponent(message);
+        window.open(previewUrl, '_blank');
+      }
+      
+      document.getElementById('seasonalForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const overlayEnabled = document.getElementById('enableOverlay').checked;
+        const overlayType = overlayEnabled ? document.querySelector('input[name="overlay"]:checked')?.value : null;
+        
+        const data = {
+          active_theme: document.querySelector('input[name="theme"]:checked').value,
+          is_active: document.getElementById('isActive').checked,
+          enable_snow: document.getElementById('enableSnow').checked,
+          enable_fireworks: document.getElementById('enableFireworks').checked,
+          enable_confetti: document.getElementById('enableConfetti').checked,
+          enable_lights: document.getElementById('enableLights').checked,
+          enable_overlay: overlayEnabled,
+          overlay_type: overlayType,
+          custom_message: document.getElementById('customMessage').value
+        };
+        
+        try {
+          const response = await fetch('/api/admin/seasonal-settings/1', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            alert('✨ Seasonal settings saved! Visit your hotel page to see the effects.');
+            loadSeasonalSettings();
+          } else {
+            alert('Failed to save settings: ' + (result.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Save seasonal settings error:', error);
+          alert('Failed to save seasonal settings');
+        }
+      });
+      
+      // Load seasonal settings when seasonal tab is opened
+      document.querySelectorAll('[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.tab === 'seasonal') {
+            loadSeasonalSettings();
+          }
+        });
       });
 
       function logout() {
