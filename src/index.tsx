@@ -5920,43 +5920,48 @@ app.get('/hotel/:property_slug', async (c) => {
             </button>
           \`;
           
-          // Add default section pills only if visible
+          // Add default section pills only if visible (using custom section names)
           if (propertyData?.show_restaurants === 1) {
+            const customName = getTranslatedField(propertyData, 'section_restaurants') || t.restaurants;
             pillsHTML += \`
               <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
-                <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">\${t.restaurants}</span>
+                <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">\${customName}</span>
               </button>
             \`;
           }
           
           if (propertyData?.show_events === 1) {
+            const customName = getTranslatedField(propertyData, 'section_events') || t.events;
             pillsHTML += \`
               <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
-                <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">\${t.events}</span>
+                <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">\${customName}</span>
               </button>
             \`;
           }
           
           if (propertyData?.show_spa === 1) {
+            const customName = getTranslatedField(propertyData, 'section_spa') || t.spa;
             pillsHTML += \`
               <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
-                <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">\${t.spa}</span>
+                <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">\${customName}</span>
               </button>
             \`;
           }
           
           if (propertyData?.show_service === 1) {
+            const customName = getTranslatedField(propertyData, 'section_service') || t.services;
             pillsHTML += \`
               <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
-                <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">\${t.services}</span>
+                <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">\${customName}</span>
               </button>
             \`;
           }
           
           if (propertyData?.show_activities === 1) {
+            const customName = getTranslatedField(propertyData, 'section_activities') || t.activities;
             pillsHTML += \`
               <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
-                <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">\${t.activities}</span>
+                <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">\${customName}</span>
               </button>
             \`;
           }
