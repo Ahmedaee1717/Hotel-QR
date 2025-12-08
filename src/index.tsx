@@ -16383,8 +16383,8 @@ app.get('/admin/dashboard', (c) => {
           const container = document.getElementById('beachSpotsList');
           
           if (data.success && data.spots && data.spots.length > 0) {
-            container.innerHTML = data.spots.map(spot =>
-              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
+            container.innerHTML = data.spots.map(spot => {
+              return '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
                 '<div class="flex items-center gap-3">' +
                   '<div class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center">' +
                     '<i class="fas fa-umbrella-beach"></i>' +
@@ -16403,8 +16403,8 @@ app.get('/admin/dashboard', (c) => {
                     '<i class="fas fa-trash"></i>' +
                   '</button>' +
                 '</div>' +
-              '</div>'
-            ).join('');
+              '</div>';
+            }).join('');
           } else {
             container.innerHTML = '<p class="text-gray-500 text-center py-8">No beach spots created yet. Use the Beach Map Designer to add spots.</p>';
           }
@@ -16485,8 +16485,8 @@ app.get('/admin/dashboard', (c) => {
           const container = document.getElementById('beachBookingsList');
           
           if (data.success && data.bookings && data.bookings.length > 0) {
-            container.innerHTML = data.bookings.map(booking =>
-              '<div class="border-l-4 ' + (booking.booking_status === 'confirmed' ? 'border-green-500' : 'border-gray-400') + ' bg-gray-50 p-4 rounded-lg">' +
+            container.innerHTML = data.bookings.map(booking => {
+              return '<div class="border-l-4 ' + (booking.booking_status === 'confirmed' ? 'border-green-500' : 'border-gray-400') + ' bg-gray-50 p-4 rounded-lg">' +
                 '<div class="flex items-center justify-between mb-2">' +
                   '<div class="flex items-center gap-2">' +
                     '<span class="font-bold text-blue-600">' + booking.spot_number + '</span>' +
@@ -16508,8 +16508,8 @@ app.get('/admin/dashboard', (c) => {
                     '<i class="fas fa-times mr-1"></i>Cancel' +
                   '</button>' +
                 '</div>' +
-              '</div>'
-            ).join('');
+              '</div>';
+            }).join('');
           } else {
             container.innerHTML = '<p class="text-gray-500 text-center py-8">No bookings for this date</p>';
           }
