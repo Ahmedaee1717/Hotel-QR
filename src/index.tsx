@@ -6891,39 +6891,50 @@ app.get('/vendor/dashboard', (c) => {
 
       function displayActivities(activities) {
         const list = document.getElementById('activitiesList');
-        if (activities.length === 0) {
+        
+        console.log('displayActivities called with:', activities ? activities.length : 'null', 'activities');
+        
+        if (!activities || activities.length === 0) {
           list.innerHTML = '<p class="text-gray-500 text-center py-8">No activities yet. Create your first activity above!</p>';
           return;
         }
         
-        list.innerHTML = activities.map(a => {
-          const statusClass = a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
-          const titleEscaped = (a.title_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-          const descEscaped = (a.short_description_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        try {
+          const html = activities.map(a => {
+            const statusClass = a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+            const titleEscaped = String(a.title_en || 'Untitled').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ');
+            const descEscaped = String(a.short_description_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ');
+            
+            return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
+              '<div class="flex justify-between items-start">' +
+              '<div class="flex-1">' +
+              '<h3 class="text-xl font-bold">' + titleEscaped + '</h3>' +
+              '<p class="text-gray-600 text-sm mt-1">' + descEscaped + '</p>' +
+              '<div class="flex gap-4 mt-3 text-sm text-gray-600">' +
+              '<span><i class="fas fa-tag mr-1"></i>' + (a.currency || 'USD') + ' ' + (a.price || 0) + '</span>' +
+              '<span><i class="far fa-clock mr-1"></i>' + (a.duration_minutes || 0) + ' min</span>' +
+              '<span><i class="far fa-user mr-1"></i>Max ' + (a.capacity_per_slot || 1) + '</span>' +
+              '</div>' +
+              '</div>' +
+              '<div class="flex items-start gap-2">' +
+              '<span class="px-3 py-1 rounded-full text-sm ' + statusClass + '">' + (a.status || 'draft') + '</span>' +
+              '<button onclick="editActivity(' + a.activity_id + ')" class="text-blue-600 hover:text-blue-800 p-2" title="Edit">' +
+              '<i class="fas fa-edit"></i>' +
+              '</button>' +
+              '<button onclick="deleteActivity(' + a.activity_id + ')" class="text-red-600 hover:text-red-800 p-2" title="Delete">' +
+              '<i class="fas fa-trash"></i>' +
+              '</button>' +
+              '</div>' +
+              '</div>' +
+              '</div>';
+          }).join('');
           
-          return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
-            '<div class="flex justify-between items-start">' +
-            '<div class="flex-1">' +
-            '<h3 class="text-xl font-bold">' + titleEscaped + '</h3>' +
-            '<p class="text-gray-600 text-sm mt-1">' + descEscaped + '</p>' +
-            '<div class="flex gap-4 mt-3 text-sm text-gray-600">' +
-            '<span><i class="fas fa-tag mr-1"></i>' + (a.currency || 'USD') + ' ' + (a.price || 0) + '</span>' +
-            '<span><i class="far fa-clock mr-1"></i>' + (a.duration_minutes || 0) + ' min</span>' +
-            '<span><i class="far fa-user mr-1"></i>Max ' + (a.capacity_per_slot || 1) + '</span>' +
-            '</div>' +
-            '</div>' +
-            '<div class="flex items-start gap-2">' +
-            '<span class="px-3 py-1 rounded-full text-sm ' + statusClass + '">' + (a.status || 'draft') + '</span>' +
-            '<button onclick="editActivity(' + a.activity_id + ')" class="text-blue-600 hover:text-blue-800 p-2" title="Edit">' +
-            '<i class="fas fa-edit"></i>' +
-            '</button>' +
-            '<button onclick="deleteActivity(' + a.activity_id + ')" class="text-red-600 hover:text-red-800 p-2" title="Delete">' +
-            '<i class="fas fa-trash"></i>' +
-            '</button>' +
-            '</div>' +
-            '</div>' +
-            '</div>';
-        }).join('');
+          list.innerHTML = html;
+          console.log('Successfully rendered', activities.length, 'activities');
+        } catch (error) {
+          console.error('Error rendering activities:', error);
+          list.innerHTML = '<p class="text-red-500 text-center py-8">Error displaying activities. Check console for details.</p>';
+        }
       }
 
       // Profile form submission
