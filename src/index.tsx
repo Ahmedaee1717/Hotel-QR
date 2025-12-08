@@ -6359,23 +6359,36 @@ app.get('/hotel/:property_slug', async (c) => {
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
           
           // Logo - add to propertyLogo container (Facebook Profile Style)
-          console.log('🎨 LOGO DEBUG - settings object:', settings);
-          console.log('🎨 LOGO DEBUG - brand_logo_url:', settings.brand_logo_url);
+          console.log('🎨 Loading logo from settings:', settings.brand_logo_url);
           const logoContainer = document.getElementById('propertyLogo');
-          console.log('📍 LOGO DEBUG - container found:', logoContainer);
           
           if (logoContainer && settings.brand_logo_url) {
-            console.log('✅ LOGO DEBUG - Setting logo image:', settings.brand_logo_url);
-            // Replace placeholder with actual logo
-            const logoHTML = '<img src="' + settings.brand_logo_url + '" alt="GuestConnect Logo" class="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover shadow-lg border-4 border-white bg-white" style="display: block;" onerror="console.error(\'❌ Logo image failed to load:\', this.src); alert(\'Logo failed: \' + this.src);" onload="console.log(\'✅✅✅ Logo image loaded successfully!\');" />';
-            logoContainer.innerHTML = logoHTML;
-            console.log('✅ LOGO DEBUG - innerHTML set, new HTML:', logoContainer.innerHTML.substring(0, 100));
+            console.log('✅ Setting logo image');
+            // Create img element programmatically to avoid CSP inline handler issues
+            const logoImg = document.createElement('img');
+            logoImg.src = settings.brand_logo_url;
+            logoImg.alt = 'GuestConnect Logo';
+            logoImg.className = 'w-24 h-24 md:w-32 md:h-32 rounded-full object-cover shadow-lg border-4 border-white bg-white';
+            logoImg.style.display = 'block';
+            
+            // Add event listeners (CSP-compliant way)
+            logoImg.addEventListener('load', function() {
+              console.log('✅ Logo loaded successfully!');
+            });
+            
+            logoImg.addEventListener('error', function() {
+              console.error('❌ Logo failed to load:', this.src);
+            });
+            
+            // Replace the placeholder
+            logoContainer.innerHTML = '';
+            logoContainer.appendChild(logoImg);
           } else {
             if (!logoContainer) {
-              console.error('❌ LOGO DEBUG - Logo container element not found!');
+              console.error('❌ Logo container not found!');
             }
             if (!settings.brand_logo_url) {
-              console.error('❌ LOGO DEBUG - No brand_logo_url in settings! Settings keys:', Object.keys(settings));
+              console.warn('⚠️ No brand_logo_url in settings');
             }
           }
           
