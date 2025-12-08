@@ -6862,22 +6862,31 @@ app.get('/vendor/dashboard', (c) => {
           return;
         }
         
-        list.innerHTML = bookings.slice(0, 10).map(b => \`
-          <div class="border rounded-lg p-4 hover:shadow-md transition">
-            <div class="flex justify-between items-start">
-              <div class="flex-1">
-                <h3 class="font-bold">\${b.activity_title}</h3>
-                <p class="text-sm text-gray-600">\${b.first_name} \${b.last_name} • \${b.email}</p>
-                <div class="flex gap-4 mt-2 text-sm text-gray-600">
-                  <span><i class="far fa-calendar mr-1"></i>\${b.activity_date}</span>
-                  <span><i class="far fa-clock mr-1"></i>\${b.activity_time}</span>
-                  <span><i class="far fa-user mr-1"></i>\${b.num_participants} people</span>
-                </div>
-              </div>
-              <span class="px-3 py-1 rounded-full text-xs \${b.booking_status === 'confirmed' ? 'bg-green-100 text-green-800' : b.booking_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">\${b.booking_status}</span>
-            </div>
-          </div>
-        \`).join('');
+        list.innerHTML = bookings.slice(0, 10).map(b => {
+          let statusClass = 'bg-gray-100 text-gray-800';
+          if (b.booking_status === 'confirmed') statusClass = 'bg-green-100 text-green-800';
+          else if (b.booking_status === 'pending') statusClass = 'bg-yellow-100 text-yellow-800';
+          
+          const title = (b.activity_title || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const firstName = (b.first_name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const lastName = (b.last_name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const email = (b.email || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          
+          return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
+            '<div class="flex justify-between items-start">' +
+            '<div class="flex-1">' +
+            '<h3 class="font-bold">' + title + '</h3>' +
+            '<p class="text-sm text-gray-600">' + firstName + ' ' + lastName + ' • ' + email + '</p>' +
+            '<div class="flex gap-4 mt-2 text-sm text-gray-600">' +
+            '<span><i class="far fa-calendar mr-1"></i>' + (b.activity_date || '') + '</span>' +
+            '<span><i class="far fa-clock mr-1"></i>' + (b.activity_time || '') + '</span>' +
+            '<span><i class="far fa-user mr-1"></i>' + (b.num_participants || 0) + ' people</span>' +
+            '</div>' +
+            '</div>' +
+            '<span class="px-3 py-1 rounded-full text-xs ' + statusClass + '">' + (b.booking_status || 'pending') + '</span>' +
+            '</div>' +
+            '</div>';
+        }).join('');
       }
 
       function displayActivities(activities) {
@@ -6887,30 +6896,34 @@ app.get('/vendor/dashboard', (c) => {
           return;
         }
         
-        list.innerHTML = activities.map(a => \`
-          <div class="border rounded-lg p-4 hover:shadow-md transition">
-            <div class="flex justify-between items-start">
-              <div class="flex-1">
-                <h3 class="text-xl font-bold">\${a.title_en}</h3>
-                <p class="text-gray-600 text-sm mt-1">\${a.short_description_en}</p>
-                <div class="flex gap-4 mt-3 text-sm text-gray-600">
-                  <span><i class="fas fa-tag mr-1"></i>\${a.currency} \${a.price}</span>
-                  <span><i class="far fa-clock mr-1"></i>\${a.duration_minutes} min</span>
-                  <span><i class="far fa-user mr-1"></i>Max \${a.capacity_per_slot}</span>
-                </div>
-              </div>
-              <div class="flex items-start gap-2">
-                <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
-                <button onclick="editActivity(\${a.activity_id})" class="text-blue-600 hover:text-blue-800 p-2" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
-                <button onclick="deleteActivity(\${a.activity_id})" class="text-red-600 hover:text-red-800 p-2" title="Delete">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        \`).join('');
+        list.innerHTML = activities.map(a => {
+          const statusClass = a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+          const titleEscaped = (a.title_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const descEscaped = (a.short_description_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          
+          return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
+            '<div class="flex justify-between items-start">' +
+            '<div class="flex-1">' +
+            '<h3 class="text-xl font-bold">' + titleEscaped + '</h3>' +
+            '<p class="text-gray-600 text-sm mt-1">' + descEscaped + '</p>' +
+            '<div class="flex gap-4 mt-3 text-sm text-gray-600">' +
+            '<span><i class="fas fa-tag mr-1"></i>' + (a.currency || 'USD') + ' ' + (a.price || 0) + '</span>' +
+            '<span><i class="far fa-clock mr-1"></i>' + (a.duration_minutes || 0) + ' min</span>' +
+            '<span><i class="far fa-user mr-1"></i>Max ' + (a.capacity_per_slot || 1) + '</span>' +
+            '</div>' +
+            '</div>' +
+            '<div class="flex items-start gap-2">' +
+            '<span class="px-3 py-1 rounded-full text-sm ' + statusClass + '">' + (a.status || 'draft') + '</span>' +
+            '<button onclick="editActivity(' + a.activity_id + ')" class="text-blue-600 hover:text-blue-800 p-2" title="Edit">' +
+            '<i class="fas fa-edit"></i>' +
+            '</button>' +
+            '<button onclick="deleteActivity(' + a.activity_id + ')" class="text-red-600 hover:text-red-800 p-2" title="Delete">' +
+            '<i class="fas fa-trash"></i>' +
+            '</button>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        }).join('');
       }
 
       // Profile form submission
