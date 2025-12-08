@@ -1359,6 +1359,73 @@ app.get('/api/vendor/bookings', async (c) => {
   }
 })
 
+// Get vendor callbacks
+app.get('/api/vendor/callbacks', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+  
+  try {
+    const callbacks = await DB.prepare(`
+      SELECT 
+        cr.*,
+        a.title_en as activity_title,
+        a.activity_id
+      FROM callback_requests cr
+      LEFT JOIN activities a ON cr.activity_id = a.activity_id
+      WHERE cr.vendor_id = ? OR (cr.activity_id IS NOT NULL AND a.vendor_id = ?)
+      ORDER BY cr.created_at DESC
+    `).bind(vendor_id, vendor_id).all()
+    
+    return c.json(callbacks.results || [])
+  } catch (error) {
+    console.error('Get vendor callbacks error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Update callback status
+app.patch('/api/vendor/callbacks/:request_id', async (c) => {
+  const { DB } = c.env
+  const { request_id } = c.req.param()
+  const vendor_id = c.req.header('X-Vendor-ID')
+  const { status } = await c.req.json()
+  
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+  
+  try {
+    // Verify callback belongs to vendor's activity
+    const callback = await DB.prepare(`
+      SELECT cr.*, a.vendor_id
+      FROM callback_requests cr
+      LEFT JOIN activities a ON cr.activity_id = a.activity_id
+      WHERE cr.request_id = ?
+    `).bind(request_id).first()
+    
+    if (!callback || (callback.vendor_id && callback.vendor_id != vendor_id)) {
+      return c.json({ error: 'Callback not found or access denied' }, 404)
+    }
+    
+    const contacted_at = status === 'contacted' || status === 'completed' ? new Date().toISOString() : null
+    
+    await DB.prepare(`
+      UPDATE callback_requests 
+      SET status = ?, contacted_at = ?
+      WHERE request_id = ?
+    `).bind(status, contacted_at, request_id).run()
+    
+    return c.json({ success: true, message: 'Callback status updated' })
+  } catch (error) {
+    console.error('Update callback error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // Update booking status (vendor confirms or completes)
 app.patch('/api/vendor/bookings/:booking_id', async (c) => {
   const { DB } = c.env
@@ -1830,15 +1897,25 @@ app.post('/api/vendor/register', async (c) => {
 // Submit callback request
 app.post('/api/callback-request', async (c) => {
   const { DB } = c.env
-  const { property_id, first_name, last_name, phone, email, preferred_time, message } = await c.req.json()
+  const { property_id, activity_id, vendor_id, first_name, last_name, phone, email, preferred_time, message } = await c.req.json()
   
   try {
     const request = await DB.prepare(`
       INSERT INTO callback_requests (
-        property_id, first_name, last_name, phone, email, preferred_time, message, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        property_id, activity_id, vendor_id, first_name, last_name, phone, email, preferred_time, message, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       RETURNING request_id
-    `).bind(property_id, first_name, last_name, phone, email || null, preferred_time || 'anytime', message || null).first()
+    `).bind(
+      property_id, 
+      activity_id || null, 
+      vendor_id || null, 
+      first_name, 
+      last_name, 
+      phone, 
+      email || null, 
+      preferred_time || 'anytime', 
+      message || null
+    ).first()
     
     return c.json({
       success: true,
@@ -6857,6 +6934,13 @@ app.get('/vendor/dashboard', (c) => {
             <div id="bookingsList" class="space-y-3"></div>
         </div>
 
+        <!-- Callback Requests -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-phone-alt mr-2 text-orange-600"></i>Callback Requests</h2>
+            <p class="text-gray-600 mb-4">Guests who requested callbacks for your activities</p>
+            <div id="callbacksList" class="space-y-3"></div>
+        </div>
+
         <!-- Vendor Profile -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-user-circle mr-2 text-indigo-600"></i>My Profile</h2>
@@ -7001,12 +7085,13 @@ app.get('/vendor/dashboard', (c) => {
 
       async function loadDashboard() {
         try {
-          const [bookingsRes, activitiesRes, categoriesRes, profileRes, propertiesRes] = await Promise.all([
+          const [bookingsRes, activitiesRes, categoriesRes, profileRes, propertiesRes, callbacksRes] = await Promise.all([
             fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }),
             fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }),
             fetch('/api/categories'),
             fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } }),
-            fetch('/api/vendor/properties', { headers: { 'X-Vendor-ID': vendorId } })
+            fetch('/api/vendor/properties', { headers: { 'X-Vendor-ID': vendorId } }),
+            fetch('/api/vendor/callbacks', { headers: { 'X-Vendor-ID': vendorId } })
           ]);
 
           // Check if all responses are OK
@@ -7055,8 +7140,11 @@ app.get('/vendor/dashboard', (c) => {
           });
           console.log('Category dropdown HTML:', categorySelect.innerHTML);
 
+          const callbacks = await callbacksRes.json();
+          
           displayProperties(properties.properties || []);
           displayBookings(bookingsList);
+          displayCallbacks(callbacks || []);
           displayActivities(activities.activities || []);
           console.log('Activities displayed:', activities.activities?.length || 0);
           displayProfile(profile.profile);
@@ -7278,6 +7366,80 @@ app.get('/vendor/dashboard', (c) => {
             '</div>' +
             '</div>';
         }).join('');
+      }
+
+      function displayCallbacks(callbacks) {
+        const list = document.getElementById('callbacksList');
+        if (callbacks.length === 0) {
+          list.innerHTML = '<p class="text-gray-500 text-center py-4">No callback requests yet</p>';
+          return;
+        }
+        
+        list.innerHTML = callbacks.map(cb => {
+          let statusClass = 'bg-gray-100 text-gray-800';
+          if (cb.status === 'contacted') statusClass = 'bg-blue-100 text-blue-800';
+          else if (cb.status === 'completed') statusClass = 'bg-green-100 text-green-800';
+          else if (cb.status === 'cancelled') statusClass = 'bg-red-100 text-red-800';
+          else if (cb.status === 'pending') statusClass = 'bg-yellow-100 text-yellow-800';
+          
+          const firstName = (cb.first_name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const lastName = (cb.last_name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const phone = (cb.phone || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const email = (cb.email || 'N/A').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const activityTitle = (cb.activity_title || 'General Inquiry').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const message = (cb.message || 'No message').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          const preferredTime = (cb.preferred_time || 'anytime').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+          
+          const statusButtons = cb.status === 'pending' 
+            ? '<button onclick="updateCallbackStatus(' + cb.request_id + ', ' + String.fromCharCode(39) + 'contacted' + String.fromCharCode(39) + ')" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Mark Contacted</button>' +
+              '<button onclick="updateCallbackStatus(' + cb.request_id + ', ' + String.fromCharCode(39) + 'completed' + String.fromCharCode(39) + ')" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">Complete</button>'
+            : cb.status === 'contacted'
+            ? '<button onclick="updateCallbackStatus(' + cb.request_id + ', ' + String.fromCharCode(39) + 'completed' + String.fromCharCode(39) + ')" class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">Complete</button>'
+            : '';
+          
+          return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
+            '<div class="flex justify-between items-start mb-3">' +
+            '<div class="flex-1">' +
+            '<h3 class="font-bold text-lg">' + firstName + ' ' + lastName + '</h3>' +
+            '<p class="text-sm text-orange-600 font-semibold"><i class="fas fa-clipboard-list mr-1"></i>' + activityTitle + '</p>' +
+            '</div>' +
+            '<span class="px-3 py-1 rounded-full text-xs font-semibold ' + statusClass + '">' + (cb.status || 'pending') + '</span>' +
+            '</div>' +
+            '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-3">' +
+            '<div><i class="fas fa-phone mr-1 text-blue-600"></i>' + phone + '</div>' +
+            '<div><i class="fas fa-envelope mr-1 text-blue-600"></i>' + email + '</div>' +
+            '<div><i class="fas fa-clock mr-1 text-purple-600"></i>Preferred: ' + preferredTime + '</div>' +
+            '<div><i class="fas fa-calendar mr-1 text-gray-500"></i>' + new Date(cb.created_at).toLocaleString() + '</div>' +
+            '</div>' +
+            (cb.message ? '<div class="bg-gray-50 p-3 rounded text-sm mb-3"><i class="fas fa-comment mr-1 text-gray-600"></i>' + message + '</div>' : '') +
+            '<div class="flex gap-2">' +
+            statusButtons +
+            '</div>' +
+            '</div>';
+        }).join('');
+      }
+      
+      async function updateCallbackStatus(requestId, status) {
+        try {
+          const response = await fetch(String.fromCharCode(47) + 'api' + String.fromCharCode(47) + 'vendor' + String.fromCharCode(47) + 'callbacks' + String.fromCharCode(47) + requestId, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Vendor-ID': vendorId
+            },
+            body: JSON.stringify({ status })
+          });
+          
+          if (response.ok) {
+            alert('Callback status updated!');
+            loadDashboard();
+          } else {
+            alert('Failed to update callback status');
+          }
+        } catch (error) {
+          console.error('Update callback error:', error);
+          alert('Error updating callback status');
+        }
       }
 
       function displayActivities(activities) {
@@ -8445,7 +8607,9 @@ app.get('/activity', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
+              property_id: propertyId || 1,
+              activity_id: activityId || null,
+              vendor_id: activity ? activity.vendor_id : null,
               first_name: document.getElementById('cbFirstName').value,
               last_name: document.getElementById('cbLastName').value,
               phone: document.getElementById('cbPhone').value,
