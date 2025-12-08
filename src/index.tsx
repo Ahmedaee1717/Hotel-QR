@@ -4918,7 +4918,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <div class="gradient-hero h-64 md:h-96 relative">
                     <!-- Info Button & Language Selector - Top Right on Cover -->
                     <div class="absolute top-4 right-4 z-10 flex gap-2">
-                        <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" style="background-color: #8B5CF6;" title="Hotel Information">
+                        <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" title="Hotel Information">
                             <i class="fas fa-info-circle"></i>
                             <span class="hidden sm:inline">Info</span>
                         </button>
@@ -6368,7 +6368,8 @@ app.get('/hotel/:property_slug', async (c) => {
               // Custom message banner
               if (s.custom_message) {
                 const banner = document.createElement('div');
-                banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-align:center;padding:12px;font-size:18px;font-weight:bold;z-index:10000;box-shadow:0 2px 10px rgba(0,0,0,0.2);animation:slideDown 0.5s';
+                const primaryColor = propertyData.primary_color || '#3B82F6';
+                banner.style.cssText = 'position:fixed;top:0;left:0;width:100%;background:linear-gradient(135deg,' + primaryColor + ',#ffffff);color:white;text-align:center;padding:12px;font-size:18px;font-weight:bold;z-index:10000;box-shadow:0 2px 10px rgba(0,0,0,0.2);animation:slideDown 0.5s;text-shadow: 1px 1px 2px rgba(0,0,0,0.3)';
                 banner.textContent = s.custom_message;
                 document.body.appendChild(banner);
                 document.body.style.paddingTop = '48px';
@@ -6479,23 +6480,14 @@ app.get('/hotel/:property_slug', async (c) => {
             return;
           }
 
-          const colorClasses = {
-            blue: 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700',
-            purple: 'from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700',
-            green: 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700',
-            orange: 'from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700',
-            red: 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
-            pink: 'from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700',
-            indigo: 'from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700',
-            teal: 'from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
-          };
+          // Use primary color from settings for all info page buttons
+          const primaryColor = propertyData.primary_color || '#3B82F6';
 
           let html = '';
           infoPages.forEach(page => {
             const title = page['title_' + currentLang] || page.title_en;
-            const colorClass = colorClasses[page.color_theme] || colorClasses.blue;
             
-            html += '<button onclick="openInfoPage(&quot;' + page.page_key + '&quot;)" class="w-full bg-gradient-to-r ' + colorClass + ' text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">' +
+            html += '<button onclick="openInfoPage(&quot;' + page.page_key + '&quot;)" class="w-full text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left" style="background: linear-gradient(135deg, ' + primaryColor + ' 0%, ' + primaryColor + 'dd 100%);">' +
               '<div class="flex items-center gap-3">' +
                 '<i class="' + page.icon_class + ' text-2xl"></i>' +
                 '<span class="font-bold text-lg">' + title + '</span>' +
@@ -6543,9 +6535,9 @@ app.get('/hotel/:property_slug', async (c) => {
         <div id="infoMenuModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden animate-scale-up">
                 <!-- Header -->
-                <div id="infoModalHeader" class="p-6 flex justify-between items-center" style="background: linear-gradient(135deg, #8B5CF6 0%, #ffffff 100%);">
-                    <h2 class="text-2xl font-bold" style="color: #8B5CF6;"><i class="fas fa-info-circle mr-2"></i>Hotel Information</h2>
-                    <button onclick="closeInfoMenu()" class="hover:opacity-80 transition" style="color: #8B5CF6;">
+                <div id="infoModalHeader" class="p-6 flex justify-between items-center">
+                    <h2 id="infoModalTitle" class="text-2xl font-bold"><i class="fas fa-info-circle mr-2"></i>Hotel Information</h2>
+                    <button id="infoModalCloseBtn" onclick="closeInfoMenu()" class="hover:opacity-80 transition">
                         <i class="fas fa-times text-2xl"></i>
                     </button>
                 </div>
