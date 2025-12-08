@@ -5262,8 +5262,18 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
       }
       
       aiResponse = `Based on our hotel information: ${bestMatch}.\n\nNote: For more detailed assistance, please contact our front desk. (AI responses will be more intelligent once the administrator configures the GenSpark API.)`
+    } else if (!apiKey && context.length === 0) {
+      // No chunks found - generic greeting or question not in knowledge base
+      const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
+      const isGreeting = greetings.some(g => message.toLowerCase().includes(g));
+      
+      if (isGreeting) {
+        aiResponse = `Hello! I'm your hotel assistant. I can help you with questions about:\n\n• Check-in and check-out times\n• Dining options and restaurants\n• Pool and beach facilities\n• Spa and wellness services\n• WiFi and internet access\n• Kids activities and babysitting\n\nWhat would you like to know?`;
+      } else {
+        aiResponse = `I don't have specific information about that in my current knowledge base. However, I can help you with questions about check-in times, dining, pool facilities, spa services, WiFi, and kids activities.\n\nWould you like to know about any of these topics?`;
+      }
     } else if (!apiKey) {
-      aiResponse = 'The AI assistant is not fully configured yet. Please contact the hotel staff for assistance, or ask the administrator to configure the GenSpark API for intelligent responses.'
+      aiResponse = 'I apologize, but I encountered an issue. Please try rephrasing your question or contact the hotel staff for assistance.'
     } else {
       aiResponse = 'I don\'t have specific information about that. Please contact the hotel staff for assistance.'
     }
