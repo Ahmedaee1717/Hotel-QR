@@ -5005,6 +5005,327 @@ Important: Do not add or remove information. Only improve grammar, spelling, and
   }
 })
 
+// ============================================
+// RAG CHATBOT UTILITY FUNCTIONS
+// ============================================
+
+// Split text into chunks for RAG
+function chunkText(text: string, maxChunkSize: number = 500): string[] {
+  const chunks: string[] = []
+  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0)
+  
+  let currentChunk = ''
+  
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length > maxChunkSize && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim())
+      currentChunk = sentence + '. '
+    } else {
+      currentChunk += sentence + '. '
+    }
+  }
+  
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.trim())
+  }
+  
+  return chunks
+}
+
+// Simple keyword-based search for chunks (BM25-like)
+function calculateRelevanceScore(query: string, text: string): number {
+  const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+  const textLower = text.toLowerCase()
+  
+  let score = 0
+  for (const word of queryWords) {
+    // Exact match
+    if (textLower.includes(word)) {
+      score += 2
+    }
+    // Partial match
+    const regex = new RegExp(word.substring(0, Math.min(word.length, 4)), 'i')
+    if (regex.test(textLower)) {
+      score += 1
+    }
+  }
+  
+  return score
+}
+
+// ============================================
+// RAG CHATBOT API ENDPOINTS
+// ============================================
+
+// API: Upload/Create Knowledge Base Document
+app.post('/api/admin/chatbot/documents', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { property_id, title, content, document_type } = body
+    
+    if (!property_id || !title || !content) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Insert document
+    const docResult = await DB.prepare(`
+      INSERT INTO chatbot_documents (property_id, title, content, document_type)
+      VALUES (?, ?, ?, ?)
+    `).bind(property_id, title, content, document_type || 'general').run()
+    
+    const documentId = docResult.meta.last_row_id
+    
+    // Chunk the content
+    const chunks = chunkText(content)
+    
+    // Insert chunks
+    for (let i = 0; i < chunks.length; i++) {
+      await DB.prepare(`
+        INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(documentId, property_id, chunks[i], i, chunks[i].toLowerCase(), chunks[i].split(/\s+/).length).run()
+    }
+    
+    return c.json({ 
+      success: true, 
+      document_id: documentId,
+      chunks_created: chunks.length 
+    })
+    
+  } catch (error) {
+    console.error('Create document error:', error)
+    return c.json({ error: 'Failed to create document' }, 500)
+  }
+})
+
+// API: Get all documents for a property
+app.get('/api/admin/chatbot/documents', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    const documents = await DB.prepare(`
+      SELECT d.*, 
+             (SELECT COUNT(*) FROM chatbot_chunks WHERE document_id = d.document_id) as chunk_count
+      FROM chatbot_documents d
+      WHERE d.property_id = ? AND d.is_active = 1
+      ORDER BY d.created_at DESC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, documents: documents.results || [] })
+  } catch (error) {
+    console.error('Get documents error:', error)
+    return c.json({ error: 'Failed to get documents' }, 500)
+  }
+})
+
+// API: Delete document
+app.delete('/api/admin/chatbot/documents/:document_id', async (c) => {
+  const { DB } = c.env
+  const { document_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`UPDATE chatbot_documents SET is_active = 0 WHERE document_id = ?`).bind(document_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete document error:', error)
+    return c.json({ error: 'Failed to delete document' }, 500)
+  }
+})
+
+// API: Chat with RAG
+app.post('/api/chatbot/chat', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { property_id, session_id, message, conversation_id } = body
+    
+    if (!property_id || !session_id || !message) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Rate limiting check
+    const today = new Date().toISOString().split('T')[0]
+    const rateLimit = await DB.prepare(`
+      SELECT message_count FROM chatbot_rate_limits
+      WHERE property_id = ? AND session_id = ? AND reset_date = ?
+    `).bind(property_id, session_id, today).first()
+    
+    if (rateLimit && rateLimit.message_count >= 20) {
+      return c.json({ 
+        error: 'Rate limit exceeded',
+        message: 'You have reached your daily limit of 20 messages. Please try again tomorrow.'
+      }, 429)
+    }
+    
+    // Get or create conversation
+    let convId = conversation_id
+    if (!convId) {
+      const convResult = await DB.prepare(`
+        INSERT INTO chatbot_conversations (property_id, session_id)
+        VALUES (?, ?)
+      `).bind(property_id, session_id).run()
+      convId = convResult.meta.last_row_id
+    }
+    
+    // Store user message
+    await DB.prepare(`
+      INSERT INTO chatbot_messages (conversation_id, role, content)
+      VALUES (?, 'user', ?)
+    `).bind(convId, message).run()
+    
+    // RAG: Find relevant chunks
+    const allChunks = await DB.prepare(`
+      SELECT chunk_id, chunk_text, document_id
+      FROM chatbot_chunks
+      WHERE property_id = ?
+    `).bind(property_id).all()
+    
+    // Score and rank chunks
+    const scoredChunks = (allChunks.results || []).map((chunk: any) => ({
+      ...chunk,
+      score: calculateRelevanceScore(message, chunk.chunk_text)
+    })).filter((chunk: any) => chunk.score > 0)
+      .sort((a: any, b: any) => b.score - a.score)
+      .slice(0, 3) // Top 3 most relevant chunks
+    
+    // Build context from chunks
+    const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
+    const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
+    
+    // Generate AI response
+    const apiKey = process.env.OPENAI_API_KEY
+    const baseURL = process.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    
+    let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
+    
+    if (apiKey && context.length > 0) {
+      try {
+        const systemPrompt = `You are a helpful hotel assistant. Use the following information to answer the guest's question. If the information doesn't contain the answer, say you don't know and suggest contacting the hotel staff.
+
+Hotel Information:
+${context}
+
+Answer in a friendly, professional manner. Keep responses concise but informative.`
+        
+        const response = await fetch(`${baseURL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-5-nano',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: message }
+            ],
+            temperature: 0.7,
+            max_tokens: 300
+          })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          aiResponse = data.choices[0].message.content
+        }
+      } catch (error) {
+        console.error('AI chat error:', error)
+      }
+    } else if (!apiKey) {
+      aiResponse = 'AI service is not configured. Please contact the administrator.'
+    } else {
+      aiResponse = 'I don\'t have specific information about that. Please contact the hotel staff for assistance.'
+    }
+    
+    // Store AI response
+    await DB.prepare(`
+      INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+      VALUES (?, 'assistant', ?, ?)
+    `).bind(convId, aiResponse, JSON.stringify(chunkIds)).run()
+    
+    // Update rate limit
+    if (rateLimit) {
+      await DB.prepare(`
+        UPDATE chatbot_rate_limits 
+        SET message_count = message_count + 1
+        WHERE property_id = ? AND session_id = ? AND reset_date = ?
+      `).bind(property_id, session_id, today).run()
+    } else {
+      await DB.prepare(`
+        INSERT INTO chatbot_rate_limits (property_id, session_id, message_count, reset_date)
+        VALUES (?, ?, 1, ?)
+      `).bind(property_id, session_id, today).run()
+    }
+    
+    // Track chunk usage (simplified - just insert)
+    for (const chunkId of chunkIds) {
+      try {
+        await DB.prepare(`
+          INSERT INTO chatbot_chunk_usage (chunk_id, property_id, times_retrieved, last_used)
+          VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+        `).bind(chunkId, property_id).run()
+      } catch {
+        // Ignore duplicate errors for now
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      response: aiResponse,
+      conversation_id: convId,
+      chunks_used: chunkIds.length
+    })
+    
+  } catch (error) {
+    console.error('Chatbot error:', error)
+    return c.json({ error: 'Failed to process message' }, 500)
+  }
+})
+
+// API: Get chatbot settings
+app.get('/api/chatbot/settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    return c.json({ success: true, settings })
+  } catch (error) {
+    console.error('Get chatbot settings error:', error)
+    return c.json({ error: 'Failed to get settings' }, 500)
+  }
+})
+
+// API: Update chatbot settings
+app.post('/api/admin/chatbot/settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { property_id, chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url } = body
+    
+    await DB.prepare(`
+      UPDATE properties
+      SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?
+      WHERE property_id = ?
+    `).bind(chatbot_enabled ? 1 : 0, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update chatbot settings error:', error)
+    return c.json({ error: 'Failed to update settings' }, 500)
+  }
+})
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
@@ -14012,6 +14333,8 @@ app.get('/admin/dashboard', (c) => {
       }
       
       function updateAdminFilterButtons(settings) {
+        console.log('🔧 updateAdminFilterButtons called with settings:', settings);
+        
         // Update admin panel filter button text with custom section names
         const sections = [
           { key: 'restaurant', elementId: 'admin-pill-restaurants', settingKey: 'section_restaurants_en', default: 'Restaurants', optionValue: 'restaurant', optionDefault: 'Restaurant' },
@@ -14022,10 +14345,14 @@ app.get('/admin/dashboard', (c) => {
         sections.forEach(section => {
           // Update filter button
           const element = document.getElementById(section.elementId);
+          console.log('🔍 Looking for element:', section.elementId, 'Found:', !!element);
           if (element) {
             const customName = settings[section.settingKey];
+            console.log('📝 Setting key:', section.settingKey, 'Value from DB:', customName);
             element.textContent = customName || section.default;
-            console.log('Admin filter updated:', section.key, '→', customName || section.default);
+            console.log('✅ Admin filter updated:', section.key, '→', customName || section.default);
+          } else {
+            console.warn('❌ Element not found:', section.elementId);
           }
           
           // Update dropdown option
@@ -14035,6 +14362,7 @@ app.get('/admin/dashboard', (c) => {
             if (option) {
               const customName = settings[section.settingKey];
               option.textContent = customName || section.optionDefault;
+              console.log('✅ Dropdown updated:', section.optionValue, '→', customName || section.optionDefault);
             }
           }
         });
