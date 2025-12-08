@@ -16501,10 +16501,10 @@ app.get('/admin/dashboard', (c) => {
                   (booking.special_requests ? '<div class="mt-1"><i class="fas fa-comment mr-1"></i>' + booking.special_requests + '</div>' : '') +
                 '</div>' +
                 '<div class="mt-2 flex gap-2">' +
-                  '<button onclick="viewBookingQR(\'' + booking.booking_reference + '\')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">' +
+                  '<button onclick="viewBookingQR(\\'' + booking.booking_reference + '\\')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">' +
                     '<i class="fas fa-qrcode mr-1"></i>QR Code' +
                   '</button>' +
-                  '<button onclick="cancelBeachBooking(\'' + booking.booking_reference + '\')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">' +
+                  '<button onclick="cancelBeachBooking(\\'' + booking.booking_reference + '\\')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">' +
                     '<i class="fas fa-times mr-1"></i>Cancel' +
                   '</button>' +
                 '</div>' +
