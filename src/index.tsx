@@ -5197,11 +5197,43 @@ app.post('/api/chatbot/chat', async (c) => {
       convId = convResult.meta.last_row_id
     }
     
+    // Get property info for personalization
+    const propertyInfo = await DB.prepare(`
+      SELECT name, chatbot_name, chatbot_greeting_en
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    const hotelName = propertyInfo?.name || 'our hotel'
+    const chatbotName = propertyInfo?.chatbot_name || 'Hotel Assistant'
+    
     // Store user message
     await DB.prepare(`
       INSERT INTO chatbot_messages (conversation_id, role, content)
       VALUES (?, 'user', ?)
     `).bind(convId, message).run()
+    
+    // Check if this is a simple greeting FIRST (before RAG search)
+    const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings'];
+    const messageLower = message.toLowerCase().trim()
+    const isSimpleGreeting = greetings.includes(messageLower) || greetings.some(g => messageLower === g + '!' || messageLower === g + '.');
+    
+    if (isSimpleGreeting) {
+      // Return friendly greeting immediately
+      const greetingResponse = `Welcome to ${hotelName}! I'm ${chatbotName}, your personal concierge assistant. It's my pleasure to assist you today.\n\nI'm here to help with:\n• Dining reservations and restaurant information\n• Spa and wellness services\n• Activities and excursions\n• Room amenities and facilities\n• Check-in/check-out assistance\n• Any special requests\n\nHow may I be of service?`;
+      
+      await DB.prepare(`
+        INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+        VALUES (?, 'assistant', ?, ?)
+      `).bind(convId, greetingResponse, '[]').run()
+      
+      return c.json({ 
+        success: true,
+        response: greetingResponse,
+        conversation_id: convId,
+        chunks_used: 0
+      })
+    }
     
     // RAG: Find relevant chunks
     const allChunks = await DB.prepare(`
@@ -5234,19 +5266,22 @@ app.post('/api/chatbot/chat', async (c) => {
         console.log('📚 Context length:', context.length)
         console.log('📝 Context preview:', context.substring(0, 200))
         
-        const systemPrompt = `You are a helpful hotel assistant for Paradise Resort. Answer the guest's question using ONLY the information provided below. Be confident and direct - if the information mentions something, provide a clear answer.
+        const systemPrompt = `You are ${chatbotName}, the personal concierge assistant for ${hotelName}, a 5-star luxury resort. Your role is to provide impeccable, professional service with warmth and sophistication.
 
-Hotel Information:
+Guest's Question: "${message}"
+
+Relevant Hotel Information:
 ${context}
 
-Important Rules:
-1. If the hotel information above mentions the topic, answer confidently with those details
-2. Include specific details like prices, times, locations when available
-3. Be friendly and conversational
-4. Keep responses concise (2-3 sentences maximum)
-5. Only say "I don't have that information" if the context truly doesn't mention the topic at all
+Instructions:
+1. **Tone**: Professional yet warm, like a luxury hotel concierge. Use phrases like "It would be my pleasure", "Certainly", "I'd be delighted to assist"
+2. **Accuracy**: Use ONLY the information provided above. Be confident if the information is available.
+3. **Specifics**: Include prices, times, locations, booking details when mentioned
+4. **Brevity**: Keep responses concise (2-3 sentences) but complete
+5. **Referrals**: If information is NOT in the context above, politely refer to hotel staff: "For detailed information about [topic], I'd recommend contacting our front desk at your convenience. They'll be delighted to assist you personally."
+6. **Never** say "I don't have that information" - always be gracious
 
-Answer the guest's question now:`
+Provide your response now:`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
@@ -5350,18 +5385,11 @@ Answer the guest's question now:`
       
       aiResponse = prefix + summary + '.\n\n💡 Tip: For booking or detailed questions, please contact our front desk.'
     } else if (!aiResponse && context.length === 0) {
-      // No chunks found - generic greeting or question not in knowledge base
-      const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
-      const isGreeting = greetings.some(g => message.toLowerCase().includes(g));
-      
-      if (isGreeting) {
-        aiResponse = `Hello! I'm your hotel assistant. I can help you with questions about:\n\n• Check-in and check-out times\n• Dining options and restaurants\n• Pool and beach facilities\n• Spa and wellness services\n• WiFi and internet access\n• Kids activities and babysitting\n\nWhat would you like to know?`;
-      } else {
-        aiResponse = `I don't have specific information about that in my current knowledge base. However, I can help you with questions about check-in times, dining, pool facilities, spa services, WiFi, and kids activities.\n\nWould you like to know about any of these topics?`;
-      }
+      // No relevant chunks found
+      aiResponse = `Thank you for your inquiry. While I don't have specific information about that particular topic in my current knowledge base, our dedicated team at ${hotelName} would be delighted to assist you personally.\n\nI can help you with:\n• Dining reservations and menus\n• Spa treatments and wellness services\n• Activities and excursions\n• Room amenities\n• Check-in/check-out procedures\n\nWould you like to know about any of these services, or shall I connect you with our front desk?`;
     } else if (!aiResponse) {
-      // Fallback if nothing else worked
-      aiResponse = 'I apologize, but I encountered an issue. Please try rephrasing your question or contact the hotel staff for assistance.'
+      // Final fallback
+      aiResponse = `I appreciate your patience. For the most accurate and detailed information regarding your inquiry, I'd recommend speaking directly with our guest services team at ${hotelName}. They'll be able to provide you with comprehensive assistance. How else may I help you today?`;
     }
     
     // Store AI response
