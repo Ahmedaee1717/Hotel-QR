@@ -6562,6 +6562,69 @@ app.get('/hotel/:property_slug', async (c) => {
                         <!-- Loaded dynamically -->
                     </div>
                 </section>
+
+                <!-- Beach Booking Section -->
+                <section id="beach-booking-section" class="mb-12 hidden">
+                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white shadow-xl">
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div class="flex-1">
+                                <h2 class="text-3xl font-bold mb-3 flex items-center">
+                                    <i class="fas fa-umbrella-beach mr-3"></i>
+                                    Beach Booking
+                                </h2>
+                                <p class="text-blue-100 mb-4">
+                                    Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.
+                                </p>
+                                <div class="flex flex-wrap gap-3 text-sm">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span>Free for Hotel Guests</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Book Up to 7 Days Ahead</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-qrcode"></i>
+                                        <span>QR Code Check-in</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <button onclick="goToBeachBooking()" class="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition shadow-lg transform hover:scale-105">
+                                    <i class="fas fa-calendar-check mr-2"></i>
+                                    Book Your Spot Now
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Beach Spots Preview -->
+                        <div id="beach-spots-preview" class="mt-6 pt-6 border-t border-white/20">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                    <div class="text-3xl mb-2">🏖️</div>
+                                    <div class="font-semibold">Umbrellas</div>
+                                    <div class="text-sm text-blue-100">Classic Beach</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                    <div class="text-3xl mb-2">🏕️</div>
+                                    <div class="font-semibold">Cabanas</div>
+                                    <div class="text-sm text-blue-100">Private & Cozy</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                    <div class="text-3xl mb-2">🛏️</div>
+                                    <div class="font-semibold">Loungers</div>
+                                    <div class="text-sm text-blue-100">Relax in Style</div>
+                                </div>
+                                <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                                    <div class="text-3xl mb-2">☀️</div>
+                                    <div class="font-semibold">Daybeds</div>
+                                    <div class="text-sm text-blue-100">Ultimate Comfort</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 
             </div>
         </div>
@@ -7466,6 +7529,7 @@ app.get('/hotel/:property_slug', async (c) => {
               'spa': document.getElementById('spa-section'),
               'service': document.getElementById('service-section'),
               'activities': document.getElementById('activities-section'),
+              'beach-booking': document.getElementById('beach-booking-section'),
               'hotel-map': document.getElementById('hotel-map-section')
             };
             
@@ -7532,6 +7596,7 @@ app.get('/hotel/:property_slug', async (c) => {
             });
             
             updateSectionVisibility();
+            checkBeachBookingEnabled();
         }
 
         function renderRestaurants() {
@@ -7839,6 +7904,25 @@ app.get('/hotel/:property_slug', async (c) => {
         function closeMapModal() {
             document.getElementById('mapModal').classList.add('hidden');
             document.body.style.overflow = 'auto';
+        }
+
+        async function checkBeachBookingEnabled() {
+            try {
+                const response = await fetch('/api/admin/beach/settings/' + propertyData.property_id);
+                const data = await response.json();
+                
+                if (data.success && data.settings && data.settings.beach_booking_enabled === 1) {
+                    document.getElementById('beach-booking-section').classList.remove('hidden');
+                    return true;
+                }
+            } catch (error) {
+                console.error('Check beach booking error:', error);
+            }
+            return false;
+        }
+        
+        function goToBeachBooking() {
+            window.location.href = '/beach-booking/' + propertyData.property_id;
         }
 
         function updateSectionVisibility() {
