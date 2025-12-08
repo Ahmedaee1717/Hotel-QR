@@ -6452,7 +6452,7 @@ app.get('/hotel/:property_slug', async (c) => {
 
         async function loadInfoPages() {
           try {
-            const response = await fetch(\`/api/info-pages/\${propertyData.property_id}\`);
+            const response = await fetch('/api/info-pages/' + propertyData.property_id);
             const data = await response.json();
             if (data.success) {
               infoPages = data.pages;
@@ -6492,16 +6492,16 @@ app.get('/hotel/:property_slug', async (c) => {
 
           let html = '';
           infoPages.forEach(page => {
-            const title = page[\`title_\${currentLang}\`] || page.title_en;
+            const title = page['title_' + currentLang] || page.title_en;
             const colorClass = colorClasses[page.color_theme] || colorClasses.blue;
             
-            html += \`<button onclick="openInfoPage('\${page.page_key}')" class="w-full bg-gradient-to-r \${colorClass} text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">
-              <div class="flex items-center gap-3">
-                <i class="\${page.icon_class} text-2xl"></i>
-                <span class="font-bold text-lg">\${title}</span>
-                <i class="fas fa-chevron-right ml-auto"></i>
-              </div>
-            </button>\`;
+            html += '<button onclick="openInfoPage(\'' + page.page_key + '\')" class="w-full bg-gradient-to-r ' + colorClass + ' text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">' +
+              '<div class="flex items-center gap-3">' +
+                '<i class="' + page.icon_class + ' text-2xl"></i>' +
+                '<span class="font-bold text-lg">' + title + '</span>' +
+                '<i class="fas fa-chevron-right ml-auto"></i>' +
+              '</div>' +
+            '</button>';
           });
 
           container.innerHTML = html;
@@ -6509,7 +6509,7 @@ app.get('/hotel/:property_slug', async (c) => {
 
         window.openInfoPage = async function(pageKey) {
           try {
-            const response = await fetch(\`/api/info-page/\${propertyData.property_id}/\${pageKey}\`);
+            const response = await fetch('/api/info-page/' + propertyData.property_id + '/' + pageKey);
             const data = await response.json();
             
             if (data.success) {
@@ -6523,10 +6523,10 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function displayInfoPage(page) {
-          const title = page[\`title_\${currentLang}\`] || page.title_en;
-          const content = page[\`content_\${currentLang}\`] || page.content_en;
+          const title = page['title_' + currentLang] || page.title_en;
+          const content = page['content_' + currentLang] || page.content_en;
           
-          document.getElementById('infoPageTitle').innerHTML = \`<i class="\${page.icon_class} mr-3"></i>\${title}\`;
+          document.getElementById('infoPageTitle').innerHTML = '<i class="' + page.icon_class + ' mr-3"></i>' + title;
           document.getElementById('infoPageContent').innerHTML = content;
           document.getElementById('infoPageModal').classList.remove('hidden');
         }
