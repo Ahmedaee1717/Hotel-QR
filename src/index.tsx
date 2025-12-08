@@ -7575,6 +7575,11 @@ app.get('/hotel/:property_slug', async (c) => {
               }
             });
             
+            // Append beach booking section (if it exists, before hotel map)
+            if (sectionElements['beach-booking']) {
+              container.appendChild(sectionElements['beach-booking']);
+            }
+            
             // Always append hotel map at the end
             if (sectionElements['hotel-map']) {
               container.appendChild(sectionElements['hotel-map']);
