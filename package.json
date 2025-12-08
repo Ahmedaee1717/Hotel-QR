@@ -23,13 +23,14 @@
     "git:log": "git log --oneline"
   },
   "dependencies": {
-    "hono": "^4.10.7"
+    "hono": "^4.10.7",
+    "openai": "^6.10.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
     "@hono/vite-build": "^1.2.0",
-    "@hono/vite-dev-server": "^0.18.2",
     "@hono/vite-cloudflare-pages": "^0.4.2",
+    "@hono/vite-dev-server": "^0.18.2",
     "typescript": "^5.0.0",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"

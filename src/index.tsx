@@ -4839,6 +4839,172 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
   }
 })
 
+// ============================================
+// AI PROOFREADING API ENDPOINT
+// ============================================
+
+// API: AI Proofread Text with Rate Limiting
+app.post('/api/ai/proofread', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { text, user_id, user_type } = body
+    
+    // Validation
+    if (!text || !user_id || !user_type) {
+      return c.json({ error: 'Missing required fields: text, user_id, user_type' }, 400)
+    }
+    
+    if (!['admin', 'vendor'].includes(user_type)) {
+      return c.json({ error: 'Invalid user_type. Must be admin or vendor' }, 400)
+    }
+    
+    if (text.length > 5000) {
+      return c.json({ error: 'Text too long. Maximum 5000 characters allowed.' }, 400)
+    }
+    
+    // Check rate limiting
+    const today = new Date().toISOString().split('T')[0]
+    
+    // Get today's usage
+    const usage = await DB.prepare(`
+      SELECT request_count, last_request_time
+      FROM ai_proofreading_usage
+      WHERE user_id = ? AND user_type = ? AND usage_date = ?
+    `).bind(user_id, user_type, today).first()
+    
+    // Check daily limit (10 requests per day)
+    if (usage && usage.request_count >= 10) {
+      return c.json({ 
+        error: 'Daily limit reached', 
+        message: 'You have reached your daily limit of 10 AI proofreading requests. Please try again tomorrow.',
+        limit: 10,
+        used: usage.request_count
+      }, 429)
+    }
+    
+    // Check cooldown period (60 seconds between requests)
+    if (usage && usage.last_request_time) {
+      const lastRequest = new Date(usage.last_request_time).getTime()
+      const now = new Date().getTime()
+      const timeDiff = (now - lastRequest) / 1000 // seconds
+      
+      if (timeDiff < 60) {
+        const waitTime = Math.ceil(60 - timeDiff)
+        return c.json({ 
+          error: 'Cooldown period active', 
+          message: `Please wait ${waitTime} seconds before making another proofreading request.`,
+          wait_seconds: waitTime
+        }, 429)
+      }
+    }
+    
+    // Call AI proofreading (using GenSpark LLM proxy)
+    const startTime = Date.now()
+    let proofreadText = text
+    let modelUsed = 'gpt-5-nano'
+    
+    try {
+      // Check if GenSpark API is configured
+      const apiKey = process.env.OPENAI_API_KEY
+      const baseURL = process.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+      
+      if (!apiKey) {
+        // Fallback: Return formatted text with basic improvements
+        console.warn('GenSpark API not configured. Using fallback formatting.')
+        proofreadText = text.trim()
+        modelUsed = 'fallback'
+      } else {
+        // Use GenSpark LLM API for proofreading
+        const response = await fetch(`${baseURL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-5-nano', // Fastest, cheapest model
+            messages: [{
+              role: 'system',
+              content: `You are a professional proofreading assistant for hotel and tourism content. Your task is to:
+
+1. Fix grammar, spelling, and punctuation errors
+2. Improve sentence structure and clarity
+3. Maintain the original meaning and tone
+4. Use professional hospitality language
+5. Keep the text length similar to the original
+6. Output ONLY the corrected text, NO explanations or comments
+
+Important: Do not add or remove information. Only improve grammar, spelling, and readability.`
+            }, {
+              role: 'user',
+              content: `Please proofread and improve this text:\n\n${text}`
+            }],
+            temperature: 0.3,
+            max_tokens: 1000
+          })
+        })
+        
+        if (response.ok) {
+          const data: any = await response.json()
+          proofreadText = data.choices?.[0]?.message?.content?.trim() || text
+        } else {
+          console.error('AI API error:', await response.text())
+          proofreadText = text.trim()
+          modelUsed = 'fallback'
+        }
+      }
+    } catch (aiError) {
+      console.error('AI proofreading error:', aiError)
+      proofreadText = text.trim()
+      modelUsed = 'fallback'
+    }
+    
+    const processingTime = Date.now() - startTime
+    
+    // Update usage tracking
+    await DB.prepare(`
+      INSERT INTO ai_proofreading_usage (user_id, user_type, request_count, last_request_time, usage_date)
+      VALUES (?, ?, 1, CURRENT_TIMESTAMP, ?)
+      ON CONFLICT(user_id, user_type, usage_date) 
+      DO UPDATE SET 
+        request_count = request_count + 1,
+        last_request_time = CURRENT_TIMESTAMP
+    `).bind(user_id, user_type, today).run()
+    
+    // Log the request for analytics
+    await DB.prepare(`
+      INSERT INTO ai_proofreading_logs (user_id, user_type, original_text, proofread_text, text_length, model_used, processing_time_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(user_id, user_type, text, proofreadText, text.length, modelUsed, processingTime).run()
+    
+    // Get updated usage stats
+    const updatedUsage = await DB.prepare(`
+      SELECT request_count
+      FROM ai_proofreading_usage
+      WHERE user_id = ? AND user_type = ? AND usage_date = ?
+    `).bind(user_id, user_type, today).first()
+    
+    return c.json({
+      success: true,
+      original_text: text,
+      proofread_text: proofreadText,
+      model_used: modelUsed,
+      processing_time_ms: processingTime,
+      usage: {
+        used: updatedUsage?.request_count || 0,
+        limit: 10,
+        remaining: 10 - (updatedUsage?.request_count || 0)
+      }
+    })
+    
+  } catch (error) {
+    console.error('AI proofread error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
@@ -8831,8 +8997,26 @@ app.get('/vendor/dashboard', (c) => {
                     <div><label class="block text-sm font-medium mb-2">Activity Image URL</label><input type="url" id="activityImageUrl" placeholder="https://images.unsplash.com/photo-example.jpg" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity image (e.g., from Unsplash, Imgur)</p></div>
                     <div><label class="block text-sm font-medium mb-2">Video URL</label><input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">YouTube or direct video link (optional)</p></div>
                 </div>
-                <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
-                <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium">Short Description</label>
+                        <button type="button" onclick="proofreadText('shortDesc', 'vendor')" class="text-xs px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition flex items-center gap-1">
+                            <i class="fas fa-magic"></i> AI Proofread
+                        </button>
+                    </div>
+                    <textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">✨ Use AI Proofread to improve grammar and clarity (10 free per day)</p>
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium">Full Description</label>
+                        <button type="button" onclick="proofreadText('fullDesc', 'vendor')" class="text-xs px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition flex items-center gap-1">
+                            <i class="fas fa-magic"></i> AI Proofread
+                        </button>
+                    </div>
+                    <textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">✨ Use AI Proofread to improve grammar and clarity (10 free per day)</p>
+                </div>
                 
                 <!-- Requirements Section -->
                 <div class="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
@@ -9564,6 +9748,85 @@ app.get('/vendor/dashboard', (c) => {
         localStorage.removeItem('vendor_id');
         localStorage.removeItem('vendor_token');
         window.location.href = '/vendor/login';
+      }
+
+      // AI Proofreading function
+      async function proofreadText(textareaId, userType) {
+        const textarea = document.getElementById(textareaId);
+        const text = textarea.value.trim();
+        
+        if (!text) {
+          alert('Please enter some text first!');
+          return;
+        }
+        
+        if (text.length > 5000) {
+          alert('Text is too long! Maximum 5000 characters allowed.');
+          return;
+        }
+        
+        // Get user ID
+        const userId = userType === 'vendor' ? 
+          localStorage.getItem('vendor_id') : 
+          localStorage.getItem('property_id');
+        
+        if (!userId) {
+          alert('User session not found. Please log in again.');
+          return;
+        }
+        
+        // Show loading state
+        const originalText = textarea.value;
+        textarea.value = '✨ AI is proofreading your text...';
+        textarea.disabled = true;
+        
+        try {
+          const response = await fetch('/api/ai/proofread', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: originalText,
+              user_id: userId,
+              user_type: userType
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            // Show success
+            textarea.value = data.proofread_text;
+            textarea.disabled = false;
+            
+            // Show usage stats
+            const usageMsg = \`✅ Proofreading complete!\\n\\n📊 Your usage: \${data.usage.used}/\${data.usage.limit} today (\\n\${data.usage.remaining} remaining)\\n⚡ Processed in \${data.processing_time_ms}ms\`;
+            
+            if (data.model_used === 'fallback') {
+              alert(usageMsg + '\\n\\n⚠️ Note: AI service is currently unavailable. Basic formatting applied.');
+            } else {
+              alert(usageMsg);
+            }
+          } else {
+            // Handle errors
+            textarea.value = originalText;
+            textarea.disabled = false;
+            
+            if (response.status === 429) {
+              if (data.wait_seconds) {
+                alert(\`⏳ \${data.message}\\n\\nPlease wait \${data.wait_seconds} seconds before trying again.\`);
+              } else {
+                alert(\`🚫 \${data.message}\\n\\nYou've used \${data.used}/\${data.limit} requests today.\`);
+              }
+            } else {
+              alert('❌ Error: ' + (data.error || 'Failed to proofread text'));
+            }
+          }
+        } catch (error) {
+          textarea.value = originalText;
+          textarea.disabled = false;
+          alert('❌ Network error. Please check your connection and try again.');
+          console.error('Proofread error:', error);
+        }
       }
 
       loadDashboard();
@@ -11142,8 +11405,26 @@ app.get('/admin/dashboard', (c) => {
                         </select>
                         <input type="text" id="offeringTitle" placeholder="Title (English)" required class="px-4 py-2 border rounded-lg">
                     </div>
-                    <textarea id="offeringDescription" placeholder="Short description" required class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
-                    <textarea id="offeringFullDescription" placeholder="Full description" class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium">Short Description</label>
+                            <button type="button" onclick="proofreadText('offeringDescription', 'admin')" class="text-xs px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition flex items-center gap-1">
+                                <i class="fas fa-magic"></i> AI Proofread
+                            </button>
+                        </div>
+                        <textarea id="offeringDescription" placeholder="Short description" required class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">✨ Use AI Proofread to improve grammar and clarity (10 free per day)</p>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium">Full Description</label>
+                            <button type="button" onclick="proofreadText('offeringFullDescription', 'admin')" class="text-xs px-3 py-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg hover:from-purple-600 hover:to-blue-600 transition flex items-center gap-1">
+                                <i class="fas fa-magic"></i> AI Proofread
+                            </button>
+                        </div>
+                        <textarea id="offeringFullDescription" placeholder="Full description" class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">✨ Use AI Proofread to improve grammar and clarity (10 free per day)</p>
+                    </div>
                     <div class="grid md:grid-cols-3 gap-4">
                         <input type="number" id="offeringPrice" placeholder="Price" step="0.01" class="px-4 py-2 border rounded-lg">
                         <input type="text" id="offeringLocation" placeholder="Location" class="px-4 py-2 border rounded-lg">
@@ -14264,6 +14545,85 @@ app.get('/admin/dashboard', (c) => {
         localStorage.removeItem('admin_user');
         localStorage.removeItem('admin_token');
         window.location.href = '/admin/login';
+      }
+
+      // AI Proofreading function
+      async function proofreadText(textareaId, userType) {
+        const textarea = document.getElementById(textareaId);
+        const text = textarea.value.trim();
+        
+        if (!text) {
+          alert('Please enter some text first!');
+          return;
+        }
+        
+        if (text.length > 5000) {
+          alert('Text is too long! Maximum 5000 characters allowed.');
+          return;
+        }
+        
+        // Get user ID
+        const userId = userType === 'vendor' ? 
+          localStorage.getItem('vendor_id') : 
+          localStorage.getItem('property_id');
+        
+        if (!userId) {
+          alert('User session not found. Please log in again.');
+          return;
+        }
+        
+        // Show loading state
+        const originalText = textarea.value;
+        textarea.value = '✨ AI is proofreading your text...';
+        textarea.disabled = true;
+        
+        try {
+          const response = await fetch('/api/ai/proofread', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: originalText,
+              user_id: userId,
+              user_type: userType
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok) {
+            // Show success
+            textarea.value = data.proofread_text;
+            textarea.disabled = false;
+            
+            // Show usage stats
+            const usageMsg = \`✅ Proofreading complete!\\n\\n📊 Your usage: \${data.usage.used}/\${data.usage.limit} today\\n(\${data.usage.remaining} remaining)\\n⚡ Processed in \${data.processing_time_ms}ms\`;
+            
+            if (data.model_used === 'fallback') {
+              alert(usageMsg + '\\n\\n⚠️ Note: AI service is currently unavailable. Basic formatting applied.');
+            } else {
+              alert(usageMsg);
+            }
+          } else {
+            // Handle errors
+            textarea.value = originalText;
+            textarea.disabled = false;
+            
+            if (response.status === 429) {
+              if (data.wait_seconds) {
+                alert(\`⏳ \${data.message}\\n\\nPlease wait \${data.wait_seconds} seconds before trying again.\`);
+              } else {
+                alert(\`🚫 \${data.message}\\n\\nYou've used \${data.used}/\${data.limit} requests today.\`);
+              }
+            } else {
+              alert('❌ Error: ' + (data.error || 'Failed to proofread text'));
+            }
+          }
+        } catch (error) {
+          textarea.value = originalText;
+          textarea.disabled = false;
+          alert('❌ Network error. Please check your connection and try again.');
+          console.error('Proofread error:', error);
+        }
       }
 
       loadRooms();
