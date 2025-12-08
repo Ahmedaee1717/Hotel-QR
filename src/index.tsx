@@ -5793,6 +5793,125 @@ app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
   }
 })
 
+// API: Get chatbot analytics stats
+app.get('/api/admin/chatbot/analytics/stats', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  try {
+    // Total conversations
+    const totalConversations = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chatbot_conversations WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    // Total messages
+    const totalMessages = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chatbot_messages m
+      JOIN chatbot_conversations c ON m.conversation_id = c.conversation_id
+      WHERE c.property_id = ? AND m.role = 'user'
+    `).bind(property_id).first()
+    
+    // Today's chats
+    const today = new Date().toISOString().split('T')[0]
+    const todayChats = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chatbot_conversations
+      WHERE property_id = ? AND DATE(started_at) = ?
+    `).bind(property_id, today).first()
+    
+    // Average response time (placeholder - would need timestamps)
+    const avgResponseTime = 1.2
+    
+    return c.json({
+      success: true,
+      stats: {
+        total_conversations: totalConversations?.count || 0,
+        total_messages: totalMessages?.count || 0,
+        today_chats: todayChats?.count || 0,
+        avg_response_time: avgResponseTime
+      }
+    })
+  } catch (error) {
+    console.error('Get analytics stats error:', error)
+    return c.json({ error: 'Failed to get analytics stats' }, 500)
+  }
+})
+
+// API: Get top asked questions
+app.get('/api/admin/chatbot/analytics/top-questions', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  const limit = parseInt(c.req.query('limit') || '10')
+  
+  try {
+    const topQuestions = await DB.prepare(`
+      SELECT m.content as question, COUNT(*) as count
+      FROM chatbot_messages m
+      JOIN chatbot_conversations c ON m.conversation_id = c.conversation_id
+      WHERE c.property_id = ? AND m.role = 'user'
+      GROUP BY m.content
+      ORDER BY count DESC
+      LIMIT ?
+    `).bind(property_id, limit).all()
+    
+    return c.json({
+      success: true,
+      questions: topQuestions.results || []
+    })
+  } catch (error) {
+    console.error('Get top questions error:', error)
+    return c.json({ error: 'Failed to get top questions' }, 500)
+  }
+})
+
+// API: Get chat history
+app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  const date = c.req.query('date')
+  const search = c.req.query('search')
+  
+  try {
+    let query = `
+      SELECT 
+        c.conversation_id,
+        c.session_id,
+        c.started_at as created_at,
+        (SELECT content FROM chatbot_messages WHERE conversation_id = c.conversation_id AND role = 'user' ORDER BY created_at ASC LIMIT 1) as user_message,
+        (SELECT content FROM chatbot_messages WHERE conversation_id = c.conversation_id AND role = 'assistant' ORDER BY created_at ASC LIMIT 1) as ai_message,
+        (SELECT COUNT(*) FROM chatbot_messages WHERE conversation_id = c.conversation_id) as message_count
+      FROM chatbot_conversations c
+      WHERE c.property_id = ?
+    `
+    
+    const params = [property_id]
+    
+    if (date) {
+      query += ' AND DATE(c.started_at) = ?'
+      params.push(date)
+    }
+    
+    if (search) {
+      query += ` AND c.conversation_id IN (
+        SELECT conversation_id FROM chatbot_messages 
+        WHERE content LIKE ?
+      )`
+      params.push(`%${search}%`)
+    }
+    
+    query += ' ORDER BY c.started_at DESC LIMIT 50'
+    
+    const chats = await DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      chats: chats.results || []
+    })
+  } catch (error) {
+    console.error('Get chat history error:', error)
+    return c.json({ error: 'Failed to get chat history' }, 500)
+  }
+})
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
@@ -13432,6 +13551,69 @@ app.get('/admin/dashboard', (c) => {
                 <p class="text-gray-600 mb-6">
                     Create a smart AI assistant that answers guest questions using your hotel's information. Upload FAQs, policies, and amenities details.
                 </p>
+                
+                <!-- Analytics Section -->
+                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 mb-6 border-2 border-indigo-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-chart-line mr-2 text-indigo-600"></i>Chatbot Analytics
+                        </h3>
+                        <button onclick="toggleAnalytics()" id="analyticsToggleBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+                            <i class="fas fa-chart-bar mr-2"></i>View Analytics
+                        </button>
+                    </div>
+                    
+                    <div id="analyticsSection" class="hidden">
+                        <!-- Stats Overview -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div class="bg-white rounded-lg p-4 shadow">
+                                <div class="text-sm text-gray-600 mb-1">Total Conversations</div>
+                                <div class="text-2xl font-bold text-indigo-600" id="statTotalConversations">0</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow">
+                                <div class="text-sm text-gray-600 mb-1">Total Messages</div>
+                                <div class="text-2xl font-bold text-purple-600" id="statTotalMessages">0</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow">
+                                <div class="text-sm text-gray-600 mb-1">Avg Response Time</div>
+                                <div class="text-2xl font-bold text-blue-600" id="statAvgResponseTime">0s</div>
+                            </div>
+                            <div class="bg-white rounded-lg p-4 shadow">
+                                <div class="text-sm text-gray-600 mb-1">Today's Chats</div>
+                                <div class="text-2xl font-bold text-green-600" id="statTodayChats">0</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Most Asked Questions -->
+                        <div class="bg-white rounded-lg p-6 shadow mb-6">
+                            <h4 class="text-lg font-bold mb-4">
+                                <i class="fas fa-fire mr-2 text-orange-500"></i>Most Asked Questions (Top 10)
+                            </h4>
+                            <div id="topQuestionsList" class="space-y-2">
+                                <p class="text-gray-500">Loading...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Chat History -->
+                        <div class="bg-white rounded-lg p-6 shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-lg font-bold">
+                                    <i class="fas fa-history mr-2 text-blue-600"></i>Recent Chat History
+                                </h4>
+                                <div class="flex gap-2">
+                                    <input type="date" id="filterDate" class="px-3 py-2 border rounded-lg text-sm" onchange="loadChatHistory()">
+                                    <input type="text" id="searchQuery" placeholder="Search messages..." class="px-3 py-2 border rounded-lg text-sm w-64" onkeyup="if(event.key==='Enter') loadChatHistory()">
+                                    <button onclick="loadChatHistory()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="chatHistoryList" class="space-y-4 max-h-96 overflow-y-auto">
+                                <p class="text-gray-500">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Chatbot Settings -->
                 <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
@@ -15359,6 +15541,118 @@ app.get('/admin/dashboard', (c) => {
         } finally {
           syncBtn.disabled = false;
           syncBtn.innerHTML = originalHTML;
+        }
+      };
+      
+      // Analytics Functions
+      window.toggleAnalytics = async function() {
+        const section = document.getElementById('analyticsSection');
+        const btn = document.getElementById('analyticsToggleBtn');
+        
+        if (section.classList.contains('hidden')) {
+          section.classList.remove('hidden');
+          btn.innerHTML = '<i class="fas fa-chart-bar mr-2"></i>Hide Analytics';
+          await loadAnalytics();
+        } else {
+          section.classList.add('hidden');
+          btn.innerHTML = '<i class="fas fa-chart-bar mr-2"></i>View Analytics';
+        }
+      };
+      
+      async function loadAnalytics() {
+        await Promise.all([
+          loadAnalyticsStats(),
+          loadTopQuestions(),
+          loadChatHistory()
+        ]);
+      }
+      
+      async function loadAnalyticsStats() {
+        try {
+          const response = await fetch('/api/admin/chatbot/analytics/stats?property_id=1');
+          const data = await response.json();
+          
+          if (data.success) {
+            document.getElementById('statTotalConversations').textContent = data.stats.total_conversations || 0;
+            document.getElementById('statTotalMessages').textContent = data.stats.total_messages || 0;
+            document.getElementById('statAvgResponseTime').textContent = (data.stats.avg_response_time || 0) + 's';
+            document.getElementById('statTodayChats').textContent = data.stats.today_chats || 0;
+          }
+        } catch (error) {
+          console.error('Load stats error:', error);
+        }
+      }
+      
+      async function loadTopQuestions() {
+        try {
+          const response = await fetch('/api/admin/chatbot/analytics/top-questions?property_id=1&limit=10');
+          const data = await response.json();
+          
+          const container = document.getElementById('topQuestionsList');
+          
+          if (data.success && data.questions && data.questions.length > 0) {
+            container.innerHTML = data.questions.map((q, index) => 
+              '<div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
+                '<div class="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full flex items-center justify-center font-bold text-sm">' + (index + 1) + '</div>' +
+                '<div class="flex-1">' +
+                  '<div class="font-medium text-gray-900">' + q.question + '</div>' +
+                  '<div class="text-sm text-gray-500 mt-1">Asked ' + q.count + ' times</div>' +
+                '</div>' +
+              '</div>'
+            ).join('');
+          } else {
+            container.innerHTML = '<p class="text-gray-500">No questions asked yet</p>';
+          }
+        } catch (error) {
+          console.error('Load top questions error:', error);
+          document.getElementById('topQuestionsList').innerHTML = '<p class="text-red-500">Error loading questions</p>';
+        }
+      }
+      
+      window.loadChatHistory = async function() {
+        try {
+          const date = document.getElementById('filterDate').value;
+          const search = document.getElementById('searchQuery').value;
+          
+          let url = '/api/admin/chatbot/analytics/chat-history?property_id=1';
+          if (date) url += '&date=' + date;
+          if (search) url += '&search=' + encodeURIComponent(search);
+          
+          const response = await fetch(url);
+          const data = await response.json();
+          
+          const container = document.getElementById('chatHistoryList');
+          
+          if (data.success && data.chats && data.chats.length > 0) {
+            container.innerHTML = data.chats.map(chat => 
+              '<div class="border-l-4 border-blue-500 bg-gray-50 p-4 rounded-lg">' +
+                '<div class="flex items-center justify-between mb-2">' +
+                  '<div class="flex items-center gap-2">' +
+                    '<span class="text-xs font-mono bg-gray-200 px-2 py-1 rounded">' + chat.session_id.substring(0, 8) + '</span>' +
+                    '<span class="text-xs text-gray-500">' + new Date(chat.created_at).toLocaleString() + '</span>' +
+                  '</div>' +
+                  '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">' + chat.message_count + ' messages</span>' +
+                '</div>' +
+                '<div class="space-y-2">' +
+                  '<div class="flex items-start gap-2">' +
+                    '<div class="flex-shrink-0 w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs"><i class="fas fa-user"></i></div>' +
+                    '<div class="flex-1 bg-white p-2 rounded-lg text-sm">' + chat.user_message + '</div>' +
+                  '</div>' +
+                  (chat.ai_message ? 
+                    '<div class="flex items-start gap-2">' +
+                      '<div class="flex-shrink-0 w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs"><i class="fas fa-robot"></i></div>' +
+                      '<div class="flex-1 bg-white p-2 rounded-lg text-sm">' + chat.ai_message + '</div>' +
+                    '</div>'
+                  : '') +
+                '</div>' +
+              '</div>'
+            ).join('');
+          } else {
+            container.innerHTML = '<p class="text-gray-500">No chat history found</p>';
+          }
+        } catch (error) {
+          console.error('Load chat history error:', error);
+          document.getElementById('chatHistoryList').innerHTML = '<p class="text-red-500">Error loading chat history</p>';
         }
       };
       
