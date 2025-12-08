@@ -5196,14 +5196,17 @@ app.post('/api/chatbot/chat', async (c) => {
     const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
     
-    // Generate AI response
-    const apiKey = process.env.OPENAI_API_KEY
-    const baseURL = process.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    // Generate AI response - use Cloudflare env bindings
+    const apiKey = c.env.OPENAI_API_KEY
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
     
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
     if (apiKey && context.length > 0) {
       try {
+        console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
+        console.log('📚 Context length:', context.length)
+        
         const systemPrompt = `You are a helpful hotel assistant. Use the following information to answer the guest's question. If the information doesn't contain the answer, say you don't know and suggest contacting the hotel staff.
 
 Hotel Information:
@@ -5228,26 +5231,61 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
           })
         })
         
+        console.log('🔥 API Response status:', response.status)
+        
         if (response.ok) {
           const data = await response.json()
+          console.log('✅ AI Response received:', data.choices[0].message.content.substring(0, 100))
           aiResponse = data.choices[0].message.content
+        } else {
+          const errorText = await response.text()
+          console.error('❌ API Error:', response.status, errorText)
+          // API failed, use fallback
+          aiResponse = null // Will trigger fallback below
         }
       } catch (error) {
-        console.error('AI chat error:', error)
+        console.error('💥 AI chat error:', error)
+        // API error, use fallback
+        aiResponse = null
       }
-    } else if (!apiKey && context.length > 0) {
-      // Fallback: Use retrieved context directly (simple keyword-based response)
-      // This provides basic answers until GenSpark API is configured
-      const contextLower = context.toLowerCase()
+    }
+    
+    // Smart fallback if API didn't work or no API key
+    if (!aiResponse && context.length > 0) {
+      // Fallback: Intelligent text summarization without AI API
       const messageLower = message.toLowerCase()
       
-      // Extract the most relevant sentence from context
-      const sentences = context.split(/[.!?]+/).filter(s => s.trim().length > 0)
-      let bestMatch = sentences[0] || context.substring(0, 200)
-      let bestScore = 0
+      // Remove duplicate sentences and clean up text
+      // More aggressive normalization to catch duplicates
+      const sentences = context.split(/[.!?\n]+/).filter(s => s.trim().length > 10)
+      const uniqueSentences = []
+      const seen = new Set()
       
-      const keywords = messageLower.split(/\s+/).filter(w => w.length > 3)
       for (const sentence of sentences) {
+        // Normalize: lowercase, remove extra spaces, remove common filler words
+        const normalized = sentence.trim().toLowerCase()
+          .replace(/\s+/g, ' ')
+          .replace(/^(the|a|an|our|at)\s+/i, '') // Remove common leading articles
+          
+        // Check for near-duplicate (>80% similarity for short text)
+        let isDuplicate = false
+        for (const existing of seen) {
+          // Simple contains check for obvious duplicates
+          if (normalized.includes(existing) || existing.includes(normalized)) {
+            isDuplicate = true
+            break
+          }
+        }
+        
+        if (!isDuplicate && !seen.has(normalized)) {
+          seen.add(normalized)
+          uniqueSentences.push(sentence.trim())
+        }
+      }
+      
+      // Score sentences by keyword relevance
+      const keywords = messageLower.split(/\s+/).filter(w => w.length > 3)
+      const scoredSentences = uniqueSentences.map(sentence => {
         const sentenceLower = sentence.toLowerCase()
         let score = 0
         for (const keyword of keywords) {
@@ -5255,14 +5293,29 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
             score += 2
           }
         }
-        if (score > bestScore) {
-          bestScore = score
-          bestMatch = sentence.trim()
-        }
+        // Prefer sentences with specific details (prices, times, locations)
+        if (/\d+/.test(sentence)) score += 1
+        if (/location:|price:|time:|duration:/i.test(sentence)) score += 1
+        return { sentence, score }
+      })
+      
+      // Sort by relevance and take top 3-5 sentences
+      scoredSentences.sort((a, b) => b.score - a.score)
+      const topSentences = scoredSentences.slice(0, Math.min(5, scoredSentences.length))
+      const summary = topSentences.map(s => s.sentence).join('. ')
+      
+      // Format response based on question type
+      let prefix = ''
+      if (messageLower.includes('tell me about') || messageLower.includes('what is') || messageLower.includes('describe')) {
+        prefix = 'Here\'s what I found:\n\n'
+      } else if (messageLower.includes('do you have') || messageLower.includes('is there')) {
+        prefix = 'Yes, we have this available:\n\n'
+      } else {
+        prefix = 'Based on our hotel information:\n\n'
       }
       
-      aiResponse = `Based on our hotel information: ${bestMatch}.\n\nNote: For more detailed assistance, please contact our front desk. (AI responses will be more intelligent once the administrator configures the GenSpark API.)`
-    } else if (!apiKey && context.length === 0) {
+      aiResponse = prefix + summary + '.\n\n💡 Tip: For booking or detailed questions, please contact our front desk.'
+    } else if (!aiResponse && context.length === 0) {
       // No chunks found - generic greeting or question not in knowledge base
       const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'];
       const isGreeting = greetings.some(g => message.toLowerCase().includes(g));
@@ -5272,10 +5325,9 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
       } else {
         aiResponse = `I don't have specific information about that in my current knowledge base. However, I can help you with questions about check-in times, dining, pool facilities, spa services, WiFi, and kids activities.\n\nWould you like to know about any of these topics?`;
       }
-    } else if (!apiKey) {
+    } else if (!aiResponse) {
+      // Fallback if nothing else worked
       aiResponse = 'I apologize, but I encountered an issue. Please try rephrasing your question or contact the hotel staff for assistance.'
-    } else {
-      aiResponse = 'I don\'t have specific information about that. Please contact the hotel staff for assistance.'
     }
     
     // Store AI response
