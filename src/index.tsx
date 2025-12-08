@@ -6277,10 +6277,46 @@ app.post('/api/beach/bookings', async (c) => {
       totalPrice === 0 ? 'free' : 'pending'
     ).run()
     
-    return c.json({ success: true, booking_reference: bookingReference })
+    return c.json({ 
+      success: true, 
+      booking: { 
+        booking_reference: bookingReference,
+        spot_number: spot.spot_number,
+        spot_type: spot.spot_type
+      } 
+    })
   } catch (error) {
     console.error('Create beach booking error:', error)
     return c.json({ error: 'Failed to create booking' }, 500)
+  }
+})
+
+// API: Get Beach Booking Details by Reference
+app.get('/api/beach/bookings/:booking_reference', async (c) => {
+  const { DB } = c.env
+  const { booking_reference } = c.req.param()
+  
+  try {
+    const booking = await DB.prepare(`
+      SELECT 
+        bb.*,
+        bs.spot_number,
+        bs.spot_type,
+        bs.max_capacity,
+        bs.is_premium
+      FROM beach_bookings bb
+      LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.booking_reference = ?
+    `).bind(booking_reference).first()
+    
+    if (!booking) {
+      return c.json({ error: 'Booking not found' }, 404)
+    }
+    
+    return c.json({ success: true, booking })
+  } catch (error) {
+    console.error('Get booking error:', error)
+    return c.json({ error: 'Failed to get booking' }, 500)
   }
 })
 
@@ -10394,6 +10430,996 @@ app.get('/superadmin/dashboard', (c) => {
 // ============================================
 // HOTEL ADMIN (existing)
 // ============================================
+
+// Beach Map Designer - Interactive drag-and-drop interface
+app.get('/admin/beach-map-designer', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Map Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        #beachCanvas {
+            border: 2px solid #cbd5e0;
+            cursor: crosshair;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .spot-icon {
+            position: absolute;
+            cursor: move;
+            font-size: 24px;
+            user-select: none;
+            transition: transform 0.1s;
+        }
+        .spot-icon:hover {
+            transform: scale(1.2);
+        }
+        .spot-icon.selected {
+            transform: scale(1.3);
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8));
+        }
+        .tool-btn {
+            transition: all 0.2s;
+        }
+        .tool-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-80 bg-white shadow-lg p-6 overflow-y-auto">
+            <h1 class="text-2xl font-bold mb-6">
+                <i class="fas fa-map-marked-alt mr-2 text-blue-600"></i>
+                Beach Map Designer
+            </h1>
+            
+            <!-- Tools -->
+            <div class="mb-6">
+                <h3 class="font-bold mb-3">Tools</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setTool('select')" id="selectTool" class="tool-btn active px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        <i class="fas fa-mouse-pointer mr-1"></i>Select
+                    </button>
+                    <button onclick="setTool('umbrella')" id="umbrellaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        🏖️ Umbrella
+                    </button>
+                    <button onclick="setTool('cabana')" id="cabanaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        🏕️ Cabana
+                    </button>
+                    <button onclick="setTool('lounger')" id="loungerTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        🛏️ Lounger
+                    </button>
+                    <button onclick="setTool('daybed')" id="daybedTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
+                        ☀️ Daybed
+                    </button>
+                    <button onclick="deleteSelected()" class="tool-btn px-4 py-2 border rounded-lg hover:bg-red-50 text-red-600">
+                        <i class="fas fa-trash mr-1"></i>Delete
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Upload Beach Photo -->
+            <div class="mb-6">
+                <h3 class="font-bold mb-3">Beach Photo</h3>
+                <input type="file" id="beachPhotoUpload" accept="image/*" class="w-full px-4 py-2 border rounded-lg text-sm">
+                <p class="text-xs text-gray-500 mt-2">Upload an aerial view of your beach</p>
+            </div>
+            
+            <!-- Selected Spot Details -->
+            <div id="spotDetails" class="mb-6 hidden">
+                <h3 class="font-bold mb-3">Spot Details</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Spot Number</label>
+                        <input type="text" id="spotNumber" class="w-full px-3 py-2 border rounded-lg" placeholder="A1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Capacity</label>
+                        <input type="number" id="spotCapacity" min="1" max="10" value="2" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Price (Full Day)</label>
+                        <input type="number" id="spotPrice" min="0" step="5" value="0" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="spotPremium" class="mr-2">
+                            <span class="text-sm">Premium Spot</span>
+                        </label>
+                    </div>
+                    <button onclick="updateSpotDetails()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-save mr-2"></i>Update Spot
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Spots List -->
+            <div class="mb-6">
+                <h3 class="font-bold mb-3">Beach Spots (<span id="spotCount">0</span>)</h3>
+                <div id="spotsList" class="space-y-2 max-h-60 overflow-y-auto">
+                    <p class="text-sm text-gray-500">No spots placed yet</p>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="space-y-2">
+                <button onclick="saveLayout()" class="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg hover:from-green-700 hover:to-blue-700 font-semibold">
+                    <i class="fas fa-save mr-2"></i>Save Beach Layout
+                </button>
+                <button onclick="clearAll()" class="w-full px-4 py-2 border border-red-600 text-red-600 rounded-lg hover:bg-red-50">
+                    <i class="fas fa-trash mr-2"></i>Clear All Spots
+                </button>
+                <button onclick="window.close()" class="w-full px-4 py-2 border rounded-lg hover:bg-gray-50">
+                    <i class="fas fa-times mr-2"></i>Close Designer
+                </button>
+            </div>
+        </div>
+        
+        <!-- Canvas Area -->
+        <div class="flex-1 p-6 overflow-hidden">
+            <div class="bg-white rounded-lg shadow-lg h-full p-4">
+                <div class="relative w-full h-full">
+                    <div id="beachCanvas" class="w-full h-full relative bg-gradient-to-b from-blue-100 to-yellow-100">
+                        <!-- Spots will be placed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTool = 'select';
+        let selectedSpot = null;
+        let spots = [];
+        let spotIdCounter = 1;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        
+        const canvas = document.getElementById('beachCanvas');
+        const spotDetails = document.getElementById('spotDetails');
+        
+        // Load existing spots
+        async function loadExistingSpots() {
+            try {
+                const response = await fetch('/api/admin/beach/spots/1');
+                const data = await response.json();
+                
+                if (data.success && data.spots) {
+                    spots = data.spots.map(spot => ({
+                        id: spot.spot_id,
+                        type: spot.spot_type,
+                        x: spot.position_x,
+                        y: spot.position_y,
+                        number: spot.spot_number,
+                        capacity: spot.max_capacity,
+                        price: spot.price_full_day,
+                        premium: spot.is_premium === 1
+                    }));
+                    renderSpots();
+                }
+            } catch (error) {
+                console.error('Load spots error:', error);
+            }
+        }
+        
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            const toolBtn = document.getElementById(tool + 'Tool');
+            if (toolBtn) toolBtn.classList.add('active');
+            canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+        }
+        
+        function getSpotIcon(type) {
+            const icons = {
+                umbrella: '🏖️',
+                cabana: '🏕️',
+                lounger: '🛏️',
+                daybed: '☀️'
+            };
+            return icons[type] || '🏖️';
+        }
+        
+        canvas.addEventListener('click', (e) => {
+            if (currentTool === 'select') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const spot = {
+                id: spotIdCounter++,
+                type: currentTool,
+                x: x,
+                y: y,
+                number: 'S' + spotIdCounter,
+                capacity: 2,
+                price: 0,
+                premium: false
+            };
+            
+            spots.push(spot);
+            renderSpots();
+        });
+        
+        function renderSpots() {
+            // Remove existing spot elements
+            document.querySelectorAll('.spot-icon').forEach(el => el.remove());
+            
+            spots.forEach(spot => {
+                const spotEl = document.createElement('div');
+                spotEl.className = 'spot-icon';
+                spotEl.innerHTML = getSpotIcon(spot.type);
+                spotEl.style.left = spot.x + 'px';
+                spotEl.style.top = spot.y + 'px';
+                spotEl.dataset.spotId = spot.id;
+                
+                spotEl.addEventListener('mousedown', (e) => {
+                    if (currentTool === 'select') {
+                        e.stopPropagation();
+                        selectSpot(spot.id);
+                        isDragging = true;
+                        const rect = canvas.getBoundingClientRect();
+                        dragOffset.x = e.clientX - rect.left - spot.x;
+                        dragOffset.y = e.clientY - rect.top - spot.y;
+                    }
+                });
+                
+                canvas.appendChild(spotEl);
+            });
+            
+            updateSpotsList();
+            document.getElementById('spotCount').textContent = spots.length;
+        }
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && selectedSpot) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left - dragOffset.x;
+                const y = e.clientY - rect.top - dragOffset.y;
+                
+                const spot = spots.find(s => s.id === selectedSpot);
+                if (spot) {
+                    spot.x = Math.max(0, Math.min(x, rect.width - 30));
+                    spot.y = Math.max(0, Math.min(y, rect.height - 30));
+                    renderSpots();
+                }
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        function selectSpot(id) {
+            selectedSpot = id;
+            document.querySelectorAll('.spot-icon').forEach(el => el.classList.remove('selected'));
+            const spotEl = document.querySelector('[data-spot-id="' + id + '"]');
+            if (spotEl) spotEl.classList.add('selected');
+            
+            const spot = spots.find(s => s.id === id);
+            if (spot) {
+                document.getElementById('spotNumber').value = spot.number;
+                document.getElementById('spotCapacity').value = spot.capacity;
+                document.getElementById('spotPrice').value = spot.price;
+                document.getElementById('spotPremium').checked = spot.premium;
+                spotDetails.classList.remove('hidden');
+            }
+        }
+        
+        function updateSpotDetails() {
+            const spot = spots.find(s => s.id === selectedSpot);
+            if (spot) {
+                spot.number = document.getElementById('spotNumber').value;
+                spot.capacity = parseInt(document.getElementById('spotCapacity').value);
+                spot.price = parseFloat(document.getElementById('spotPrice').value);
+                spot.premium = document.getElementById('spotPremium').checked;
+                updateSpotsList();
+                alert('✅ Spot details updated!');
+            }
+        }
+        
+        function deleteSelected() {
+            if (selectedSpot) {
+                spots = spots.filter(s => s.id !== selectedSpot);
+                selectedSpot = null;
+                spotDetails.classList.add('hidden');
+                renderSpots();
+            } else {
+                alert('Please select a spot first');
+            }
+        }
+        
+        function updateSpotsList() {
+            const list = document.getElementById('spotsList');
+            if (spots.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-500">No spots placed yet</p>';
+                return;
+            }
+            
+            list.innerHTML = spots.map(spot =>
+                '<div class="p-2 border rounded hover:bg-gray-50 cursor-pointer text-sm" onclick="selectSpot(' + spot.id + ')">' +
+                    '<div class="flex items-center justify-between">' +
+                        '<span>' + getSpotIcon(spot.type) + ' ' + spot.number + '</span>' +
+                        '<span class="text-xs text-gray-500">' + spot.capacity + ' guests</span>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+        }
+        
+        async function saveLayout() {
+            if (spots.length === 0) {
+                alert('⚠️ Please add at least one spot to the beach');
+                return;
+            }
+            
+            try {
+                // Delete all existing spots
+                const existingSpots = await fetch('/api/admin/beach/spots/1');
+                const existingData = await existingSpots.json();
+                
+                if (existingData.success && existingData.spots) {
+                    for (const spot of existingData.spots) {
+                        await fetch('/api/admin/beach/spots/' + spot.spot_id, { method: 'DELETE' });
+                    }
+                }
+                
+                // Create all new spots
+                for (const spot of spots) {
+                    await fetch('/api/admin/beach/spots', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            property_id: 1,
+                            zone_id: 1,
+                            spot_number: spot.number,
+                            spot_type: spot.type,
+                            position_x: Math.round(spot.x),
+                            position_y: Math.round(spot.y),
+                            max_capacity: spot.capacity,
+                            price_full_day: spot.price,
+                            is_premium: spot.premium ? 1 : 0
+                        })
+                    });
+                }
+                
+                alert('✅ Beach layout saved successfully!\\n' + spots.length + ' spots saved.');
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('❌ Failed to save beach layout');
+            }
+        }
+        
+        function clearAll() {
+            if (confirm('Clear all spots? This cannot be undone.')) {
+                spots = [];
+                selectedSpot = null;
+                spotDetails.classList.add('hidden');
+                renderSpots();
+            }
+        }
+        
+        // Beach photo upload
+        document.getElementById('beachPhotoUpload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    canvas.style.backgroundImage = 'url(' + event.target.result + ')';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Initialize
+        loadExistingSpots();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Guest Beach Booking Interface - Visual beach map for guests to book spots
+app.get('/beach-booking/:property_id', async (c) => {
+  const { property_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Booking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        #beachCanvas {
+            border: 2px solid #cbd5e0;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+        }
+        .spot-icon {
+            position: absolute;
+            font-size: 28px;
+            user-select: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+        .spot-icon:hover {
+            transform: scale(1.15);
+        }
+        .spot-icon.available {
+            opacity: 1;
+        }
+        .spot-icon.booked {
+            opacity: 0.3;
+            filter: grayscale(100%);
+            cursor: not-allowed;
+        }
+        .spot-icon.selected {
+            transform: scale(1.3);
+            filter: drop-shadow(0 0 12px rgba(59, 130, 246, 1));
+        }
+        .time-slot {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .time-slot:hover {
+            transform: translateY(-2px);
+        }
+        .time-slot.selected {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-white to-yellow-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        <i class="fas fa-umbrella-beach mr-3 text-blue-500"></i>Beach Booking
+                    </h1>
+                    <p class="text-gray-600 mt-2">Select your perfect spot by the sea 🌊</p>
+                </div>
+                <button onclick="window.history.back()" class="px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left: Beach Map -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-map-marked-alt mr-3 text-blue-600"></i>
+                        Select Your Spot
+                    </h2>
+                    <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-hidden" style="height: 500px">
+                        <div id="beachCanvas" class="w-full h-full relative">
+                            <!-- Spots will be rendered here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div class="mt-4 flex flex-wrap gap-4 text-sm">
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">✅</span>
+                            <span class="text-gray-600">Available</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl opacity-30 grayscale">🏖️</span>
+                            <span class="text-gray-600">Booked</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-2xl">⭐</span>
+                            <span class="text-gray-600">Premium Location</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Booking Form -->
+            <div>
+                <div class="bg-white rounded-2xl shadow-lg p-6 sticky top-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-calendar-check mr-3 text-green-600"></i>
+                        Your Booking
+                    </h2>
+
+                    <!-- Date Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold mb-2">
+                            <i class="fas fa-calendar mr-2 text-blue-500"></i>Date
+                        </label>
+                        <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+
+                    <!-- Selected Spot Info -->
+                    <div id="selectedSpotInfo" class="mb-4 p-4 bg-blue-50 rounded-xl hidden">
+                        <h3 class="font-bold text-lg mb-2 flex items-center">
+                            <span id="selectedSpotIcon" class="mr-2 text-2xl"></span>
+                            <span id="selectedSpotNumber"></span>
+                        </h3>
+                        <div class="space-y-1 text-sm text-gray-700">
+                            <p><i class="fas fa-users mr-2"></i>Capacity: <span id="selectedSpotCapacity" class="font-semibold"></span> guests</p>
+                            <p><i class="fas fa-dollar-sign mr-2"></i>Price: <span id="selectedSpotPrice" class="font-semibold"></span></p>
+                            <p id="premiumBadge" class="hidden"><i class="fas fa-star mr-2 text-yellow-500"></i><span class="font-semibold text-yellow-600">Premium Location</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Time Slot Selection -->
+                    <div id="timeSlotSection" class="mb-4 hidden">
+                        <label class="block text-sm font-semibold mb-3">
+                            <i class="fas fa-clock mr-2 text-purple-500"></i>Duration
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="selectTimeSlot('half_day_am')" data-slot="half_day_am" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
+                                <div class="text-sm">Morning</div>
+                                <div class="text-xs text-gray-600">8AM - 1PM</div>
+                            </button>
+                            <button onclick="selectTimeSlot('half_day_pm')" data-slot="half_day_pm" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
+                                <div class="text-sm">Afternoon</div>
+                                <div class="text-xs text-gray-600">1PM - 6PM</div>
+                            </button>
+                            <button onclick="selectTimeSlot('full_day')" data-slot="full_day" class="time-slot col-span-2 px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
+                                <div class="text-sm">Full Day</div>
+                                <div class="text-xs text-gray-600">8AM - 6PM</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Guest Details -->
+                    <div id="guestDetailsSection" class="mb-4 space-y-3 hidden">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                <i class="fas fa-user mr-2 text-indigo-500"></i>Guest Name
+                            </label>
+                            <input type="text" id="guestName" placeholder="John Doe" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                <i class="fas fa-door-open mr-2 text-pink-500"></i>Room Number
+                            </label>
+                            <input type="text" id="roomNumber" placeholder="101" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                <i class="fas fa-users mr-2 text-green-500"></i>Number of Guests
+                            </label>
+                            <input type="number" id="numGuests" min="1" value="2" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                <i class="fas fa-comment mr-2 text-orange-500"></i>Special Requests (Optional)
+                            </label>
+                            <textarea id="specialRequests" rows="2" placeholder="Extra towels, umbrella setup, etc." class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Book Button -->
+                    <button id="bookButton" onclick="completeBooking()" disabled class="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold text-lg hover:from-green-700 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                        <i class="fas fa-check-circle mr-2"></i>Complete Booking
+                    </button>
+                    
+                    <p class="text-xs text-gray-500 text-center mt-3">
+                        <i class="fas fa-info-circle mr-1"></i>Free for hotel guests
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedSpot = null;
+        let selectedTimeSlot = null;
+        let spots = [];
+        let bookings = [];
+        const propertyId = ${property_id};
+        
+        const canvas = document.getElementById('beachCanvas');
+        
+        // Set today as minimum date
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('bookingDate').min = today;
+        document.getElementById('bookingDate').value = today;
+        
+        // Load beach spots and bookings
+        async function loadBeachData() {
+            try {
+                // Load spots
+                const spotsResponse = await fetch('/api/admin/beach/spots/' + propertyId);
+                const spotsData = await spotsResponse.json();
+                
+                if (spotsData.success && spotsData.spots) {
+                    spots = spotsData.spots;
+                }
+                
+                // Load bookings for selected date
+                await loadBookingsForDate();
+                renderSpots();
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+        
+        async function loadBookingsForDate() {
+            const date = document.getElementById('bookingDate').value;
+            try {
+                const response = await fetch('/api/beach/availability/' + propertyId + '/' + date);
+                const data = await response.json();
+                
+                if (data.success) {
+                    bookings = data.bookings || [];
+                }
+            } catch (error) {
+                console.error('Load bookings error:', error);
+            }
+        }
+        
+        function getSpotIcon(type) {
+            const icons = {
+                umbrella: '🏖️',
+                cabana: '🏕️',
+                lounger: '🛏️',
+                daybed: '☀️'
+            };
+            return icons[type] || '🏖️';
+        }
+        
+        function isSpotAvailable(spotId, timeSlot) {
+            if (!timeSlot) return true;
+            
+            return !bookings.some(booking => 
+                booking.spot_id === spotId && 
+                booking.slot_type === timeSlot &&
+                booking.booking_status !== 'cancelled'
+            );
+        }
+        
+        function renderSpots() {
+            // Remove existing spot elements
+            document.querySelectorAll('.spot-icon').forEach(el => el.remove());
+            
+            spots.forEach(spot => {
+                const spotEl = document.createElement('div');
+                spotEl.className = 'spot-icon';
+                
+                // Check if spot is available for selected time slot
+                const available = isSpotAvailable(spot.spot_id, selectedTimeSlot);
+                spotEl.classList.add(available ? 'available' : 'booked');
+                
+                if (selectedSpot && selectedSpot.spot_id === spot.spot_id) {
+                    spotEl.classList.add('selected');
+                }
+                
+                spotEl.innerHTML = getSpotIcon(spot.spot_type) + (spot.is_premium ? '⭐' : '');
+                spotEl.style.left = spot.position_x + 'px';
+                spotEl.style.top = spot.position_y + 'px';
+                spotEl.dataset.spotId = spot.spot_id;
+                
+                if (available) {
+                    spotEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectSpot(spot);
+                    });
+                }
+                
+                canvas.appendChild(spotEl);
+            });
+        }
+        
+        function selectSpot(spot) {
+            selectedSpot = spot;
+            renderSpots();
+            
+            // Show spot info
+            document.getElementById('selectedSpotIcon').textContent = getSpotIcon(spot.spot_type);
+            document.getElementById('selectedSpotNumber').textContent = 'Spot ' + spot.spot_number;
+            document.getElementById('selectedSpotCapacity').textContent = spot.max_capacity;
+            document.getElementById('selectedSpotPrice').textContent = spot.price_full_day > 0 ? spot.price_full_day + ' USD' : 'FREE for guests';
+            document.getElementById('premiumBadge').classList.toggle('hidden', !spot.is_premium);
+            document.getElementById('selectedSpotInfo').classList.remove('hidden');
+            document.getElementById('timeSlotSection').classList.remove('hidden');
+            
+            checkFormComplete();
+        }
+        
+        function selectTimeSlot(slot) {
+            selectedTimeSlot = slot;
+            
+            // Update UI
+            document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
+            document.querySelector('[data-slot="' + slot + '"]').classList.add('selected');
+            
+            document.getElementById('guestDetailsSection').classList.remove('hidden');
+            
+            // Re-render spots to update availability
+            renderSpots();
+            checkFormComplete();
+        }
+        
+        function checkFormComplete() {
+            const hasSpot = selectedSpot !== null;
+            const hasSlot = selectedTimeSlot !== null;
+            const hasName = document.getElementById('guestName').value.trim() !== '';
+            const hasRoom = document.getElementById('roomNumber').value.trim() !== '';
+            
+            document.getElementById('bookButton').disabled = !(hasSpot && hasSlot && hasName && hasRoom);
+        }
+        
+        // Add input listeners
+        document.getElementById('guestName').addEventListener('input', checkFormComplete);
+        document.getElementById('roomNumber').addEventListener('input', checkFormComplete);
+        document.getElementById('bookingDate').addEventListener('change', async () => {
+            await loadBookingsForDate();
+            renderSpots();
+        });
+        
+        async function completeBooking() {
+            if (!selectedSpot || !selectedTimeSlot) {
+                alert('Please select a spot and time slot');
+                return;
+            }
+            
+            const bookingData = {
+                property_id: propertyId,
+                spot_id: selectedSpot.spot_id,
+                booking_date: document.getElementById('bookingDate').value,
+                slot_type: selectedTimeSlot,
+                guest_name: document.getElementById('guestName').value,
+                guest_room_number: document.getElementById('roomNumber').value,
+                num_guests: parseInt(document.getElementById('numGuests').value),
+                special_requests: document.getElementById('specialRequests').value
+            };
+            
+            try {
+                const response = await fetch('/api/beach/bookings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Booking Confirmed!\\n\\nBooking Reference: ' + data.booking.booking_reference + '\\n\\nPlease show your QR code at the beach entrance.');
+                    
+                    // Redirect to booking confirmation
+                    window.location.href = '/beach-booking-confirmation/' + data.booking.booking_reference;
+                } else {
+                    alert('❌ Booking failed: ' + (data.error || 'Please try again'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('❌ Booking failed. Please try again.');
+            }
+        }
+        
+        // Initialize
+        loadBeachData();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Beach Booking Confirmation Page with QR Code
+app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
+  const { booking_reference } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Confirmed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        @media print {
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 min-h-screen py-8">
+    <div class="max-w-2xl mx-auto px-4">
+        <!-- Success Animation -->
+        <div class="text-center mb-8 animate-slide-in">
+            <div class="inline-block p-6 bg-green-500 rounded-full shadow-2xl mb-4">
+                <i class="fas fa-check-circle text-6xl text-white"></i>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Booking Confirmed!</h1>
+            <p class="text-xl text-gray-600">Your beach spot is reserved 🏖️</p>
+        </div>
+
+        <!-- Booking Details Card -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6 animate-slide-in" style="animation-delay: 0.2s">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-info-circle mr-3 text-blue-600"></i>
+                Booking Details
+            </h2>
+
+            <div id="bookingDetails" class="space-y-4">
+                <div class="flex items-start gap-4 p-4 bg-blue-50 rounded-xl">
+                    <i class="fas fa-receipt text-blue-600 text-xl mt-1"></i>
+                    <div>
+                        <p class="text-sm text-gray-600">Booking Reference</p>
+                        <p class="text-xl font-bold text-gray-800">${booking_reference}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start gap-4 p-4 bg-purple-50 rounded-xl">
+                    <i class="fas fa-umbrella-beach text-purple-600 text-xl mt-1"></i>
+                    <div>
+                        <p class="text-sm text-gray-600">Beach Spot</p>
+                        <p class="text-lg font-semibold text-gray-800" id="spotInfo">Loading...</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-start gap-3 p-4 bg-green-50 rounded-xl">
+                        <i class="fas fa-calendar text-green-600 text-lg mt-1"></i>
+                        <div>
+                            <p class="text-xs text-gray-600">Date</p>
+                            <p class="font-semibold text-gray-800" id="bookingDateInfo">-</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3 p-4 bg-yellow-50 rounded-xl">
+                        <i class="fas fa-clock text-yellow-600 text-lg mt-1"></i>
+                        <div>
+                            <p class="text-xs text-gray-600">Time Slot</p>
+                            <p class="font-semibold text-gray-800" id="slotInfo">-</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-start gap-4 p-4 bg-pink-50 rounded-xl">
+                    <i class="fas fa-user text-pink-600 text-xl mt-1"></i>
+                    <div>
+                        <p class="text-sm text-gray-600">Guest Name</p>
+                        <p class="text-lg font-semibold text-gray-800" id="guestName">-</p>
+                        <p class="text-sm text-gray-600 mt-1">Room: <span id="roomNumber" class="font-semibold">-</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code -->
+            <div class="mt-8 p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl text-center">
+                <h3 class="text-xl font-bold mb-4 flex items-center justify-center">
+                    <i class="fas fa-qrcode mr-3 text-indigo-600"></i>
+                    Your Access QR Code
+                </h3>
+                <div class="bg-white p-6 rounded-xl inline-block shadow-lg">
+                    <div id="qrcode" class="flex justify-center"></div>
+                </div>
+                <p class="text-sm text-gray-600 mt-4">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Show this QR code at the beach entrance
+                </p>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="grid grid-cols-2 gap-4 no-print animate-slide-in" style="animation-delay: 0.4s">
+            <button onclick="window.print()" class="px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-lg">
+                <i class="fas fa-print mr-2"></i>Print Confirmation
+            </button>
+            <button onclick="window.location.href='/hotel/' + propertySlug" class="px-6 py-4 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-semibold transition shadow-lg">
+                <i class="fas fa-home mr-2"></i>Back to Hotel
+            </button>
+        </div>
+
+        <!-- Important Info -->
+        <div class="mt-6 p-6 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg no-print animate-slide-in" style="animation-delay: 0.6s">
+            <h4 class="font-bold text-gray-800 mb-2 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>
+                Important Information
+            </h4>
+            <ul class="space-y-2 text-sm text-gray-700">
+                <li><i class="fas fa-check mr-2 text-green-600"></i>Please arrive 10 minutes before your time slot</li>
+                <li><i class="fas fa-check mr-2 text-green-600"></i>Bring your QR code (printed or on phone)</li>
+                <li><i class="fas fa-check mr-2 text-green-600"></i>Beach towels provided by hotel</li>
+                <li><i class="fas fa-check mr-2 text-green-600"></i>Late arrivals may result in reduced time</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let propertySlug = 'paradise-resort';
+        
+        async function loadBookingDetails() {
+            try {
+                const response = await fetch('/api/beach/bookings/${booking_reference}');
+                const data = await response.json();
+                
+                if (data.success && data.booking) {
+                    const booking = data.booking;
+                    
+                    // Update UI
+                    document.getElementById('spotInfo').textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number;
+                    document.getElementById('bookingDateInfo').textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    document.getElementById('slotInfo').textContent = formatSlotType(booking.slot_type);
+                    document.getElementById('guestName').textContent = booking.guest_name;
+                    document.getElementById('roomNumber').textContent = booking.room_number;
+                    
+                    // Generate QR code
+                    new QRCode(document.getElementById('qrcode'), {
+                        text: '${booking_reference}',
+                        width: 200,
+                        height: 200,
+                        colorDark: '#1e3a8a',
+                        colorLight: '#ffffff'
+                    });
+                } else {
+                    alert('Failed to load booking details');
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Failed to load booking details');
+            }
+        }
+        
+        function getSpotIcon(type) {
+            const icons = {
+                umbrella: '🏖️',
+                cabana: '🏕️',
+                lounger: '🛏️',
+                daybed: '☀️'
+            };
+            return icons[type] || '🏖️';
+        }
+        
+        function formatSlotType(slot) {
+            const slots = {
+                half_day_am: 'Morning (8AM - 1PM)',
+                half_day_pm: 'Afternoon (1PM - 6PM)',
+                full_day: 'Full Day (8AM - 6PM)'
+            };
+            return slots[slot] || slot;
+        }
+        
+        // Initialize
+        loadBookingDetails();
+    </script>
+</body>
+</html>
+  `)
+})
 
 app.get('/admin/login', (c) => {
   return c.html(`
