@@ -6557,9 +6557,9 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="min-h-screen p-4 flex items-center justify-center">
                 <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 animate-scale-up">
                     <!-- Header -->
-                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-2xl flex justify-between items-center">
+                    <div id="infoPageHeader" class="text-white p-6 rounded-t-2xl flex justify-between items-center">
                         <h2 id="infoPageTitle" class="text-2xl md:text-3xl font-bold flex items-center">Loading...</h2>
-                        <button onclick="closeInfoPage()" class="text-white hover:text-gray-200 transition">
+                        <button id="infoPageCloseBtn" onclick="closeInfoPage()" class="hover:opacity-80 transition">
                             <i class="fas fa-times text-2xl"></i>
                         </button>
                     </div>
@@ -6571,7 +6571,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     
                     <!-- Footer -->
                     <div class="bg-gray-50 p-4 rounded-b-2xl flex justify-end">
-                        <button onclick="closeInfoPage()" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold transition">
+                        <button id="infoPageCloseFooterBtn" onclick="closeInfoPage()" class="px-6 py-3 text-white rounded-lg font-semibold transition">
                             <i class="fas fa-times mr-2"></i>Close
                         </button>
                     </div>
@@ -7034,6 +7034,23 @@ app.get('/offering-detail', async (c) => {
                 if (modalCloseBtn) {
                     modalCloseBtn.style.color = primaryColor;
                 }
+            }
+
+            // Apply colors to Info Page modal (individual page view)
+            const infoPageHeader = document.getElementById('infoPageHeader');
+            const infoPageCloseBtn = document.getElementById('infoPageCloseBtn');
+            const infoPageCloseFooterBtn = document.getElementById('infoPageCloseFooterBtn');
+
+            if (infoPageHeader) {
+                infoPageHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + (secondaryColor || '#ffffff') + ' 100%)';
+            }
+            if (infoPageCloseBtn) {
+                infoPageCloseBtn.style.color = '#ffffff';
+            }
+            if (infoPageCloseFooterBtn) {
+                infoPageCloseFooterBtn.style.background = primaryColor;
+                infoPageCloseFooterBtn.onmouseover = function() { this.style.opacity = '0.9'; };
+                infoPageCloseFooterBtn.onmouseout = function() { this.style.opacity = '1'; };
             }
         }
 
