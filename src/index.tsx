@@ -6730,9 +6730,10 @@ app.get('/vendor/dashboard', (c) => {
           exclude: { bg: 'bg-red-100', text: 'text-red-800', btn: 'text-gray-600 hover:text-gray-800' }
         };
         const color = colors[type];
+        const escapedText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         return '<div class="flex items-center justify-between ' + color.bg + ' px-3 py-2 rounded-lg">' +
-          '<span class="' + color.text + ' text-sm">' + text + '</span>' +
-          '<button type="button" onclick="removeItem(' + index + ', \'' + type + '\')" class="' + color.btn + '">' +
+          '<span class="' + color.text + ' text-sm">' + escapedText + '</span>' +
+          '<button type="button" onclick="removeItem(' + index + ', &quot;' + type + '&quot;)" class="' + color.btn + '">' +
           '<i class="fas fa-times"></i>' +
           '</button>' +
           '</div>';
