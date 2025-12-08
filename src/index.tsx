@@ -1460,6 +1460,124 @@ app.post('/api/vendor/activities', async (c) => {
   }
 })
 
+// Update activity
+app.put('/api/vendor/activities/:activity_id', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  const { activity_id } = c.req.param()
+  const body = await c.req.json()
+
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+
+  try {
+    // Verify activity belongs to vendor
+    const existing = await DB.prepare(`
+      SELECT activity_id FROM activities WHERE activity_id = ? AND vendor_id = ?
+    `).bind(activity_id, vendor_id).first()
+
+    if (!existing) {
+      return c.json({ error: 'Activity not found or access denied' }, 404)
+    }
+
+    const {
+      category_id, title_en, title_ar, short_description_en, short_description_ar,
+      full_description_en, full_description_ar, images, video_url, duration_minutes,
+      capacity_per_slot, price, currency, price_type, status
+    } = body
+
+    await DB.prepare(`
+      UPDATE activities
+      SET category_id = ?,
+          title_en = ?,
+          title_ar = ?,
+          short_description_en = ?,
+          short_description_ar = ?,
+          full_description_en = ?,
+          full_description_ar = ?,
+          images = ?,
+          video_url = ?,
+          duration_minutes = ?,
+          capacity_per_slot = ?,
+          price = ?,
+          currency = ?,
+          price_type = ?,
+          status = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE activity_id = ? AND vendor_id = ?
+    `).bind(
+      category_id,
+      title_en,
+      title_ar || title_en,
+      short_description_en,
+      short_description_ar || short_description_en,
+      full_description_en,
+      full_description_ar || full_description_en,
+      JSON.stringify(images || []),
+      video_url || null,
+      duration_minutes,
+      capacity_per_slot,
+      price,
+      currency || 'USD',
+      price_type || 'per_person',
+      status || 'active',
+      activity_id,
+      vendor_id
+    ).run()
+
+    return c.json({ success: true, message: 'Activity updated successfully' })
+  } catch (error) {
+    console.error('Update activity error:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
+  }
+})
+
+// Delete activity
+app.delete('/api/vendor/activities/:activity_id', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  const { activity_id } = c.req.param()
+
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+
+  try {
+    // Verify activity belongs to vendor
+    const existing = await DB.prepare(`
+      SELECT activity_id FROM activities WHERE activity_id = ? AND vendor_id = ?
+    `).bind(activity_id, vendor_id).first()
+
+    if (!existing) {
+      return c.json({ error: 'Activity not found or access denied' }, 404)
+    }
+
+    // Check for existing bookings
+    const bookings = await DB.prepare(`
+      SELECT COUNT(*) as count FROM bookings 
+      WHERE activity_id = ? AND booking_status != 'cancelled'
+    `).bind(activity_id).first()
+
+    if (bookings && bookings.count > 0) {
+      return c.json({ 
+        error: `Cannot delete activity with ${bookings.count} active booking(s). Please cancel bookings first.`,
+        has_bookings: true
+      }, 400)
+    }
+
+    // Delete the activity
+    await DB.prepare(`
+      DELETE FROM activities WHERE activity_id = ? AND vendor_id = ?
+    `).bind(activity_id, vendor_id).run()
+
+    return c.json({ success: true, message: 'Activity deleted successfully' })
+  } catch (error) {
+    console.error('Delete activity error:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
+  }
+})
+
 // Upload activity image (simulated - returns data URL for now)
 app.post('/api/vendor/upload-image', async (c) => {
   const { DB } = c.env
@@ -6621,7 +6739,15 @@ app.get('/vendor/dashboard', (c) => {
                   <span><i class="far fa-user mr-1"></i>Max \${a.capacity_per_slot}</span>
                 </div>
               </div>
-              <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+              <div class="flex items-start gap-2">
+                <span class="px-3 py-1 rounded-full text-sm \${a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">\${a.status}</span>
+                <button onclick="editActivity(\${a.activity_id})" class="text-blue-600 hover:text-blue-800 p-2" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteActivity(\${a.activity_id})" class="text-red-600 hover:text-red-800 p-2" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
             </div>
           </div>
         \`).join('');
@@ -6694,6 +6820,10 @@ app.get('/vendor/dashboard', (c) => {
 
       document.getElementById('addActivityForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const form = e.target;
+        const editingId = form.dataset.editingId;
+        const isEditing = !!editingId;
+        
         try {
           // Handle image upload if present
           const imageFile = document.getElementById('activityImage').files[0];
@@ -6715,37 +6845,126 @@ app.get('/vendor/dashboard', (c) => {
             }
           }
 
-          const response = await fetch('/api/vendor/activities', {
-            method: 'POST',
+          const activityData = {
+            category_id: document.getElementById('category').value,
+            title_en: document.getElementById('title').value,
+            short_description_en: document.getElementById('shortDesc').value,
+            full_description_en: document.getElementById('fullDesc').value,
+            price: parseFloat(document.getElementById('price').value),
+            duration_minutes: parseInt(document.getElementById('duration').value),
+            capacity_per_slot: parseInt(document.getElementById('capacity').value),
+            images: imageUrl ? [imageUrl] : [],
+            video_url: document.getElementById('videoUrl').value || null,
+            requirements: {},
+            includes: [],
+            status: 'active'
+          };
+
+          const url = isEditing ? '/api/vendor/activities/' + editingId : '/api/vendor/activities';
+          const method = isEditing ? 'PUT' : 'POST';
+
+          const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json', 'X-Vendor-ID': vendorId },
-            body: JSON.stringify({
-              category_id: document.getElementById('category').value,
-              title_en: document.getElementById('title').value,
-              short_description_en: document.getElementById('shortDesc').value,
-              full_description_en: document.getElementById('fullDesc').value,
-              price: parseFloat(document.getElementById('price').value),
-              duration_minutes: parseInt(document.getElementById('duration').value),
-              capacity_per_slot: parseInt(document.getElementById('capacity').value),
-              images: imageUrl ? [imageUrl] : [],
-              video_url: document.getElementById('videoUrl').value || null,
-              requirements: {},
-              includes: [],
-              status: 'active'
-            })
+            body: JSON.stringify(activityData)
           });
 
           const data = await response.json();
           if (data.success) {
-            alert('Activity created successfully!');
-            window.location.reload();
+            alert(isEditing ? 'Activity updated successfully!' : 'Activity created successfully!');
+            
+            // Reset form
+            form.reset();
+            delete form.dataset.editingId;
+            
+            // Reset button and title
+            const formTitle = form.parentElement.querySelector('h2');
+            formTitle.innerHTML = '<i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add New Activity';
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '<i class="fas fa-plus mr-2"></i>Add Activity';
+            submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            
+            // Reload dashboard
+            loadDashboard();
           } else {
-            alert('Error: ' + (data.error || 'Failed to create activity'));
+            alert('Error: ' + (data.error || 'Failed to save activity'));
           }
         } catch (error) {
-          console.error('Create activity error:', error);
-          alert('Failed to create activity');
+          console.error('Save activity error:', error);
+          alert('Failed to save activity');
         }
       });
+
+      async function editActivity(activityId) {
+        try {
+          // Fetch activity details
+          const response = await fetch('/api/vendor/activities', {
+            headers: { 'X-Vendor-ID': vendorId }
+          });
+          const data = await response.json();
+          const activity = data.activities.find(a => a.activity_id === activityId);
+          
+          if (!activity) {
+            alert('Activity not found');
+            return;
+          }
+          
+          // Populate form with activity data
+          document.getElementById('title').value = activity.title_en;
+          document.getElementById('category').value = activity.category_id;
+          document.getElementById('price').value = activity.price;
+          document.getElementById('duration').value = activity.duration_minutes;
+          document.getElementById('capacity').value = activity.capacity_per_slot;
+          document.getElementById('videoUrl').value = activity.video_url || '';
+          document.getElementById('shortDesc').value = activity.short_description_en;
+          document.getElementById('fullDesc').value = activity.full_description_en;
+          
+          // Change form title and button
+          const formTitle = document.querySelector('#addActivityForm').parentElement.querySelector('h2');
+          formTitle.innerHTML = '<i class="fas fa-edit mr-2 text-blue-600"></i>Edit Activity';
+          
+          // Change submit button
+          const form = document.getElementById('addActivityForm');
+          const submitBtn = form.querySelector('button[type="submit"]');
+          submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Update Activity';
+          submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+          submitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+          
+          // Store activity ID for update
+          form.dataset.editingId = activityId;
+          
+          // Scroll to form
+          form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) {
+          console.error('Edit activity error:', error);
+          alert('Failed to load activity details');
+        }
+      }
+      
+      async function deleteActivity(activityId) {
+        if (!confirm('Are you sure you want to delete this activity? This action cannot be undone.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/vendor/activities/' + activityId, {
+            method: 'DELETE',
+            headers: { 'X-Vendor-ID': vendorId }
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Activity deleted successfully!');
+            loadDashboard();
+          } else {
+            alert('Failed to delete activity: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete activity error:', error);
+          alert('Failed to delete activity');
+        }
+      }
 
       function logout() {
         localStorage.removeItem('vendor_id');
