@@ -5037,17 +5037,43 @@ function calculateRelevanceScore(query: string, text: string): number {
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
   const textLower = text.toLowerCase()
   
+  // Synonym/related terms mapping
+  const synonyms: Record<string, string[]> = {
+    'gym': ['fitness', 'exercise', 'workout', 'gym'],
+    'fitness': ['gym', 'exercise', 'workout', 'fitness'],
+    'restaurant': ['dining', 'food', 'eat', 'restaurant', 'cuisine'],
+    'dining': ['restaurant', 'food', 'eat', 'dining', 'cuisine'],
+    'pool': ['swimming', 'swim', 'beach', 'pool'],
+    'spa': ['wellness', 'massage', 'treatment', 'spa', 'therapy']
+  }
+  
   let score = 0
   for (const word of queryWords) {
-    // Exact match
+    // Exact word match (high priority)
+    const wordRegex = new RegExp(`\\b${word}\\b`, 'i')
+    if (wordRegex.test(textLower)) {
+      score += 10 // Much higher score for exact match
+    }
+    
+    // Check synonyms
+    if (synonyms[word]) {
+      for (const synonym of synonyms[word]) {
+        const synRegex = new RegExp(`\\b${synonym}\\b`, 'i')
+        if (synRegex.test(textLower)) {
+          score += 8 // High score for synonym match
+        }
+      }
+    }
+    
+    // Partial match (lower priority)
     if (textLower.includes(word)) {
       score += 2
     }
-    // Partial match
-    const regex = new RegExp(word.substring(0, Math.min(word.length, 4)), 'i')
-    if (regex.test(textLower)) {
-      score += 1
-    }
+  }
+  
+  // Boost if text looks like a title/heading (starts with capital or has newlines around it)
+  if (/^[A-Z]/.test(text) || text.includes('\n\n')) {
+    score *= 1.2
   }
   
   return score
@@ -5206,13 +5232,21 @@ app.post('/api/chatbot/chat', async (c) => {
       try {
         console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
         console.log('📚 Context length:', context.length)
+        console.log('📝 Context preview:', context.substring(0, 200))
         
-        const systemPrompt = `You are a helpful hotel assistant. Use the following information to answer the guest's question. If the information doesn't contain the answer, say you don't know and suggest contacting the hotel staff.
+        const systemPrompt = `You are a helpful hotel assistant for Paradise Resort. Answer the guest's question using ONLY the information provided below. Be confident and direct - if the information mentions something, provide a clear answer.
 
 Hotel Information:
 ${context}
 
-Answer in a friendly, professional manner. Keep responses concise but informative.`
+Important Rules:
+1. If the hotel information above mentions the topic, answer confidently with those details
+2. Include specific details like prices, times, locations when available
+3. Be friendly and conversational
+4. Keep responses concise (2-3 sentences maximum)
+5. Only say "I don't have that information" if the context truly doesn't mention the topic at all
+
+Answer the guest's question now:`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
