@@ -5504,9 +5504,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
             });
             
-            // Update all data-i18n elements
+            // Update all data-i18n elements (except pill buttons which are handled above)
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
+                // Skip category pills as they use custom section names
+                if (key && key.startsWith('pill-')) {
+                    return;
+                }
                 const translated = t(key);
                 if (translated && translated !== key) {
                     el.textContent = translated;
@@ -5866,13 +5870,16 @@ app.get('/hotel/:property_slug', async (c) => {
           });
           
           // Update category pills with custom section names from propertyData
+          console.log('🏷️ Updating category pills in applySectionTranslations...');
           document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             if (key === 'pill-all') {
               el.textContent = translations[lang].all;
             } else if (key === 'pill-restaurants') {
               const customName = getTranslatedField(propertyData, 'section_restaurants');
+              console.log('  pill-restaurants: getTranslatedField returned:', customName);
               el.textContent = customName || translations[lang].restaurants;
+              console.log('  pill-restaurants: final value:', el.textContent);
             } else if (key === 'pill-events') {
               const customName = getTranslatedField(propertyData, 'section_events');
               el.textContent = customName || translations[lang].events;
