@@ -6686,6 +6686,19 @@ app.get('/hotel/:property_slug', async (c) => {
           
           document.getElementById('infoPageTitle').innerHTML = '<i class="' + page.icon_class + ' mr-3"></i>' + title;
           document.getElementById('infoPageContent').innerHTML = content;
+          
+          // Apply custom colors from propertyData
+          const primaryColor = propertyData.primary_color || '#3B82F6';
+          const infoPageHeader = document.getElementById('infoPageHeader');
+          const infoPageCloseFooterBtn = document.getElementById('infoPageCloseFooterBtn');
+          
+          if (infoPageHeader) {
+            infoPageHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, #ffffff 100%)';
+          }
+          if (infoPageCloseFooterBtn) {
+            infoPageCloseFooterBtn.style.background = primaryColor;
+          }
+          
           document.getElementById('infoPageModal').classList.remove('hidden');
         }
 
