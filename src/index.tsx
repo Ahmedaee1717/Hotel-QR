@@ -4916,8 +4916,12 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="relative bg-white">
                 <!-- Cover Photo -->
                 <div class="gradient-hero h-64 md:h-96 relative">
-                    <!-- Language Selector - Top Right on Cover -->
-                    <div class="absolute top-4 right-4 z-10">
+                    <!-- Info Button & Language Selector - Top Right on Cover -->
+                    <div class="absolute top-4 right-4 z-10 flex gap-2">
+                        <button onclick="openInfoMenu()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" title="Hotel Information">
+                            <i class="fas fa-info-circle"></i>
+                            <span class="hidden sm:inline">Info</span>
+                        </button>
                         <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
                             <option value="en">🇬🇧 English</option>
                             <option value="ar">🇸🇦 العربية</option>
@@ -6439,7 +6443,217 @@ app.get('/hotel/:property_slug', async (c) => {
             console.error('Seasonal effects error:', error);
           }
         }
+
+        // ============================================
+        // INFO PAGES - GUEST INTERFACE
+        // ============================================
+        
+        let infoPages = [];
+
+        async function loadInfoPages() {
+          try {
+            const response = await fetch(\`/api/info-pages/\${propertyData.property_id}\`);
+            const data = await response.json();
+            if (data.success) {
+              infoPages = data.pages;
+            }
+          } catch (error) {
+            console.error('Load info pages error:', error);
+          }
+        }
+
+        window.openInfoMenu = function() {
+          document.getElementById('infoMenuModal').classList.remove('hidden');
+          displayInfoMenu();
+        }
+
+        window.closeInfoMenu = function() {
+          document.getElementById('infoMenuModal').classList.add('hidden');
+        }
+
+        function displayInfoMenu() {
+          const container = document.getElementById('infoMenuList');
+          
+          if (infoPages.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fas fa-info-circle text-4xl mb-3"></i><p>No information pages available</p></div>';
+            return;
+          }
+
+          const colorClasses = {
+            blue: 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700',
+            purple: 'from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700',
+            green: 'from-green-500 to-green-600 hover:from-green-600 hover:to-green-700',
+            orange: 'from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700',
+            red: 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
+            pink: 'from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700',
+            indigo: 'from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700',
+            teal: 'from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700'
+          };
+
+          let html = '';
+          infoPages.forEach(page => {
+            const title = page[\`title_\${currentLang}\`] || page.title_en;
+            const colorClass = colorClasses[page.color_theme] || colorClasses.blue;
+            
+            html += \`<button onclick="openInfoPage('\${page.page_key}')" class="w-full bg-gradient-to-r \${colorClass} text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">
+              <div class="flex items-center gap-3">
+                <i class="\${page.icon_class} text-2xl"></i>
+                <span class="font-bold text-lg">\${title}</span>
+                <i class="fas fa-chevron-right ml-auto"></i>
+              </div>
+            </button>\`;
+          });
+
+          container.innerHTML = html;
+        }
+
+        window.openInfoPage = async function(pageKey) {
+          try {
+            const response = await fetch(\`/api/info-page/\${propertyData.property_id}/\${pageKey}\`);
+            const data = await response.json();
+            
+            if (data.success) {
+              displayInfoPage(data.page);
+              closeInfoMenu();
+            }
+          } catch (error) {
+            console.error('Open info page error:', error);
+            alert('Failed to load page');
+          }
+        }
+
+        function displayInfoPage(page) {
+          const title = page[\`title_\${currentLang}\`] || page.title_en;
+          const content = page[\`content_\${currentLang}\`] || page.content_en;
+          
+          document.getElementById('infoPageTitle').innerHTML = \`<i class="\${page.icon_class} mr-3"></i>\${title}\`;
+          document.getElementById('infoPageContent').innerHTML = content;
+          document.getElementById('infoPageModal').classList.remove('hidden');
+        }
+
+        window.closeInfoPage = function() {
+          document.getElementById('infoPageModal').classList.add('hidden');
+        }
+
+        // Load info pages on init
+        loadInfoPages();
+        
         </script>
+
+        <!-- Info Menu Modal -->
+        <div id="infoMenuModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden animate-scale-up">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold"><i class="fas fa-info-circle mr-2"></i>Hotel Information</h2>
+                    <button onclick="closeInfoMenu()" class="text-white hover:text-gray-200 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Info Pages List -->
+                <div id="infoMenuList" class="p-6 space-y-3 overflow-y-auto max-h-[60vh]">
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-3xl"></i>
+                        <p class="mt-2">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Page Display Modal -->
+        <div id="infoPageModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 overflow-y-auto">
+            <div class="min-h-screen p-4 flex items-center justify-center">
+                <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 animate-scale-up">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-2xl flex justify-between items-center">
+                        <h2 id="infoPageTitle" class="text-2xl md:text-3xl font-bold flex items-center">Loading...</h2>
+                        <button onclick="closeInfoPage()" class="text-white hover:text-gray-200 transition">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Content -->
+                    <div id="infoPageContent" class="p-6 md:p-8 prose prose-lg max-w-none overflow-y-auto max-h-[70vh]">
+                        <!-- Content will be injected here -->
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="bg-gray-50 p-4 rounded-b-2xl flex justify-end">
+                        <button onclick="closeInfoPage()" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold transition">
+                            <i class="fas fa-times mr-2"></i>Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+          @keyframes scale-up {
+            from {
+              transform: scale(0.9);
+              opacity: 0;
+            }
+            to {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+          
+          .animate-scale-up {
+            animation: scale-up 0.2s ease-out;
+          }
+
+          /* Prose styling for info page content */
+          .prose {
+            color: #374151;
+          }
+          .prose h2 {
+            color: #1f2937;
+            font-weight: 700;
+            font-size: 1.875rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+          }
+          .prose h3 {
+            color: #374151;
+            font-weight: 600;
+            font-size: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+          }
+          .prose p {
+            margin-bottom: 1rem;
+            line-height: 1.75;
+          }
+          .prose ul, .prose ol {
+            margin-bottom: 1rem;
+            padding-left: 1.5rem;
+          }
+          .prose li {
+            margin-bottom: 0.5rem;
+          }
+          .prose table {
+            width: 100%;
+            margin-bottom: 1rem;
+          }
+          .prose th {
+            background-color: #f3f4f6;
+            font-weight: 600;
+            padding: 0.75rem;
+            text-align: left;
+          }
+          .prose td {
+            padding: 0.75rem;
+          }
+          .prose strong {
+            font-weight: 700;
+            color: #1f2937;
+          }
+          .prose em {
+            font-style: italic;
+          }
+        </style>
     </body>
     </html>
   `)
