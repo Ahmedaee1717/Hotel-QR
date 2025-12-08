@@ -1433,15 +1433,15 @@ app.post('/api/vendor/activities', async (c) => {
       category_id, title_en, title_ar, short_description_en, short_description_ar,
       full_description_en, full_description_ar, images, video_url, duration_minutes,
       capacity_per_slot, price, currency, price_type, requirements,
-      includes, cancellation_policy_hours, status
+      includes, excludes, cancellation_policy_hours, status
     } = body
 
     const activity = await DB.prepare(`
       INSERT INTO activities (
         vendor_id, category_id, title_en, title_ar, short_description_en, short_description_ar,
         full_description_en, full_description_ar, images, video_url, duration_minutes, capacity_per_slot,
-        price, currency, price_type, requirements, includes, cancellation_policy_hours, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        price, currency, price_type, requirements, includes, excludes, cancellation_policy_hours, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING activity_id
     `).bind(
       vendor_id, category_id, title_en, title_ar || title_en,
@@ -1449,7 +1449,7 @@ app.post('/api/vendor/activities', async (c) => {
       full_description_en, full_description_ar || full_description_en,
       JSON.stringify(images), video_url || null, duration_minutes, capacity_per_slot,
       price, currency || 'USD', price_type || 'per_person',
-      JSON.stringify(requirements), JSON.stringify(includes),
+      JSON.stringify(requirements), JSON.stringify(includes), JSON.stringify(excludes),
       cancellation_policy_hours || 24, status || 'draft'
     ).first()
 
@@ -1484,7 +1484,7 @@ app.put('/api/vendor/activities/:activity_id', async (c) => {
     const {
       category_id, title_en, title_ar, short_description_en, short_description_ar,
       full_description_en, full_description_ar, images, video_url, duration_minutes,
-      capacity_per_slot, price, currency, price_type, status
+      capacity_per_slot, price, currency, price_type, requirements, includes, excludes, status
     } = body
 
     await DB.prepare(`
@@ -1503,6 +1503,9 @@ app.put('/api/vendor/activities/:activity_id', async (c) => {
           price = ?,
           currency = ?,
           price_type = ?,
+          requirements = ?,
+          includes = ?,
+          excludes = ?,
           status = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE activity_id = ? AND vendor_id = ?
@@ -1521,6 +1524,9 @@ app.put('/api/vendor/activities/:activity_id', async (c) => {
       price,
       currency || 'USD',
       price_type || 'per_person',
+      JSON.stringify(requirements || []),
+      JSON.stringify(includes || []),
+      JSON.stringify(excludes || []),
       status || 'active',
       activity_id,
       vendor_id
@@ -6592,7 +6598,50 @@ app.get('/vendor/dashboard', (c) => {
                 </div>
                 <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
                 <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
-                <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold"><i class="fas fa-save mr-2"></i>Create Activity</button>
+                
+                <!-- Requirements Section -->
+                <div class="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+                  <label class="block text-sm font-bold mb-3 text-gray-700">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>Requirements
+                  </label>
+                  <div id="requirementsList" class="space-y-2 mb-3"></div>
+                  <div class="flex gap-2">
+                    <input type="text" id="requirementInput" placeholder="e.g., Minimum age: 12 years" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                    <button type="button" onclick="addRequirement()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
+                      <i class="fas fa-plus"></i> Add
+                    </button>
+                  </div>
+                </div>
+
+                <!-- What's Included Section -->
+                <div class="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                  <label class="block text-sm font-bold mb-3 text-green-700">
+                    <i class="fas fa-check-circle mr-2 text-green-600"></i>What's Included
+                  </label>
+                  <div id="includesList" class="space-y-2 mb-3"></div>
+                  <div class="flex gap-2">
+                    <input type="text" id="includeInput" placeholder="e.g., Professional guide, Equipment" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                    <button type="button" onclick="addInclude()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 text-sm">
+                      <i class="fas fa-plus"></i> Add
+                    </button>
+                  </div>
+                </div>
+
+                <!-- What's NOT Included Section -->
+                <div class="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+                  <label class="block text-sm font-bold mb-3 text-red-700">
+                    <i class="fas fa-times-circle mr-2 text-red-600"></i>What's NOT Included
+                  </label>
+                  <div id="excludesList" class="space-y-2 mb-3"></div>
+                  <div class="flex gap-2">
+                    <input type="text" id="excludeInput" placeholder="e.g., Dive session, Personal expenses" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                    <button type="button" onclick="addExclude()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 text-sm">
+                      <i class="fas fa-plus"></i> Add
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold w-full"><i class="fas fa-save mr-2"></i><span id="submitBtnText">Create Activity</span></button>
             </form>
         </div>
 
@@ -6655,6 +6704,107 @@ app.get('/vendor/dashboard', (c) => {
           console.error('Dashboard load error:', error);
           alert('Failed to load dashboard. Please try refreshing the page.');
         }
+      }
+
+      // Arrays to store requirements, includes, excludes
+      let requirementsArray = [];
+      let includesArray = [];
+      let excludesArray = [];
+      let currentEditId = null;
+
+      // Helper function to render a list item with remove button
+      function renderListItem(text, index, type) {
+        const colors = {
+          requirement: { bg: 'bg-blue-100', text: 'text-blue-800', btn: 'text-red-600 hover:text-red-800' },
+          include: { bg: 'bg-green-100', text: 'text-green-800', btn: 'text-red-600 hover:text-red-800' },
+          exclude: { bg: 'bg-red-100', text: 'text-red-800', btn: 'text-gray-600 hover:text-gray-800' }
+        };
+        const color = colors[type];
+        return '<div class="flex items-center justify-between ' + color.bg + ' px-3 py-2 rounded-lg">' +
+          '<span class="' + color.text + ' text-sm">' + text + '</span>' +
+          '<button type="button" onclick="removeItem(' + index + ', \'' + type + '\')" class="' + color.btn + '">' +
+          '<i class="fas fa-times"></i>' +
+          '</button>' +
+          '</div>';
+      }
+
+      // Add requirement
+      window.addRequirement = function() {
+        const input = document.getElementById('requirementInput');
+        const value = input.value.trim();
+        if (value) {
+          requirementsArray.push(value);
+          input.value = '';
+          updateRequirementsList();
+        }
+      }
+
+      // Add include
+      window.addInclude = function() {
+        const input = document.getElementById('includeInput');
+        const value = input.value.trim();
+        if (value) {
+          includesArray.push(value);
+          input.value = '';
+          updateIncludesList();
+        }
+      }
+
+      // Add exclude
+      window.addExclude = function() {
+        const input = document.getElementById('excludeInput');
+        const value = input.value.trim();
+        if (value) {
+          excludesArray.push(value);
+          input.value = '';
+          updateExcludesList();
+        }
+      }
+
+      // Remove item from array
+      window.removeItem = function(index, type) {
+        if (type === 'requirement') {
+          requirementsArray.splice(index, 1);
+          updateRequirementsList();
+        } else if (type === 'include') {
+          includesArray.splice(index, 1);
+          updateIncludesList();
+        } else if (type === 'exclude') {
+          excludesArray.splice(index, 1);
+          updateExcludesList();
+        }
+      }
+
+      // Update display lists
+      function updateRequirementsList() {
+        const container = document.getElementById('requirementsList');
+        container.innerHTML = requirementsArray.map((item, i) => 
+          renderListItem(item, i, 'requirement')
+        ).join('');
+      }
+
+      function updateIncludesList() {
+        const container = document.getElementById('includesList');
+        container.innerHTML = includesArray.map((item, i) => 
+          renderListItem(item, i, 'include')
+        ).join('');
+      }
+
+      function updateExcludesList() {
+        const container = document.getElementById('excludesList');
+        container.innerHTML = excludesArray.map((item, i) => 
+          renderListItem(item, i, 'exclude')
+        ).join('');
+      }
+
+      // Clear all arrays (for resetting form)
+      function clearAllArrays() {
+        requirementsArray = [];
+        includesArray = [];
+        excludesArray = [];
+        updateRequirementsList();
+        updateIncludesList();
+        updateExcludesList();
       }
 
       function displayProfile(profile) {
@@ -6838,8 +6988,9 @@ app.get('/vendor/dashboard', (c) => {
             capacity_per_slot: parseInt(document.getElementById('capacity').value),
             images: imageUrl ? [imageUrl] : [],
             video_url: document.getElementById('videoUrl').value || null,
-            requirements: {},
-            includes: [],
+            requirements: requirementsArray,
+            includes: includesArray,
+            excludes: excludesArray,
             status: 'active'
           };
 
@@ -6859,12 +7010,13 @@ app.get('/vendor/dashboard', (c) => {
             // Reset form
             form.reset();
             delete form.dataset.editingId;
+            clearAllArrays();
             
             // Reset button and title
             const formTitle = form.parentElement.querySelector('h2');
             formTitle.innerHTML = '<i class="fas fa-plus-circle mr-2 text-blue-600"></i>Add New Activity';
+            document.getElementById('submitBtnText').textContent = 'Create Activity';
             const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.innerHTML = '<i class="fas fa-plus mr-2"></i>Add Activity';
             submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
             submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
             
@@ -6913,14 +7065,40 @@ app.get('/vendor/dashboard', (c) => {
           document.getElementById('shortDesc').value = activity.short_description_en;
           document.getElementById('fullDesc').value = activity.full_description_en;
           
+          // Populate requirements, includes, excludes
+          try {
+            requirementsArray = activity.requirements ? JSON.parse(activity.requirements) : [];
+            if (!Array.isArray(requirementsArray)) requirementsArray = [];
+          } catch (e) {
+            requirementsArray = [];
+          }
+          
+          try {
+            includesArray = activity.includes ? JSON.parse(activity.includes) : [];
+            if (!Array.isArray(includesArray)) includesArray = [];
+          } catch (e) {
+            includesArray = [];
+          }
+          
+          try {
+            excludesArray = activity.excludes ? JSON.parse(activity.excludes) : [];
+            if (!Array.isArray(excludesArray)) excludesArray = [];
+          } catch (e) {
+            excludesArray = [];
+          }
+          
+          updateRequirementsList();
+          updateIncludesList();
+          updateExcludesList();
+          
           // Change form title and button
           const formTitle = document.querySelector('#addActivityForm').parentElement.querySelector('h2');
           formTitle.innerHTML = '<i class="fas fa-edit mr-2 text-blue-600"></i>Edit Activity';
           
           // Change submit button
           const form = document.getElementById('addActivityForm');
+          document.getElementById('submitBtnText').textContent = 'Update Activity';
           const submitBtn = form.querySelector('button[type="submit"]');
-          submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Update Activity';
           submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
           submitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
           
@@ -7308,6 +7486,33 @@ app.get('/activity', (c) => {
                 <p id="description" class="text-gray-700"></p>
             </div>
 
+            <!-- Requirements & Includes Section -->
+            <div class="grid md:grid-cols-3 gap-4 mb-6">
+                <!-- Requirements -->
+                <div id="requirementsSection" class="hidden bg-blue-50 rounded-lg shadow p-5 border-2 border-blue-200">
+                    <h4 class="font-bold text-blue-800 mb-3 flex items-center">
+                        <i class="fas fa-info-circle mr-2"></i>Requirements
+                    </h4>
+                    <ul id="requirementsList" class="space-y-2 text-sm text-blue-800"></ul>
+                </div>
+
+                <!-- What's Included -->
+                <div id="includesSection" class="hidden bg-green-50 rounded-lg shadow p-5 border-2 border-green-200">
+                    <h4 class="font-bold text-green-800 mb-3 flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>Included
+                    </h4>
+                    <ul id="includesList" class="space-y-2 text-sm text-green-800"></ul>
+                </div>
+
+                <!-- What's NOT Included -->
+                <div id="excludesSection" class="hidden bg-red-50 rounded-lg shadow p-5 border-2 border-red-200">
+                    <h4 class="font-bold text-red-800 mb-3 flex items-center">
+                        <i class="fas fa-times-circle mr-2"></i>Not Included
+                    </h4>
+                    <ul id="excludesList" class="space-y-2 text-sm text-red-800"></ul>
+                </div>
+            </div>
+
             <!-- Vendor Information Card -->
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold mb-4"><i class="fas fa-user-tie mr-2 text-blue-500"></i>Activity Provider</h3>
@@ -7599,6 +7804,57 @@ app.get('/activity', (c) => {
           
           document.getElementById('activityTitle').textContent = title;
           document.getElementById('description').textContent = description;
+
+          // Display requirements if available
+          if (activity.requirements) {
+            let requirements = [];
+            try {
+              requirements = typeof activity.requirements === 'string' ? JSON.parse(activity.requirements) : activity.requirements;
+            } catch (e) {
+              requirements = [];
+            }
+            
+            if (Array.isArray(requirements) && requirements.length > 0) {
+              document.getElementById('requirementsSection').classList.remove('hidden');
+              document.getElementById('requirementsList').innerHTML = requirements.map(req => 
+                '<li class="flex items-start"><i class="fas fa-chevron-right mr-2 mt-1 text-blue-600"></i><span>' + req + '</span></li>'
+              ).join('');
+            }
+          }
+
+          // Display includes if available
+          if (activity.includes) {
+            let includes = [];
+            try {
+              includes = typeof activity.includes === 'string' ? JSON.parse(activity.includes) : activity.includes;
+            } catch (e) {
+              includes = [];
+            }
+            
+            if (Array.isArray(includes) && includes.length > 0) {
+              document.getElementById('includesSection').classList.remove('hidden');
+              document.getElementById('includesList').innerHTML = includes.map(inc => 
+                '<li class="flex items-start"><i class="fas fa-check mr-2 mt-1 text-green-600"></i><span>' + inc + '</span></li>'
+              ).join('');
+            }
+          }
+
+          // Display excludes if available
+          if (activity.excludes) {
+            let excludes = [];
+            try {
+              excludes = typeof activity.excludes === 'string' ? JSON.parse(activity.excludes) : activity.excludes;
+            } catch (e) {
+              excludes = [];
+            }
+            
+            if (Array.isArray(excludes) && excludes.length > 0) {
+              document.getElementById('excludesSection').classList.remove('hidden');
+              document.getElementById('excludesList').innerHTML = excludes.map(exc => 
+                '<li class="flex items-start"><i class="fas fa-times mr-2 mt-1 text-red-600"></i><span>' + exc + '</span></li>'
+              ).join('');
+            }
+          }
 
           // Display video if available
           if (activity.video_url) {
