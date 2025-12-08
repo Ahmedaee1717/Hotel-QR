@@ -10471,7 +10471,7 @@ app.get('/admin/dashboard', (c) => {
                                     <!-- QR Code Container with Festive Overlay -->
                                     <div class="relative inline-block mb-4">
                                         <div id="qrCodePreview" class="bg-white p-4 rounded-lg inline-block" style="position: relative;">
-                                            <img id="qrImage" src="" alt="QR Code" style="display: block; width: 300px; height: 300px;" />
+                                            <img id="qrImage" alt="QR Code" style="display: block; width: 300px; height: 300px;" />
                                         </div>
                                         <!-- Festive Overlay (positioned over QR) -->
                                         <div id="festiveOverlayDiv" style="position: absolute; top: -20px; right: -20px; font-size: 80px; display: none;">🎅</div>
@@ -11789,7 +11789,7 @@ app.get('/admin/dashboard', (c) => {
         const propertyName = document.getElementById('propertyName').textContent;
         
         // Use html2canvas to capture the card
-        alert('📥 Download feature: Right-click on the preview card and select "Save Image As..." \n\nOr use your browser\'s screenshot tool to capture the card.');
+        alert('📥 Download feature: Right-click on the preview card and select "Save Image As..." \n\nOr use your browser screenshot tool to capture the card.');
       };
 
       // Print QR card
