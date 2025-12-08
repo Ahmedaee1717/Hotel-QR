@@ -2106,6 +2106,47 @@ app.get('/api/admin/dashboard', async (c) => {
   }
 })
 
+// Track QR code scan
+app.post('/api/track-scan', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { property_id } = await c.req.json()
+    const user_agent = c.req.header('User-Agent') || ''
+    const ip_address = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || ''
+    
+    await DB.prepare(`
+      INSERT INTO qr_scans (property_id, user_agent, ip_address)
+      VALUES (?, ?, ?)
+    `).bind(property_id || 1, user_agent, ip_address).run()
+    
+    return c.json({ success: true, message: 'Scan tracked' })
+  } catch (error) {
+    console.error('Track scan error:', error)
+    return c.json({ success: false, error: 'Failed to track scan' }, 500)
+  }
+})
+
+// Track page view
+app.post('/api/track-page-view', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { property_id, page_type, page_id } = await c.req.json()
+    const user_agent = c.req.header('User-Agent') || ''
+    
+    await DB.prepare(`
+      INSERT INTO page_views (property_id, page_type, page_id, user_agent)
+      VALUES (?, ?, ?, ?)
+    `).bind(property_id || 1, page_type, page_id || null, user_agent).run()
+    
+    return c.json({ success: true, message: 'Page view tracked' })
+  } catch (error) {
+    console.error('Track page view error:', error)
+    return c.json({ success: false, error: 'Failed to track page view' }, 500)
+  }
+})
+
 // Get analytics data
 app.get('/api/admin/analytics', async (c) => {
   const { DB } = c.env
@@ -4117,6 +4158,38 @@ app.get('/hotel/:property_slug', async (c) => {
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
+        // Track QR code scan on page load
+        async function trackQRScan() {
+          try {
+            await fetch('/api/track-scan', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                property_id: propertyData?.property_id || 1
+              })
+            });
+          } catch (error) {
+            console.error('Failed to track scan:', error);
+          }
+        }
+        
+        // Track page view
+        async function trackPageView(pageType, pageId) {
+          try {
+            await fetch('/api/track-page-view', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                property_id: propertyData?.property_id || 1,
+                page_type: pageType,
+                page_id: pageId
+              })
+            });
+          } catch (error) {
+            console.error('Failed to track page view:', error);
+          }
+        }
+        
         // Translation dictionaries for UI elements
         const uiTranslations = {
             en: {
@@ -4819,6 +4892,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 document.title = propertyData.name;
                 
+                // Track QR scan
+                trackQRScan();
+                
                 // Apply design settings
                 applyDesignSettings(propertyData);
                 
@@ -5309,6 +5385,11 @@ app.get('/hotel/:property_slug', async (c) => {
         function filterOfferings(category) {
             currentFilter = category;
             
+            // Track page view for the section
+            if (category !== 'all') {
+                trackPageView(category, null);
+            }
+            
             // Update pill styles
             document.querySelectorAll('.category-pill').forEach(pill => {
                 if (pill.dataset.category === category) {
@@ -5322,10 +5403,12 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function viewOffering(offeringId) {
+            trackPageView('offering', String(offeringId));
             window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
         }
 
         function viewActivity(activityId) {
+            trackPageView('activity', String(activityId));
             window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
         }
 
