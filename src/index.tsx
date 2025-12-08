@@ -6366,6 +6366,11 @@ app.get('/hotel/:property_slug', async (c) => {
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
                 
+                // Initialize chatbot after all data is loaded
+                if (typeof initChatbot === 'function') {
+                    initChatbot();
+                }
+                
             } catch (error) {
                 console.error('Initialization error:', error);
                 console.error('Error details:', error.message, error.stack);
@@ -6872,6 +6877,11 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 // Initialize seasonal effects
                 initSeasonalEffects();
+                
+                // Initialize chatbot (must run after propertyData is loaded)
+                if (typeof window.initChatbot === 'function') {
+                    window.initChatbot();
+                }
             });
         });
         
@@ -7227,20 +7237,19 @@ app.get('/hotel/:property_slug', async (c) => {
         
         <script>
           // Chatbot Widget JavaScript
-          (function() {
-            const chatbotWidget = document.getElementById('chatbotWidget');
-            const chatButton = document.getElementById('chatbotButton');
-            const chatWindow = document.getElementById('chatWindow');
-            const closeChatBtn = document.getElementById('closeChatBtn');
-            const chatMessages = document.getElementById('chatMessages');
-            const chatInput = document.getElementById('chatInput');
-            const sendChatBtn = document.getElementById('sendChatBtn');
-            
-            let conversationId = null;
-            let sessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-            
-            // Load chatbot settings and show if enabled
-            async function initChatbot() {
+          const chatbotWidget = document.getElementById('chatbotWidget');
+          const chatButton = document.getElementById('chatbotButton');
+          const chatWindow = document.getElementById('chatWindow');
+          const closeChatBtn = document.getElementById('closeChatBtn');
+          const chatMessages = document.getElementById('chatMessages');
+          const chatInput = document.getElementById('chatInput');
+          const sendChatBtn = document.getElementById('sendChatBtn');
+          
+          let chatConversationId = null;
+          let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          // Load chatbot settings and show if enabled
+          window.initChatbot = async function() {
               try {
                 const response = await fetch('/api/chatbot/settings/' + propertyData.property_id);
                 const data = await response.json();
@@ -7309,9 +7318,9 @@ app.get('/hotel/:property_slug', async (c) => {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     property_id: propertyData.property_id,
-                    session_id: sessionId,
+                    session_id: chatSessionId,
                     message: message,
-                    conversation_id: conversationId
+                    conversation_id: chatConversationId
                   })
                 });
                 
@@ -7321,7 +7330,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 document.getElementById('typing')?.remove();
                 
                 if (data.success) {
-                  conversationId = data.conversation_id;
+                  chatConversationId = data.conversation_id;
                   addMessage(data.response, 'assistant');
                 } else if (response.status === 429) {
                   addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant');
@@ -7335,18 +7344,12 @@ app.get('/hotel/:property_slug', async (c) => {
               }
             }
             
-            sendChatBtn.addEventListener('click', sendMessage);
-            chatInput.addEventListener('keypress', (e) => {
-              if (e.key === 'Enter') {
-                sendMessage();
-              }
-            });
-            
-            // Initialize chatbot when page loads
-            if (propertyData) {
-              initChatbot();
+          sendChatBtn.addEventListener('click', sendMessage);
+          chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              sendMessage();
             }
-          })();
+          });
         </script>
     </body>
     </html>
