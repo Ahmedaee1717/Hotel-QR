@@ -6903,8 +6903,8 @@ app.get('/vendor/dashboard', (c) => {
         try {
           const html = activities.map(a => {
             const statusClass = a.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
-            const titleEscaped = String(a.title_en || 'Untitled').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ');
-            const descEscaped = String(a.short_description_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ');
+            const titleEscaped = String(a.title_en || 'Untitled').replace(/"/g, '&quot;').replace(/'/g, '&#39;').split('\\n').join(' ');
+            const descEscaped = String(a.short_description_en || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').split('\\n').join(' ');
             
             return '<div class="border rounded-lg p-4 hover:shadow-md transition">' +
               '<div class="flex justify-between items-start">' +
