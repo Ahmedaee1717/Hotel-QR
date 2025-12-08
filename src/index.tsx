@@ -6723,7 +6723,7 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="min-h-screen p-4 flex items-center justify-center">
                 <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 animate-scale-up">
                     <!-- Header -->
-                    <div id="infoPageHeader" class="p-6 rounded-t-2xl flex justify-between items-center">
+                    <div id="infoPageHeader" class="p-6 rounded-t-2xl flex justify-between items-center bg-gradient-to-r from-blue-500 to-white">
                         <h2 id="infoPageTitle" class="text-2xl md:text-3xl font-bold flex items-center text-white">Loading...</h2>
                         <button id="infoPageCloseBtn" onclick="closeInfoPage()" class="text-white hover:opacity-80 transition">
                             <i class="fas fa-times text-2xl"></i>
@@ -6737,7 +6737,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     
                     <!-- Footer -->
                     <div class="bg-gray-50 p-4 rounded-b-2xl flex justify-end">
-                        <button id="infoPageCloseFooterBtn" onclick="closeInfoPage()" class="px-6 py-3 text-white rounded-lg font-semibold transition">
+                        <button id="infoPageCloseFooterBtn" onclick="closeInfoPage()" class="px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold transition">
                             <i class="fas fa-times mr-2"></i>Close
                         </button>
                     </div>
