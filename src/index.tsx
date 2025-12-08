@@ -5221,7 +5221,7 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: 'gpt-5-nano',
+            model: 'gpt-4o-mini', // OpenAI's fastest, cheapest model
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: message }
