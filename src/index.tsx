@@ -8299,55 +8299,153 @@ app.get('/admin/dashboard', (c) => {
       .tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }
       .hidden { display: none !important; }
       .tab-content { display: block; }
-      .tab-btn { cursor: pointer; transition: all 0.3s; }
+      .tab-btn { 
+        cursor: pointer; 
+        transition: all 0.3s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
       .tab-btn:hover { background-color: rgba(59, 130, 246, 0.1); }
+      
+      /* Mobile responsive */
+      @media (max-width: 768px) {
+        body { font-size: 14px; }
+        
+        .tab-btn {
+          font-size: 0.75rem;
+          padding: 0.5rem 0.75rem !important;
+        }
+        .tab-btn i { display: none; }
+        .tab-btn span { font-size: 0.75rem; }
+        
+        h1 { font-size: 1.25rem !important; }
+        h2 { font-size: 1.125rem !important; }
+        h3 { font-size: 1rem !important; }
+        
+        /* Make all form inputs stack on mobile */
+        .grid.md\\:grid-cols-2,
+        .grid.md\\:grid-cols-3,
+        .grid.md\\:grid-cols-4 {
+          grid-template-columns: 1fr !important;
+        }
+        
+        /* Stats cards mobile */
+        .stats-card {
+          padding: 1rem !important;
+        }
+        .stats-card .text-3xl {
+          font-size: 1.5rem !important;
+        }
+        .stats-card i {
+          font-size: 2rem !important;
+        }
+        
+        /* Better mobile padding */
+        .p-6 { padding: 1rem !important; }
+        .py-8 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+        .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
+        
+        /* Mobile buttons */
+        button, .btn {
+          padding: 0.5rem 1rem !important;
+          font-size: 0.875rem !important;
+        }
+        
+        /* QR Code section mobile */
+        #qrCodeDisplay {
+          padding: 1rem !important;
+          max-width: 200px;
+          margin: 0 auto;
+        }
+        #qrCodeDisplay img {
+          max-width: 100%;
+          height: auto;
+        }
+        
+        /* Tables scroll on mobile */
+        table {
+          display: block;
+          overflow-x: auto;
+          white-space: nowrap;
+        }
+        
+        /* Form fields full width on mobile */
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="url"],
+        input[type="number"],
+        input[type="password"],
+        select,
+        textarea {
+          width: 100% !important;
+        }
+      }
+      
+      @media (min-width: 769px) {
+        .mobile-menu-btn { display: none; }
+      }
+      
+      /* Hide scrollbar but keep functionality */
+      .overflow-x-auto::-webkit-scrollbar {
+        height: 4px;
+      }
+      .overflow-x-auto::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      .overflow-x-auto::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
     </style>
 </head>
 <body class="bg-gray-50">
-    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-3 md:py-4 px-3 md:px-4 shadow-lg">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div><h1 class="text-2xl font-bold">Admin Dashboard</h1></div>
-            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+            <div><h1 class="text-lg md:text-2xl font-bold">Admin Dashboard</h1></div>
+            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base">
+              <i class="fas fa-sign-out-alt mr-0 md:mr-2"></i><span class="hidden md:inline">Logout</span>
+            </button>
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="max-w-7xl mx-auto px-2 md:px-4 py-4 md:py-8">
         <!-- Tabs -->
-        <div class="bg-white rounded-lg shadow mb-6">
-            <div class="flex overflow-x-auto">
-                <button data-tab="qrcode" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Master QR Code</button>
-                <button data-tab="analytics" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-chart-line mr-2"></i>Analytics</button>
-                <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
-                <button data-tab="regcode" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
-                <button data-tab="offerings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
-                <button data-tab="customsections" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-layer-group mr-2"></i>Custom Sections</button>
-                <button data-tab="activities" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-hiking mr-2"></i>Activities</button>
-                <button data-tab="callbacks" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-phone mr-2"></i>Callbacks</button>
-                <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-cog mr-2"></i>Design Settings</button>
+        <div class="bg-white rounded-lg shadow mb-4 md:mb-6">
+            <div class="flex overflow-x-auto scrollbar-thin">
+                <button data-tab="qrcode" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i><span>QR Code</span></button>
+                <button data-tab="analytics" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-chart-line mr-2"></i><span>Analytics</span></button>
+                <button data-tab="vendors" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-store mr-2"></i><span>Vendors</span></button>
+                <button data-tab="regcode" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-key mr-2"></i><span>Code</span></button>
+                <button data-tab="offerings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-utensils mr-2"></i><span>Offerings</span></button>
+                <button data-tab="customsections" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-layer-group mr-2"></i><span>Sections</span></button>
+                <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
+                <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
+                <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
             </div>
         </div>
 
         <!-- Master QR Code Tab -->
         <div id="qrcodeTab" class="tab-content">
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-qrcode mr-2 text-blue-600"></i>Master QR Code for Hotel</h2>
-                <p class="text-gray-600 mb-6">Generate one universal QR code that guests can scan from any room. The QR code will direct them to your hotel's main landing page where they can access all services, activities, and offerings.</p>
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-qrcode mr-2 text-blue-600"></i>Master QR Code for Hotel</h2>
+                <p class="text-sm md:text-base text-gray-600 mb-4 md:mb-6">Generate one universal QR code that guests can scan from any room. The QR code will direct them to your hotel's main landing page where they can access all services, activities, and offerings.</p>
                 
-                <div class="grid md:grid-cols-2 gap-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                     <!-- QR Code Display -->
                     <div class="text-center">
-                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-xl border-2 border-blue-200">
-                            <h3 class="text-lg font-semibold mb-4 text-gray-700">Your Hotel QR Code</h3>
-                            <div id="qrCodeDisplay" class="bg-white p-6 rounded-lg shadow-inner inline-block">
-                                <div class="text-gray-400"><i class="fas fa-spinner fa-spin text-4xl"></i></div>
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8 rounded-xl border-2 border-blue-200">
+                            <h3 class="text-base md:text-lg font-semibold mb-3 md:mb-4 text-gray-700">Your Hotel QR Code</h3>
+                            <div id="qrCodeDisplay" class="bg-white p-4 md:p-6 rounded-lg shadow-inner inline-block max-w-full">
+                                <div class="text-gray-400"><i class="fas fa-spinner fa-spin text-2xl md:text-4xl"></i></div>
                             </div>
-                            <p class="mt-4 text-sm text-gray-600">Scan this code to test your guest experience</p>
+                            <p class="mt-3 md:mt-4 text-xs md:text-sm text-gray-600">Scan this code to test your guest experience</p>
                         </div>
-                        <div class="mt-4 flex gap-2 justify-center">
-                            <button onclick="downloadQR()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        <div class="mt-3 md:mt-4 flex flex-col sm:flex-row gap-2 justify-center">
+                            <button onclick="downloadQR()" class="bg-blue-600 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:bg-blue-700 font-semibold text-sm md:text-base w-full sm:w-auto">
                                 <i class="fas fa-download mr-2"></i>Download QR Code
                             </button>
-                            <button onclick="printQR()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
+                            <button onclick="printQR()" class="bg-green-600 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:bg-green-700 font-semibold text-sm md:text-base w-full sm:w-auto">
                                 <i class="fas fa-print mr-2"></i>Print
                             </button>
                         </div>
@@ -8355,25 +8453,25 @@ app.get('/admin/dashboard', (c) => {
                     
                     <!-- QR Code Info -->
                     <div>
-                        <h3 class="text-lg font-semibold mb-4 text-gray-700">QR Code Details</h3>
+                        <h3 class="text-base md:text-lg font-semibold mb-3 md:mb-4 text-gray-700">QR Code Details</h3>
                         <div class="space-y-3">
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Hotel Landing Page URL:</p>
-                                <p id="hotelURL" class="font-mono text-sm text-blue-600 break-all">Loading...</p>
+                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
+                                <p class="text-xs md:text-sm text-gray-600 mb-1">Hotel Landing Page URL:</p>
+                                <p id="hotelURL" class="font-mono text-xs md:text-sm text-blue-600 break-all">Loading...</p>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Property Name:</p>
-                                <p id="propertyName" class="font-semibold">Loading...</p>
+                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
+                                <p class="text-xs md:text-sm text-gray-600 mb-1">Property Name:</p>
+                                <p id="propertyName" class="font-semibold text-sm md:text-base">Loading...</p>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-lg">
-                                <p class="text-sm text-gray-600 mb-1">Property Slug:</p>
-                                <p id="propertySlug" class="font-mono text-sm">Loading...</p>
+                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
+                                <p class="text-xs md:text-sm text-gray-600 mb-1">Property Slug:</p>
+                                <p id="propertySlug" class="font-mono text-xs md:text-sm">Loading...</p>
                             </div>
                         </div>
                         
-                        <div class="mt-6 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                            <h4 class="font-semibold text-yellow-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>How to Use:</h4>
-                            <ul class="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                        <div class="mt-4 md:mt-6 bg-yellow-50 border border-yellow-200 p-3 md:p-4 rounded-lg">
+                            <h4 class="font-semibold text-sm md:text-base text-yellow-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>How to Use:</h4>
+                            <ul class="text-xs md:text-sm text-yellow-800 space-y-1 list-disc list-inside">
                                 <li>Print and place this QR code in every guest room</li>
                                 <li>Display it in common areas (lobby, restaurant, pool)</li>
                                 <li>Include it in welcome materials</li>
@@ -8387,67 +8485,67 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Analytics Tab -->
         <div id="analyticsTab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
                 
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
+                    <div class="stats-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-4 md:p-6">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-blue-100 text-sm">Total Scans</p>
-                                <p class="text-3xl font-bold" id="totalScans">0</p>
+                                <p class="text-blue-100 text-xs md:text-sm">Total Scans</p>
+                                <p class="text-2xl md:text-3xl font-bold" id="totalScans">0</p>
                             </div>
-                            <i class="fas fa-qrcode text-4xl opacity-30"></i>
+                            <i class="fas fa-qrcode text-2xl md:text-4xl opacity-30"></i>
                         </div>
                     </div>
-                    <div class="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="stats-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-4 md:p-6">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-green-100 text-sm">Active Bookings</p>
-                                <p class="text-3xl font-bold" id="activeBookings">0</p>
+                                <p class="text-green-100 text-xs md:text-sm">Active Bookings</p>
+                                <p class="text-2xl md:text-3xl font-bold" id="activeBookings">0</p>
                             </div>
-                            <i class="fas fa-calendar-check text-4xl opacity-30"></i>
+                            <i class="fas fa-calendar-check text-2xl md:text-4xl opacity-30"></i>
                         </div>
                     </div>
-                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="stats-card bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-4 md:p-6">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-purple-100 text-sm">Total Activities</p>
-                                <p class="text-3xl font-bold" id="totalActivities">0</p>
+                                <p class="text-purple-100 text-xs md:text-sm">Total Activities</p>
+                                <p class="text-2xl md:text-3xl font-bold" id="totalActivities">0</p>
                             </div>
-                            <i class="fas fa-hiking text-4xl opacity-30"></i>
+                            <i class="fas fa-hiking text-2xl md:text-4xl opacity-30"></i>
                         </div>
                     </div>
-                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+                    <div class="stats-card bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-4 md:p-6">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-orange-100 text-sm">Total Vendors</p>
-                                <p class="text-3xl font-bold" id="totalVendors">0</p>
+                                <p class="text-orange-100 text-xs md:text-sm">Total Vendors</p>
+                                <p class="text-2xl md:text-3xl font-bold" id="totalVendors">0</p>
                             </div>
-                            <i class="fas fa-store text-4xl opacity-30"></i>
+                            <i class="fas fa-store text-2xl md:text-4xl opacity-30"></i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Popular Sections -->
-                <div class="grid md:grid-cols-2 gap-6">
-                    <div class="bg-white border rounded-lg p-6">
-                        <h3 class="text-lg font-bold mb-4 text-gray-700"><i class="fas fa-fire mr-2 text-red-500"></i>Most Popular Activities</h3>
-                        <div id="popularActivities" class="space-y-3">
-                            <div class="text-center text-gray-400 py-8">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading...</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div class="bg-white border rounded-lg p-4 md:p-6">
+                        <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-fire mr-2 text-red-500"></i>Most Popular Activities</h3>
+                        <div id="popularActivities" class="space-y-2 md:space-y-3">
+                            <div class="text-center text-gray-400 py-6 md:py-8">
+                                <i class="fas fa-spinner fa-spin text-xl md:text-2xl mb-2"></i>
+                                <p class="text-sm md:text-base">Loading...</p>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="bg-white border rounded-lg p-6">
-                        <h3 class="text-lg font-bold mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
-                        <div id="popularSections" class="space-y-3">
-                            <div class="text-center text-gray-400 py-8">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                                <p>Loading...</p>
+                    <div class="bg-white border rounded-lg p-4 md:p-6">
+                        <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
+                        <div id="popularSections" class="space-y-2 md:space-y-3">
+                            <div class="text-center text-gray-400 py-6 md:py-8">
+                                <i class="fas fa-spinner fa-spin text-xl md:text-2xl mb-2"></i>
+                                <p class="text-sm md:text-base">Loading...</p>
                             </div>
                         </div>
                     </div>
@@ -8480,21 +8578,21 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Vendors Tab -->
         <div id="vendorsTab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-user-plus mr-2 text-green-600"></i>Add New Vendor</h2>
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-user-plus mr-2 text-green-600"></i>Add New Vendor</h2>
                 <form id="addVendorForm" class="space-y-4">
-                    <div class="grid md:grid-cols-2 gap-4">
-                        <input type="text" id="businessName" placeholder="Business Name" required class="px-4 py-2 border rounded-lg">
-                        <input type="email" id="vendorEmail" placeholder="Email" required class="px-4 py-2 border rounded-lg">
-                        <input type="text" id="vendorPhone" placeholder="Phone" required class="px-4 py-2 border rounded-lg">
-                        <input type="password" id="vendorPassword" placeholder="Password" required class="px-4 py-2 border rounded-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                        <input type="text" id="businessName" placeholder="Business Name" required class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+                        <input type="email" id="vendorEmail" placeholder="Email" required class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+                        <input type="text" id="vendorPhone" placeholder="Phone" required class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
+                        <input type="password" id="vendorPassword" placeholder="Password" required class="w-full px-3 md:px-4 py-2 border rounded-lg text-sm md:text-base">
                     </div>
-                    <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"><i class="fas fa-check mr-2"></i>Add Vendor</button>
+                    <button type="submit" class="w-full sm:w-auto bg-green-600 text-white px-4 md:px-6 py-2 rounded-lg hover:bg-green-700 text-sm md:text-base"><i class="fas fa-check mr-2"></i>Add Vendor</button>
                 </form>
             </div>
 
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4">All Vendors</h2>
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4">All Vendors</h2>
                 <div id="vendorsList" class="space-y-3"></div>
             </div>
         </div>
@@ -8664,19 +8762,19 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Settings Tab -->
         <div id="settingsTab" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-6"><i class="fas fa-cog mr-2 text-purple-600"></i>Hotel Design Settings</h2>
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6"><i class="fas fa-cog mr-2 text-purple-600"></i>Hotel Design Settings</h2>
                 
                 <!-- Hotel Homepage Link -->
-                <div class="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2 text-blue-800"><i class="fas fa-link mr-2"></i>Your Hotel Homepage</h3>
-                    <div class="flex items-center gap-4">
-                        <input type="text" id="homepageUrl" readonly class="flex-1 px-4 py-2 border rounded-lg bg-white font-mono text-sm" />
-                        <button onclick="copyHomepageUrl()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                            <i class="fas fa-copy mr-2"></i>Copy Link
+                <div class="mb-6 md:mb-8 p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="text-base md:text-lg font-semibold mb-2 text-blue-800"><i class="fas fa-link mr-2"></i>Your Hotel Homepage</h3>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4">
+                        <input type="text" id="homepageUrl" readonly class="flex-1 px-3 md:px-4 py-2 border rounded-lg bg-white font-mono text-xs md:text-sm" />
+                        <button onclick="copyHomepageUrl()" class="px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm md:text-base whitespace-nowrap">
+                            <i class="fas fa-copy mr-2"></i><span class="hidden sm:inline">Copy Link</span><span class="sm:hidden">Copy</span>
                         </button>
-                        <a id="visitHomepage" href="#" target="_blank" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                            <i class="fas fa-external-link-alt mr-2"></i>Visit
+                        <a id="visitHomepage" href="#" target="_blank" class="px-3 md:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center text-sm md:text-base whitespace-nowrap">
+                            <i class="fas fa-external-link-alt mr-2"></i><span class="hidden sm:inline">Visit</span><span class="sm:hidden">Open</span>
                         </a>
                     </div>
                 </div>
