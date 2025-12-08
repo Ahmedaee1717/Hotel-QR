@@ -9673,7 +9673,7 @@ app.get('/admin/dashboard', (c) => {
         document.getElementById('offeringPrice').value = offering.price || '';
         document.getElementById('offeringLocation').value = offering.location || '';
         document.getElementById('offeringDuration').value = offering.duration_minutes || '';
-        document.getElementById('offeringImages').value = offering.images ? offering.images.join('\n') : '';
+        document.getElementById('offeringImages').value = offering.images ? offering.images.join(String.fromCharCode(10)) : '';
         document.getElementById('offeringVideoUrl').value = offering.video_url || '';
         document.getElementById('offeringRequiresBooking').checked = offering.requires_booking === 1;
         
@@ -9688,7 +9688,7 @@ app.get('/admin/dashboard', (c) => {
         const form = document.getElementById('addOfferingForm');
         form.onsubmit = async (e) => {
           e.preventDefault();
-          const images = document.getElementById('offeringImages').value.split('\n').map(url => url.trim()).filter(Boolean);
+          const images = document.getElementById('offeringImages').value.split(String.fromCharCode(10)).map(url => url.trim()).filter(Boolean);
           
           try {
             const response = await fetch('/api/admin/offerings/' + offeringId, {
@@ -9767,7 +9767,7 @@ app.get('/admin/dashboard', (c) => {
       document.getElementById('addOfferingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         try {
-          const images = document.getElementById('offeringImages').value.split('\n').map(url => url.trim()).filter(Boolean);
+          const images = document.getElementById('offeringImages').value.split(String.fromCharCode(10)).map(url => url.trim()).filter(Boolean);
           const selectedType = document.getElementById('offeringType').value;
           const selectedOption = document.getElementById('offeringType').selectedOptions[0];
           const isCustomSection = selectedOption.getAttribute('data-custom') === 'true';
