@@ -10405,35 +10405,35 @@ app.get('/admin/dashboard', (c) => {
                             <h3 class="font-bold text-lg mb-3 text-orange-900"><i class="fas fa-gift mr-2"></i>Festive Decorations</h3>
                             <p class="text-xs text-gray-600 mb-3">Add seasonal overlays to your QR code</p>
                             <div class="grid grid-cols-3 gap-2">
-                                <button onclick="setFestiveOverlay(null)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-blue-500 transition">
+                                <button onclick="setFestiveOverlay(null, event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-blue-500 transition">
                                     <div class="text-2xl mb-1">❌</div>
                                     <div class="text-xs">None</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('christmas')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
+                                <button onclick="setFestiveOverlay('christmas', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
                                     <div class="text-2xl mb-1">🎅</div>
                                     <div class="text-xs">Christmas</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('newyear')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-yellow-500 transition">
+                                <button onclick="setFestiveOverlay('newyear', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-yellow-500 transition">
                                     <div class="text-2xl mb-1">🎊</div>
                                     <div class="text-xs">New Year</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('easter')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-pink-500 transition">
+                                <button onclick="setFestiveOverlay('easter', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-pink-500 transition">
                                     <div class="text-2xl mb-1">🐰</div>
                                     <div class="text-xs">Easter</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('ramadan')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-purple-500 transition">
+                                <button onclick="setFestiveOverlay('ramadan', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-purple-500 transition">
                                     <div class="text-2xl mb-1">🌙</div>
                                     <div class="text-xs">Ramadan</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('eid')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-green-500 transition">
+                                <button onclick="setFestiveOverlay('eid', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-green-500 transition">
                                     <div class="text-2xl mb-1">🕌</div>
                                     <div class="text-xs">Eid</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('halloween')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-orange-500 transition">
+                                <button onclick="setFestiveOverlay('halloween', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-orange-500 transition">
                                     <div class="text-2xl mb-1">🎃</div>
                                     <div class="text-xs">Halloween</div>
                                 </button>
-                                <button onclick="setFestiveOverlay('valentine')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
+                                <button onclick="setFestiveOverlay('valentine', event)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
                                     <div class="text-2xl mb-1">💝</div>
                                     <div class="text-xs">Valentine</div>
                                 </button>
@@ -11690,7 +11690,7 @@ app.get('/admin/dashboard', (c) => {
       }
 
       // Set festive overlay
-      window.setFestiveOverlay = function(overlay) {
+      window.setFestiveOverlay = function(overlay, event) {
         currentFestiveOverlay = overlay;
         qrCardConfig.festiveOverlay = overlay;
         
@@ -11701,9 +11701,12 @@ app.get('/admin/dashboard', (c) => {
           btn.classList.add('border-gray-300');
         });
         
-        if (overlay) {
-          event.target.closest('.festive-btn').classList.remove('border-gray-300');
-          event.target.closest('.festive-btn').classList.add('ring-4', 'ring-blue-200', 'border-blue-500');
+        if (overlay && event) {
+          const targetBtn = event.target.closest('.festive-btn');
+          if (targetBtn) {
+            targetBtn.classList.remove('border-gray-300');
+            targetBtn.classList.add('ring-4', 'ring-blue-200', 'border-blue-500');
+          }
         }
         
         // Update current overlay text
