@@ -1649,6 +1649,43 @@ app.get('/api/vendor/profile', async (c) => {
   }
 })
 
+// Get vendor connected properties
+app.get('/api/vendor/properties', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+  
+  try {
+    const properties = await DB.prepare(`
+      SELECT 
+        vp.vendor_property_id,
+        vp.vendor_id,
+        vp.property_id,
+        vp.status,
+        vp.is_featured,
+        vp.custom_commission_rate,
+        vp.joined_via,
+        p.name as property_name,
+        p.slug as property_slug,
+        p.contact_email as property_email,
+        p.contact_phone as property_phone,
+        p.address as property_address
+      FROM vendor_properties vp
+      JOIN properties p ON vp.property_id = p.property_id
+      WHERE vp.vendor_id = ?
+      ORDER BY vp.is_featured DESC, p.name ASC
+    `).bind(vendor_id).all()
+    
+    return c.json({ properties: properties.results || [] })
+  } catch (error) {
+    console.error('Get vendor properties error:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
+  }
+})
+
 // Update vendor profile
 app.put('/api/vendor/profile', async (c) => {
   const { DB } = c.env
@@ -6536,6 +6573,15 @@ app.get('/vendor/dashboard', (c) => {
             </div>
         </div>
 
+        <!-- Connected Hotels/Properties -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-hotel mr-2 text-indigo-600"></i>Connected Hotels & Resorts</h2>
+            <p class="text-gray-600 text-sm mb-4">You are currently connected to the following properties. Guests at these hotels can discover and book your activities.</p>
+            <div id="propertiesList" class="space-y-3">
+                <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>
+            </div>
+        </div>
+
         <!-- Bookings History -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-history mr-2 text-purple-600"></i>Booking History</h2>
@@ -6658,11 +6704,12 @@ app.get('/vendor/dashboard', (c) => {
 
       async function loadDashboard() {
         try {
-          const [bookingsRes, activitiesRes, categoriesRes, profileRes] = await Promise.all([
+          const [bookingsRes, activitiesRes, categoriesRes, profileRes, propertiesRes] = await Promise.all([
             fetch('/api/vendor/bookings', { headers: { 'X-Vendor-ID': vendorId } }),
             fetch('/api/vendor/activities', { headers: { 'X-Vendor-ID': vendorId } }),
             fetch('/api/categories'),
-            fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } })
+            fetch('/api/vendor/profile', { headers: { 'X-Vendor-ID': vendorId } }),
+            fetch('/api/vendor/properties', { headers: { 'X-Vendor-ID': vendorId } })
           ]);
 
           // Check if all responses are OK
@@ -6678,16 +6725,21 @@ app.get('/vendor/dashboard', (c) => {
           if (!profileRes.ok) {
             console.error('Profile fetch failed:', profileRes.status, await profileRes.text());
           }
+          if (!propertiesRes.ok) {
+            console.error('Properties fetch failed:', propertiesRes.status, await propertiesRes.text());
+          }
 
           const bookings = bookingsRes.ok ? await bookingsRes.json() : { bookings: [] };
           const activities = activitiesRes.ok ? await activitiesRes.json() : { activities: [] };
           const categories = categoriesRes.ok ? await categoriesRes.json() : { categories: [] };
           const profile = profileRes.ok ? await profileRes.json() : { profile: null };
+          const properties = propertiesRes.ok ? await propertiesRes.json() : { properties: [] };
 
           console.log('Dashboard data loaded:', {
             bookings: bookings.bookings?.length || 0,
             activities: activities.activities?.length || 0,
             categories: categories.categories?.length || 0,
+            properties: properties.properties?.length || 0,
             profile: profile.profile ? 'loaded' : 'missing'
           });
 
@@ -6706,6 +6758,7 @@ app.get('/vendor/dashboard', (c) => {
           });
           console.log('Category dropdown HTML:', categorySelect.innerHTML);
 
+          displayProperties(properties.properties || []);
           displayBookings(bookingsList);
           displayActivities(activities.activities || []);
           console.log('Activities displayed:', activities.activities?.length || 0);
@@ -6854,6 +6907,46 @@ app.get('/vendor/dashboard', (c) => {
         if (profile.profile_image) {
           document.getElementById('profileImagePreview').src = profile.profile_image;
         }
+      }
+
+      function displayProperties(properties) {
+        const list = document.getElementById('propertiesList');
+        
+        if (!properties || properties.length === 0) {
+          list.innerHTML = '<div class="text-center py-8 text-gray-500">' +
+            '<i class="fas fa-info-circle text-3xl mb-3"></i>' +
+            '<p class="font-semibold">Not connected to any hotels yet</p>' +
+            '<p class="text-sm mt-2">Contact hotel administration to get connected and start receiving bookings.</p>' +
+            '</div>';
+          return;
+        }
+        
+        list.innerHTML = properties.map(prop => {
+          const statusClass = prop.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+          const featuredBadge = prop.is_featured ? '<span class="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full"><i class="fas fa-star mr-1"></i>Featured</span>' : '';
+          const commissionRate = prop.custom_commission_rate || '15';
+          
+          return '<div class="border border-indigo-200 rounded-lg p-4 bg-indigo-50 hover:shadow-md transition">' +
+            '<div class="flex justify-between items-start">' +
+            '<div class="flex-1">' +
+            '<h3 class="text-lg font-bold text-indigo-900">' + (prop.property_name || 'Unknown Property') + featuredBadge + '</h3>' +
+            '<div class="mt-2 space-y-1 text-sm text-gray-700">' +
+            '<p><i class="fas fa-map-marker-alt mr-2 text-indigo-600 w-4"></i>' + (prop.property_address || 'Address not available') + '</p>' +
+            '<p><i class="fas fa-envelope mr-2 text-indigo-600 w-4"></i>' + (prop.property_email || 'N/A') + '</p>' +
+            '<p><i class="fas fa-phone mr-2 text-indigo-600 w-4"></i>' + (prop.property_phone || 'N/A') + '</p>' +
+            '<p><i class="fas fa-percentage mr-2 text-indigo-600 w-4"></i>Commission Rate: <strong>' + commissionRate + '%</strong></p>' +
+            '<p><i class="fas fa-user-plus mr-2 text-indigo-600 w-4"></i>Joined via: <span class="capitalize">' + (prop.joined_via || 'admin') + '</span></p>' +
+            '</div>' +
+            '</div>' +
+            '<div class="flex flex-col items-end gap-2">' +
+            '<span class="px-3 py-1 rounded-full text-xs font-semibold ' + statusClass + '">' + (prop.status || 'pending') + '</span>' +
+            '<a href="/hotel/' + (prop.property_slug || '') + '" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">' +
+            '<i class="fas fa-external-link-alt mr-1"></i>View Hotel Page' +
+            '</a>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        }).join('');
       }
 
       function displayBookings(bookings) {
