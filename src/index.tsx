@@ -5859,29 +5859,6 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 \`;
             }
-          
-          // Apply colors to Info button and modal
-          const infoButton = document.getElementById('infoButton');
-          const infoModalHeader = document.getElementById('infoModalHeader');
-          
-          if (infoButton) {
-            infoButton.style.background = primaryColor;
-            infoButton.style.borderColor = primaryColor;
-            infoButton.onmouseover = function() { this.style.opacity = '0.9'; };
-            infoButton.onmouseout = function() { this.style.opacity = '1'; };
-          }
-          
-          if (infoModalHeader) {
-            infoModalHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, #ffffff 100%)';
-            const modalTitle = infoModalHeader.querySelector('h2');
-            const modalCloseBtn = infoModalHeader.querySelector('button');
-            if (modalTitle) {
-              modalTitle.style.color = primaryColor;
-            }
-            if (modalCloseBtn) {
-              modalCloseBtn.style.color = primaryColor;
-            }
-          }
         }
 
         function renderContent() {
