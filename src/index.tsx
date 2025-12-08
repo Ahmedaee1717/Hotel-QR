@@ -5037,23 +5037,77 @@ function calculateRelevanceScore(query: string, text: string): number {
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
   const textLower = text.toLowerCase()
   
-  // Synonym/related terms mapping
+  // Synonym/related terms mapping - MULTILINGUAL (English + Arabic + French + Spanish + German + Russian + Chinese)
   const synonyms: Record<string, string[]> = {
-    'gym': ['fitness', 'exercise', 'workout', 'gym'],
-    'fitness': ['gym', 'exercise', 'workout', 'fitness'],
-    'restaurant': ['dining', 'food', 'eat', 'restaurant', 'cuisine'],
-    'dining': ['restaurant', 'food', 'eat', 'dining', 'cuisine'],
-    'pool': ['swimming', 'swim', 'beach', 'pool'],
-    'spa': ['wellness', 'massage', 'treatment', 'spa', 'therapy'],
-    'event': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment'],
-    'events': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment'],
-    'party': ['event', 'celebration', 'gala', 'dinner', 'party', 'festive'],
-    'celebration': ['event', 'party', 'gala', 'dinner', 'celebration', 'festive'],
-    'snorkel': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
-    'snorkeling': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
-    'dive': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
-    'diving': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel'],
-    'scuba': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel']
+    // Gym/Fitness (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'gym': ['fitness', 'exercise', 'workout', 'gym', 'صالة', 'رياضية', 'نادي', 'gymnase', 'gimnasio', 'fitnessstudio', 'спортзал', '健身房'],
+    'fitness': ['gym', 'exercise', 'workout', 'fitness', 'صالة', 'رياضية', 'فتنس', 'gymnase', 'gimnasio', 'спортзал', '健身'],
+    'صالة': ['gym', 'fitness', 'exercise', 'workout'],
+    'رياضية': ['gym', 'fitness', 'exercise', 'workout'],
+    'نادي': ['gym', 'fitness', 'club'],
+    'gymnase': ['gym', 'fitness', 'exercise'],
+    'gimnasio': ['gym', 'fitness', 'exercise'],
+    'спортзал': ['gym', 'fitness', 'exercise'],
+    '健身房': ['gym', 'fitness', 'exercise'],
+    
+    // Restaurant/Dining (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'restaurant': ['dining', 'food', 'eat', 'restaurant', 'cuisine', 'مطعم', 'طعام', 'أكل', 'restaurante', 'ресторан', '餐厅'],
+    'dining': ['restaurant', 'food', 'eat', 'dining', 'cuisine', 'مطعم', 'طعام', 'restaurante', 'ресторан', '用餐'],
+    'مطعم': ['restaurant', 'dining', 'food'],
+    'طعام': ['food', 'dining', 'restaurant', 'eat'],
+    'أكل': ['food', 'eat', 'dining'],
+    'restaurante': ['restaurant', 'dining', 'food'],
+    'ресторан': ['restaurant', 'dining', 'food'],
+    '餐厅': ['restaurant', 'dining', 'food'],
+    
+    // Pool (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'pool': ['swimming', 'swim', 'beach', 'pool', 'مسبح', 'سباحة', 'piscine', 'alberca', 'schwimmbad', 'бассейн', '游泳池'],
+    'مسبح': ['pool', 'swimming', 'swim'],
+    'سباحة': ['swimming', 'swim', 'pool'],
+    'piscine': ['pool', 'swimming'],
+    'alberca': ['pool', 'swimming'],
+    'schwimmbad': ['pool', 'swimming'],
+    'бассейн': ['pool', 'swimming'],
+    '游泳池': ['pool', 'swimming'],
+    
+    // Spa (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'spa': ['wellness', 'massage', 'treatment', 'spa', 'therapy', 'سبا', 'تدليك', 'massage', 'спа', 'массаж', '水疗'],
+    'سبا': ['spa', 'wellness', 'massage'],
+    'تدليك': ['massage', 'spa', 'treatment'],
+    'massage': ['spa', 'wellness', 'treatment', 'massage', 'تدليك', 'массаж', '按摩'],
+    'спа': ['spa', 'wellness'],
+    'массаж': ['massage', 'spa'],
+    '水疗': ['spa', 'wellness'],
+    '按摩': ['massage', 'spa'],
+    
+    // Events (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'event': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment', 'حفل', 'احتفال', 'حدث', 'événement', 'evento', 'veranstaltung', 'мероприятие', '活动'],
+    'events': ['party', 'celebration', 'gala', 'dinner', 'event', 'festive', 'entertainment', 'حفلات', 'احتفالات', 'أحداث', 'événements', 'eventos', '活动'],
+    'party': ['event', 'celebration', 'gala', 'dinner', 'party', 'festive', 'حفلة', 'fiesta', 'вечеринка', '派对'],
+    'celebration': ['event', 'party', 'gala', 'dinner', 'celebration', 'festive', 'احتفال', 'celebración', 'праздник', '庆祝'],
+    'حفل': ['event', 'party', 'celebration'],
+    'حفلة': ['party', 'event', 'celebration'],
+    'احتفال': ['celebration', 'event', 'party'],
+    'حدث': ['event', 'happening'],
+    'événement': ['event', 'happening'],
+    'evento': ['event', 'happening'],
+    'мероприятие': ['event', 'happening'],
+    '活动': ['event', 'activity'],
+    
+    // Diving/Snorkeling (English + Arabic + French + Spanish + German + Russian + Chinese)
+    'snorkel': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel', 'غطس', 'plongée', 'buceo', 'tauchen', 'дайвинг', '潜水'],
+    'snorkeling': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel', 'غطس', 'plongée', 'buceo', 'дайвинг', '浮潜'],
+    'dive': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel', 'غوص', 'plongée', 'buceo', '潜水'],
+    'diving': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel', 'غطس', 'غوص', 'plongée', 'buceo', 'tauchen', 'дайвинг', '潜水'],
+    'scuba': ['diving', 'snorkeling', 'underwater', 'scuba', 'dive', 'snorkel', 'غطس', 'buceo', 'дайвинг', '水肺潜水'],
+    'غطس': ['diving', 'snorkeling', 'scuba', 'dive'],
+    'غوص': ['diving', 'dive', 'scuba'],
+    'plongée': ['diving', 'snorkeling', 'scuba'],
+    'buceo': ['diving', 'snorkeling', 'scuba'],
+    'tauchen': ['diving', 'snorkeling'],
+    'дайвинг': ['diving', 'scuba'],
+    '潜水': ['diving', 'snorkeling', 'scuba'],
+    '浮潜': ['snorkeling', 'diving']
   }
   
   let score = 0
@@ -5268,14 +5322,64 @@ app.post('/api/chatbot/chat', async (c) => {
       VALUES (?, 'user', ?)
     `).bind(convId, message).run()
     
-    // Check if this is a simple greeting FIRST (before RAG search)
-    const greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings'];
+    // Check if this is a simple greeting FIRST (before RAG search) - MULTILINGUAL
+    const greetings = [
+      // English
+      'hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings',
+      // Arabic
+      'مرحبا', 'مرحباً', 'السلام عليكم', 'أهلا', 'أهلاً', 'صباح الخير', 'مساء الخير',
+      // French
+      'bonjour', 'salut', 'bonsoir', 'coucou',
+      // Spanish
+      'hola', 'buenos días', 'buenas tardes', 'buenas noches',
+      // German
+      'hallo', 'guten tag', 'guten morgen', 'guten abend',
+      // Italian
+      'ciao', 'buongiorno', 'buonasera',
+      // Russian
+      'привет', 'здравствуйте', 'добрый день',
+      // Chinese
+      '你好', '您好', '早上好', '晚上好'
+    ];
     const messageLower = message.toLowerCase().trim()
-    const isSimpleGreeting = greetings.includes(messageLower) || greetings.some(g => messageLower === g + '!' || messageLower === g + '.');
+    const isSimpleGreeting = greetings.includes(messageLower) || greetings.some(g => messageLower === g + '!' || messageLower === g + '.' || messageLower === g + '؟');
     
     if (isSimpleGreeting) {
-      // Return friendly greeting immediately
-      const greetingResponse = `Welcome to ${hotelName}! I'm ${chatbotName}, your personal concierge assistant. It's my pleasure to assist you today.\n\nI'm here to help with:\n• Dining reservations and restaurant information\n• Spa and wellness services\n• Activities and excursions\n• Room amenities and facilities\n• Check-in/check-out assistance\n• Any special requests\n\nHow may I be of service?`;
+      // Detect language and respond accordingly
+      let greetingResponse = '';
+      
+      // Arabic detection
+      if (/[\u0600-\u06FF]/.test(message)) {
+        greetingResponse = `أهلاً وسهلاً بكم في ${hotelName}! أنا ${chatbotName}، مساعدكم الشخصي.\n\nيسعدني مساعدتكم في:\n• حجز المطاعم ومعلومات تناول الطعام\n• خدمات السبا والعافية\n• الأنشطة والرحلات\n• مرافق الغرف والفندق\n• تسجيل الوصول والمغادرة\n• أي طلبات خاصة\n\nكيف يمكنني خدمتكم؟`;
+      }
+      // French detection
+      else if (messageLower.includes('bonjour') || messageLower.includes('salut') || messageLower.includes('bonsoir')) {
+        greetingResponse = `Bienvenue à ${hotelName}! Je suis ${chatbotName}, votre assistant personnel.\n\nJe suis là pour vous aider avec:\n• Réservations de restaurants et informations\n• Services de spa et bien-être\n• Activités et excursions\n• Équipements de chambre et installations\n• Enregistrement et départ\n• Toute demande spéciale\n\nComment puis-je vous servir?`;
+      }
+      // Spanish detection
+      else if (messageLower.includes('hola') || messageLower.includes('buenos')) {
+        greetingResponse = `¡Bienvenido a ${hotelName}! Soy ${chatbotName}, su asistente personal.\n\nEstoy aquí para ayudarle con:\n• Reservas de restaurantes e información\n• Servicios de spa y bienestar\n• Actividades y excursiones\n• Comodidades de habitación y instalaciones\n• Check-in y check-out\n• Cualquier solicitud especial\n\n¿En qué puedo servirle?`;
+      }
+      // German detection
+      else if (messageLower.includes('hallo') || messageLower.includes('guten')) {
+        greetingResponse = `Willkommen im ${hotelName}! Ich bin ${chatbotName}, Ihr persönlicher Assistent.\n\nIch helfe Ihnen gerne bei:\n• Restaurant-Reservierungen und Informationen\n• Spa- und Wellness-Dienstleistungen\n• Aktivitäten und Ausflüge\n• Zimmerausstattung und Einrichtungen\n• Check-in und Check-out\n• Besonderen Wünschen\n\nWie kann ich Ihnen helfen?`;
+      }
+      // Russian detection
+      else if (/[\u0400-\u04FF]/.test(message)) {
+        greetingResponse = `Добро пожаловать в ${hotelName}! Я ${chatbotName}, ваш личный помощник.\n\nЯ здесь, чтобы помочь вам с:\n• Бронирование ресторанов и информация\n• Спа и велнес услуги\n• Мероприятия и экскурсии\n• Удобства номера и отеля\n• Регистрация заезда и выезда\n• Любые особые запросы\n\nЧем я могу вам помочь?`;
+      }
+      // Chinese detection
+      else if (/[\u4E00-\u9FFF]/.test(message)) {
+        greetingResponse = `欢迎来到${hotelName}！我是${chatbotName}，您的私人助理。\n\n我可以帮助您：\n• 餐厅预订和信息\n• 水疗和健康服务\n• 活动和游览\n• 房间设施和设备\n• 入住和退房\n• 任何特殊要求\n\n我能为您做些什么？`;
+      }
+      // Italian detection
+      else if (messageLower.includes('ciao') || messageLower.includes('buon')) {
+        greetingResponse = `Benvenuto a ${hotelName}! Sono ${chatbotName}, il tuo assistente personale.\n\nSono qui per aiutarti con:\n• Prenotazioni ristoranti e informazioni\n• Servizi spa e benessere\n• Attività ed escursioni\n• Comfort della camera e strutture\n• Check-in e check-out\n• Qualsiasi richiesta speciale\n\nCome posso servirti?`;
+      }
+      // Default: English
+      else {
+        greetingResponse = `Welcome to ${hotelName}! I'm ${chatbotName}, your personal concierge assistant. It's my pleasure to assist you today.\n\nI'm here to help with:\n• Dining reservations and restaurant information\n• Spa and wellness services\n• Activities and excursions\n• Room amenities and facilities\n• Check-in/check-out assistance\n• Any special requests\n\nHow may I be of service?`;
+      }
       
       await DB.prepare(`
         INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
@@ -5323,20 +5427,23 @@ app.post('/api/chatbot/chat', async (c) => {
         
         const systemPrompt = `You are ${chatbotName}, the personal concierge assistant for ${hotelName}, a 5-star luxury resort. Your role is to provide impeccable, professional service with warmth and sophistication.
 
+CRITICAL: You MUST respond in the SAME LANGUAGE as the guest's question. If they ask in Arabic, respond in Arabic. If French, respond in French. If Spanish, respond in Spanish. This is ESSENTIAL for international guests.
+
 Guest's Question: "${message}"
 
-Relevant Hotel Information:
+Relevant Hotel Information (English):
 ${context}
 
 Instructions:
-1. **Tone**: Professional yet warm, like a luxury hotel concierge. Use phrases like "It would be my pleasure", "Certainly", "I'd be delighted to assist"
-2. **Accuracy**: Use ONLY the information provided above. Be confident if the information is available.
-3. **Specifics**: Include prices, times, locations, booking details when mentioned
-4. **Brevity**: Keep responses concise (2-3 sentences) but complete
-5. **Referrals**: If information is NOT in the context above, politely refer to hotel staff: "For detailed information about [topic], I'd recommend contacting our front desk at your convenience. They'll be delighted to assist you personally."
-6. **Never** say "I don't have that information" - always be gracious
+1. **Language Matching**: ALWAYS respond in the SAME language as the guest's question. Translate your response accordingly.
+2. **Tone**: Professional yet warm, like a luxury hotel concierge. Use phrases appropriate to the language (e.g., "بكل سرور" in Arabic, "Avec plaisir" in French, "Con mucho gusto" in Spanish)
+3. **Accuracy**: Use ONLY the information provided above. Translate and adapt the information naturally.
+4. **Specifics**: Include prices, times, locations, booking details when mentioned (keep numbers/times as-is)
+5. **Brevity**: Keep responses concise (2-3 sentences) but complete
+6. **Referrals**: If information is NOT in the context above, politely refer to hotel staff IN THE GUEST'S LANGUAGE
+7. **Never** say "I don't have that information" - always be gracious
 
-Provide your response now:`
+Provide your response now IN THE SAME LANGUAGE as the guest's question:`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
