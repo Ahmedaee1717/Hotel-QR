@@ -7596,7 +7596,11 @@ app.get('/hotel/:property_slug', async (c) => {
             });
             
             updateSectionVisibility();
-            checkBeachBookingEnabled();
+            
+            // Check beach booking after property data is loaded
+            if (propertyData && propertyData.property_id) {
+                checkBeachBookingEnabled();
+            }
         }
 
         function renderRestaurants() {
@@ -7907,12 +7911,25 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         async function checkBeachBookingEnabled() {
+            if (!propertyData || !propertyData.property_id) {
+                console.log('Property data not loaded yet');
+                return false;
+            }
+            
             try {
                 const response = await fetch('/api/admin/beach/settings/' + propertyData.property_id);
                 const data = await response.json();
                 
+                console.log('Beach settings response:', data);
+                
                 if (data.success && data.settings && data.settings.beach_booking_enabled === 1) {
-                    document.getElementById('beach-booking-section').classList.remove('hidden');
+                    const section = document.getElementById('beach-booking-section');
+                    if (section) {
+                        section.classList.remove('hidden');
+                        console.log('Beach booking section shown!');
+                    } else {
+                        console.error('Beach booking section element not found');
+                    }
                     return true;
                 }
             } catch (error) {
