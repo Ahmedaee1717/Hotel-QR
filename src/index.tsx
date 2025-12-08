@@ -5127,19 +5127,19 @@ app.get('/hotel/:property_slug', async (c) => {
                         <i class="fas fa-th-large mr-2"></i><span data-i18n="pill-all">All</span>
                     </button>
                     <button onclick="filterOfferings('restaurant')" class="category-pill bg-gray-200 text-gray-700" data-category="restaurant">
-                        <i class="fas fa-utensils mr-2"></i><span data-i18n="pill-restaurants">Restaurants</span>
+                        <i class="fas fa-utensils mr-2"></i><span id="pill-restaurants" data-i18n="pill-restaurants">Restaurants</span>
                     </button>
                     <button onclick="filterOfferings('event')" class="category-pill bg-gray-200 text-gray-700" data-category="event">
-                        <i class="fas fa-calendar-star mr-2"></i><span data-i18n="pill-events">Events</span>
+                        <i class="fas fa-calendar-star mr-2"></i><span id="pill-events" data-i18n="pill-events">Events</span>
                     </button>
                     <button onclick="filterOfferings('spa')" class="category-pill bg-gray-200 text-gray-700" data-category="spa">
-                        <i class="fas fa-spa mr-2"></i><span data-i18n="pill-spa">Spa</span>
+                        <i class="fas fa-spa mr-2"></i><span id="pill-spa" data-i18n="pill-spa">Spa</span>
                     </button>
                     <button onclick="filterOfferings('service')" class="category-pill bg-gray-200 text-gray-700" data-category="service">
-                        <i class="fas fa-concierge-bell mr-2"></i><span data-i18n="pill-services">Services</span>
+                        <i class="fas fa-concierge-bell mr-2"></i><span id="pill-services" data-i18n="pill-services">Services</span>
                     </button>
                     <button onclick="filterOfferings('activities')" class="category-pill bg-gray-200 text-gray-700" data-category="activities">
-                        <i class="fas fa-hiking mr-2"></i><span data-i18n="pill-activities">Activities</span>
+                        <i class="fas fa-hiking mr-2"></i><span id="pill-activities" data-i18n="pill-activities">Activities</span>
                     </button>
                 </div>
             </div>
@@ -5490,6 +5490,16 @@ app.get('/hotel/:property_slug', async (c) => {
                     console.log('  ' + section + ': "' + translated + '"');
                     if (translated) {
                         el.textContent = translated;
+                    }
+                }
+                
+                // Also update filter pill buttons
+                const pillEl = document.getElementById('pill-' + section);
+                if (pillEl) {
+                    const fieldName = 'section_' + section;
+                    const translated = getTranslatedField(propertyData, fieldName);
+                    if (translated) {
+                        pillEl.textContent = translated;
                     }
                 }
             });
