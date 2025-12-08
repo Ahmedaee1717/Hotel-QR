@@ -6784,11 +6784,38 @@ app.get('/vendor/dashboard', (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-50">
-    <div class="bg-gradient-to-r from-blue-600 to-green-600 text-white py-4 px-4 shadow-lg">
+<body class="bg-gray-50 transition-colors duration-300">
+    <style>
+      /* Dark mode styles for vendor dashboard */
+      .dark { color-scheme: dark; }
+      .dark body { background-color: #1a202c !important; color: #e2e8f0 !important; }
+      .dark .bg-white { background-color: #2d3748 !important; }
+      .dark .bg-gray-50 { background-color: #1a202c !important; }
+      .dark .bg-gray-100 { background-color: #2d3748 !important; }
+      .dark .bg-gray-200 { background-color: #4a5568 !important; }
+      .dark .text-gray-700 { color: #cbd5e0 !important; }
+      .dark .text-gray-600 { color: #a0aec0 !important; }
+      .dark .text-gray-800 { color: #e2e8f0 !important; }
+      .dark .text-gray-900 { color: #f7fafc !important; }
+      .dark .border { border-color: #4a5568 !important; }
+      .dark .border-gray-200 { border-color: #4a5568 !important; }
+      .dark .border-gray-300 { border-color: #4a5568 !important; }
+      .dark input, .dark select, .dark textarea { background-color: #2d3748 !important; border-color: #4a5568 !important; color: #e2e8f0 !important; }
+      .dark input::placeholder, .dark textarea::placeholder { color: #718096 !important; }
+      .dark .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important; }
+      .dark .shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important; }
+      .dark .bg-gradient-to-r { opacity: 0.95; }
+      * { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+    </style>
+    <div class="bg-gradient-to-r from-blue-600 to-green-600 text-white py-4 px-4 shadow-lg transition-colors duration-300">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div><h1 class="text-2xl font-bold">Vendor Portal</h1></div>
-            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleDarkMode()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors" title="Toggle Dark Mode">
+                  <i id="darkModeIcon" class="fas fa-moon mr-2"></i><span id="darkModeText">Dark Mode</span>
+                </button>
+                <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg"><i class="fas fa-sign-out-alt mr-2"></i>Logout</button>
+            </div>
         </div>
     </div>
 
@@ -6943,6 +6970,34 @@ app.get('/vendor/dashboard', (c) => {
     <script>
       const vendorId = localStorage.getItem('vendor_id');
       if (!vendorId) { window.location.href = '/vendor/login'; }
+
+      // Dark mode toggle
+      function toggleDarkMode() {
+        const html = document.documentElement;
+        const isDark = html.classList.contains('dark');
+        
+        if (isDark) {
+          html.classList.remove('dark');
+          localStorage.setItem('vendorDarkMode', 'false');
+          document.getElementById('darkModeIcon').className = 'fas fa-moon mr-2';
+          document.getElementById('darkModeText').textContent = 'Dark Mode';
+        } else {
+          html.classList.add('dark');
+          localStorage.setItem('vendorDarkMode', 'true');
+          document.getElementById('darkModeIcon').className = 'fas fa-sun mr-2';
+          document.getElementById('darkModeText').textContent = 'Light Mode';
+        }
+      }
+      
+      // Initialize dark mode from localStorage
+      (function initDarkMode() {
+        const darkMode = localStorage.getItem('vendorDarkMode');
+        if (darkMode === 'true') {
+          document.documentElement.classList.add('dark');
+          document.getElementById('darkModeIcon').className = 'fas fa-sun mr-2';
+          document.getElementById('darkModeText').textContent = 'Light Mode';
+        }
+      })();
 
       async function loadDashboard() {
         try {
@@ -8482,6 +8537,111 @@ app.get('/admin/dashboard', (c) => {
       }
       .tab-btn:hover { background-color: rgba(59, 130, 246, 0.1); }
       
+      /* Dark mode styles */
+      .dark {
+        color-scheme: dark;
+      }
+      
+      .dark body {
+        background-color: #1a202c !important;
+        color: #e2e8f0 !important;
+      }
+      
+      .dark .bg-white {
+        background-color: #2d3748 !important;
+      }
+      
+      .dark .bg-gray-50 {
+        background-color: #1a202c !important;
+      }
+      
+      .dark .bg-gray-100 {
+        background-color: #2d3748 !important;
+      }
+      
+      .dark .bg-gray-200 {
+        background-color: #4a5568 !important;
+      }
+      
+      .dark .text-gray-700 {
+        color: #cbd5e0 !important;
+      }
+      
+      .dark .text-gray-600 {
+        color: #a0aec0 !important;
+      }
+      
+      .dark .text-gray-800 {
+        color: #e2e8f0 !important;
+      }
+      
+      .dark .text-gray-900 {
+        color: #f7fafc !important;
+      }
+      
+      .dark .border {
+        border-color: #4a5568 !important;
+      }
+      
+      .dark .border-gray-200 {
+        border-color: #4a5568 !important;
+      }
+      
+      .dark .border-gray-300 {
+        border-color: #4a5568 !important;
+      }
+      
+      .dark input,
+      .dark select,
+      .dark textarea {
+        background-color: #2d3748 !important;
+        border-color: #4a5568 !important;
+        color: #e2e8f0 !important;
+      }
+      
+      .dark input::placeholder,
+      .dark textarea::placeholder {
+        color: #718096 !important;
+      }
+      
+      .dark .shadow-lg {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2) !important;
+      }
+      
+      .dark .shadow {
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
+      }
+      
+      /* Keep gradient backgrounds vibrant in dark mode */
+      .dark .bg-gradient-to-r {
+        opacity: 0.95;
+      }
+      
+      /* Stats cards - keep their gradient colors */
+      .dark .stats-card {
+        opacity: 1 !important;
+      }
+      
+      /* Tab button hover in dark mode */
+      .dark .tab-btn:hover {
+        background-color: rgba(59, 130, 246, 0.2) !important;
+      }
+      
+      /* Date filter buttons in dark mode */
+      .dark .date-filter-btn {
+        background-color: #4a5568 !important;
+        color: #e2e8f0 !important;
+      }
+      
+      .dark .date-filter-btn.active {
+        background-color: #3B82F6 !important;
+        color: white !important;
+      }
+      
+      * {
+        transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+      }
+      
       /* Mobile responsive */
       @media (max-width: 768px) {
         body { font-size: 14px; }
@@ -8572,13 +8732,18 @@ app.get('/admin/dashboard', (c) => {
       }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-3 md:py-4 px-3 md:px-4 shadow-lg">
+<body class="bg-gray-50 transition-colors duration-300">
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-3 md:py-4 px-3 md:px-4 shadow-lg transition-colors duration-300">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div><h1 class="text-lg md:text-2xl font-bold">Admin Dashboard</h1></div>
-            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base">
-              <i class="fas fa-sign-out-alt mr-0 md:mr-2"></i><span class="hidden md:inline">Logout</span>
-            </button>
+            <div class="flex items-center gap-2 md:gap-3">
+                <button onclick="toggleDarkMode()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Toggle Dark Mode">
+                  <i id="darkModeIcon" class="fas fa-moon"></i><span class="hidden md:inline ml-2" id="darkModeText">Dark</span>
+                </button>
+                <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base">
+                  <i class="fas fa-sign-out-alt mr-0 md:mr-2"></i><span class="hidden md:inline">Logout</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -10475,6 +10640,37 @@ app.get('/admin/dashboard', (c) => {
           alert('Failed to save settings');
         }
       });
+
+      // Dark mode toggle
+      function toggleDarkMode() {
+        const html = document.documentElement;
+        const isDark = html.classList.contains('dark');
+        
+        if (isDark) {
+          html.classList.remove('dark');
+          localStorage.setItem('adminDarkMode', 'false');
+          document.getElementById('darkModeIcon').className = 'fas fa-moon';
+          document.getElementById('darkModeText').textContent = 'Dark';
+        } else {
+          html.classList.add('dark');
+          localStorage.setItem('adminDarkMode', 'true');
+          document.getElementById('darkModeIcon').className = 'fas fa-sun';
+          document.getElementById('darkModeText').textContent = 'Light';
+        }
+      }
+      
+      // Initialize dark mode from localStorage
+      function initDarkMode() {
+        const darkMode = localStorage.getItem('adminDarkMode');
+        if (darkMode === 'true') {
+          document.documentElement.classList.add('dark');
+          document.getElementById('darkModeIcon').className = 'fas fa-sun';
+          document.getElementById('darkModeText').textContent = 'Light';
+        }
+      }
+      
+      // Apply dark mode immediately
+      initDarkMode();
 
       function logout() {
         localStorage.removeItem('admin_user');
