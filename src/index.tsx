@@ -13431,6 +13431,12 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadOfferings() {
         try {
+          // Load property settings if not already loaded
+          if (!adminPropertySettings) {
+            const settingsResponse = await fetch('/api/admin/property-settings?property_id=1');
+            adminPropertySettings = await settingsResponse.json();
+          }
+          
           const response = await fetch('/api/hotel-offerings/1');
           const data = await response.json();
           allOfferings = data.offerings || [];
@@ -13439,10 +13445,8 @@ app.get('/admin/dashboard', (c) => {
           // Also load custom sections for the dropdown
           await loadCustomSectionsDropdown();
           
-          // Update filter buttons if settings are loaded
-          if (adminPropertySettings) {
-            updateAdminFilterButtons(adminPropertySettings);
-          }
+          // Update filter buttons with custom section names
+          updateAdminFilterButtons(adminPropertySettings);
         } catch (error) {
           console.error('Load offerings error:', error);
         }
