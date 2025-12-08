@@ -2066,6 +2066,401 @@ app.get('/api/superadmin/bookings', async (c) => {
 })
 
 // ============================================
+// SUPER ADMIN - USER MANAGEMENT API
+// ============================================
+
+// Get all platform users
+app.get('/api/superadmin/users', async (c) => {
+  const { DB } = c.env
+  const user_type = c.req.query('type') // 'hotel', 'vendor', or 'all'
+  const status = c.req.query('status') // 'active', 'suspended', etc.
+  
+  try {
+    let query = `
+      SELECT 
+        pu.*,
+        p.name as property_name,
+        v.business_name as vendor_business_name
+      FROM platform_users pu
+      LEFT JOIN properties p ON pu.property_id = p.property_id
+      LEFT JOIN vendors v ON pu.vendor_id = v.vendor_id
+      WHERE 1=1
+    `
+    const bindings = []
+    
+    if (user_type && user_type !== 'all') {
+      query += ` AND pu.user_type = ?`
+      bindings.push(user_type)
+    }
+    if (status && status !== 'all') {
+      query += ` AND pu.status = ?`
+      bindings.push(status)
+    }
+    
+    query += ` ORDER BY pu.created_at DESC LIMIT 1000`
+    
+    const users = await DB.prepare(query).bind(...bindings).all()
+    return c.json({ success: true, users: users.results })
+  } catch (error) {
+    console.error('Get users error:', error)
+    return c.json({ error: 'Failed to load users' }, 500)
+  }
+})
+
+// Suspend/Activate user
+app.patch('/api/superadmin/users/:user_id/status', async (c) => {
+  const { DB } = c.env
+  const { user_id } = c.req.param()
+  const { status, reason } = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE platform_users 
+      SET status = ?, 
+          suspended_at = CASE WHEN ? = 'suspended' THEN CURRENT_TIMESTAMP ELSE NULL END,
+          suspended_reason = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+    `).bind(status, status, reason || null, user_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update user status error:', error)
+    return c.json({ error: 'Failed to update user status' }, 500)
+  }
+})
+
+// Delete user
+app.delete('/api/superadmin/users/:user_id', async (c) => {
+  const { DB } = c.env
+  const { user_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`DELETE FROM platform_users WHERE user_id = ?`).bind(user_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete user error:', error)
+    return c.json({ error: 'Failed to delete user' }, 500)
+  }
+})
+
+// ============================================
+// SUPER ADMIN - SUPPORT TICKETS API
+// ============================================
+
+// Get all tickets
+app.get('/api/superadmin/tickets', async (c) => {
+  const { DB } = c.env
+  const status = c.req.query('status') || 'all'
+  const priority = c.req.query('priority') || 'all'
+  
+  try {
+    let query = `SELECT * FROM support_tickets WHERE 1=1`
+    const bindings = []
+    
+    if (status !== 'all') {
+      query += ` AND status = ?`
+      bindings.push(status)
+    }
+    if (priority !== 'all') {
+      query += ` AND priority = ?`
+      bindings.push(priority)
+    }
+    
+    query += ` ORDER BY 
+      CASE priority 
+        WHEN 'urgent' THEN 1 
+        WHEN 'high' THEN 2 
+        WHEN 'medium' THEN 3 
+        ELSE 4 
+      END,
+      created_at DESC
+      LIMIT 500`
+    
+    const tickets = await DB.prepare(query).bind(...bindings).all()
+    return c.json({ success: true, tickets: tickets.results })
+  } catch (error) {
+    console.error('Get tickets error:', error)
+    return c.json({ error: 'Failed to load tickets' }, 500)
+  }
+})
+
+// Create ticket
+app.post('/api/tickets', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const ticket_number = 'TKT-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase()
+    
+    const result = await DB.prepare(`
+      INSERT INTO support_tickets (
+        ticket_number, subject, description, priority, category,
+        created_by_type, created_by_id, created_by_email, created_by_name,
+        property_id, vendor_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      ticket_number,
+      data.subject,
+      data.description,
+      data.priority || 'medium',
+      data.category || 'general',
+      data.created_by_type,
+      data.created_by_id,
+      data.created_by_email,
+      data.created_by_name,
+      data.property_id || null,
+      data.vendor_id || null
+    ).run()
+    
+    return c.json({ success: true, ticket_id: result.meta.last_row_id, ticket_number })
+  } catch (error) {
+    console.error('Create ticket error:', error)
+    return c.json({ error: 'Failed to create ticket' }, 500)
+  }
+})
+
+// Update ticket status
+app.patch('/api/superadmin/tickets/:ticket_id', async (c) => {
+  const { DB } = c.env
+  const { ticket_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE support_tickets 
+      SET status = ?,
+          assigned_to_id = ?,
+          assigned_to_name = ?,
+          resolved_at = CASE WHEN ? = 'resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END,
+          closed_at = CASE WHEN ? = 'closed' THEN CURRENT_TIMESTAMP ELSE closed_at END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE ticket_id = ?
+    `).bind(
+      data.status || 'open',
+      data.assigned_to_id || null,
+      data.assigned_to_name || null,
+      data.status,
+      data.status,
+      ticket_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update ticket error:', error)
+    return c.json({ error: 'Failed to update ticket' }, 500)
+  }
+})
+
+// Get ticket messages
+app.get('/api/tickets/:ticket_id/messages', async (c) => {
+  const { DB } = c.env
+  const { ticket_id } = c.req.param()
+  
+  try {
+    const messages = await DB.prepare(`
+      SELECT * FROM ticket_messages 
+      WHERE ticket_id = ? 
+      ORDER BY created_at ASC
+    `).bind(ticket_id).all()
+    
+    return c.json({ success: true, messages: messages.results })
+  } catch (error) {
+    console.error('Get ticket messages error:', error)
+    return c.json({ error: 'Failed to load messages' }, 500)
+  }
+})
+
+// Add ticket message/reply
+app.post('/api/tickets/:ticket_id/messages', async (c) => {
+  const { DB } = c.env
+  const { ticket_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO ticket_messages (
+        ticket_id, message, is_internal_note,
+        author_type, author_id, author_name, author_email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      ticket_id,
+      data.message,
+      data.is_internal_note ? 1 : 0,
+      data.author_type,
+      data.author_id,
+      data.author_name,
+      data.author_email || null
+    ).run()
+    
+    // Update ticket updated_at
+    await DB.prepare(`
+      UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE ticket_id = ?
+    `).bind(ticket_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Add ticket message error:', error)
+    return c.json({ error: 'Failed to add message' }, 500)
+  }
+})
+
+// ============================================
+// SUPER ADMIN - LIVE CHAT API
+// ============================================
+
+// Get chat rooms
+app.get('/api/superadmin/chat/rooms', async (c) => {
+  const { DB } = c.env
+  const status = c.req.query('status') || 'active'
+  
+  try {
+    const rooms = await DB.prepare(`
+      SELECT * FROM chat_rooms 
+      WHERE status = ? 
+      ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+      LIMIT 100
+    `).bind(status).all()
+    
+    return c.json({ success: true, rooms: rooms.results })
+  } catch (error) {
+    console.error('Get chat rooms error:', error)
+    return c.json({ error: 'Failed to load chat rooms' }, 500)
+  }
+})
+
+// Get user's chat rooms
+app.get('/api/chat/rooms', async (c) => {
+  const { DB } = c.env
+  const user_type = c.req.query('user_type')
+  const user_id = c.req.query('user_id')
+  
+  try {
+    const rooms = await DB.prepare(`
+      SELECT * FROM chat_rooms 
+      WHERE (
+        (participant1_type = ? AND participant1_id = ?) OR
+        (participant2_type = ? AND participant2_id = ?)
+      )
+      AND status = 'active'
+      ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+    `).bind(user_type, user_id, user_type, user_id).all()
+    
+    return c.json({ success: true, rooms: rooms.results })
+  } catch (error) {
+    console.error('Get user chat rooms error:', error)
+    return c.json({ error: 'Failed to load chat rooms' }, 500)
+  }
+})
+
+// Create chat room
+app.post('/api/chat/rooms', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    // Check if room already exists
+    const existing = await DB.prepare(`
+      SELECT room_id FROM chat_rooms 
+      WHERE (
+        (participant1_type = ? AND participant1_id = ? AND participant2_type = ? AND participant2_id = ?) OR
+        (participant1_type = ? AND participant1_id = ? AND participant2_type = ? AND participant2_id = ?)
+      )
+      AND status = 'active'
+    `).bind(
+      data.participant1_type, data.participant1_id, data.participant2_type, data.participant2_id,
+      data.participant2_type, data.participant2_id, data.participant1_type, data.participant1_id
+    ).first()
+    
+    if (existing) {
+      return c.json({ success: true, room_id: existing.room_id, existing: true })
+    }
+    
+    const result = await DB.prepare(`
+      INSERT INTO chat_rooms (
+        room_type, room_name,
+        participant1_type, participant1_id, participant1_name,
+        participant2_type, participant2_id, participant2_name,
+        property_id, vendor_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.room_type,
+      data.room_name,
+      data.participant1_type,
+      data.participant1_id,
+      data.participant1_name,
+      data.participant2_type || 'superadmin',
+      data.participant2_id || 1,
+      data.participant2_name || 'Support Team',
+      data.property_id || null,
+      data.vendor_id || null
+    ).run()
+    
+    return c.json({ success: true, room_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create chat room error:', error)
+    return c.json({ error: 'Failed to create chat room' }, 500)
+  }
+})
+
+// Get chat messages
+app.get('/api/chat/rooms/:room_id/messages', async (c) => {
+  const { DB } = c.env
+  const { room_id } = c.req.param()
+  const limit = parseInt(c.req.query('limit') || '50')
+  
+  try {
+    const messages = await DB.prepare(`
+      SELECT * FROM chat_messages 
+      WHERE room_id = ? 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `).bind(room_id, limit).all()
+    
+    return c.json({ success: true, messages: messages.results.reverse() })
+  } catch (error) {
+    console.error('Get chat messages error:', error)
+    return c.json({ error: 'Failed to load messages' }, 500)
+  }
+})
+
+// Send chat message
+app.post('/api/chat/rooms/:room_id/messages', async (c) => {
+  const { DB } = c.env
+  const { room_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO chat_messages (
+        room_id, message, message_type,
+        sender_type, sender_id, sender_name
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      room_id,
+      data.message,
+      data.message_type || 'text',
+      data.sender_type,
+      data.sender_id,
+      data.sender_name
+    ).run()
+    
+    // Update room last_message_at
+    await DB.prepare(`
+      UPDATE chat_rooms 
+      SET last_message_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE room_id = ?
+    `).bind(room_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Send chat message error:', error)
+    return c.json({ error: 'Failed to send message' }, 500)
+  }
+})
+
+// ============================================
 // HOTEL ADMIN API ENDPOINTS
 // ============================================
 
@@ -6657,12 +7052,172 @@ app.get('/superadmin/dashboard', (c) => {
                 <button data-tab="bookings" class="tab-btn px-6 py-4 font-semibold">
                     <i class="fas fa-calendar-alt mr-2"></i>All Bookings
                 </button>
+                <button data-tab="users" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-users mr-2"></i>Users
+                </button>
+                <button data-tab="support" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-ticket-alt mr-2"></i>Support
+                </button>
+                <button data-tab="chat" class="tab-btn px-6 py-4 font-semibold">
+                    <i class="fas fa-comments mr-2"></i>Live Chat
+                </button>
                 <button data-tab="analytics" class="tab-btn px-6 py-4 font-semibold">
                     <i class="fas fa-chart-line mr-2"></i>Analytics
                 </button>
                 <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold">
                     <i class="fas fa-cog mr-2"></i>Platform Settings
                 </button>
+            </div>
+        </div>
+
+        <!-- Users Management Tab -->
+        <div id="usersTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold"><i class="fas fa-users mr-2 text-purple-600"></i>Platform Users</h2>
+                    <div class="flex gap-3">
+                        <select id="userTypeFilter" class="px-4 py-2 border rounded-lg">
+                            <option value="all">All Types</option>
+                            <option value="hotel">Hotel Admins</option>
+                            <option value="vendor">Vendors</option>
+                            <option value="superadmin">Super Admins</option>
+                        </select>
+                        <select id="userStatusFilter" class="px-4 py-2 border rounded-lg">
+                            <option value="all">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="suspended">Suspended</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                        <button onclick="loadUsers()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Associated With</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersList" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support Tickets Tab -->
+        <div id="supportTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold"><i class="fas fa-ticket-alt mr-2 text-orange-600"></i>Support Tickets</h2>
+                    <div class="flex gap-3">
+                        <select id="ticketStatusFilter" class="px-4 py-2 border rounded-lg">
+                            <option value="all">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                        <select id="ticketPriorityFilter" class="px-4 py-2 border rounded-lg">
+                            <option value="all">All Priority</option>
+                            <option value="urgent">Urgent</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                        <button onclick="loadTickets()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket #</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ticketsList" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Ticket Detail Modal (hidden by default) -->
+            <div id="ticketModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                    <div class="p-6 border-b flex justify-between items-center">
+                        <h3 class="text-2xl font-bold" id="ticketModalTitle">Ticket Details</h3>
+                        <button onclick="closeTicketModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div id="ticketDetails"></div>
+                        <div class="mt-6">
+                            <h4 class="font-bold mb-3">Messages</h4>
+                            <div id="ticketMessages" class="space-y-3 mb-4"></div>
+                            <div class="border-t pt-4">
+                                <textarea id="ticketReplyMessage" placeholder="Type your reply..." class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                                <div class="flex justify-end gap-2 mt-2">
+                                    <button onclick="replyToTicket(false)" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                        <i class="fas fa-reply mr-2"></i>Reply
+                                    </button>
+                                    <button onclick="replyToTicket(true)" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                                        <i class="fas fa-sticky-note mr-2"></i>Internal Note
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Chat Tab -->
+        <div id="chatTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" style="height: calc(100vh - 250px);">
+                <!-- Chat Rooms List -->
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+                    <div class="p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                        <h3 class="font-bold flex items-center">
+                            <i class="fas fa-comments mr-2"></i>Chat Rooms
+                        </h3>
+                    </div>
+                    <div class="flex-1 overflow-y-auto" id="chatRoomsList">
+                        <!-- Chat rooms will be loaded here -->
+                    </div>
+                </div>
+                
+                <!-- Chat Messages -->
+                <div class="md:col-span-2 bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+                    <div class="p-4 border-b bg-gray-50">
+                        <div id="chatHeader" class="text-gray-500">Select a chat room to start conversation</div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4" id="chatMessages" style="min-height: 400px;">
+                        <!-- Messages will be loaded here -->
+                    </div>
+                    <div class="p-4 border-t">
+                        <div class="flex gap-2">
+                            <input type="text" id="chatMessageInput" placeholder="Type a message..." class="flex-1 px-4 py-2 border rounded-lg" disabled>
+                            <button onclick="sendChatMessage()" id="sendChatBtn" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50" disabled>
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -6883,6 +7438,454 @@ app.get('/superadmin/dashboard', (c) => {
                 alert('Failed to add hotel');
             }
         });
+
+        // ============================================
+        // USER MANAGEMENT FUNCTIONS
+        // ============================================
+        let allUsers = [];
+        
+        async function loadUsers() {
+            try {
+                const userType = document.getElementById('userTypeFilter').value;
+                const status = document.getElementById('userStatusFilter').value;
+                
+                const response = await fetch('/api/superadmin/users?type=' + userType + '&status=' + status);
+                const data = await response.json();
+                allUsers = data.users || [];
+                displayUsers(allUsers);
+            } catch (error) {
+                console.error('Load users error:', error);
+            }
+        }
+        
+        function displayUsers(users) {
+            const html = users.map(user => {
+                const statusColors = {
+                    active: 'bg-green-100 text-green-800',
+                    suspended: 'bg-red-100 text-red-800',
+                    inactive: 'bg-gray-100 text-gray-800',
+                    pending: 'bg-yellow-100 text-yellow-800'
+                };
+                const typeIcons = {
+                    hotel: 'fa-hotel',
+                    vendor: 'fa-store',
+                    superadmin: 'fa-crown'
+                };
+                
+                return '<tr>' +
+                    '<td class="px-6 py-4">' +
+                        '<div class="font-medium">' + user.name + '</div>' +
+                        '<div class="text-sm text-gray-500">' + user.email + '</div>' +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<i class="fas ' + typeIcons[user.user_type] + ' mr-2"></i>' +
+                        user.user_type.toUpperCase() +
+                    '</td>' +
+                    '<td class="px-6 py-4 text-sm">' +
+                        (user.property_name || user.vendor_business_name || 'N/A') +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<span class="px-2 py-1 text-xs rounded-full ' + statusColors[user.status] + '">' +
+                            user.status.toUpperCase() +
+                        '</span>' +
+                    '</td>' +
+                    '<td class="px-6 py-4 text-sm">' +
+                        (user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : 'Never') +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<div class="flex gap-2">' +
+                            (user.status === 'active' ?
+                                '<button onclick="suspendUser(' + user.user_id + ')" class="text-red-600 hover:text-red-800">' +
+                                    '<i class="fas fa-ban"></i>' +
+                                '</button>' :
+                                '<button onclick="activateUser(' + user.user_id + ')" class="text-green-600 hover:text-green-800">' +
+                                    '<i class="fas fa-check-circle"></i>' +
+                                '</button>') +
+                            '<button onclick="deleteUser(' + user.user_id + ')" class="text-red-600 hover:text-red-800">' +
+                                '<i class="fas fa-trash"></i>' +
+                            '</button>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+            
+            document.getElementById('usersList').innerHTML = html || '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No users found</td></tr>';
+        }
+        
+        async function suspendUser(userId) {
+            const reason = prompt('Reason for suspension:');
+            if (!reason) return;
+            
+            try {
+                const response = await fetch('/api/superadmin/users/' + userId + '/status', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'suspended', reason })
+                });
+                
+                if (response.ok) {
+                    alert('User suspended successfully');
+                    loadUsers();
+                }
+            } catch (error) {
+                console.error('Suspend user error:', error);
+                alert('Failed to suspend user');
+            }
+        }
+        
+        async function activateUser(userId) {
+            try {
+                const response = await fetch('/api/superadmin/users/' + userId + '/status', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'active' })
+                });
+                
+                if (response.ok) {
+                    alert('User activated successfully');
+                    loadUsers();
+                }
+            } catch (error) {
+                console.error('Activate user error:', error);
+                alert('Failed to activate user');
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+            
+            try {
+                const response = await fetch('/api/superadmin/users/' + userId, { method: 'DELETE' });
+                if (response.ok) {
+                    alert('User deleted successfully');
+                    loadUsers();
+                }
+            } catch (error) {
+                console.error('Delete user error:', error);
+                alert('Failed to delete user');
+            }
+        }
+        
+        // ============================================
+        // SUPPORT TICKET FUNCTIONS
+        // ============================================
+        let allTickets = [];
+        let currentTicketId = null;
+        
+        async function loadTickets() {
+            try {
+                const status = document.getElementById('ticketStatusFilter').value;
+                const priority = document.getElementById('ticketPriorityFilter').value;
+                
+                const response = await fetch('/api/superadmin/tickets?status=' + status + '&priority=' + priority);
+                const data = await response.json();
+                allTickets = data.tickets || [];
+                displayTickets(allTickets);
+            } catch (error) {
+                console.error('Load tickets error:', error);
+            }
+        }
+        
+        function displayTickets(tickets) {
+            const priorityColors = {
+                urgent: 'bg-red-100 text-red-800',
+                high: 'bg-orange-100 text-orange-800',
+                medium: 'bg-yellow-100 text-yellow-800',
+                low: 'bg-green-100 text-green-800'
+            };
+            const statusColors = {
+                open: 'bg-blue-100 text-blue-800',
+                in_progress: 'bg-purple-100 text-purple-800',
+                resolved: 'bg-green-100 text-green-800',
+                closed: 'bg-gray-100 text-gray-800'
+            };
+            
+            const html = tickets.map(ticket => {
+                return '<tr class="hover:bg-gray-50 cursor-pointer" onclick="viewTicket(' + ticket.ticket_id + ')">' +
+                    '<td class="px-6 py-4 font-medium">' + ticket.ticket_number + '</td>' +
+                    '<td class="px-6 py-4">' + ticket.subject + '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<div>' + ticket.created_by_name + '</div>' +
+                        '<div class="text-xs text-gray-500">' + ticket.created_by_type + '</div>' +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<span class="px-2 py-1 text-xs rounded-full ' + priorityColors[ticket.priority] + '">' +
+                            ticket.priority.toUpperCase() +
+                        '</span>' +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<span class="px-2 py-1 text-xs rounded-full ' + statusColors[ticket.status] + '">' +
+                            ticket.status.replace('_', ' ').toUpperCase() +
+                        '</span>' +
+                    '</td>' +
+                    '<td class="px-6 py-4 text-sm">' +
+                        new Date(ticket.created_at).toLocaleDateString() +
+                    '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<button onclick="event.stopPropagation(); viewTicket(' + ticket.ticket_id + ')" class="text-blue-600 hover:text-blue-800">' +
+                            '<i class="fas fa-eye"></i>' +
+                        '</button>' +
+                    '</td>' +
+                '</tr>';
+            }).join('');
+            
+            document.getElementById('ticketsList').innerHTML = html || '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">No tickets found</td></tr>';
+        }
+        
+        async function viewTicket(ticketId) {
+            currentTicketId = ticketId;
+            const ticket = allTickets.find(t => t.ticket_id === ticketId);
+            if (!ticket) return;
+            
+            document.getElementById('ticketModalTitle').textContent = 'Ticket #' + ticket.ticket_number;
+            
+            const detailsHtml = '<div class="space-y-4">' +
+                '<div><strong>Subject:</strong> ' + ticket.subject + '</div>' +
+                '<div><strong>Description:</strong><br>' + ticket.description + '</div>' +
+                '<div><strong>From:</strong> ' + ticket.created_by_name + ' (' + ticket.created_by_email + ')</div>' +
+                '<div><strong>Priority:</strong> ' + ticket.priority.toUpperCase() + '</div>' +
+                '<div><strong>Status:</strong> ' + ticket.status.toUpperCase() + '</div>' +
+                '<div><strong>Created:</strong> ' + new Date(ticket.created_at).toLocaleString() + '</div>' +
+                '<div>' +
+                    '<select id="ticketStatusUpdate" class="px-4 py-2 border rounded-lg">' +
+                        '<option value="open" ' + (ticket.status === 'open' ? 'selected' : '') + '>Open</option>' +
+                        '<option value="in_progress" ' + (ticket.status === 'in_progress' ? 'selected' : '') + '>In Progress</option>' +
+                        '<option value="resolved" ' + (ticket.status === 'resolved' ? 'selected' : '') + '>Resolved</option>' +
+                        '<option value="closed" ' + (ticket.status === 'closed' ? 'selected' : '') + '>Closed</option>' +
+                    '</select>' +
+                    '<button onclick="updateTicketStatus()" class="ml-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">' +
+                        'Update Status' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+            
+            document.getElementById('ticketDetails').innerHTML = detailsHtml;
+            
+            // Load messages
+            try {
+                const response = await fetch('/api/tickets/' + ticketId + '/messages');
+                const data = await response.json();
+                const messages = data.messages || [];
+                
+                const messagesHtml = messages.map(msg => {
+                    return '<div class="border-l-4 ' + (msg.is_internal_note ? 'border-yellow-500 bg-yellow-50' : 'border-blue-500 bg-blue-50') + ' p-3 rounded">' +
+                        '<div class="flex justify-between mb-1">' +
+                            '<strong>' + msg.author_name + '</strong>' +
+                            '<span class="text-xs text-gray-500">' + new Date(msg.created_at).toLocaleString() + '</span>' +
+                        '</div>' +
+                        (msg.is_internal_note ? '<div class="text-xs text-yellow-700 mb-1">Internal Note</div>' : '') +
+                        '<div>' + msg.message + '</div>' +
+                    '</div>';
+                }).join('');
+                
+                document.getElementById('ticketMessages').innerHTML = messagesHtml || '<p class="text-gray-500">No messages yet</p>';
+            } catch (error) {
+                console.error('Load messages error:', error);
+            }
+            
+            document.getElementById('ticketModal').classList.remove('hidden');
+        }
+        
+        function closeTicketModal() {
+            document.getElementById('ticketModal').classList.add('hidden');
+            currentTicketId = null;
+        }
+        
+        async function updateTicketStatus() {
+            const newStatus = document.getElementById('ticketStatusUpdate').value;
+            
+            try {
+                const response = await fetch('/api/superadmin/tickets/' + currentTicketId, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus, assigned_to_id: 1, assigned_to_name: 'Super Admin' })
+                });
+                
+                if (response.ok) {
+                    alert('Ticket status updated');
+                    loadTickets();
+                    closeTicketModal();
+                }
+            } catch (error) {
+                console.error('Update ticket error:', error);
+                alert('Failed to update ticket');
+            }
+        }
+        
+        async function replyToTicket(isInternal) {
+            const message = document.getElementById('ticketReplyMessage').value.trim();
+            if (!message) return;
+            
+            try {
+                const response = await fetch('/api/tickets/' + currentTicketId + '/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        is_internal_note: isInternal,
+                        author_type: 'superadmin',
+                        author_id: 1,
+                        author_name: 'Super Admin'
+                    })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('ticketReplyMessage').value = '';
+                    viewTicket(currentTicketId); // Reload to show new message
+                }
+            } catch (error) {
+                console.error('Reply error:', error);
+                alert('Failed to send reply');
+            }
+        }
+        
+        // ============================================
+        // LIVE CHAT FUNCTIONS
+        // ============================================
+        let chatRooms = [];
+        let currentRoomId = null;
+        let chatRefreshInterval = null;
+        
+        async function loadChatRooms() {
+            try {
+                const response = await fetch('/api/superadmin/chat/rooms?status=active');
+                const data = await response.json();
+                chatRooms = data.rooms || [];
+                displayChatRooms(chatRooms);
+            } catch (error) {
+                console.error('Load chat rooms error:', error);
+            }
+        }
+        
+        function displayChatRooms(rooms) {
+            const html = rooms.map(room => {
+                return '<div onclick="selectChatRoom(' + room.room_id + ')" class="p-4 border-b hover:bg-gray-50 cursor-pointer ' + (currentRoomId === room.room_id ? 'bg-blue-50' : '') + '">' +
+                    '<div class="font-medium">' + room.room_name + '</div>' +
+                    '<div class="text-sm text-gray-500">' + room.participant1_name + '</div>' +
+                    '<div class="text-xs text-gray-400">' +
+                        (room.last_message_at ? new Date(room.last_message_at).toLocaleString() : 'No messages') +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            
+            document.getElementById('chatRoomsList').innerHTML = html || '<div class="p-4 text-gray-500 text-center">No active chats</div>';
+        }
+        
+        async function selectChatRoom(roomId) {
+            currentRoomId = roomId;
+            const room = chatRooms.find(r => r.room_id === roomId);
+            if (!room) return;
+            
+            document.getElementById('chatHeader').innerHTML = '<div class="font-bold">' + room.room_name + '</div>' +
+                '<div class="text-sm text-gray-500">' + room.participant1_name + '</div>';
+            
+            document.getElementById('chatMessageInput').disabled = false;
+            document.getElementById('sendChatBtn').disabled = false;
+            
+            loadChatMessages(roomId);
+            displayChatRooms(chatRooms); // Refresh to show selected state
+            
+            // Auto-refresh messages every 3 seconds
+            if (chatRefreshInterval) clearInterval(chatRefreshInterval);
+            chatRefreshInterval = setInterval(() => loadChatMessages(roomId), 3000);
+        }
+        
+        async function loadChatMessages(roomId) {
+            try {
+                const response = await fetch('/api/chat/rooms/' + roomId + '/messages?limit=100');
+                const data = await response.json();
+                const messages = data.messages || [];
+                
+                const html = messages.map(msg => {
+                    const isSuperAdmin = msg.sender_type === 'superadmin';
+                    return '<div class="flex ' + (isSuperAdmin ? 'justify-end' : 'justify-start') + ' mb-3">' +
+                        '<div class="max-w-[70%] ' + (isSuperAdmin ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-800') + ' px-4 py-2 rounded-lg">' +
+                            '<div class="text-xs mb-1 ' + (isSuperAdmin ? 'text-purple-200' : 'text-gray-500') + '">' +
+                                msg.sender_name + ' · ' + new Date(msg.created_at).toLocaleTimeString() +
+                            '</div>' +
+                            '<div>' + msg.message + '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+                
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.innerHTML = html || '<div class="text-center text-gray-500">No messages yet. Start the conversation!</div>';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                console.error('Load messages error:', error);
+            }
+        }
+        
+        async function sendChatMessage() {
+            const input = document.getElementById('chatMessageInput');
+            const message = input.value.trim();
+            if (!message || !currentRoomId) return;
+            
+            try {
+                const response = await fetch('/api/chat/rooms/' + currentRoomId + '/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        sender_type: 'superadmin',
+                        sender_id: 1,
+                        sender_name: 'Super Admin'
+                    })
+                });
+                
+                if (response.ok) {
+                    input.value = '';
+                    loadChatMessages(currentRoomId);
+                }
+            } catch (error) {
+                console.error('Send message error:', error);
+                alert('Failed to send message');
+            }
+        }
+        
+        // Allow Enter key to send messages
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('chatMessageInput');
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                    }
+                });
+            }
+        });
+        
+        // ============================================
+        // TAB SWITCHING
+        // ============================================
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                
+                // Update active button
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+                btn.classList.add('tab-active');
+                
+                // Show/hide content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById(tab + 'Tab').classList.remove('hidden');
+                
+                // Load data for the selected tab
+                if (tab === 'users') loadUsers();
+                else if (tab === 'support') loadTickets();
+                else if (tab === 'chat') loadChatRooms();
+                else if (tab === 'hotels') loadHotels();
+                else if (tab === 'vendors') loadVendors();
+                else if (tab === 'bookings') loadBookings();
+            });
+        });
+        
+        // Event listeners for filters
+        document.getElementById('userTypeFilter').addEventListener('change', loadUsers);
+        document.getElementById('userStatusFilter').addEventListener('change', loadUsers);
+        document.getElementById('ticketStatusFilter').addEventListener('change', loadTickets);
+        document.getElementById('ticketPriorityFilter').addEventListener('change', loadTickets);
 
         function logout() {
             localStorage.removeItem('superadmin_user');
