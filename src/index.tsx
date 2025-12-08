@@ -6588,7 +6588,7 @@ app.get('/vendor/dashboard', (c) => {
                     <div><label class="block text-sm font-medium mb-2">Duration (minutes)</label><input type="number" id="duration" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Capacity per Slot</label><input type="number" id="capacity" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Activity Image URL</label><input type="url" id="activityImageUrl" placeholder="https://images.unsplash.com/photo-example.jpg" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity image (e.g., from Unsplash, Imgur)</p></div>
-                    <div><label class="block text-sm font-medium mb-2">Video URL</label><input type="url" id="videoUrl" placeholder="https://example.com/video.mp4" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity video (optional)</p></div>
+                    <div><label class="block text-sm font-medium mb-2">Video URL</label><input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">YouTube or direct video link (optional)</p></div>
                 </div>
                 <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
                 <div><label class="block text-sm font-medium mb-2">Full Description</label><textarea id="fullDesc" rows="4" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
@@ -7603,8 +7603,33 @@ app.get('/activity', (c) => {
           // Display video if available
           if (activity.video_url) {
             document.getElementById('videoSection').classList.remove('hidden');
-            document.getElementById('activityVideo').querySelector('source').src = activity.video_url;
-            document.getElementById('activityVideo').load();
+            
+            // Check if it's a YouTube URL
+            const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const youtubeMatch = activity.video_url.match(youtubeRegex);
+            
+            if (youtubeMatch && youtubeMatch[1]) {
+              // It's a YouTube video - use iframe embed
+              const videoId = youtubeMatch[1];
+              const videoContainer = document.getElementById('videoSection').querySelector('.bg-white');
+              videoContainer.innerHTML = \`
+                <iframe 
+                  id="activityVideo"
+                  width="100%" 
+                  height="500" 
+                  src="https://www.youtube.com/embed/\${videoId}" 
+                  frameborder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowfullscreen
+                  class="w-full rounded-lg"
+                  style="max-height: 500px;">
+                </iframe>
+              \`;
+            } else {
+              // Direct video file (MP4, etc.)
+              document.getElementById('activityVideo').querySelector('source').src = activity.video_url;
+              document.getElementById('activityVideo').load();
+            }
           }
 
           // Display vendor information
