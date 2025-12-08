@@ -5156,6 +5156,52 @@ app.get('/api/admin/chatbot/documents', async (c) => {
   }
 })
 
+// API: Update document
+app.put('/api/admin/chatbot/documents/:document_id', async (c) => {
+  const { DB } = c.env
+  const { document_id } = c.req.param()
+  
+  try {
+    const body = await c.req.json()
+    const { property_id, title, content, document_type } = body
+    
+    if (!property_id || !title || !content) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Update document
+    await DB.prepare(`
+      UPDATE chatbot_documents 
+      SET title = ?, content = ?, document_type = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE document_id = ? AND property_id = ?
+    `).bind(title, content, document_type || 'general', document_id, property_id).run()
+    
+    // Delete old chunks
+    await DB.prepare(`DELETE FROM chatbot_chunks WHERE document_id = ?`).bind(document_id).run()
+    
+    // Re-chunk the content
+    const chunks = chunkText(content)
+    
+    // Insert new chunks
+    for (let i = 0; i < chunks.length; i++) {
+      await DB.prepare(`
+        INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(document_id, property_id, chunks[i], i, chunks[i].toLowerCase(), chunks[i].split(/\s+/).length).run()
+    }
+    
+    return c.json({ 
+      success: true, 
+      document_id: document_id,
+      chunks_created: chunks.length 
+    })
+    
+  } catch (error) {
+    console.error('Update document error:', error)
+    return c.json({ error: 'Failed to update document' }, 500)
+  }
+})
+
 // API: Delete document
 app.delete('/api/admin/chatbot/documents/:document_id', async (c) => {
   const { DB } = c.env
@@ -13350,6 +13396,48 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
 
+    <!-- Edit Document Modal -->
+    <div id="editDocumentModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold"><i class="fas fa-edit mr-2 text-blue-600"></i>Edit Knowledge Document</h3>
+                <button onclick="closeEditDocumentModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <form id="editDocumentForm" class="space-y-4">
+                <input type="hidden" id="editDocId" />
+                <div>
+                    <label class="block font-medium mb-2">Document Title *</label>
+                    <input type="text" id="editDocTitle" required placeholder="e.g., Check-in & Check-out Policy" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Category</label>
+                    <select id="editDocType" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="faq">FAQ</option>
+                        <option value="policy">Policy</option>
+                        <option value="amenity">Amenity Info</option>
+                        <option value="general">General Info</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium mb-2">Content *</label>
+                    <textarea id="editDocContent" required rows="8" placeholder="Enter detailed information..." class="w-full px-4 py-2 border rounded-lg"></textarea>
+                    <p class="text-sm text-gray-500 mt-2">
+                        <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                        Tip: When you save, the AI will automatically re-chunk this content for better search.
+                    </p>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" onclick="closeEditDocumentModal()" class="px-6 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Support Ticket Modal -->
     <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
@@ -15061,9 +15149,14 @@ app.get('/admin/dashboard', (c) => {
                     '<span><i class="fas fa-calendar mr-1"></i>' + new Date(doc.created_at).toLocaleDateString() + '</span>' +
                   '</div>' +
                 '</div>' +
-                '<button onclick="deleteChatbotDocument(' + doc.document_id + ')" class="ml-4 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">' +
-                  '<i class="fas fa-trash"></i>' +
-                '</button>' +
+                '<div class="ml-4 flex gap-2">' +
+                  '<button onclick="editChatbotDocument(' + doc.document_id + ')" class="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition" title="Edit document">' +
+                    '<i class="fas fa-edit"></i>' +
+                  '</button>' +
+                  '<button onclick="deleteChatbotDocument(' + doc.document_id + ')" class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition" title="Delete document">' +
+                    '<i class="fas fa-trash"></i>' +
+                  '</button>' +
+                '</div>' +
               '</div>' +
             '</div>';
           }).join('');
@@ -15171,6 +15264,78 @@ app.get('/admin/dashboard', (c) => {
           alert('❌ Error adding document');
         }
       });
+      
+      document.getElementById('editDocumentForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const documentId = document.getElementById('editDocId').value;
+        const title = document.getElementById('editDocTitle').value;
+        const content = document.getElementById('editDocContent').value;
+        const type = document.getElementById('editDocType').value;
+        
+        if (!title || !content) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/chatbot/documents/' + documentId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              title: title,
+              content: content,
+              document_type: type
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Document updated successfully!\\n' + data.chunks_created + ' text chunks re-created for AI search.');
+            closeEditDocumentModal();
+            await loadChatbotDocuments();
+          } else {
+            alert('❌ Failed to update document: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Update document error:', error);
+          alert('❌ Error updating document');
+        }
+      });
+      
+      window.editChatbotDocument = async function(documentId) {
+        try {
+          // Fetch document details
+          const response = await fetch('/api/admin/chatbot/documents?property_id=1');
+          const data = await response.json();
+          
+          const doc = data.documents.find(d => d.document_id === documentId);
+          
+          if (!doc) {
+            alert('❌ Document not found');
+            return;
+          }
+          
+          // Pre-fill form
+          document.getElementById('editDocId').value = doc.document_id;
+          document.getElementById('editDocTitle').value = doc.title;
+          document.getElementById('editDocType').value = doc.document_type;
+          document.getElementById('editDocContent').value = doc.content;
+          
+          // Show modal
+          document.getElementById('editDocumentModal').classList.remove('hidden');
+        } catch (error) {
+          console.error('Edit document error:', error);
+          alert('❌ Error loading document for edit');
+        }
+      };
+      
+      window.closeEditDocumentModal = function() {
+        document.getElementById('editDocumentModal').classList.add('hidden');
+        document.getElementById('editDocumentForm').reset();
+      };
       
       window.deleteChatbotDocument = async function(documentId) {
         if (!confirm('Are you sure you want to delete this document? This will also remove all its text chunks.')) {
