@@ -6485,7 +6485,7 @@ app.get('/hotel/:property_slug', async (c) => {
 
           let html = '';
           infoPages.forEach(page => {
-            const title = page['title_' + currentLang] || page.title_en;
+            const title = page['title_' + currentLanguage] || page.title_en;
             
             html += '<button onclick="openInfoPage(&quot;' + page.page_key + '&quot;)" class="w-full text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left" style="background: linear-gradient(135deg, ' + primaryColor + ' 0%, ' + primaryColor + 'dd 100%);">' +
               '<div class="flex items-center gap-3">' +
@@ -6515,8 +6515,8 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function displayInfoPage(page) {
-          const title = page['title_' + currentLang] || page.title_en;
-          const content = page['content_' + currentLang] || page.content_en;
+          const title = page['title_' + currentLanguage] || page.title_en;
+          const content = page['content_' + currentLanguage] || page.content_en;
           
           document.getElementById('infoPageTitle').innerHTML = '<i class="' + page.icon_class + ' mr-3"></i>' + title;
           document.getElementById('infoPageContent').innerHTML = content;
