@@ -6488,7 +6488,7 @@ app.get('/hotel/:property_slug', async (c) => {
             const title = page['title_' + currentLang] || page.title_en;
             const colorClass = colorClasses[page.color_theme] || colorClasses.blue;
             
-            html += '<button onclick="openInfoPage(\'' + page.page_key + '\')" class="w-full bg-gradient-to-r ' + colorClass + ' text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">' +
+            html += '<button onclick="openInfoPage(&quot;' + page.page_key + '&quot;)" class="w-full bg-gradient-to-r ' + colorClass + ' text-white p-4 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-left">' +
               '<div class="flex items-center gap-3">' +
                 '<i class="' + page.icon_class + ' text-2xl"></i>' +
                 '<span class="font-bold text-lg">' + title + '</span>' +
