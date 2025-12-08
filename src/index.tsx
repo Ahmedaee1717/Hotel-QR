@@ -6264,16 +6264,16 @@ app.post('/api/beach/bookings', async (c) => {
       property_id,
       spot_id,
       guest_name,
-      guest_room_number,
-      guest_phone,
-      guest_email,
+      guest_room_number || null,
+      guest_phone || null,
+      guest_email || null,
       booking_date,
       slot_type,
-      start_time,
-      end_time,
+      start_time || null,
+      end_time || null,
       num_guests,
       totalPrice,
-      special_requests,
+      special_requests || null,
       totalPrice === 0 ? 'free' : 'pending'
     ).run()
     
