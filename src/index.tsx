@@ -5912,6 +5912,423 @@ app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
   }
 })
 
+// ========== BEACH BOOKING API ENDPOINTS ==========
+
+// API: Get or Create Beach Settings
+app.get('/api/admin/beach/settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    let settings = await DB.prepare(`
+      SELECT * FROM beach_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    // Create default settings if not exists
+    if (!settings) {
+      await DB.prepare(`
+        INSERT INTO beach_settings (property_id) VALUES (?)
+      `).bind(property_id).run()
+      
+      settings = await DB.prepare(`
+        SELECT * FROM beach_settings WHERE property_id = ?
+      `).bind(property_id).first()
+    }
+    
+    return c.json({ success: true, settings })
+  } catch (error) {
+    console.error('Get beach settings error:', error)
+    return c.json({ error: 'Failed to get beach settings' }, 500)
+  }
+})
+
+// API: Save Beach Settings
+app.post('/api/admin/beach/settings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const {
+      property_id,
+      beach_booking_enabled,
+      beach_map_image_url,
+      opening_time,
+      closing_time,
+      advance_booking_days,
+      max_booking_duration_hours,
+      free_for_hotel_guests
+    } = body
+    
+    // Check if settings exist
+    const existing = await DB.prepare(`
+      SELECT setting_id FROM beach_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (existing) {
+      // Update
+      await DB.prepare(`
+        UPDATE beach_settings
+        SET beach_booking_enabled = ?,
+            beach_map_image_url = ?,
+            opening_time = ?,
+            closing_time = ?,
+            advance_booking_days = ?,
+            max_booking_duration_hours = ?,
+            free_for_hotel_guests = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE property_id = ?
+      `).bind(
+        beach_booking_enabled,
+        beach_map_image_url,
+        opening_time,
+        closing_time,
+        advance_booking_days,
+        max_booking_duration_hours,
+        free_for_hotel_guests,
+        property_id
+      ).run()
+    } else {
+      // Insert
+      await DB.prepare(`
+        INSERT INTO beach_settings (
+          property_id, beach_booking_enabled, beach_map_image_url,
+          opening_time, closing_time, advance_booking_days,
+          max_booking_duration_hours, free_for_hotel_guests
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        beach_booking_enabled,
+        beach_map_image_url,
+        opening_time,
+        closing_time,
+        advance_booking_days,
+        max_booking_duration_hours,
+        free_for_hotel_guests
+      ).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Save beach settings error:', error)
+    return c.json({ error: 'Failed to save beach settings' }, 500)
+  }
+})
+
+// API: Get Beach Spots
+app.get('/api/admin/beach/spots/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const spots = await DB.prepare(`
+      SELECT s.*, z.zone_name
+      FROM beach_spots s
+      LEFT JOIN beach_zones z ON s.zone_id = z.zone_id
+      WHERE s.property_id = ? AND s.is_active = 1
+      ORDER BY s.spot_number
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, spots: spots.results || [] })
+  } catch (error) {
+    console.error('Get beach spots error:', error)
+    return c.json({ error: 'Failed to get beach spots' }, 500)
+  }
+})
+
+// API: Create Beach Spot
+app.post('/api/admin/beach/spots', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const {
+      property_id,
+      zone_id,
+      spot_number,
+      spot_type,
+      position_x,
+      position_y,
+      max_capacity,
+      price_full_day,
+      price_half_day,
+      price_hourly
+    } = body
+    
+    // Create default zone if none exists
+    let zoneIdToUse = zone_id
+    if (!zoneIdToUse) {
+      const defaultZone = await DB.prepare(`
+        SELECT zone_id FROM beach_zones WHERE property_id = ? LIMIT 1
+      `).bind(property_id).first()
+      
+      if (!defaultZone) {
+        const zoneResult = await DB.prepare(`
+          INSERT INTO beach_zones (property_id, zone_name, zone_type)
+          VALUES (?, 'Main Beach', 'standard')
+        `).bind(property_id).run()
+        zoneIdToUse = zoneResult.meta.last_row_id
+      } else {
+        zoneIdToUse = defaultZone.zone_id
+      }
+    }
+    
+    await DB.prepare(`
+      INSERT INTO beach_spots (
+        property_id, zone_id, spot_number, spot_type,
+        position_x, position_y, max_capacity,
+        price_full_day, price_half_day, price_hourly
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      zoneIdToUse,
+      spot_number,
+      spot_type,
+      position_x,
+      position_y,
+      max_capacity || 2,
+      price_full_day || 0,
+      price_half_day || 0,
+      price_hourly || 0
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Create beach spot error:', error)
+    return c.json({ error: 'Failed to create beach spot' }, 500)
+  }
+})
+
+// API: Delete Beach Spot
+app.delete('/api/admin/beach/spots/:spot_id', async (c) => {
+  const { DB } = c.env
+  const { spot_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE beach_spots SET is_active = 0 WHERE spot_id = ?
+    `).bind(spot_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete beach spot error:', error)
+    return c.json({ error: 'Failed to delete beach spot' }, 500)
+  }
+})
+
+// API: Get Beach Bookings (Admin)
+app.get('/api/admin/beach/bookings', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  const date = c.req.query('date')
+  
+  try {
+    let query = `
+      SELECT 
+        bb.*,
+        bs.spot_number,
+        bs.spot_type
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+    `
+    
+    const params = [property_id]
+    
+    if (date) {
+      query += ' AND bb.booking_date = ?'
+      params.push(date)
+    }
+    
+    query += ' ORDER BY bb.booking_date DESC, bb.start_time ASC'
+    
+    const bookings = await DB.prepare(query).bind(...params).all()
+    
+    return c.json({ success: true, bookings: bookings.results || [] })
+  } catch (error) {
+    console.error('Get beach bookings error:', error)
+    return c.json({ error: 'Failed to get beach bookings' }, 500)
+  }
+})
+
+// API: Get Beach Availability (Guest)
+app.get('/api/beach/availability/:property_id/:date', async (c) => {
+  const { DB } = c.env
+  const { property_id, date } = c.req.param()
+  const slot_type = c.req.query('slot_type') || 'full_day'
+  
+  try {
+    // Get all active spots
+    const spots = await DB.prepare(`
+      SELECT * FROM beach_spots
+      WHERE property_id = ? AND is_active = 1 AND maintenance_mode = 0
+    `).bind(property_id).all()
+    
+    // Get bookings for the date
+    const bookings = await DB.prepare(`
+      SELECT spot_id, slot_type FROM beach_bookings
+      WHERE property_id = ? AND booking_date = ? AND booking_status IN ('confirmed', 'checked_in')
+    `).bind(property_id, date).all()
+    
+    // Mark spots as available/unavailable
+    const availableSpots = (spots.results || []).map(spot => {
+      const spotBookings = (bookings.results || []).filter(b => b.spot_id === spot.spot_id)
+      
+      // Check if spot is available for requested slot
+      let isAvailable = true
+      
+      for (const booking of spotBookings) {
+        if (booking.slot_type === 'full_day' || slot_type === 'full_day') {
+          isAvailable = false
+          break
+        }
+        if (booking.slot_type === slot_type) {
+          isAvailable = false
+          break
+        }
+      }
+      
+      return {
+        ...spot,
+        is_available: isAvailable
+      }
+    })
+    
+    return c.json({ success: true, spots: availableSpots })
+  } catch (error) {
+    console.error('Get beach availability error:', error)
+    return c.json({ error: 'Failed to get beach availability' }, 500)
+  }
+})
+
+// API: Create Beach Booking (Guest)
+app.post('/api/beach/bookings', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const {
+      property_id,
+      spot_id,
+      guest_name,
+      guest_room_number,
+      guest_phone,
+      guest_email,
+      booking_date,
+      slot_type,
+      start_time,
+      end_time,
+      num_guests,
+      special_requests
+    } = body
+    
+    // Check if spot is available
+    const existingBookings = await DB.prepare(`
+      SELECT COUNT(*) as count FROM beach_bookings
+      WHERE spot_id = ? AND booking_date = ? AND booking_status IN ('confirmed', 'checked_in')
+        AND (slot_type = 'full_day' OR slot_type = ? OR ? = 'full_day')
+    `).bind(spot_id, booking_date, slot_type, slot_type).first()
+    
+    if (existingBookings.count > 0) {
+      return c.json({ error: 'This spot is already booked for the selected time' }, 400)
+    }
+    
+    // Get spot price
+    const spot = await DB.prepare(`
+      SELECT * FROM beach_spots WHERE spot_id = ?
+    `).bind(spot_id).first()
+    
+    // Get settings to check if free for guests
+    const settings = await DB.prepare(`
+      SELECT * FROM beach_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    let totalPrice = 0
+    if (!settings?.free_for_hotel_guests || !guest_room_number) {
+      if (slot_type === 'full_day') totalPrice = spot.price_full_day
+      else if (slot_type === 'morning' || slot_type === 'afternoon') totalPrice = spot.price_half_day
+      else totalPrice = spot.price_hourly
+    }
+    
+    // Generate booking reference
+    const bookingReference = 'BCH-' + Date.now() + '-' + Math.random().toString(36).substring(7).toUpperCase()
+    
+    // Create booking
+    await DB.prepare(`
+      INSERT INTO beach_bookings (
+        booking_reference, property_id, spot_id, guest_name, guest_room_number,
+        guest_phone, guest_email, booking_date, slot_type, start_time, end_time,
+        num_guests, total_price, special_requests, booking_status, payment_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+    `).bind(
+      bookingReference,
+      property_id,
+      spot_id,
+      guest_name,
+      guest_room_number,
+      guest_phone,
+      guest_email,
+      booking_date,
+      slot_type,
+      start_time,
+      end_time,
+      num_guests,
+      totalPrice,
+      special_requests,
+      totalPrice === 0 ? 'free' : 'pending'
+    ).run()
+    
+    return c.json({ success: true, booking_reference: bookingReference })
+  } catch (error) {
+    console.error('Create beach booking error:', error)
+    return c.json({ error: 'Failed to create booking' }, 500)
+  }
+})
+
+// API: Cancel Beach Booking
+app.post('/api/beach/bookings/:booking_reference/cancel', async (c) => {
+  const { DB } = c.env
+  const { booking_reference } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+      WHERE booking_reference = ?
+    `).bind(booking_reference).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Cancel beach booking error:', error)
+    return c.json({ error: 'Failed to cancel booking' }, 500)
+  }
+})
+
+// API: Get Booking Details
+app.get('/api/beach/bookings/:booking_reference', async (c) => {
+  const { DB } = c.env
+  const { booking_reference } = c.req.param()
+  
+  try {
+    const booking = await DB.prepare(`
+      SELECT bb.*, bs.spot_number, bs.spot_type, bs.max_capacity
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.booking_reference = ?
+    `).bind(booking_reference).first()
+    
+    if (!booking) {
+      return c.json({ error: 'Booking not found' }, 404)
+    }
+    
+    return c.json({ success: true, booking })
+  } catch (error) {
+    console.error('Get booking error:', error)
+    return c.json({ error: 'Failed to get booking' }, 500)
+  }
+})
+
+// ========== END BEACH BOOKING API ENDPOINTS ==========
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
@@ -12224,6 +12641,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
                 <button data-tab="chatbot" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-robot mr-2"></i><span>AI Chatbot</span></button>
+                <button data-tab="beach" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-umbrella-beach mr-2"></i><span>Beach</span></button>
             </div>
         </div>
 
@@ -13804,6 +14222,112 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Beach Management Tab -->
+    <div id="beachTab" class="tab-content hidden">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
+                Beach Booking Management
+            </h2>
+            <p class="text-gray-600 mb-6">
+                Configure your beach spots, create interactive beach maps, and manage guest bookings for umbrellas, cabanas, and loungers.
+            </p>
+            
+            <!-- Beach Settings -->
+            <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 mb-6 border-2 border-blue-200">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-cog mr-2 text-blue-600"></i>Beach Settings
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="beachBookingEnabled" class="w-5 h-5 rounded">
+                            <span class="font-medium">Enable Beach Booking</span>
+                        </label>
+                        <p class="text-sm text-gray-600 ml-8 mt-1">Allow guests to reserve beach spots online</p>
+                    </div>
+                    <div>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="freeForGuests" class="w-5 h-5 rounded" checked>
+                            <span class="font-medium">Free for Hotel Guests</span>
+                        </label>
+                        <p class="text-sm text-gray-600 ml-8 mt-1">No charge for registered guests</p>
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Opening Time</label>
+                        <input type="time" id="openingTime" value="08:00" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Closing Time</label>
+                        <input type="time" id="closingTime" value="18:00" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Advance Booking (days)</label>
+                        <input type="number" id="advanceBookingDays" value="7" min="1" max="30" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Max Duration (hours)</label>
+                        <input type="number" id="maxDurationHours" value="12" min="1" max="24" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                <button onclick="saveBeachSettings()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-save mr-2"></i>Save Settings
+                </button>
+            </div>
+
+            <!-- Beach Map Designer -->
+            <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-map-marked-alt mr-2 text-cyan-600"></i>Beach Map Designer
+                    </h3>
+                    <div class="flex gap-2">
+                        <button onclick="openBeachMapDesigner()" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:from-cyan-700 hover:to-blue-700 transition">
+                            <i class="fas fa-paint-brush mr-2"></i>Design Beach Map
+                        </button>
+                    </div>
+                </div>
+                <p class="text-gray-600 mb-4">
+                    Upload your beach photo, draw zones, and place spots (umbrellas, cabanas, loungers) with drag-and-drop.
+                </p>
+                
+                <div id="beachMapPreview" class="bg-gray-100 rounded-lg p-8 text-center">
+                    <i class="fas fa-map text-6xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-600">No beach map configured yet</p>
+                    <p class="text-sm text-gray-500 mt-2">Click "Design Beach Map" to get started</p>
+                </div>
+            </div>
+
+            <!-- Beach Spots List -->
+            <div class="bg-white rounded-lg border p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-list mr-2 text-blue-600"></i>Beach Spots
+                    </h3>
+                    <button onclick="addQuickSpot()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-plus mr-2"></i>Add Spot
+                    </button>
+                </div>
+                <div id="beachSpotsList" class="space-y-2">
+                    <p class="text-gray-500 text-center py-8">No beach spots created yet. Use the Beach Map Designer to add spots.</p>
+                </div>
+            </div>
+
+            <!-- Beach Bookings -->
+            <div class="bg-white rounded-lg border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-calendar-check mr-2 text-green-600"></i>Today's Beach Bookings
+                    </h3>
+                    <input type="date" id="beachBookingDate" class="px-4 py-2 border rounded-lg" onchange="loadBeachBookings()">
+                </div>
+                <div id="beachBookingsList" class="space-y-3">
+                    <p class="text-gray-500 text-center py-8">No bookings for today</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Live Chat Widget -->
     <div id="chatWidget" class="hidden fixed bottom-4 left-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-50">
         <div class="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl flex justify-between items-center">
@@ -13855,6 +14379,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'callbacks') loadCallbacks();
         if (tab === 'settings') loadSettings();
         if (tab === 'chatbot') loadChatbot();
+        if (tab === 'beach') loadBeachSettings();
       }
       
       // Add event listeners to tab buttons
@@ -15791,6 +16316,235 @@ app.get('/admin/dashboard', (c) => {
           alert('❌ Error deleting document');
         }
       };
+      
+      // ===== BEACH MANAGEMENT FUNCTIONS =====
+      
+      async function loadBeachSettings() {
+        try {
+          const response = await fetch('/api/admin/beach/settings/1');
+          const data = await response.json();
+          
+          if (data.success && data.settings) {
+            const s = data.settings;
+            document.getElementById('beachBookingEnabled').checked = s.beach_booking_enabled === 1;
+            document.getElementById('freeForGuests').checked = s.free_for_hotel_guests === 1;
+            document.getElementById('openingTime').value = s.opening_time || '08:00';
+            document.getElementById('closingTime').value = s.closing_time || '18:00';
+            document.getElementById('advanceBookingDays').value = s.advance_booking_days || 7;
+            document.getElementById('maxDurationHours').value = s.max_booking_duration_hours || 12;
+            
+            // Load beach spots
+            await loadBeachSpots();
+            
+            // Set today's date for bookings
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('beachBookingDate').value = today;
+            await loadBeachBookings();
+          }
+        } catch (error) {
+          console.error('Load beach settings error:', error);
+        }
+      }
+      
+      window.saveBeachSettings = async function() {
+        try {
+          const response = await fetch('/api/admin/beach/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              beach_booking_enabled: document.getElementById('beachBookingEnabled').checked ? 1 : 0,
+              free_for_hotel_guests: document.getElementById('freeForGuests').checked ? 1 : 0,
+              opening_time: document.getElementById('openingTime').value,
+              closing_time: document.getElementById('closingTime').value,
+              advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
+              max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value)
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Beach settings saved successfully!');
+          } else {
+            alert('❌ Failed to save settings: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Save beach settings error:', error);
+          alert('❌ Error saving settings');
+        }
+      };
+      
+      async function loadBeachSpots() {
+        try {
+          const response = await fetch('/api/admin/beach/spots/1');
+          const data = await response.json();
+          
+          const container = document.getElementById('beachSpotsList');
+          
+          if (data.success && data.spots && data.spots.length > 0) {
+            container.innerHTML = data.spots.map(spot =>
+              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">' +
+                '<div class="flex items-center gap-3">' +
+                  '<div class="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center">' +
+                    '<i class="fas fa-umbrella-beach"></i>' +
+                  '</div>' +
+                  '<div>' +
+                    '<div class="font-medium">' + spot.spot_number + '</div>' +
+                    '<div class="text-sm text-gray-600">' + spot.spot_type + ' • Capacity: ' + spot.max_capacity + '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="flex items-center gap-2">' +
+                  '<span class="text-sm text-gray-600">' + spot.currency + ' ' + spot.price_full_day + '/day</span>' +
+                  '<button onclick="editBeachSpot(' + spot.spot_id + ')" class="p-2 text-blue-600 hover:bg-blue-50 rounded">' +
+                    '<i class="fas fa-edit"></i>' +
+                  '</button>' +
+                  '<button onclick="deleteBeachSpot(' + spot.spot_id + ')" class="p-2 text-red-600 hover:bg-red-50 rounded">' +
+                    '<i class="fas fa-trash"></i>' +
+                  '</button>' +
+                '</div>' +
+              '</div>'
+            ).join('');
+          } else {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8">No beach spots created yet. Use the Beach Map Designer to add spots.</p>';
+          }
+        } catch (error) {
+          console.error('Load beach spots error:', error);
+        }
+      }
+      
+      window.openBeachMapDesigner = function() {
+        window.open('/admin/beach-map-designer', '_blank', 'width=1400,height=900');
+      };
+      
+      window.addQuickSpot = async function() {
+        const spotNumber = prompt('Enter spot number (e.g., A1, B2):');
+        if (!spotNumber) return;
+        
+        const spotType = prompt('Enter spot type (umbrella, cabana, lounger, daybed):', 'umbrella');
+        if (!spotType) return;
+        
+        try {
+          const response = await fetch('/api/admin/beach/spots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              zone_id: 1, // Default zone
+              spot_number: spotNumber,
+              spot_type: spotType,
+              position_x: Math.floor(Math.random() * 800),
+              position_y: Math.floor(Math.random() * 400),
+              max_capacity: 2,
+              price_full_day: 0
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Spot added! Use Beach Map Designer to position it correctly.');
+            await loadBeachSpots();
+          } else {
+            alert('❌ Failed to add spot');
+          }
+        } catch (error) {
+          console.error('Add spot error:', error);
+          alert('❌ Error adding spot');
+        }
+      };
+      
+      window.deleteBeachSpot = async function(spotId) {
+        if (!confirm('Delete this beach spot?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/beach/spots/' + spotId, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Spot deleted!');
+            await loadBeachSpots();
+          } else {
+            alert('❌ Failed to delete spot');
+          }
+        } catch (error) {
+          console.error('Delete spot error:', error);
+          alert('❌ Error deleting spot');
+        }
+      };
+      
+      window.loadBeachBookings = async function() {
+        try {
+          const date = document.getElementById('beachBookingDate').value;
+          const response = await fetch('/api/admin/beach/bookings?property_id=1&date=' + date);
+          const data = await response.json();
+          
+          const container = document.getElementById('beachBookingsList');
+          
+          if (data.success && data.bookings && data.bookings.length > 0) {
+            container.innerHTML = data.bookings.map(booking =>
+              '<div class="border-l-4 ' + (booking.booking_status === 'confirmed' ? 'border-green-500' : 'border-gray-400') + ' bg-gray-50 p-4 rounded-lg">' +
+                '<div class="flex items-center justify-between mb-2">' +
+                  '<div class="flex items-center gap-2">' +
+                    '<span class="font-bold text-blue-600">' + booking.spot_number + '</span>' +
+                    '<span class="text-sm text-gray-600">' + booking.guest_name + '</span>' +
+                    (booking.guest_room_number ? '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Room ' + booking.guest_room_number + '</span>' : '') +
+                  '</div>' +
+                  '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">' + booking.slot_type + '</span>' +
+                '</div>' +
+                '<div class="text-sm text-gray-600">' +
+                  '<i class="fas fa-users mr-1"></i>' + booking.num_guests + ' guests' +
+                  '<i class="fas fa-clock ml-3 mr-1"></i>' + booking.start_time + ' - ' + booking.end_time +
+                  (booking.special_requests ? '<div class="mt-1"><i class="fas fa-comment mr-1"></i>' + booking.special_requests + '</div>' : '') +
+                '</div>' +
+                '<div class="mt-2 flex gap-2">' +
+                  '<button onclick="viewBookingQR(\'' + booking.booking_reference + '\')" class="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">' +
+                    '<i class="fas fa-qrcode mr-1"></i>QR Code' +
+                  '</button>' +
+                  '<button onclick="cancelBeachBooking(\'' + booking.booking_reference + '\')" class="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">' +
+                    '<i class="fas fa-times mr-1"></i>Cancel' +
+                  '</button>' +
+                '</div>' +
+              '</div>'
+            ).join('');
+          } else {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8">No bookings for this date</p>';
+          }
+        } catch (error) {
+          console.error('Load beach bookings error:', error);
+        }
+      };
+      
+      window.viewBookingQR = function(bookingReference) {
+        window.open('/api/beach/bookings/' + bookingReference + '/qr', '_blank');
+      };
+      
+      window.cancelBeachBooking = async function(bookingReference) {
+        if (!confirm('Cancel this booking?')) return;
+        
+        try {
+          const response = await fetch('/api/beach/bookings/' + bookingReference + '/cancel', {
+            method: 'POST'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Booking cancelled!');
+            await loadBeachBookings();
+          } else {
+            alert('❌ Failed to cancel booking');
+          }
+        } catch (error) {
+          console.error('Cancel booking error:', error);
+          alert('❌ Error cancelling booking');
+        }
+      };
+      
+      // ===== END BEACH MANAGEMENT FUNCTIONS =====
       
       async function renderSectionVisibility() {
         // Load custom sections
