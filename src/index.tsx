@@ -6963,7 +6963,7 @@ app.get('/welcome/:property_slug/:room_token', async (c) => {
         }
         
         function bookActivity(id) {
-            alert('Booking activity ' + id + '. Full booking interface will be available in the next update!\\n\\nFor now, you can use the API directly to create bookings.');
+            alert('Booking activity ' + id + '. Full booking interface will be available in the next update!\n\nFor now, you can use the API directly to create bookings.');
         }
         
         window.addEventListener('DOMContentLoaded', init);
@@ -7085,7 +7085,7 @@ app.get('/browse', async (c) => {
         }
         
         function viewActivity(id) {
-            alert('Activity details for ID: ' + id + '\\n\\nFull detail page coming soon!\\n\\nFor now, use API endpoint: /api/activities/' + id);
+            alert('Activity details for ID: ' + id + '\n\nFull detail page coming soon!\n\nFor now, use API endpoint: /api/activities/' + id);
         }
         
         window.addEventListener('DOMContentLoaded', init);
@@ -7712,7 +7712,7 @@ app.get('/superadmin/dashboard', (c) => {
 
                 const result = await response.json();
                 if (result.success) {
-                    alert('Hotel added successfully! Admin credentials:\\nEmail: ' + hotelData.contact_email + '\\nPassword: admin123\\n\\nPlease ask the hotel to change their password.');
+                    alert('Hotel added successfully! Admin credentials:\nEmail: ' + hotelData.contact_email + '\nPassword: admin123\n\nPlease ask the hotel to change their password.');
                     e.target.reset();
                     loadHotels();
                     loadStats();
@@ -11789,7 +11789,7 @@ app.get('/admin/dashboard', (c) => {
         const propertyName = document.getElementById('propertyName').textContent;
         
         // Use html2canvas to capture the card
-        alert('📥 Download feature: Right-click on the preview card and select "Save Image As..."\\n\\nOr use your browser\'s screenshot tool to capture the card.');
+        alert('📥 Download feature: Right-click on the preview card and select "Save Image As..." \n\nOr use your browser\'s screenshot tool to capture the card.');
       };
 
       // Print QR card
@@ -12310,7 +12310,7 @@ app.get('/admin/dashboard', (c) => {
         const btn = document.getElementById('translateAllBtn');
         const originalText = btn.innerHTML;
         
-        if (!confirm('This will translate ALL offerings to 8 languages (Arabic, German, Russian, Polish, Italian, French, Czech, Ukrainian).\\n\\nThis may take 2-3 minutes depending on the number of offerings.\\n\\nProceed?')) {
+        if (!confirm('This will translate ALL offerings to 8 languages (Arabic, German, Russian, Polish, Italian, French, Czech, Ukrainian).\n\nThis may take 2-3 minutes depending on the number of offerings.\n\nProceed?')) {
           return;
         }
         
@@ -12330,10 +12330,10 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           if (data.success) {
-            alert('✅ Translation Complete!\\n\\n' + 
-                  'Total offerings: ' + data.total + '\\n' +
-                  'Successfully translated: ' + data.translated + '\\n' +
-                  'Failed: ' + data.failed + '\\n\\n' +
+            alert('✅ Translation Complete!\n\n' + 
+                  'Total offerings: ' + data.total + '\n' +
+                  'Successfully translated: ' + data.translated + '\n' +
+                  'Failed: ' + data.failed + '\n\n' +
                   'All offerings now available in 8 languages!');
             loadOfferings();
           } else {
