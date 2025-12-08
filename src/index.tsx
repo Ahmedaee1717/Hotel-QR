@@ -2957,6 +2957,20 @@ app.post('/api/admin/offerings', async (c) => {
       })())
     }
     
+    // If restaurant and menus provided, save them
+    if (data.offering_type === 'restaurant' && data.menu_urls && data.menu_urls.length > 0) {
+      for (let i = 0; i < data.menu_urls.length; i++) {
+        const menuUrl = data.menu_urls[i].trim()
+        if (menuUrl) {
+          await DB.prepare(`
+            INSERT INTO restaurant_menus (
+              offering_id, menu_name, menu_url, menu_type, display_order, is_active
+            ) VALUES (?, ?, ?, 'full', ?, 1)
+          `).bind(offering_id, 'Menu ' + (i + 1), menuUrl, i).run()
+        }
+      }
+    }
+    
     return c.json({ 
       success: true,
       offering_id: offering_id,
@@ -3927,6 +3941,26 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
   } catch (error) {
     console.error('Get hotel offerings error:', error)
     return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// API: Get restaurant menus for an offering
+app.get('/api/offerings/:offering_id/menus', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const menus = await DB.prepare(`
+      SELECT menu_id, menu_name, menu_url, menu_type, display_order
+      FROM restaurant_menus
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY display_order ASC, created_at ASC
+    `).bind(offering_id).all()
+    
+    return c.json({ success: true, menus: menus.results })
+  } catch (error) {
+    console.error('Get menus error:', error)
+    return c.json({ error: 'Failed to get menus' }, 500)
   }
 })
 
@@ -5596,6 +5630,16 @@ app.get('/offering-detail', async (c) => {
                         </div>
                     </div>
 
+                    <div id="restaurantMenus" class="hidden mb-6">
+                        <h3 class="font-bold text-lg mb-3 flex items-center">
+                            <i class="fas fa-utensils mr-2 text-orange-500"></i>
+                            <span>Our Menus</span>
+                        </h3>
+                        <div id="menuGrid" class="grid gap-4 md:grid-cols-2">
+                            <!-- Menus will be displayed here -->
+                        </div>
+                    </div>
+
                     <div id="bookingSection" class="border-t pt-6">
                         <h3 class="font-bold text-lg mb-4" data-i18n="book-experience">Book Your Experience</h3>
                         <form id="bookingForm" class="space-y-4">
@@ -5998,12 +6042,59 @@ app.get('/offering-detail', async (c) => {
                 }
             }
 
-            // Show restaurant-specific fields
+            // Show restaurant-specific fields and load menus
             if (offeringData.offering_type === 'restaurant') {
                 document.getElementById('restaurantFields').classList.remove('hidden');
+                loadRestaurantMenus();
             }
 
             updateTotalPrice();
+        }
+
+        async function loadRestaurantMenus() {
+            try {
+                const response = await fetch('/api/offerings/' + offeringId + '/menus');
+                const data = await response.json();
+                
+                if (data.success && data.menus && data.menus.length > 0) {
+                    document.getElementById('restaurantMenus').classList.remove('hidden');
+                    const menuGrid = document.getElementById('menuGrid');
+                    menuGrid.innerHTML = '';
+                    
+                    data.menus.forEach((menu, index) => {
+                        const menuCard = document.createElement('div');
+                        menuCard.className = 'bg-white border-2 border-orange-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer';
+                        menuCard.onclick = () => window.open(menu.menu_url, '_blank');
+                        
+                        const img = document.createElement('img');
+                        img.src = menu.menu_url;
+                        img.alt = menu.menu_name;
+                        img.className = 'w-full h-48 object-cover';
+                        
+                        const content = document.createElement('div');
+                        content.className = 'p-3';
+                        
+                        const title = document.createElement('h4');
+                        title.className = 'font-semibold text-center';
+                        title.textContent = menu.menu_name;
+                        
+                        const hint = document.createElement('p');
+                        hint.className = 'text-xs text-gray-500 text-center mt-1';
+                        hint.innerHTML = '<i class="fas fa-external-link-alt mr-1"></i>Click to view full size';
+                        
+                        content.appendChild(title);
+                        content.appendChild(hint);
+                        menuCard.appendChild(img);
+                        menuCard.appendChild(content);
+                        menuGrid.appendChild(menuCard);
+                    });
+                } else {
+                    document.getElementById('restaurantMenus').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading menus:', error);
+                document.getElementById('restaurantMenus').classList.add('hidden');
+            }
         }
 
         function updateTotalPrice() {
@@ -9179,6 +9270,25 @@ app.get('/admin/dashboard', (c) => {
                         </label>
                     </div>
                     
+                    <!-- Restaurant-specific fields (menus) -->
+                    <div id="restaurantFields" class="hidden space-y-4">
+                        <div class="border-2 border-dashed border-orange-300 rounded-lg p-4 bg-orange-50">
+                            <h3 class="font-bold text-orange-800 mb-2 flex items-center">
+                                <i class="fas fa-utensils mr-2"></i>Restaurant Menus
+                            </h3>
+                            <p class="text-sm text-orange-700 mb-3">Add menu images (paste image URLs, one per line)</p>
+                            <textarea 
+                                id="menuUrls" 
+                                placeholder="Menu Image URLs (one per line)&#10;Example:&#10;https://example.com/breakfast-menu.jpg&#10;https://example.com/lunch-menu.jpg&#10;https://example.com/dinner-menu.jpg" 
+                                class="w-full px-4 py-2 border rounded-lg" 
+                                rows="4"></textarea>
+                            <p class="text-xs text-gray-600 mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Upload images to Imgur, Cloudinary, or any image host, then paste URLs here
+                            </p>
+                        </div>
+                    </div>
+                    
                     <!-- Event-specific fields (hidden by default) -->
                     <div id="eventFields" class="hidden grid md:grid-cols-3 gap-4">
                         <input type="date" id="eventDate" placeholder="Event Date" class="px-4 py-2 border rounded-lg">
@@ -10291,10 +10401,17 @@ app.get('/admin/dashboard', (c) => {
       // Show/hide event-specific fields based on offering type
       document.getElementById('offeringType').addEventListener('change', (e) => {
         const eventFields = document.getElementById('eventFields');
+        const restaurantFields = document.getElementById('restaurantFields');
+        
         if (e.target.value === 'event') {
           eventFields.classList.remove('hidden');
+          restaurantFields.classList.add('hidden');
+        } else if (e.target.value === 'restaurant') {
+          restaurantFields.classList.remove('hidden');
+          eventFields.classList.add('hidden');
         } else {
           eventFields.classList.add('hidden');
+          restaurantFields.classList.add('hidden');
         }
       });
 
@@ -10330,6 +10447,18 @@ app.get('/admin/dashboard', (c) => {
           const selectedOption = document.getElementById('offeringType').selectedOptions[0];
           const isCustomSection = selectedOption.getAttribute('data-custom') === 'true';
           
+          // Get menu URLs if restaurant
+          const menuUrls = [];
+          if (selectedType === 'restaurant') {
+            const menuUrlsText = document.getElementById('menuUrls').value;
+            if (menuUrlsText) {
+              menuUrlsText.split(String.fromCharCode(10)).forEach(url => {
+                const trimmedUrl = url.trim();
+                if (trimmedUrl) menuUrls.push(trimmedUrl);
+              });
+            }
+          }
+          
           const payload = {
             property_id: 1,
             offering_type: isCustomSection ? 'custom' : selectedType,
@@ -10345,7 +10474,8 @@ app.get('/admin/dashboard', (c) => {
             video_url: document.getElementById('offeringVideoUrl').value || null,
             event_date: document.getElementById('eventDate').value || null,
             event_start_time: document.getElementById('eventStartTime').value || null,
-            event_end_time: document.getElementById('eventEndTime').value || null
+            event_end_time: document.getElementById('eventEndTime').value || null,
+            menu_urls: menuUrls.length > 0 ? menuUrls : null
           };
           
           const response = await fetch('/api/admin/offerings', {
@@ -10359,6 +10489,8 @@ app.get('/admin/dashboard', (c) => {
             alert('Hotel offering added successfully!');
             document.getElementById('addOfferingForm').reset();
             document.getElementById('eventFields').classList.add('hidden');
+            document.getElementById('restaurantFields').classList.add('hidden');
+            document.getElementById('menuUrls').value = '';
             loadOfferings();
           }
         } catch (error) {
