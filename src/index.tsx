@@ -2110,8 +2110,60 @@ app.get('/api/admin/dashboard', async (c) => {
 app.get('/api/admin/analytics', async (c) => {
   const { DB } = c.env
   const property_id = c.req.query('property_id') || '1'
+  const dateRange = c.req.query('range') || 'today' // today, yesterday, 7days, 30days, custom
+  const startDate = c.req.query('start_date')
+  const endDate = c.req.query('end_date')
 
   try {
+    // Calculate date ranges
+    let currentStartDate, currentEndDate, previousStartDate, previousEndDate
+    
+    if (dateRange === 'custom' && startDate && endDate) {
+      currentStartDate = startDate
+      currentEndDate = endDate
+      // Calculate previous period of same length
+      const daysDiff = Math.floor((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+      previousEndDate = startDate
+      previousStartDate = new Date(new Date(startDate) - daysDiff * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    } else if (dateRange === 'today') {
+      currentStartDate = "date('now')"
+      currentEndDate = "date('now')"
+      previousStartDate = "date('now', '-1 day')"
+      previousEndDate = "date('now', '-1 day')"
+    } else if (dateRange === 'yesterday') {
+      currentStartDate = "date('now', '-1 day')"
+      currentEndDate = "date('now', '-1 day')"
+      previousStartDate = "date('now', '-2 days')"
+      previousEndDate = "date('now', '-2 days')"
+    } else if (dateRange === '7days') {
+      currentStartDate = "date('now', '-6 days')"
+      currentEndDate = "date('now')"
+      previousStartDate = "date('now', '-13 days')"
+      previousEndDate = "date('now', '-7 days')"
+    } else if (dateRange === '30days') {
+      currentStartDate = "date('now', '-29 days')"
+      currentEndDate = "date('now')"
+      previousStartDate = "date('now', '-59 days')"
+      previousEndDate = "date('now', '-30 days')"
+    }
+
+    // QR Scans for current period
+    const currentScans = await DB.prepare(`
+      SELECT COUNT(*) as count FROM qr_scans
+      WHERE property_id = ? AND scan_date BETWEEN ${currentStartDate} AND ${currentEndDate}
+    `).bind(property_id).first()
+
+    // QR Scans for previous period (for comparison)
+    const previousScans = await DB.prepare(`
+      SELECT COUNT(*) as count FROM qr_scans
+      WHERE property_id = ? AND scan_date BETWEEN ${previousStartDate} AND ${previousEndDate}
+    `).bind(property_id).first()
+
+    // Calculate percentage change
+    const scansChange = previousScans.count > 0 
+      ? ((currentScans.count - previousScans.count) / previousScans.count * 100).toFixed(1)
+      : currentScans.count > 0 ? 100 : 0
+
     // Total activities count
     const activities = await DB.prepare(`
       SELECT COUNT(*) as count FROM activities a
@@ -2126,14 +2178,25 @@ app.get('/api/admin/analytics', async (c) => {
       WHERE vp.property_id = ? AND v.status = 'active'
     `).bind(property_id).first()
 
-    // Active bookings count
-    const bookings = await DB.prepare(`
+    // Active bookings for current period
+    const currentBookings = await DB.prepare(`
       SELECT COUNT(*) as count FROM bookings
       WHERE property_id = ? AND booking_status IN ('confirmed', 'pending')
-        AND activity_date >= date('now')
+        AND booking_date BETWEEN ${currentStartDate} AND ${currentEndDate}
     `).bind(property_id).first()
 
-    // Most popular activities (by bookings)
+    // Previous period bookings for comparison
+    const previousBookings = await DB.prepare(`
+      SELECT COUNT(*) as count FROM bookings
+      WHERE property_id = ? AND booking_status IN ('confirmed', 'pending')
+        AND booking_date BETWEEN ${previousStartDate} AND ${previousEndDate}
+    `).bind(property_id).first()
+
+    const bookingsChange = previousBookings.count > 0
+      ? ((currentBookings.count - previousBookings.count) / previousBookings.count * 100).toFixed(1)
+      : currentBookings.count > 0 ? 100 : 0
+
+    // Most popular activities (by bookings in current period)
     const popularActivities = await DB.prepare(`
       SELECT 
         a.title_en,
@@ -2142,30 +2205,59 @@ app.get('/api/admin/analytics', async (c) => {
         SUM(b.total_price) as total_revenue
       FROM activities a
       JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
-      LEFT JOIN bookings b ON a.activity_id = b.activity_id
+      LEFT JOIN bookings b ON a.activity_id = b.activity_id 
+        AND b.booking_date BETWEEN ${currentStartDate} AND ${currentEndDate}
       WHERE vp.property_id = ?
       GROUP BY a.activity_id
+      HAVING booking_count > 0
       ORDER BY booking_count DESC
       LIMIT 5
     `).bind(property_id).all()
 
-    // Most viewed sections (simulated data for now)
-    const sections = [
-      { name: 'Activities', views: Math.floor(Math.random() * 500) + 100, icon: 'hiking' },
-      { name: 'Restaurants', views: Math.floor(Math.random() * 400) + 80, icon: 'utensils' },
-      { name: 'Spa & Wellness', views: Math.floor(Math.random() * 300) + 60, icon: 'spa' },
-      { name: 'Events', views: Math.floor(Math.random() * 200) + 40, icon: 'calendar' }
-    ].sort((a, b) => b.views - a.views)
+    // Most viewed sections (from page_views table)
+    const popularSections = await DB.prepare(`
+      SELECT 
+        page_type as name,
+        COUNT(*) as views
+      FROM page_views
+      WHERE property_id = ? AND view_date BETWEEN ${currentStartDate} AND ${currentEndDate}
+      GROUP BY page_type
+      ORDER BY views DESC
+      LIMIT 5
+    `).bind(property_id).all()
+
+    // Add icons for sections
+    const sectionIcons = {
+      'activities': 'hiking',
+      'restaurants': 'utensils',
+      'spa': 'spa',
+      'events': 'calendar',
+      'rooms': 'bed',
+      'custom': 'layer-group'
+    }
+
+    const sectionsWithIcons = (popularSections.results || []).map(s => ({
+      ...s,
+      icon: sectionIcons[s.name] || 'eye'
+    }))
 
     return c.json({
       stats: {
+        totalScans: currentScans.count,
+        scansChange: scansChange,
+        scansPrevious: previousScans.count,
         totalActivities: activities.count,
         totalVendors: vendors.count,
-        activeBookings: bookings.count,
-        totalScans: Math.floor(Math.random() * 1000) + 500 // Simulated for now
+        activeBookings: currentBookings.count,
+        bookingsChange: bookingsChange,
+        bookingsPrevious: previousBookings.count
       },
       popularActivities: popularActivities.results || [],
-      popularSections: sections
+      popularSections: sectionsWithIcons,
+      dateRange: {
+        current: { start: currentStartDate, end: currentEndDate },
+        previous: { start: previousStartDate, end: previousEndDate }
+      }
     })
   } catch (error) {
     console.error('Analytics error:', error)
@@ -8484,26 +8576,42 @@ app.get('/admin/dashboard', (c) => {
         <!-- Analytics Tab -->
         <div id="analyticsTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
-                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
+                    <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-0"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
+                    
+                    <!-- Date Range Filter -->
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="filterAnalytics('today')" class="date-filter-btn active px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">Today</button>
+                        <button onclick="filterAnalytics('yesterday')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Yesterday</button>
+                        <button onclick="filterAnalytics('7days')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Last 7 Days</button>
+                        <button onclick="filterAnalytics('30days')" class="date-filter-btn px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300">Last 30 Days</button>
+                    </div>
+                </div>
                 
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
                     <div class="stats-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-4 md:p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-blue-100 text-xs md:text-sm">Total Scans</p>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex-1">
+                                <p class="text-blue-100 text-xs md:text-sm">QR Code Scans</p>
                                 <p class="text-2xl md:text-3xl font-bold" id="totalScans">0</p>
                             </div>
                             <i class="fas fa-qrcode text-2xl md:text-4xl opacity-30"></i>
                         </div>
+                        <div id="scansComparison" class="text-xs md:text-sm text-blue-100 flex items-center gap-1">
+                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                        </div>
                     </div>
                     <div class="stats-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-4 md:p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-green-100 text-xs md:text-sm">Active Bookings</p>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex-1">
+                                <p class="text-green-100 text-xs md:text-sm">Bookings</p>
                                 <p class="text-2xl md:text-3xl font-bold" id="activeBookings">0</p>
                             </div>
                             <i class="fas fa-calendar-check text-2xl md:text-4xl opacity-30"></i>
+                        </div>
+                        <div id="bookingsComparison" class="text-xs md:text-sm text-green-100 flex items-center gap-1">
+                            <i class="fas fa-spinner fa-spin"></i> Loading...
                         </div>
                     </div>
                     <div class="stats-card bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-4 md:p-6">
@@ -9196,15 +9304,40 @@ app.get('/admin/dashboard', (c) => {
       }
       
       // Analytics functions
-      async function loadAnalytics() {
+      let currentAnalyticsRange = 'today';
+      
+      async function loadAnalytics(range) {
+        if (range) currentAnalyticsRange = range;
+        
         try {
-          const response = await fetch('/api/admin/analytics?property_id=1');
+          const response = await fetch('/api/admin/analytics?property_id=1&range=' + currentAnalyticsRange);
           const data = await response.json();
           
+          // Update stats
           document.getElementById('totalScans').textContent = data.stats.totalScans;
           document.getElementById('activeBookings').textContent = data.stats.activeBookings;
           document.getElementById('totalActivities').textContent = data.stats.totalActivities;
           document.getElementById('totalVendors').textContent = data.stats.totalVendors;
+          
+          // Show comparison for scans
+          const scansChange = parseFloat(data.stats.scansChange);
+          const scansIcon = scansChange > 0 ? 'arrow-up' : scansChange < 0 ? 'arrow-down' : 'minus';
+          const scansColor = scansChange > 0 ? 'text-green-200' : scansChange < 0 ? 'text-red-200' : 'text-blue-200';
+          const scansChangeText = scansChange > 0 ? '+' + Math.abs(scansChange) : scansChange < 0 ? '-' + Math.abs(scansChange) : scansChange;
+          document.getElementById('scansComparison').innerHTML = 
+            '<i class="fas fa-' + scansIcon + ' ' + scansColor + '"></i>' +
+            '<span class="' + scansColor + '">' + scansChangeText + '%</span>' +
+            '<span>vs previous period</span>';
+          
+          // Show comparison for bookings
+          const bookingsChange = parseFloat(data.stats.bookingsChange);
+          const bookingsIcon = bookingsChange > 0 ? 'arrow-up' : bookingsChange < 0 ? 'arrow-down' : 'minus';
+          const bookingsColor = bookingsChange > 0 ? 'text-green-200' : bookingsChange < 0 ? 'text-red-200' : 'text-green-200';
+          const bookingsChangeText = bookingsChange > 0 ? '+' + Math.abs(bookingsChange) : bookingsChange < 0 ? '-' + Math.abs(bookingsChange) : bookingsChange;
+          document.getElementById('bookingsComparison').innerHTML = 
+            '<i class="fas fa-' + bookingsIcon + ' ' + bookingsColor + '"></i>' +
+            '<span class="' + bookingsColor + '">' + bookingsChangeText + '%</span>' +
+            '<span>vs previous period</span>';
           
           // Popular activities
           const activitiesHTML = data.popularActivities.map((a, i) => 
@@ -9212,7 +9345,7 @@ app.get('/admin/dashboard', (c) => {
             '<div class="flex items-center gap-3">' +
             '<span class="text-2xl font-bold text-gray-300">' + (i + 1) + '</span>' +
             '<div>' +
-            '<p class="font-semibold">' + a.title_en + '</p>' +
+            '<p class="font-semibold">' + (a.title_en || 'Activity') + '</p>' +
             '<p class="text-sm text-gray-600">' + a.booking_count + ' bookings</p>' +
             '</div>' +
             '</div>' +
@@ -9225,17 +9358,30 @@ app.get('/admin/dashboard', (c) => {
           const sectionsHTML = data.popularSections.map((s, i) =>
             '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
             '<div class="flex items-center gap-3">' +
-            '<i class="fas fa-' + s.icon + ' text-xl text-indigo-600"></i>' +
-            '<p class="font-semibold">' + s.name + '</p>' +
+            '<i class="fas fa-' + (s.icon || 'eye') + ' text-xl text-indigo-600"></i>' +
+            '<p class="font-semibold capitalize">' + s.name + '</p>' +
             '</div>' +
             '<span class="text-blue-600 font-semibold">' + s.views + ' views</span>' +
             '</div>'
           ).join('');
-          document.getElementById('popularSections').innerHTML = sectionsHTML;
+          document.getElementById('popularSections').innerHTML = sectionsHTML || '<p class="text-center text-gray-400 py-4">No section data yet</p>';
           
         } catch (error) {
           console.error('Analytics load error:', error);
         }
+      }
+      
+      function filterAnalytics(range) {
+        // Update active button
+        document.querySelectorAll('.date-filter-btn').forEach(btn => {
+          btn.classList.remove('active', 'bg-blue-600', 'text-white');
+          btn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+        event.target.classList.add('active', 'bg-blue-600', 'text-white');
+        event.target.classList.remove('bg-gray-200', 'text-gray-700');
+        
+        // Reload analytics with new range
+        loadAnalytics(range);
       }
       
       // Initialize: Load QR code tab by default (it's marked as tab-active)
