@@ -5473,16 +5473,23 @@ app.post('/api/admin/chatbot/settings', async (c) => {
     const body = await c.req.json()
     const { property_id, chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color } = body
     
+    // Handle undefined/null values - D1 doesn't accept undefined
+    const enabled = chatbot_enabled ? 1 : 0
+    const greeting = chatbot_greeting_en || null
+    const name = chatbot_name || null
+    const avatar = chatbot_avatar_url || null
+    const color = chatbot_primary_color || null
+    
     await DB.prepare(`
       UPDATE properties
       SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?, chatbot_primary_color = ?
       WHERE property_id = ?
-    `).bind(chatbot_enabled ? 1 : 0, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color, property_id).run()
+    `).bind(enabled, greeting, name, avatar, color, property_id).run()
     
     return c.json({ success: true })
   } catch (error) {
     console.error('Update chatbot settings error:', error)
-    return c.json({ error: 'Failed to update settings' }, 500)
+    return c.json({ error: 'Failed to update settings', details: error.message }, 500)
   }
 })
 
