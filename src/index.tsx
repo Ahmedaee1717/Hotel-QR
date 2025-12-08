@@ -6684,6 +6684,13 @@ app.get('/vendor/dashboard', (c) => {
           const categories = categoriesRes.ok ? await categoriesRes.json() : { categories: [] };
           const profile = profileRes.ok ? await profileRes.json() : { profile: null };
 
+          console.log('Dashboard data loaded:', {
+            bookings: bookings.bookings?.length || 0,
+            activities: activities.activities?.length || 0,
+            categories: categories.categories?.length || 0,
+            profile: profile.profile ? 'loaded' : 'missing'
+          });
+
           const today = new Date().toISOString().split('T')[0];
           const bookingsList = bookings.bookings || [];
           const todayBookings = bookingsList.filter(b => b.activity_date === today);
@@ -6693,12 +6700,15 @@ app.get('/vendor/dashboard', (c) => {
 
           const categorySelect = document.getElementById('category');
           const categoriesList = categories.categories || [];
+          console.log('Populating categories dropdown:', categoriesList);
           categoriesList.forEach(cat => {
             categorySelect.innerHTML += '<option value="' + cat.category_id + '">' + cat.name + '</option>';
           });
+          console.log('Category dropdown HTML:', categorySelect.innerHTML);
 
           displayBookings(bookingsList);
           displayActivities(activities.activities || []);
+          console.log('Activities displayed:', activities.activities?.length || 0);
           displayProfile(profile.profile);
         } catch (error) {
           console.error('Dashboard load error:', error);
