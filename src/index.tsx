@@ -5402,7 +5402,7 @@ app.get('/hotel/:property_slug', async (c) => {
           
           // Gradient or solid color
           const heroBackground = useGradient ? 
-            \`linear-gradient(135deg, \${primaryColor} 0%, \${secondaryColor} 100%)\` : 
+            'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + secondaryColor + ' 100%)' : 
             primaryColor;
           
           // Hero image filter effects
@@ -5412,14 +5412,9 @@ app.get('/hotel/:property_slug', async (c) => {
           else if (heroImageEffect === 'blur') heroFilter = 'blur(4px)';
           
           // Hero background with image and overlay
-          const heroImageCSS = settings.hero_image_url ? \`
-            background-image: 
-              linear-gradient(rgba(0,0,0,\${heroOverlay}), rgba(0,0,0,\${heroOverlay})),
-              url('\${settings.hero_image_url}');
-            background-size: cover;
-            background-position: center;
-            \${heroFilter ? 'filter: ' + heroFilter + ';' : ''}
-          \` : '';
+          const heroImageCSS = settings.hero_image_url ? 
+            'background-image: linear-gradient(rgba(0,0,0,' + heroOverlay + '), rgba(0,0,0,' + heroOverlay + ')), url(\\'' + settings.hero_image_url + '\\'); background-size: cover; background-position: center; ' + (heroFilter ? 'filter: ' + heroFilter + ';' : '')
+            : '';
           
           // Generate dynamic CSS based on layout style
           let dynamicCSS = '';
@@ -5894,18 +5889,16 @@ app.get('/hotel/:property_slug', async (c) => {
                   customSectionEl.className = 'mb-12';
                   
                   const lang = currentLanguage;
-                  const sectionName = section[\`section_name_\${lang}\`] || section.section_name_en;
+                  const sectionName = section['section_name_' + lang] || section.section_name_en;
                   const icon = section.icon_class || 'fas fa-star';
                   
-                  customSectionEl.innerHTML = \`
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
-                      <i class="\${icon} text-blue-500 mr-3"></i>
-                      <span>\${sectionName}</span>
-                    </h2>
-                    <div id="custom-grid-\${section.section_key}" class="grid grid-cols-1 gap-4">
-                      <!-- Loaded dynamically -->
-                    </div>
-                  \`;
+                  customSectionEl.innerHTML = '<h2 class="text-2xl font-bold mb-4 flex items-center">' +
+                    '<i class="' + icon + ' text-blue-500 mr-3"></i>' +
+                    '<span>' + sectionName + '</span>' +
+                    '</h2>' +
+                    '<div id="custom-grid-' + section.section_key + '" class="grid grid-cols-1 gap-4">' +
+                    '<!-- Loaded dynamically -->' +
+                    '</div>';
                 }
                 
                 sectionElements[section.section_key] = customSectionEl;
