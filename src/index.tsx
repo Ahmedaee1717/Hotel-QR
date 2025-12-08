@@ -7179,6 +7179,175 @@ app.get('/hotel/:property_slug', async (c) => {
             font-style: italic;
           }
         </style>
+        
+        <!-- AI Chatbot Widget -->
+        <div id="chatbotWidget" style="display: none;">
+          <!-- Chat Button -->
+          <button id="chatbotButton" class="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-50" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <i class="fas fa-comments"></i>
+          </button>
+          
+          <!-- Chat Window -->
+          <div id="chatWindow" class="hidden fixed bottom-24 right-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
+            <!-- Header -->
+            <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+              <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3">
+                  <i class="fas fa-robot text-xl"></i>
+                </div>
+                <div>
+                  <h3 id="chatbotName" class="font-bold">Hotel Assistant</h3>
+                  <p class="text-xs opacity-90">Always here to help</p>
+                </div>
+              </div>
+              <button id="closeChatBtn" class="text-white/80 hover:text-white transition">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            
+            <!-- Messages Container -->
+            <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+              <!-- Messages will be added here -->
+            </div>
+            
+            <!-- Input Area -->
+            <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
+              <div class="flex gap-2">
+                <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button id="sendChatBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                  <i class="fas fa-paper-plane"></i>
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-2 text-center">
+                <span id="chatUsageInfo">AI-powered by hotel knowledge base</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <script>
+          // Chatbot Widget JavaScript
+          (function() {
+            const chatbotWidget = document.getElementById('chatbotWidget');
+            const chatButton = document.getElementById('chatbotButton');
+            const chatWindow = document.getElementById('chatWindow');
+            const closeChatBtn = document.getElementById('closeChatBtn');
+            const chatMessages = document.getElementById('chatMessages');
+            const chatInput = document.getElementById('chatInput');
+            const sendChatBtn = document.getElementById('sendChatBtn');
+            
+            let conversationId = null;
+            let sessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            
+            // Load chatbot settings and show if enabled
+            async function initChatbot() {
+              try {
+                const response = await fetch('/api/chatbot/settings/' + propertyData.property_id);
+                const data = await response.json();
+                
+                if (data.success && data.settings && data.settings.chatbot_enabled === 1) {
+                  chatbotWidget.style.display = 'block';
+                  document.getElementById('chatbotName').textContent = data.settings.chatbot_name || 'Hotel Assistant';
+                  
+                  // Add welcome message
+                  const greeting = data.settings.chatbot_greeting_en || 'Hi! How can I help you today?';
+                  addMessage(greeting, 'assistant');
+                }
+              } catch (error) {
+                console.error('Chatbot init error:', error);
+              }
+            }
+            
+            // Toggle chat window
+            chatButton.addEventListener('click', () => {
+              chatWindow.classList.toggle('hidden');
+              if (!chatWindow.classList.contains('hidden')) {
+                chatInput.focus();
+              }
+            });
+            
+            closeChatBtn.addEventListener('click', () => {
+              chatWindow.classList.add('hidden');
+            });
+            
+            // Add message to chat
+            function addMessage(text, role) {
+              const messageDiv = document.createElement('div');
+              messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+              
+              const bubble = document.createElement('div');
+              bubble.className = role === 'user' 
+                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-none max-w-[80%]'
+                : 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+              bubble.textContent = text;
+              
+              messageDiv.appendChild(bubble);
+              chatMessages.appendChild(messageDiv);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Send message
+            async function sendMessage() {
+              const message = chatInput.value.trim();
+              if (!message) return;
+              
+              // Add user message
+              addMessage(message, 'user');
+              chatInput.value = '';
+              
+              // Show typing indicator
+              const typingDiv = document.createElement('div');
+              typingDiv.id = 'typing';
+              typingDiv.className = 'flex justify-start';
+              typingDiv.innerHTML = '<div class="bg-white border border-gray-200 px-4 py-2 rounded-2xl rounded-tl-none"><i class="fas fa-ellipsis-h animate-pulse"></i></div>';
+              chatMessages.appendChild(typingDiv);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+              
+              try {
+                const response = await fetch('/api/chatbot/chat', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    property_id: propertyData.property_id,
+                    session_id: sessionId,
+                    message: message,
+                    conversation_id: conversationId
+                  })
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                document.getElementById('typing')?.remove();
+                
+                if (data.success) {
+                  conversationId = data.conversation_id;
+                  addMessage(data.response, 'assistant');
+                } else if (response.status === 429) {
+                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant');
+                } else {
+                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+                }
+              } catch (error) {
+                console.error('Chat error:', error);
+                document.getElementById('typing')?.remove();
+                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant');
+              }
+            }
+            
+            sendChatBtn.addEventListener('click', sendMessage);
+            chatInput.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                sendMessage();
+              }
+            });
+            
+            // Initialize chatbot when page loads
+            if (propertyData) {
+              initChatbot();
+            }
+          })();
+        </script>
     </body>
     </html>
   `)
@@ -11407,6 +11576,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
                 <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
+                <button data-tab="chatbot" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-robot mr-2"></i><span>AI Chatbot</span></button>
             </div>
         </div>
 
@@ -12724,6 +12894,87 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+        <!-- AI Chatbot Tab -->
+        <div id="chatbotTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-robot mr-2 text-purple-600"></i>
+                    AI Chatbot - Knowledge Base Management
+                </h2>
+                <p class="text-gray-600 mb-6">
+                    Create a smart AI assistant that answers guest questions using your hotel's information. Upload FAQs, policies, and amenities details.
+                </p>
+
+                <!-- Chatbot Settings -->
+                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-cog mr-2"></i>Chatbot Settings</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" id="chatbotEnabled" class="w-5 h-5 rounded">
+                                <span class="font-medium">Enable AI Chatbot</span>
+                            </label>
+                            <p class="text-sm text-gray-600 ml-8 mt-1">Show chat widget on guest page</p>
+                        </div>
+                        <div>
+                            <label class="block font-medium mb-2">Chatbot Name</label>
+                            <input type="text" id="chatbotName" placeholder="e.g., Paradise Assistant" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block font-medium mb-2">Greeting Message</label>
+                            <textarea id="chatbotGreeting" rows="2" placeholder="Welcome message for guests..." class="w-full px-4 py-2 border rounded-lg"></textarea>
+                        </div>
+                    </div>
+                    <button onclick="saveChatbotSettings()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-save mr-2"></i>Save Settings
+                    </button>
+                </div>
+
+                <!-- Add New Document -->
+                <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-file-upload mr-2 text-green-600"></i>Add Knowledge Document</h3>
+                    <form id="addDocumentForm" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block font-medium mb-2">Document Title *</label>
+                                <input type="text" id="docTitle" required placeholder="e.g., Check-in & Check-out Policy" class="w-full px-4 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block font-medium mb-2">Category</label>
+                                <select id="docType" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="faq">FAQ</option>
+                                    <option value="policy">Policy</option>
+                                    <option value="amenity">Amenity Info</option>
+                                    <option value="general">General Info</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block font-medium mb-2">Content *</label>
+                            <textarea id="docContent" required rows="6" placeholder="Enter detailed information that guests might ask about..." class="w-full px-4 py-2 border rounded-lg"></textarea>
+                            <p class="text-sm text-gray-500 mt-2">
+                                <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                                Tip: Be specific and detailed. Include times, prices, locations, and procedures. The AI will use this to answer questions accurately.
+                            </p>
+                        </div>
+                        <button type="submit" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold">
+                            <i class="fas fa-plus mr-2"></i>Add Document & Create Chunks
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Documents List -->
+                <div class="bg-white rounded-lg border p-6">
+                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-database mr-2 text-blue-600"></i>Knowledge Base Documents</h3>
+                    <div id="documentsList" class="space-y-3">
+                        <p class="text-gray-500 text-center py-8">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading documents...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <!-- Support Ticket Modal -->
     <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
@@ -12821,6 +13072,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
         if (tab === 'settings') loadSettings();
+        if (tab === 'chatbot') loadChatbot();
       }
       
       // Add event listeners to tab buttons
@@ -14367,6 +14619,160 @@ app.get('/admin/dashboard', (c) => {
           }
         });
       }
+      
+      // ============================================
+      // CHATBOT MANAGEMENT
+      // ============================================
+      
+      async function loadChatbot() {
+        try {
+          // Load chatbot settings
+          const settingsRes = await fetch('/api/chatbot/settings/1');
+          const settingsData = await settingsRes.json();
+          
+          if (settingsData.success && settingsData.settings) {
+            document.getElementById('chatbotEnabled').checked = settingsData.settings.chatbot_enabled === 1;
+            document.getElementById('chatbotName').value = settingsData.settings.chatbot_name || '';
+            document.getElementById('chatbotGreeting').value = settingsData.settings.chatbot_greeting_en || '';
+          }
+          
+          // Load documents
+          await loadChatbotDocuments();
+        } catch (error) {
+          console.error('Load chatbot error:', error);
+        }
+      }
+      
+      async function loadChatbotDocuments() {
+        try {
+          const response = await fetch('/api/admin/chatbot/documents?property_id=1');
+          const data = await response.json();
+          
+          const container = document.getElementById('documentsList');
+          
+          if (!data.success || !data.documents || data.documents.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8"><i class="fas fa-folder-open mr-2"></i>No documents yet. Add your first knowledge document above!</p>';
+            return;
+          }
+          
+          container.innerHTML = data.documents.map(doc => {
+            const typeClass = doc.document_type === 'faq' ? 'bg-blue-100 text-blue-800' : doc.document_type === 'policy' ? 'bg-purple-100 text-purple-800' : doc.document_type === 'amenity' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+            return '<div class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition">' +
+              '<div class="flex justify-between items-start">' +
+                '<div class="flex-1">' +
+                  '<div class="flex items-center mb-2">' +
+                    '<span class="px-3 py-1 text-xs font-semibold rounded-full ' + typeClass + ' mr-2">' +
+                      doc.document_type.toUpperCase() +
+                    '</span>' +
+                    '<h4 class="text-lg font-bold">' + doc.title + '</h4>' +
+                  '</div>' +
+                  '<p class="text-gray-600 text-sm mb-2 line-clamp-2">' + doc.content.substring(0, 150) + '...</p>' +
+                  '<div class="flex items-center text-xs text-gray-500 space-x-4">' +
+                    '<span><i class="fas fa-cube mr-1"></i>' + doc.chunk_count + ' chunks</span>' +
+                    '<span><i class="fas fa-calendar mr-1"></i>' + new Date(doc.created_at).toLocaleDateString() + '</span>' +
+                  '</div>' +
+                '</div>' +
+                '<button onclick="deleteChatbotDocument(' + doc.document_id + ')" class="ml-4 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">' +
+                  '<i class="fas fa-trash"></i>' +
+                '</button>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+        } catch (error) {
+          console.error('Load documents error:', error);
+          document.getElementById('documentsList').innerHTML = '<p class="text-red-500 text-center py-8"><i class="fas fa-exclamation-circle mr-2"></i>Error loading documents</p>';
+        }
+      }
+      
+      window.saveChatbotSettings = async function() {
+        try {
+          const response = await fetch('/api/admin/chatbot/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              chatbot_enabled: document.getElementById('chatbotEnabled').checked,
+              chatbot_name: document.getElementById('chatbotName').value,
+              chatbot_greeting_en: document.getElementById('chatbotGreeting').value
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Chatbot settings saved successfully!');
+          } else {
+            alert('❌ Failed to save settings: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Save settings error:', error);
+          alert('❌ Error saving settings');
+        }
+      };
+      
+      // Add document form handler
+      document.getElementById('addDocumentForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const title = document.getElementById('docTitle').value;
+        const content = document.getElementById('docContent').value;
+        const type = document.getElementById('docType').value;
+        
+        if (!title || !content) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/chatbot/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              title: title,
+              content: content,
+              document_type: type
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Document added successfully!\\n' + data.chunks_created + ' text chunks created for AI search.');
+            document.getElementById('addDocumentForm').reset();
+            await loadChatbotDocuments();
+          } else {
+            alert('❌ Failed to add document: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Add document error:', error);
+          alert('❌ Error adding document');
+        }
+      });
+      
+      window.deleteChatbotDocument = async function(documentId) {
+        if (!confirm('Are you sure you want to delete this document? This will also remove all its text chunks.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/chatbot/documents/' + documentId, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Document deleted successfully!');
+            await loadChatbotDocuments();
+          } else {
+            alert('❌ Failed to delete document');
+          }
+        } catch (error) {
+          console.error('Delete document error:', error);
+          alert('❌ Error deleting document');
+        }
+      };
       
       async function renderSectionVisibility() {
         // Load custom sections
