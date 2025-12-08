@@ -134,6 +134,12 @@ async function translateActivityContent(
 }
 
 // ============================================
+// STATIC FILES - Serve GuestConnect logo and other assets
+// ============================================
+
+// Serve static files from public directory (Cloudflare Pages will handle this automatically)
+
+// ============================================
 // SAAS HOMEPAGE
 // ============================================
 
