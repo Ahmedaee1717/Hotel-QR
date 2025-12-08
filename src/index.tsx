@@ -6587,7 +6587,7 @@ app.get('/vendor/dashboard', (c) => {
                     <div><label class="block text-sm font-medium mb-2">Price (USD)</label><input type="number" id="price" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Duration (minutes)</label><input type="number" id="duration" required class="w-full px-4 py-2 border rounded-lg"></div>
                     <div><label class="block text-sm font-medium mb-2">Capacity per Slot</label><input type="number" id="capacity" required class="w-full px-4 py-2 border rounded-lg"></div>
-                    <div><label class="block text-sm font-medium mb-2">Activity Image</label><input type="file" id="activityImage" accept="image/*" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Upload activity image (optional)</p></div>
+                    <div><label class="block text-sm font-medium mb-2">Activity Image URL</label><input type="url" id="activityImageUrl" placeholder="https://images.unsplash.com/photo-example.jpg" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity image (e.g., from Unsplash, Imgur)</p></div>
                     <div><label class="block text-sm font-medium mb-2">Video URL</label><input type="url" id="videoUrl" placeholder="https://example.com/video.mp4" class="w-full px-4 py-2 border rounded-lg"><p class="text-xs text-gray-500 mt-1">Provide a direct link to activity video (optional)</p></div>
                 </div>
                 <div><label class="block text-sm font-medium mb-2">Short Description</label><textarea id="shortDesc" rows="2" required class="w-full px-4 py-2 border rounded-lg"></textarea></div>
@@ -6825,25 +6825,8 @@ app.get('/vendor/dashboard', (c) => {
         const isEditing = !!editingId;
         
         try {
-          // Handle image upload if present
-          const imageFile = document.getElementById('activityImage').files[0];
-          let imageUrl = '';
-          
-          if (imageFile) {
-            const formData = new FormData();
-            formData.append('image', imageFile);
-            
-            const uploadResponse = await fetch('/api/vendor/upload-image', {
-              method: 'POST',
-              headers: { 'X-Vendor-ID': vendorId },
-              body: formData
-            });
-            
-            if (uploadResponse.ok) {
-              const uploadData = await uploadResponse.json();
-              imageUrl = uploadData.image_url;
-            }
-          }
+          // Get image URL from input
+          const imageUrl = document.getElementById('activityImageUrl').value.trim();
 
           const activityData = {
             category_id: document.getElementById('category').value,
@@ -6916,6 +6899,16 @@ app.get('/vendor/dashboard', (c) => {
           document.getElementById('price').value = activity.price;
           document.getElementById('duration').value = activity.duration_minutes;
           document.getElementById('capacity').value = activity.capacity_per_slot;
+          
+          // Parse and set image URL
+          let images = [];
+          try {
+            images = activity.images ? JSON.parse(activity.images) : [];
+          } catch (e) {
+            images = Array.isArray(activity.images) ? activity.images : [];
+          }
+          document.getElementById('activityImageUrl').value = images[0] || '';
+          
           document.getElementById('videoUrl').value = activity.video_url || '';
           document.getElementById('shortDesc').value = activity.short_description_en;
           document.getElementById('fullDesc').value = activity.full_description_en;
