@@ -7604,9 +7604,21 @@ app.get('/activity', (c) => {
           if (activity.video_url) {
             document.getElementById('videoSection').classList.remove('hidden');
             
-            // Check if it's a YouTube URL
-            const youtubeRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-            const youtubeMatch = activity.video_url.match(youtubeRegex);
+            // Check if it's a YouTube URL - use simpler detection to avoid regex escaping issues
+            let videoId = null;
+            const url = activity.video_url;
+            
+            // Extract YouTube video ID
+            if (url.includes('youtube.com/watch')) {
+              const urlParams = new URLSearchParams(url.split('?')[1]);
+              videoId = urlParams.get('v');
+            } else if (url.includes('youtu.be/')) {
+              videoId = url.split('youtu.be/')[1].split(/[?&]/)[0];
+            } else if (url.includes('youtube.com/embed/')) {
+              videoId = url.split('youtube.com/embed/')[1].split(/[?&]/)[0];
+            }
+            
+            const youtubeMatch = videoId ? [null, videoId] : null;
             
             if (youtubeMatch && youtubeMatch[1]) {
               // It's a YouTube video - use iframe embed
