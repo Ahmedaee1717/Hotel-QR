@@ -5235,8 +5235,35 @@ Answer in a friendly, professional manner. Keep responses concise but informativ
       } catch (error) {
         console.error('AI chat error:', error)
       }
+    } else if (!apiKey && context.length > 0) {
+      // Fallback: Use retrieved context directly (simple keyword-based response)
+      // This provides basic answers until GenSpark API is configured
+      const contextLower = context.toLowerCase()
+      const messageLower = message.toLowerCase()
+      
+      // Extract the most relevant sentence from context
+      const sentences = context.split(/[.!?]+/).filter(s => s.trim().length > 0)
+      let bestMatch = sentences[0] || context.substring(0, 200)
+      let bestScore = 0
+      
+      const keywords = messageLower.split(/\s+/).filter(w => w.length > 3)
+      for (const sentence of sentences) {
+        const sentenceLower = sentence.toLowerCase()
+        let score = 0
+        for (const keyword of keywords) {
+          if (sentenceLower.includes(keyword)) {
+            score += 2
+          }
+        }
+        if (score > bestScore) {
+          bestScore = score
+          bestMatch = sentence.trim()
+        }
+      }
+      
+      aiResponse = `Based on our hotel information: ${bestMatch}.\n\nNote: For more detailed assistance, please contact our front desk. (AI responses will be more intelligent once the administrator configures the GenSpark API.)`
     } else if (!apiKey) {
-      aiResponse = 'AI service is not configured. Please contact the administrator.'
+      aiResponse = 'The AI assistant is not fully configured yet. Please contact the hotel staff for assistance, or ask the administrator to configure the GenSpark API for intelligent responses.'
     } else {
       aiResponse = 'I don\'t have specific information about that. Please contact the hotel staff for assistance.'
     }
@@ -5293,7 +5320,7 @@ app.get('/api/chatbot/settings/:property_id', async (c) => {
   
   try {
     const settings = await DB.prepare(`
-      SELECT chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url
+      SELECT chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
@@ -5311,13 +5338,13 @@ app.post('/api/admin/chatbot/settings', async (c) => {
   
   try {
     const body = await c.req.json()
-    const { property_id, chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url } = body
+    const { property_id, chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color } = body
     
     await DB.prepare(`
       UPDATE properties
-      SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?
+      SET chatbot_enabled = ?, chatbot_greeting_en = ?, chatbot_name = ?, chatbot_avatar_url = ?, chatbot_primary_color = ?
       WHERE property_id = ?
-    `).bind(chatbot_enabled ? 1 : 0, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, property_id).run()
+    `).bind(chatbot_enabled ? 1 : 0, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color, property_id).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -7258,6 +7285,23 @@ app.get('/hotel/:property_slug', async (c) => {
                   chatbotWidget.style.display = 'block';
                   document.getElementById('chatbotName').textContent = data.settings.chatbot_name || 'Hotel Assistant';
                   
+                  // Apply custom branding color
+                  const primaryColor = data.settings.chatbot_primary_color || '#667eea';
+                  const chatHeader = document.querySelector('#chatWindow > div:first-child');
+                  const sendBtn = document.getElementById('sendChatBtn');
+                  
+                  // Apply gradient background to button and header
+                  chatButton.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+                  if (chatHeader) {
+                    chatHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+                  }
+                  if (sendBtn) {
+                    sendBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+                  }
+                  
+                  // Store color for message bubbles
+                  window.chatbotPrimaryColor = primaryColor;
+                  
                   // Add welcome message
                   const greeting = data.settings.chatbot_greeting_en || 'Hi! How can I help you today?';
                   addMessage(greeting, 'assistant');
@@ -7265,6 +7309,19 @@ app.get('/hotel/:property_slug', async (c) => {
               } catch (error) {
                 console.error('Chatbot init error:', error);
               }
+            }
+            
+            // Helper function to adjust color brightness
+            function adjustColor(hex, percent) {
+              const num = parseInt(hex.replace('#', ''), 16);
+              const amt = Math.round(2.55 * percent);
+              const R = (num >> 16) + amt;
+              const G = (num >> 8 & 0x00FF) + amt;
+              const B = (num & 0x0000FF) + amt;
+              return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255))
+                .toString(16).slice(1);
             }
             
             // Toggle chat window
@@ -7285,9 +7342,13 @@ app.get('/hotel/:property_slug', async (c) => {
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
               
               const bubble = document.createElement('div');
-              bubble.className = role === 'user' 
-                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-2xl rounded-tr-none max-w-[80%]'
-                : 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+              if (role === 'user') {
+                const primaryColor = window.chatbotPrimaryColor || '#667eea';
+                bubble.className = 'text-white px-4 py-2 rounded-2xl rounded-tr-none max-w-[80%]';
+                bubble.style.background = 'linear-gradient(to right, ' + primaryColor + ', ' + adjustColor(primaryColor, -20) + ')';
+              } else {
+                bubble.className = 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+              }
               bubble.textContent = text;
               
               messageDiv.appendChild(bubble);
@@ -12923,6 +12984,14 @@ app.get('/admin/dashboard', (c) => {
                             <label class="block font-medium mb-2">Chatbot Name</label>
                             <input type="text" id="chatbotName" placeholder="e.g., Paradise Assistant" class="w-full px-4 py-2 border rounded-lg">
                         </div>
+                        <div>
+                            <label class="block font-medium mb-2">Chat Widget Color</label>
+                            <div class="flex gap-2">
+                                <input type="color" id="chatbotPrimaryColor" value="#667eea" class="w-16 h-10 border rounded cursor-pointer">
+                                <input type="text" id="chatbotPrimaryColorText" value="#667eea" placeholder="#667eea" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm">
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Color for chat button and message bubbles</p>
+                        </div>
                         <div class="md:col-span-2">
                             <label class="block font-medium mb-2">Greeting Message</label>
                             <textarea id="chatbotGreeting" rows="2" placeholder="Welcome message for guests..." class="w-full px-4 py-2 border rounded-lg"></textarea>
@@ -14637,6 +14706,20 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('chatbotEnabled').checked = settingsData.settings.chatbot_enabled === 1;
             document.getElementById('chatbotName').value = settingsData.settings.chatbot_name || '';
             document.getElementById('chatbotGreeting').value = settingsData.settings.chatbot_greeting_en || '';
+            
+            const primaryColor = settingsData.settings.chatbot_primary_color || '#667eea';
+            document.getElementById('chatbotPrimaryColor').value = primaryColor;
+            document.getElementById('chatbotPrimaryColorText').value = primaryColor;
+            
+            // Sync color inputs
+            document.getElementById('chatbotPrimaryColor').addEventListener('input', (e) => {
+              document.getElementById('chatbotPrimaryColorText').value = e.target.value;
+            });
+            document.getElementById('chatbotPrimaryColorText').addEventListener('input', (e) => {
+              if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+                document.getElementById('chatbotPrimaryColor').value = e.target.value;
+              }
+            });
           }
           
           // Load documents
@@ -14696,7 +14779,8 @@ app.get('/admin/dashboard', (c) => {
               property_id: 1,
               chatbot_enabled: document.getElementById('chatbotEnabled').checked,
               chatbot_name: document.getElementById('chatbotName').value,
-              chatbot_greeting_en: document.getElementById('chatbotGreeting').value
+              chatbot_greeting_en: document.getElementById('chatbotGreeting').value,
+              chatbot_primary_color: document.getElementById('chatbotPrimaryColorText').value
             })
           });
           
