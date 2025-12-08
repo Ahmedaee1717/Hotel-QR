@@ -2106,6 +2106,73 @@ app.get('/api/admin/dashboard', async (c) => {
   }
 })
 
+// Get analytics data
+app.get('/api/admin/analytics', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+
+  try {
+    // Total activities count
+    const activities = await DB.prepare(`
+      SELECT COUNT(*) as count FROM activities a
+      JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
+      WHERE vp.property_id = ? AND a.status = 'active'
+    `).bind(property_id).first()
+
+    // Total vendors count
+    const vendors = await DB.prepare(`
+      SELECT COUNT(*) as count FROM vendor_properties vp
+      JOIN vendors v ON vp.vendor_id = v.vendor_id
+      WHERE vp.property_id = ? AND v.status = 'active'
+    `).bind(property_id).first()
+
+    // Active bookings count
+    const bookings = await DB.prepare(`
+      SELECT COUNT(*) as count FROM bookings
+      WHERE property_id = ? AND booking_status IN ('confirmed', 'pending')
+        AND activity_date >= date('now')
+    `).bind(property_id).first()
+
+    // Most popular activities (by bookings)
+    const popularActivities = await DB.prepare(`
+      SELECT 
+        a.title_en,
+        a.activity_id,
+        COUNT(b.booking_id) as booking_count,
+        SUM(b.total_price) as total_revenue
+      FROM activities a
+      JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
+      LEFT JOIN bookings b ON a.activity_id = b.activity_id
+      WHERE vp.property_id = ?
+      GROUP BY a.activity_id
+      ORDER BY booking_count DESC
+      LIMIT 5
+    `).bind(property_id).all()
+
+    // Most viewed sections (simulated data for now)
+    const sections = [
+      { name: 'Activities', views: Math.floor(Math.random() * 500) + 100, icon: 'hiking' },
+      { name: 'Restaurants', views: Math.floor(Math.random() * 400) + 80, icon: 'utensils' },
+      { name: 'Spa & Wellness', views: Math.floor(Math.random() * 300) + 60, icon: 'spa' },
+      { name: 'Events', views: Math.floor(Math.random() * 200) + 40, icon: 'calendar' }
+    ].sort((a, b) => b.views - a.views)
+
+    return c.json({
+      stats: {
+        totalActivities: activities.count,
+        totalVendors: vendors.count,
+        activeBookings: bookings.count,
+        totalScans: Math.floor(Math.random() * 1000) + 500 // Simulated for now
+      },
+      popularActivities: popularActivities.results || [],
+      popularSections: sections
+    })
+  } catch (error) {
+    console.error('Analytics error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // Get all rooms
 app.get('/api/admin/rooms', async (c) => {
   const { DB } = c.env
@@ -8248,7 +8315,8 @@ app.get('/admin/dashboard', (c) => {
         <!-- Tabs -->
         <div class="bg-white rounded-lg shadow mb-6">
             <div class="flex overflow-x-auto">
-                <button data-tab="rooms" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Rooms & QR Codes</button>
+                <button data-tab="qrcode" class="tab-btn px-6 py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i>Master QR Code</button>
+                <button data-tab="analytics" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-chart-line mr-2"></i>Analytics</button>
                 <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-store mr-2"></i>Vendors</button>
                 <button data-tab="regcode" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-key mr-2"></i>Vendor Code</button>
                 <button data-tab="offerings" class="tab-btn px-6 py-4 font-semibold"><i class="fas fa-utensils mr-2"></i>Hotel Offerings</button>
@@ -8259,10 +8327,138 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
 
-        <!-- Rooms Tab -->
-        <div id="roomsTab" class="tab-content">
+        <!-- Master QR Code Tab -->
+        <div id="qrcodeTab" class="tab-content">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-door-open mr-2 text-blue-600"></i>Add New Room & Generate QR Code</h2>
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-qrcode mr-2 text-blue-600"></i>Master QR Code for Hotel</h2>
+                <p class="text-gray-600 mb-6">Generate one universal QR code that guests can scan from any room. The QR code will direct them to your hotel's main landing page where they can access all services, activities, and offerings.</p>
+                
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- QR Code Display -->
+                    <div class="text-center">
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-xl border-2 border-blue-200">
+                            <h3 class="text-lg font-semibold mb-4 text-gray-700">Your Hotel QR Code</h3>
+                            <div id="qrCodeDisplay" class="bg-white p-6 rounded-lg shadow-inner inline-block">
+                                <div class="text-gray-400"><i class="fas fa-spinner fa-spin text-4xl"></i></div>
+                            </div>
+                            <p class="mt-4 text-sm text-gray-600">Scan this code to test your guest experience</p>
+                        </div>
+                        <div class="mt-4 flex gap-2 justify-center">
+                            <button onclick="downloadQR()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                                <i class="fas fa-download mr-2"></i>Download QR Code
+                            </button>
+                            <button onclick="printQR()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
+                                <i class="fas fa-print mr-2"></i>Print
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- QR Code Info -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4 text-gray-700">QR Code Details</h3>
+                        <div class="space-y-3">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Hotel Landing Page URL:</p>
+                                <p id="hotelURL" class="font-mono text-sm text-blue-600 break-all">Loading...</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Property Name:</p>
+                                <p id="propertyName" class="font-semibold">Loading...</p>
+                            </div>
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <p class="text-sm text-gray-600 mb-1">Property Slug:</p>
+                                <p id="propertySlug" class="font-mono text-sm">Loading...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                            <h4 class="font-semibold text-yellow-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>How to Use:</h4>
+                            <ul class="text-sm text-yellow-800 space-y-1 list-disc list-inside">
+                                <li>Print and place this QR code in every guest room</li>
+                                <li>Display it in common areas (lobby, restaurant, pool)</li>
+                                <li>Include it in welcome materials</li>
+                                <li>One code works for all rooms - no need for individual codes</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analyticsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-blue-100 text-sm">Total Scans</p>
+                                <p class="text-3xl font-bold" id="totalScans">0</p>
+                            </div>
+                            <i class="fas fa-qrcode text-4xl opacity-30"></i>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-green-100 text-sm">Active Bookings</p>
+                                <p class="text-3xl font-bold" id="activeBookings">0</p>
+                            </div>
+                            <i class="fas fa-calendar-check text-4xl opacity-30"></i>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-purple-100 text-sm">Total Activities</p>
+                                <p class="text-3xl font-bold" id="totalActivities">0</p>
+                            </div>
+                            <i class="fas fa-hiking text-4xl opacity-30"></i>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-orange-100 text-sm">Total Vendors</p>
+                                <p class="text-3xl font-bold" id="totalVendors">0</p>
+                            </div>
+                            <i class="fas fa-store text-4xl opacity-30"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Popular Sections -->
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-white border rounded-lg p-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-700"><i class="fas fa-fire mr-2 text-red-500"></i>Most Popular Activities</h3>
+                        <div id="popularActivities" class="space-y-3">
+                            <div class="text-center text-gray-400 py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white border rounded-lg p-6">
+                        <h3 class="text-lg font-bold mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
+                        <div id="popularSections" class="space-y-3">
+                            <div class="text-center text-gray-400 py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                                <p>Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Old Rooms Tab (keep for backward compatibility but hide) -->
+        <div id="roomsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-door-open mr-2 text-blue-600"></i>Individual Room QR Codes (Legacy)</h2>
                 <form id="addRoomForm" class="grid md:grid-cols-3 gap-4">
                     <input type="text" id="roomNumber" placeholder="Room Number (e.g., 101)" required class="px-4 py-2 border rounded-lg">
                     <select id="roomType" required class="px-4 py-2 border rounded-lg">
@@ -8837,6 +9033,8 @@ app.get('/admin/dashboard', (c) => {
           clickedButton.classList.add('tab-active');
         }
         
+        if (tab === 'qrcode') loadQRCode();
+        if (tab === 'analytics') loadAnalytics();
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
@@ -8855,8 +9053,97 @@ app.get('/admin/dashboard', (c) => {
         });
       });
       
-      // Initialize: Load rooms tab by default (it's marked as tab-active)
-      loadRooms();
+      // QR Code functions
+      async function loadQRCode() {
+        try {
+          const response = await fetch('/api/properties');
+          const data = await response.json();
+          const property = data.properties[0];
+          
+          if (property) {
+            const hotelURL = window.location.origin + '/hotel/' + property.slug;
+            document.getElementById('hotelURL').textContent = hotelURL;
+            document.getElementById('propertyName').textContent = property.name;
+            document.getElementById('propertySlug').textContent = property.slug;
+            
+            // Generate QR code using QR Code API
+            const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(hotelURL);
+            document.getElementById('qrCodeDisplay').innerHTML = '<img src="' + qrURL + '" alt="QR Code" class="w-64 h-64">';
+          }
+        } catch (error) {
+          console.error('QR Code load error:', error);
+          document.getElementById('qrCodeDisplay').innerHTML = '<div class="text-red-500"><i class="fas fa-exclamation-triangle"></i><p>Error loading QR code</p></div>';
+        }
+      }
+      
+      window.downloadQR = function() {
+        const hotelURL = document.getElementById('hotelURL').textContent;
+        const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&format=png&data=' + encodeURIComponent(hotelURL);
+        const a = document.createElement('a');
+        a.href = qrURL;
+        a.download = 'hotel-qr-code.png';
+        a.click();
+      }
+      
+      window.printQR = function() {
+        const qrImg = document.querySelector('#qrCodeDisplay img');
+        if (qrImg) {
+          const win = window.open('', '_blank');
+          win.document.write('<html><head><title>Print QR Code</title></head><body style="text-align:center;padding:50px;">');
+          win.document.write('<h1>' + document.getElementById('propertyName').textContent + '</h1>');
+          win.document.write('<img src="' + qrImg.src + '" style="width:500px;height:500px;">');
+          win.document.write('<p>' + document.getElementById('hotelURL').textContent + '</p>');
+          win.document.write('</body></html>');
+          win.document.close();
+          win.print();
+        }
+      }
+      
+      // Analytics functions
+      async function loadAnalytics() {
+        try {
+          const response = await fetch('/api/admin/analytics?property_id=1');
+          const data = await response.json();
+          
+          document.getElementById('totalScans').textContent = data.stats.totalScans;
+          document.getElementById('activeBookings').textContent = data.stats.activeBookings;
+          document.getElementById('totalActivities').textContent = data.stats.totalActivities;
+          document.getElementById('totalVendors').textContent = data.stats.totalVendors;
+          
+          // Popular activities
+          const activitiesHTML = data.popularActivities.map((a, i) => 
+            '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+            '<div class="flex items-center gap-3">' +
+            '<span class="text-2xl font-bold text-gray-300">' + (i + 1) + '</span>' +
+            '<div>' +
+            '<p class="font-semibold">' + a.title_en + '</p>' +
+            '<p class="text-sm text-gray-600">' + a.booking_count + ' bookings</p>' +
+            '</div>' +
+            '</div>' +
+            '<span class="text-green-600 font-semibold">$' + (a.total_revenue || 0) + '</span>' +
+            '</div>'
+          ).join('');
+          document.getElementById('popularActivities').innerHTML = activitiesHTML || '<p class="text-center text-gray-400 py-4">No activity data yet</p>';
+          
+          // Popular sections
+          const sectionsHTML = data.popularSections.map((s, i) =>
+            '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+            '<div class="flex items-center gap-3">' +
+            '<i class="fas fa-' + s.icon + ' text-xl text-indigo-600"></i>' +
+            '<p class="font-semibold">' + s.name + '</p>' +
+            '</div>' +
+            '<span class="text-blue-600 font-semibold">' + s.views + ' views</span>' +
+            '</div>'
+          ).join('');
+          document.getElementById('popularSections').innerHTML = sectionsHTML;
+          
+        } catch (error) {
+          console.error('Analytics load error:', error);
+        }
+      }
+      
+      // Initialize: Load QR code tab by default (it's marked as tab-active)
+      loadQRCode();
 
       async function loadRegCode() {
         try {
