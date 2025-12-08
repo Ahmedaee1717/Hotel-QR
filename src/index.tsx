@@ -11541,9 +11541,9 @@ app.get('/admin/dashboard', (c) => {
                 </div>
                 <div class="mb-4 flex gap-2">
                     <button onclick="filterOfferings('all')" class="offering-filter-btn px-4 py-2 rounded bg-blue-500 text-white" data-type="all">All</button>
-                    <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant">Restaurants</button>
-                    <button onclick="filterOfferings('event')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="event">Events</button>
-                    <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa">Spa</button>
+                    <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant"><span id="admin-pill-restaurants">Restaurants</span></button>
+                    <button onclick="filterOfferings('event')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="event"><span id="admin-pill-events">Events</span></button>
+                    <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa"><span id="admin-pill-spa">Spa</span></button>
                 </div>
                 <div id="offeringsList" class="space-y-3"></div>
             </div>
@@ -13438,6 +13438,11 @@ app.get('/admin/dashboard', (c) => {
           
           // Also load custom sections for the dropdown
           await loadCustomSectionsDropdown();
+          
+          // Update filter buttons if settings are loaded
+          if (adminPropertySettings) {
+            updateAdminFilterButtons(adminPropertySettings);
+          }
         } catch (error) {
           console.error('Load offerings error:', error);
         }
@@ -13867,10 +13872,13 @@ app.get('/admin/dashboard', (c) => {
         }
       }
 
+      let adminPropertySettings = null; // Store settings globally for admin panel
+      
       async function loadSettings() {
         try {
           const response = await fetch('/api/admin/property-settings?property_id=1');
           const settings = await response.json();
+          adminPropertySettings = settings; // Store for later use
           
           // Set homepage URL
           const homepageUrl = window.location.origin + '/hotel/' + settings.slug;
@@ -13918,6 +13926,9 @@ app.get('/admin/dashboard', (c) => {
           
           document.getElementById('fontFamily').value = settings.font_family || 'inter';
           document.getElementById('buttonStyle').value = settings.button_style || 'rounded';
+          
+          // Update admin filter buttons with custom section names
+          updateAdminFilterButtons(settings);
           document.getElementById('cardStyle').value = settings.card_style || 'shadow';
           document.getElementById('headerStyle').value = settings.header_style || 'transparent';
           
@@ -13994,6 +14005,35 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load settings error:', error);
           alert('Failed to load settings');
         }
+      }
+      
+      function updateAdminFilterButtons(settings) {
+        // Update admin panel filter button text with custom section names
+        const sections = [
+          { key: 'restaurant', elementId: 'admin-pill-restaurants', settingKey: 'section_restaurants_en', default: 'Restaurants', optionValue: 'restaurant', optionDefault: 'Restaurant' },
+          { key: 'event', elementId: 'admin-pill-events', settingKey: 'section_events_en', default: 'Events', optionValue: 'event', optionDefault: 'Event' },
+          { key: 'spa', elementId: 'admin-pill-spa', settingKey: 'section_spa_en', default: 'Spa', optionValue: 'spa', optionDefault: 'Spa/Wellness' }
+        ];
+        
+        sections.forEach(section => {
+          // Update filter button
+          const element = document.getElementById(section.elementId);
+          if (element) {
+            const customName = settings[section.settingKey];
+            element.textContent = customName || section.default;
+            console.log('Admin filter updated:', section.key, '→', customName || section.default);
+          }
+          
+          // Update dropdown option
+          const dropdown = document.getElementById('offeringType');
+          if (dropdown) {
+            const option = dropdown.querySelector('option[value="' + section.optionValue + '"]');
+            if (option) {
+              const customName = settings[section.settingKey];
+              option.textContent = customName || section.optionDefault;
+            }
+          }
+        });
       }
       
       async function renderSectionVisibility() {
