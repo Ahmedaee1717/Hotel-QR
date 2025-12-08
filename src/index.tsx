@@ -2856,6 +2856,117 @@ app.post('/api/admin/rooms/:room_id/regenerate-qr', async (c) => {
   }
 })
 
+// QR Card Designer - Get QR card template
+app.get('/api/admin/qr-card/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+
+  try {
+    const card = await DB.prepare(`
+      SELECT * FROM qr_card_templates WHERE property_id = ?
+    `).bind(property_id).first()
+
+    if (!card) {
+      // Return default template if none exists
+      return c.json({
+        property_id,
+        card_title: 'Scan for Hotel Services',
+        card_subtitle: 'Access all amenities and services',
+        background_color: '#ffffff',
+        text_color: '#000000',
+        qr_size: 300,
+        border_radius: 10,
+        show_logo: true,
+        festive_overlay: null,
+        custom_message: null
+      })
+    }
+
+    return c.json(card)
+  } catch (error) {
+    console.error('Get QR card error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// QR Card Designer - Save/Update QR card template
+app.put('/api/admin/qr-card/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const {
+    card_title,
+    card_subtitle,
+    background_color,
+    text_color,
+    qr_size,
+    border_radius,
+    show_logo,
+    festive_overlay,
+    custom_message
+  } = await c.req.json()
+
+  try {
+    // Check if template exists
+    const existing = await DB.prepare(`
+      SELECT template_id FROM qr_card_templates WHERE property_id = ?
+    `).bind(property_id).first()
+
+    if (existing) {
+      // Update existing template
+      await DB.prepare(`
+        UPDATE qr_card_templates 
+        SET card_title = ?,
+            card_subtitle = ?,
+            background_color = ?,
+            text_color = ?,
+            qr_size = ?,
+            border_radius = ?,
+            show_logo = ?,
+            festive_overlay = ?,
+            custom_message = ?,
+            updated_at = datetime('now')
+        WHERE property_id = ?
+      `).bind(
+        card_title,
+        card_subtitle,
+        background_color,
+        text_color,
+        qr_size,
+        border_radius,
+        show_logo ? 1 : 0,
+        festive_overlay,
+        custom_message,
+        property_id
+      ).run()
+    } else {
+      // Insert new template
+      await DB.prepare(`
+        INSERT INTO qr_card_templates (
+          property_id, card_title, card_subtitle, background_color,
+          text_color, qr_size, border_radius, show_logo,
+          festive_overlay, custom_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        card_title,
+        card_subtitle,
+        background_color,
+        text_color,
+        qr_size,
+        border_radius,
+        show_logo ? 1 : 0,
+        festive_overlay,
+        custom_message
+      ).run()
+    }
+
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Save QR card error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // Get all vendors
 app.get('/api/admin/vendors', async (c) => {
   const { DB } = c.env
@@ -10231,59 +10342,197 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Master QR Code Tab -->
         <div id="qrcodeTab" class="tab-content">
+            <!-- QR Code Card Designer -->
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
-                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-qrcode mr-2 text-blue-600"></i>Master QR Code for Hotel</h2>
-                <p class="text-sm md:text-base text-gray-600 mb-4 md:mb-6">Generate one universal QR code that guests can scan from any room. The QR code will direct them to your hotel's main landing page where they can access all services, activities, and offerings.</p>
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4">
+                    <i class="fas fa-palette mr-2 text-purple-600"></i>QR Code Card Designer
+                </h2>
+                <p class="text-sm md:text-base text-gray-600 mb-4 md:mb-6">Create a beautiful, print-ready QR code card for your hotel with custom text, colors, and festive decorations.</p>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-                    <!-- QR Code Display -->
-                    <div class="text-center">
-                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 md:p-8 rounded-xl border-2 border-blue-200">
-                            <h3 class="text-base md:text-lg font-semibold mb-3 md:mb-4 text-gray-700">Your Hotel QR Code</h3>
-                            <div id="qrCodeDisplay" class="bg-white p-4 md:p-6 rounded-lg shadow-inner inline-block max-w-full">
-                                <div class="text-gray-400"><i class="fas fa-spinner fa-spin text-2xl md:text-4xl"></i></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Left: Designer Controls -->
+                    <div class="space-y-4">
+                        <!-- Card Text -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-3 text-blue-900"><i class="fas fa-text mr-2"></i>Card Text</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Main Title</label>
+                                    <input type="text" id="cardTitle" class="w-full p-2 border rounded" placeholder="Scan for Hotel Services" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Subtitle</label>
+                                    <input type="text" id="cardSubtitle" class="w-full p-2 border rounded" placeholder="Access all amenities and services" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Bottom Message (optional)</label>
+                                    <input type="text" id="cardMessage" class="w-full p-2 border rounded" placeholder="e.g., Scan here for info, Welcome!" />
+                                </div>
                             </div>
-                            <p class="mt-3 md:mt-4 text-xs md:text-sm text-gray-600">Scan this code to test your guest experience</p>
                         </div>
-                        <div class="mt-3 md:mt-4 flex flex-col sm:flex-row gap-2 justify-center">
-                            <button onclick="downloadQR()" class="bg-blue-600 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:bg-blue-700 font-semibold text-sm md:text-base w-full sm:w-auto">
-                                <i class="fas fa-download mr-2"></i>Download QR Code
+
+                        <!-- Styling Options -->
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-3 text-green-900"><i class="fas fa-paint-brush mr-2"></i>Colors & Style</h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Background</label>
+                                    <input type="color" id="bgColor" class="w-full h-10 border rounded cursor-pointer" value="#ffffff" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Text Color</label>
+                                    <input type="color" id="textColor" class="w-full h-10 border rounded cursor-pointer" value="#000000" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">QR Size</label>
+                                    <select id="qrSize" class="w-full p-2 border rounded">
+                                        <option value="250">Small (250px)</option>
+                                        <option value="300" selected>Medium (300px)</option>
+                                        <option value="400">Large (400px)</option>
+                                        <option value="500">Extra Large (500px)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Border Radius</label>
+                                    <input type="range" id="borderRadius" min="0" max="30" value="10" class="w-full" />
+                                    <span id="borderRadiusValue" class="text-xs text-gray-600">10px</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Festive Overlays -->
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-3 text-orange-900"><i class="fas fa-gift mr-2"></i>Festive Decorations</h3>
+                            <p class="text-xs text-gray-600 mb-3">Add seasonal overlays to your QR code</p>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button onclick="setFestiveOverlay(null)" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-blue-500 transition">
+                                    <div class="text-2xl mb-1">❌</div>
+                                    <div class="text-xs">None</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('christmas')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
+                                    <div class="text-2xl mb-1">🎅</div>
+                                    <div class="text-xs">Christmas</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('newyear')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-yellow-500 transition">
+                                    <div class="text-2xl mb-1">🎊</div>
+                                    <div class="text-xs">New Year</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('easter')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-pink-500 transition">
+                                    <div class="text-2xl mb-1">🐰</div>
+                                    <div class="text-xs">Easter</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('ramadan')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-purple-500 transition">
+                                    <div class="text-2xl mb-1">🌙</div>
+                                    <div class="text-xs">Ramadan</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('eid')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-green-500 transition">
+                                    <div class="text-2xl mb-1">🕌</div>
+                                    <div class="text-xs">Eid</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('halloween')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-orange-500 transition">
+                                    <div class="text-2xl mb-1">🎃</div>
+                                    <div class="text-xs">Halloween</div>
+                                </button>
+                                <button onclick="setFestiveOverlay('valentine')" class="festive-btn border-2 border-gray-300 bg-white p-3 rounded-lg hover:border-red-500 transition">
+                                    <div class="text-2xl mb-1">💝</div>
+                                    <div class="text-xs">Valentine</div>
+                                </button>
+                            </div>
+                            <div id="currentOverlay" class="mt-3 text-sm font-semibold text-orange-800">Current: None</div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex gap-2">
+                            <button onclick="saveQRCard()" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                                <i class="fas fa-save mr-2"></i>Save Design
                             </button>
-                            <button onclick="printQR()" class="bg-green-600 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg hover:bg-green-700 font-semibold text-sm md:text-base w-full sm:w-auto">
-                                <i class="fas fa-print mr-2"></i>Print
+                            <button onclick="resetQRCard()" class="bg-gray-400 text-white px-6 py-3 rounded-lg hover:bg-gray-500">
+                                <i class="fas fa-undo mr-2"></i>Reset
                             </button>
                         </div>
                     </div>
-                    
-                    <!-- QR Code Info -->
-                    <div>
-                        <h3 class="text-base md:text-lg font-semibold mb-3 md:mb-4 text-gray-700">QR Code Details</h3>
-                        <div class="space-y-3">
-                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
-                                <p class="text-xs md:text-sm text-gray-600 mb-1">Hotel Landing Page URL:</p>
-                                <p id="hotelURL" class="font-mono text-xs md:text-sm text-blue-600 break-all">Loading...</p>
+
+                    <!-- Right: Live Preview -->
+                    <div class="space-y-4">
+                        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border-2 border-indigo-200">
+                            <h3 class="text-lg font-bold mb-4 text-center text-indigo-900">
+                                <i class="fas fa-eye mr-2"></i>Live Preview
+                            </h3>
+                            
+                            <!-- QR Card Preview -->
+                            <div id="qrCardPreview" class="mx-auto" style="max-width: 500px;">
+                                <div id="qrCard" class="relative" style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); text-align: center;">
+                                    <!-- Title -->
+                                    <div id="previewTitle" class="text-2xl font-bold mb-2" style="color: #000;">Scan for Hotel Services</div>
+                                    
+                                    <!-- Subtitle -->
+                                    <div id="previewSubtitle" class="text-base mb-4 opacity-80" style="color: #000;">Access all amenities and services</div>
+                                    
+                                    <!-- QR Code Container with Festive Overlay -->
+                                    <div class="relative inline-block mb-4">
+                                        <div id="qrCodePreview" class="bg-white p-4 rounded-lg inline-block" style="position: relative;">
+                                            <img id="qrImage" src="" alt="QR Code" style="display: block; width: 300px; height: 300px;" />
+                                        </div>
+                                        <!-- Festive Overlay (positioned over QR) -->
+                                        <div id="festiveOverlayDiv" style="position: absolute; top: -20px; right: -20px; font-size: 80px; display: none;">🎅</div>
+                                    </div>
+                                    
+                                    <!-- Bottom Message -->
+                                    <div id="previewMessage" class="text-sm font-semibold opacity-70" style="color: #000; min-height: 20px;"></div>
+                                    
+                                    <!-- Hotel Name -->
+                                    <div id="previewHotelName" class="text-xs mt-3 opacity-60" style="color: #000;">Loading...</div>
+                                </div>
                             </div>
-                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
-                                <p class="text-xs md:text-sm text-gray-600 mb-1">Property Name:</p>
-                                <p id="propertyName" class="font-semibold text-sm md:text-base">Loading...</p>
-                            </div>
-                            <div class="bg-gray-50 p-3 md:p-4 rounded-lg">
-                                <p class="text-xs md:text-sm text-gray-600 mb-1">Property Slug:</p>
-                                <p id="propertySlug" class="font-mono text-xs md:text-sm">Loading...</p>
+
+                            <!-- Print Actions -->
+                            <div class="mt-6 flex flex-col sm:flex-row gap-2">
+                                <button onclick="downloadQRCard()" class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-bold">
+                                    <i class="fas fa-download mr-2"></i>Download Card
+                                </button>
+                                <button onclick="printQRCard()" class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-bold">
+                                    <i class="fas fa-print mr-2"></i>Print Card
+                                </button>
                             </div>
                         </div>
-                        
-                        <div class="mt-4 md:mt-6 bg-yellow-50 border border-yellow-200 p-3 md:p-4 rounded-lg">
-                            <h4 class="font-semibold text-sm md:text-base text-yellow-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>How to Use:</h4>
-                            <ul class="text-xs md:text-sm text-yellow-800 space-y-1 list-disc list-inside">
-                                <li>Print and place this QR code in every guest room</li>
-                                <li>Display it in common areas (lobby, restaurant, pool)</li>
-                                <li>Include it in welcome materials</li>
-                                <li>One code works for all rooms - no need for individual codes</li>
+
+                        <!-- Quick Tips -->
+                        <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                            <h4 class="font-bold text-yellow-900 mb-2"><i class="fas fa-lightbulb mr-2"></i>Print Tips</h4>
+                            <ul class="text-xs text-yellow-800 space-y-1">
+                                <li>• Use high-quality paper (cardstock recommended)</li>
+                                <li>• Print at 300 DPI or higher for best results</li>
+                                <li>• Test scan QR code before mass printing</li>
+                                <li>• Laminate cards for durability</li>
+                                <li>• Place in room tents, key card holders, or wall frames</li>
                             </ul>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- QR Code Details Section (Collapsible) -->
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
+                <details class="group">
+                    <summary class="cursor-pointer text-lg font-bold text-gray-700 hover:text-blue-600 transition">
+                        <i class="fas fa-info-circle mr-2"></i>QR Code Details & Technical Info
+                        <i class="fas fa-chevron-down ml-2 group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <div class="mt-4 space-y-3">
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Hotel Landing Page URL:</p>
+                            <p id="hotelURL" class="font-mono text-sm text-blue-600 break-all">Loading...</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Property Name:</p>
+                            <p id="propertyName" class="font-semibold">Loading...</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-600 mb-1">Property Slug:</p>
+                            <p id="propertySlug" class="font-mono text-sm">Loading...</p>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -11328,6 +11577,269 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
+      // QR Card Designer Functions
+      let currentFestiveOverlay = null;
+      let qrCardConfig = {
+        title: 'Scan for Hotel Services',
+        subtitle: 'Access all amenities and services',
+        message: '',
+        bgColor: '#ffffff',
+        textColor: '#000000',
+        qrSize: 300,
+        borderRadius: 10,
+        festiveOverlay: null
+      };
+
+      // Festive overlay emojis mapping
+      const festiveOverlays = {
+        christmas: '🎅',
+        newyear: '🎊',
+        easter: '🐰',
+        ramadan: '🌙',
+        eid: '🕌',
+        halloween: '🎃',
+        valentine: '💝'
+      };
+
+      // Load QR card template from database
+      async function loadQRCardTemplate() {
+        try {
+          const response = await fetch('/api/admin/qr-card/1');
+          const data = await response.json();
+          
+          // Update form fields
+          document.getElementById('cardTitle').value = data.card_title || qrCardConfig.title;
+          document.getElementById('cardSubtitle').value = data.card_subtitle || qrCardConfig.subtitle;
+          document.getElementById('cardMessage').value = data.custom_message || '';
+          document.getElementById('bgColor').value = data.background_color || qrCardConfig.bgColor;
+          document.getElementById('textColor').value = data.text_color || qrCardConfig.textColor;
+          document.getElementById('qrSize').value = data.qr_size || qrCardConfig.qrSize;
+          document.getElementById('borderRadius').value = data.border_radius || qrCardConfig.borderRadius;
+          
+          // Update config
+          qrCardConfig = {
+            title: data.card_title || qrCardConfig.title,
+            subtitle: data.card_subtitle || qrCardConfig.subtitle,
+            message: data.custom_message || '',
+            bgColor: data.background_color || qrCardConfig.bgColor,
+            textColor: data.text_color || qrCardConfig.textColor,
+            qrSize: data.qr_size || qrCardConfig.qrSize,
+            borderRadius: data.border_radius || qrCardConfig.borderRadius,
+            festiveOverlay: data.festive_overlay
+          };
+          
+          currentFestiveOverlay = data.festive_overlay;
+          
+          // Highlight active festive button
+          if (currentFestiveOverlay) {
+            setFestiveOverlay(currentFestiveOverlay);
+          }
+          
+          updateQRCardPreview();
+        } catch (error) {
+          console.error('Load QR card error:', error);
+        }
+      }
+
+      // Update QR card preview in real-time
+      function updateQRCardPreview() {
+        const hotelURL = document.getElementById('hotelURL').textContent;
+        const propertyName = document.getElementById('propertyName').textContent;
+        
+        // Update card styling
+        const card = document.getElementById('qrCard');
+        card.style.background = qrCardConfig.bgColor;
+        card.style.borderRadius = qrCardConfig.borderRadius + 'px';
+        
+        // Update text
+        const title = document.getElementById('previewTitle');
+        title.textContent = qrCardConfig.title;
+        title.style.color = qrCardConfig.textColor;
+        
+        const subtitle = document.getElementById('previewSubtitle');
+        subtitle.textContent = qrCardConfig.subtitle;
+        subtitle.style.color = qrCardConfig.textColor;
+        
+        const message = document.getElementById('previewMessage');
+        message.textContent = qrCardConfig.message;
+        message.style.color = qrCardConfig.textColor;
+        
+        const hotelName = document.getElementById('previewHotelName');
+        hotelName.textContent = propertyName;
+        hotelName.style.color = qrCardConfig.textColor;
+        
+        // Update QR code
+        const qrSize = qrCardConfig.qrSize;
+        const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=' + qrSize + 'x' + qrSize + '&data=' + encodeURIComponent(hotelURL);
+        const qrImage = document.getElementById('qrImage');
+        qrImage.src = qrURL;
+        qrImage.style.width = qrSize + 'px';
+        qrImage.style.height = qrSize + 'px';
+        
+        // Update festive overlay
+        const overlayDiv = document.getElementById('festiveOverlayDiv');
+        if (qrCardConfig.festiveOverlay && festiveOverlays[qrCardConfig.festiveOverlay]) {
+          overlayDiv.textContent = festiveOverlays[qrCardConfig.festiveOverlay];
+          overlayDiv.style.display = 'block';
+        } else {
+          overlayDiv.style.display = 'none';
+        }
+        
+        // Update border radius value display
+        document.getElementById('borderRadiusValue').textContent = qrCardConfig.borderRadius + 'px';
+      }
+
+      // Set festive overlay
+      window.setFestiveOverlay = function(overlay) {
+        currentFestiveOverlay = overlay;
+        qrCardConfig.festiveOverlay = overlay;
+        
+        // Update button styles
+        document.querySelectorAll('.festive-btn').forEach(btn => {
+          btn.classList.remove('border-blue-500', 'border-red-500', 'border-yellow-500', 'border-pink-500', 
+                                'border-purple-500', 'border-green-500', 'border-orange-500', 'ring-4', 'ring-blue-200');
+          btn.classList.add('border-gray-300');
+        });
+        
+        if (overlay) {
+          event.target.closest('.festive-btn').classList.remove('border-gray-300');
+          event.target.closest('.festive-btn').classList.add('ring-4', 'ring-blue-200', 'border-blue-500');
+        }
+        
+        // Update current overlay text
+        const overlayNames = {
+          christmas: 'Christmas 🎅',
+          newyear: 'New Year 🎊',
+          easter: 'Easter 🐰',
+          ramadan: 'Ramadan 🌙',
+          eid: 'Eid 🕌',
+          halloween: 'Halloween 🎃',
+          valentine: 'Valentine 💝'
+        };
+        document.getElementById('currentOverlay').textContent = 'Current: ' + (overlay ? overlayNames[overlay] : 'None');
+        
+        updateQRCardPreview();
+      };
+
+      // Save QR card design
+      window.saveQRCard = async function() {
+        try {
+          const response = await fetch('/api/admin/qr-card/1', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              card_title: qrCardConfig.title,
+              card_subtitle: qrCardConfig.subtitle,
+              background_color: qrCardConfig.bgColor,
+              text_color: qrCardConfig.textColor,
+              qr_size: qrCardConfig.qrSize,
+              border_radius: qrCardConfig.borderRadius,
+              show_logo: true,
+              festive_overlay: qrCardConfig.festiveOverlay,
+              custom_message: qrCardConfig.message
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ QR Card Design Saved Successfully!');
+          } else {
+            alert('❌ Error saving design');
+          }
+        } catch (error) {
+          console.error('Save QR card error:', error);
+          alert('❌ Error saving design');
+        }
+      };
+
+      // Reset QR card to defaults
+      window.resetQRCard = function() {
+        if (!confirm('Reset to default design? Any unsaved changes will be lost.')) return;
+        
+        document.getElementById('cardTitle').value = 'Scan for Hotel Services';
+        document.getElementById('cardSubtitle').value = 'Access all amenities and services';
+        document.getElementById('cardMessage').value = '';
+        document.getElementById('bgColor').value = '#ffffff';
+        document.getElementById('textColor').value = '#000000';
+        document.getElementById('qrSize').value = '300';
+        document.getElementById('borderRadius').value = '10';
+        
+        qrCardConfig = {
+          title: 'Scan for Hotel Services',
+          subtitle: 'Access all amenities and services',
+          message: '',
+          bgColor: '#ffffff',
+          textColor: '#000000',
+          qrSize: 300,
+          borderRadius: 10,
+          festiveOverlay: null
+        };
+        
+        currentFestiveOverlay = null;
+        setFestiveOverlay(null);
+        updateQRCardPreview();
+      };
+
+      // Download QR card as image
+      window.downloadQRCard = function() {
+        const card = document.getElementById('qrCard');
+        const propertyName = document.getElementById('propertyName').textContent;
+        
+        // Use html2canvas to capture the card
+        alert('📥 Download feature: Right-click on the preview card and select "Save Image As..."\\n\\nOr use your browser\'s screenshot tool to capture the card.');
+      };
+
+      // Print QR card
+      window.printQRCard = function() {
+        const card = document.getElementById('qrCard');
+        const propertyName = document.getElementById('propertyName').textContent;
+        
+        const win = window.open('', '_blank');
+        win.document.write('<html><head><title>Print QR Card - ' + propertyName + '</title>');
+        win.document.write('<style>body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; } @media print { body { padding: 0; } }</style>');
+        win.document.write('</head><body>');
+        win.document.write('<div>' + card.outerHTML + '</div>');
+        win.document.write('</body></html>');
+        win.document.close();
+        setTimeout(() => win.print(), 500);
+      };
+
+      // Event listeners for real-time updates
+      document.getElementById('cardTitle').addEventListener('input', (e) => {
+        qrCardConfig.title = e.target.value;
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('cardSubtitle').addEventListener('input', (e) => {
+        qrCardConfig.subtitle = e.target.value;
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('cardMessage').addEventListener('input', (e) => {
+        qrCardConfig.message = e.target.value;
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('bgColor').addEventListener('input', (e) => {
+        qrCardConfig.bgColor = e.target.value;
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('textColor').addEventListener('input', (e) => {
+        qrCardConfig.textColor = e.target.value;
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('qrSize').addEventListener('change', (e) => {
+        qrCardConfig.qrSize = parseInt(e.target.value);
+        updateQRCardPreview();
+      });
+      
+      document.getElementById('borderRadius').addEventListener('input', (e) => {
+        qrCardConfig.borderRadius = parseInt(e.target.value);
+        updateQRCardPreview();
+      });
+      
       // Analytics functions
       let currentAnalyticsRange = 'today';
       
@@ -11411,6 +11923,7 @@ app.get('/admin/dashboard', (c) => {
       
       // Initialize: Load QR code tab by default (it's marked as tab-active)
       loadQRCode();
+      loadQRCardTemplate();
 
       async function loadRegCode() {
         try {
