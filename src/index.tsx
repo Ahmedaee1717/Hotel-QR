@@ -5564,6 +5564,39 @@ app.post('/api/chatbot/chat', async (c) => {
       })
     }
     
+    // 📝 FEEDBACK INTENT DETECTION
+    const feedbackKeywords = ['feedback', 'review', 'survey', 'complaint', 'complain', 'suggestion', 'improve', 'opinion', 'rate', 'rating'];
+    const messageLowerForFeedback = message.toLowerCase();
+    const isFeedbackIntent = feedbackKeywords.some(keyword => messageLowerForFeedback.includes(keyword));
+    
+    if (isFeedbackIntent) {
+      // Check if there are active feedback forms
+      const activeForms = await DB.prepare(`
+        SELECT form_id, form_name, form_type
+        FROM feedback_forms
+        WHERE property_id = ? AND is_active = 1
+        ORDER BY created_at DESC
+        LIMIT 1
+      `).bind(property_id).all()
+      
+      if (activeForms.results && activeForms.results.length > 0) {
+        const form = activeForms.results[0]
+        const formUrl = '/feedback/' + form.form_id
+        
+        // Multi-language feedback invitation - Default to English
+        let feedbackResponse = 'Thank you for wanting to share your feedback with us!\\n\\nWe would love to hear from you. You can [submit your feedback here](' + formUrl + ') - it will only take a few minutes.\\n\\nIs there anything else I can help you with?';
+        
+        await DB.prepare('INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used) VALUES (?, ?, ?, ?)').bind(convId, 'assistant', feedbackResponse, '[]').run()
+        
+        return c.json({ 
+          success: true,
+          response: feedbackResponse,
+          conversation_id: convId,
+          chunks_used: 0
+        })
+      }
+    }
+    
     // RAG: Find relevant chunks
     const allChunks = await DB.prepare(`
       SELECT chunk_id, chunk_text, document_id
