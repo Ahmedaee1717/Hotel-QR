@@ -9153,7 +9153,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 bubble.className = 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
                 // Bot messages can have markdown links
                 const htmlContent = parseMarkdownLinks(text);
-                bubble.innerHTML = htmlContent.replace(/\n/g, '<br>'); // Preserve line breaks
+                bubble.innerHTML = htmlContent.replace(/\\n/g, '<br>'); // Preserve line breaks
               }
               
               messageDiv.appendChild(bubble);
