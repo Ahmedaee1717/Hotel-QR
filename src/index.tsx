@@ -5676,7 +5676,7 @@ app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
       let content = `${offering.title_en}\n\n`
       content += offering.short_description_en ? offering.short_description_en + '\n\n' : ''
       content += offering.full_description_en ? offering.full_description_en + '\n\n' : ''
-      if (offering.location) content += `Location: ${offering.location}\n`
+      if (offering.location) content += `${translations[currentLanguage]?.location || 'Location'}: ${offering.location}\n`
       if (offering.cuisine_type) content += `Cuisine: ${offering.cuisine_type}\n`
       if (offering.meal_type) content += `Meal Type: ${offering.meal_type}\n`
       if (offering.price) content += `Price: ${offering.price} USD\n`
@@ -7047,6 +7047,40 @@ app.get('/hotel/:property_slug', async (c) => {
             return item[fieldName + '_en'] || item[fieldName] || '';
         }
         
+        // Helper function to translate location text
+        function translateLocation(location) {
+            if (!location) return '';
+            
+            const t = translations[currentLanguage] || translations.en;
+            const locationLower = location.toLowerCase().trim();
+            
+            // Common location mappings
+            if (locationLower.includes('main lobby') || locationLower.includes('lobby')) {
+                return t.mainLobby;
+            }
+            if (locationLower.includes('poolside') || locationLower.includes('pool')) {
+                return t.poolside;
+            }
+            if (locationLower.includes('beachfront') || locationLower.includes('beach')) {
+                return t.beachfront;
+            }
+            if (locationLower.includes('rooftop') || locationLower.includes('roof')) {
+                return t.rooftop;
+            }
+            if (locationLower.includes('garden')) {
+                return t.garden;
+            }
+            if (locationLower.includes('behind the souq') || locationLower.includes('souq')) {
+                return currentLanguage === 'ru' ? 'За базаром' : 
+                       currentLanguage === 'ar' ? 'خلف السوق' :
+                       currentLanguage === 'de' ? 'Hinter dem Souk' :
+                       currentLanguage === 'fr' ? 'Derrière le souk' : location;
+            }
+            
+            // Return original if no match found
+            return location;
+        }
+        
         // Update section headings based on language
         function updateSectionHeadings() {
             if (!propertyData) {
@@ -7445,15 +7479,150 @@ app.get('/hotel/:property_slug', async (c) => {
 
         // Translation helpers
         const translations = {
-          en: { all: 'All', restaurants: 'Restaurants', events: 'Events', spa: 'Spa', services: 'Services', activities: 'Activities' },
-          ar: { all: 'الكل', restaurants: 'مطاعم', events: 'فعاليات', spa: 'سبا', services: 'خدمات', activities: 'أنشطة' },
-          de: { all: 'Alle', restaurants: 'Restaurants', events: 'Veranstaltungen', spa: 'Spa', services: 'Dienstleistungen', activities: 'Aktivitäten' },
-          ru: { all: 'Все', restaurants: 'Рестораны', events: 'События', spa: 'Спа', services: 'Услуги', activities: 'Мероприятия' },
-          pl: { all: 'Wszystko', restaurants: 'Restauracje', events: 'Wydarzenia', spa: 'Spa', services: 'Usługi', activities: 'Zajęcia' },
-          it: { all: 'Tutti', restaurants: 'Ristoranti', events: 'Eventi', spa: 'Spa', services: 'Servizi', activities: 'Attività' },
-          fr: { all: 'Tout', restaurants: 'Restaurants', events: 'Événements', spa: 'Spa', services: 'Services', activities: 'Activités' },
-          cs: { all: 'Vše', restaurants: 'Restaurace', events: 'Akce', spa: 'Spa', services: 'Služby', activities: 'Aktivity' },
-          uk: { all: 'Все', restaurants: 'Ресторани', events: 'Події', spa: 'Спа', services: 'Послуги', activities: 'Заходи' }
+          en: { 
+            all: 'All', 
+            restaurants: 'Restaurants', 
+            events: 'Events', 
+            spa: 'Spa', 
+            services: 'Services', 
+            activities: 'Activities',
+            discoverAll: 'Discover all we have to offer',
+            viewMenu: 'View Menu',
+            location: 'Location',
+            mainLobby: 'Main Lobby',
+            poolside: 'Poolside',
+            beachfront: 'Beachfront',
+            rooftop: 'Rooftop',
+            garden: 'Garden'
+          },
+          ar: { 
+            all: 'الكل', 
+            restaurants: 'مطاعم', 
+            events: 'فعاليات', 
+            spa: 'سبا', 
+            services: 'خدمات', 
+            activities: 'أنشطة',
+            discoverAll: 'اكتشف كل ما لدينا لنقدمه',
+            viewMenu: 'عرض القائمة',
+            location: 'الموقع',
+            mainLobby: 'اللوبي الرئيسي',
+            poolside: 'جانب المسبح',
+            beachfront: 'الواجهة البحرية',
+            rooftop: 'السطح',
+            garden: 'الحديقة'
+          },
+          de: { 
+            all: 'Alle', 
+            restaurants: 'Restaurants', 
+            events: 'Veranstaltungen', 
+            spa: 'Spa', 
+            services: 'Dienstleistungen', 
+            activities: 'Aktivitäten',
+            discoverAll: 'Entdecken Sie alles, was wir zu bieten haben',
+            viewMenu: 'Menü ansehen',
+            location: 'Standort',
+            mainLobby: 'Hauptlobby',
+            poolside: 'Am Pool',
+            beachfront: 'Strandfront',
+            rooftop: 'Dachterrasse',
+            garden: 'Garten'
+          },
+          ru: { 
+            all: 'Все', 
+            restaurants: 'Рестораны', 
+            events: 'События', 
+            spa: 'Спа', 
+            services: 'Услуги', 
+            activities: 'Мероприятия',
+            discoverAll: 'Откройте для себя все, что мы предлагаем',
+            viewMenu: 'Посмотреть меню',
+            location: 'Расположение',
+            mainLobby: 'Главное лобби',
+            poolside: 'У бассейна',
+            beachfront: 'На берегу',
+            rooftop: 'Крыша',
+            garden: 'Сад'
+          },
+          pl: { 
+            all: 'Wszystko', 
+            restaurants: 'Restauracje', 
+            events: 'Wydarzenia', 
+            spa: 'Spa', 
+            services: 'Usługi', 
+            activities: 'Zajęcia',
+            discoverAll: 'Odkryj wszystko, co mamy do zaoferowania',
+            viewMenu: 'Zobacz menu',
+            location: 'Lokalizacja',
+            mainLobby: 'Główne lobby',
+            poolside: 'Przy basenie',
+            beachfront: 'Nad brzegiem',
+            rooftop: 'Dach',
+            garden: 'Ogród'
+          },
+          it: { 
+            all: 'Tutti', 
+            restaurants: 'Ristoranti', 
+            events: 'Eventi', 
+            spa: 'Spa', 
+            services: 'Servizi', 
+            activities: 'Attività',
+            discoverAll: 'Scopri tutto ciò che abbiamo da offrire',
+            viewMenu: 'Visualizza menu',
+            location: 'Posizione',
+            mainLobby: 'Lobby principale',
+            poolside: 'A bordo piscina',
+            beachfront: 'Fronte mare',
+            rooftop: 'Terrazza',
+            garden: 'Giardino'
+          },
+          fr: { 
+            all: 'Tout', 
+            restaurants: 'Restaurants', 
+            events: 'Événements', 
+            spa: 'Spa', 
+            services: 'Services', 
+            activities: 'Activités',
+            discoverAll: 'Découvrez tout ce que nous avons à offrir',
+            viewMenu: 'Voir le menu',
+            location: 'Emplacement',
+            mainLobby: 'Hall principal',
+            poolside: 'Au bord de la piscine',
+            beachfront: 'Front de mer',
+            rooftop: 'Terrasse',
+            garden: 'Jardin'
+          },
+          cs: { 
+            all: 'Vše', 
+            restaurants: 'Restaurace', 
+            events: 'Akce', 
+            spa: 'Spa', 
+            services: 'Služby', 
+            activities: 'Aktivity',
+            discoverAll: 'Objevte vše, co nabízíme',
+            viewMenu: 'Zobrazit menu',
+            location: 'Umístění',
+            mainLobby: 'Hlavní hala',
+            poolside: 'U bazénu',
+            beachfront: 'Nábřeží',
+            rooftop: 'Střecha',
+            garden: 'Zahrada'
+          },
+          uk: { 
+            all: 'Все', 
+            restaurants: 'Ресторани', 
+            events: 'Події', 
+            spa: 'Спа', 
+            services: 'Послуги', 
+            activities: 'Заходи',
+            discoverAll: 'Відкрийте для себе все, що ми пропонуємо',
+            viewMenu: 'Переглянути меню',
+            location: 'Розташування',
+            mainLobby: 'Головне лобі',
+            poolside: 'Біля басейну',
+            beachfront: 'Набережна',
+            rooftop: 'Дах',
+            garden: 'Сад'
+          }
         };
 
         function applySectionTranslations(propertyData) {
@@ -7600,9 +7769,17 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 propertyData = propData.properties[0];
                 document.getElementById('propertyName').textContent = propertyData.name;
+                
+                // Set tagline with translation support
+                const taglineEl = document.getElementById('propertyTagline');
                 if (propertyData.tagline) {
-                  document.getElementById('propertyTagline').textContent = propertyData.tagline;
+                  taglineEl.textContent = propertyData.tagline;
+                } else {
+                  // Use translated default tagline
+                  const t = translations[currentLanguage] || translations.en;
+                  taglineEl.textContent = t.discoverAll;
                 }
+                
                 document.title = propertyData.name;
                 
                 // Track QR scan
@@ -7788,7 +7965,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
-                            <span>\${r.location}</span>
+                            <span>\${translateLocation(r.location)}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('explore-menu')}</span>
@@ -7914,7 +8091,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     <div class="p-5">
                         <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + s.location + '</span></div>' : ''}
+                        \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + translateLocation(s.location) + '</span></div>' : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('view-details')}</span>
                             <i class="fas fa-arrow-right text-indigo-600"></i>
@@ -8013,7 +8190,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         \${o.location ? \`
                             <div class="flex items-center text-sm text-gray-500 mb-4">
                                 <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
-                                <span>\${o.location}</span>
+                                <span>\${translateLocation(o.location)}</span>
                             </div>
                         \` : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
@@ -17527,7 +17704,7 @@ app.get('/admin/dashboard', (c) => {
               <p class="text-sm text-gray-600 mb-2">\${o.short_description}</p>
               <div class="flex flex-wrap gap-3 text-sm text-gray-700">
                 <span><i class="fas fa-dollar-sign mr-1"></i>\${o.currency} \${o.price || 'Free'}</span>
-                <span><i class="fas fa-map-marker-alt mr-1"></i>\${o.location || 'N/A'}</span>
+                <span><i class="fas fa-map-marker-alt mr-1"></i>\${o.location ? translateLocation(o.location) : 'N/A'}</span>
                 \${o.duration_minutes ? \`<span><i class="fas fa-clock mr-1"></i>\${o.duration_minutes} min</span>\` : ''}
                 \${o.event_date ? \`<span><i class="fas fa-calendar mr-1"></i>\${o.event_date}</span>\` : ''}
               </div>
