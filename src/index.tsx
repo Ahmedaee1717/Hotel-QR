@@ -20999,9 +20999,14 @@ app.get('/admin/dashboard', (c) => {
         }
         
         try {
+          // Get propertyId from URL or localStorage
+          const currentPropertyId = new URLSearchParams(window.location.search).get('property') || localStorage.getItem('property_id') || '1';
+          console.log('DEBUG: currentPropertyId =', currentPropertyId);
+          console.log('DEBUG: formQuestions =', formQuestions);
+          
           // Create form
           const formData = {
-            property_id: propertyId,
+            property_id: currentPropertyId,
             form_name: formName,
             form_description: document.getElementById('formDescription').value,
             form_type: document.getElementById('formType').value,
@@ -21012,6 +21017,8 @@ app.get('/admin/dashboard', (c) => {
             thank_you_message: document.getElementById('thankYouMessage').value,
             show_on_homepage: document.getElementById('showOnHomepage').checked ? 1 : 0
           };
+          
+          console.log('DEBUG: formData =', formData);
           
           const formRes = await fetch('/api/admin/feedback/forms', {
             method: 'POST',
@@ -21041,8 +21048,9 @@ app.get('/admin/dashboard', (c) => {
           loadFeedbackTab();
           
         } catch (error) {
-          console.error('Save form error:', error);
-          alert('Failed to save form');
+          console.error('❌ Save form error:', error);
+          console.error('Error details:', error.message, error.stack);
+          alert('❌ Failed to save form: ' + error.message);
         }
       }
 
