@@ -22283,9 +22283,250 @@ app.get('/admin/restaurant/:offering_id', (c) => {
   `)
 })
 
-// Feedback submission page - serves static HTML
+// Feedback submission page - serve HTML directly
 app.get('/feedback/:form_id', async (c) => {
-  return c.redirect('/feedback.html?id=' + c.req.param('form_id'))
+  const formId = c.req.param('form_id')
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Form</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .star-rating { display: flex; gap: 0.5rem; font-size: 2rem; flex-direction: row-reverse; justify-content: flex-end; }
+        .star { cursor: pointer; color: #d1d5db; transition: color 0.2s; }
+        .star.active { color: #fbbf24; }
+        .star:hover, .star:hover ~ .star { color: #fbbf24; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <div id="loading" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+            <p class="text-gray-600">Loading form...</p>
+        </div>
+
+        <div id="formContainer" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8">
+                    <h1 class="text-3xl font-bold mb-2" id="formName"></h1>
+                    <p class="text-purple-100" id="formDescription"></p>
+                    <p class="text-sm text-purple-200 mt-2" id="propertyName"></p>
+                </div>
+
+                <div class="p-8">
+                    <form id="feedbackForm" class="space-y-6">
+                        <div id="guestInfoSection" class="space-y-4 pb-6 border-b">
+                            <h3 class="text-lg font-bold text-gray-900">Your Information</h3>
+                            <div id="guestFields"></div>
+                        </div>
+
+                        <div id="questionsSection" class="space-y-6"></div>
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all">
+                            <i class="fas fa-paper-plane mr-2"></i>Submit Feedback
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="thankYouMessage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
+                <div class="mb-6">
+                    <i class="fas fa-check-circle text-6xl text-green-500"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4" id="thankYouText"></h2>
+                <p class="text-gray-600 mb-6">We appreciate you taking the time to share your thoughts.</p>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
+                <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Form Not Available</h2>
+                <p class="text-gray-600" id="errorText"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const formId = ${formId};
+        let formData = null;
+
+        async function loadForm() {
+            try {
+                const res = await fetch('/api/feedback/forms/' + formId);
+                const data = await res.json();
+
+                if (!data.success) throw new Error(data.error || 'Failed to load form');
+
+                formData = data.form;
+                
+                document.getElementById('formName').textContent = formData.form_name;
+                document.getElementById('formDescription').textContent = formData.form_description || '';
+                document.getElementById('propertyName').textContent = formData.property_name;
+
+                const guestFields = document.getElementById('guestFields');
+                const fields = [];
+                
+                if (formData.require_room_number) {
+                    fields.push('<div><label class="block text-sm font-semibold mb-2">Room Number *</label><input type="text" name="room_number" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="e.g., 303"></div>');
+                }
+                if (formData.require_guest_name) {
+                    fields.push('<div><label class="block text-sm font-semibold mb-2">Your Name *</label><input type="text" name="guest_name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Full name"></div>');
+                }
+                if (formData.require_email) {
+                    fields.push('<div><label class="block text-sm font-semibold mb-2">Email *</label><input type="email" name="guest_email" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="your@email.com"></div>');
+                }
+                if (formData.require_phone) {
+                    fields.push('<div><label class="block text-sm font-semibold mb-2">Phone *</label><input type="tel" name="guest_phone" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="+1234567890"></div>');
+                }
+
+                guestFields.innerHTML = fields.join('');
+
+                const questionsSection = document.getElementById('questionsSection');
+                questionsSection.innerHTML = formData.questions.map((q, idx) => {
+                    let inputHtml = '';
+                    
+                    switch(q.question_type) {
+                        case 'text':
+                            inputHtml = '<input type="text" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + ' class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Your answer">';
+                            break;
+                        case 'textarea':
+                            inputHtml = '<textarea name="q_' + q.question_id + '" rows="4" ' + (q.is_required ? 'required' : '') + ' class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Your answer"></textarea>';
+                            break;
+                        case 'rating':
+                            inputHtml = '<div class="star-rating" data-question="' + q.question_id + '">';
+                            for (let i = 5; i >= 1; i--) {
+                                inputHtml += '<span class="star" data-value="' + i + '" onclick="setRating(' + q.question_id + ', ' + i + ')">★</span>';
+                            }
+                            inputHtml += '</div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
+                            break;
+                        case 'scale':
+                            inputHtml = '<div class="flex justify-between items-center gap-2">';
+                            for (let i = 1; i <= 10; i++) {
+                                inputHtml += '<button type="button" onclick="setScale(' + q.question_id + ', ' + i + ')" class="scale-btn w-12 h-12 border-2 rounded-lg font-bold hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all" data-question="' + q.question_id + '" data-value="' + i + '">' + i + '</button>';
+                            }
+                            inputHtml += '</div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
+                            break;
+                        case 'multiple_choice':
+                            const options = q.options || [];
+                            inputHtml = '<div class="space-y-2">';
+                            options.forEach(opt => {
+                                inputHtml += '<label class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-purple-50 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="' + opt + '" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5 text-purple-600"><span class="flex-1">' + opt + '</span></label>';
+                            });
+                            inputHtml += '</div>';
+                            break;
+                        case 'yes_no':
+                            inputHtml = '<div class="flex gap-4">';
+                            inputHtml += '<label class="flex-1 flex items-center justify-center space-x-2 p-4 border-2 rounded-lg hover:bg-green-50 hover:border-green-600 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="Yes" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5"><span class="font-semibold">Yes</span></label>';
+                            inputHtml += '<label class="flex-1 flex items-center justify-center space-x-2 p-4 border-2 rounded-lg hover:bg-red-50 hover:border-red-600 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="No" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5"><span class="font-semibold">No</span></label>';
+                            inputHtml += '</div>';
+                            break;
+                        case 'nps':
+                            inputHtml = '<div class="space-y-3"><div class="flex justify-between text-sm text-gray-600 mb-2"><span>Not at all likely</span><span>Extremely likely</span></div><div class="grid grid-cols-11 gap-2">';
+                            for (let i = 0; i <= 10; i++) {
+                                inputHtml += '<button type="button" onclick="setNPS(' + q.question_id + ', ' + i + ')" class="nps-btn aspect-square border-2 rounded-lg font-bold hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all" data-question="' + q.question_id + '" data-value="' + i + '">' + i + '</button>';
+                            }
+                            inputHtml += '</div></div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
+                            break;
+                    }
+                    
+                    return '<div class="question-block"><label class="block text-md font-semibold text-gray-900 mb-3">' + q.question_text + (q.is_required ? ' <span class="text-red-500">*</span>' : '') + '</label>' + inputHtml + '</div>';
+                }).join('');
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('formContainer').classList.remove('hidden');
+            } catch (error) {
+                console.error('Load form error:', error);
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('errorMessage').classList.remove('hidden');
+                document.getElementById('errorText').textContent = error.message;
+            }
+        }
+
+        function setRating(questionId, value) {
+            document.querySelector('[name="q_' + questionId + '"]').value = value;
+            const stars = document.querySelectorAll('[data-question="' + questionId + '"] .star');
+            stars.forEach(star => {
+                star.classList.toggle('active', parseInt(star.dataset.value) <= value);
+            });
+        }
+
+        function setScale(questionId, value) {
+            document.querySelector('[name="q_' + questionId + '"]').value = value;
+            document.querySelectorAll('[data-question="' + questionId + '"].scale-btn').forEach(btn => {
+                btn.classList.toggle('bg-purple-600', parseInt(btn.dataset.value) === value);
+                btn.classList.toggle('text-white', parseInt(btn.dataset.value) === value);
+                btn.classList.toggle('border-purple-600', parseInt(btn.dataset.value) === value);
+            });
+        }
+
+        function setNPS(questionId, value) {
+            document.querySelector('[name="q_' + questionId + '"]').value = value;
+            document.querySelectorAll('[data-question="' + questionId + '"].nps-btn').forEach(btn => {
+                btn.classList.toggle('bg-purple-600', parseInt(btn.dataset.value) === value);
+                btn.classList.toggle('text-white', parseInt(btn.dataset.value) === value);
+                btn.classList.toggle('border-purple-600', parseInt(btn.dataset.value) === value);
+            });
+        }
+
+        document.getElementById('feedbackForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formElement = e.target;
+            const formDataObj = new FormData(formElement);
+            
+            const answers = [];
+            formData.questions.forEach(q => {
+                const answer = formDataObj.get('q_' + q.question_id);
+                if (answer) {
+                    answers.push({
+                        question_id: q.question_id,
+                        answer_text: answer
+                    });
+                }
+            });
+
+            const submission = {
+                form_id: formId,
+                room_number: formDataObj.get('room_number') || null,
+                guest_name: formDataObj.get('guest_name') || null,
+                guest_email: formDataObj.get('guest_email') || null,
+                guest_phone: formDataObj.get('guest_phone') || null,
+                answers: answers,
+                source: 'homepage'
+            };
+
+            try {
+                const res = await fetch('/api/feedback/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submission)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('formContainer').classList.add('hidden');
+                    document.getElementById('thankYouMessage').classList.remove('hidden');
+                    document.getElementById('thankYouText').textContent = formData.thank_you_message || 'Thank you for your feedback!';
+                } else {
+                    alert('Failed to submit: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Failed to submit feedback. Please try again.');
+            }
+        });
+
+        loadForm();
+    </script>
+</body>
+</html>
+  `)
 })
 
 export default app
