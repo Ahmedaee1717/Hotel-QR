@@ -9136,7 +9136,7 @@ app.get('/hotel/:property_slug', async (c) => {
             // Helper: Convert markdown links to HTML
             function parseMarkdownLinks(text) {
               // Convert [text](url) to <a> tags
-              return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
+              return text.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
             }
             
             function addMessage(text, role) {
