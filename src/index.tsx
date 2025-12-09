@@ -7728,13 +7728,8 @@ app.get('/hotel/:property_slug', async (c) => {
               }
             });
             
-            // Append beach booking section (if it exists, before hotel map)
-            if (sectionElements['beach-booking']) {
-              container.appendChild(sectionElements['beach-booking']);
-            }
-            
-            // Always append hotel map at the end
-            if (sectionElements['hotel-map']) {
+            // Always append hotel map at the end (unless it's in the order already)
+            if (sectionElements['hotel-map'] && !sectionOrder.includes('hotel-map')) {
               container.appendChild(sectionElements['hotel-map']);
             }
             
@@ -18016,7 +18011,7 @@ app.get('/admin/dashboard', (c) => {
           // Load section order
           const sectionOrder = settings.homepage_section_order ? 
             JSON.parse(settings.homepage_section_order) : 
-            ['restaurants', 'events', 'spa', 'service', 'activities'];
+            ['restaurants', 'events', 'spa', 'service', 'activities', 'beach-booking'];
           await renderSectionOrder(sectionOrder);
           
         } catch (error) {
@@ -18761,7 +18756,8 @@ app.get('/admin/dashboard', (c) => {
           'events': '🎉 Events',
           'spa': '💆 Spa & Wellness',
           'service': '🛎️ Hotel Services',
-          'activities': '🏃 Activities & Experiences'
+          'activities': '🏃 Activities & Experiences',
+          'beach-booking': '🏖️ Beach Booking'
         };
         
         // Add custom sections to sectionNames
