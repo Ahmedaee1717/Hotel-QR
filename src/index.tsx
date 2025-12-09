@@ -7255,6 +7255,161 @@ app.post('/api/admin/feedback/insights/:insight_id/resolve', async (c) => {
   }
 })
 
+// Admin: Generate AI insights for submissions
+app.post('/api/admin/feedback/generate-insights/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Get recent unanalyzed submissions (last 24 hours)
+    const submissions = await DB.prepare(`
+      SELECT s.*, f.form_name
+      FROM feedback_submissions s
+      JOIN feedback_forms f ON s.form_id = f.form_id
+      WHERE s.property_id = ? 
+        AND s.submitted_at > datetime('now', '-24 hours')
+      ORDER BY s.submitted_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+    
+    if (!submissions.results || submissions.results.length === 0) {
+      return c.json({ success: true, message: 'No new submissions to analyze', insights: [] })
+    }
+    
+    // Use AI API for advanced analysis
+    const apiKey = c.env.OPENAI_API_KEY
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    
+    const insightsGenerated = []
+    
+    if (apiKey) {
+      try {
+        // Group submissions by sentiment
+        const urgentSubmissions = submissions.results.filter(s => s.is_urgent === 1)
+        const negativeSubmissions = submissions.results.filter(s => s.sentiment_label === 'negative' && s.is_urgent !== 1)
+        
+        // Generate insights for urgent issues
+        for (const sub of urgentSubmissions.slice(0, 5)) {
+          // Get submission details
+          const answers = await DB.prepare(`
+            SELECT a.answer_text, q.question_text
+            FROM feedback_answers a
+            JOIN feedback_questions q ON a.question_id = q.question_id
+            WHERE a.submission_id = ?
+          `).bind(sub.submission_id).all()
+          
+          const feedbackText = answers.results.map(a => a.question_text + ': ' + (a.answer_text || 'N/A')).join('\\n')
+          
+          const prompt = 'Analyze this urgent guest feedback and provide: 1) Summary of the issue, 2) Recommended immediate action, 3) Follow-up steps. Be concise.\\n\\nGuest: ' + (sub.guest_name || 'Anonymous') + (sub.room_number ? ' (Room ' + sub.room_number + ')' : '') + '\\nFeedback:\\n' + feedbackText
+          
+          const aiResponse = await fetch(baseURL + '/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + apiKey
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are a hotel manager assistant analyzing guest feedback to provide actionable insights.' },
+                { role: 'user', content: prompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 300
+            })
+          })
+          
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json()
+            const analysis = aiData.choices[0].message.content
+            
+            // Create insight
+            await DB.prepare(`
+              INSERT INTO feedback_insights (
+                property_id, submission_id, insight_type, title, description,
+                action_suggested, priority
+              ) VALUES (?, ?, 'alert', ?, ?, ?, 'critical')
+            `).bind(
+              property_id, sub.submission_id,
+              'URGENT: ' + (sub.guest_name || 'Guest') + (sub.room_number ? ' in Room ' + sub.room_number : ''),
+              analysis.substring(0, 500),
+              'Contact guest immediately and resolve issue'
+            ).run()
+            
+            insightsGenerated.push({
+              type: 'alert',
+              submission_id: sub.submission_id,
+              guest: sub.guest_name || 'Anonymous',
+              room: sub.room_number
+            })
+          }
+        }
+        
+        // Detect trends in negative feedback
+        if (negativeSubmissions.length >= 3) {
+          const trendText = negativeSubmissions.slice(0, 10).map(s => 
+            (s.guest_name || 'Guest') + ': ' + s.sentiment_label
+          ).join('; ')
+          
+          const trendPrompt = 'Analyze these recent negative feedback submissions and identify common themes or trends. Provide 2-3 key insights.\\n\\n' + trendText
+          
+          const trendResponse = await fetch(baseURL + '/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + apiKey
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are a hotel analytics expert identifying patterns in guest feedback.' },
+                { role: 'user', content: trendPrompt }
+              ],
+              temperature: 0.7,
+              max_tokens: 200
+            })
+          })
+          
+          if (trendResponse.ok) {
+            const trendData = await trendResponse.json()
+            const trendAnalysis = trendData.choices[0].message.content
+            
+            await DB.prepare(`
+              INSERT INTO feedback_insights (
+                property_id, submission_id, insight_type, title, description,
+                action_suggested, priority
+              ) VALUES (?, NULL, 'trend', ?, ?, ?, 'high')
+            `).bind(
+              property_id,
+              'Negative Feedback Trend Detected',
+              trendAnalysis,
+              'Review these common issues and implement improvements'
+            ).run()
+            
+            insightsGenerated.push({
+              type: 'trend',
+              count: negativeSubmissions.length
+            })
+          }
+        }
+        
+      } catch (aiError) {
+        console.error('AI insights error:', aiError)
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'Insights generated',
+      insights: insightsGenerated,
+      analyzed_count: submissions.results.length
+    })
+  } catch (error) {
+    console.error('Generate insights error:', error)
+    return c.json({ error: 'Failed to generate insights' }, 500)
+  }
+})
+
 // ========== END FEEDBACK SYSTEM API ENDPOINTS ==========
 
 // Hotel Landing Page - Main QR entry point
