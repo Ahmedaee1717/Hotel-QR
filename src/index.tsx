@@ -5780,6 +5780,69 @@ app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
       }
     }
     
+    // 3. Sync all info pages
+    const infoPages = await DB.prepare(`
+      SELECT page_id, page_key, title_en, content_en, icon_class, color_theme
+      FROM info_pages
+      WHERE property_id = ? AND is_published = 1
+    `).bind(property_id).all()
+    
+    for (const page of infoPages.results) {
+      // Strip HTML tags from content for better text search, preserving structure
+      const stripHtml = (html) => {
+        if (!html) return ''
+        return html
+          .replace(/<style[^>]*>.*?<\/style>/gi, '')
+          .replace(/<script[^>]*>.*?<\/script>/gi, '')
+          .replace(/<\/h[1-6]>/gi, '\n\n')  // Headings end with double newline
+          .replace(/<h[1-6][^>]*>/gi, '\n')  // Headings start with newline
+          .replace(/<\/p>/gi, '\n')  // Paragraphs end with newline
+          .replace(/<br\s*\/?>/gi, '\n')  // Line breaks
+          .replace(/<\/li>/gi, '\n')  // List items end with newline
+          .replace(/<[^>]+>/g, ' ')  // Remove remaining tags
+          .replace(/\n\s*\n\s*\n/g, '\n\n')  // Max double newlines
+          .replace(/[ \t]+/g, ' ')  // Collapse spaces
+          .trim()
+      }
+      
+      let content = `${page.title_en}\n\n`
+      content += stripHtml(page.content_en || '')
+      
+      const existing = await DB.prepare(`
+        SELECT document_id FROM chatbot_documents
+        WHERE property_id = ? AND document_type = 'info_page' AND title = ?
+      `).bind(property_id, page.title_en).first()
+      
+      let documentId = existing?.document_id
+      
+      if (!documentId) {
+        const result = await DB.prepare(`
+          INSERT INTO chatbot_documents (property_id, title, content, document_type, created_at)
+          VALUES (?, ?, ?, 'info_page', CURRENT_TIMESTAMP)
+        `).bind(property_id, page.title_en, content).run()
+        
+        documentId = result.meta.last_row_id
+        totalDocuments++
+      } else {
+        await DB.prepare(`
+          UPDATE chatbot_documents
+          SET content = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE document_id = ?
+        `).bind(content, documentId).run()
+        
+        await DB.prepare(`DELETE FROM chatbot_chunks WHERE document_id = ?`).bind(documentId).run()
+      }
+      
+      const chunks = chunkText(content, 500)
+      for (let i = 0; i < chunks.length; i++) {
+        await DB.prepare(`
+          INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(documentId, property_id, chunks[i], i, chunks[i], chunks[i].split(/\s+/).length).run()
+        totalChunks++
+      }
+    }
+    
     return c.json({ 
       success: true, 
       total_documents: totalDocuments,
