@@ -18767,6 +18767,11 @@ app.get('/admin/dashboard', (c) => {
             '✨ ' + cs.section_name_en;
         });
         
+        // Add beach-booking if it's not in the order yet (for existing databases)
+        if (!order.includes('beach-booking')) {
+          order.push('beach-booking');
+        }
+        
         // Add any custom sections that aren't in the order yet
         customSections.forEach(cs => {
           if (!order.includes(cs.section_key)) {
