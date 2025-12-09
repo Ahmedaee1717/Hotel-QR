@@ -5471,7 +5471,7 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     
     if (!isComplaint) {
       // Not a complaint, skip feedback capture
-      return
+      return { needsGuestInfo: false }
     }
     
     // 2. CALCULATE SENTIMENT SCORE (-1 to 1)
@@ -5500,11 +5500,26 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     const roomMatch = guestMessage.match(/room\s*(\d+)/i)
     const roomNumber = roomMatch ? roomMatch[1] : null
     
-    // Extract guest name if mentioned  
-    const nameMatch = guestMessage.match(/my name is (\w+)|I'm (\w+)|I am (\w+)/i)
-    const guestName = nameMatch ? (nameMatch[1] || nameMatch[2] || nameMatch[3]) : null
+    // Extract guest last name if mentioned
+    const lastNameMatch = guestMessage.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)/i)
+    const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5]) : null
     
-    // 5. SAVE TO CHAT_FEEDBACK TABLE
+    // 5. CHECK IF WE HAVE REQUIRED INFO (room number AND last name)
+    const hasRoomNumber = roomNumber !== null
+    const hasLastName = guestName !== null
+    
+    // If missing required info, return flag to ask for it
+    if (!hasRoomNumber || !hasLastName) {
+      return { 
+        needsGuestInfo: true, 
+        hasRoomNumber, 
+        hasLastName,
+        complaintCategory,
+        isUrgent
+      }
+    }
+    
+    // 6. SAVE TO CHAT_FEEDBACK TABLE (only if we have both room number AND last name)
     await DB.prepare(`
       INSERT INTO chat_feedback (
         property_id, conversation_id, guest_message, bot_response,
@@ -5528,9 +5543,12 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
       guestMessage // Full message as issue description
     ).run()
     
+    return { needsGuestInfo: false, feedbackSaved: true }
+    
   } catch (error) {
     console.error('Sentiment analysis error:', error)
     // Don't throw - this shouldn't break the chat flow
+    return { needsGuestInfo: false, error: true }
   }
 }
 
@@ -5837,7 +5855,8 @@ Instructions:
 5. **Brevity**: Keep responses concise (2-3 sentences) but complete
 6. **LINKS**: If relevant links are provided above, ALWAYS include them in your response using this EXACT format: [Link Text](URL). For example: "You can [view our diving activities here](/activity?id=7&property=1&lang=en)."
 7. **Referrals**: If information is NOT in the context above, politely refer to hotel staff IN THE GUEST'S LANGUAGE
-8. **Never** say "I don't have that information" - always be gracious
+8. **Complaints/Issues**: If guest mentions a problem or complaint, acknowledge it professionally and assure them management will be notified. If they mention their room number or last name, acknowledge it gracefully.
+9. **Never** say "I don't have that information" - always be gracious
 
 Provide your response now IN THE SAME LANGUAGE as the guest's question:`
         
@@ -5950,14 +5969,38 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
       aiResponse = `I appreciate your patience. For the most accurate and detailed information regarding your inquiry, I'd recommend speaking directly with our guest services team at ${hotelName}. They'll be able to provide you with comprehensive assistance. How else may I help you today?`;
     }
     
-    // Store AI response
+    // 🤖 AI SENTIMENT ANALYSIS - Detect complaints/feedback BEFORE storing response
+    const feedbackAnalysis = await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse)
+    
+    // If complaint detected but missing guest info, ask for it
+    if (feedbackAnalysis.needsGuestInfo) {
+      let missingInfoPrompt = "\n\n⚠️ **I've noted your concern and want to help immediately.**\n\n"
+      
+      if (!feedbackAnalysis.hasRoomNumber && !feedbackAnalysis.hasLastName) {
+        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide:\n"
+        missingInfoPrompt += "1️⃣ Your **last name**\n"
+        missingInfoPrompt += "2️⃣ Your **room number**\n\n"
+      } else if (!feedbackAnalysis.hasRoomNumber) {
+        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide your **room number**?\n\n"
+      } else if (!feedbackAnalysis.hasLastName) {
+        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide your **last name**?\n\n"
+      }
+      
+      if (feedbackAnalysis.isUrgent) {
+        missingInfoPrompt += "⏱️ *This appears urgent - we'll prioritize your request once we have this information.*"
+      } else {
+        missingInfoPrompt += "📋 *Example: My last name is Smith and I'm in room 305*"
+      }
+      
+      // Override AI response with info request
+      aiResponse = aiResponse + missingInfoPrompt
+    }
+    
+    // Store AI response (potentially modified with guest info request)
     await DB.prepare(`
       INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
       VALUES (?, 'assistant', ?, ?)
     `).bind(convId, aiResponse, JSON.stringify(chunkIds)).run()
-    
-    // 🤖 AI SENTIMENT ANALYSIS - Detect complaints/feedback
-    await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse)
     
     // Update rate limit
     if (rateLimit) {
