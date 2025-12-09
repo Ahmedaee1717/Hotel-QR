@@ -7489,8 +7489,13 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="relative bg-white">
                 <!-- Cover Photo -->
                 <div class="gradient-hero h-64 md:h-96 relative">
-                    <!-- Info Button & Language Selector - Top Right on Cover -->
+                    <!-- Info Button, Feedback Button & Language Selector - Top Right on Cover -->
                     <div class="absolute top-4 right-4 z-10 flex gap-2">
+                        <!-- Feedback Button (only shows if active form exists) -->
+                        <button id="feedbackButton" onclick="openFeedbackForm()" class="hidden px-4 py-2 bg-black text-white rounded-lg shadow-lg font-semibold transition-all hover:bg-gray-800 flex items-center gap-2" title="Share Your Feedback">
+                            <i class="fas fa-comment-dots"></i>
+                            <span class="hidden sm:inline">Feedback</span>
+                        </button>
                         <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" title="Hotel Information">
                             <i class="fas fa-info-circle"></i>
                             <span class="hidden sm:inline">Info</span>
@@ -8688,6 +8693,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Load info pages after property data is loaded
                 loadInfoPages();
                 
+                // Load feedback form for homepage (if exists)
+                loadHomepageFeedbackForm();
+                
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const offeringsData = await offeringsResponse.json();
@@ -9547,6 +9555,43 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         // Info pages will be loaded after propertyData is loaded (in main init)
+
+        // ============================================
+        // FEEDBACK FORM FUNCTIONS
+        // ============================================
+        let activeFeedbackForm = null;
+
+        async function loadHomepageFeedbackForm() {
+          try {
+            const response = await fetch('/api/admin/feedback/forms/' + propertyData.property_id);
+            const data = await response.json();
+            
+            if (data.success && data.forms) {
+              // Find the first active form with show_on_homepage = 1
+              activeFeedbackForm = data.forms.find(form => form.is_active === 1 && form.show_on_homepage === 1);
+              
+              if (activeFeedbackForm) {
+                // Show feedback button
+                const feedbackBtn = document.getElementById('feedbackButton');
+                if (feedbackBtn) {
+                  feedbackBtn.classList.remove('hidden');
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load feedback form:', error);
+          }
+        }
+
+        window.openFeedbackForm = function() {
+          if (!activeFeedbackForm) {
+            alert('No feedback form available');
+            return;
+          }
+          
+          // Redirect to feedback form page
+          window.location.href = '/feedback/' + activeFeedbackForm.form_id;
+        }
         
         </script>
 
