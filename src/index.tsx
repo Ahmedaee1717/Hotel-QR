@@ -17637,6 +17637,9 @@ app.get('/admin/dashboard', (c) => {
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
 
+      // Get property ID from URL or localStorage
+      const propertyId = new URLSearchParams(window.location.search).get('property') || localStorage.getItem('property_id') || '1';
+
       let currentTab = 'rooms';
       
       function showTab(tab, clickedButton) {
@@ -17661,6 +17664,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'settings') loadSettings();
         if (tab === 'chatbot') loadChatbot();
         if (tab === 'beach') loadBeachSettings();
+        if (tab === 'feedback') loadFeedbackTab();
       }
       
       // Add event listeners to tab buttons
