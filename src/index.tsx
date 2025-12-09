@@ -6014,6 +6014,96 @@ app.post('/api/admin/beach/settings', async (c) => {
   }
 })
 
+// ==================== HOTEL MAP API ENDPOINTS ====================
+
+// API: Get Hotel Map Categories
+app.get('/api/admin/hotel-map/categories/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const categories = await DB.prepare(`
+      SELECT * FROM hotel_map_categories
+      WHERE property_id = ?
+      ORDER BY display_order, category_name
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, categories: categories.results || [] })
+  } catch (error) {
+    console.error('Get map categories error:', error)
+    return c.json({ error: 'Failed to get categories' }, 500)
+  }
+})
+
+// API: Get Hotel Map Hotspots
+app.get('/api/admin/hotel-map/hotspots/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const hotspots = await DB.prepare(`
+      SELECT * FROM hotel_map_hotspots
+      WHERE property_id = ? AND is_visible = 1
+      ORDER BY display_order, hotspot_id
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, hotspots: hotspots.results || [] })
+  } catch (error) {
+    console.error('Get map hotspots error:', error)
+    return c.json({ error: 'Failed to get hotspots' }, 500)
+  }
+})
+
+// API: Create Hotel Map Hotspot
+app.post('/api/admin/hotel-map/hotspots', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const {
+      property_id, position_x, position_y, width, height, shape,
+      hotspot_type, title, subtitle, description, category, 
+      building_number, link_url, color
+    } = body
+    
+    await DB.prepare(`
+      INSERT INTO hotel_map_hotspots (
+        property_id, position_x, position_y, width, height, shape,
+        hotspot_type, title, subtitle, description, category,
+        building_number, link_url, color
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id, position_x, position_y, width, height, shape,
+      hotspot_type, title, subtitle || null, description || null, category || null,
+      building_number || null, link_url || null, color || '#3B82F6'
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Create hotspot error:', error)
+    return c.json({ error: 'Failed to create hotspot' }, 500)
+  }
+})
+
+// API: Clear All Hotspots for Property
+app.post('/api/admin/hotel-map/hotspots/clear/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM hotel_map_hotspots WHERE property_id = ?
+    `).bind(property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Clear hotspots error:', error)
+    return c.json({ error: 'Failed to clear hotspots' }, 500)
+  }
+})
+
+// ==================== BEACH BOOKING API ENDPOINTS ====================
+
 // API: Get Beach Spots
 app.get('/api/admin/beach/spots/:property_id', async (c) => {
   const { DB } = c.env
@@ -7879,7 +7969,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }).join('');
         }
 
-        function renderHotelMap() {
+        async function renderHotelMap() {
             const mapFloatingBtn = document.getElementById('mapFloatingBtn');
             const mapContainer = document.getElementById('hotel-map-container');
             
@@ -7892,17 +7982,104 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Show floating button
                 mapFloatingBtn.classList.remove('hidden');
                 
-                // Populate map container
-                mapContainer.innerHTML = \`
-                    <img src="\${propertyData.hotel_map_url}" 
-                         alt="Hotel Map" 
-                         class="w-full h-auto rounded-lg"
-                         style="max-height: 80vh; object-fit: contain;">
-                \`;
+                // Load interactive hotspots
+                try {
+                    const response = await fetch('/api/admin/hotel-map/hotspots/' + propertyData.property_id);
+                    const data = await response.json();
+                    
+                    if (data.success && data.hotspots && data.hotspots.length > 0) {
+                        // Render interactive map with hotspots
+                        mapContainer.innerHTML = \`
+                            <div class="relative w-full" style="padding-bottom: 75%;">
+                                <img src="\${propertyData.hotel_map_url}" 
+                                     alt="Hotel Map" 
+                                     class="absolute inset-0 w-full h-full object-contain rounded-lg">
+                                <div id="mapHotspots" class="absolute inset-0">
+                                    \${data.hotspots.map(hotspot => \`
+                                        <div class="absolute cursor-pointer transition-all duration-200 hover:z-50 group"
+                                             style="left: \${hotspot.position_x}%; top: \${hotspot.position_y}%; width: \${hotspot.width}%; height: \${hotspot.height}%;"
+                                             onclick="showHotspotInfo('\${hotspot.hotspot_id}')">
+                                            <div class="w-full h-full border-3 rounded-lg \${hotspot.shape === 'circle' ? 'rounded-full' : ''}"
+                                                 style="border-color: \${hotspot.color}; background: \${hotspot.color}20;">
+                                                <div class="flex items-center justify-center w-full h-full text-2xl">
+                                                    \${hotspot.building_number || '📍'}
+                                                </div>
+                                            </div>
+                                            <!-- Tooltip on hover -->
+                                            <div class="absolute hidden group-hover:block bg-black text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap -top-12 left-1/2 transform -translate-x-1/2 z-50 shadow-xl">
+                                                <div class="font-bold">\${hotspot.title}</div>
+                                                \${hotspot.subtitle ? '<div class="text-xs text-gray-300">' + hotspot.subtitle + '</div>' : ''}
+                                                <div class="absolute w-3 h-3 bg-black transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
+                                            </div>
+                                        </div>
+                                    \`).join('')}
+                                </div>
+                            </div>
+                            
+                            <!-- Hotspot Details Modal -->
+                            <div id="hotspotModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+                                <div class="bg-white rounded-2xl max-w-md w-full p-6 relative">
+                                    <button onclick="closeHotspotModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                                        <i class="fas fa-times text-xl"></i>
+                                    </button>
+                                    <div id="hotspotModalContent"></div>
+                                </div>
+                            </div>
+                        \`;
+                        
+                        // Store hotspots data globally for modal
+                        window.mapHotspots = data.hotspots;
+                    } else {
+                        // No hotspots, show static map
+                        mapContainer.innerHTML = \`
+                            <img src="\${propertyData.hotel_map_url}" 
+                                 alt="Hotel Map" 
+                                 class="w-full h-auto rounded-lg"
+                                 style="max-height: 80vh; object-fit: contain;">
+                        \`;
+                    }
+                } catch (error) {
+                    console.error('Load map hotspots error:', error);
+                    // Fallback to static map
+                    mapContainer.innerHTML = \`
+                        <img src="\${propertyData.hotel_map_url}" 
+                             alt="Hotel Map" 
+                             class="w-full h-auto rounded-lg"
+                             style="max-height: 80vh; object-fit: contain;">
+                    \`;
+                }
             } else {
                 // Hide floating button if no map
                 mapFloatingBtn.classList.add('hidden');
             }
+        }
+        
+        function showHotspotInfo(hotspotId) {
+            const hotspot = window.mapHotspots.find(h => h.hotspot_id == hotspotId);
+            if (!hotspot) return;
+            
+            const modal = document.getElementById('hotspotModal');
+            const content = document.getElementById('hotspotModalContent');
+            
+            content.innerHTML = \`
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-3">\${hotspot.building_number ? '🏨' : '📍'}</div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-1">\${hotspot.title}</h3>
+                    \${hotspot.subtitle ? '<p class="text-gray-600">' + hotspot.subtitle + '</p>' : ''}
+                </div>
+                
+                \${hotspot.building_number ? '<div class="bg-blue-50 rounded-lg p-3 mb-4 text-center"><span class="font-bold text-blue-900">Building ' + hotspot.building_number + '</span></div>' : ''}
+                
+                \${hotspot.description ? '<p class="text-gray-700 mb-4">' + hotspot.description + '</p>' : ''}
+                
+                \${hotspot.link_url ? '<a href="' + hotspot.link_url + '" class="block w-full py-3 bg-blue-600 text-white text-center rounded-lg font-semibold hover:bg-blue-700 transition"><i class="fas fa-external-link-alt mr-2"></i>Learn More</a>' : ''}
+            \`;
+            
+            modal.classList.remove('hidden');
+        }
+        
+        function closeHotspotModal() {
+            document.getElementById('hotspotModal').classList.add('hidden');
         }
         
         function openMapModal() {
@@ -10928,6 +11105,528 @@ app.get('/admin/beach-map-designer', (c) => {
         
         // Initialize
         loadExistingSpots();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Interactive Hotel Map Builder - Admin tool to create clickable map hotspots
+app.get('/admin/interactive-map-builder', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        #mapCanvas {
+            position: relative;
+            border: 3px solid #cbd5e0;
+            background: #f7fafc;
+            cursor: crosshair;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            overflow: hidden;
+        }
+        .hotspot {
+            position: absolute;
+            border: 3px solid;
+            background: rgba(59, 130, 246, 0.2);
+            cursor: move;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-center;
+            font-size: 20px;
+        }
+        .hotspot:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+            z-index: 10;
+        }
+        .hotspot.selected {
+            border-color: #10B981;
+            background: rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.8);
+            z-index: 11;
+        }
+        .hotspot.circle {
+            border-radius: 50%;
+        }
+        .category-badge {
+            transition: all 0.2s;
+        }
+        .category-badge:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-96 bg-white shadow-2xl p-6 overflow-y-auto border-r-4 border-blue-200">
+            <div class="mb-6">
+                <h1 class="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    <i class="fas fa-map-marked-alt mr-2"></i>
+                    Interactive Map Builder
+                </h1>
+                <p class="text-sm text-gray-600">Create clickable hotspots on your hotel map</p>
+            </div>
+
+            <!-- Map Image URL -->
+            <div class="mb-6 bg-blue-50 p-4 rounded-xl border border-blue-200">
+                <label class="block text-sm font-bold mb-2 text-gray-800">
+                    <i class="fas fa-image mr-2 text-blue-600"></i>Map Image URL
+                </label>
+                <input type="url" id="mapImageUrl" placeholder="https://..." class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 mb-2" />
+                <button onclick="loadMapImage()" class="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    <i class="fas fa-download mr-2"></i>Load Map
+                </button>
+            </div>
+
+            <!-- Drawing Tools -->
+            <div class="mb-6">
+                <h3 class="font-bold mb-3 text-gray-800">
+                    <i class="fas fa-tools mr-2 text-indigo-600"></i>Drawing Tools
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setTool('select')" id="selectTool" class="tool-btn px-4 py-3 border-2 rounded-lg font-semibold transition bg-blue-600 text-white">
+                        <i class="fas fa-mouse-pointer mr-2"></i>Select
+                    </button>
+                    <button onclick="setTool('rectangle')" id="rectangleTool" class="tool-btn px-4 py-3 border-2 rounded-lg font-semibold hover:bg-gray-50 transition">
+                        <i class="fas fa-square mr-2"></i>Rectangle
+                    </button>
+                    <button onclick="setTool('circle')" id="circleTool" class="tool-btn px-4 py-3 border-2 rounded-lg font-semibold hover:bg-gray-50 transition">
+                        <i class="fas fa-circle mr-2"></i>Circle
+                    </button>
+                    <button onclick="deleteSelected()" class="tool-btn px-4 py-3 border-2 border-red-500 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition">
+                        <i class="fas fa-trash mr-2"></i>Delete
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hotspot Details -->
+            <div id="hotspotDetails" class="mb-6 bg-green-50 p-4 rounded-xl border-2 border-green-300 hidden">
+                <h3 class="font-bold mb-3 text-gray-800 flex items-center">
+                    <i class="fas fa-edit mr-2 text-green-600"></i>Hotspot Details
+                </h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Title *</label>
+                        <input type="text" id="hotspotTitle" placeholder="e.g., Building 23" class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Subtitle</label>
+                        <input type="text" id="hotspotSubtitle" placeholder="e.g., Deluxe Rooms" class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Category *</label>
+                        <select id="hotspotCategory" class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500">
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Building Number</label>
+                        <input type="text" id="hotspotBuildingNumber" placeholder="e.g., 23" class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Description</label>
+                        <textarea id="hotspotDescription" rows="2" placeholder="Additional details..." class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">Link URL (optional)</label>
+                        <input type="url" id="hotspotLink" placeholder="https://..." class="w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-green-500" />
+                    </div>
+                    <button onclick="updateHotspot()" class="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold shadow-lg">
+                        <i class="fas fa-save mr-2"></i>Update Hotspot
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hotspots List -->
+            <div class="mb-6">
+                <h3 class="font-bold mb-3 text-gray-800 flex items-center justify-between">
+                    <span><i class="fas fa-list mr-2 text-purple-600"></i>Hotspots (<span id="hotspotCount">0</span>)</span>
+                </h3>
+                <div id="hotspotsList" class="space-y-2 max-h-64 overflow-y-auto">
+                    <p class="text-sm text-gray-500 italic">No hotspots yet. Draw on the map to add!</p>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="space-y-2">
+                <button onclick="saveAllHotspots()" class="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold text-lg shadow-xl hover:from-green-700 hover:to-blue-700 transition-all transform hover:scale-105">
+                    <i class="fas fa-save mr-2"></i>Save All Hotspots
+                </button>
+                <button onclick="clearAll()" class="w-full py-2 border-2 border-red-600 text-red-600 rounded-lg font-semibold hover:bg-red-50 transition">
+                    <i class="fas fa-trash-alt mr-2"></i>Clear All
+                </button>
+                <button onclick="window.close()" class="w-full py-2 border-2 rounded-lg font-semibold hover:bg-gray-50 transition">
+                    <i class="fas fa-times mr-2"></i>Close
+                </button>
+            </div>
+        </div>
+        
+        <!-- Canvas Area -->
+        <div class="flex-1 p-6 overflow-auto bg-gradient-to-br from-gray-50 to-gray-100">
+            <div class="bg-white rounded-2xl shadow-2xl h-full p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-compass mr-2 text-blue-600"></i>Map Canvas
+                    </h2>
+                    <div class="text-sm text-gray-600">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Click and drag to draw hotspots
+                    </div>
+                </div>
+                <div id="mapCanvas" class="w-full rounded-xl" style="height: calc(100% - 60px);">
+                    <div class="flex items-center justify-center h-full text-gray-400">
+                        <div class="text-center">
+                            <i class="fas fa-map text-6xl mb-4"></i>
+                            <p class="text-lg">Load a map image to begin</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTool = 'select';
+        let selectedHotspot = null;
+        let hotspots = [];
+        let hotspotIdCounter = 1;
+        let isDrawing = false;
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let dragStartX = 0, dragStartY = 0;
+        let categories = [];
+        let mapLoaded = false;
+        
+        const canvas = document.getElementById('mapCanvas');
+        
+        // Load categories from database
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/admin/hotel-map/categories/1');
+                const data = await response.json();
+                
+                if (data.success && data.categories) {
+                    categories = data.categories;
+                    const select = document.getElementById('hotspotCategory');
+                    select.innerHTML = '<option value="">Select category...</option>' +
+                        categories.map(cat => 
+                            \`<option value="\${cat.category_key}">\${cat.icon_emoji || ''} \${cat.category_name}</option>\`
+                        ).join('');
+                }
+            } catch (error) {
+                console.error('Load categories error:', error);
+            }
+        }
+        
+        // Load existing hotspots
+        async function loadExistingHotspots() {
+            try {
+                const response = await fetch('/api/admin/hotel-map/hotspots/1');
+                const data = await response.json();
+                
+                if (data.success && data.hotspots) {
+                    hotspots = data.hotspots.map(h => ({
+                        id: h.hotspot_id,
+                        x: h.position_x,
+                        y: h.position_y,
+                        width: h.width,
+                        height: h.height,
+                        shape: h.shape,
+                        title: h.title,
+                        subtitle: h.subtitle,
+                        description: h.description,
+                        category: h.category,
+                        buildingNumber: h.building_number,
+                        link: h.link_url,
+                        color: h.color
+                    }));
+                    renderHotspots();
+                    updateHotspotsList();
+                }
+            } catch (error) {
+                console.error('Load hotspots error:', error);
+            }
+        }
+        
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+            });
+            const btn = document.getElementById(tool + 'Tool');
+            if (btn) {
+                btn.classList.add('bg-blue-600', 'text-white');
+            }
+            canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+        }
+        
+        function loadMapImage() {
+            const url = document.getElementById('mapImageUrl').value;
+            if (!url) {
+                alert('Please enter a map image URL');
+                return;
+            }
+            
+            canvas.style.backgroundImage = \`url(\${url})\`;
+            mapLoaded = true;
+            canvas.innerHTML = '';
+            alert('✅ Map loaded! Now draw hotspots on the map.');
+        }
+        
+        // Mouse events for drawing
+        canvas.addEventListener('mousedown', (e) => {
+            if (!mapLoaded) {
+                alert('Please load a map image first');
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            if (currentTool === 'select') {
+                // Check if clicked on a hotspot
+                const clicked = hotspots.find(h => {
+                    return x >= h.x && x <= (h.x + h.width) &&
+                           y >= h.y && y <= (h.y + h.height);
+                });
+                
+                if (clicked) {
+                    selectHotspot(clicked.id);
+                    isDragging = true;
+                    dragStartX = x - clicked.x;
+                    dragStartY = y - clicked.y;
+                }
+            } else {
+                // Start drawing new hotspot
+                isDrawing = true;
+                startX = x;
+                startY = y;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!mapLoaded) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            if (isDragging && selectedHotspot) {
+                const hotspot = hotspots.find(h => h.id === selectedHotspot);
+                if (hotspot) {
+                    hotspot.x = Math.max(0, Math.min(x - dragStartX, 100 - hotspot.width));
+                    hotspot.y = Math.max(0, Math.min(y - dragStartY, 100 - hotspot.height));
+                    renderHotspots();
+                }
+            }
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (!mapLoaded) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            if (isDrawing && (currentTool === 'rectangle' || currentTool === 'circle')) {
+                const width = Math.abs(x - startX);
+                const height = Math.abs(y - startY);
+                
+                if (width > 1 && height > 1) {
+                    const hotspot = {
+                        id: hotspotIdCounter++,
+                        x: Math.min(startX, x),
+                        y: Math.min(startY, y),
+                        width: width,
+                        height: height,
+                        shape: currentTool,
+                        title: 'Hotspot ' + hotspotIdCounter,
+                        subtitle: '',
+                        description: '',
+                        category: '',
+                        buildingNumber: '',
+                        link: '',
+                        color: '#3B82F6'
+                    };
+                    
+                    hotspots.push(hotspot);
+                    renderHotspots();
+                    updateHotspotsList();
+                    selectHotspot(hotspot.id);
+                }
+            }
+            
+            isDrawing = false;
+            isDragging = false;
+        });
+        
+        function renderHotspots() {
+            document.querySelectorAll('.hotspot').forEach(el => el.remove());
+            
+            hotspots.forEach(hotspot => {
+                const el = document.createElement('div');
+                el.className = 'hotspot' + (hotspot.shape === 'circle' ? ' circle' : '');
+                if (selectedHotspot === hotspot.id) {
+                    el.classList.add('selected');
+                }
+                el.style.left = hotspot.x + '%';
+                el.style.top = hotspot.y + '%';
+                el.style.width = hotspot.width + '%';
+                el.style.height = hotspot.height + '%';
+                el.style.borderColor = hotspot.color || '#3B82F6';
+                el.dataset.hotspotId = hotspot.id;
+                
+                // Show icon or building number
+                const cat = categories.find(c => c.category_key === hotspot.category);
+                if (hotspot.buildingNumber) {
+                    el.innerHTML = '<span class="font-bold text-white bg-blue-600 px-2 py-1 rounded">' + hotspot.buildingNumber + '</span>';
+                } else if (cat && cat.icon_emoji) {
+                    el.innerHTML = cat.icon_emoji;
+                }
+                
+                el.title = hotspot.title;
+                
+                canvas.appendChild(el);
+            });
+            
+            document.getElementById('hotspotCount').textContent = hotspots.length;
+        }
+        
+        function selectHotspot(id) {
+            selectedHotspot = id;
+            renderHotspots();
+            
+            const hotspot = hotspots.find(h => h.id === id);
+            if (hotspot) {
+                document.getElementById('hotspotTitle').value = hotspot.title;
+                document.getElementById('hotspotSubtitle').value = hotspot.subtitle || '';
+                document.getElementById('hotspotCategory').value = hotspot.category || '';
+                document.getElementById('hotspotBuildingNumber').value = hotspot.buildingNumber || '';
+                document.getElementById('hotspotDescription').value = hotspot.description || '';
+                document.getElementById('hotspotLink').value = hotspot.link || '';
+                document.getElementById('hotspotDetails').classList.remove('hidden');
+            }
+        }
+        
+        function updateHotspot() {
+            const hotspot = hotspots.find(h => h.id === selectedHotspot);
+            if (hotspot) {
+                hotspot.title = document.getElementById('hotspotTitle').value;
+                hotspot.subtitle = document.getElementById('hotspotSubtitle').value;
+                hotspot.category = document.getElementById('hotspotCategory').value;
+                hotspot.buildingNumber = document.getElementById('hotspotBuildingNumber').value;
+                hotspot.description = document.getElementById('hotspotDescription').value;
+                hotspot.link = document.getElementById('hotspotLink').value;
+                
+                const cat = categories.find(c => c.category_key === hotspot.category);
+                if (cat) hotspot.color = cat.color;
+                
+                renderHotspots();
+                updateHotspotsList();
+                alert('✅ Hotspot updated!');
+            }
+        }
+        
+        function updateHotspotsList() {
+            const list = document.getElementById('hotspotsList');
+            if (hotspots.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-500 italic">No hotspots yet. Draw on the map to add!</p>';
+                return;
+            }
+            
+            list.innerHTML = hotspots.map(h => {
+                const cat = categories.find(c => c.category_key === h.category);
+                const icon = cat ? cat.icon_emoji : '📍';
+                return \`<div class="p-3 border-2 rounded-lg hover:bg-gray-50 cursor-pointer transition \${selectedHotspot === h.id ? 'bg-green-50 border-green-500' : 'border-gray-200'}" onclick="selectHotspot(\${h.id})">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold">\${icon} \${h.title}</span>
+                        <span class="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800">\${h.shape}</span>
+                    </div>
+                    \${h.buildingNumber ? '<div class="text-xs text-gray-600 mt-1">Building ' + h.buildingNumber + '</div>' : ''}
+                </div>\`;
+            }).join('');
+        }
+        
+        function deleteSelected() {
+            if (selectedHotspot) {
+                if (confirm('Delete this hotspot?')) {
+                    hotspots = hotspots.filter(h => h.id !== selectedHotspot);
+                    selectedHotspot = null;
+                    document.getElementById('hotspotDetails').classList.add('hidden');
+                    renderHotspots();
+                    updateHotspotsList();
+                }
+            } else {
+                alert('Please select a hotspot first');
+            }
+        }
+        
+        async function saveAllHotspots() {
+            if (hotspots.length === 0) {
+                alert('⚠️ No hotspots to save');
+                return;
+            }
+            
+            try {
+                // Delete all existing hotspots
+                await fetch('/api/admin/hotel-map/hotspots/clear/1', { method: 'POST' });
+                
+                // Save all hotspots
+                for (const hotspot of hotspots) {
+                    await fetch('/api/admin/hotel-map/hotspots', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            property_id: 1,
+                            position_x: hotspot.x,
+                            position_y: hotspot.y,
+                            width: hotspot.width,
+                            height: hotspot.height,
+                            shape: hotspot.shape,
+                            hotspot_type: 'poi',
+                            title: hotspot.title,
+                            subtitle: hotspot.subtitle,
+                            description: hotspot.description,
+                            category: hotspot.category,
+                            building_number: hotspot.buildingNumber,
+                            link_url: hotspot.link,
+                            color: hotspot.color
+                        })
+                    });
+                }
+                
+                alert('✅ All hotspots saved successfully!\\n\\n' + hotspots.length + ' hotspots saved to database.');
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('❌ Failed to save hotspots');
+            }
+        }
+        
+        function clearAll() {
+            if (confirm('Clear all hotspots? This cannot be undone.')) {
+                hotspots = [];
+                selectedHotspot = null;
+                document.getElementById('hotspotDetails').classList.add('hidden');
+                renderHotspots();
+                updateHotspotsList();
+            }
+        }
+        
+        // Initialize
+        loadCategories();
+        loadExistingHotspots();
     </script>
 </body>
 </html>
@@ -14790,20 +15489,44 @@ app.get('/admin/dashboard', (c) => {
                         <p class="text-sm text-gray-600 mb-4">Control what appears on your homepage and in what order</p>
                         
                         <!-- Hotel Map -->
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                            <h4 class="font-semibold mb-3 text-gray-800"><i class="fas fa-map mr-2 text-blue-600"></i>Hotel/Resort Map</h4>
-                            <div class="space-y-3">
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 mb-6 shadow-md">
+                            <h4 class="font-bold mb-4 text-gray-900 text-lg flex items-center">
+                                <i class="fas fa-map-marked-alt mr-3 text-blue-600 text-xl"></i>
+                                Interactive Hotel Map Builder
+                            </h4>
+                            
+                            <div class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium mb-2">Hotel Map Image URL</label>
-                                    <input type="url" id="hotelMapUrl" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/hotel-map.jpg" />
-                                    <p class="text-xs text-gray-500 mt-1">Upload your hotel/resort map (floor plan, grounds map, etc.)</p>
+                                    <label class="block text-sm font-semibold mb-2 text-gray-700">
+                                        <i class="fas fa-image mr-2 text-indigo-600"></i>Hotel Map Image URL
+                                    </label>
+                                    <input type="url" id="hotelMapUrl" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="https://example.com/hotel-map.jpg" />
+                                    <p class="text-xs text-gray-600 mt-2 flex items-center">
+                                        <i class="fas fa-info-circle mr-2 text-blue-500"></i>
+                                        Upload your hotel/resort map image (floor plan, grounds map, aerial view)
+                                    </p>
                                 </div>
                                 
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="checkbox" id="showHotelMap" class="mr-2 w-4 h-4" />
-                                    <span class="text-sm font-medium">Enable Hotel Map (Floating Button)</span>
-                                </label>
-                                <p class="text-xs text-gray-500 ml-6">When enabled, a convenient floating "Hotel Map" button appears in the bottom-right corner</p>
+                                <div class="flex items-center justify-between bg-white rounded-lg p-4 border border-gray-200">
+                                    <div class="flex-1">
+                                        <label class="flex items-center cursor-pointer">
+                                            <input type="checkbox" id="showHotelMap" class="mr-3 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" />
+                                            <span class="text-sm font-semibold text-gray-800">Enable Interactive Map</span>
+                                        </label>
+                                        <p class="text-xs text-gray-600 mt-1 ml-8">Show floating map button on guest homepage with clickable hotspots</p>
+                                    </div>
+                                </div>
+                                
+                                <button onclick="openInteractiveMapBuilder()" class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-2">
+                                    <i class="fas fa-pencil-ruler text-lg"></i>
+                                    <span>Build Interactive Map (Add Hotspots)</span>
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                                
+                                <div id="hotspotsCount" class="text-center text-sm text-gray-600 hidden">
+                                    <i class="fas fa-map-pin mr-2 text-indigo-600"></i>
+                                    <span id="hotspotsCountText">0 hotspots</span> configured
+                                </div>
                             </div>
                         </div>
                         
@@ -17547,6 +18270,22 @@ app.get('/admin/dashboard', (c) => {
       
       window.openBeachMapDesigner = function() {
         window.open('/admin/beach-map-designer', '_blank', 'width=1400,height=900');
+      };
+      
+      window.openInteractiveMapBuilder = function() {
+        const mapUrl = document.getElementById('hotelMapUrl').value;
+        if (!mapUrl) {
+          alert('⚠️ Please enter a hotel map image URL first');
+          return;
+        }
+        // Open in new window with map URL pre-filled
+        const builderWindow = window.open('/admin/interactive-map-builder', '_blank', 'width=1600,height=1000');
+        if (builderWindow) {
+          builderWindow.addEventListener('load', () => {
+            builderWindow.document.getElementById('mapImageUrl').value = mapUrl;
+            builderWindow.loadMapImage();
+          });
+        }
       };
       
       window.addQuickSpot = async function() {
