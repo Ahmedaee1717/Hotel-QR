@@ -5584,7 +5584,7 @@ app.post('/api/chatbot/chat', async (c) => {
         const formUrl = '/feedback/' + form.form_id
         
         // Multi-language feedback invitation - Default to English
-        let feedbackResponse = 'Thank you for wanting to share your feedback with us!\\n\\nWe would love to hear from you. You can [submit your feedback here](' + formUrl + ') - it will only take a few minutes.\\n\\nIs there anything else I can help you with?';
+        const feedbackResponse = 'Thank you for wanting to share your feedback with us!' + String.fromCharCode(10) + String.fromCharCode(10) + 'We would love to hear from you. You can [submit your feedback here](' + formUrl + ') - it will only take a few minutes.' + String.fromCharCode(10) + String.fromCharCode(10) + 'Is there anything else I can help you with?';
         
         await DB.prepare('INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used) VALUES (?, ?, ?, ?)').bind(convId, 'assistant', feedbackResponse, '[]').run()
         
@@ -6825,19 +6825,19 @@ app.get('/api/admin/feedback/forms/:property_id', async (c) => {
 app.post('/api/admin/feedback/forms', async (c) => {
   const { DB } = c.env
   const body = await c.req.json()
-  const { property_id, form_name, form_description, form_type, require_room_number, require_guest_name, require_email, require_phone, thank_you_message } = body
+  const { property_id, form_name, form_description, form_type, require_room_number, require_guest_name, require_email, require_phone, thank_you_message, show_on_homepage } = body
   
   try {
     const result = await DB.prepare(`
       INSERT INTO feedback_forms (
         property_id, form_name, form_description, form_type,
         require_room_number, require_guest_name, require_email, require_phone,
-        thank_you_message
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        thank_you_message, show_on_homepage
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id, form_name, form_description || '', form_type || 'feedback',
       require_room_number || 0, require_guest_name || 0, require_email || 0, require_phone || 0,
-      thank_you_message || 'Thank you for your feedback!'
+      thank_you_message || 'Thank you for your feedback!', show_on_homepage || 0
     ).run()
     
     const form_id = result.meta.last_row_id
@@ -17500,6 +17500,18 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                 </div>
 
+                <!-- Display Options -->
+                <div class="mb-6 bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
+                    <h4 class="text-lg font-bold mb-3 text-purple-900"><i class="fas fa-eye mr-2"></i>Display Options</h4>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="showOnHomepage" class="w-5 h-5 text-purple-600">
+                        <div>
+                            <span class="font-semibold">Show on Homepage</span>
+                            <p class="text-sm text-gray-600">Display this feedback form next to the Info tab on guest homepage</p>
+                        </div>
+                    </label>
+                </div>
+
                 <!-- Questions Builder -->
                 <div class="mb-6">
                     <div class="flex justify-between items-center mb-4">
@@ -20997,7 +21009,8 @@ app.get('/admin/dashboard', (c) => {
             require_guest_name: document.getElementById('requireGuestName').checked ? 1 : 0,
             require_email: document.getElementById('requireEmail').checked ? 1 : 0,
             require_phone: document.getElementById('requirePhone').checked ? 1 : 0,
-            thank_you_message: document.getElementById('thankYouMessage').value
+            thank_you_message: document.getElementById('thankYouMessage').value,
+            show_on_homepage: document.getElementById('showOnHomepage').checked ? 1 : 0
           };
           
           const formRes = await fetch('/api/admin/feedback/forms', {
