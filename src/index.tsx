@@ -1657,6 +1657,87 @@ app.delete('/api/vendor/activities/:activity_id', async (c) => {
   }
 })
 
+// Auto-translate activity to all languages (Vendor/Admin)
+app.post('/api/vendor/activities/:activity_id/translate', async (c) => {
+  const { DB } = c.env
+  const vendor_id = c.req.header('X-Vendor-ID')
+  const { activity_id } = c.req.param()
+  const { openai_api_key } = await c.req.json()
+  
+  if (!openai_api_key) {
+    return c.json({ error: 'OpenAI API key required' }, 400)
+  }
+  
+  if (!vendor_id) {
+    return c.json({ error: 'Vendor ID not provided' }, 401)
+  }
+  
+  try {
+    // Verify activity belongs to vendor
+    const activity: any = await DB.prepare(`
+      SELECT title_en, short_description_en, full_description_en
+      FROM activities WHERE activity_id = ? AND vendor_id = ?
+    `).bind(activity_id, vendor_id).first()
+    
+    if (!activity) {
+      return c.json({ error: 'Activity not found or access denied' }, 404)
+    }
+    
+    // Translate to all languages
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const translations: any = {}
+    
+    for (const lang of languages) {
+      const textsToTranslate = [
+        activity.title_en,
+        activity.short_description_en || '',
+        activity.full_description_en || ''
+      ]
+      
+      const translated = await translateWithAI(textsToTranslate, lang, openai_api_key)
+      
+      translations[`title_${lang}`] = translated[0] || activity.title_en
+      translations[`short_description_${lang}`] = translated[1] || activity.short_description_en
+      translations[`full_description_${lang}`] = translated[2] || activity.full_description_en
+    }
+    
+    // Update database with translations
+    await DB.prepare(`
+      UPDATE activities SET
+        title_ar = ?, short_description_ar = ?, full_description_ar = ?,
+        title_de = ?, short_description_de = ?, full_description_de = ?,
+        title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+        title_pl = ?, short_description_pl = ?, full_description_pl = ?,
+        title_it = ?, short_description_it = ?, full_description_it = ?,
+        title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+        title_cs = ?, short_description_cs = ?, full_description_cs = ?,
+        title_uk = ?, short_description_uk = ?, full_description_uk = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE activity_id = ? AND vendor_id = ?
+    `).bind(
+      translations.title_ar, translations.short_description_ar, translations.full_description_ar,
+      translations.title_de, translations.short_description_de, translations.full_description_de,
+      translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+      translations.title_pl, translations.short_description_pl, translations.full_description_pl,
+      translations.title_it, translations.short_description_it, translations.full_description_it,
+      translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+      translations.title_cs, translations.short_description_cs, translations.full_description_cs,
+      translations.title_uk, translations.short_description_uk, translations.full_description_uk,
+      activity_id,
+      vendor_id
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      translations: translations,
+      message: 'Activity translated to 8 languages successfully'
+    })
+  } catch (error) {
+    console.error('Activity translation error:', error)
+    return c.json({ error: 'Translation failed: ' + error }, 500)
+  }
+})
+
 // Upload activity image (simulated - returns data URL for now)
 app.post('/api/vendor/upload-image', async (c) => {
   const { DB } = c.env
@@ -3998,6 +4079,98 @@ app.post('/api/admin/offerings/translate-all', async (c) => {
   }
 })
 
+// Batch translate ALL activities to all languages (Admin)
+app.post('/api/admin/activities/translate-all', async (c) => {
+  const { DB } = c.env
+  const { property_id, openai_api_key } = await c.req.json()
+  
+  if (!openai_api_key) {
+    return c.json({ error: 'OpenAI API key required' }, 400)
+  }
+  
+  try {
+    // Get all activities - need to join with vendors table to filter by property_id
+    const activities: any = await DB.prepare(`
+      SELECT a.activity_id, a.title_en, a.short_description_en, a.full_description_en
+      FROM activities a
+      JOIN vendors v ON a.vendor_id = v.vendor_id
+      WHERE v.property_id = ?
+    `).bind(property_id).all()
+    
+    if (!activities.results || activities.results.length === 0) {
+      return c.json({ error: 'No activities found' }, 404)
+    }
+    
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    let translatedCount = 0
+    let failedCount = 0
+    
+    // Translate each activity
+    for (const activity of activities.results) {
+      try {
+        const translations: any = {}
+        
+        // Translate to all languages
+        for (const lang of languages) {
+          const textsToTranslate = [
+            activity.title_en,
+            activity.short_description_en || '',
+            activity.full_description_en || ''
+          ]
+          
+          const translated = await translateWithAI(textsToTranslate, lang, openai_api_key)
+          
+          translations['title_' + lang] = translated[0] || activity.title_en
+          translations['short_description_' + lang] = translated[1] || activity.short_description_en
+          translations['full_description_' + lang] = translated[2] || activity.full_description_en
+        }
+        
+        // Update database with translations
+        await DB.prepare(`
+          UPDATE activities SET
+            title_ar = ?, short_description_ar = ?, full_description_ar = ?,
+            title_de = ?, short_description_de = ?, full_description_de = ?,
+            title_ru = ?, short_description_ru = ?, full_description_ru = ?,
+            title_pl = ?, short_description_pl = ?, full_description_pl = ?,
+            title_it = ?, short_description_it = ?, full_description_it = ?,
+            title_fr = ?, short_description_fr = ?, full_description_fr = ?,
+            title_cs = ?, short_description_cs = ?, full_description_cs = ?,
+            title_uk = ?, short_description_uk = ?, full_description_uk = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE activity_id = ?
+        `).bind(
+          translations.title_ar, translations.short_description_ar, translations.full_description_ar,
+          translations.title_de, translations.short_description_de, translations.full_description_de,
+          translations.title_ru, translations.short_description_ru, translations.full_description_ru,
+          translations.title_pl, translations.short_description_pl, translations.full_description_pl,
+          translations.title_it, translations.short_description_it, translations.full_description_it,
+          translations.title_fr, translations.short_description_fr, translations.full_description_fr,
+          translations.title_cs, translations.short_description_cs, translations.full_description_cs,
+          translations.title_uk, translations.short_description_uk, translations.full_description_uk,
+          activity.activity_id
+        ).run()
+        
+        translatedCount++
+        console.log('Translated activity ' + activity.activity_id)
+      } catch (error) {
+        failedCount++
+        console.error('Failed to translate activity ' + activity.activity_id + ':', error)
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      total: activities.results.length,
+      translated: translatedCount,
+      failed: failedCount,
+      message: 'Translated ' + translatedCount + ' activities to 8 languages'
+    })
+  } catch (error) {
+    console.error('Activities batch translation error:', error)
+    return c.json({ error: 'Batch translation failed: ' + error }, 500)
+  }
+})
+
 // Translate property tagline (Admin)
 app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
   const { DB } = c.env
@@ -4786,10 +4959,31 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
         v.business_name,
         v.slug as vendor_slug,
         c.name_en as category_name,
-        CASE WHEN ? = 'ar' THEN a.title_ar ELSE a.title_en END as title,
-        CASE WHEN ? = 'ar' THEN a.short_description_ar ELSE a.short_description_en END as short_description,
-        a.title_en, a.title_ar,
-        a.short_description_en, a.short_description_ar
+        CASE 
+          WHEN ? = 'ar' THEN COALESCE(a.title_ar, a.title_en)
+          WHEN ? = 'de' THEN COALESCE(a.title_de, a.title_en)
+          WHEN ? = 'ru' THEN COALESCE(a.title_ru, a.title_en)
+          WHEN ? = 'pl' THEN COALESCE(a.title_pl, a.title_en)
+          WHEN ? = 'it' THEN COALESCE(a.title_it, a.title_en)
+          WHEN ? = 'fr' THEN COALESCE(a.title_fr, a.title_en)
+          WHEN ? = 'cs' THEN COALESCE(a.title_cs, a.title_en)
+          WHEN ? = 'uk' THEN COALESCE(a.title_uk, a.title_en)
+          ELSE a.title_en
+        END as title,
+        CASE 
+          WHEN ? = 'ar' THEN COALESCE(a.short_description_ar, a.short_description_en)
+          WHEN ? = 'de' THEN COALESCE(a.short_description_de, a.short_description_en)
+          WHEN ? = 'ru' THEN COALESCE(a.short_description_ru, a.short_description_en)
+          WHEN ? = 'pl' THEN COALESCE(a.short_description_pl, a.short_description_en)
+          WHEN ? = 'it' THEN COALESCE(a.short_description_it, a.short_description_en)
+          WHEN ? = 'fr' THEN COALESCE(a.short_description_fr, a.short_description_en)
+          WHEN ? = 'cs' THEN COALESCE(a.short_description_cs, a.short_description_en)
+          WHEN ? = 'uk' THEN COALESCE(a.short_description_uk, a.short_description_en)
+          ELSE a.short_description_en
+        END as short_description,
+        a.title_en, a.title_ar, a.title_de, a.title_ru, a.title_pl, a.title_it, a.title_fr, a.title_cs, a.title_uk,
+        a.short_description_en, a.short_description_ar, a.short_description_de, a.short_description_ru, 
+        a.short_description_pl, a.short_description_it, a.short_description_fr, a.short_description_cs, a.short_description_uk
       FROM activities a
       JOIN vendors v ON a.vendor_id = v.vendor_id
       JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
@@ -4800,41 +4994,11 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
         AND v.status = 'active'
       ORDER BY a.is_featured DESC, a.popularity_score DESC
       LIMIT 50
-    `).bind(lang, lang, property_id).all()
-    
-    // For non-EN/AR languages, translate using AI if API key is available
-    let translatedActivities = activities.results;
-    
-    if (lang !== 'en' && lang !== 'ar') {
-      // Try to get API key from environment
-      const openai_api_key = process.env.OPENAI_API_KEY;
-      
-      if (openai_api_key) {
-        try {
-          translatedActivities = await Promise.all(activities.results.map(async (activity) => {
-            const translated = await translateActivityContent(
-              activity.title_en,
-              activity.short_description_en,
-              lang,
-              openai_api_key
-            );
-            
-            return {
-              ...activity,
-              title: translated.title || activity.title,
-              short_description: translated.short_description || activity.short_description
-            };
-          }));
-        } catch (translationError) {
-          console.warn('Translation failed, using English:', translationError);
-          // Fall back to English if translation fails
-        }
-      }
-    }
+    `).bind(lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, property_id).all()
     
     return c.json({ 
       success: true,
-      activities: translatedActivities.map(a => ({
+      activities: activities.results.map(a => ({
         ...a,
         images: a.images ? JSON.parse(a.images) : []
       }))
@@ -5419,6 +5583,83 @@ app.post('/api/chatbot/chat', async (c) => {
     const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
     
+    // 🔗 SMART LINK SEARCH: Find relevant activities, restaurants, spa, events
+    const messageLowerCase = message.toLowerCase()
+    const relevantLinks: any[] = []
+    
+    // Search keywords from user message
+    const searchTerms = messageLowerCase.split(/\s+/).filter(w => w.length > 3)
+    
+    try {
+      // Search Activities
+      const activities = await DB.prepare(`
+        SELECT activity_id, title_en, short_description_en, vendor_id
+        FROM activities a
+        JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
+        WHERE vp.property_id = ? AND a.status = 'active' AND vp.status = 'active'
+        LIMIT 50
+      `).bind(property_id).all()
+      
+      for (const activity of (activities.results || [])) {
+        const titleLower = activity.title_en.toLowerCase()
+        const descLower = (activity.short_description_en || '').toLowerCase()
+        const matchScore = searchTerms.filter(term => 
+          titleLower.includes(term) || descLower.includes(term)
+        ).length
+        
+        if (matchScore > 0) {
+          relevantLinks.push({
+            type: 'activity',
+            id: activity.activity_id,
+            title: activity.title_en,
+            url: `/activity?id=${activity.activity_id}&property=${property_id}&lang=en`,
+            score: matchScore
+          })
+        }
+      }
+      
+      // Search Hotel Offerings (Restaurants, Spa, Events)
+      const offerings = await DB.prepare(`
+        SELECT offering_id, title_en, short_description_en, offering_type
+        FROM hotel_offerings
+        WHERE property_id = ? AND status = 'active'
+        LIMIT 50
+      `).bind(property_id).all()
+      
+      for (const offering of (offerings.results || [])) {
+        const titleLower = offering.title_en.toLowerCase()
+        const descLower = (offering.short_description_en || '').toLowerCase()
+        const matchScore = searchTerms.filter(term => 
+          titleLower.includes(term) || descLower.includes(term)
+        ).length
+        
+        if (matchScore > 0) {
+          relevantLinks.push({
+            type: offering.offering_type,
+            id: offering.offering_id,
+            title: offering.title_en,
+            url: `/offering?id=${offering.offering_id}&property=${property_id}&lang=en`,
+            score: matchScore
+          })
+        }
+      }
+    } catch (linkError) {
+      console.error('Link search error:', linkError)
+    }
+    
+    // Sort by relevance and take top 3
+    relevantLinks.sort((a, b) => b.score - a.score)
+    const topLinks = relevantLinks.slice(0, 3)
+    
+    // Build link context for AI
+    let linkContext = ''
+    if (topLinks.length > 0) {
+      linkContext = '\n\n📎 RELEVANT LINKS (Include these in your response):\n'
+      topLinks.forEach(link => {
+        linkContext += `- ${link.title}: ${link.url}\n`
+      })
+    }
+    
     // Generate AI response - use Cloudflare env bindings
     const apiKey = c.env.OPENAI_API_KEY
     const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
@@ -5438,7 +5679,7 @@ CRITICAL: You MUST respond in the SAME LANGUAGE as the guest's question. If they
 Guest's Question: "${message}"
 
 Relevant Hotel Information (English):
-${context}
+${context}${linkContext}
 
 Instructions:
 1. **Language Matching**: ALWAYS respond in the SAME language as the guest's question. Translate your response accordingly.
@@ -5446,8 +5687,9 @@ Instructions:
 3. **Accuracy**: Use ONLY the information provided above. Translate and adapt the information naturally.
 4. **Specifics**: Include prices, times, locations, booking details when mentioned (keep numbers/times as-is)
 5. **Brevity**: Keep responses concise (2-3 sentences) but complete
-6. **Referrals**: If information is NOT in the context above, politely refer to hotel staff IN THE GUEST'S LANGUAGE
-7. **Never** say "I don't have that information" - always be gracious
+6. **LINKS**: If relevant links are provided above, ALWAYS include them in your response using this EXACT format: [Link Text](URL). For example: "You can [view our diving activities here](/activity?id=7&property=1&lang=en)."
+7. **Referrals**: If information is NOT in the context above, politely refer to hotel staff IN THE GUEST'S LANGUAGE
+8. **Never** say "I don't have that information" - always be gracious
 
 Provide your response now IN THE SAME LANGUAGE as the guest's question:`
         
@@ -8891,6 +9133,12 @@ app.get('/hotel/:property_slug', async (c) => {
             });
             
             // Add message to chat
+            // Helper: Convert markdown links to HTML
+            function parseMarkdownLinks(text) {
+              // Convert [text](url) to <a> tags
+              return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
+            }
+            
             function addMessage(text, role) {
               const messageDiv = document.createElement('div');
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
@@ -8900,10 +9148,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 const primaryColor = window.chatbotPrimaryColor || '#667eea';
                 bubble.className = 'text-white px-4 py-2 rounded-2xl rounded-tr-none max-w-[80%]';
                 bubble.style.background = 'linear-gradient(to right, ' + primaryColor + ', ' + adjustColor(primaryColor, -20) + ')';
+                bubble.textContent = text; // User messages are plain text
               } else {
                 bubble.className = 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+                // Bot messages can have markdown links
+                const htmlContent = parseMarkdownLinks(text);
+                bubble.innerHTML = htmlContent.replace(/\n/g, '<br>'); // Preserve line breaks
               }
-              bubble.textContent = text;
               
               messageDiv.appendChild(bubble);
               chatMessages.appendChild(messageDiv);
@@ -15447,7 +15698,15 @@ app.get('/admin/dashboard', (c) => {
         <!-- Activities Tab -->
         <div id="activitiesTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4">All Activities</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold">All Activities</h2>
+                    <button 
+                        onclick="translateAllActivities()" 
+                        id="translateAllActivitiesBtn"
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all">
+                        <i class="fas fa-language mr-2"></i>Translate All to 8 Languages
+                    </button>
+                </div>
                 <div id="activitiesList" class="space-y-3"></div>
             </div>
         </div>
@@ -17793,6 +18052,44 @@ app.get('/admin/dashboard', (c) => {
           }
         } catch (error) {
           console.error('Batch translation error:', error);
+          alert('Translation failed: ' + error.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+      }
+      
+      async function translateAllActivities() {
+        const btn = document.getElementById('translateAllActivitiesBtn');
+        const originalText = btn.innerHTML;
+        
+        if (!confirm('This will translate ALL activities to 8 languages (Arabic, German, Russian, Polish, Italian, French, Czech, Ukrainian).' + String.fromCharCode(10) + String.fromCharCode(10) + 'This may take 2-3 minutes depending on the number of activities.' + String.fromCharCode(10) + String.fromCharCode(10) + 'Proceed?')) {
+          return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Translating...';
+        
+        try {
+          const response = await fetch('/api/admin/activities/translate-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              openai_api_key: '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'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Translation Complete!' + String.fromCharCode(10) + String.fromCharCode(10) + 'Total activities: ' + data.total + String.fromCharCode(10) + 'Successfully translated: ' + data.translated + String.fromCharCode(10) + 'Failed: ' + data.failed + String.fromCharCode(10) + String.fromCharCode(10) + 'All activities now available in 8 languages!');
+            loadActivities();
+          } else {
+            alert('Translation failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Activities batch translation error:', error);
           alert('Translation failed: ' + error.message);
         } finally {
           btn.disabled = false;
