@@ -15167,68 +15167,80 @@ app.get('/admin/dashboard', (c) => {
                                 </div>
                             </div>
 
-                            <!-- Rich Content Editor -->
+                            <!-- Modern Visual Page Builder - NO CODE REQUIRED! -->
                             <div>
-                                <label class="block text-sm font-bold mb-2">
-                                    <i class="fas fa-edit mr-1 text-purple-600"></i>Page Content *
-                                </label>
-                                
-                                <!-- Formatting Toolbar -->
-                                <div class="bg-gray-100 p-3 rounded-t-lg border border-b-0 flex flex-wrap gap-2">
-                                    <button type="button" onclick="formatText('bold')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Bold">
-                                        <i class="fas fa-bold"></i>
-                                    </button>
-                                    <button type="button" onclick="formatText('italic')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Italic">
-                                        <i class="fas fa-italic"></i>
-                                    </button>
-                                    <button type="button" onclick="formatText('underline')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Underline">
-                                        <i class="fas fa-underline"></i>
-                                    </button>
-                                    <span class="border-r mx-1"></span>
-                                    <button type="button" onclick="formatText('h2')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Heading 2">
-                                        <strong>H2</strong>
-                                    </button>
-                                    <button type="button" onclick="formatText('h3')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Heading 3">
-                                        <strong>H3</strong>
-                                    </button>
-                                    <span class="border-r mx-1"></span>
-                                    <button type="button" onclick="formatText('ul')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Bullet List">
-                                        <i class="fas fa-list-ul"></i>
-                                    </button>
-                                    <button type="button" onclick="formatText('ol')" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Numbered List">
-                                        <i class="fas fa-list-ol"></i>
-                                    </button>
-                                    <span class="border-r mx-1"></span>
-                                    <button type="button" onclick="insertTable()" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Insert Table">
-                                        <i class="fas fa-table"></i>
-                                    </button>
-                                    <button type="button" onclick="insertCallout('info')" class="px-3 py-1 bg-blue-100 border rounded hover:bg-blue-200" title="Info Box">
-                                        <i class="fas fa-info-circle text-blue-600"></i>
-                                    </button>
-                                    <button type="button" onclick="insertCallout('warning')" class="px-3 py-1 bg-yellow-100 border rounded hover:bg-yellow-200" title="Warning Box">
-                                        <i class="fas fa-exclamation-triangle text-yellow-600"></i>
-                                    </button>
-                                    <button type="button" onclick="insertCallout('success')" class="px-3 py-1 bg-green-100 border rounded hover:bg-green-200" title="Success Box">
-                                        <i class="fas fa-check-circle text-green-600"></i>
-                                    </button>
-                                    <span class="border-r mx-1"></span>
-                                    <button type="button" onclick="insertDivider()" class="px-3 py-1 bg-white border rounded hover:bg-gray-50" title="Divider">
-                                        <i class="fas fa-minus"></i>
+                                <div class="flex justify-between items-center mb-4">
+                                    <label class="block text-sm font-bold">
+                                        <i class="fas fa-magic mr-1 text-purple-600"></i>Page Content Builder - Visual & Simple!
+                                    </label>
+                                    <button type="button" onclick="toggleBuilderMode()" id="builderModeToggle" class="text-xs px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 transition">
+                                        <i class="fas fa-code mr-1"></i>Show HTML Editor
                                     </button>
                                 </div>
-
-                                <!-- Content Textarea -->
-                                <textarea id="infoPageContent" rows="15" required
-                                          class="w-full p-4 border rounded-b-lg font-mono text-sm focus:ring-2 focus:ring-purple-500"
-                                          placeholder="Enter your content here... You can use HTML or plain text.&#10;&#10;Use the toolbar above to format your content."></textarea>
                                 
-                                <div class="mt-2 flex justify-between items-center">
-                                    <p class="text-xs text-gray-500">
-                                        <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
-                                        Tip: Use the toolbar to add formatting, tables, and callout boxes!
+                                <!-- Visual Builder Mode (Default - NO HTML!) -->
+                                <div id="visualBuilderContainer" class="border-2 border-dashed border-purple-300 rounded-xl bg-gradient-to-br from-purple-50 to-blue-50 p-4 min-h-[450px]">
+                                    <!-- Add Content Blocks Menu -->
+                                    <div class="mb-4 bg-white rounded-lg p-4 shadow-md border border-purple-200">
+                                        <p class="text-sm font-bold text-purple-700 mb-3 flex items-center">
+                                            <i class="fas fa-plus-circle mr-2"></i>
+                                            Add Content Block - Click to Add:
+                                        </p>
+                                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                                            <button type="button" onclick="addContentBlock('heading')" class="px-4 py-3 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-heading text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">Heading</p>
+                                            </button>
+                                            <button type="button" onclick="addContentBlock('text')" class="px-4 py-3 bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-paragraph text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">Paragraph</p>
+                                            </button>
+                                            <button type="button" onclick="addContentBlock('list')" class="px-4 py-3 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-list text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">List</p>
+                                            </button>
+                                            <button type="button" onclick="addContentBlock('table')" class="px-4 py-3 bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-table text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">Table</p>
+                                            </button>
+                                            <button type="button" onclick="addContentBlock('callout')" class="px-4 py-3 bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-lightbulb text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">Alert Box</p>
+                                            </button>
+                                            <button type="button" onclick="addContentBlock('divider')" class="px-4 py-3 bg-gradient-to-br from-gray-400 to-gray-500 text-white rounded-lg hover:from-gray-500 hover:to-gray-600 text-sm shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                                <i class="fas fa-minus text-xl mb-1"></i>
+                                                <p class="text-xs font-semibold">Divider</p>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Content Blocks Container (Sortable Blocks!) -->
+                                    <div id="contentBlocksContainer" class="space-y-3 min-h-[200px]">
+                                        <div id="emptyBuilderState" class="text-center text-gray-500 py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                                            <i class="fas fa-cubes text-5xl mb-3 text-purple-300"></i>
+                                            <p class="text-lg font-semibold mb-1">No content blocks yet</p>
+                                            <p class="text-sm">Click the colorful buttons above to start building your page!</p>
+                                            <p class="text-xs mt-2 text-gray-400">No HTML knowledge required - it's drag & drop simple! 🎨</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden Advanced HTML Editor (for tech-savvy users) -->
+                                <textarea id="infoPageContent" rows="15" required
+                                          class="hidden w-full p-4 border rounded-lg font-mono text-sm focus:ring-2 focus:ring-purple-500 bg-gray-900 text-green-400"
+                                          placeholder="Advanced HTML editor for developers..."></textarea>
+                                
+                                <div class="mt-3 flex justify-between items-center">
+                                    <p class="text-xs text-gray-600 flex items-center gap-2">
+                                        <span class="flex items-center gap-1 px-2 py-1 bg-purple-100 rounded">
+                                            <i class="fas fa-magic text-purple-600"></i>
+                                            <span id="builderHelpText" class="font-semibold text-purple-700">Visual Builder Active - No Coding!</span>
+                                        </span>
+                                        <span class="text-gray-400">|</span>
+                                        <span class="text-gray-500">Add blocks • Edit • Reorder • Delete</span>
                                     </p>
-                                    <button type="button" onclick="previewContent()" class="text-purple-600 hover:text-purple-800 text-sm font-semibold">
-                                        <i class="fas fa-eye mr-1"></i>Preview
+                                    <button type="button" onclick="toggleLivePreview()" id="livePreviewBtn" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold shadow-md">
+                                        <i class="fas fa-eye mr-1"></i>Live Preview
                                     </button>
                                 </div>
                             </div>
@@ -16866,6 +16878,13 @@ app.get('/admin/dashboard', (c) => {
         document.getElementById('infoPageForm').reset();
         document.getElementById('infoPageId').value = '';
         document.getElementById('infoPageModalTitle').innerHTML = '<i class="fas fa-file-alt mr-2"></i>Create Info Page';
+        
+        // Reset visual builder
+        contentBlocks = [];
+        blockIdCounter = 0;
+        renderContentBlocks();
+        document.getElementById('infoPageContent').value = '';
+        
         document.getElementById('infoPageModal').classList.remove('hidden');
       }
 
@@ -16969,96 +16988,293 @@ app.get('/admin/dashboard', (c) => {
         }
       }
 
-      // Rich Text Editor Functions
-      window.formatText = function(command) {
-        const textarea = document.getElementById('infoPageContent');
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selected = textarea.value.substring(start, end);
-        const before = textarea.value.substring(0, start);
-        const after = textarea.value.substring(end);
+      // ============================================
+      // MODERN VISUAL PAGE BUILDER - NO CODE VERSION!
+      // ============================================
+      
+      let contentBlocks = [];
+      let blockIdCounter = 0;
+      let isVisualMode = true;
+      
+      // Toggle between visual builder and HTML editor
+      window.toggleBuilderMode = function() {
+        isVisualMode = !isVisualMode;
+        const visualContainer = document.getElementById('visualBuilderContainer');
+        const htmlTextarea = document.getElementById('infoPageContent');
+        const toggleBtn = document.getElementById('builderModeToggle');
+        const helpText = document.getElementById('builderHelpText');
         
-        let formatted = '';
+        if (isVisualMode) {
+          // Switch to Visual Mode
+          visualContainer.classList.remove('hidden');
+          htmlTextarea.classList.add('hidden');
+          toggleBtn.innerHTML = '<i class="fas fa-code mr-1"></i>Show HTML Editor';
+          helpText.textContent = 'Visual Builder Active - No Coding!';
+          // Convert HTML back to blocks if needed
+          if (htmlTextarea.value) {
+            // Keep HTML in sync
+            syncBlocksToHTML();
+          }
+        } else {
+          // Switch to HTML Mode
+          visualContainer.classList.add('hidden');
+          htmlTextarea.classList.remove('hidden');
+          toggleBtn.innerHTML = '<i class="fas fa-magic mr-1"></i>Show Visual Builder';
+          helpText.textContent = 'HTML Editor Active - For Advanced Users';
+          // Sync blocks to HTML
+          syncBlocksToHTML();
+        }
+      }
+      
+      // Add a new content block
+      window.addContentBlock = function(type) {
+        const blockId = 'block-' + (++blockIdCounter);
+        const block = { id: blockId, type: type, content: {} };
         
-        switch(command) {
-          case 'bold':
-            formatted = '<strong>' + selected + '</strong>';
+        // Set default content based on type
+        switch(type) {
+          case 'heading':
+            block.content = { text: 'New Heading', level: 'h2' };
             break;
-          case 'italic':
-            formatted = '<em>' + selected + '</em>';
+          case 'text':
+            block.content = { text: 'Write your paragraph text here...' };
             break;
-          case 'underline':
-            formatted = '<u>' + selected + '</u>';
+          case 'list':
+            block.content = { type: 'ul', items: ['First item', 'Second item', 'Third item'] };
             break;
-          case 'h2':
-            formatted = '<h2 class="text-2xl font-bold mb-3 mt-6">' + selected + '</h2>';
+          case 'table':
+            block.content = { 
+              headers: ['Header 1', 'Header 2'], 
+              rows: [['Data 1', 'Data 2'], ['Data 3', 'Data 4']]
+            };
             break;
-          case 'h3':
-            formatted = '<h3 class="text-xl font-bold mb-2 mt-4">' + selected + '</h3>';
+          case 'callout':
+            block.content = { type: 'info', title: 'Important Note', text: 'Your message here...' };
             break;
-          case 'ul':
-            formatted = '<ul class="list-disc list-inside space-y-1 mb-4">' + String.fromCharCode(10) + '  <li>' + selected + '</li>' + String.fromCharCode(10) + '</ul>';
-            break;
-          case 'ol':
-            formatted = '<ol class="list-decimal list-inside space-y-1 mb-4">' + String.fromCharCode(10) + '  <li>' + selected + '</li>' + String.fromCharCode(10) + '</ol>';
+          case 'divider':
+            block.content = {};
             break;
         }
         
-        textarea.value = before + formatted + after;
-        textarea.focus();
-        textarea.selectionStart = start;
-        textarea.selectionEnd = start + formatted.length;
+        contentBlocks.push(block);
+        renderContentBlocks();
+        syncBlocksToHTML();
       }
-
-      window.insertTable = function() {
-        const table = '<table class="w-full border-collapse border border-gray-300 mb-4">' + String.fromCharCode(10) +
-          '  <thead>' + String.fromCharCode(10) +
-          '    <tr class="bg-gray-100">' + String.fromCharCode(10) +
-          '      <th class="border border-gray-300 px-4 py-2">Header 1</th>' + String.fromCharCode(10) +
-          '      <th class="border border-gray-300 px-4 py-2">Header 2</th>' + String.fromCharCode(10) +
-          '    </tr>' + String.fromCharCode(10) +
-          '  </thead>' + String.fromCharCode(10) +
-          '  <tbody>' + String.fromCharCode(10) +
-          '    <tr>' + String.fromCharCode(10) +
-          '      <td class="border border-gray-300 px-4 py-2">Data 1</td>' + String.fromCharCode(10) +
-          '      <td class="border border-gray-300 px-4 py-2">Data 2</td>' + String.fromCharCode(10) +
-          '    </tr>' + String.fromCharCode(10) +
-          '  </tbody>' + String.fromCharCode(10) +
-          '</table>';
+      
+      // Render all content blocks
+      window.renderContentBlocks = function() {
+        const container = document.getElementById('contentBlocksContainer');
+        const emptyState = document.getElementById('emptyBuilderState');
         
-        const textarea = document.getElementById('infoPageContent');
-        textarea.value += String.fromCharCode(10) + table;
+        if (contentBlocks.length === 0) {
+          if (emptyState) emptyState.classList.remove('hidden');
+          return;
+        }
+        
+        if (emptyState) emptyState.classList.add('hidden');
+        
+        container.innerHTML = contentBlocks.map((block, index) => {
+          return renderBlock(block, index);
+        }).join('');
       }
-
-      window.insertCallout = function(type) {
-        const colors = {
-          info: 'bg-blue-50 border-blue-300 text-blue-800',
-          warning: 'bg-yellow-50 border-yellow-300 text-yellow-800',
-          success: 'bg-green-50 border-green-300 text-green-800'
-        };
-        const icons = {
-          info: 'fas fa-info-circle',
-          warning: 'fas fa-exclamation-triangle',
-          success: 'fas fa-check-circle'
+      
+      // Render individual block
+      function renderBlock(block, index) {
+        const blockTypeColors = {
+          heading: 'from-blue-100 to-blue-200',
+          text: 'from-gray-100 to-gray-200',
+          list: 'from-green-100 to-green-200',
+          table: 'from-orange-100 to-orange-200',
+          callout: 'from-yellow-100 to-yellow-200',
+          divider: 'from-gray-100 to-gray-200'
         };
         
-        const callout = '<div class="border-l-4 p-4 mb-4 ' + colors[type] + '">' + String.fromCharCode(10) +
-          '  <div class="flex items-start">' + String.fromCharCode(10) +
-          '    <i class="' + icons[type] + ' text-xl mr-3 mt-1"></i>' + String.fromCharCode(10) +
-          '    <div>' + String.fromCharCode(10) +
-          '      <p class="font-semibold">Important Note</p>' + String.fromCharCode(10) +
-          '      <p>Your message here...</p>' + String.fromCharCode(10) +
-          '    </div>' + String.fromCharCode(10) +
-          '  </div>' + String.fromCharCode(10) +
-          '</div>';
+        let blockHTML = '<div class="bg-gradient-to-r ' + blockTypeColors[block.type] + ' p-4 rounded-lg border-2 border-white shadow-md hover:shadow-lg transition-all" data-block-id="' + block.id + '">' +
+          '<div class="flex justify-between items-start mb-3">' +
+          '<span class="text-xs font-bold text-gray-600 uppercase px-2 py-1 bg-white rounded">' + block.type + '</span>' +
+          '<div class="flex gap-1">';
         
-        const textarea = document.getElementById('infoPageContent');
-        textarea.value += String.fromCharCode(10) + callout;
+        if (index > 0) {
+          blockHTML += '<button onclick="moveBlockUp(' + index + ')" class="px-2 py-1 bg-white rounded hover:bg-gray-50 text-xs"><i class="fas fa-arrow-up"></i></button>';
+        }
+        if (index < contentBlocks.length - 1) {
+          blockHTML += '<button onclick="moveBlockDown(' + index + ')" class="px-2 py-1 bg-white rounded hover:bg-gray-50 text-xs"><i class="fas fa-arrow-down"></i></button>';
+        }
+        blockHTML += '<button onclick="editBlock(' + index + ')" class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"><i class="fas fa-edit"></i></button>' +
+          '<button onclick="deleteBlock(' + index + ')" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"><i class="fas fa-trash"></i></button>' +
+          '</div></div>';
+        
+        // Render block preview
+        switch(block.type) {
+          case 'heading':
+            blockHTML += '<' + block.content.level + ' class="font-bold text-gray-800">' + block.content.text + '</' + block.content.level + '>';
+            break;
+          case 'text':
+            blockHTML += '<p class="text-gray-700">' + block.content.text + '</p>';
+            break;
+          case 'list':
+            const listTag = block.content.type === 'ol' ? 'ol' : 'ul';
+            const listClass = block.content.type === 'ol' ? 'list-decimal' : 'list-disc';
+            blockHTML += '<' + listTag + ' class="' + listClass + ' list-inside space-y-1">';
+            block.content.items.forEach(item => {
+              blockHTML += '<li>' + item + '</li>';
+            });
+            blockHTML += '</' + listTag + '>';
+            break;
+          case 'table':
+            blockHTML += '<table class="w-full border text-sm"><thead class="bg-gray-100"><tr>';
+            block.content.headers.forEach(header => {
+              blockHTML += '<th class="border px-2 py-1">' + header + '</th>';
+            });
+            blockHTML += '</tr></thead><tbody>';
+            block.content.rows.forEach(row => {
+              blockHTML += '<tr>';
+              row.forEach(cell => {
+                blockHTML += '<td class="border px-2 py-1">' + cell + '</td>';
+              });
+              blockHTML += '</tr>';
+            });
+            blockHTML += '</tbody></table>';
+            break;
+          case 'callout':
+            const calloutColors = {
+              info: 'bg-blue-50 border-blue-400',
+              warning: 'bg-yellow-50 border-yellow-400',
+              success: 'bg-green-50 border-green-400'
+            };
+            blockHTML += '<div class="border-l-4 p-3 ' + calloutColors[block.content.type] + '">' +
+              '<p class="font-semibold">' + block.content.title + '</p>' +
+              '<p class="text-sm">' + block.content.text + '</p>' +
+              '</div>';
+            break;
+          case 'divider':
+            blockHTML += '<hr class="border-gray-400">';
+            break;
+        }
+        
+        blockHTML += '</div>';
+        return blockHTML;
       }
-
-      window.insertDivider = function() {
-        const textarea = document.getElementById('infoPageContent');
-        textarea.value += String.fromCharCode(10) + '<hr class="my-6 border-gray-300">' + String.fromCharCode(10);
+      
+      // Move block up
+      window.moveBlockUp = function(index) {
+        if (index > 0) {
+          [contentBlocks[index], contentBlocks[index - 1]] = [contentBlocks[index - 1], contentBlocks[index]];
+          renderContentBlocks();
+          syncBlocksToHTML();
+        }
+      }
+      
+      // Move block down
+      window.moveBlockDown = function(index) {
+        if (index < contentBlocks.length - 1) {
+          [contentBlocks[index], contentBlocks[index + 1]] = [contentBlocks[index + 1], contentBlocks[index]];
+          renderContentBlocks();
+          syncBlocksToHTML();
+        }
+      }
+      
+      // Edit block (inline editing)
+      window.editBlock = function(index) {
+        const block = contentBlocks[index];
+        let newContent;
+        
+        switch(block.type) {
+          case 'heading':
+            newContent = prompt('Edit heading:', block.content.text);
+            if (newContent) block.content.text = newContent;
+            break;
+          case 'text':
+            newContent = prompt('Edit text:', block.content.text);
+            if (newContent) block.content.text = newContent;
+            break;
+          case 'list':
+            newContent = prompt('Edit list items (comma-separated):', block.content.items.join(', '));
+            if (newContent) block.content.items = newContent.split(',').map(s => s.trim());
+            break;
+          case 'callout':
+            const newTitle = prompt('Edit title:', block.content.title);
+            if (newTitle) block.content.title = newTitle;
+            const newText = prompt('Edit message:', block.content.text);
+            if (newText) block.content.text = newText;
+            break;
+        }
+        
+        renderContentBlocks();
+        syncBlocksToHTML();
+      }
+      
+      // Delete block
+      window.deleteBlock = function(index) {
+        if (confirm('Delete this block?')) {
+          contentBlocks.splice(index, 1);
+          renderContentBlocks();
+          syncBlocksToHTML();
+        }
+      }
+      
+      // Sync blocks to HTML (for saving)
+      function syncBlocksToHTML() {
+        let html = '';
+        
+        contentBlocks.forEach(block => {
+          switch(block.type) {
+            case 'heading':
+              html += '<' + block.content.level + ' class="text-2xl font-bold mb-3 mt-6">' + block.content.text + '</' + block.content.level + '>' + String.fromCharCode(10);
+              break;
+            case 'text':
+              html += '<p class="mb-4">' + block.content.text + '</p>' + String.fromCharCode(10);
+              break;
+            case 'list':
+              const listTag = block.content.type === 'ol' ? 'ol' : 'ul';
+              const listClass = block.content.type === 'ol' ? 'list-decimal' : 'list-disc';
+              html += '<' + listTag + ' class="' + listClass + ' list-inside space-y-1 mb-4">' + String.fromCharCode(10);
+              block.content.items.forEach(item => {
+                html += '  <li>' + item + '</li>' + String.fromCharCode(10);
+              });
+              html += '</' + listTag + '>' + String.fromCharCode(10);
+              break;
+            case 'table':
+              html += '<table class="w-full border-collapse border border-gray-300 mb-4">' + String.fromCharCode(10);
+              html += '  <thead><tr class="bg-gray-100">';
+              block.content.headers.forEach(header => {
+                html += '<th class="border border-gray-300 px-4 py-2">' + header + '</th>';
+              });
+              html += '</tr></thead>' + String.fromCharCode(10);
+              html += '  <tbody>';
+              block.content.rows.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => {
+                  html += '<td class="border border-gray-300 px-4 py-2">' + cell + '</td>';
+                });
+                html += '</tr>';
+              });
+              html += '</tbody></table>' + String.fromCharCode(10);
+              break;
+            case 'callout':
+              const calloutColors = {
+                info: 'bg-blue-50 border-blue-300 text-blue-800',
+                warning: 'bg-yellow-50 border-yellow-300 text-yellow-800',
+                success: 'bg-green-50 border-green-300 text-green-800'
+              };
+              html += '<div class="border-l-4 p-4 mb-4 ' + calloutColors[block.content.type] + '">' + String.fromCharCode(10);
+              html += '  <p class="font-semibold">' + block.content.title + '</p>' + String.fromCharCode(10);
+              html += '  <p>' + block.content.text + '</p>' + String.fromCharCode(10);
+              html += '</div>' + String.fromCharCode(10);
+              break;
+            case 'divider':
+              html += '<hr class="my-6 border-gray-300">' + String.fromCharCode(10);
+              break;
+          }
+        });
+        
+        document.getElementById('infoPageContent').value = html;
+      }
+      
+      // Toggle live preview
+      window.toggleLivePreview = function() {
+        syncBlocksToHTML();
+        window.previewContent();
       }
 
       window.previewContent = function() {
