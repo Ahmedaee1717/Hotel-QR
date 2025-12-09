@@ -15423,6 +15423,7 @@ app.get('/admin/dashboard', (c) => {
                 <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
                 <button data-tab="chatbot" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-robot mr-2"></i><span>AI Chatbot</span></button>
                 <button data-tab="beach" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-umbrella-beach mr-2"></i><span>Beach</span></button>
+                <button data-tab="feedback" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-comments mr-2"></i><span>Feedback</span></button>
             </div>
         </div>
 
@@ -17149,6 +17150,261 @@ app.get('/admin/dashboard', (c) => {
                 <div id="beachBookingsList" class="space-y-3">
                     <p class="text-gray-500 text-center py-8">No bookings for today</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Management Tab -->
+    <div id="feedbackTab" class="tab-content hidden">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-comments mr-2 text-purple-600"></i>
+                Feedback & Survey Management
+            </h2>
+            <p class="text-gray-600 mb-6">
+                Create dynamic feedback forms, generate QR codes, analyze guest sentiment, and get AI-powered insights on urgent issues.
+            </p>
+            
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="feedbackStats">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-blue-600 font-semibold">Total Responses</p>
+                            <p class="text-3xl font-bold text-blue-900" id="totalResponses">0</p>
+                        </div>
+                        <i class="fas fa-inbox text-4xl text-blue-400"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-green-600 font-semibold">Positive</p>
+                            <p class="text-3xl font-bold text-green-900" id="positiveCount">0</p>
+                        </div>
+                        <i class="fas fa-smile text-4xl text-green-400"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-red-600 font-semibold">Urgent</p>
+                            <p class="text-3xl font-bold text-red-900" id="urgentCount">0</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-400"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-yellow-600 font-semibold">Avg Sentiment</p>
+                            <p class="text-3xl font-bold text-yellow-900" id="avgSentiment">0.0</p>
+                        </div>
+                        <i class="fas fa-chart-line text-4xl text-yellow-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-3 mb-6">
+                <button onclick="createNewForm()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-plus mr-2"></i>Create New Form
+                </button>
+                <button onclick="viewAnalytics()" class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-chart-bar mr-2"></i>View Analytics
+                </button>
+                <button onclick="viewInsights()" class="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-lightbulb mr-2"></i>AI Insights
+                </button>
+            </div>
+
+            <!-- Forms List -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-xl font-bold mb-4"><i class="fas fa-list mr-2 text-purple-600"></i>Your Feedback Forms</h3>
+                <div id="formsList" class="space-y-3">
+                    <div class="text-center text-gray-500 py-8">
+                        <i class="fas fa-inbox text-5xl mb-3"></i>
+                        <p>No forms created yet. Click "Create New Form" to get started!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Urgent Alerts Section -->
+        <div class="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg shadow-lg p-6 mb-6 border-2 border-red-200" id="urgentAlertsSection" style="display: none;">
+            <h3 class="text-xl font-bold mb-4 text-red-800">
+                <i class="fas fa-exclamation-circle mr-2 animate-pulse"></i>
+                Urgent Issues Requiring Attention
+            </h3>
+            <div id="urgentAlertsList" class="space-y-3">
+            </div>
+        </div>
+
+        <!-- Recent Submissions -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-clock mr-2 text-blue-600"></i>Recent Feedback</h3>
+            <div id="recentSubmissions" class="space-y-3">
+                <div class="text-center text-gray-500 py-4">
+                    <p>No submissions yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Builder Modal -->
+    <div id="formBuilderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-xl">
+                <h3 class="text-2xl font-bold"><i class="fas fa-edit mr-2"></i>Form Builder</h3>
+                <p class="text-purple-100 mt-1">Create your custom feedback form</p>
+            </div>
+            
+            <div class="p-6">
+                <!-- Form Basic Info -->
+                <div class="mb-6">
+                    <h4 class="text-lg font-bold mb-4">Basic Information</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Form Name *</label>
+                            <input type="text" id="formName" class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., Guest Satisfaction Survey">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Description</label>
+                            <textarea id="formDescription" rows="2" class="w-full px-4 py-2 border rounded-lg" placeholder="Brief description of this form"></textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Form Type</label>
+                                <select id="formType" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="feedback">Feedback</option>
+                                    <option value="survey">Survey</option>
+                                    <option value="complaint">Complaint</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Thank You Message</label>
+                                <input type="text" id="thankYouMessage" class="w-full px-4 py-2 border rounded-lg" placeholder="Thank you for your feedback!">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Required Fields -->
+                <div class="mb-6 bg-gray-50 p-4 rounded-lg">
+                    <h4 class="text-lg font-bold mb-3">Required Guest Information</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="requireRoomNumber" class="w-4 h-4 text-purple-600">
+                            <span class="text-sm">Room Number</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="requireGuestName" class="w-4 h-4 text-purple-600">
+                            <span class="text-sm">Guest Name</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="requireEmail" class="w-4 h-4 text-purple-600">
+                            <span class="text-sm">Email</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="requirePhone" class="w-4 h-4 text-purple-600">
+                            <span class="text-sm">Phone</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Questions Builder -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold">Questions</h4>
+                        <button onclick="addQuestion()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-plus mr-2"></i>Add Question
+                        </button>
+                    </div>
+                    <div id="questionsList" class="space-y-3">
+                        <div class="text-center text-gray-500 py-4 border-2 border-dashed border-gray-300 rounded-lg">
+                            <i class="fas fa-question-circle text-3xl mb-2"></i>
+                            <p>No questions yet. Click "Add Question" to start!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-end gap-3 pt-4 border-t">
+                    <button onclick="closeFormBuilder()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button onclick="saveForm()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:shadow-lg">
+                        <i class="fas fa-save mr-2"></i>Save Form
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Question Type Modal -->
+    <div id="questionTypeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-xl">
+                <h3 class="text-xl font-bold">Choose Question Type</h3>
+            </div>
+            <div class="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <button onclick="selectQuestionType('text')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-font text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Short Text</p>
+                    <p class="text-xs text-gray-500">Single line input</p>
+                </button>
+                <button onclick="selectQuestionType('textarea')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-align-left text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Long Text</p>
+                    <p class="text-xs text-gray-500">Multi-line input</p>
+                </button>
+                <button onclick="selectQuestionType('rating')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-star text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Rating</p>
+                    <p class="text-xs text-gray-500">1-5 stars</p>
+                </button>
+                <button onclick="selectQuestionType('scale')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-sliders-h text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Scale</p>
+                    <p class="text-xs text-gray-500">1-10 scale</p>
+                </button>
+                <button onclick="selectQuestionType('multiple_choice')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-list-ul text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Multiple Choice</p>
+                    <p class="text-xs text-gray-500">Pick one option</p>
+                </button>
+                <button onclick="selectQuestionType('yes_no')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-check-circle text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">Yes/No</p>
+                    <p class="text-xs text-gray-500">Binary choice</p>
+                </button>
+                <button onclick="selectQuestionType('nps')" class="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-600 hover:bg-purple-50 transition-all">
+                    <i class="fas fa-chart-line text-3xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold">NPS</p>
+                    <p class="text-xs text-gray-500">0-10 recommendation</p>
+                </button>
+            </div>
+            <div class="p-4 border-t flex justify-end">
+                <button onclick="closeQuestionTypeModal()" class="px-6 py-2 border rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Submission Modal -->
+    <div id="submissionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">
+                <h3 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>Feedback Details</h3>
+            </div>
+            <div id="submissionDetails" class="p-6">
+                <!-- Will be populated dynamically -->
+            </div>
+            <div class="p-4 border-t flex justify-end">
+                <button onclick="closeSubmissionModal()" class="px-6 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                    Close
+                </button>
             </div>
         </div>
     </div>
@@ -20322,6 +20578,431 @@ app.get('/admin/dashboard', (c) => {
       }
 
       loadRooms();
+
+      // ========== FEEDBACK MANAGEMENT FUNCTIONS ==========
+      
+      let currentFormId = null;
+      let formQuestions = [];
+      let currentQuestionIndex = 0;
+
+      // Load feedback stats and forms
+      async function loadFeedbackTab() {
+        try {
+          // Load analytics
+          const analyticsRes = await fetch('/api/admin/feedback/analytics/' + propertyId);
+          const analyticsData = await analyticsRes.json();
+          
+          if (analyticsData.success) {
+            document.getElementById('totalResponses').textContent = analyticsData.stats.total_submissions || 0;
+            document.getElementById('positiveCount').textContent = analyticsData.stats.positive_count || 0;
+            document.getElementById('urgentCount').textContent = analyticsData.stats.urgent_count || 0;
+            document.getElementById('avgSentiment').textContent = (analyticsData.stats.avg_sentiment || 0).toFixed(1);
+            
+            // Show urgent alerts if any
+            if (analyticsData.insights && analyticsData.insights.length > 0) {
+              const urgentSection = document.getElementById('urgentAlertsSection');
+              const alertsList = document.getElementById('urgentAlertsList');
+              urgentSection.style.display = 'block';
+              
+              alertsList.innerHTML = analyticsData.insights.map(insight => \`
+                <div class="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow">
+                  <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                      <h4 class="font-bold text-red-900">\${insight.title}</h4>
+                      <p class="text-gray-700 mt-1">\${insight.description}</p>
+                      <p class="text-sm text-gray-600 mt-2"><strong>Suggested Action:</strong> \${insight.action_suggested}</p>
+                      <span class="inline-block mt-2 px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
+                        \${insight.priority.toUpperCase()}
+                      </span>
+                    </div>
+                    <button onclick="resolveInsight(\${insight.insight_id})" class="ml-4 px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                      <i class="fas fa-check mr-1"></i>Resolve
+                    </button>
+                  </div>
+                </div>
+              \`).join('');
+            }
+            
+            // Show recent submissions
+            if (analyticsData.recent_submissions && analyticsData.recent_submissions.length > 0) {
+              const recentList = document.getElementById('recentSubmissions');
+              recentList.innerHTML = analyticsData.recent_submissions.map(sub => \`
+                <div class="bg-gray-50 p-4 rounded-lg border hover:shadow-md transition-all cursor-pointer" onclick="viewSubmission(\${sub.submission_id})">
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <h4 class="font-semibold">\${sub.form_name}</h4>
+                      <p class="text-sm text-gray-600 mt-1">
+                        \${sub.guest_name || 'Anonymous'} \${sub.room_number ? '• Room ' + sub.room_number : ''}
+                      </p>
+                      <span class="inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full \${
+                        sub.sentiment_label === 'positive' ? 'bg-green-100 text-green-800' :
+                        sub.sentiment_label === 'negative' ? 'bg-red-100 text-red-800' :
+                        sub.sentiment_label === 'urgent' ? 'bg-red-200 text-red-900' :
+                        'bg-gray-100 text-gray-800'
+                      }">
+                        \${sub.sentiment_label.toUpperCase()}
+                      </span>
+                    </div>
+                    <span class="text-sm text-gray-500">\${new Date(sub.submitted_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              \`).join('');
+            }
+          }
+          
+          // Load forms
+          const formsRes = await fetch('/api/admin/feedback/forms/' + propertyId);
+          const formsData = await formsRes.json();
+          
+          if (formsData.success && formsData.forms.length > 0) {
+            const formsList = document.getElementById('formsList');
+            formsList.innerHTML = formsData.forms.map(form => \`
+              <div class="bg-white p-4 rounded-lg border hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-3">
+                      <h4 class="font-bold text-lg">\${form.form_name}</h4>
+                      <span class="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">
+                        \${form.form_type.toUpperCase()}
+                      </span>
+                      \${form.is_active ? '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">ACTIVE</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">INACTIVE</span>'}
+                    </div>
+                    <p class="text-gray-600 text-sm mt-1">\${form.form_description || 'No description'}</p>
+                    <div class="flex gap-4 mt-3 text-sm text-gray-600">
+                      <span><i class="fas fa-inbox mr-1"></i>\${form.total_submissions || 0} responses</span>
+                      <span><i class="fas fa-exclamation-triangle mr-1 text-red-600"></i>\${form.urgent_count || 0} urgent</span>
+                      <span><i class="fas fa-smile mr-1 text-green-600"></i>Sentiment: \${(form.avg_sentiment || 0).toFixed(1)}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <button onclick="generateQR(\${form.form_id}, '\${form.form_name}')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 whitespace-nowrap">
+                      <i class="fas fa-qrcode mr-1"></i>QR Code
+                    </button>
+                    <button onclick="viewFormSubmissions(\${form.form_id})" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 whitespace-nowrap">
+                      <i class="fas fa-eye mr-1"></i>View Responses
+                    </button>
+                    <button onclick="copyFormLink(\${form.form_id})" class="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 whitespace-nowrap">
+                      <i class="fas fa-link mr-1"></i>Copy Link
+                    </button>
+                    <button onclick="editForm(\${form.form_id})" class="px-4 py-2 border border-gray-300 text-sm rounded hover:bg-gray-50 whitespace-nowrap">
+                      <i class="fas fa-edit mr-1"></i>Edit
+                    </button>
+                  </div>
+                </div>
+              </div>
+            \`).join('');
+          }
+        } catch (error) {
+          console.error('Load feedback error:', error);
+          alert('Failed to load feedback data');
+        }
+      }
+
+      // Create new form
+      function createNewForm() {
+        currentFormId = null;
+        formQuestions = [];
+        document.getElementById('formName').value = '';
+        document.getElementById('formDescription').value = '';
+        document.getElementById('formType').value = 'feedback';
+        document.getElementById('thankYouMessage').value = 'Thank you for your feedback!';
+        document.getElementById('requireRoomNumber').checked = false;
+        document.getElementById('requireGuestName').checked = false;
+        document.getElementById('requireEmail').checked = false;
+        document.getElementById('requirePhone').checked = false;
+        document.getElementById('questionsList').innerHTML = '<div class="text-center text-gray-500 py-4 border-2 border-dashed border-gray-300 rounded-lg"><i class="fas fa-question-circle text-3xl mb-2"></i><p>No questions yet. Click "Add Question" to start!</p></div>';
+        document.getElementById('formBuilderModal').classList.remove('hidden');
+      }
+
+      function closeFormBuilder() {
+        document.getElementById('formBuilderModal').classList.add('hidden');
+      }
+
+      // Add question
+      function addQuestion() {
+        document.getElementById('questionTypeModal').classList.remove('hidden');
+      }
+
+      function closeQuestionTypeModal() {
+        document.getElementById('questionTypeModal').classList.add('hidden');
+      }
+
+      function selectQuestionType(type) {
+        closeQuestionTypeModal();
+        
+        const questionText = prompt('Enter your question:');
+        if (!questionText) return;
+        
+        const question = {
+          question_text: questionText,
+          question_type: type,
+          is_required: true,
+          options: null,
+          display_order: formQuestions.length
+        };
+        
+        // For multiple choice, get options
+        if (type === 'multiple_choice') {
+          const optionsStr = prompt('Enter options (comma-separated):');
+          if (optionsStr) {
+            question.options = optionsStr.split(',').map(o => o.trim());
+          }
+        }
+        
+        formQuestions.push(question);
+        renderQuestions();
+      }
+
+      function renderQuestions() {
+        const questionsList = document.getElementById('questionsList');
+        if (formQuestions.length === 0) {
+          questionsList.innerHTML = '<div class="text-center text-gray-500 py-4 border-2 border-dashed border-gray-300 rounded-lg"><i class="fas fa-question-circle text-3xl mb-2"></i><p>No questions yet. Click "Add Question" to start!</p></div>';
+          return;
+        }
+        
+        questionsList.innerHTML = formQuestions.map((q, idx) => \`
+          <div class="bg-white p-4 rounded-lg border">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-gray-400">#\${idx + 1}</span>
+                  <span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">\${q.question_type.toUpperCase()}</span>
+                  \${q.is_required ? '<span class="text-red-500 text-sm">*</span>' : ''}
+                </div>
+                <p class="font-semibold mt-2">\${q.question_text}</p>
+                \${q.options ? \`<p class="text-sm text-gray-600 mt-1">Options: \${q.options.join(', ')}</p>\` : ''}
+              </div>
+              <button onclick="removeQuestion(\${idx})" class="text-red-600 hover:text-red-800">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        \`).join('');
+      }
+
+      function removeQuestion(index) {
+        formQuestions.splice(index, 1);
+        renderQuestions();
+      }
+
+      // Save form
+      async function saveForm() {
+        const formName = document.getElementById('formName').value;
+        if (!formName) {
+          alert('Please enter a form name');
+          return;
+        }
+        
+        if (formQuestions.length === 0) {
+          alert('Please add at least one question');
+          return;
+        }
+        
+        try {
+          // Create form
+          const formData = {
+            property_id: propertyId,
+            form_name: formName,
+            form_description: document.getElementById('formDescription').value,
+            form_type: document.getElementById('formType').value,
+            require_room_number: document.getElementById('requireRoomNumber').checked ? 1 : 0,
+            require_guest_name: document.getElementById('requireGuestName').checked ? 1 : 0,
+            require_email: document.getElementById('requireEmail').checked ? 1 : 0,
+            require_phone: document.getElementById('requirePhone').checked ? 1 : 0,
+            thank_you_message: document.getElementById('thankYouMessage').value
+          };
+          
+          const formRes = await fetch('/api/admin/feedback/forms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          });
+          
+          const formResult = await formRes.json();
+          if (!formResult.success) throw new Error('Failed to create form');
+          
+          const newFormId = formResult.form_id;
+          
+          // Add all questions
+          for (const question of formQuestions) {
+            await fetch('/api/admin/feedback/questions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                form_id: newFormId,
+                ...question
+              })
+            });
+          }
+          
+          alert('✅ Form created successfully!');
+          closeFormBuilder();
+          loadFeedbackTab();
+          
+        } catch (error) {
+          console.error('Save form error:', error);
+          alert('Failed to save form');
+        }
+      }
+
+      // Generate QR Code
+      async function generateQR(formId, formName) {
+        const formUrl = window.location.origin + '/feedback/' + formId;
+        const qrApiUrl = \`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=\${encodeURIComponent(formUrl)}\`;
+        
+        // Create modal to show QR code
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = \`
+          <div class="bg-white rounded-xl p-6 max-w-md">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-qrcode mr-2 text-purple-600"></i>\${formName}</h3>
+            <div class="text-center mb-4">
+              <img src="\${qrApiUrl}" alt="QR Code" class="mx-auto border-4 border-purple-600 rounded-lg">
+            </div>
+            <p class="text-sm text-gray-600 mb-4 text-center">Scan this code to access the feedback form</p>
+            <div class="bg-gray-100 p-3 rounded mb-4 break-all text-sm">
+              <strong>URL:</strong> \${formUrl}
+            </div>
+            <div class="flex gap-3">
+              <a href="\${qrApiUrl}" download="feedback-qr-\${formId}.png" class="flex-1 bg-purple-600 text-white px-4 py-2 rounded text-center hover:bg-purple-700">
+                <i class="fas fa-download mr-2"></i>Download QR
+              </a>
+              <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-gray-200 px-4 py-2 rounded hover:bg-gray-300">
+                Close
+              </button>
+            </div>
+          </div>
+        \`;
+        document.body.appendChild(modal);
+        
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) modal.remove();
+        });
+      }
+
+      // Copy form link
+      function copyFormLink(formId) {
+        const formUrl = window.location.origin + '/feedback/' + formId;
+        navigator.clipboard.writeText(formUrl).then(() => {
+          alert('✅ Link copied to clipboard!\\n' + formUrl);
+        }).catch(() => {
+          prompt('Copy this link:', formUrl);
+        });
+      }
+
+      // View submission details
+      async function viewSubmission(submissionId) {
+        try {
+          const res = await fetch('/api/admin/feedback/submissions/' + submissionId);
+          const data = await res.json();
+          
+          if (data.success) {
+            const sub = data.submission;
+            const details = document.getElementById('submissionDetails');
+            
+            details.innerHTML = \`
+              <div class="space-y-4">
+                <div class="bg-gray-50 p-4 rounded-lg">
+                  <h4 class="font-bold mb-2">Guest Information</h4>
+                  <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div><strong>Name:</strong> \${sub.guest_name || 'N/A'}</div>
+                    <div><strong>Room:</strong> \${sub.room_number || 'N/A'}</div>
+                    <div><strong>Email:</strong> \${sub.guest_email || 'N/A'}</div>
+                    <div><strong>Phone:</strong> \${sub.guest_phone || 'N/A'}</div>
+                    <div><strong>Submitted:</strong> \${new Date(sub.submitted_at).toLocaleString()}</div>
+                    <div><strong>Source:</strong> \${sub.submission_source}</div>
+                  </div>
+                </div>
+                
+                <div class="bg-\${sub.sentiment_label === 'positive' ? 'green' : sub.sentiment_label === 'urgent' ? 'red' : 'gray'}-50 p-4 rounded-lg">
+                  <h4 class="font-bold mb-2">Sentiment Analysis</h4>
+                  <div class="flex items-center gap-4">
+                    <span class="px-4 py-2 bg-white rounded-lg font-semibold text-\${sub.sentiment_label === 'positive' ? 'green' : sub.sentiment_label === 'urgent' ? 'red' : 'gray'}-800">
+                      \${sub.sentiment_label.toUpperCase()}
+                    </span>
+                    <span class="text-sm">Score: \${(sub.sentiment_score || 0).toFixed(2)}</span>
+                    \${sub.is_urgent ? '<span class="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full animate-pulse">URGENT</span>' : ''}
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 class="font-bold mb-3">Responses</h4>
+                  <div class="space-y-3">
+                    \${sub.answers.map(answer => \`
+                      <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="font-semibold text-purple-900 mb-2">\${answer.question_text}</p>
+                        <p class="text-gray-800">
+                          \${answer.answer_text || ''}
+                          \${answer.answer_numeric !== null ? '⭐ ' + answer.answer_numeric : ''}
+                        </p>
+                      </div>
+                    \`).join('')}
+                  </div>
+                </div>
+              </div>
+            \`;
+            
+            document.getElementById('submissionModal').classList.remove('hidden');
+            
+            // Mark as read
+            await fetch('/api/admin/feedback/submissions/' + submissionId + '/mark-read', { method: 'POST' });
+          }
+        } catch (error) {
+          console.error('View submission error:', error);
+          alert('Failed to load submission');
+        }
+      }
+
+      function closeSubmissionModal() {
+        document.getElementById('submissionModal').classList.add('hidden');
+      }
+
+      // Resolve insight
+      async function resolveInsight(insightId) {
+        if (!confirm('Mark this issue as resolved?')) return;
+        
+        try {
+          await fetch('/api/admin/feedback/insights/' + insightId + '/resolve', { method: 'POST' });
+          alert('✅ Issue marked as resolved');
+          loadFeedbackTab();
+        } catch (error) {
+          console.error('Resolve insight error:', error);
+          alert('Failed to resolve insight');
+        }
+      }
+
+      // View form submissions
+      function viewFormSubmissions(formId) {
+        // TODO: Implement detailed submissions view
+        alert('Form submissions view - Coming soon!');
+      }
+
+      // View analytics
+      function viewAnalytics() {
+        alert('Detailed analytics dashboard - Coming soon!');
+      }
+
+      // View insights
+      function viewInsights() {
+        alert('AI Insights dashboard - Coming soon!');
+      }
+
+      function editForm(formId) {
+        alert('Edit form - Coming soon!');
+      }
+
+      // Load feedback tab when admin dashboard loads
+      const originalLoadDashboard = loadDashboard;
+      loadDashboard = async function() {
+        await originalLoadDashboard();
+        // Check if feedback tab is active
+        if (document.querySelector('[data-tab="feedback"]')?.classList.contains('active')) {
+          loadFeedbackTab();
+        }
+      };
+
+      // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
     </script>
 </body>
 </html>
@@ -20832,6 +21513,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 </body>
 </html>
   `)
+})
+
+// Feedback submission page - serves static HTML
+app.get('/feedback/:form_id', async (c) => {
+  return c.redirect('/feedback.html?id=' + c.req.param('form_id'))
 })
 
 export default app

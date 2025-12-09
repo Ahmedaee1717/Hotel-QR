@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Form</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .star-rating { display: flex; gap: 0.5rem; font-size: 2rem; flex-direction: row-reverse; justify-content: flex-end; }
+        .star { cursor: pointer; color: #d1d5db; transition: color 0.2s; }
+        .star.active { color: #fbbf24; }
+        .star:hover, .star:hover ~ .star { color: #fbbf24; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-indigo-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <div id="loading" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+            <p class="text-gray-600">Loading form...</p>
+        </div>
+
+        <div id="formContainer" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8">
+                    <h1 class="text-3xl font-bold mb-2" id="formName"></h1>
+                    <p class="text-purple-100" id="formDescription"></p>
+                    <p class="text-sm text-purple-200 mt-2" id="propertyName"></p>
+                </div>
+
+                <div class="p-8">
+                    <form id="feedbackForm" class="space-y-6">
+                        <div id="guestInfoSection" class="space-y-4 pb-6 border-b">
+                            <h3 class="text-lg font-bold text-gray-900">Your Information</h3>
+                            <div id="guestFields"></div>
+                        </div>
+
+                        <div id="questionsSection" class="space-y-6"></div>
+
+                        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all">
+                            <i class="fas fa-paper-plane mr-2"></i>Submit Feedback
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="thankYouMessage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
+                <div class="mb-6">
+                    <i class="fas fa-check-circle text-6xl text-green-500"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4" id="thankYouText"></h2>
+                <p class="text-gray-600 mb-6">We appreciate you taking the time to share your thoughts.</p>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
+                <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Form Not Available</h2>
+                <p class="text-gray-600" id="errorText"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/feedback.js"></script>
+</body>
+</html>
