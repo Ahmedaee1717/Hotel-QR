@@ -6760,6 +6760,470 @@ app.get('/api/beach/bookings/:booking_reference', async (c) => {
 
 // ========== END BEACH BOOKING API ENDPOINTS ==========
 
+// ========== FEEDBACK SYSTEM API ENDPOINTS ==========
+
+// Admin: Get all feedback forms for a property
+app.get('/api/admin/feedback/forms/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const forms = await DB.prepare(`
+      SELECT 
+        f.*,
+        COUNT(DISTINCT s.submission_id) as total_submissions,
+        SUM(CASE WHEN s.is_urgent = 1 THEN 1 ELSE 0 END) as urgent_count,
+        AVG(s.sentiment_score) as avg_sentiment
+      FROM feedback_forms f
+      LEFT JOIN feedback_submissions s ON f.form_id = s.form_id
+      WHERE f.property_id = ?
+      GROUP BY f.form_id
+      ORDER BY f.created_at DESC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, forms: forms.results })
+  } catch (error) {
+    console.error('Get feedback forms error:', error)
+    return c.json({ error: 'Failed to get forms' }, 500)
+  }
+})
+
+// Admin: Create new feedback form
+app.post('/api/admin/feedback/forms', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  const { property_id, form_name, form_description, form_type, require_room_number, require_guest_name, require_email, require_phone, thank_you_message } = body
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO feedback_forms (
+        property_id, form_name, form_description, form_type,
+        require_room_number, require_guest_name, require_email, require_phone,
+        thank_you_message
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id, form_name, form_description || '', form_type || 'feedback',
+      require_room_number || 0, require_guest_name || 0, require_email || 0, require_phone || 0,
+      thank_you_message || 'Thank you for your feedback!'
+    ).run()
+    
+    const form_id = result.meta.last_row_id
+    
+    return c.json({ success: true, form_id })
+  } catch (error) {
+    console.error('Create feedback form error:', error)
+    return c.json({ error: 'Failed to create form' }, 500)
+  }
+})
+
+// Admin: Get form details with questions
+app.get('/api/admin/feedback/forms/:form_id/details', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  
+  try {
+    const form = await DB.prepare(`
+      SELECT * FROM feedback_forms WHERE form_id = ?
+    `).bind(form_id).first()
+    
+    if (!form) {
+      return c.json({ error: 'Form not found' }, 404)
+    }
+    
+    const questions = await DB.prepare(`
+      SELECT * FROM feedback_questions
+      WHERE form_id = ?
+      ORDER BY display_order ASC
+    `).bind(form_id).all()
+    
+    return c.json({ 
+      success: true, 
+      form: {
+        ...form,
+        questions: questions.results.map(q => ({
+          ...q,
+          options: q.options ? JSON.parse(q.options) : null
+        }))
+      }
+    })
+  } catch (error) {
+    console.error('Get form details error:', error)
+    return c.json({ error: 'Failed to get form details' }, 500)
+  }
+})
+
+// Admin: Add question to form
+app.post('/api/admin/feedback/questions', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  const { form_id, question_text, question_type, is_required, options, display_order } = body
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO feedback_questions (
+        form_id, question_text, question_type, is_required, options, display_order
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      form_id, question_text, question_type, is_required !== false ? 1 : 0,
+      options ? JSON.stringify(options) : null, display_order || 0
+    ).run()
+    
+    return c.json({ success: true, question_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Add question error:', error)
+    return c.json({ error: 'Failed to add question' }, 500)
+  }
+})
+
+// Admin: Delete question
+app.delete('/api/admin/feedback/questions/:question_id', async (c) => {
+  const { DB } = c.env
+  const { question_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM feedback_questions WHERE question_id = ?
+    `).bind(question_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete question error:', error)
+    return c.json({ error: 'Failed to delete question' }, 500)
+  }
+})
+
+// Admin: Update form
+app.put('/api/admin/feedback/forms/:form_id', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  const body = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE feedback_forms
+      SET form_name = ?, form_description = ?, is_active = ?,
+          require_room_number = ?, require_guest_name = ?, 
+          require_email = ?, require_phone = ?,
+          thank_you_message = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE form_id = ?
+    `).bind(
+      body.form_name, body.form_description, body.is_active,
+      body.require_room_number, body.require_guest_name,
+      body.require_email, body.require_phone,
+      body.thank_you_message, form_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update form error:', error)
+    return c.json({ error: 'Failed to update form' }, 500)
+  }
+})
+
+// Admin: Delete form
+app.delete('/api/admin/feedback/forms/:form_id', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM feedback_forms WHERE form_id = ?
+    `).bind(form_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete form error:', error)
+    return c.json({ error: 'Failed to delete form' }, 500)
+  }
+})
+
+// PUBLIC: Get feedback form for guest (by form_id)
+app.get('/api/feedback/forms/:form_id', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  
+  try {
+    const form = await DB.prepare(`
+      SELECT f.*, p.name as property_name
+      FROM feedback_forms f
+      JOIN properties p ON f.property_id = p.property_id
+      WHERE f.form_id = ? AND f.is_active = 1
+    `).bind(form_id).first()
+    
+    if (!form) {
+      return c.json({ error: 'Form not found or inactive' }, 404)
+    }
+    
+    const questions = await DB.prepare(`
+      SELECT * FROM feedback_questions
+      WHERE form_id = ?
+      ORDER BY display_order ASC
+    `).bind(form_id).all()
+    
+    return c.json({ 
+      success: true, 
+      form: {
+        ...form,
+        questions: questions.results.map(q => ({
+          ...q,
+          options: q.options ? JSON.parse(q.options) : null
+        }))
+      }
+    })
+  } catch (error) {
+    console.error('Get public form error:', error)
+    return c.json({ error: 'Failed to get form' }, 500)
+  }
+})
+
+// PUBLIC: Submit feedback
+app.post('/api/feedback/submit', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  const { form_id, room_number, guest_name, guest_email, guest_phone, answers, submission_source, session_id } = body
+  
+  try {
+    // Get form details
+    const form = await DB.prepare(`
+      SELECT * FROM feedback_forms WHERE form_id = ?
+    `).bind(form_id).first()
+    
+    if (!form) {
+      return c.json({ error: 'Form not found' }, 404)
+    }
+    
+    // Analyze sentiment from answers
+    let sentiment_score = 0
+    let sentiment_label = 'neutral'
+    let is_urgent = 0
+    
+    // Simple sentiment analysis based on ratings and text
+    for (const answer of answers) {
+      if (answer.answer_numeric !== undefined && answer.answer_numeric !== null) {
+        // For rating/scale questions (1-5 or 1-10)
+        const normalized = answer.answer_numeric / 10 // Normalize to 0-1
+        sentiment_score += normalized
+      }
+      
+      if (answer.answer_text) {
+        const lowerText = answer.answer_text.toLowerCase()
+        // Check for urgent keywords
+        if (lowerText.match(/urgent|emergency|terrible|awful|angry|furious|disgusting|complaint/)) {
+          is_urgent = 1
+          sentiment_label = 'urgent'
+        }
+        // Negative keywords
+        else if (lowerText.match(/bad|poor|disappointed|unhappy|dirty|broken|not working/)) {
+          sentiment_score -= 0.5
+        }
+        // Positive keywords
+        else if (lowerText.match(/excellent|amazing|wonderful|great|fantastic|perfect|loved/)) {
+          sentiment_score += 0.5
+        }
+      }
+    }
+    
+    // Calculate final sentiment
+    if (answers.length > 0) {
+      sentiment_score = sentiment_score / answers.length
+    }
+    
+    if (is_urgent === 0) {
+      if (sentiment_score > 0.6) sentiment_label = 'positive'
+      else if (sentiment_score < -0.2) sentiment_label = 'negative'
+      else sentiment_label = 'neutral'
+    }
+    
+    // Create submission
+    const submissionResult = await DB.prepare(`
+      INSERT INTO feedback_submissions (
+        form_id, property_id, room_number, guest_name, guest_email, guest_phone,
+        submission_source, session_id, sentiment_score, sentiment_label, is_urgent
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      form_id, form.property_id, room_number || null, guest_name || null,
+      guest_email || null, guest_phone || null, submission_source || 'web',
+      session_id || null, sentiment_score, sentiment_label, is_urgent
+    ).run()
+    
+    const submission_id = submissionResult.meta.last_row_id
+    
+    // Save all answers
+    for (const answer of answers) {
+      await DB.prepare(`
+        INSERT INTO feedback_answers (submission_id, question_id, answer_text, answer_numeric)
+        VALUES (?, ?, ?, ?)
+      `).bind(
+        submission_id, answer.question_id,
+        answer.answer_text || null, answer.answer_numeric || null
+      ).run()
+    }
+    
+    // If urgent, create AI insight
+    if (is_urgent === 1) {
+      await DB.prepare(`
+        INSERT INTO feedback_insights (
+          property_id, submission_id, insight_type, title, description,
+          action_suggested, priority
+        ) VALUES (?, ?, 'alert', ?, ?, ?, 'critical')
+      `).bind(
+        form.property_id, submission_id,
+        `URGENT: Issue from ${guest_name || 'Guest'} ${room_number ? 'in Room ' + room_number : ''}`,
+        `Guest expressed urgent concern. Immediate attention required.`,
+        `Contact guest immediately and resolve the issue. Follow up within 1 hour.`
+      ).run()
+    }
+    
+    return c.json({ success: true, submission_id })
+  } catch (error) {
+    console.error('Submit feedback error:', error)
+    return c.json({ error: 'Failed to submit feedback' }, 500)
+  }
+})
+
+// Admin: Get submissions for a form
+app.get('/api/admin/feedback/forms/:form_id/submissions', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  
+  try {
+    const submissions = await DB.prepare(`
+      SELECT * FROM feedback_submissions
+      WHERE form_id = ?
+      ORDER BY submitted_at DESC
+    `).bind(form_id).all()
+    
+    return c.json({ success: true, submissions: submissions.results })
+  } catch (error) {
+    console.error('Get submissions error:', error)
+    return c.json({ error: 'Failed to get submissions' }, 500)
+  }
+})
+
+// Admin: Get submission details with answers
+app.get('/api/admin/feedback/submissions/:submission_id', async (c) => {
+  const { DB } = c.env
+  const { submission_id } = c.req.param()
+  
+  try {
+    const submission = await DB.prepare(`
+      SELECT s.*, f.form_name
+      FROM feedback_submissions s
+      JOIN feedback_forms f ON s.form_id = f.form_id
+      WHERE s.submission_id = ?
+    `).bind(submission_id).first()
+    
+    if (!submission) {
+      return c.json({ error: 'Submission not found' }, 404)
+    }
+    
+    const answers = await DB.prepare(`
+      SELECT a.*, q.question_text, q.question_type
+      FROM feedback_answers a
+      JOIN feedback_questions q ON a.question_id = q.question_id
+      WHERE a.submission_id = ?
+    `).bind(submission_id).all()
+    
+    return c.json({
+      success: true,
+      submission: {
+        ...submission,
+        answers: answers.results
+      }
+    })
+  } catch (error) {
+    console.error('Get submission details error:', error)
+    return c.json({ error: 'Failed to get submission' }, 500)
+  }
+})
+
+// Admin: Get analytics for property
+app.get('/api/admin/feedback/analytics/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Overall stats
+    const stats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_submissions,
+        SUM(CASE WHEN is_urgent = 1 THEN 1 ELSE 0 END) as urgent_count,
+        SUM(CASE WHEN sentiment_label = 'positive' THEN 1 ELSE 0 END) as positive_count,
+        SUM(CASE WHEN sentiment_label = 'negative' THEN 1 ELSE 0 END) as negative_count,
+        AVG(sentiment_score) as avg_sentiment,
+        SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread_count
+      FROM feedback_submissions
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    // Recent submissions
+    const recent = await DB.prepare(`
+      SELECT s.*, f.form_name
+      FROM feedback_submissions s
+      JOIN feedback_forms f ON s.form_id = f.form_id
+      WHERE s.property_id = ?
+      ORDER BY s.submitted_at DESC
+      LIMIT 10
+    `).bind(property_id).all()
+    
+    // Active insights
+    const insights = await DB.prepare(`
+      SELECT * FROM feedback_insights
+      WHERE property_id = ? AND is_resolved = 0
+      ORDER BY priority DESC, created_at DESC
+      LIMIT 20
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      stats,
+      recent_submissions: recent.results,
+      insights: insights.results
+    })
+  } catch (error) {
+    console.error('Get analytics error:', error)
+    return c.json({ error: 'Failed to get analytics' }, 500)
+  }
+})
+
+// Admin: Mark submission as read
+app.post('/api/admin/feedback/submissions/:submission_id/mark-read', async (c) => {
+  const { DB } = c.env
+  const { submission_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE feedback_submissions SET is_read = 1 WHERE submission_id = ?
+    `).bind(submission_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Mark read error:', error)
+    return c.json({ error: 'Failed to mark as read' }, 500)
+  }
+})
+
+// Admin: Resolve insight
+app.post('/api/admin/feedback/insights/:insight_id/resolve', async (c) => {
+  const { DB } = c.env
+  const { insight_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE feedback_insights 
+      SET is_resolved = 1, resolved_at = CURRENT_TIMESTAMP
+      WHERE insight_id = ?
+    `).bind(insight_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Resolve insight error:', error)
+    return c.json({ error: 'Failed to resolve insight' }, 500)
+  }
+})
+
+// ========== END FEEDBACK SYSTEM API ENDPOINTS ==========
+
 // Hotel Landing Page - Main QR entry point
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
