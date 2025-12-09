@@ -5441,6 +5441,121 @@ app.delete('/api/admin/chatbot/documents/:document_id', async (c) => {
 })
 
 // API: Chat with RAG
+// 🤖 AI Sentiment Analysis & Feedback Capture Function
+async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, conversation_id: number, guestMessage: string, botResponse: string) {
+  try {
+    const messageLower = guestMessage.toLowerCase()
+    
+    // 1. DETECT COMPLAINT KEYWORDS (explicit and implicit)
+    const explicitComplaintKeywords = [
+      'complaint', 'complain', 'problem', 'issue', 'wrong', 'terrible', 'awful', 
+      'horrible', 'disgusting', 'unacceptable', 'disappointed', 'unhappy', 'angry',
+      'frustrated', 'bad', 'poor', 'worst', 'never again', 'refund'
+    ]
+    
+    const implicitComplaintKeywords = [
+      'not clean', 'dirty', 'broken', 'doesn\'t work', 'not working', 'cold food',
+      'waited too long', 'rude staff', 'noisy', 'too small', 'overpriced', 
+      'expected better', 'not as described', 'missing', 'forgot', 'late'
+    ]
+    
+    const urgentKeywords = [
+      'emergency', 'urgent', 'immediately', 'right now', 'asap', 'help'
+    ]
+    
+    // Check for complaint indicators
+    const hasExplicitComplaint = explicitComplaintKeywords.some(k => messageLower.includes(k))
+    const hasImplicitComplaint = implicitComplaintKeywords.some(k => messageLower.includes(k))
+    const isUrgent = urgentKeywords.some(k => messageLower.includes(k))
+    const isComplaint = hasExplicitComplaint || hasImplicitComplaint
+    
+    if (!isComplaint) {
+      // Not a complaint, skip feedback capture
+      return
+    }
+    
+    // 2. CALCULATE SENTIMENT SCORE (-1 to 1)
+    const negativeWords = ['terrible', 'awful', 'horrible', 'disgusting', 'worst', 'hate', 'never']
+    const moderateNegWords = ['bad', 'poor', 'disappointed', 'unhappy', 'problem', 'issue']
+    
+    let sentimentScore = 0
+    negativeWords.forEach(word => {
+      if (messageLower.includes(word)) sentimentScore -= 0.3
+    })
+    moderateNegWords.forEach(word => {
+      if (messageLower.includes(word)) sentimentScore -= 0.15
+    })
+    sentimentScore = Math.max(-1, sentimentScore) // Cap at -1
+    
+    // 3. DETERMINE SENTIMENT LABEL
+    let sentimentLabel = 'negative'
+    if (isUrgent) sentimentLabel = 'urgent'
+    else if (sentimentScore < -0.5) sentimentLabel = 'complaint'
+    
+    // 4. EXTRACT STRUCTURED INFORMATION
+    const complaintCategory = detectComplaintCategory(messageLower)
+    const complaintSummary = generateComplaintSummary(guestMessage, complaintCategory)
+    
+    // Extract room number if mentioned
+    const roomMatch = guestMessage.match(/room\s*(\d+)/i)
+    const roomNumber = roomMatch ? roomMatch[1] : null
+    
+    // Extract guest name if mentioned  
+    const nameMatch = guestMessage.match(/my name is (\w+)|I'm (\w+)|I am (\w+)/i)
+    const guestName = nameMatch ? (nameMatch[1] || nameMatch[2] || nameMatch[3]) : null
+    
+    // 5. SAVE TO CHAT_FEEDBACK TABLE
+    await DB.prepare(`
+      INSERT INTO chat_feedback (
+        property_id, conversation_id, guest_message, bot_response,
+        sentiment_label, sentiment_score, is_complaint, is_urgent,
+        complaint_category, complaint_summary, guest_name, room_number,
+        issue_description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id, 
+      conversation_id, 
+      guestMessage, 
+      botResponse,
+      sentimentLabel,
+      sentimentScore,
+      isComplaint ? 1 : 0,
+      isUrgent ? 1 : 0,
+      complaintCategory,
+      complaintSummary,
+      guestName,
+      roomNumber,
+      guestMessage // Full message as issue description
+    ).run()
+    
+  } catch (error) {
+    console.error('Sentiment analysis error:', error)
+    // Don't throw - this shouldn't break the chat flow
+  }
+}
+
+function detectComplaintCategory(messageLower: string): string {
+  if (messageLower.includes('room') || messageLower.includes('bed') || messageLower.includes('bathroom')) 
+    return 'room'
+  if (messageLower.includes('food') || messageLower.includes('restaurant') || messageLower.includes('meal') || messageLower.includes('breakfast'))
+    return 'food'
+  if (messageLower.includes('staff') || messageLower.includes('reception') || messageLower.includes('rude'))
+    return 'staff'
+  if (messageLower.includes('clean') || messageLower.includes('dirty') || messageLower.includes('hygiene'))
+    return 'cleanliness'
+  if (messageLower.includes('wifi') || messageLower.includes('pool') || messageLower.includes('gym') || messageLower.includes('spa'))
+    return 'amenities'
+  if (messageLower.includes('service') || messageLower.includes('wait'))
+    return 'service'
+  return 'other'
+}
+
+function generateComplaintSummary(message: string, category: string): string {
+  const maxLength = 200
+  const trimmed = message.length > maxLength ? message.substring(0, maxLength) + '...' : message
+  return `[${category.toUpperCase()}] ${trimmed}`
+}
+
 app.post('/api/chatbot/chat', async (c) => {
   const { DB } = c.env
   
@@ -5840,6 +5955,9 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
       INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
       VALUES (?, 'assistant', ?, ?)
     `).bind(convId, aiResponse, JSON.stringify(chunkIds)).run()
+    
+    // 🤖 AI SENTIMENT ANALYSIS - Detect complaints/feedback
+    await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse)
     
     // Update rate limit
     if (rateLimit) {
@@ -7245,6 +7363,68 @@ app.get('/api/admin/feedback/analytics/:property_id', async (c) => {
   } catch (error) {
     console.error('Get analytics error:', error)
     return c.json({ error: 'Failed to get analytics' }, 500)
+  }
+})
+
+// Admin: Get chat feedback (AI-detected complaints from chatbot conversations)
+app.get('/api/admin/feedback/chat/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const chatFeedback = await DB.prepare(`
+      SELECT 
+        cf.*,
+        datetime(cf.detected_at, 'localtime') as detected_at_formatted
+      FROM chat_feedback cf
+      WHERE cf.property_id = ?
+      ORDER BY cf.is_urgent DESC, cf.detected_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+    
+    // Get summary stats
+    const stats = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_chat_feedback,
+        SUM(CASE WHEN is_urgent = 1 THEN 1 ELSE 0 END) as urgent_count,
+        SUM(CASE WHEN is_resolved = 0 THEN 1 ELSE 0 END) as unresolved_count,
+        SUM(CASE WHEN complaint_category = 'room' THEN 1 ELSE 0 END) as room_complaints,
+        SUM(CASE WHEN complaint_category = 'food' THEN 1 ELSE 0 END) as food_complaints,
+        SUM(CASE WHEN complaint_category = 'staff' THEN 1 ELSE 0 END) as staff_complaints,
+        SUM(CASE WHEN complaint_category = 'cleanliness' THEN 1 ELSE 0 END) as cleanliness_complaints
+      FROM chat_feedback
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    return c.json({
+      success: true,
+      chat_feedback: chatFeedback.results || [],
+      stats: stats || {}
+    })
+  } catch (error) {
+    console.error('Get chat feedback error:', error)
+    return c.json({ error: 'Failed to get chat feedback' }, 500)
+  }
+})
+
+// Admin: Resolve chat feedback
+app.post('/api/admin/feedback/chat/:feedback_id/resolve', async (c) => {
+  const { DB } = c.env
+  const { feedback_id } = c.req.param()
+  const body = await c.req.json()
+  const { admin_notes } = body
+  
+  try {
+    await DB.prepare(`
+      UPDATE chat_feedback 
+      SET is_resolved = 1, resolved_at = CURRENT_TIMESTAMP, admin_notes = ?
+      WHERE feedback_id = ?
+    `).bind(admin_notes || '', feedback_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Resolve chat feedback error:', error)
+    return c.json({ error: 'Failed to resolve chat feedback' }, 500)
   }
 })
 
@@ -17511,6 +17691,50 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </div>
         </div>
+
+        <!-- 🤖 AI Chat Feedback Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold"><i class="fas fa-robot mr-2 text-purple-600"></i>AI Chat Feedback</h3>
+                <div class="flex gap-2">
+                    <span id="chatFeedbackCount" class="px-3 py-1 bg-purple-100 text-purple-800 text-sm rounded-full font-semibold">0 detected</span>
+                    <span id="chatFeedbackUrgent" class="px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full font-semibold">0 urgent</span>
+                </div>
+            </div>
+            <p class="text-gray-600 text-sm mb-4">
+                💡 <strong>Auto-detected complaints and feedback</strong> from chatbot conversations. 
+                AI analyzes sentiment and extracts structured information.
+            </p>
+            
+            <!-- Category Filter -->
+            <div class="mb-4 flex gap-2 flex-wrap">
+                <button onclick="filterChatFeedback('all')" class="chat-filter-btn chat-filter-active px-3 py-1 rounded-lg text-sm font-semibold">
+                    All
+                </button>
+                <button onclick="filterChatFeedback('urgent')" class="chat-filter-btn px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm font-semibold">
+                    Urgent
+                </button>
+                <button onclick="filterChatFeedback('room')" class="chat-filter-btn px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-semibold">
+                    Room
+                </button>
+                <button onclick="filterChatFeedback('food')" class="chat-filter-btn px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-sm font-semibold">
+                    Food
+                </button>
+                <button onclick="filterChatFeedback('staff')" class="chat-filter-btn px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold">
+                    Staff
+                </button>
+                <button onclick="filterChatFeedback('cleanliness')" class="chat-filter-btn px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm font-semibold">
+                    Cleanliness
+                </button>
+            </div>
+            
+            <div id="chatFeedbackList" class="space-y-3 max-h-96 overflow-y-auto">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-robot text-4xl mb-2"></i>
+                    <p>No chat feedback detected yet</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Form Builder Modal -->
@@ -20993,6 +21217,153 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load feedback error:', error);
           alert('Failed to load feedback data');
         }
+        
+        // Load AI Chat Feedback
+        await loadChatFeedback();
+      }
+      
+      // Load AI-detected chat feedback
+      let allChatFeedback = [];
+      async function loadChatFeedback() {
+        try {
+          const response = await fetch('/api/admin/feedback/chat/' + propertyId);
+          const data = await response.json();
+          
+          if (data.success) {
+            allChatFeedback = data.chat_feedback || [];
+            
+            // Update counts
+            document.getElementById('chatFeedbackCount').textContent = allChatFeedback.length + ' detected';
+            const urgentCount = allChatFeedback.filter(f => f.is_urgent === 1).length;
+            document.getElementById('chatFeedbackUrgent').textContent = urgentCount + ' urgent';
+            
+            // Display all feedback
+            displayChatFeedback(allChatFeedback);
+          }
+        } catch (error) {
+          console.error('Load chat feedback error:', error);
+        }
+      }
+      
+      function displayChatFeedback(feedbackList) {
+        const container = document.getElementById('chatFeedbackList');
+        
+        if (!feedbackList || feedbackList.length === 0) {
+          container.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-robot text-4xl mb-2"></i><p>No chat feedback detected yet</p></div>';
+          return;
+        }
+        
+        container.innerHTML = feedbackList.map(feedback => \`
+          <div class="bg-gray-50 border-l-4 \${feedback.is_urgent ? 'border-red-500' : 'border-purple-500'} p-4 rounded-lg hover:shadow-md transition">
+            <div class="flex justify-between items-start mb-2">
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-1 bg-\${getCategoryColor(feedback.complaint_category)}-100 text-\${getCategoryColor(feedback.complaint_category)}-800 text-xs font-semibold rounded uppercase">
+                    \${feedback.complaint_category}
+                  </span>
+                  \${feedback.is_urgent ? '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded">URGENT</span>' : ''}
+                  \${feedback.sentiment_label === 'complaint' ? '<span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">COMPLAINT</span>' : ''}
+                  \${feedback.is_resolved ? '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">RESOLVED</span>' : ''}
+                </div>
+                <p class="font-semibold text-sm text-gray-700 mb-1">\${feedback.complaint_summary}</p>
+                <div class="text-sm text-gray-600 mb-2">
+                  <strong>Guest:</strong> "\${feedback.guest_message.substring(0, 150)}\${feedback.guest_message.length > 150 ? '...' : ''}"
+                </div>
+                <div class="text-xs text-gray-500 flex gap-3">
+                  \${feedback.guest_name ? '<span><i class="fas fa-user mr-1"></i>' + feedback.guest_name + '</span>' : ''}
+                  \${feedback.room_number ? '<span><i class="fas fa-door-open mr-1"></i>Room ' + feedback.room_number + '</span>' : ''}
+                  <span><i class="fas fa-clock mr-1"></i>\${new Date(feedback.detected_at).toLocaleString()}</span>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2 ml-4">
+                \${!feedback.is_resolved ? 
+                  '<button onclick="resolveChatFeedback(' + feedback.feedback_id + ')" class="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 whitespace-nowrap"><i class="fas fa-check mr-1"></i>Resolve</button>' :
+                  '<button disabled class="px-3 py-1 bg-gray-300 text-gray-600 text-xs rounded cursor-not-allowed whitespace-nowrap"><i class="fas fa-check mr-1"></i>Resolved</button>'
+                }
+                <button onclick="viewFullChatFeedback(\${feedback.feedback_id})" class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 whitespace-nowrap">
+                  <i class="fas fa-eye mr-1"></i>View
+                </button>
+              </div>
+            </div>
+          </div>
+        \`).join('');
+      }
+      
+      function getCategoryColor(category) {
+        const colors = {
+          'room': 'blue',
+          'food': 'orange',
+          'staff': 'purple',
+          'cleanliness': 'green',
+          'service': 'indigo',
+          'amenities': 'cyan',
+          'other': 'gray'
+        };
+        return colors[category] || 'gray';
+      }
+      
+      window.filterChatFeedback = function(filter) {
+        // Update active button
+        document.querySelectorAll('.chat-filter-btn').forEach(btn => {
+          btn.classList.remove('chat-filter-active');
+          btn.classList.remove('bg-purple-600', 'text-white');
+        });
+        event.target.classList.add('chat-filter-active');
+        event.target.classList.add('bg-purple-600', 'text-white');
+        
+        // Filter feedback
+        let filtered = allChatFeedback;
+        if (filter === 'urgent') {
+          filtered = allChatFeedback.filter(f => f.is_urgent === 1);
+        } else if (filter !== 'all') {
+          filtered = allChatFeedback.filter(f => f.complaint_category === filter);
+        }
+        
+        displayChatFeedback(filtered);
+      }
+      
+      window.resolveChatFeedback = async function(feedbackId) {
+        const notes = prompt('Add resolution notes (optional):');
+        
+        try {
+          const response = await fetch('/api/admin/feedback/chat/' + feedbackId + '/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_notes: notes || '' })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ Chat feedback marked as resolved');
+            loadChatFeedback(); // Reload
+          }
+        } catch (error) {
+          console.error('Resolve error:', error);
+          alert('Failed to resolve feedback');
+        }
+      }
+      
+      window.viewFullChatFeedback = function(feedbackId) {
+        const feedback = allChatFeedback.find(f => f.feedback_id === feedbackId);
+        if (!feedback) return;
+        
+        alert(\`🤖 AI Chat Feedback Details
+
+Category: \${feedback.complaint_category.toUpperCase()}
+Sentiment: \${feedback.sentiment_label} (Score: \${feedback.sentiment_score})
+
+Guest Message:
+"\${feedback.guest_message}"
+
+Bot Response:
+"\${feedback.bot_response}"
+
+\${feedback.guest_name ? 'Guest Name: ' + feedback.guest_name : ''}
+\${feedback.room_number ? 'Room: ' + feedback.room_number : ''}
+
+Detected: \${new Date(feedback.detected_at).toLocaleString()}
+\${feedback.is_resolved ? 'Status: RESOLVED' : 'Status: PENDING'}
+\${feedback.admin_notes ? 'Notes: ' + feedback.admin_notes : ''}\`);
       }
 
       // Create new form
