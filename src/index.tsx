@@ -6970,6 +6970,35 @@ app.delete('/api/admin/feedback/forms/:form_id', async (c) => {
   }
 })
 
+// Admin: Set form as homepage form (only ONE can be active at a time)
+app.post('/api/admin/feedback/forms/:form_id/set-homepage', async (c) => {
+  const { DB } = c.env
+  const { form_id } = c.req.param()
+  const body = await c.req.json()
+  const { property_id } = body
+  
+  try {
+    // First, unset all other forms for this property
+    await DB.prepare(`
+      UPDATE feedback_forms 
+      SET show_on_homepage = 0 
+      WHERE property_id = ?
+    `).bind(property_id).run()
+    
+    // Then set the selected form as homepage form
+    await DB.prepare(`
+      UPDATE feedback_forms 
+      SET show_on_homepage = 1 
+      WHERE form_id = ?
+    `).bind(form_id).run()
+    
+    return c.json({ success: true, message: 'Homepage form updated' })
+  } catch (error) {
+    console.error('Set homepage form error:', error)
+    return c.json({ error: 'Failed to set homepage form' }, 500)
+  }
+})
+
 // PUBLIC: Get feedback form for guest (by form_id)
 app.get('/api/feedback/forms/:form_id', async (c) => {
   const { DB } = c.env
@@ -20922,6 +20951,22 @@ app.get('/admin/dashboard', (c) => {
                       <span><i class="fas fa-exclamation-triangle mr-1 text-red-600"></i>\${form.urgent_count || 0} urgent</span>
                       <span><i class="fas fa-smile mr-1 text-green-600"></i>Sentiment: \${(form.avg_sentiment || 0).toFixed(1)}</span>
                     </div>
+                    <div class="mt-3 flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <input 
+                        type="radio" 
+                        name="homepageForm" 
+                        id="homepage_\${form.form_id}" 
+                        value="\${form.form_id}"
+                        \${form.show_on_homepage === 1 ? 'checked' : ''}
+                        onchange="setHomepageForm(\${form.form_id})"
+                        class="w-4 h-4 text-black border-gray-300 focus:ring-black"
+                      />
+                      <label for="homepage_\${form.form_id}" class="font-medium text-sm cursor-pointer">
+                        <i class="fas fa-home mr-1 text-gray-600"></i>
+                        Show on Homepage
+                        \${form.show_on_homepage === 1 ? '<span class="ml-2 px-2 py-1 bg-black text-white text-xs rounded">ACTIVE</span>' : ''}
+                      </label>
+                    </div>
                   </div>
                   <div class="flex flex-col gap-2">
                     <button onclick="generateQR(\${form.form_id}, '\${form.form_name}')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 whitespace-nowrap">
@@ -20933,8 +20978,11 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="copyFormLink(\${form.form_id})" class="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 whitespace-nowrap">
                       <i class="fas fa-link mr-1"></i>Copy Link
                     </button>
-                    <button onclick="editForm(\${form.form_id})" class="px-4 py-2 border border-gray-300 text-sm rounded hover:bg-gray-50 whitespace-nowrap">
+                    <button onclick="editForm(\${form.form_id})" class="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 whitespace-nowrap">
                       <i class="fas fa-edit mr-1"></i>Edit
+                    </button>
+                    <button onclick="deleteForm(\${form.form_id}, '\${form.form_name.replace(/'/g, "\\\\'")}')" class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 whitespace-nowrap">
+                      <i class="fas fa-trash mr-1"></i>Delete
                     </button>
                   </div>
                 </div>
@@ -21246,8 +21294,56 @@ app.get('/admin/dashboard', (c) => {
         alert('AI Insights dashboard - Coming soon!');
       }
 
+      // Set homepage form (only ONE can be selected)
+      async function setHomepageForm(formId) {
+        try {
+          const response = await fetch('/api/admin/feedback/forms/' + formId + '/set-homepage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: propertyId })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Homepage form updated successfully!');
+            loadFeedbackTab(); // Reload to show updated state
+          } else {
+            alert('❌ Failed to update homepage form: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Set homepage form error:', error);
+          alert('❌ Failed to update homepage form');
+        }
+      }
+
+      // Delete form
+      async function deleteForm(formId, formName) {
+        if (!confirm('Are you sure you want to delete "' + formName + '"?\\n\\nThis will permanently delete the form and all its questions and submissions!')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/feedback/forms/' + formId, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Form deleted successfully!');
+            loadFeedbackTab(); // Reload forms list
+          } else {
+            alert('❌ Failed to delete form: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete form error:', error);
+          alert('❌ Failed to delete form');
+        }
+      }
+
       function editForm(formId) {
-        alert('Edit form - Coming soon!');
+        alert('Edit form functionality - Coming soon!\\n\\nFor now, you can delete and recreate the form.');
       }
 
       // Load feedback tab when admin dashboard loads
