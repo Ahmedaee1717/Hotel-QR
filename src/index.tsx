@@ -18069,21 +18069,17 @@ app.get('/admin/dashboard', (c) => {
         
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
-          console.log('🎯 Analytics tab detected, will call loadAnalytics()...');
+          console.log('🎯 Analytics tab detected, will call window.loadAnalytics()...');
           // Use requestAnimationFrame to ensure DOM is ready
           requestAnimationFrame(() => {
-            console.log('⏰ requestAnimationFrame fired, calling loadAnalytics() NOW');
-            if (typeof loadAnalytics !== 'undefined') {
-              loadAnalytics().catch(err => console.error('loadAnalytics error:', err));
+            console.log('⏰ requestAnimationFrame fired');
+            console.log('window.loadAnalytics type:', typeof window.loadAnalytics);
+            if (typeof window.loadAnalytics === 'function') {
+              console.log('✅ Calling window.loadAnalytics() NOW');
+              window.loadAnalytics().catch(err => console.error('❌ loadAnalytics error:', err));
             } else {
-              console.error('❌ loadAnalytics is undefined!');
-              // Try to find it in window scope
-              if (typeof window.loadAnalytics === 'function') {
-                console.log('Found loadAnalytics in window scope');
-                window.loadAnalytics();
-              } else {
-                alert('ERROR: loadAnalytics function not found!');
-              }
+              console.error('❌ window.loadAnalytics is not a function!');
+              alert('ERROR: loadAnalytics function not found in window scope!');
             }
           });
         }
@@ -18425,10 +18421,12 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
+        console.log('🚀 FUNCTION BODY ENTERED');
         console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
         if (range) currentAnalyticsRange = range;
         
         try {
+          
           console.log('🌐 Fetching analytics API...');
           const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           
@@ -18531,6 +18529,10 @@ app.get('/admin/dashboard', (c) => {
           alert('Analytics Error: ' + error.message + '\\n\\nCheck console for details.');
         }
       }
+      
+      // Make loadAnalytics globally accessible to avoid scope issues
+      window.loadAnalytics = loadAnalytics;
+      console.log('✅ window.loadAnalytics assigned:', typeof window.loadAnalytics);
       
       function filterAnalytics(range) {
         // Update active button
