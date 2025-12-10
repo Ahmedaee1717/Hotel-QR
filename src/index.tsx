@@ -4961,29 +4961,12 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
         c.name_en as category_name,
         CASE 
           WHEN ? = 'ar' THEN COALESCE(a.title_ar, a.title_en)
-          WHEN ? = 'de' THEN COALESCE(a.title_de, a.title_en)
-          WHEN ? = 'ru' THEN COALESCE(a.title_ru, a.title_en)
-          WHEN ? = 'pl' THEN COALESCE(a.title_pl, a.title_en)
-          WHEN ? = 'it' THEN COALESCE(a.title_it, a.title_en)
-          WHEN ? = 'fr' THEN COALESCE(a.title_fr, a.title_en)
-          WHEN ? = 'cs' THEN COALESCE(a.title_cs, a.title_en)
-          WHEN ? = 'uk' THEN COALESCE(a.title_uk, a.title_en)
           ELSE a.title_en
         END as title,
         CASE 
           WHEN ? = 'ar' THEN COALESCE(a.short_description_ar, a.short_description_en)
-          WHEN ? = 'de' THEN COALESCE(a.short_description_de, a.short_description_en)
-          WHEN ? = 'ru' THEN COALESCE(a.short_description_ru, a.short_description_en)
-          WHEN ? = 'pl' THEN COALESCE(a.short_description_pl, a.short_description_en)
-          WHEN ? = 'it' THEN COALESCE(a.short_description_it, a.short_description_en)
-          WHEN ? = 'fr' THEN COALESCE(a.short_description_fr, a.short_description_en)
-          WHEN ? = 'cs' THEN COALESCE(a.short_description_cs, a.short_description_en)
-          WHEN ? = 'uk' THEN COALESCE(a.short_description_uk, a.short_description_en)
           ELSE a.short_description_en
-        END as short_description,
-        a.title_en, a.title_ar, a.title_de, a.title_ru, a.title_pl, a.title_it, a.title_fr, a.title_cs, a.title_uk,
-        a.short_description_en, a.short_description_ar, a.short_description_de, a.short_description_ru, 
-        a.short_description_pl, a.short_description_it, a.short_description_fr, a.short_description_cs, a.short_description_uk
+        END as short_description
       FROM activities a
       JOIN vendors v ON a.vendor_id = v.vendor_id
       JOIN vendor_properties vp ON v.vendor_id = vp.vendor_id
@@ -4994,7 +4977,7 @@ app.get('/api/property-vendor-activities/:property_id', async (c) => {
         AND v.status = 'active'
       ORDER BY a.is_featured DESC, a.popularity_score DESC
       LIMIT 50
-    `).bind(lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, lang, property_id).all()
+    `).bind(lang, lang, property_id).all()
     
     return c.json({ 
       success: true,
