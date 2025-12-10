@@ -19258,6 +19258,11 @@ app.get('/admin/dashboard', (c) => {
         }
       });
 
+      // Helper function for admin dashboard - simple passthrough for locations
+      function translateLocation(location) {
+        return location || '';
+      }
+
       // Hotel Offerings Management
       let allOfferings = [];
       let currentOfferingFilter = 'all';
