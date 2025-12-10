@@ -18436,7 +18436,10 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
+        console.warn('🚀🚀🚀 FUNCTION ENTRY - THIS SHOULD ALWAYS SHOW');
         try {
+          console.warn('🔥 INSIDE TRY BLOCK');
+          alert('Analytics function started! Check console.');
           console.log('🚀 FUNCTION BODY ENTERED');
           console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
           if (range) currentAnalyticsRange = range;
@@ -18547,6 +18550,8 @@ app.get('/admin/dashboard', (c) => {
       // Make loadAnalytics globally accessible to avoid scope issues
       window.loadAnalytics = loadAnalytics;
       console.log('✅ window.loadAnalytics assigned:', typeof window.loadAnalytics);
+      console.log('✅ window.loadAnalytics.name:', window.loadAnalytics.name);
+      console.log('✅ window.loadAnalytics.toString():', window.loadAnalytics.toString().substring(0, 200));
       
       function filterAnalytics(range) {
         // Update active button
