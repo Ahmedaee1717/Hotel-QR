@@ -21874,16 +21874,6 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         alert('Edit form functionality - Coming soon!\\n\\nFor now, you can delete and recreate the form.');
       }
 
-      // Load feedback tab when admin dashboard loads
-      const originalLoadDashboard = loadDashboard;
-      loadDashboard = async function() {
-        await originalLoadDashboard();
-        // Check if feedback tab is active
-        if (document.querySelector('[data-tab="feedback"]')?.classList.contains('active')) {
-          loadFeedbackTab();
-        }
-      };
-
       // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
     </script>
 </body>
