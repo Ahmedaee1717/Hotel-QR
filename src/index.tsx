@@ -18515,7 +18515,8 @@ app.get('/admin/dashboard', (c) => {
           }
           
         } catch (error) {
-          console.error('Analytics load error:', error);
+          console.error('❌ Analytics load error:', error);
+          alert('Analytics Error: ' + error.message + '\\n\\nCheck console for details.');
         }
       }
       
