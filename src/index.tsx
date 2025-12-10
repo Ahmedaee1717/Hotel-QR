@@ -5446,17 +5446,36 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
   try {
     const messageLower = guestMessage.toLowerCase()
     
-    // 1. DETECT COMPLAINT KEYWORDS (explicit and implicit) - COMPREHENSIVE LIST
+    // 1. DETECT COMPLAINT KEYWORDS - MULTILINGUAL (English, Arabic, French, Spanish, German, Russian, Chinese)
     const explicitComplaintKeywords = [
+      // English
       'complaint', 'complain', 'problem', 'issue', 'wrong', 'terrible', 'awful', 
       'horrible', 'disgusting', 'unacceptable', 'disappointed', 'unhappy', 'angry',
       'frustrated', 'bad', 'poor', 'worst', 'never again', 'refund', 'hate', 'sucks',
-      'horrible', 'pathetic', 'ridiculous', 'outrageous', 'upset', 'annoyed', 'mad',
+      'pathetic', 'ridiculous', 'outrageous', 'upset', 'annoyed', 'mad',
       'furious', 'not happy', 'not satisfied', 'dissatisfied', 'unsatisfied',
-      'not acceptable', 'unpleasant', 'nasty', 'gross', 'disgusted', 'appalling'
+      'not acceptable', 'unpleasant', 'nasty', 'gross', 'disgusted', 'appalling',
+      // Arabic
+      'شكوى', 'مشكلة', 'خطأ', 'فظيع', 'سيئ', 'غير مقبول', 'متسخ', 'قذر', 'محبط', 'غاضب',
+      'مستاء', 'غير راضي', 'كريه', 'مقرف', 'استرجاع', 'غير نظيف', 'معطل', 'لا يعمل',
+      // French  
+      'plainte', 'problème', 'mauvais', 'terrible', 'horrible', 'dégoûtant', 
+      'inacceptable', 'déçu', 'mécontent', 'en colère', 'frustré', 'sale', 'cassé',
+      // Spanish
+      'queja', 'problema', 'malo', 'terrible', 'horrible', 'asqueroso', 'inaceptable',
+      'decepcionado', 'infeliz', 'enojado', 'frustrado', 'sucio', 'roto',
+      // German
+      'beschwerde', 'problem', 'schlecht', 'schrecklich', 'ekelhaft', 'inakzeptabel',
+      'enttäuscht', 'unglücklich', 'wütend', 'frustriert', 'schmutzig', 'kaputt',
+      // Russian
+      'жалоба', 'проблема', 'плохо', 'ужасно', 'отвратительно', 'неприемлемо',
+      'разочарован', 'недоволен', 'зол', 'грязный', 'сломан',
+      // Chinese
+      '投诉', '问题', '糟糕', '可怕', '恶心', '不可接受', '失望', '不满', '生气', '脏', '坏了'
     ]
     
     const implicitComplaintKeywords = [
+      // English
       'not clean', 'dirty', 'broken', 'doesn\'t work', 'not working', 'cold food',
       'waited too long', 'rude staff', 'noisy', 'too small', 'overpriced', 
       'expected better', 'not as described', 'missing', 'forgot', 'late', 'slow',
@@ -5466,12 +5485,42 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
       'cold shower', 'no hot water', 'no water', 'clogged', 'blocked',
       'not responding', 'ignored', 'unprofessional', 'incompetent', 'careless',
       'worst experience', 'worst stay', 'never coming back', 'money wasted',
-      'overcharged', 'scam', 'misleading', 'false advertising', 'lies'
+      'overcharged', 'scam', 'misleading', 'false advertising', 'lies',
+      // Arabic
+      'طعام بارد', 'موظفين وقحين', 'صاخب', 'صغير جداً', 'غالي جداً', 'متأخر',
+      'رائحة كريهة', 'تسرب', 'عفن', 'حشرات', 'صراصير', 'لا ماء ساخن',
+      // French
+      'nourriture froide', 'personnel impoli', 'bruyant', 'trop petit', 'trop cher',
+      'en retard', 'mauvaise odeur', 'fuite', 'moisissure', 'insectes',
+      // Spanish
+      'comida fría', 'personal grosero', 'ruidoso', 'demasiado pequeño', 'caro',
+      'tarde', 'mal olor', 'fuga', 'moho', 'insectos',
+      // German
+      'kaltes essen', 'unhöfliches personal', 'laut', 'zu klein', 'zu teuer',
+      'spät', 'schlechter geruch', 'leck', 'schimmel', 'insekten',
+      // Russian
+      'холодная еда', 'грубый персонал', 'шумно', 'слишком маленький', 'дорого',
+      'поздно', 'запах', 'протечка', 'плесень', 'насекомые',
+      // Chinese
+      '冷食物', '粗鲁的员工', '吵闹', '太小', '太贵', '晚了', '臭味', '漏水', '霉菌', '昆虫'
     ]
     
     const urgentKeywords = [
+      // English
       'emergency', 'urgent', 'immediately', 'right now', 'asap', 'help', 'danger',
-      'unsafe', 'health hazard', 'serious', 'critical'
+      'unsafe', 'health hazard', 'serious', 'critical',
+      // Arabic
+      'طوارئ', 'عاجل', 'فوراً', 'الآن', 'خطر', 'غير آمن', 'خطير',
+      // French
+      'urgence', 'urgent', 'immédiatement', 'maintenant', 'danger', 'dangereux',
+      // Spanish
+      'emergencia', 'urgente', 'inmediatamente', 'ahora', 'peligro', 'peligroso',
+      // German
+      'notfall', 'dringend', 'sofort', 'jetzt', 'gefahr', 'gefährlich',
+      // Russian
+      'срочно', 'немедленно', 'сейчас', 'опасность', 'опасно',
+      // Chinese
+      '紧急', '立即', '现在', '危险', '严重'
     ]
     
     // Check for complaint indicators
@@ -5663,6 +5712,24 @@ function generateComplaintSummary(message: string, category: string): string {
   return `[${category.toUpperCase()}] ${trimmed}`
 }
 
+// DETECT LANGUAGE from message
+function detectLanguage(message: string): string {
+  // Arabic
+  if (/[\u0600-\u06FF]/.test(message)) return 'ar'
+  // Chinese
+  if (/[\u4E00-\u9FFF]/.test(message)) return 'zh'
+  // Russian
+  if (/[\u0400-\u04FF]/.test(message)) return 'ru'
+  // French indicators
+  if (/\b(le|la|les|un|une|des|bonjour|merci|oui|non|est|sont)\b/i.test(message)) return 'fr'
+  // Spanish indicators
+  if (/\b(el|la|los|las|un|una|hola|gracias|sí|no|es|son|está|están)\b/i.test(message)) return 'es'
+  // German indicators
+  if (/\b(der|die|das|ein|eine|ist|sind|und|oder|aber|guten|danke)\b/i.test(message)) return 'de'
+  // Default to English
+  return 'en'
+}
+
 // SMART EXTRACTION: Extract room number from natural language
 function extractRoomNumber(message: string): string | null {
   const msg = message.toLowerCase().trim()
@@ -5688,39 +5755,50 @@ function extractRoomNumber(message: string): string | null {
   return null
 }
 
-// SMART EXTRACTION: Extract guest name from natural language
+// SMART EXTRACTION: Extract guest name from natural language (supports all languages)
 function extractGuestName(message: string): string | null {
   const msg = message.trim()
   
   // Pattern 1: "my name is Smith", "my last name is Smith", "surname is Smith"
-  let match = msg.match(/(?:my\s+)?(?:last\s+)?(?:name|surname)\s+(?:is\s+)?(\w+)/i)
+  let match = msg.match(/(?:my\s+)?(?:last\s+)?(?:name|surname)\s+(?:is\s+)?([^\s,]+)/i)
   if (match) return match[1]
   
   // Pattern 2: "I'm Smith", "I am Smith"
-  match = msg.match(/I'?m\s+(\w+)|I\s+am\s+(\w+)/i)
+  match = msg.match(/I'?m\s+([^\s,]+)|I\s+am\s+([^\s,]+)/i)
   if (match) return match[1] || match[2]
   
   // Pattern 3: "Mr. Smith", "Mrs. Smith", "Ms. Smith", "Miss Smith"
-  match = msg.match(/(?:mr\.?|mrs\.?|ms\.?|miss)\s+(\w+)/i)
+  match = msg.match(/(?:mr\.?|mrs\.?|ms\.?|miss)\s+([^\s,]+)/i)
   if (match) return match[1]
   
-  // Pattern 4: Just a capitalized word (likely a name if message is short)
-  if (msg.length < 50) {
+  // Pattern 4: Name before room number "Ahmed 401" or "أحمد 401"
+  match = msg.match(/^([^\s\d]+)\s+\d{2,4}/)
+  if (match && match[1].length >= 2) return match[1]
+  
+  // Pattern 5: Just a word (likely a name if message is short and has no numbers)
+  if (msg.length < 50 && !/\d/.test(msg)) {
+    // Latin alphabet capitalized word
     match = msg.match(/\b([A-Z][a-z]{2,})\b/)
     if (match && !['Room', 'Hotel', 'Yes', 'Sure', 'Thanks', 'Please', 'Hello'].includes(match[1])) {
       return match[1]
     }
+    // Or any non-space word (for Arabic, Chinese, etc.)
+    match = msg.match(/([^\s\d]{2,})/)
+    if (match) return match[1]
   }
   
-  // Pattern 5: Name followed by room (extract name part)
-  match = msg.match(/(\w+)\s+(?:and|,)?\s*(?:room|in|at)?\s*\d{2,4}/i)
-  if (match) return match[1]
+  // Pattern 6: Name followed by room with various separators
+  match = msg.match(/([^\s\d,]+)\s*(?:and|,|in|at|room)?\s*\d{2,4}/i)
+  if (match && match[1].length >= 2) return match[1]
   
-  // Pattern 6: Multiple words - take last capitalized word as surname
-  const words = msg.split(/\s+/)
-  for (let i = words.length - 1; i >= 0; i--) {
-    if (/^[A-Z][a-z]{2,}$/.test(words[i])) {
-      return words[i]
+  // Pattern 7: For short messages with both letters and numbers, extract letters
+  if (msg.length < 30) {
+    // Extract first word that's not a number
+    const words = msg.split(/\s+/)
+    for (const word of words) {
+      if (!/^\d+$/.test(word) && word.length >= 2) {
+        return word
+      }
     }
   }
   
@@ -6258,48 +6336,101 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
     
     // If complaint detected but missing guest info, REQUIRE it before continuing
     if (feedbackAnalysis.needsGuestInfo) {
+      // Detect language from original complaint message
+      const lang = detectLanguage(message)
       let missingInfoPrompt = ""
+      
+      // Multilingual templates
+      const templates: any = {
+        en: {
+          header1: "🚨 **I need your information to log your complaint with management.**\n\n**I cannot process any other requests until you provide:**\n\n",
+          header2: "⚠️ **I've noted your concern and our management team needs to address this immediately.**\n\n**To log your complaint officially, I need:**\n\n",
+          lastName: "👤 Your **last name** (surname)\n",
+          roomNumber: "🏨 Your **room number**\n",
+          both: "1️⃣ Your **last name** (surname)\n2️⃣ Your **room number**\n\n",
+          example: "📋 **Please respond with BOTH** (Example: My last name is Smith and I'm in room 305)\n\n",
+          urgent: "⏱️ **URGENT**: This will be escalated to management immediately once I have your information.",
+          normal: "✅ Once provided, your complaint will be logged and staff will contact you within 15 minutes."
+        },
+        ar: {
+          header1: "🚨 **أحتاج معلوماتك لتسجيل شكواك مع الإدارة.**\n\n**لا يمكنني معالجة أي طلبات أخرى حتى تقدم:**\n\n",
+          header2: "⚠️ **لقد سجلت شكواك وإدارتنا بحاجة للتعامل معها فوراً.**\n\n**لتسجيل شكواك رسمياً، أحتاج:**\n\n",
+          lastName: "👤 **اسم العائلة**\n",
+          roomNumber: "🏨 **رقم الغرفة**\n",
+          both: "1️⃣ **اسم العائلة**\n2️⃣ **رقم الغرفة**\n\n",
+          example: "📋 **يرجى تقديم كليهما** (مثال: اسمي سميث وأنا في الغرفة 305)\n\n",
+          urgent: "⏱️ **عاجل**: سيتم إحالة هذا للإدارة فوراً بمجرد حصولي على معلوماتك.",
+          normal: "✅ بمجرد تقديمها، سيتم تسجيل شكواك وسيتصل بك الموظفون خلال 15 دقيقة."
+        },
+        fr: {
+          header1: "🚨 **J'ai besoin de vos informations pour enregistrer votre plainte auprès de la direction.**\n\n**Je ne peux traiter d'autres demandes avant que vous ne fournissiez:**\n\n",
+          header2: "⚠️ **J'ai noté votre préoccupation et notre direction doit y répondre immédiatement.**\n\n**Pour enregistrer officiellement votre plainte, j'ai besoin de:**\n\n",
+          lastName: "👤 Votre **nom de famille**\n",
+          roomNumber: "🏨 Votre **numéro de chambre**\n",
+          both: "1️⃣ Votre **nom de famille**\n2️⃣ Votre **numéro de chambre**\n\n",
+          example: "📋 **Veuillez fournir les DEUX** (Exemple: Mon nom est Smith et je suis dans la chambre 305)\n\n",
+          urgent: "⏱️ **URGENT**: Cela sera transmis à la direction immédiatement une fois vos informations reçues.",
+          normal: "✅ Une fois fournis, votre plainte sera enregistrée et le personnel vous contactera dans 15 minutes."
+        },
+        es: {
+          header1: "🚨 **Necesito su información para registrar su queja con la gerencia.**\n\n**No puedo procesar otras solicitudes hasta que proporcione:**\n\n",
+          header2: "⚠️ **He notado su preocupación y nuestra gerencia necesita atenderla inmediatamente.**\n\n**Para registrar su queja oficialmente, necesito:**\n\n",
+          lastName: "👤 Su **apellido**\n",
+          roomNumber: "🏨 Su **número de habitación**\n",
+          both: "1️⃣ Su **apellido**\n2️⃣ Su **número de habitación**\n\n",
+          example: "📋 **Por favor proporcione AMBOS** (Ejemplo: Mi apellido es Smith y estoy en la habitación 305)\n\n",
+          urgent: "⏱️ **URGENTE**: Esto se escalará a la gerencia inmediatamente una vez que tenga su información.",
+          normal: "✅ Una vez proporcionada, su queja será registrada y el personal lo contactará en 15 minutos."
+        },
+        de: {
+          header1: "🚨 **Ich benötige Ihre Informationen, um Ihre Beschwerde bei der Geschäftsleitung einzureichen.**\n\n**Ich kann keine anderen Anfragen bearbeiten, bis Sie Folgendes angeben:**\n\n",
+          header2: "⚠️ **Ich habe Ihre Beschwerde notiert und unsere Geschäftsleitung muss sich sofort darum kümmern.**\n\n**Um Ihre Beschwerde offiziell zu registrieren, benötige ich:**\n\n",
+          lastName: "👤 Ihren **Nachnamen**\n",
+          roomNumber: "🏨 Ihre **Zimmernummer**\n",
+          both: "1️⃣ Ihren **Nachnamen**\n2️⃣ Ihre **Zimmernummer**\n\n",
+          example: "📋 **Bitte geben Sie BEIDES an** (Beispiel: Mein Name ist Schmidt und ich bin in Zimmer 305)\n\n",
+          urgent: "⏱️ **DRINGEND**: Dies wird sofort an die Geschäftsleitung weitergeleitet, sobald ich Ihre Informationen habe.",
+          normal: "✅ Sobald angegeben, wird Ihre Beschwerde registriert und das Personal kontaktiert Sie innerhalb von 15 Minuten."
+        }
+      }
+      
+      const t = templates[lang] || templates.en
       
       // First time asking vs. still waiting for info
       if (feedbackAnalysis.hasPendingComplaint) {
-        // Already asked - be more insistent
-        missingInfoPrompt = "🚨 **I need your information to log your complaint with management.**\n\n"
-        missingInfoPrompt += "**I cannot process any other requests until you provide:**\n\n"
+        missingInfoPrompt = t.header1
       } else {
-        // First time - be polite but firm
-        missingInfoPrompt = "⚠️ **I've noted your concern and our management team needs to address this immediately.**\n\n"
-        missingInfoPrompt += "**To log your complaint officially, I need:**\n\n"
+        missingInfoPrompt = t.header2
       }
       
       if (!feedbackAnalysis.hasRoomNumber && !feedbackAnalysis.hasLastName) {
-        missingInfoPrompt += "1️⃣ Your **last name** (surname)\n"
-        missingInfoPrompt += "2️⃣ Your **room number**\n\n"
-        missingInfoPrompt += "📋 **Please respond with BOTH** (Example: My last name is Smith and I'm in room 305)\n\n"
+        missingInfoPrompt += t.both + t.example
       } else if (!feedbackAnalysis.hasRoomNumber) {
-        missingInfoPrompt += "🏨 Your **room number**\n\n"
-        missingInfoPrompt += "📋 **Please provide your room number** (Example: I'm in room 305)\n\n"
+        missingInfoPrompt += t.roomNumber + "\n" + t.example
       } else if (!feedbackAnalysis.hasLastName) {
-        missingInfoPrompt += "👤 Your **last name** (surname)\n\n"
-        missingInfoPrompt += "📋 **Please provide your last name** (Example: My last name is Smith)\n\n"
+        missingInfoPrompt += t.lastName + "\n" + t.example
       }
       
       if (feedbackAnalysis.isUrgent) {
-        missingInfoPrompt += "⏱️ **URGENT**: This will be escalated to management immediately once I have your information."
+        missingInfoPrompt += t.urgent
       } else {
-        missingInfoPrompt += "✅ Once provided, your complaint will be logged and staff will contact you within 15 minutes."
+        missingInfoPrompt += t.normal
       }
       
       // COMPLETELY OVERRIDE AI response - don't answer their question until we have info
       aiResponse = missingInfoPrompt
     } else if (feedbackAnalysis.feedbackSaved && feedbackAnalysis.complaintUpdated) {
       // Guest just provided the missing info - confirm complaint is now logged
-      aiResponse = "✅ **Thank you! Your complaint has been officially logged.**\n\n"
-      aiResponse += "📋 **Complaint Details:**\n"
-      aiResponse += "• Category: " + (feedbackAnalysis.complaintCategory || 'General') + "\n"
-      aiResponse += "• Status: Logged with management\n"
-      aiResponse += "• Response Time: Within 15 minutes\n\n"
-      aiResponse += "Our management team will contact you shortly to resolve this issue.\n\n"
-      aiResponse += "Is there anything else I can help you with in the meantime?"
+      const lang = detectLanguage(message)
+      const confirmations: any = {
+        en: "✅ **Thank you! Your complaint has been officially logged.**\n\n📋 **Complaint Details:**\n• Category: {category}\n• Status: Logged with management\n• Response Time: Within 15 minutes\n\nOur management team will contact you shortly to resolve this issue.\n\nIs there anything else I can help you with in the meantime?",
+        ar: "✅ **شكراً لك! تم تسجيل شكواك رسمياً.**\n\n📋 **تفاصيل الشكوى:**\n• الفئة: {category}\n• الحالة: مسجلة لدى الإدارة\n• وقت الرد: خلال 15 دقيقة\n\nسيتواصل معك فريق الإدارة قريباً لحل هذه المشكلة.\n\nهل هناك أي شيء آخر يمكنني مساعدتك به؟",
+        fr: "✅ **Merci! Votre plainte a été officiellement enregistrée.**\n\n📋 **Détails de la plainte:**\n• Catégorie: {category}\n• Statut: Enregistré auprès de la direction\n• Temps de réponse: Dans 15 minutes\n\nNotre équipe de direction vous contactera sous peu pour résoudre ce problème.\n\nPuis-je vous aider avec autre chose?",
+        es: "✅ **¡Gracias! Su queja ha sido registrada oficialmente.**\n\n📋 **Detalles de la queja:**\n• Categoría: {category}\n• Estado: Registrada con la gerencia\n• Tiempo de respuesta: Dentro de 15 minutos\n\nNuestro equipo de gerencia se pondrá en contacto con usted en breve para resolver este problema.\n\n¿Hay algo más en lo que pueda ayudarlo?",
+        de: "✅ **Vielen Dank! Ihre Beschwerde wurde offiziell registriert.**\n\n📋 **Beschwerdedetails:**\n• Kategorie: {category}\n• Status: Bei der Geschäftsleitung registriert\n• Antwortzeit: Innerhalb von 15 Minuten\n\nUnser Management-Team wird Sie in Kürze kontaktieren, um dieses Problem zu lösen.\n\nKann ich Ihnen noch bei etwas anderem helfen?"
+      }
+      
+      aiResponse = (confirmations[lang] || confirmations.en).replace('{category}', feedbackAnalysis.complaintCategory || 'General')
     }
     
     // Store AI response (potentially modified with guest info request)
