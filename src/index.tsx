@@ -18067,7 +18067,7 @@ app.get('/admin/dashboard', (c) => {
         }
         
         if (tab === 'qrcode') loadQRCode();
-        if (tab === 'analytics') loadAnalytics();
+        if (tab === 'analytics') setTimeout(() => loadAnalytics(), 100); // Small delay for DOM to be ready
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
@@ -18424,14 +18424,21 @@ app.get('/admin/dashboard', (c) => {
           const totalVendorsEl = document.getElementById('totalVendors');
           
           if (!totalScansEl || !activeBookingsEl || !totalActivitiesEl || !totalVendorsEl) {
-            console.error('Analytics DOM elements not found', {
+            console.error('❌ Analytics DOM elements not found:', {
               totalScans: !!totalScansEl,
               activeBookings: !!activeBookingsEl,
               totalActivities: !!totalActivitiesEl,
               totalVendors: !!totalVendorsEl
             });
+            alert('Analytics elements not found. Please refresh the page.');
             return;
           }
+          
+          console.log('✅ Analytics loading data...', {
+            propertyId: propertyId,
+            range: currentAnalyticsRange,
+            stats: data.stats
+          });
           
           // Update stats
           totalScansEl.textContent = data.stats.totalScans || '0';
