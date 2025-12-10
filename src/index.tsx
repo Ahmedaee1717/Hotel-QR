@@ -18410,60 +18410,93 @@ app.get('/admin/dashboard', (c) => {
         
         try {
           const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
+          
+          if (!response.ok) {
+            throw new Error('Analytics API returned ' + response.status);
+          }
+          
           const data = await response.json();
           
+          // Defensive: Check if elements exist before updating
+          const totalScansEl = document.getElementById('totalScans');
+          const activeBookingsEl = document.getElementById('activeBookings');
+          const totalActivitiesEl = document.getElementById('totalActivities');
+          const totalVendorsEl = document.getElementById('totalVendors');
+          
+          if (!totalScansEl || !activeBookingsEl || !totalActivitiesEl || !totalVendorsEl) {
+            console.error('Analytics DOM elements not found', {
+              totalScans: !!totalScansEl,
+              activeBookings: !!activeBookingsEl,
+              totalActivities: !!totalActivitiesEl,
+              totalVendors: !!totalVendorsEl
+            });
+            return;
+          }
+          
           // Update stats
-          document.getElementById('totalScans').textContent = data.stats.totalScans;
-          document.getElementById('activeBookings').textContent = data.stats.activeBookings;
-          document.getElementById('totalActivities').textContent = data.stats.totalActivities;
-          document.getElementById('totalVendors').textContent = data.stats.totalVendors;
+          totalScansEl.textContent = data.stats.totalScans || '0';
+          activeBookingsEl.textContent = data.stats.activeBookings || '0';
+          totalActivitiesEl.textContent = data.stats.totalActivities || '0';
+          totalVendorsEl.textContent = data.stats.totalVendors || '0';
           
           // Show comparison for scans
-          const scansChange = parseFloat(data.stats.scansChange);
-          const scansIcon = scansChange > 0 ? 'arrow-up' : scansChange < 0 ? 'arrow-down' : 'minus';
-          const scansColor = scansChange > 0 ? 'text-green-200' : scansChange < 0 ? 'text-red-200' : 'text-blue-200';
-          const scansChangeText = scansChange > 0 ? '+' + Math.abs(scansChange) : scansChange < 0 ? '-' + Math.abs(scansChange) : scansChange;
-          document.getElementById('scansComparison').innerHTML = 
-            '<i class="fas fa-' + scansIcon + ' ' + scansColor + '"></i>' +
-            '<span class="' + scansColor + '">' + scansChangeText + '%</span>' +
-            '<span>vs previous period</span>';
+          const scansComparisonEl = document.getElementById('scansComparison');
+          if (scansComparisonEl && data.stats.scansChange !== undefined) {
+            const scansChange = parseFloat(data.stats.scansChange);
+            const scansIcon = scansChange > 0 ? 'arrow-up' : scansChange < 0 ? 'arrow-down' : 'minus';
+            const scansColor = scansChange > 0 ? 'text-green-200' : scansChange < 0 ? 'text-red-200' : 'text-blue-200';
+            const scansChangeText = scansChange > 0 ? '+' + Math.abs(scansChange) : scansChange < 0 ? '-' + Math.abs(scansChange) : scansChange;
+            scansComparisonEl.innerHTML = 
+              '<i class="fas fa-' + scansIcon + ' ' + scansColor + '"></i>' +
+              '<span class="' + scansColor + '">' + scansChangeText + '%</span>' +
+              '<span>vs previous period</span>';
+          }
           
           // Show comparison for bookings
-          const bookingsChange = parseFloat(data.stats.bookingsChange);
-          const bookingsIcon = bookingsChange > 0 ? 'arrow-up' : bookingsChange < 0 ? 'arrow-down' : 'minus';
-          const bookingsColor = bookingsChange > 0 ? 'text-green-200' : bookingsChange < 0 ? 'text-red-200' : 'text-green-200';
-          const bookingsChangeText = bookingsChange > 0 ? '+' + Math.abs(bookingsChange) : bookingsChange < 0 ? '-' + Math.abs(bookingsChange) : bookingsChange;
-          document.getElementById('bookingsComparison').innerHTML = 
-            '<i class="fas fa-' + bookingsIcon + ' ' + bookingsColor + '"></i>' +
-            '<span class="' + bookingsColor + '">' + bookingsChangeText + '%</span>' +
-            '<span>vs previous period</span>';
+          const bookingsComparisonEl = document.getElementById('bookingsComparison');
+          if (bookingsComparisonEl && data.stats.bookingsChange !== undefined) {
+            const bookingsChange = parseFloat(data.stats.bookingsChange);
+            const bookingsIcon = bookingsChange > 0 ? 'arrow-up' : bookingsChange < 0 ? 'arrow-down' : 'minus';
+            const bookingsColor = bookingsChange > 0 ? 'text-green-200' : bookingsChange < 0 ? 'text-red-200' : 'text-green-200';
+            const bookingsChangeText = bookingsChange > 0 ? '+' + Math.abs(bookingsChange) : bookingsChange < 0 ? '-' + Math.abs(bookingsChange) : bookingsChange;
+            bookingsComparisonEl.innerHTML = 
+              '<i class="fas fa-' + bookingsIcon + ' ' + bookingsColor + '"></i>' +
+              '<span class="' + bookingsColor + '">' + bookingsChangeText + '%</span>' +
+              '<span>vs previous period</span>';
+          }
           
           // Popular activities
-          const activitiesHTML = data.popularActivities.map((a, i) => 
-            '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
-            '<div class="flex items-center gap-3">' +
-            '<span class="text-2xl font-bold text-gray-300">' + (i + 1) + '</span>' +
-            '<div>' +
-            '<p class="font-semibold">' + (a.title_en || 'Activity') + '</p>' +
-            '<p class="text-sm text-gray-600">' + a.booking_count + ' bookings</p>' +
-            '</div>' +
-            '</div>' +
-            '<span class="text-green-600 font-semibold">$' + (a.total_revenue || 0) + '</span>' +
-            '</div>'
-          ).join('');
-          document.getElementById('popularActivities').innerHTML = activitiesHTML || '<p class="text-center text-gray-400 py-4">No activity data yet</p>';
+          const popularActivitiesEl = document.getElementById('popularActivities');
+          if (popularActivitiesEl && data.popularActivities) {
+            const activitiesHTML = data.popularActivities.map((a, i) => 
+              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+              '<div class="flex items-center gap-3">' +
+              '<span class="text-2xl font-bold text-gray-300">' + (i + 1) + '</span>' +
+              '<div>' +
+              '<p class="font-semibold">' + (a.title_en || 'Activity') + '</p>' +
+              '<p class="text-sm text-gray-600">' + a.booking_count + ' bookings</p>' +
+              '</div>' +
+              '</div>' +
+              '<span class="text-green-600 font-semibold">$' + (a.total_revenue || 0) + '</span>' +
+              '</div>'
+            ).join('');
+            popularActivitiesEl.innerHTML = activitiesHTML || '<p class="text-center text-gray-400 py-4">No activity data yet</p>';
+          }
           
           // Popular sections
-          const sectionsHTML = data.popularSections.map((s, i) =>
-            '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
-            '<div class="flex items-center gap-3">' +
-            '<i class="fas fa-' + (s.icon || 'eye') + ' text-xl text-indigo-600"></i>' +
-            '<p class="font-semibold capitalize">' + s.name + '</p>' +
-            '</div>' +
-            '<span class="text-blue-600 font-semibold">' + s.views + ' views</span>' +
-            '</div>'
-          ).join('');
-          document.getElementById('popularSections').innerHTML = sectionsHTML || '<p class="text-center text-gray-400 py-4">No section data yet</p>';
+          const popularSectionsEl = document.getElementById('popularSections');
+          if (popularSectionsEl && data.popularSections) {
+            const sectionsHTML = data.popularSections.map((s, i) =>
+              '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+              '<div class="flex items-center gap-3">' +
+              '<i class="fas fa-' + (s.icon || 'eye') + ' text-xl text-indigo-600"></i>' +
+              '<p class="font-semibold capitalize">' + s.name + '</p>' +
+              '</div>' +
+              '<span class="text-blue-600 font-semibold">' + s.views + ' views</span>' +
+              '</div>'
+            ).join('');
+            popularSectionsEl.innerHTML = sectionsHTML || '<p class="text-center text-gray-400 py-4">No section data yet</p>';
+          }
           
         } catch (error) {
           console.error('Analytics load error:', error);
