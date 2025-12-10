@@ -18069,11 +18069,23 @@ app.get('/admin/dashboard', (c) => {
         
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
-          console.log('🎯 Analytics tab detected, calling loadAnalytics() in 100ms...');
-          setTimeout(() => {
-            console.log('⏰ Timeout fired, calling loadAnalytics() NOW');
-            loadAnalytics();
-          }, 100);
+          console.log('🎯 Analytics tab detected, will call loadAnalytics()...');
+          // Use requestAnimationFrame to ensure DOM is ready
+          requestAnimationFrame(() => {
+            console.log('⏰ requestAnimationFrame fired, calling loadAnalytics() NOW');
+            if (typeof loadAnalytics !== 'undefined') {
+              loadAnalytics().catch(err => console.error('loadAnalytics error:', err));
+            } else {
+              console.error('❌ loadAnalytics is undefined!');
+              // Try to find it in window scope
+              if (typeof window.loadAnalytics === 'function') {
+                console.log('Found loadAnalytics in window scope');
+                window.loadAnalytics();
+              } else {
+                alert('ERROR: loadAnalytics function not found!');
+              }
+            }
+          });
         }
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
