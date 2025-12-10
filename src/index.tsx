@@ -15665,16 +15665,33 @@ app.get('/admin/dashboard', (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-      .tab-active { border-bottom: 3px solid #3B82F6; color: #3B82F6; }
+      /* Sidebar Navigation Styles */
+      .sidebar-btn {
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #4B5563;
+      }
+      .sidebar-btn:hover {
+        background-color: #F3F4F6;
+        color: #1F2937;
+      }
+      .sidebar-btn.tab-active {
+        background-color: #3B82F6;
+        color: white;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+      }
+      .sidebar-btn.tab-active i {
+        color: white;
+      }
+      
+      /* Keep compatibility with old tab-btn class for JavaScript */
+      .tab-btn {
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      
       .hidden { display: none !important; }
       .tab-content { display: block; }
-      .tab-btn { 
-        cursor: pointer; 
-        transition: all 0.3s;
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .tab-btn:hover { background-color: rgba(59, 130, 246, 0.1); }
       
       /* Dark mode styles */
       .dark {
@@ -15785,12 +15802,19 @@ app.get('/admin/dashboard', (c) => {
       @media (max-width: 768px) {
         body { font-size: 14px; }
         
-        .tab-btn {
-          font-size: 0.75rem;
-          padding: 0.5rem 0.75rem !important;
+        /* Hide sidebar on mobile, show toggle button */
+        #sidebar {
+          transform: translateX(-100%);
+          transition: transform 0.3s ease;
         }
-        .tab-btn i { display: none; }
-        .tab-btn span { font-size: 0.75rem; }
+        #sidebar.mobile-open {
+          transform: translateX(0);
+        }
+        
+        /* Remove left margin on mobile */
+        #sidebar + div {
+          margin-left: 0 !important;
+        }
         
         h1 { font-size: 1.25rem !important; }
         h2 { font-size: 1.125rem !important; }
@@ -15892,25 +15916,74 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-2 md:px-4 py-4 md:py-8">
-        <!-- Tabs -->
-        <div class="bg-white rounded-lg shadow mb-4 md:mb-6">
-            <div class="flex overflow-x-auto scrollbar-thin">
-                <button data-tab="qrcode" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold tab-active"><i class="fas fa-qrcode mr-2"></i><span>QR Code</span></button>
-                <button data-tab="analytics" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-chart-line mr-2"></i><span>Analytics</span></button>
-                <button data-tab="vendors" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-store mr-2"></i><span>Vendors</span></button>
-                <button data-tab="regcode" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-key mr-2"></i><span>Code</span></button>
-                <button data-tab="offerings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-utensils mr-2"></i><span>Offerings</span></button>
-                <button data-tab="customsections" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-layer-group mr-2"></i><span>Sections</span></button>
-                <button data-tab="infopages" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-file-alt mr-2"></i><span>Info Pages</span></button>
-                <button data-tab="activities" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-hiking mr-2"></i><span>Activities</span></button>
-                <button data-tab="callbacks" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-phone mr-2"></i><span>Callbacks</span></button>
-                <button data-tab="settings" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-cog mr-2"></i><span>Settings</span></button>
-                <button data-tab="chatbot" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-robot mr-2"></i><span>AI Chatbot</span></button>
-                <button data-tab="beach" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-umbrella-beach mr-2"></i><span>Beach</span></button>
-                <button data-tab="feedback" class="tab-btn px-4 md:px-6 py-3 md:py-4 font-semibold"><i class="fas fa-comments mr-2"></i><span>Feedback</span></button>
-            </div>
-        </div>
+    <!-- Sidebar + Content Layout -->
+    <div class="flex min-h-screen bg-gray-50">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="w-64 bg-white shadow-xl fixed left-0 top-16 bottom-0 overflow-y-auto transition-all duration-300 z-40">
+            <nav class="py-4">
+                <!-- Core Section -->
+                <div class="px-3 mb-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Core</h3>
+                    <button data-tab="qrcode" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3 tab-active">
+                        <i class="fas fa-qrcode w-5"></i><span>QR Code</span>
+                    </button>
+                    <button data-tab="analytics" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-chart-line w-5"></i><span>Analytics</span>
+                    </button>
+                    <button data-tab="settings" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-cog w-5"></i><span>Settings</span>
+                    </button>
+                    <button data-tab="feedback" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-comments w-5"></i><span>Feedback</span>
+                    </button>
+                </div>
+                
+                <!-- Content Section -->
+                <div class="px-3 mb-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Content</h3>
+                    <button data-tab="offerings" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-utensils w-5"></i><span>Offerings</span>
+                    </button>
+                    <button data-tab="customsections" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-layer-group w-5"></i><span>Sections</span>
+                    </button>
+                    <button data-tab="infopages" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-file-alt w-5"></i><span>Info Pages</span>
+                    </button>
+                    <button data-tab="activities" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-hiking w-5"></i><span>Activities</span>
+                    </button>
+                </div>
+                
+                <!-- Services Section -->
+                <div class="px-3 mb-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Services</h3>
+                    <button data-tab="vendors" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-store w-5"></i><span>Vendors</span>
+                    </button>
+                    <button data-tab="beach" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-umbrella-beach w-5"></i><span>Beach</span>
+                    </button>
+                    <button data-tab="callbacks" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-phone w-5"></i><span>Callbacks</span>
+                    </button>
+                </div>
+                
+                <!-- AI & Advanced Section -->
+                <div class="px-3 mb-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">AI & Advanced</h3>
+                    <button data-tab="chatbot" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-robot w-5"></i><span>AI Chatbot</span>
+                    </button>
+                    <button data-tab="regcode" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-key w-5"></i><span>Code</span>
+                    </button>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 ml-64 px-4 py-8">
 
         <!-- Master QR Code Tab -->
         <div id="qrcodeTab" class="tab-content">
@@ -17972,7 +18045,8 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
         </div>
-    </div>
+        </div><!-- End Main Content Area -->
+    </div><!-- End Sidebar + Content Layout -->
 
     <script>
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
@@ -17986,7 +18060,7 @@ app.get('/admin/dashboard', (c) => {
       function showTab(tab, clickedButton) {
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
+        document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
         document.getElementById(tab + 'Tab').classList.remove('hidden');
         if (clickedButton) {
           clickedButton.classList.add('tab-active');
@@ -18008,8 +18082,8 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'feedback') loadFeedbackTab();
       }
       
-      // Add event listeners to tab buttons
-      document.querySelectorAll('.tab-btn').forEach(btn => {
+      // Add event listeners to sidebar buttons
+      document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
         btn.addEventListener('click', function() {
           const tab = this.getAttribute('data-tab');
           showTab(tab, this);
