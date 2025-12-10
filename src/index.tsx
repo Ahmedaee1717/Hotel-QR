@@ -5507,13 +5507,9 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     const complaintCategory = detectComplaintCategory(messageLower)
     const complaintSummary = generateComplaintSummary(guestMessage, complaintCategory)
     
-    // Extract room number if mentioned
-    const roomMatch = guestMessage.match(/room\s*(\d+)/i)
-    const roomNumber = roomMatch ? roomMatch[1] : null
-    
-    // Extract guest last name if mentioned (more patterns)
-    const lastNameMatch = guestMessage.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)|mr\.?\s+(\w+)|mrs\.?\s+(\w+)|ms\.?\s+(\w+)/i)
-    const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5] || lastNameMatch[6] || lastNameMatch[7] || lastNameMatch[8]) : null
+    // Extract room number and name using SMART EXTRACTORS
+    const roomNumber = extractRoomNumber(guestMessage)
+    const guestName = extractGuestName(guestMessage)
     
     // 5. CHECK IF WE HAVE GUEST INFO - REQUIRED for actionable complaints
     const hasRoomNumber = roomNumber !== null
@@ -5667,6 +5663,70 @@ function generateComplaintSummary(message: string, category: string): string {
   return `[${category.toUpperCase()}] ${trimmed}`
 }
 
+// SMART EXTRACTION: Extract room number from natural language
+function extractRoomNumber(message: string): string | null {
+  const msg = message.toLowerCase().trim()
+  
+  // Pattern 1: "room 305", "room number 305", "room #305"
+  let match = msg.match(/room\s*(?:number|#)?\s*(\d+)/i)
+  if (match) return match[1]
+  
+  // Pattern 2: "305" or "#305" standalone (2-4 digit number)
+  match = msg.match(/(?:^|\s)#?(\d{2,4})(?:\s|$)/)
+  if (match) return match[1]
+  
+  // Pattern 3: "in 305", "at 305"
+  match = msg.match(/(?:in|at)\s+(?:room\s*)?(\d{2,4})/i)
+  if (match) return match[1]
+  
+  // Pattern 4: Just numbers in response (if message is short)
+  if (msg.length < 30) {
+    match = msg.match(/(\d{2,4})/)
+    if (match) return match[1]
+  }
+  
+  return null
+}
+
+// SMART EXTRACTION: Extract guest name from natural language
+function extractGuestName(message: string): string | null {
+  const msg = message.trim()
+  
+  // Pattern 1: "my name is Smith", "my last name is Smith", "surname is Smith"
+  let match = msg.match(/(?:my\s+)?(?:last\s+)?(?:name|surname)\s+(?:is\s+)?(\w+)/i)
+  if (match) return match[1]
+  
+  // Pattern 2: "I'm Smith", "I am Smith"
+  match = msg.match(/I'?m\s+(\w+)|I\s+am\s+(\w+)/i)
+  if (match) return match[1] || match[2]
+  
+  // Pattern 3: "Mr. Smith", "Mrs. Smith", "Ms. Smith", "Miss Smith"
+  match = msg.match(/(?:mr\.?|mrs\.?|ms\.?|miss)\s+(\w+)/i)
+  if (match) return match[1]
+  
+  // Pattern 4: Just a capitalized word (likely a name if message is short)
+  if (msg.length < 50) {
+    match = msg.match(/\b([A-Z][a-z]{2,})\b/)
+    if (match && !['Room', 'Hotel', 'Yes', 'Sure', 'Thanks', 'Please', 'Hello'].includes(match[1])) {
+      return match[1]
+    }
+  }
+  
+  // Pattern 5: Name followed by room (extract name part)
+  match = msg.match(/(\w+)\s+(?:and|,)?\s*(?:room|in|at)?\s*\d{2,4}/i)
+  if (match) return match[1]
+  
+  // Pattern 6: Multiple words - take last capitalized word as surname
+  const words = msg.split(/\s+/)
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (/^[A-Z][a-z]{2,}$/.test(words[i])) {
+      return words[i]
+    }
+  }
+  
+  return null
+}
+
 app.post('/api/chatbot/chat', async (c) => {
   const { DB } = c.env
   
@@ -5725,11 +5785,9 @@ app.post('/api/chatbot/chat', async (c) => {
     `).bind(session_id, property_id).first()
     
     if (pendingComplaint) {
-      // Check if user is providing the missing info NOW
-      const roomMatch = message.match(/room\s*(\d+)/i)
-      const roomNumber = roomMatch ? roomMatch[1] : null
-      const lastNameMatch = message.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)|mr\.?\s+(\w+)|mrs\.?\s+(\w+)|ms\.?\s+(\w+)/i)
-      const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5] || lastNameMatch[6] || lastNameMatch[7] || lastNameMatch[8]) : null
+      // Check if user is providing the missing info NOW - SMART EXTRACTION
+      const roomNumber = extractRoomNumber(message)
+      const guestName = extractGuestName(message)
       
       const needsRoom = !pendingComplaint.room_number
       const needsName = !pendingComplaint.guest_name
