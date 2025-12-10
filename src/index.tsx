@@ -20107,14 +20107,14 @@ app.get('/admin/dashboard', (c) => {
         if (section.classList.contains('hidden')) {
           section.classList.remove('hidden');
           btn.innerHTML = '<i class="fas fa-chart-bar mr-2"></i>Hide Analytics';
-          await loadAnalytics();
+          await loadChatbotAnalytics();
         } else {
           section.classList.add('hidden');
           btn.innerHTML = '<i class="fas fa-chart-bar mr-2"></i>View Analytics';
         }
       };
       
-      async function loadAnalytics() {
+      async function loadChatbotAnalytics() {
         await Promise.all([
           loadAnalyticsStats(),
           loadTopQuestions(),
