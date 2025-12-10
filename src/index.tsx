@@ -5446,21 +5446,32 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
   try {
     const messageLower = guestMessage.toLowerCase()
     
-    // 1. DETECT COMPLAINT KEYWORDS (explicit and implicit)
+    // 1. DETECT COMPLAINT KEYWORDS (explicit and implicit) - COMPREHENSIVE LIST
     const explicitComplaintKeywords = [
       'complaint', 'complain', 'problem', 'issue', 'wrong', 'terrible', 'awful', 
       'horrible', 'disgusting', 'unacceptable', 'disappointed', 'unhappy', 'angry',
-      'frustrated', 'bad', 'poor', 'worst', 'never again', 'refund'
+      'frustrated', 'bad', 'poor', 'worst', 'never again', 'refund', 'hate', 'sucks',
+      'horrible', 'pathetic', 'ridiculous', 'outrageous', 'upset', 'annoyed', 'mad',
+      'furious', 'not happy', 'not satisfied', 'dissatisfied', 'unsatisfied',
+      'not acceptable', 'unpleasant', 'nasty', 'gross', 'disgusted', 'appalling'
     ]
     
     const implicitComplaintKeywords = [
       'not clean', 'dirty', 'broken', 'doesn\'t work', 'not working', 'cold food',
       'waited too long', 'rude staff', 'noisy', 'too small', 'overpriced', 
-      'expected better', 'not as described', 'missing', 'forgot', 'late'
+      'expected better', 'not as described', 'missing', 'forgot', 'late', 'slow',
+      'uncomfortable', 'smells', 'smell', 'odor', 'stain', 'damaged', 'faulty',
+      'tiny', 'cramped', 'loud', 'noise', 'leak', 'leaking', 'mold', 'moldy',
+      'bug', 'bugs', 'insect', 'cockroach', 'ant', 'spider', 'infested',
+      'cold shower', 'no hot water', 'no water', 'clogged', 'blocked',
+      'not responding', 'ignored', 'unprofessional', 'incompetent', 'careless',
+      'worst experience', 'worst stay', 'never coming back', 'money wasted',
+      'overcharged', 'scam', 'misleading', 'false advertising', 'lies'
     ]
     
     const urgentKeywords = [
-      'emergency', 'urgent', 'immediately', 'right now', 'asap', 'help'
+      'emergency', 'urgent', 'immediately', 'right now', 'asap', 'help', 'danger',
+      'unsafe', 'health hazard', 'serious', 'critical'
     ]
     
     // Check for complaint indicators
@@ -5500,26 +5511,16 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     const roomMatch = guestMessage.match(/room\s*(\d+)/i)
     const roomNumber = roomMatch ? roomMatch[1] : null
     
-    // Extract guest last name if mentioned
-    const lastNameMatch = guestMessage.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)/i)
-    const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5]) : null
+    // Extract guest last name if mentioned (more patterns)
+    const lastNameMatch = guestMessage.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)|mr\.?\s+(\w+)|mrs\.?\s+(\w+)|ms\.?\s+(\w+)/i)
+    const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5] || lastNameMatch[6] || lastNameMatch[7] || lastNameMatch[8]) : null
     
-    // 5. CHECK IF WE HAVE REQUIRED INFO (room number AND last name)
+    // 5. CHECK IF WE HAVE GUEST INFO (optional - we save complaints regardless)
     const hasRoomNumber = roomNumber !== null
     const hasLastName = guestName !== null
     
-    // If missing required info, return flag to ask for it
-    if (!hasRoomNumber || !hasLastName) {
-      return { 
-        needsGuestInfo: true, 
-        hasRoomNumber, 
-        hasLastName,
-        complaintCategory,
-        isUrgent
-      }
-    }
-    
-    // 6. SAVE TO CHAT_FEEDBACK TABLE (only if we have both room number AND last name)
+    // 6. SAVE TO CHAT_FEEDBACK TABLE (ALWAYS save complaints, even without guest info)
+    // This ensures ALL complaints are tracked for insights generation
     await DB.prepare(`
       INSERT INTO chat_feedback (
         property_id, conversation_id, guest_message, bot_response,
@@ -5542,6 +5543,18 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
       roomNumber,
       guestMessage // Full message as issue description
     ).run()
+    
+    // After saving, check if we should ask for missing info (for follow-up)
+    if (!hasRoomNumber || !hasLastName) {
+      return { 
+        needsGuestInfo: true, 
+        hasRoomNumber, 
+        hasLastName,
+        complaintCategory,
+        isUrgent,
+        feedbackSaved: true
+      }
+    }
     
     return { needsGuestInfo: false, feedbackSaved: true }
     
