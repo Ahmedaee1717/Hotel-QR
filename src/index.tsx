@@ -18048,6 +18048,26 @@ app.get('/admin/dashboard', (c) => {
         </div><!-- End Main Content Area -->
     </div><!-- End Sidebar + Content Layout -->
 
+    <!-- AI Insights Modal -->
+    <div id="insightsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-lightbulb mr-2"></i>AI Insights Dashboard</h3>
+                <button onclick="closeInsightsModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div id="insightsList">
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-orange-600 mb-4"></i>
+                        <p class="text-gray-600">Loading insights...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
@@ -21833,8 +21853,128 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // View insights
-      function viewInsights() {
-        alert('AI Insights dashboard - Coming soon!');
+      async function viewInsights() {
+        const modal = document.getElementById('insightsModal');
+        modal.classList.remove('hidden');
+        await loadInsights();
+      }
+      
+      async function loadInsights() {
+        try {
+          const response = await fetch('/api/admin/feedback/analytics/' + propertyId);
+          const data = await response.json();
+          
+          if (data.success) {
+            const insightsContainer = document.getElementById('insightsList');
+            
+            if (!data.insights || data.insights.length === 0) {
+              insightsContainer.innerHTML = '<div class="text-center py-8">' +
+                '<i class="fas fa-lightbulb text-6xl text-gray-300 mb-4"></i>' +
+                '<p class="text-gray-500 mb-4">No AI insights generated yet</p>' +
+                '<button onclick="generateInsights()" class="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all">' +
+                '<i class="fas fa-magic mr-2"></i>Generate AI Insights' +
+                '</button>' +
+                '</div>';
+              return;
+            }
+            
+            const insightsHTML = data.insights.map(insight => {
+              const borderColor = insight.priority === 'high' ? 'border-red-500' : insight.priority === 'medium' ? 'border-yellow-500' : 'border-blue-500';
+              const badgeColor = insight.priority === 'high' ? 'bg-red-100 text-red-700' : insight.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
+              const actionItemsHTML = insight.action_items ? 
+                '<div class="bg-blue-50 border-l-2 border-blue-500 p-3 mb-2">' +
+                '<p class="text-sm font-semibold text-blue-900 mb-1"><i class="fas fa-tasks mr-1"></i>Action Items:</p>' +
+                '<p class="text-sm text-blue-800">' + insight.action_items + '</p>' +
+                '</div>' : '';
+              
+              return '<div class="bg-white border-l-4 ' + borderColor + ' rounded-lg shadow p-4 mb-4">' +
+                '<div class="flex items-start justify-between mb-2">' +
+                '<div class="flex-1">' +
+                '<div class="flex items-center gap-2 mb-2">' +
+                '<span class="px-2 py-1 rounded text-xs font-semibold ' + badgeColor + '">' + insight.priority.toUpperCase() + '</span>' +
+                '<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">' + (insight.category || 'General') + '</span>' +
+                '</div>' +
+                '<h4 class="font-bold text-lg mb-2">' + insight.insight_title + '</h4>' +
+                '<p class="text-gray-700 mb-3">' + insight.insight_text + '</p>' +
+                actionItemsHTML +
+                '<p class="text-xs text-gray-500 mt-2">' +
+                '<i class="fas fa-calendar mr-1"></i>' + new Date(insight.created_at).toLocaleString() +
+                '</p>' +
+                '</div>' +
+                '<button onclick="resolveInsight(' + insight.insight_id + ')" class="ml-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">' +
+                '<i class="fas fa-check mr-1"></i>Resolve' +
+                '</button>' +
+                '</div>' +
+                '</div>';
+            }).join('');
+            
+            insightsContainer.innerHTML = '<div class="mb-4">' +
+              '<button onclick="generateInsights()" class="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all">' +
+              '<i class="fas fa-magic mr-2"></i>Generate New Insights' +
+              '</button>' +
+              '</div>' +
+              insightsHTML;
+          }
+        } catch (error) {
+          console.error('Load insights error:', error);
+          document.getElementById('insightsList').innerHTML = 
+            '<div class="text-center py-8 text-red-600">' +
+            '<i class="fas fa-exclamation-triangle text-4xl mb-2"></i>' +
+            '<p>Error loading insights</p>' +
+            '</div>';
+        }
+      }
+      
+      async function generateInsights() {
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating insights...';
+        
+        try {
+          const response = await fetch('/api/admin/feedback/generate-insights/' + propertyId, {
+            method: 'POST'
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ AI insights generated successfully!\\n\\nGenerated ' + (data.insights?.length || 0) + ' new insights.');
+            await loadInsights();
+          } else {
+            alert('⚠️ ' + (data.message || 'No new insights generated'));
+            await loadInsights();
+          }
+        } catch (error) {
+          console.error('Generate insights error:', error);
+          alert('❌ Error generating insights. Please try again.');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        }
+      }
+      
+      async function resolveInsight(insightId) {
+        if (!confirm('Mark this insight as resolved?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/feedback/insights/' + insightId + '/resolve', {
+            method: 'POST'
+          });
+          
+          if (response.ok) {
+            alert('✅ Insight marked as resolved!');
+            await loadInsights();
+          } else {
+            alert('❌ Failed to resolve insight');
+          }
+        } catch (error) {
+          console.error('Resolve insight error:', error);
+          alert('❌ Error resolving insight');
+        }
+      }
+      
+      function closeInsightsModal() {
+        document.getElementById('insightsModal').classList.add('hidden');
       }
 
       // Set homepage form (only ONE can be selected)
