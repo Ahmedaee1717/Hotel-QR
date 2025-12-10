@@ -18058,6 +18058,7 @@ app.get('/admin/dashboard', (c) => {
       let currentTab = 'rooms';
       
       function showTab(tab, clickedButton) {
+        console.log('🔄 showTab() called with tab:', tab);
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
@@ -18067,7 +18068,13 @@ app.get('/admin/dashboard', (c) => {
         }
         
         if (tab === 'qrcode') loadQRCode();
-        if (tab === 'analytics') setTimeout(() => loadAnalytics(), 100); // Small delay for DOM to be ready
+        if (tab === 'analytics') {
+          console.log('🎯 Analytics tab detected, calling loadAnalytics() in 100ms...');
+          setTimeout(() => {
+            console.log('⏰ Timeout fired, calling loadAnalytics() NOW');
+            loadAnalytics();
+          }, 100);
+        }
         if (tab === 'rooms') loadRooms();
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
@@ -18406,9 +18413,11 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
+        console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
         if (range) currentAnalyticsRange = range;
         
         try {
+          console.log('🌐 Fetching analytics API...');
           const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           
           if (!response.ok) {
