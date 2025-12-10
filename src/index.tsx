@@ -18076,7 +18076,22 @@ app.get('/admin/dashboard', (c) => {
             console.log('window.loadAnalytics type:', typeof window.loadAnalytics);
             if (typeof window.loadAnalytics === 'function') {
               console.log('✅ Calling window.loadAnalytics() NOW');
-              window.loadAnalytics().catch(err => console.error('❌ loadAnalytics error:', err));
+              try {
+                const result = window.loadAnalytics();
+                console.log('📦 loadAnalytics returned:', result);
+                console.log('📦 Result type:', typeof result);
+                console.log('📦 Is Promise?:', result instanceof Promise);
+                if (result && typeof result.catch === 'function') {
+                  result.catch(err => {
+                    console.error('❌ Promise rejected:', err);
+                    alert('Analytics Promise Error: ' + err.message);
+                  });
+                  result.then(() => console.log('✅ Promise resolved'));
+                }
+              } catch (err) {
+                console.error('❌ Exception calling loadAnalytics:', err);
+                alert('Exception: ' + err.message);
+              }
             } else {
               console.error('❌ window.loadAnalytics is not a function!');
               alert('ERROR: loadAnalytics function not found in window scope!');
