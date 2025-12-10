@@ -18058,7 +18058,6 @@ app.get('/admin/dashboard', (c) => {
       let currentTab = 'rooms';
       
       function showTab(tab, clickedButton) {
-        console.log('🔄 showTab() called with tab:', tab);
         currentTab = tab;
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
@@ -18069,32 +18068,9 @@ app.get('/admin/dashboard', (c) => {
         
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
-          console.log('🎯 Analytics tab detected, will call window.loadAnalytics()...');
-          // Use requestAnimationFrame to ensure DOM is ready
           requestAnimationFrame(() => {
-            console.log('⏰ requestAnimationFrame fired');
-            console.log('window.loadAnalytics type:', typeof window.loadAnalytics);
             if (typeof window.loadAnalytics === 'function') {
-              console.log('✅ Calling window.loadAnalytics() NOW');
-              try {
-                const result = window.loadAnalytics();
-                console.log('📦 loadAnalytics returned:', result);
-                console.log('📦 Result type:', typeof result);
-                console.log('📦 Is Promise?:', result instanceof Promise);
-                if (result && typeof result.catch === 'function') {
-                  result.catch(err => {
-                    console.error('❌ Promise rejected:', err);
-                    alert('Analytics Promise Error: ' + err.message);
-                  });
-                  result.then(() => console.log('✅ Promise resolved'));
-                }
-              } catch (err) {
-                console.error('❌ Exception calling loadAnalytics:', err);
-                alert('Exception: ' + err.message);
-              }
-            } else {
-              console.error('❌ window.loadAnalytics is not a function!');
-              alert('ERROR: loadAnalytics function not found in window scope!');
+              window.loadAnalytics().catch(err => console.error('Analytics error:', err));
             }
           });
         }
@@ -18436,15 +18412,9 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
-        console.warn('🚀🚀🚀 FUNCTION ENTRY - THIS SHOULD ALWAYS SHOW');
         try {
-          console.warn('🔥 INSIDE TRY BLOCK');
-          alert('Analytics function started! Check console.');
-          console.log('🚀 FUNCTION BODY ENTERED');
-          console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
           if (range) currentAnalyticsRange = range;
           
-          console.log('🌐 Fetching analytics API...');
           const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           
           if (!response.ok) {
@@ -18549,9 +18519,6 @@ app.get('/admin/dashboard', (c) => {
       
       // Make loadAnalytics globally accessible to avoid scope issues
       window.loadAnalytics = loadAnalytics;
-      console.log('✅ window.loadAnalytics assigned:', typeof window.loadAnalytics);
-      console.log('✅ window.loadAnalytics.name:', window.loadAnalytics.name);
-      console.log('✅ window.loadAnalytics.toString():', window.loadAnalytics.toString().substring(0, 200));
       
       function filterAnalytics(range) {
         // Update active button
