@@ -18409,7 +18409,7 @@ app.get('/admin/dashboard', (c) => {
         if (range) currentAnalyticsRange = range;
         
         try {
-          const response = await fetch('/api/admin/analytics?property_id=1&range=' + currentAnalyticsRange);
+          const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           const data = await response.json();
           
           // Update stats
