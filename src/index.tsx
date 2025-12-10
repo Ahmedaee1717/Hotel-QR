@@ -5442,118 +5442,114 @@ app.delete('/api/admin/chatbot/documents/:document_id', async (c) => {
 
 // API: Chat with RAG
 // 🤖 AI Sentiment Analysis & Feedback Capture Function
-async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, conversation_id: number, guestMessage: string, botResponse: string) {
+// AI-POWERED COMPLAINT DETECTION - Works for ANY language, ANY phrasing
+async function detectComplaintWithAI(message: string, apiKey: string, baseURL: string): Promise<{isComplaint: boolean, isUrgent: boolean, category: string, confidence: number}> {
   try {
-    const messageLower = guestMessage.toLowerCase()
+    const response = await fetch(`${baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a sentiment analysis expert for hotel guest messages. Analyze if the message is a complaint or negative feedback.
+
+IMPORTANT: Guest messages can be in ANY language (English, Arabic, French, Spanish, German, Russian, Chinese, etc.)
+
+Analyze this message and respond with ONLY valid JSON (no markdown, no code blocks):
+{
+  "isComplaint": boolean (true if expressing dissatisfaction, problem, or negative experience),
+  "isUrgent": boolean (true if requires immediate attention - emergency, danger, health hazard),
+  "category": string (one of: "room", "food", "staff", "cleanliness", "amenities", "service", "other"),
+  "confidence": number (0-100, how confident you are this is a complaint)
+}
+
+Examples:
+"الغرفة متسخة" → {"isComplaint": true, "isUrgent": false, "category": "cleanliness", "confidence": 95}
+"I'm not satisfied with the service" → {"isComplaint": true, "isUrgent": false, "category": "service", "confidence": 90}
+"可以告诉我早餐时间吗？" → {"isComplaint": false, "isUrgent": false, "category": "other", "confidence": 0}
+"There are bugs in my room!" → {"isComplaint": true, "isUrgent": true, "category": "room", "confidence": 100}`
+          },
+          {
+            role: 'user',
+            content: message
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 100
+      })
+    })
+
+    if (!response.ok) {
+      console.error('AI complaint detection failed:', response.status)
+      return { isComplaint: false, isUrgent: false, category: 'other', confidence: 0 }
+    }
+
+    const data = await response.json()
+    const content = data.choices[0].message.content.trim()
     
-    // 1. DETECT COMPLAINT KEYWORDS - MULTILINGUAL (English, Arabic, French, Spanish, German, Russian, Chinese)
-    const explicitComplaintKeywords = [
-      // English
-      'complaint', 'complain', 'problem', 'issue', 'wrong', 'terrible', 'awful', 
-      'horrible', 'disgusting', 'unacceptable', 'disappointed', 'unhappy', 'angry',
-      'frustrated', 'bad', 'poor', 'worst', 'never again', 'refund', 'hate', 'sucks',
-      'pathetic', 'ridiculous', 'outrageous', 'upset', 'annoyed', 'mad',
-      'furious', 'not happy', 'not satisfied', 'dissatisfied', 'unsatisfied',
-      'not acceptable', 'unpleasant', 'nasty', 'gross', 'disgusted', 'appalling',
-      // Arabic
-      'شكوى', 'مشكلة', 'خطأ', 'فظيع', 'سيئ', 'غير مقبول', 'متسخ', 'قذر', 'محبط', 'غاضب',
-      'مستاء', 'غير راضي', 'كريه', 'مقرف', 'استرجاع', 'غير نظيف', 'معطل', 'لا يعمل',
-      // French  
-      'plainte', 'problème', 'mauvais', 'terrible', 'horrible', 'dégoûtant', 
-      'inacceptable', 'déçu', 'mécontent', 'en colère', 'frustré', 'sale', 'cassé',
-      // Spanish
-      'queja', 'problema', 'malo', 'terrible', 'horrible', 'asqueroso', 'inaceptable',
-      'decepcionado', 'infeliz', 'enojado', 'frustrado', 'sucio', 'roto',
-      // German
-      'beschwerde', 'problem', 'schlecht', 'schrecklich', 'ekelhaft', 'inakzeptabel',
-      'enttäuscht', 'unglücklich', 'wütend', 'frustriert', 'schmutzig', 'kaputt',
-      // Russian
-      'жалоба', 'проблема', 'плохо', 'ужасно', 'отвратительно', 'неприемлемо',
-      'разочарован', 'недоволен', 'зол', 'грязный', 'сломан',
-      // Chinese
-      '投诉', '问题', '糟糕', '可怕', '恶心', '不可接受', '失望', '不满', '生气', '脏', '坏了'
-    ]
+    // Remove markdown code blocks if present
+    const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const result = JSON.parse(jsonStr)
     
-    const implicitComplaintKeywords = [
-      // English
-      'not clean', 'dirty', 'broken', 'doesn\'t work', 'not working', 'cold food',
-      'waited too long', 'rude staff', 'noisy', 'too small', 'overpriced', 
-      'expected better', 'not as described', 'missing', 'forgot', 'late', 'slow',
-      'uncomfortable', 'smells', 'smell', 'odor', 'stain', 'damaged', 'faulty',
-      'tiny', 'cramped', 'loud', 'noise', 'leak', 'leaking', 'mold', 'moldy',
-      'bug', 'bugs', 'insect', 'cockroach', 'ant', 'spider', 'infested',
-      'cold shower', 'no hot water', 'no water', 'clogged', 'blocked',
-      'not responding', 'ignored', 'unprofessional', 'incompetent', 'careless',
-      'worst experience', 'worst stay', 'never coming back', 'money wasted',
-      'overcharged', 'scam', 'misleading', 'false advertising', 'lies',
-      // Arabic
-      'طعام بارد', 'موظفين وقحين', 'صاخب', 'صغير جداً', 'غالي جداً', 'متأخر',
-      'رائحة كريهة', 'تسرب', 'عفن', 'حشرات', 'صراصير', 'لا ماء ساخن',
-      // French
-      'nourriture froide', 'personnel impoli', 'bruyant', 'trop petit', 'trop cher',
-      'en retard', 'mauvaise odeur', 'fuite', 'moisissure', 'insectes',
-      // Spanish
-      'comida fría', 'personal grosero', 'ruidoso', 'demasiado pequeño', 'caro',
-      'tarde', 'mal olor', 'fuga', 'moho', 'insectos',
-      // German
-      'kaltes essen', 'unhöfliches personal', 'laut', 'zu klein', 'zu teuer',
-      'spät', 'schlechter geruch', 'leck', 'schimmel', 'insekten',
-      // Russian
-      'холодная еда', 'грубый персонал', 'шумно', 'слишком маленький', 'дорого',
-      'поздно', 'запах', 'протечка', 'плесень', 'насекомые',
-      // Chinese
-      '冷食物', '粗鲁的员工', '吵闹', '太小', '太贵', '晚了', '臭味', '漏水', '霉菌', '昆虫'
-    ]
+    console.log('🤖 AI Complaint Detection:', {
+      message: message.substring(0, 50),
+      result
+    })
     
-    const urgentKeywords = [
-      // English
-      'emergency', 'urgent', 'immediately', 'right now', 'asap', 'help', 'danger',
-      'unsafe', 'health hazard', 'serious', 'critical',
-      // Arabic
-      'طوارئ', 'عاجل', 'فوراً', 'الآن', 'خطر', 'غير آمن', 'خطير',
-      // French
-      'urgence', 'urgent', 'immédiatement', 'maintenant', 'danger', 'dangereux',
-      // Spanish
-      'emergencia', 'urgente', 'inmediatamente', 'ahora', 'peligro', 'peligroso',
-      // German
-      'notfall', 'dringend', 'sofort', 'jetzt', 'gefahr', 'gefährlich',
-      // Russian
-      'срочно', 'немедленно', 'сейчас', 'опасность', 'опасно',
-      // Chinese
-      '紧急', '立即', '现在', '危险', '严重'
-    ]
+    return result
+  } catch (error) {
+    console.error('AI complaint detection error:', error)
+    // Fallback to safe default
+    return { isComplaint: false, isUrgent: false, category: 'other', confidence: 0 }
+  }
+}
+
+async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, conversation_id: number, guestMessage: string, botResponse: string, apiKey?: string, baseURL?: string) {
+  try {
+    // Use AI-powered detection if API key available
+    let isComplaint = false
+    let isUrgent = false
+    let complaintCategory = 'other'
+    let confidence = 0
     
-    // Check for complaint indicators
-    const hasExplicitComplaint = explicitComplaintKeywords.some(k => messageLower.includes(k))
-    const hasImplicitComplaint = implicitComplaintKeywords.some(k => messageLower.includes(k))
-    const isUrgent = urgentKeywords.some(k => messageLower.includes(k))
-    const isComplaint = hasExplicitComplaint || hasImplicitComplaint
+    if (apiKey) {
+      const aiResult = await detectComplaintWithAI(guestMessage, apiKey, baseURL || 'https://www.genspark.ai/api/llm_proxy/v1')
+      isComplaint = aiResult.isComplaint && aiResult.confidence >= 70
+      isUrgent = aiResult.isUrgent
+      complaintCategory = aiResult.category
+      confidence = aiResult.confidence
+      
+      console.log('✅ AI Detection:', { isComplaint, isUrgent, category: complaintCategory, confidence })
+    } else {
+      // Fallback: Simple keyword detection for critical words only
+      const messageLower = guestMessage.toLowerCase()
+      const criticalKeywords = ['terrible', 'disgusting', 'awful', 'horrible', 'unacceptable', 'emergency', 'dirty', 'broken',
+        'شكوى', 'مشكلة', 'فظيع', 'قذر', 'متسخ', 'غير مقبول',
+        'plainte', 'problème', 'terrible', 'sale',
+        'queja', 'problema', 'terrible', 'sucio']
+      isComplaint = criticalKeywords.some(k => messageLower.includes(k))
+      complaintCategory = detectComplaintCategory(messageLower)
+    }
     
     if (!isComplaint) {
       // Not a complaint, skip feedback capture
       return { needsGuestInfo: false }
     }
     
-    // 2. CALCULATE SENTIMENT SCORE (-1 to 1)
-    const negativeWords = ['terrible', 'awful', 'horrible', 'disgusting', 'worst', 'hate', 'never']
-    const moderateNegWords = ['bad', 'poor', 'disappointed', 'unhappy', 'problem', 'issue']
-    
-    let sentimentScore = 0
-    negativeWords.forEach(word => {
-      if (messageLower.includes(word)) sentimentScore -= 0.3
-    })
-    moderateNegWords.forEach(word => {
-      if (messageLower.includes(word)) sentimentScore -= 0.15
-    })
-    sentimentScore = Math.max(-1, sentimentScore) // Cap at -1
+    // 2. CALCULATE SENTIMENT SCORE based on confidence
+    const sentimentScore = confidence ? -(confidence / 100) : -0.5
     
     // 3. DETERMINE SENTIMENT LABEL
     let sentimentLabel = 'negative'
     if (isUrgent) sentimentLabel = 'urgent'
-    else if (sentimentScore < -0.5) sentimentLabel = 'complaint'
+    else if (confidence >= 90) sentimentLabel = 'complaint'
     
     // 4. EXTRACT STRUCTURED INFORMATION
-    const complaintCategory = detectComplaintCategory(messageLower)
     const complaintSummary = generateComplaintSummary(guestMessage, complaintCategory)
     
     // Extract room number and name using SMART EXTRACTORS
@@ -6332,7 +6328,7 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
     }
     
     // 🤖 AI SENTIMENT ANALYSIS - Detect complaints/feedback BEFORE storing response
-    const feedbackAnalysis = await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse)
+    const feedbackAnalysis = await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse, apiKey, baseURL)
     
     // If complaint detected but missing guest info, REQUIRE it before continuing
     if (feedbackAnalysis.needsGuestInfo) {
