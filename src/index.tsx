@@ -7513,152 +7513,241 @@ app.post('/api/admin/feedback/generate-insights/:property_id', async (c) => {
   const { property_id } = c.req.param()
   
   try {
-    // Get recent unanalyzed submissions (last 24 hours)
+    // Get recent feedback submissions (last 7 days)
     const submissions = await DB.prepare(`
-      SELECT s.*, f.form_name
+      SELECT s.*, f.form_name, 'form' as source
       FROM feedback_submissions s
       JOIN feedback_forms f ON s.form_id = f.form_id
       WHERE s.property_id = ? 
-        AND s.submitted_at > datetime('now', '-24 hours')
+        AND s.submitted_at > datetime('now', '-7 days')
       ORDER BY s.submitted_at DESC
       LIMIT 50
     `).bind(property_id).all()
     
-    if (!submissions.results || submissions.results.length === 0) {
-      return c.json({ success: true, message: 'No new submissions to analyze', insights: [] })
+    // Get recent chatbot conversations with complaints (last 7 days)
+    const chatFeedback = await DB.prepare(`
+      SELECT 
+        feedback_id,
+        property_id,
+        guest_name,
+        room_number,
+        complaint_category,
+        complaint_summary,
+        sentiment_label,
+        is_urgent,
+        is_complaint,
+        detected_at as submitted_at,
+        'chat' as source
+      FROM chat_feedback
+      WHERE property_id = ?
+        AND detected_at > datetime('now', '-7 days')
+        AND is_complaint = 1
+      ORDER BY detected_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+    
+    const allFeedback = [...(submissions.results || []), ...(chatFeedback.results || [])]
+    const chatCount = chatFeedback.results?.length || 0
+    const formCount = submissions.results?.length || 0
+    
+    if (allFeedback.length === 0) {
+      return c.json({ success: true, message: 'No recent feedback to analyze. Try chatting with guests or collecting form submissions!', insights: [] })
     }
     
     // Use AI API for advanced analysis
     const apiKey = c.env.OPENAI_API_KEY
     const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
     
+    if (!apiKey) {
+      return c.json({ 
+        success: false, 
+        message: 'AI API key not configured. Please add OPENAI_API_KEY to environment variables.',
+        insights: []
+      })
+    }
+    
     const insightsGenerated = []
     
-    if (apiKey) {
-      try {
-        // Group submissions by sentiment
-        const urgentSubmissions = submissions.results.filter(s => s.is_urgent === 1)
-        const negativeSubmissions = submissions.results.filter(s => s.sentiment_label === 'negative' && s.is_urgent !== 1)
+    try {
+      // Group all feedback
+      const urgentFeedback = allFeedback.filter(f => f.is_urgent === 1)
+      const negativeFeedback = allFeedback.filter(f => 
+        (f.sentiment_label === 'negative' || f.is_complaint === 1) && f.is_urgent !== 1
+      )
+      
+      // Generate insights for urgent issues (both form and chat)
+      for (const item of urgentFeedback.slice(0, 5)) {
+        let feedbackText = ''
         
-        // Generate insights for urgent issues
-        for (const sub of urgentSubmissions.slice(0, 5)) {
-          // Get submission details
+        if (item.source === 'form') {
           const answers = await DB.prepare(`
             SELECT a.answer_text, q.question_text
             FROM feedback_answers a
             JOIN feedback_questions q ON a.question_id = q.question_id
             WHERE a.submission_id = ?
-          `).bind(sub.submission_id).all()
-          
-          const feedbackText = answers.results.map(a => a.question_text + ': ' + (a.answer_text || 'N/A')).join('\\n')
-          
-          const prompt = 'Analyze this urgent guest feedback and provide: 1) Summary of the issue, 2) Recommended immediate action, 3) Follow-up steps. Be concise.\\n\\nGuest: ' + (sub.guest_name || 'Anonymous') + (sub.room_number ? ' (Room ' + sub.room_number + ')' : '') + '\\nFeedback:\\n' + feedbackText
-          
-          const aiResponse = await fetch(baseURL + '/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + apiKey
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: 'You are a hotel manager assistant analyzing guest feedback to provide actionable insights.' },
-                { role: 'user', content: prompt }
-              ],
-              temperature: 0.7,
-              max_tokens: 300
-            })
-          })
-          
-          if (aiResponse.ok) {
-            const aiData = await aiResponse.json()
-            const analysis = aiData.choices[0].message.content
-            
-            // Create insight
-            await DB.prepare(`
-              INSERT INTO feedback_insights (
-                property_id, submission_id, insight_type, title, description,
-                action_suggested, priority
-              ) VALUES (?, ?, 'alert', ?, ?, ?, 'critical')
-            `).bind(
-              property_id, sub.submission_id,
-              'URGENT: ' + (sub.guest_name || 'Guest') + (sub.room_number ? ' in Room ' + sub.room_number : ''),
-              analysis.substring(0, 500),
-              'Contact guest immediately and resolve issue'
-            ).run()
-            
-            insightsGenerated.push({
-              type: 'alert',
-              submission_id: sub.submission_id,
-              guest: sub.guest_name || 'Anonymous',
-              room: sub.room_number
-            })
-          }
+          `).bind(item.submission_id).all()
+          feedbackText = answers.results.map(a => a.question_text + ': ' + (a.answer_text || 'N/A')).join('\\n')
+        } else {
+          feedbackText = 'Category: ' + (item.complaint_category || 'General') + '\\nIssue: ' + (item.complaint_summary || 'Guest complaint detected')
         }
         
-        // Detect trends in negative feedback
-        if (negativeSubmissions.length >= 3) {
-          const trendText = negativeSubmissions.slice(0, 10).map(s => 
-            (s.guest_name || 'Guest') + ': ' + s.sentiment_label
-          ).join('; ')
-          
-          const trendPrompt = 'Analyze these recent negative feedback submissions and identify common themes or trends. Provide 2-3 key insights.\\n\\n' + trendText
-          
-          const trendResponse = await fetch(baseURL + '/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + apiKey
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: 'You are a hotel analytics expert identifying patterns in guest feedback.' },
-                { role: 'user', content: trendPrompt }
-              ],
-              temperature: 0.7,
-              max_tokens: 200
-            })
-          })
-          
-          if (trendResponse.ok) {
-            const trendData = await trendResponse.json()
-            const trendAnalysis = trendData.choices[0].message.content
-            
-            await DB.prepare(`
-              INSERT INTO feedback_insights (
-                property_id, submission_id, insight_type, title, description,
-                action_suggested, priority
-              ) VALUES (?, NULL, 'trend', ?, ?, ?, 'high')
-            `).bind(
-              property_id,
-              'Negative Feedback Trend Detected',
-              trendAnalysis,
-              'Review these common issues and implement improvements'
-            ).run()
-            
-            insightsGenerated.push({
-              type: 'trend',
-              count: negativeSubmissions.length
-            })
-          }
-        }
+        const prompt = 'Analyze this urgent guest issue and provide: 1) Brief summary, 2) Immediate action needed, 3) Follow-up steps. Be concise (max 150 words).\\n\\nSource: ' + (item.source === 'chat' ? 'AI Chatbot Conversation' : 'Feedback Form') + '\\nGuest: ' + (item.guest_name || 'Anonymous') + (item.room_number ? ' (Room ' + item.room_number + ')' : '') + '\\n\\n' + feedbackText
         
-      } catch (aiError) {
-        console.error('AI insights error:', aiError)
+        const aiResponse = await fetch(baseURL + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a hotel manager assistant. Provide brief, actionable insights.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 250
+          })
+        })
+        
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json()
+          const analysis = aiData.choices[0].message.content
+          
+          await DB.prepare(`
+            INSERT INTO feedback_insights (
+              property_id, submission_id, insight_type, title, description,
+              action_suggested, priority
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            property_id, 
+            item.submission_id || null,
+            'urgent',
+            'URGENT: ' + (item.guest_name || 'Guest') + (item.room_number ? ' - Room ' + item.room_number : '') + ' (' + item.source + ')',
+            analysis.substring(0, 500),
+            'Contact guest immediately and resolve issue',
+            'critical'
+          ).run()
+          
+          insightsGenerated.push({ type: 'urgent', source: item.source })
+        }
       }
+      
+      // Analyze negative trends across ALL feedback sources
+      if (negativeFeedback.length >= 3) {
+        const feedbackSummary = negativeFeedback.slice(0, 15).map(f => {
+          if (f.source === 'chat') {
+            return (f.complaint_category || 'issue') + ' complaint from chat'
+          }
+          return 'negative form response: ' + f.sentiment_label
+        }).join('; ')
+        
+        const trendPrompt = 'Analyze these recent guest issues from feedback forms AND chatbot conversations. Identify 2-3 common themes and suggest improvements. Be concise.\\n\\nData points (' + negativeFeedback.length + ' total):\\n' + feedbackSummary
+        
+        const trendResponse = await fetch(baseURL + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a hotel analytics expert identifying patterns in guest feedback.' },
+              { role: 'user', content: trendPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 300
+          })
+        })
+        
+        if (trendResponse.ok) {
+          const trendData = await trendResponse.json()
+          const trendAnalysis = trendData.choices[0].message.content
+          
+          await DB.prepare(`
+            INSERT INTO feedback_insights (
+              property_id, submission_id, insight_type, title, description,
+              action_suggested, priority
+            ) VALUES (?, NULL, ?, ?, ?, ?, ?)
+          `).bind(
+            property_id,
+            'trend',
+            'Negative Feedback Trend - ' + negativeFeedback.length + ' issues detected',
+            trendAnalysis,
+            'Review common issues and implement improvements',
+            'high'
+          ).run()
+          
+          insightsGenerated.push({ type: 'trend', count: negativeFeedback.length })
+        }
+      }
+      
+      // Generate overall sentiment summary
+      if (allFeedback.length >= 5) {
+        const summaryPrompt = 'Provide a brief executive summary of guest satisfaction based on: ' + formCount + ' feedback forms and ' + chatCount + ' chatbot conversations with complaints. Include overall sentiment and top recommendation. Max 100 words.'
+        
+        const summaryResponse = await fetch(baseURL + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a hotel management consultant providing executive summaries.' },
+              { role: 'user', content: summaryPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 200
+          })
+        })
+        
+        if (summaryResponse.ok) {
+          const summaryData = await summaryResponse.json()
+          const summary = summaryData.choices[0].message.content
+          
+          await DB.prepare(`
+            INSERT INTO feedback_insights (
+              property_id, submission_id, insight_type, title, description,
+              action_suggested, priority
+            ) VALUES (?, NULL, ?, ?, ?, ?, ?)
+          `).bind(
+            property_id,
+            'recommendation',
+            'Guest Satisfaction Overview',
+            summary,
+            'Review detailed feedback and implement suggested improvements',
+            'medium'
+          ).run()
+          
+          insightsGenerated.push({ type: 'summary' })
+        }
+      }
+      
+    } catch (aiError) {
+      console.error('AI insights generation error:', aiError)
+      return c.json({ 
+        success: false, 
+        message: 'AI analysis failed: ' + aiError.message,
+        insights: insightsGenerated
+      })
     }
     
     return c.json({ 
       success: true, 
-      message: 'Insights generated',
+      message: 'Generated ' + insightsGenerated.length + ' insights from ' + allFeedback.length + ' feedback items (' + formCount + ' forms, ' + chatCount + ' chats)',
       insights: insightsGenerated,
-      analyzed_count: submissions.results.length
+      analyzed_count: allFeedback.length,
+      sources: {
+        forms: formCount,
+        chats: chatCount
+      }
     })
   } catch (error) {
     console.error('Generate insights error:', error)
-    return c.json({ error: 'Failed to generate insights' }, 500)
+    return c.json({ error: 'Failed to generate insights: ' + error.message }, 500)
   }
 })
 
@@ -21879,12 +21968,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             }
             
             const insightsHTML = data.insights.map(insight => {
-              const borderColor = insight.priority === 'high' ? 'border-red-500' : insight.priority === 'medium' ? 'border-yellow-500' : 'border-blue-500';
-              const badgeColor = insight.priority === 'high' ? 'bg-red-100 text-red-700' : insight.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
-              const actionItemsHTML = insight.action_items ? 
+              const borderColor = insight.priority === 'high' || insight.priority === 'critical' ? 'border-red-500' : insight.priority === 'medium' ? 'border-yellow-500' : 'border-blue-500';
+              const badgeColor = insight.priority === 'high' || insight.priority === 'critical' ? 'bg-red-100 text-red-700' : insight.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700';
+              const actionItemsHTML = insight.action_suggested ? 
                 '<div class="bg-blue-50 border-l-2 border-blue-500 p-3 mb-2">' +
-                '<p class="text-sm font-semibold text-blue-900 mb-1"><i class="fas fa-tasks mr-1"></i>Action Items:</p>' +
-                '<p class="text-sm text-blue-800">' + insight.action_items + '</p>' +
+                '<p class="text-sm font-semibold text-blue-900 mb-1"><i class="fas fa-tasks mr-1"></i>Suggested Action:</p>' +
+                '<p class="text-sm text-blue-800">' + insight.action_suggested + '</p>' +
                 '</div>' : '';
               
               return '<div class="bg-white border-l-4 ' + borderColor + ' rounded-lg shadow p-4 mb-4">' +
@@ -21892,10 +21981,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 '<div class="flex-1">' +
                 '<div class="flex items-center gap-2 mb-2">' +
                 '<span class="px-2 py-1 rounded text-xs font-semibold ' + badgeColor + '">' + insight.priority.toUpperCase() + '</span>' +
-                '<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">' + (insight.category || 'General') + '</span>' +
+                '<span class="px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">' + (insight.insight_type || 'General') + '</span>' +
                 '</div>' +
-                '<h4 class="font-bold text-lg mb-2">' + insight.insight_title + '</h4>' +
-                '<p class="text-gray-700 mb-3">' + insight.insight_text + '</p>' +
+                '<h4 class="font-bold text-lg mb-2">' + insight.title + '</h4>' +
+                '<p class="text-gray-700 mb-3">' + insight.description + '</p>' +
                 actionItemsHTML +
                 '<p class="text-xs text-gray-500 mt-2">' +
                 '<i class="fas fa-calendar mr-1"></i>' + new Date(insight.created_at).toLocaleString() +
