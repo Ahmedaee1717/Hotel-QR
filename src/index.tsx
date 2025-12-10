@@ -18421,11 +18421,10 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
-        console.log('🚀 FUNCTION BODY ENTERED');
-        console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
-        if (range) currentAnalyticsRange = range;
-        
         try {
+          console.log('🚀 FUNCTION BODY ENTERED');
+          console.log('📊 loadAnalytics() STARTED', { range, propertyId, currentAnalyticsRange });
+          if (range) currentAnalyticsRange = range;
           
           console.log('🌐 Fetching analytics API...');
           const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
