@@ -5515,12 +5515,104 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     const lastNameMatch = guestMessage.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)|mr\.?\s+(\w+)|mrs\.?\s+(\w+)|ms\.?\s+(\w+)/i)
     const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5] || lastNameMatch[6] || lastNameMatch[7] || lastNameMatch[8]) : null
     
-    // 5. CHECK IF WE HAVE GUEST INFO (optional - we save complaints regardless)
+    // 5. CHECK IF WE HAVE GUEST INFO - REQUIRED for actionable complaints
     const hasRoomNumber = roomNumber !== null
     const hasLastName = guestName !== null
     
-    // 6. SAVE TO CHAT_FEEDBACK TABLE (ALWAYS save complaints, even without guest info)
-    // This ensures ALL complaints are tracked for insights generation
+    // Check if there's a pending complaint for this conversation (missing guest info)
+    const pendingComplaint = await DB.prepare(`
+      SELECT feedback_id, guest_name, room_number 
+      FROM chat_feedback 
+      WHERE conversation_id = ? AND property_id = ?
+        AND (guest_name IS NULL OR room_number IS NULL)
+      ORDER BY detected_at DESC
+      LIMIT 1
+    `).bind(conversation_id, property_id).first()
+    
+    // If guest provided info, update the pending complaint
+    if (pendingComplaint && (hasRoomNumber || hasLastName)) {
+      const updateFields = []
+      const updateValues = []
+      
+      if (hasRoomNumber && !pendingComplaint.room_number) {
+        updateFields.push('room_number = ?')
+        updateValues.push(roomNumber)
+      }
+      if (hasLastName && !pendingComplaint.guest_name) {
+        updateFields.push('guest_name = ?')
+        updateValues.push(guestName)
+      }
+      
+      if (updateFields.length > 0) {
+        updateValues.push(pendingComplaint.feedback_id)
+        await DB.prepare(`
+          UPDATE chat_feedback 
+          SET ${updateFields.join(', ')}
+          WHERE feedback_id = ?
+        `).bind(...updateValues).run()
+        
+        // Check if now complete
+        const updatedComplaint = await DB.prepare(`
+          SELECT guest_name, room_number FROM chat_feedback WHERE feedback_id = ?
+        `).bind(pendingComplaint.feedback_id).first()
+        
+        if (updatedComplaint.guest_name && updatedComplaint.room_number) {
+          return { needsGuestInfo: false, feedbackSaved: true, complaintUpdated: true }
+        }
+      }
+    }
+    
+    // 6. SAVE NEW COMPLAINT ONLY IF we have complete info OR it's the first complaint
+    if (!hasRoomNumber || !hasLastName) {
+      // Check if we already asked for info (don't create duplicate entries)
+      if (pendingComplaint) {
+        return { 
+          needsGuestInfo: true, 
+          hasRoomNumber, 
+          hasLastName,
+          complaintCategory,
+          isUrgent,
+          feedbackSaved: false,
+          hasPendingComplaint: true
+        }
+      }
+      
+      // First time - save incomplete complaint as placeholder
+      await DB.prepare(`
+        INSERT INTO chat_feedback (
+          property_id, conversation_id, guest_message, bot_response,
+          sentiment_label, sentiment_score, is_complaint, is_urgent,
+          complaint_category, complaint_summary, guest_name, room_number,
+          issue_description
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id, 
+        conversation_id, 
+        guestMessage, 
+        botResponse,
+        sentimentLabel,
+        sentimentScore,
+        isComplaint ? 1 : 0,
+        isUrgent ? 1 : 0,
+        complaintCategory,
+        complaintSummary,
+        null, // No guest name yet
+        null, // No room number yet
+        guestMessage
+      ).run()
+      
+      return { 
+        needsGuestInfo: true, 
+        hasRoomNumber, 
+        hasLastName,
+        complaintCategory,
+        isUrgent,
+        feedbackSaved: true,
+        hasPendingComplaint: false
+      }
+    }
+    
+    // Complete info available - save full complaint
     await DB.prepare(`
       INSERT INTO chat_feedback (
         property_id, conversation_id, guest_message, bot_response,
@@ -5541,20 +5633,8 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
       complaintSummary,
       guestName,
       roomNumber,
-      guestMessage // Full message as issue description
+      guestMessage
     ).run()
-    
-    // After saving, check if we should ask for missing info (for follow-up)
-    if (!hasRoomNumber || !hasLastName) {
-      return { 
-        needsGuestInfo: true, 
-        hasRoomNumber, 
-        hasLastName,
-        complaintCategory,
-        isUrgent,
-        feedbackSaved: true
-      }
-    }
     
     return { needsGuestInfo: false, feedbackSaved: true }
     
@@ -5632,7 +5712,140 @@ app.post('/api/chatbot/chat', async (c) => {
     const hotelName = propertyInfo?.name || 'our hotel'
     const chatbotName = propertyInfo?.chatbot_name || 'Hotel Assistant'
     
-    // Store user message
+    // ⚠️ CHECK FOR PENDING COMPLAINT FIRST - Block conversation until guest info provided
+    // Search by session_id since frontend might not always send conversation_id
+    const pendingComplaint = await DB.prepare(`
+      SELECT cf.feedback_id, cf.complaint_category, cf.is_urgent, cf.guest_name, cf.room_number
+      FROM chat_feedback cf
+      JOIN chatbot_conversations cc ON cf.conversation_id = cc.conversation_id
+      WHERE cc.session_id = ? AND cf.property_id = ?
+        AND (cf.guest_name IS NULL OR cf.room_number IS NULL)
+      ORDER BY cf.detected_at DESC
+      LIMIT 1
+    `).bind(session_id, property_id).first()
+    
+    if (pendingComplaint) {
+      // Check if user is providing the missing info NOW
+      const roomMatch = message.match(/room\s*(\d+)/i)
+      const roomNumber = roomMatch ? roomMatch[1] : null
+      const lastNameMatch = message.match(/my (?:last )?name is (\w+)|I'?m (\w+)|I am (\w+)|name: (\w+)|surname: (\w+)|mr\.?\s+(\w+)|mrs\.?\s+(\w+)|ms\.?\s+(\w+)/i)
+      const guestName = lastNameMatch ? (lastNameMatch[1] || lastNameMatch[2] || lastNameMatch[3] || lastNameMatch[4] || lastNameMatch[5] || lastNameMatch[6] || lastNameMatch[7] || lastNameMatch[8]) : null
+      
+      const needsRoom = !pendingComplaint.room_number
+      const needsName = !pendingComplaint.guest_name
+      const providedRoom = roomNumber !== null
+      const providedName = guestName !== null
+      
+      // If they provided what we need, update the complaint
+      if ((needsRoom && providedRoom) || (needsName && providedName)) {
+        const updateFields = []
+        const updateValues = []
+        
+        if (needsRoom && providedRoom) {
+          updateFields.push('room_number = ?')
+          updateValues.push(roomNumber)
+        }
+        if (needsName && providedName) {
+          updateFields.push('guest_name = ?')
+          updateValues.push(guestName)
+        }
+        
+        updateValues.push(pendingComplaint.feedback_id)
+        await DB.prepare(`
+          UPDATE chat_feedback 
+          SET ${updateFields.join(', ')}
+          WHERE feedback_id = ?
+        `).bind(...updateValues).run()
+        
+        // Check if now complete
+        const stillNeedsRoom = needsRoom && !providedRoom
+        const stillNeedsName = needsName && !providedName
+        
+        if (!stillNeedsRoom && !stillNeedsName) {
+          // Complete! Send confirmation
+          const finalName = guestName || pendingComplaint.guest_name
+          const finalRoom = roomNumber || pendingComplaint.room_number
+          let confirmationMsg = "✅ **Thank you! Your complaint has been officially logged.**\n\n"
+          confirmationMsg += "📋 **Complaint Details:**\n"
+          confirmationMsg += "• Guest: " + finalName + "\n"
+          confirmationMsg += "• Room: " + finalRoom + "\n"
+          confirmationMsg += "• Category: " + (pendingComplaint.complaint_category || 'General') + "\n"
+          confirmationMsg += "• Status: Logged with management\n"
+          confirmationMsg += "• Response Time: Within 15 minutes\n\n"
+          confirmationMsg += "Our management team will contact you shortly to resolve this issue.\n\n"
+          confirmationMsg += "Is there anything else I can help you with in the meantime?"
+          
+          await DB.prepare(`
+            INSERT INTO chatbot_messages (conversation_id, role, content)
+            VALUES (?, 'user', ?)
+          `).bind(convId, message).run()
+          
+          await DB.prepare(`
+            INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+            VALUES (?, 'assistant', ?, '[]')
+          `).bind(convId, confirmationMsg).run()
+          
+          return c.json({ 
+            success: true,
+            response: confirmationMsg,
+            conversation_id: convId,
+            chunks_used: 0
+          })
+        } else {
+          // Still need more info
+          let stillNeedMsg = "📋 **Thank you! I have:\n"
+          if (providedName || !needsName) stillNeedMsg += "✅ Your name: " + (providedName || pendingComplaint.guest_name) + "\n"
+          if (providedRoom || !needsRoom) stillNeedMsg += "✅ Your room: " + (providedRoom || pendingComplaint.room_number) + "\n"
+          stillNeedMsg += "\n🚨 **Still needed:**\n"
+          if (stillNeedsRoom) stillNeedMsg += "❌ Your room number\n"
+          if (stillNeedsName) stillNeedMsg += "❌ Your last name\n"
+          stillNeedMsg += "\n📋 Please provide the missing information so I can log your complaint."
+          
+          await DB.prepare(`
+            INSERT INTO chatbot_messages (conversation_id, role, content)
+            VALUES (?, 'user', ?)
+          `).bind(convId, message).run()
+          
+          await DB.prepare(`
+            INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+            VALUES (?, 'assistant', ?, '[]')
+          `).bind(convId, stillNeedMsg).run()
+          
+          return c.json({ 
+            success: true,
+            response: stillNeedMsg,
+            conversation_id: convId,
+            chunks_used: 0
+          })
+        }
+      } else {
+        // They didn't provide the info - block and remind them
+        let blockMsg = "🚨 **I cannot assist with other requests until your complaint is logged.**\n\n"
+        blockMsg += "**Please provide:**\n"
+        if (needsName) blockMsg += "👤 Your **last name** (surname)\n"
+        if (needsRoom) blockMsg += "🏨 Your **room number**\n"
+        blockMsg += "\n📋 Example: My last name is Smith and I'm in room 305"
+        
+        await DB.prepare(`
+          INSERT INTO chatbot_messages (conversation_id, role, content)
+          VALUES (?, 'user', ?)
+        `).bind(convId, message).run()
+        
+        await DB.prepare(`
+          INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+          VALUES (?, 'assistant', ?, '[]')
+        `).bind(convId, blockMsg).run()
+        
+        return c.json({ 
+          success: true,
+          response: blockMsg,
+          conversation_id: convId,
+          chunks_used: 0
+        })
+      }
+    }
+    
+    // Store user message (only if no pending complaint)
     await DB.prepare(`
       INSERT INTO chatbot_messages (conversation_id, role, content)
       VALUES (?, 'user', ?)
@@ -5985,28 +6198,50 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
     // 🤖 AI SENTIMENT ANALYSIS - Detect complaints/feedback BEFORE storing response
     const feedbackAnalysis = await analyzeSentimentAndCaptureFeedback(DB, property_id, convId, message, aiResponse)
     
-    // If complaint detected but missing guest info, ask for it
+    // If complaint detected but missing guest info, REQUIRE it before continuing
     if (feedbackAnalysis.needsGuestInfo) {
-      let missingInfoPrompt = "\n\n⚠️ **I've noted your concern and want to help immediately.**\n\n"
+      let missingInfoPrompt = ""
+      
+      // First time asking vs. still waiting for info
+      if (feedbackAnalysis.hasPendingComplaint) {
+        // Already asked - be more insistent
+        missingInfoPrompt = "🚨 **I need your information to log your complaint with management.**\n\n"
+        missingInfoPrompt += "**I cannot process any other requests until you provide:**\n\n"
+      } else {
+        // First time - be polite but firm
+        missingInfoPrompt = "⚠️ **I've noted your concern and our management team needs to address this immediately.**\n\n"
+        missingInfoPrompt += "**To log your complaint officially, I need:**\n\n"
+      }
       
       if (!feedbackAnalysis.hasRoomNumber && !feedbackAnalysis.hasLastName) {
-        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide:\n"
-        missingInfoPrompt += "1️⃣ Your **last name**\n"
+        missingInfoPrompt += "1️⃣ Your **last name** (surname)\n"
         missingInfoPrompt += "2️⃣ Your **room number**\n\n"
+        missingInfoPrompt += "📋 **Please respond with BOTH** (Example: My last name is Smith and I'm in room 305)\n\n"
       } else if (!feedbackAnalysis.hasRoomNumber) {
-        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide your **room number**?\n\n"
+        missingInfoPrompt += "🏨 Your **room number**\n\n"
+        missingInfoPrompt += "📋 **Please provide your room number** (Example: I'm in room 305)\n\n"
       } else if (!feedbackAnalysis.hasLastName) {
-        missingInfoPrompt += "To ensure our management team can assist you properly, could you please provide your **last name**?\n\n"
+        missingInfoPrompt += "👤 Your **last name** (surname)\n\n"
+        missingInfoPrompt += "📋 **Please provide your last name** (Example: My last name is Smith)\n\n"
       }
       
       if (feedbackAnalysis.isUrgent) {
-        missingInfoPrompt += "⏱️ *This appears urgent - we'll prioritize your request once we have this information.*"
+        missingInfoPrompt += "⏱️ **URGENT**: This will be escalated to management immediately once I have your information."
       } else {
-        missingInfoPrompt += "📋 *Example: My last name is Smith and I'm in room 305*"
+        missingInfoPrompt += "✅ Once provided, your complaint will be logged and staff will contact you within 15 minutes."
       }
       
-      // Override AI response with info request
-      aiResponse = aiResponse + missingInfoPrompt
+      // COMPLETELY OVERRIDE AI response - don't answer their question until we have info
+      aiResponse = missingInfoPrompt
+    } else if (feedbackAnalysis.feedbackSaved && feedbackAnalysis.complaintUpdated) {
+      // Guest just provided the missing info - confirm complaint is now logged
+      aiResponse = "✅ **Thank you! Your complaint has been officially logged.**\n\n"
+      aiResponse += "📋 **Complaint Details:**\n"
+      aiResponse += "• Category: " + (feedbackAnalysis.complaintCategory || 'General') + "\n"
+      aiResponse += "• Status: Logged with management\n"
+      aiResponse += "• Response Time: Within 15 minutes\n\n"
+      aiResponse += "Our management team will contact you shortly to resolve this issue.\n\n"
+      aiResponse += "Is there anything else I can help you with in the meantime?"
     }
     
     // Store AI response (potentially modified with guest info request)
