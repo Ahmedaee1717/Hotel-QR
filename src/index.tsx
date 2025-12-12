@@ -16633,6 +16633,9 @@ app.get('/admin/dashboard', (c) => {
                 <!-- Services Section -->
                 <div class="px-3 mb-6">
                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Services</h3>
+                    <button data-tab="restaurants" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-utensils w-5"></i><span>Restaurants</span>
+                    </button>
                     <button data-tab="vendors" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-store w-5"></i><span>Vendors</span>
                     </button>
@@ -18286,6 +18289,54 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Restaurants Management Tab -->
+    <div id="restaurantsTab" class="tab-content hidden">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">
+                <i class="fas fa-utensils mr-2 text-orange-600"></i>
+                Restaurant Reservations
+            </h2>
+            <p class="text-gray-600 mb-6">
+                Manage restaurant table bookings, time slots, and floor plans. Select a restaurant below to view its management dashboard.
+            </p>
+            
+            <!-- Restaurant Selector -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-2">Select Restaurant:</label>
+                <select id="restaurantSelector" class="w-full md:w-96 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                    <option value="">Loading restaurants...</option>
+                </select>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div id="restaurantQuickStats" class="grid md:grid-cols-4 gap-4 mb-6 hidden">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="text-sm text-blue-600 font-semibold">Today's Reservations</div>
+                    <div class="text-2xl font-bold text-blue-700" id="statTodayReservations">0</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4">
+                    <div class="text-sm text-green-600 font-semibold">Tables Available</div>
+                    <div class="text-2xl font-bold text-green-700" id="statTablesAvailable">0</div>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-4">
+                    <div class="text-sm text-purple-600 font-semibold">Time Slots Today</div>
+                    <div class="text-2xl font-bold text-purple-700" id="statSlotsToday">0</div>
+                </div>
+                <div class="bg-orange-50 rounded-lg p-4">
+                    <div class="text-sm text-orange-600 font-semibold">Pending Confirmations</div>
+                    <div class="text-2xl font-bold text-orange-700" id="statPending">0</div>
+                </div>
+            </div>
+            
+            <!-- Action Button -->
+            <div id="restaurantActionButton" class="hidden">
+                <button onclick="openRestaurantManagement()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold shadow-lg">
+                    <i class="fas fa-external-link-alt mr-2"></i>Open Restaurant Management Dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Beach Management Tab -->
     <div id="beachTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -18796,6 +18847,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'chatbot') loadChatbot();
         if (tab === 'beach') loadBeachSettings();
         if (tab === 'feedback') loadFeedbackTab();
+        if (tab === 'restaurants') loadRestaurantsTab();
       }
       
       // Add event listeners to sidebar buttons
@@ -22721,6 +22773,84 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
 
+      // ========================================
+      // RESTAURANTS MANAGEMENT
+      // ========================================
+      let selectedRestaurantId = null;
+      
+      async function loadRestaurantsTab() {
+        try {
+          const response = await fetch('/api/hotel-offerings/1');
+          const data = await response.json();
+          const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
+          
+          const selector = document.getElementById('restaurantSelector');
+          if (restaurants.length === 0) {
+            selector.innerHTML = '<option value="">No restaurants found</option>';
+            return;
+          }
+          
+          selector.innerHTML = '<option value="">-- Select a Restaurant --</option>' + 
+            restaurants.map(r => '<option value="' + r.offering_id + '">' + (r.title_en || r.title) + '</option>').join('');
+          
+          selector.addEventListener('change', async function() {
+            selectedRestaurantId = this.value;
+            if (selectedRestaurantId) {
+              await loadRestaurantStats(selectedRestaurantId);
+              document.getElementById('restaurantQuickStats').classList.remove('hidden');
+              document.getElementById('restaurantActionButton').classList.remove('hidden');
+            } else {
+              document.getElementById('restaurantQuickStats').classList.add('hidden');
+              document.getElementById('restaurantActionButton').classList.add('hidden');
+            }
+          });
+        } catch (error) {
+          console.error('Load restaurants error:', error);
+        }
+      }
+      
+      async function loadRestaurantStats(offeringId) {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          
+          // Get today's reservations
+          const resResponse = await fetch('/api/admin/restaurant/reservations?offering_id=' + offeringId + '&date=' + today);
+          const resData = await resResponse.json();
+          const reservations = resData.reservations || [];
+          
+          // Get tables
+          const tablesResponse = await fetch('/api/restaurant/' + offeringId + '/tables');
+          const tablesData = await tablesResponse.json();
+          const tables = tablesData.tables || [];
+          
+          // Get sessions
+          const sessionsResponse = await fetch('/api/restaurant/' + offeringId + '/sessions?date=' + today);
+          const sessionsData = await sessionsResponse.json();
+          const sessions = sessionsData.sessions || [];
+          
+          // Update stats
+          document.getElementById('statTodayReservations').textContent = reservations.length;
+          document.getElementById('statTablesAvailable').textContent = tables.length;
+          document.getElementById('statSlotsToday').textContent = sessions.length;
+          document.getElementById('statPending').textContent = reservations.filter(r => r.status === 'pending').length;
+        } catch (error) {
+          console.error('Load restaurant stats error:', error);
+        }
+      }
+      
+      function openRestaurantManagement() {
+        if (selectedRestaurantId) {
+          window.open('/admin/restaurant/' + selectedRestaurantId, '_blank');
+        } else {
+          alert('Please select a restaurant first');
+        }
+      }
+      
+      // Make function globally accessible
+      window.openRestaurantManagement = openRestaurantManagement;
+      
+      // ========== END RESTAURANTS MANAGEMENT ==========
+
       // ========== AUTO-REFRESH & NOTIFICATION SYSTEM ==========
       
       // Store previous data to detect new bookings
@@ -23709,14 +23839,23 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 </head>
 <body class="bg-gray-50">
     <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <a href="/admin/dashboard" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-                </a>
-                <h1 class="text-2xl font-bold">Restaurant Table Management</h1>
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-4">
+                    <a href="/admin/dashboard" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                    <h1 class="text-2xl font-bold">Restaurant Management</h1>
+                </div>
+                <span id="restaurantName" class="text-lg"></span>
             </div>
-            <span id="restaurantName" class="text-lg"></span>
+            <!-- Restaurant Selector -->
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-semibold">Restaurant:</label>
+                <select id="restaurantSelectorHeader" onchange="switchRestaurant(this.value)" class="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-white/40 min-w-64">
+                    <option value="${offering_id}">${offering_id}</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -23968,13 +24107,27 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         try {
           const response = await fetch('/api/hotel-offerings/1');
           const data = await response.json();
-          const restaurant = data.offerings.find(o => o.offering_id == offeringId);
+          const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
+          const restaurant = restaurants.find(o => o.offering_id == offeringId);
+          
           if (restaurant) {
-            document.getElementById('restaurantName').textContent = restaurant.title;
-            document.title = \`\${restaurant.title} - Table Management\`;
+            document.getElementById('restaurantName').textContent = restaurant.title_en || restaurant.title;
+            document.title = \`\${restaurant.title_en || restaurant.title} - Restaurant Management\`;
           }
+          
+          // Populate restaurant selector
+          const selector = document.getElementById('restaurantSelectorHeader');
+          selector.innerHTML = restaurants.map(r => 
+            \`<option value="\${r.offering_id}" \${r.offering_id == offeringId ? 'selected' : ''}>\${r.title_en || r.title}</option>\`
+          ).join('');
         } catch (error) {
           console.error('Load restaurant error:', error);
+        }
+      }
+      
+      function switchRestaurant(newOfferingId) {
+        if (newOfferingId && newOfferingId != offeringId) {
+          window.location.href = '/admin/restaurant/' + newOfferingId;
         }
       }
 
