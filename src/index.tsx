@@ -24410,7 +24410,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const data = await response.json();
           if (data.success) {
             alert('Time slot created successfully!');
+            // Update filter to show the newly created session's date
+            document.getElementById('filterSessionDate').value = sessionData.session_date;
             document.getElementById('createSessionForm').reset();
+            // Reset the form date to today for next creation
+            document.getElementById('sessionDate').value = new Date().toISOString().split('T')[0];
             loadSessions();
           } else {
             alert('Failed to create time slot: ' + (data.error || 'Unknown error'));
