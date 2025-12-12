@@ -24946,6 +24946,27 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         </div>
                     </div>
                     
+                    <!-- Master Scale Control -->
+                    <div class="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="font-bold text-gray-700">
+                                <i class="fas fa-search-plus mr-2 text-blue-600"></i>Master Scale
+                            </label>
+                            <span id="scaleValue" class="text-lg font-bold text-blue-600">100%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-gray-500">Small</span>
+                            <input type="range" id="masterScale" min="30" max="150" value="100" step="5" 
+                                   class="flex-1 h-3 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+                                   oninput="updateMasterScale(this.value)">
+                            <span class="text-xs text-gray-500">Large</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Scale all tables, elements & walls at once - perfect for fitting more in the space!
+                        </p>
+                    </div>
+                    
                     <div id="canvas" style="width: 100%; height: 600px; overflow: auto;"></div>
                     
                     <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
@@ -25216,6 +25237,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let isDragging = false;
       let dragOffset = { x: 0, y: 0 };
       let currentTab = 'tables';
+      let masterScale = 1.0; // 100% by default
 
       async function init() {
         await loadRestaurant();
@@ -25275,11 +25297,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const div = document.createElement('div');
           div.className = \`table-item table-\${table.shape}\`;
           div.id = \`table-\${table.table_id}\`;
-          div.style.left = table.position_x + 'px';
-          div.style.top = table.position_y + 'px';
-          div.style.width = table.width + 'px';
-          div.style.height = table.height + 'px';
-          div.innerHTML = \`<div class="text-center"><div class="text-sm">\${table.table_number}</div><div class="text-xs text-gray-600">\${table.capacity}p</div></div>\`;
+          
+          // Apply master scale to position and size
+          div.style.left = (table.position_x * masterScale) + 'px';
+          div.style.top = (table.position_y * masterScale) + 'px';
+          div.style.width = (table.width * masterScale) + 'px';
+          div.style.height = (table.height * masterScale) + 'px';
+          
+          // Scale font size too
+          const fontSize = Math.max(8, 14 * masterScale);
+          div.innerHTML = \`<div class="text-center" style="font-size: \${fontSize}px;"><div class="font-bold">\${table.table_number}</div><div class="text-gray-600" style="font-size: \${fontSize * 0.8}px;">\${table.capacity}p</div></div>\`;
           
           div.addEventListener('mousedown', (e) => startDrag(e, table));
           div.addEventListener('click', (e) => {
@@ -25494,10 +25521,13 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.className = 'floor-element';
           div.id = 'element-' + element.element_id;
           div.style.position = 'absolute';
-          div.style.left = element.position_x + 'px';
-          div.style.top = element.position_y + 'px';
-          div.style.width = element.width + 'px';
-          div.style.height = element.height + 'px';
+          
+          // Apply master scale
+          div.style.left = (element.position_x * masterScale) + 'px';
+          div.style.top = (element.position_y * masterScale) + 'px';
+          div.style.width = (element.width * masterScale) + 'px';
+          div.style.height = (element.height * masterScale) + 'px';
+          
           div.style.background = element.color || '#94A3B8';
           div.style.border = '2px solid ' + (element.border_color || '#64748B');
           div.style.borderRadius = '8px';
@@ -25507,12 +25537,15 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.cursor = 'move';
           div.style.userSelect = 'none';
           div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-          div.style.fontSize = '12px';
+          
+          // Scale font size
+          const fontSize = Math.max(8, 12 * masterScale);
+          div.style.fontSize = fontSize + 'px';
           div.style.fontWeight = 'bold';
           div.style.color = '#1F2937';
           
           const icon = getElementIcon(element.element_type);
-          div.innerHTML = '<div class="text-center"><i class="' + icon + ' mr-1"></i><br><span style="font-size: 10px;">' + element.element_label + '</span></div>';
+          div.innerHTML = '<div class="text-center"><i class="' + icon + ' mr-1"></i><br><span style="font-size: ' + (fontSize * 0.8) + 'px;">' + element.element_label + '</span></div>';
           
           div.addEventListener('mousedown', (e) => startElementDrag(e, element));
           div.addEventListener('click', (e) => {
@@ -25633,10 +25666,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         svg.style.pointerEvents = 'none';
         svg.style.zIndex = '0';
         
-        const minX = Math.min(wall.start_x, wall.end_x);
-        const minY = Math.min(wall.start_y, wall.end_y);
-        const width = Math.abs(wall.end_x - wall.start_x);
-        const height = Math.abs(wall.end_y - wall.start_y);
+        // Apply master scale to wall coordinates
+        const scaledStartX = wall.start_x * masterScale;
+        const scaledStartY = wall.start_y * masterScale;
+        const scaledEndX = wall.end_x * masterScale;
+        const scaledEndY = wall.end_y * masterScale;
+        
+        const minX = Math.min(scaledStartX, scaledEndX);
+        const minY = Math.min(scaledStartY, scaledEndY);
+        const width = Math.abs(scaledEndX - scaledStartX);
+        const height = Math.abs(scaledEndY - scaledStartY);
         
         svg.style.left = minX + 'px';
         svg.style.top = minY + 'px';
@@ -25644,12 +25683,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         svg.style.height = (height + 10) + 'px';
         
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', wall.start_x - minX);
-        line.setAttribute('y1', wall.start_y - minY);
-        line.setAttribute('x2', wall.end_x - minX);
-        line.setAttribute('y2', wall.end_y - minY);
+        line.setAttribute('x1', scaledStartX - minX);
+        line.setAttribute('y1', scaledStartY - minY);
+        line.setAttribute('x2', scaledEndX - minX);
+        line.setAttribute('y2', scaledEndY - minY);
         line.setAttribute('stroke', wall.color || '#64748B');
-        line.setAttribute('stroke-width', wall.thickness || 4);
+        line.setAttribute('stroke-width', (wall.thickness || 4) * masterScale);
         
         if (wall.style === 'dashed') {
           line.setAttribute('stroke-dasharray', '10,5');
@@ -25734,6 +25773,19 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           }
         }
       });
+
+      // ========================================
+      // MASTER SCALE CONTROL
+      // ========================================
+      window.updateMasterScale = function(value) {
+        masterScale = value / 100; // Convert percentage to decimal
+        document.getElementById('scaleValue').textContent = value + '%';
+        
+        // Re-render everything with new scale
+        renderTables();
+        renderFloorElements();
+        renderWalls();
+      }
 
       // ========================================
       // TAB SWITCHING
