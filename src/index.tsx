@@ -23617,7 +23617,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           if (data.success && data.sessions && data.sessions.length > 0) {
             container.innerHTML = data.sessions.map(session => {
               const available = session.current_bookings < session.max_capacity;
-              const clickHandler = available ? 'selectTimeSlot(' + session.session_id + ', "' + session.session_time + '")' : '';
+              const clickHandler = available ? "window.selectTimeSlot(" + session.session_id + ", '" + session.session_time + "')" : '';
               const disabledClass = !available ? 'disabled' : '';
               const fullyBookedMsg = !available ? '<div class="text-xs text-red-600 mt-1">Fully Booked</div>' : '';
               return '<div class="time-slot p-4 border-2 rounded-lg text-center ' + disabledClass + '" onclick="' + clickHandler + '">' +
