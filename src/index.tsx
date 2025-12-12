@@ -4591,6 +4591,90 @@ app.delete('/api/admin/restaurant/table/:table_id', async (c) => {
   }
 })
 
+// Floor Plan Elements APIs
+app.get('/api/admin/restaurant/:offering_id/floor-elements', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const elements = await DB.prepare(`
+      SELECT * FROM floor_plan_elements 
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY element_id ASC
+    `).bind(offering_id).all()
+    
+    return c.json({ success: true, elements: elements.results })
+  } catch (error) {
+    console.error('Get floor elements error:', error)
+    return c.json({ error: 'Failed to load floor elements' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant/floor-element', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO floor_plan_elements (
+        offering_id, property_id, element_type, element_label,
+        position_x, position_y, width, height, color, icon
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.offering_id,
+      body.property_id,
+      body.element_type,
+      body.element_label,
+      body.position_x,
+      body.position_y,
+      body.width,
+      body.height,
+      body.color,
+      getElementIcon(body.element_type)
+    ).run()
+    
+    return c.json({ success: true, element_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create floor element error:', error)
+    return c.json({ error: 'Failed to create floor element' }, 500)
+  }
+})
+
+app.put('/api/admin/restaurant/floor-element/:element_id', async (c) => {
+  const { DB } = c.env
+  const { element_id } = c.req.param()
+  const body = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE floor_plan_elements 
+      SET position_x = ?, position_y = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE element_id = ?
+    `).bind(body.position_x, body.position_y, element_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update floor element error:', error)
+    return c.json({ error: 'Failed to update floor element' }, 500)
+  }
+})
+
+function getElementIcon(type: string) {
+  const icons: Record<string, string> = {
+    'buffet': 'fa-utensils',
+    'bar': 'fa-glass-cheers',
+    'kitchen': 'fa-fire-burner',
+    'entrance': 'fa-door-open',
+    'exit': 'fa-door-closed',
+    'restroom': 'fa-restroom',
+    'window': 'fa-window-maximize',
+    'wall': 'fa-border-all',
+    'plant': 'fa-leaf',
+    'stage': 'fa-microphone'
+  }
+  return icons[type] || 'fa-shapes'
+}
+
 // Get dining sessions for a restaurant
 app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   const { DB } = c.env
@@ -24717,6 +24801,33 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     </form>
                 </div>
 
+                <!-- Add Floor Plan Element Form -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-shapes mr-2 text-purple-600"></i>Add Floor Element</h2>
+                    <form id="addElementForm" class="space-y-3">
+                        <select id="elementType" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                            <option value="">Select Type...</option>
+                            <option value="buffet">🍽️ Buffet</option>
+                            <option value="bar">🍷 Bar</option>
+                            <option value="kitchen">🔥 Kitchen</option>
+                            <option value="entrance">🚪 Entrance</option>
+                            <option value="exit">⬅️ Exit</option>
+                            <option value="restroom">🚻 Restroom</option>
+                            <option value="window">🪟 Window</option>
+                            <option value="wall">🧱 Wall</option>
+                            <option value="plant">🌿 Plant</option>
+                            <option value="stage">🎤 Stage</option>
+                        </select>
+                        <input type="text" id="elementLabel" placeholder="Label (e.g., Main Buffet)" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="number" id="elementWidth" placeholder="Width (px)" value="100" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="number" id="elementHeight" placeholder="Height (px)" value="80" required class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="color" id="elementColor" value="#94A3B8" class="w-full h-10 border rounded-lg">
+                        <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-plus mr-2"></i>Add Element
+                        </button>
+                    </form>
+                </div>
+
                 <!-- Selected Table Info -->
                 <div id="selectedTableInfo" class="bg-white rounded-lg shadow-lg p-6 hidden">
                     <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
@@ -25015,6 +25126,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       const offeringId = '${offering_id}';
       let tables = [];
       let selectedTable = null;
+      let floorElements = [];
+      let selectedElement = null;
       let isDragging = false;
       let dragOffset = { x: 0, y: 0 };
       let currentTab = 'tables';
@@ -25022,6 +25135,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       async function init() {
         await loadRestaurant();
         await loadTables();
+        await loadFloorElements();
       }
 
       async function loadRestaurant() {
@@ -25108,28 +25222,51 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       }
 
       function onDrag(e) {
-        if (!isDragging || !selectedTable) return;
+        if (!isDragging) return;
         
         const canvas = document.getElementById('canvas');
         const canvasRect = canvas.getBoundingClientRect();
         const x = e.clientX - canvasRect.left - dragOffset.x;
         const y = e.clientY - canvasRect.top - dragOffset.y;
         
-        selectedTable.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedTable.width));
-        selectedTable.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedTable.height));
-        
-        const div = document.getElementById(\`table-\${selectedTable.table_id}\`);
-        div.style.left = selectedTable.position_x + 'px';
-        div.style.top = selectedTable.position_y + 'px';
+        if (selectedTable) {
+          selectedTable.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedTable.width));
+          selectedTable.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedTable.height));
+          
+          const div = document.getElementById(\`table-\${selectedTable.table_id}\`);
+          div.style.left = selectedTable.position_x + 'px';
+          div.style.top = selectedTable.position_y + 'px';
+        } else if (selectedElement) {
+          selectedElement.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedElement.width));
+          selectedElement.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedElement.height));
+          
+          const div = document.getElementById(\`element-\${selectedElement.element_id}\`);
+          div.style.left = selectedElement.position_x + 'px';
+          div.style.top = selectedElement.position_y + 'px';
+        }
       }
 
       function stopDrag() {
         if (isDragging && selectedTable) {
           updateTablePosition(selectedTable);
+        } else if (isDragging && selectedElement) {
+          updateElementPosition(selectedElement);
         }
         isDragging = false;
         document.removeEventListener('mousemove', onDrag);
         document.removeEventListener('mouseup', stopDrag);
+      }
+
+      async function updateElementPosition(element) {
+        try {
+          await fetch('/api/admin/restaurant/floor-element/' + element.element_id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(element)
+          });
+        } catch (error) {
+          console.error('Update element position error:', error);
+        }
       }
 
       async function updateTablePosition(table) {
@@ -25246,6 +25383,129 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Implementation for bulk delete
         alert('Please delete tables individually for now');
       }
+
+      // ========================================
+      // FLOOR PLAN ELEMENTS MANAGEMENT
+      // ========================================
+      async function loadFloorElements() {
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/floor-elements');
+          const data = await response.json();
+          floorElements = data.elements || [];
+          renderFloorElements();
+        } catch (error) {
+          console.error('Load floor elements error:', error);
+        }
+      }
+
+      function renderFloorElements() {
+        const canvas = document.getElementById('canvas');
+        // Remove old elements
+        canvas.querySelectorAll('.floor-element').forEach(el => el.remove());
+        
+        floorElements.forEach(element => {
+          const div = document.createElement('div');
+          div.className = 'floor-element';
+          div.id = 'element-' + element.element_id;
+          div.style.position = 'absolute';
+          div.style.left = element.position_x + 'px';
+          div.style.top = element.position_y + 'px';
+          div.style.width = element.width + 'px';
+          div.style.height = element.height + 'px';
+          div.style.background = element.color || '#94A3B8';
+          div.style.border = '2px solid ' + (element.border_color || '#64748B');
+          div.style.borderRadius = '8px';
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.style.justifyContent = 'center';
+          div.style.cursor = 'move';
+          div.style.userSelect = 'none';
+          div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+          div.style.fontSize = '12px';
+          div.style.fontWeight = 'bold';
+          div.style.color = '#1F2937';
+          
+          const icon = getElementIcon(element.element_type);
+          div.innerHTML = '<div class="text-center"><i class="' + icon + ' mr-1"></i><br><span style="font-size: 10px;">' + element.element_label + '</span></div>';
+          
+          div.addEventListener('mousedown', (e) => startElementDrag(e, element));
+          div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectElement(element);
+          });
+          
+          canvas.appendChild(div);
+        });
+      }
+
+      function getElementIcon(type) {
+        const icons = {
+          'buffet': 'fas fa-utensils',
+          'bar': 'fas fa-glass-cheers',
+          'kitchen': 'fas fa-fire-burner',
+          'entrance': 'fas fa-door-open',
+          'exit': 'fas fa-door-closed',
+          'restroom': 'fas fa-restroom',
+          'window': 'fas fa-window-maximize',
+          'wall': 'fas fa-border-all',
+          'plant': 'fas fa-leaf',
+          'stage': 'fas fa-microphone'
+        };
+        return icons[type] || 'fas fa-shapes';
+      }
+
+      function startElementDrag(e, element) {
+        e.preventDefault();
+        isDragging = true;
+        selectedElement = element;
+        selectedTable = null;
+        const div = document.getElementById('element-' + element.element_id);
+        const rect = div.getBoundingClientRect();
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+      }
+
+      function selectElement(element) {
+        selectedElement = element;
+        selectedTable = null;
+        document.querySelectorAll('.floor-element').forEach(el => el.style.borderColor = '#64748B');
+        const div = document.getElementById('element-' + element.element_id);
+        if (div) div.style.borderColor = '#10B981';
+      }
+
+      document.getElementById('addElementForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const elementData = {
+          offering_id: offeringId,
+          property_id: 1,
+          element_type: document.getElementById('elementType').value,
+          element_label: document.getElementById('elementLabel').value,
+          width: parseInt(document.getElementById('elementWidth').value),
+          height: parseInt(document.getElementById('elementHeight').value),
+          color: document.getElementById('elementColor').value,
+          position_x: 50,
+          position_y: 50
+        };
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/floor-element', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(elementData)
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Floor element added!');
+            document.getElementById('addElementForm').reset();
+            await loadFloorElements();
+          }
+        } catch (error) {
+          console.error('Add element error:', error);
+          alert('Failed to add floor element');
+        }
+      });
 
       // ========================================
       // TAB SWITCHING
