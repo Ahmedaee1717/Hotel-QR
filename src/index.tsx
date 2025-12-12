@@ -25299,13 +25299,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.id = \`table-\${table.table_id}\`;
           
           // Apply master scale to position and size
-          div.style.left = (table.position_x * masterScale) + 'px';
-          div.style.top = (table.position_y * masterScale) + 'px';
-          div.style.width = (table.width * masterScale) + 'px';
-          div.style.height = (table.height * masterScale) + 'px';
+          const scale = masterScale / 100;
+          div.style.left = (table.position_x * scale) + 'px';
+          div.style.top = (table.position_y * scale) + 'px';
+          div.style.width = (table.width * scale) + 'px';
+          div.style.height = (table.height * scale) + 'px';
           
           // Scale font size too
-          const fontSize = Math.max(8, 14 * masterScale);
+          const fontSize = Math.max(8, 14 * scale);
           div.innerHTML = \`<div class="text-center" style="font-size: \${fontSize}px;"><div class="font-bold">\${table.table_number}</div><div class="text-gray-600" style="font-size: \${fontSize * 0.8}px;">\${table.capacity}p</div></div>\`;
           
           div.addEventListener('mousedown', (e) => startDrag(e, table));
@@ -25538,10 +25539,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.position = 'absolute';
           
           // Apply master scale
-          div.style.left = (element.position_x * masterScale) + 'px';
-          div.style.top = (element.position_y * masterScale) + 'px';
-          div.style.width = (element.width * masterScale) + 'px';
-          div.style.height = (element.height * masterScale) + 'px';
+          const scale = masterScale / 100;
+          div.style.left = (element.position_x * scale) + 'px';
+          div.style.top = (element.position_y * scale) + 'px';
+          div.style.width = (element.width * scale) + 'px';
+          div.style.height = (element.height * scale) + 'px';
           
           div.style.background = element.color || '#94A3B8';
           div.style.border = '2px solid ' + (element.border_color || '#64748B');
@@ -25554,7 +25556,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
           
           // Scale font size
-          const fontSize = Math.max(8, 12 * masterScale);
+          const scale = masterScale / 100;
+          const fontSize = Math.max(8, 12 * scale);
           div.style.fontSize = fontSize + 'px';
           div.style.fontWeight = 'bold';
           div.style.color = '#1F2937';
@@ -25703,7 +25706,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         line.setAttribute('x2', scaledEndX - minX);
         line.setAttribute('y2', scaledEndY - minY);
         line.setAttribute('stroke', wall.color || '#64748B');
-        line.setAttribute('stroke-width', (wall.thickness || 4) * masterScale);
+        const scale = masterScale / 100;
+        line.setAttribute('stroke-width', (wall.thickness || 4) * scale);
         
         if (wall.style === 'dashed') {
           line.setAttribute('stroke-dasharray', '10,5');
