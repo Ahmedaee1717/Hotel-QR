@@ -23620,9 +23620,10 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           if (data.success && data.sessions && data.sessions.length > 0) {
             container.innerHTML = data.sessions.map(session => {
               const available = session.current_bookings < session.max_capacity;
+              const clickHandler = available ? 'selectTimeSlot(' + session.session_id + ', "' + session.session_time + '")' : '';
               return \`
                 <div class="time-slot p-4 border-2 rounded-lg text-center \${!available ? 'disabled' : ''}"
-                     onclick="\${available ? 'selectTimeSlot(' + session.session_id + ', \\\\'' + session.session_time + '\\\\')' : ''}">
+                     onclick="\${clickHandler}">
                   <div class="font-bold">\${session.session_time}</div>
                   <div class="text-xs text-gray-600 mt-1">\${session.session_type}</div>
                   \${!available ? '<div class="text-xs text-red-600 mt-1">Fully Booked</div>' : ''}
