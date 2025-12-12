@@ -4534,6 +4534,25 @@ app.post('/api/admin/restaurant/session', async (c) => {
   }
 })
 
+// Delete a dining session
+app.delete('/api/admin/restaurant/session/:session_id', async (c) => {
+  const { DB } = c.env
+  const { session_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE dining_sessions 
+      SET status = 'cancelled' 
+      WHERE session_id = ?
+    `).bind(session_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete session error:', error)
+    return c.json({ error: 'Failed to delete session' }, 500)
+  }
+})
+
 // Get table availability for a session
 app.get('/api/restaurant/session/:session_id/availability', async (c) => {
   const { DB } = c.env
@@ -4617,17 +4636,24 @@ app.post('/api/restaurant/reserve', async (c) => {
     let guestId = guest?.guest_id
     
     if (!guestId) {
+      const nameParts = (data.guest_name || '').split(' ')
+      const firstName = nameParts[0] || 'Guest'
+      const lastName = nameParts.slice(1).join(' ') || ''
+      
       const newGuest = await DB.prepare(`
-        INSERT INTO guests (email, name, phone, language_preference)
-        VALUES (?, ?, ?, 'en')
-      `).bind(data.guest_email, data.guest_name, data.guest_phone).run()
+        INSERT INTO guests (property_id, first_name, last_name, email, phone, preferred_language)
+        VALUES (?, ?, ?, ?, ?, 'en')
+      `).bind(data.property_id || 1, firstName, lastName, data.guest_email, data.guest_phone).run()
       guestId = newGuest.meta.last_row_id
     }
     
-    // Get session details for reservation_time
+    // Get session details for reservation_time and date
     const session = await DB.prepare(`
-      SELECT session_time FROM dining_sessions WHERE session_id = ?
+      SELECT session_time, session_date FROM dining_sessions WHERE session_id = ?
     `).bind(data.session_id).first()
+    
+    // Use guest_count or num_guests
+    const guestCount = data.guest_count || data.num_guests || 1
     
     // Create reservation
     const result = await DB.prepare(`
@@ -4635,17 +4661,17 @@ app.post('/api/restaurant/reserve', async (c) => {
         session_id, table_id, guest_id, property_id,
         reservation_date, reservation_time, num_guests,
         special_requests, dietary_requirements, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.session_id,
       data.table_id,
       guestId,
-      data.property_id,
-      data.reservation_date,
+      data.property_id || 1,
+      data.reservation_date || session.session_date,
       session.session_time,
-      data.num_guests,
+      guestCount,
       data.special_requests || null,
-      data.special_requests || null, // Use special_requests for dietary_requirements too
+      data.dietary_requirements || null,
       'confirmed'
     ).run()
     
@@ -4654,11 +4680,15 @@ app.post('/api/restaurant/reserve', async (c) => {
       UPDATE dining_sessions 
       SET current_bookings = current_bookings + ?
       WHERE session_id = ?
-    `).bind(data.num_guests, data.session_id).run()
+    `).bind(guestCount, data.session_id).run()
+    
+    // Generate reservation reference (using reservation_id)
+    const reservationRef = `RES${String(result.meta.last_row_id).padStart(6, '0')}`
     
     return c.json({ 
       success: true,
       reservation_id: result.meta.last_row_id,
+      reservation_reference: reservationRef,
       message: 'Table reserved successfully!'
     })
   } catch (error) {
@@ -4720,9 +4750,11 @@ app.get('/api/admin/restaurant/reservations', async (c) => {
   const { DB } = c.env
   const offering_id = c.req.query('offering_id')
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const status = c.req.query('status')
+  const guest = c.req.query('guest')
   
   try {
-    const reservations = await DB.prepare(`
+    let query = `
       SELECT 
         tr.*,
         rt.table_number,
@@ -4738,16 +4770,108 @@ app.get('/api/admin/restaurant/reservations', async (c) => {
       JOIN dining_sessions ds ON tr.session_id = ds.session_id
       JOIN guests g ON tr.guest_id = g.guest_id
       WHERE rt.offering_id = ? AND tr.reservation_date = ?
-      ORDER BY ds.session_time, rt.table_number
-    `).bind(offering_id, date).all()
+    `
+    
+    const params = [offering_id, date]
+    
+    if (status) {
+      query += ` AND tr.status = ?`
+      params.push(status)
+    }
+    
+    if (guest) {
+      query += ` AND (g.first_name LIKE ? OR g.last_name LIKE ? OR g.email LIKE ?)`
+      const searchTerm = `%${guest}%`
+      params.push(searchTerm, searchTerm, searchTerm)
+    }
+    
+    query += ` ORDER BY ds.session_time, rt.table_number`
+    
+    const reservations = await DB.prepare(query).bind(...params).all()
+    
+    // Format the data
+    const formattedReservations = (reservations.results || []).map(r => ({
+      ...r,
+      guest_name: `${r.first_name} ${r.last_name}`,
+      guest_email: r.email,
+      guest_phone: r.phone,
+      reservation_time: r.session_time,
+      reservation_reference: `RES${String(r.reservation_id).padStart(6, '0')}`
+    }))
     
     return c.json({ 
       success: true,
-      reservations: reservations.results
+      reservations: formattedReservations
     })
   } catch (error) {
     console.error('Get reservations error:', error)
     return c.json({ error: 'Failed to get reservations' }, 500)
+  }
+})
+
+// Confirm reservation
+app.post('/api/admin/restaurant/reservation/:reference/confirm', async (c) => {
+  const { DB } = c.env
+  const { reference } = c.req.param()
+  
+  try {
+    // Extract reservation_id from reference (RES000001 -> 1)
+    const reservationId = reference.replace('RES', '').replace(/^0+/, '')
+    
+    await DB.prepare(`
+      UPDATE table_reservations 
+      SET status = 'confirmed' 
+      WHERE reservation_id = ?
+    `).bind(reservationId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Confirm reservation error:', error)
+    return c.json({ error: 'Failed to confirm reservation' }, 500)
+  }
+})
+
+// Check in reservation
+app.post('/api/admin/restaurant/reservation/:reference/checkin', async (c) => {
+  const { DB } = c.env
+  const { reference } = c.req.param()
+  
+  try {
+    // Extract reservation_id from reference (RES000001 -> 1)
+    const reservationId = reference.replace('RES', '').replace(/^0+/, '')
+    
+    await DB.prepare(`
+      UPDATE table_reservations 
+      SET status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP 
+      WHERE reservation_id = ?
+    `).bind(reservationId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Check in reservation error:', error)
+    return c.json({ error: 'Failed to check in reservation' }, 500)
+  }
+})
+
+// Cancel reservation
+app.post('/api/admin/restaurant/reservation/:reference/cancel', async (c) => {
+  const { DB } = c.env
+  const { reference } = c.req.param()
+  
+  try {
+    // Extract reservation_id from reference (RES000001 -> 1)
+    const reservationId = reference.replace('RES', '').replace(/^0+/, '')
+    
+    await DB.prepare(`
+      UPDATE table_reservations 
+      SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP 
+      WHERE reservation_id = ?
+    `).bind(reservationId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Cancel reservation error:', error)
+    return c.json({ error: 'Failed to cancel reservation' }, 500)
   }
 })
 
@@ -23597,6 +23721,21 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     </div>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Tab Navigation -->
+        <div class="bg-white rounded-lg shadow-lg mb-6 p-2 flex gap-2">
+            <button onclick="switchTab('tables')" id="tabTables" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-blue-600 text-white">
+                <i class="fas fa-chair mr-2"></i>Tables & Floor Plan
+            </button>
+            <button onclick="switchTab('sessions')" id="tabSessions" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <i class="fas fa-clock mr-2"></i>Time Slots & Sessions
+            </button>
+            <button onclick="switchTab('reservations')" id="tabReservations" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <i class="fas fa-calendar-check mr-2"></i>Reservations
+            </button>
+        </div>
+
+        <!-- TABLES TAB -->
+        <div id="tablesSection">
         <div class="grid md:grid-cols-3 gap-6">
             <!-- Left Panel: Table Controls -->
             <div class="space-y-6">
@@ -23680,6 +23819,136 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 </div>
             </div>
         </div>
+        </div>
+        <!-- END TABLES TAB -->
+
+        <!-- SESSIONS TAB -->
+        <div id="sessionsSection" class="hidden">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Create Session Form -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-green-600"></i>Create Time Slot</h2>
+                    <form id="createSessionForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Session Date</label>
+                            <input type="date" id="sessionDate" required class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Start Time</label>
+                            <input type="time" id="sessionTime" required class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Session Type</label>
+                            <select id="sessionType" class="w-full px-3 py-2 border rounded-lg">
+                                <option value="breakfast">Breakfast</option>
+                                <option value="brunch">Brunch</option>
+                                <option value="lunch">Lunch</option>
+                                <option value="afternoon_tea">Afternoon Tea</option>
+                                <option value="dinner">Dinner</option>
+                                <option value="late_night">Late Night</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Duration (minutes)</label>
+                            <input type="number" id="sessionDuration" value="90" min="30" max="240" step="15" class="w-full px-3 py-2 border rounded-lg">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Maximum Capacity</label>
+                            <input type="number" id="sessionCapacity" value="80" min="1" max="500" class="w-full px-3 py-2 border rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Total seats available for this time slot</p>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-plus mr-2"></i>Create Time Slot
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Sessions List -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">Upcoming Time Slots</h2>
+                        <input type="date" id="filterSessionDate" class="px-3 py-2 border rounded-lg text-sm" onchange="loadSessions()">
+                    </div>
+                    <div id="sessionsList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="text-center text-gray-400 py-8">
+                            <i class="fas fa-clock text-4xl mb-3"></i>
+                            <p>No sessions found</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END SESSIONS TAB -->
+
+        <!-- RESERVATIONS TAB -->
+        <div id="reservationsSection" class="hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <!-- Filter Controls -->
+                <div class="grid md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Date</label>
+                        <input type="date" id="filterReservationDate" class="w-full px-3 py-2 border rounded-lg" onchange="loadReservations()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Status</label>
+                        <select id="filterStatus" class="w-full px-3 py-2 border rounded-lg" onchange="loadReservations()">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="checked_in">Checked In</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Search Guest</label>
+                        <input type="text" id="filterGuest" placeholder="Name or email..." class="w-full px-3 py-2 border rounded-lg" oninput="loadReservations()">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="loadReservations()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-search mr-2"></i>Search
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Stats Cards -->
+                <div class="grid md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <div class="text-sm text-blue-600 font-semibold">Total Today</div>
+                        <div class="text-2xl font-bold text-blue-700" id="statTotal">0</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="text-sm text-green-600 font-semibold">Confirmed</div>
+                        <div class="text-2xl font-bold text-green-700" id="statConfirmed">0</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4">
+                        <div class="text-sm text-yellow-600 font-semibold">Pending</div>
+                        <div class="text-2xl font-bold text-yellow-700" id="statPending">0</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4">
+                        <div class="text-sm text-purple-600 font-semibold">Total Guests</div>
+                        <div class="text-2xl font-bold text-purple-700" id="statGuests">0</div>
+                    </div>
+                </div>
+                
+                <!-- Reservations List -->
+                <div class="mb-4">
+                    <h2 class="text-xl font-bold">Reservations (<span id="reservationCount">0</span>)</h2>
+                </div>
+                <div id="reservationsList" class="space-y-4 max-h-96 overflow-y-auto">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fas fa-calendar-times text-4xl mb-3"></i>
+                        <p>No reservations found</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END RESERVATIONS TAB -->
     </div>
 
     <script>
@@ -23688,6 +23957,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let selectedTable = null;
       let isDragging = false;
       let dragOffset = { x: 0, y: 0 };
+      let currentTab = 'tables';
 
       async function init() {
         await loadRestaurant();
@@ -23902,6 +24172,273 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Implementation for bulk delete
         alert('Please delete tables individually for now');
       }
+
+      // ========================================
+      // TAB SWITCHING
+      // ========================================
+      function switchTab(tab) {
+        currentTab = tab;
+        
+        // Update button styles
+        document.getElementById('tabTables').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'tables' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        document.getElementById('tabSessions').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        document.getElementById('tabReservations').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'reservations' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        
+        // Show/hide sections
+        document.getElementById('tablesSection').style.display = tab === 'tables' ? 'block' : 'none';
+        document.getElementById('sessionsSection').style.display = tab === 'sessions' ? 'block' : 'none';
+        document.getElementById('reservationsSection').style.display = tab === 'reservations' ? 'block' : 'none';
+        
+        // Load data for active tab
+        if (tab === 'sessions') {
+          loadSessions();
+        } else if (tab === 'reservations') {
+          loadReservations();
+        }
+      }
+
+      // ========================================
+      // SESSIONS MANAGEMENT
+      // ========================================
+      async function loadSessions() {
+        try {
+          const dateFilter = document.getElementById('filterSessionDate').value || new Date().toISOString().split('T')[0];
+          const response = await fetch(\`/api/restaurant/\${offeringId}/sessions?date=\${dateFilter}\`);
+          const data = await response.json();
+          
+          const list = document.getElementById('sessionsList');
+          if (!data.sessions || data.sessions.length === 0) {
+            list.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fas fa-clock text-4xl mb-3"></i><p>No sessions found for this date</p></div>';
+            return;
+          }
+          
+          list.innerHTML = data.sessions.map(session => \`
+            <div class="border rounded-lg p-4 hover:shadow-lg transition-shadow">
+              <div class="flex justify-between items-start mb-2">
+                <div>
+                  <h3 class="font-bold text-lg">\${session.session_time}</h3>
+                  <span class="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-700 capitalize">\${session.session_type}</span>
+                </div>
+                <button onclick="deleteSession(\${session.session_id})" class="text-red-600 hover:text-red-800">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+              <div class="text-sm text-gray-600 space-y-1">
+                <div><i class="fas fa-calendar mr-2"></i>\${session.session_date}</div>
+                <div><i class="fas fa-hourglass-half mr-2"></i>\${session.duration_minutes} minutes</div>
+                <div><i class="fas fa-users mr-2"></i>\${session.current_bookings} / \${session.max_capacity} seats</div>
+                <div class="mt-2">
+                  \${session.is_available ? '<span class="text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i>Available</span>' : '<span class="text-red-600 font-semibold"><i class="fas fa-times-circle mr-1"></i>Full</span>'}
+                </div>
+              </div>
+            </div>
+          \`).join('');
+        } catch (error) {
+          console.error('Load sessions error:', error);
+          document.getElementById('sessionsList').innerHTML = '<div class="text-center text-red-500 py-4">Failed to load sessions</div>';
+        }
+      }
+
+      document.getElementById('createSessionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const sessionData = {
+          offering_id: offeringId,
+          session_date: document.getElementById('sessionDate').value,
+          session_time: document.getElementById('sessionTime').value,
+          session_type: document.getElementById('sessionType').value,
+          duration_minutes: parseInt(document.getElementById('sessionDuration').value),
+          max_capacity: parseInt(document.getElementById('sessionCapacity').value)
+        };
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sessionData)
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Time slot created successfully!');
+            document.getElementById('createSessionForm').reset();
+            loadSessions();
+          } else {
+            alert('Failed to create time slot: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Create session error:', error);
+          alert('Error creating time slot');
+        }
+      });
+
+      async function deleteSession(sessionId) {
+        if (!confirm('Delete this time slot? Existing reservations will be affected.')) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/restaurant/session/\${sessionId}\`, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Time slot deleted');
+            loadSessions();
+          } else {
+            alert('Failed to delete: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete session error:', error);
+          alert('Error deleting time slot');
+        }
+      }
+
+      // ========================================
+      // RESERVATIONS MANAGEMENT
+      // ========================================
+      async function loadReservations() {
+        try {
+          const dateFilter = document.getElementById('filterReservationDate').value || new Date().toISOString().split('T')[0];
+          const statusFilter = document.getElementById('filterStatus').value;
+          const guestFilter = document.getElementById('filterGuest').value;
+          
+          let url = \`/api/admin/restaurant/reservations?offering_id=\${offeringId}&date=\${dateFilter}\`;
+          if (statusFilter) url += \`&status=\${statusFilter}\`;
+          if (guestFilter) url += \`&guest=\${encodeURIComponent(guestFilter)}\`;
+          
+          const response = await fetch(url);
+          const data = await response.json();
+          
+          if (!data.success) {
+            throw new Error(data.error || 'Failed to load reservations');
+          }
+          
+          const reservations = data.reservations || [];
+          
+          // Update stats
+          document.getElementById('statTotal').textContent = reservations.length;
+          document.getElementById('statConfirmed').textContent = reservations.filter(r => r.status === 'confirmed').length;
+          document.getElementById('statPending').textContent = reservations.filter(r => r.status === 'pending').length;
+          document.getElementById('statGuests').textContent = reservations.reduce((sum, r) => sum + r.guest_count, 0);
+          document.getElementById('reservationCount').textContent = reservations.length;
+          
+          // Render reservations
+          const list = document.getElementById('reservationsList');
+          if (reservations.length === 0) {
+            list.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fas fa-calendar-times text-4xl mb-3"></i><p>No reservations found</p></div>';
+            return;
+          }
+          
+          list.innerHTML = reservations.map(res => {
+            const statusColors = {
+              pending: 'bg-yellow-100 text-yellow-700',
+              confirmed: 'bg-green-100 text-green-700',
+              checked_in: 'bg-blue-100 text-blue-700',
+              completed: 'bg-gray-100 text-gray-700',
+              cancelled: 'bg-red-100 text-red-700'
+            };
+            
+            return \`
+              <div class="border rounded-lg p-4 hover:shadow-lg transition-shadow">
+                <div class="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 class="font-bold text-lg">\${res.guest_name}</h3>
+                    <div class="text-sm text-gray-600">
+                      <i class="fas fa-envelope mr-1"></i>\${res.guest_email || 'No email'}
+                      \${res.guest_phone ? \`<span class="ml-3"><i class="fas fa-phone mr-1"></i>\${res.guest_phone}</span>\` : ''}
+                    </div>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-xs font-semibold \${statusColors[res.status] || 'bg-gray-100'} capitalize">
+                    \${res.status}
+                  </span>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                  <div><i class="fas fa-calendar mr-2 text-blue-600"></i><strong>Date:</strong> \${res.reservation_date}</div>
+                  <div><i class="fas fa-clock mr-2 text-blue-600"></i><strong>Time:</strong> \${res.reservation_time}</div>
+                  <div><i class="fas fa-users mr-2 text-blue-600"></i><strong>Guests:</strong> \${res.guest_count}</div>
+                  <div><i class="fas fa-chair mr-2 text-blue-600"></i><strong>Table:</strong> \${res.table_number || 'Not assigned'}</div>
+                </div>
+                
+                \${res.special_requests ? \`<div class="text-sm text-gray-600 bg-gray-50 p-2 rounded mb-3"><strong>Special Requests:</strong> \${res.special_requests}</div>\` : ''}
+                \${res.dietary_requirements ? \`<div class="text-sm text-gray-600 bg-gray-50 p-2 rounded mb-3"><strong>Dietary:</strong> \${res.dietary_requirements}</div>\` : ''}
+                
+                <div class="flex gap-2 mt-3">
+                  \${res.status === 'pending' ? \`<button onclick="confirmReservation('\${res.reservation_reference}')" class="flex-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-semibold"><i class="fas fa-check mr-1"></i>Confirm</button>\` : ''}
+                  \${res.status === 'confirmed' ? \`<button onclick="checkInReservation('\${res.reservation_reference}')" class="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"><i class="fas fa-sign-in-alt mr-1"></i>Check In</button>\` : ''}
+                  \${res.status !== 'cancelled' && res.status !== 'completed' ? \`<button onclick="cancelReservation('\${res.reservation_reference}')" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-semibold"><i class="fas fa-times mr-1"></i>Cancel</button>\` : ''}
+                </div>
+              </div>
+            \`;
+          }).join('');
+          
+        } catch (error) {
+          console.error('Load reservations error:', error);
+          document.getElementById('reservationsList').innerHTML = '<div class="text-center text-red-500 py-4">Failed to load reservations: ' + error.message + '</div>';
+        }
+      }
+
+      async function confirmReservation(reference) {
+        try {
+          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/confirm\`, {
+            method: 'POST'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Reservation confirmed!');
+            loadReservations();
+          } else {
+            alert('Failed to confirm: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Confirm error:', error);
+          alert('Error confirming reservation');
+        }
+      }
+
+      async function checkInReservation(reference) {
+        try {
+          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/checkin\`, {
+            method: 'POST'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Guest checked in!');
+            loadReservations();
+          } else {
+            alert('Failed to check in: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Check in error:', error);
+          alert('Error checking in guest');
+        }
+      }
+
+      async function cancelReservation(reference) {
+        if (!confirm('Cancel this reservation?')) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/cancel\`, {
+            method: 'POST'
+          });
+          const data = await response.json();
+          if (data.success) {
+            alert('Reservation cancelled');
+            loadReservations();
+          } else {
+            alert('Failed to cancel: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Cancel error:', error);
+          alert('Error cancelling reservation');
+        }
+      }
+
+      // Initialize on page load
+      // Set today's date as default for filters
+      document.getElementById('filterSessionDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('filterReservationDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('sessionDate').value = new Date().toISOString().split('T')[0];
 
       init();
     </script>
