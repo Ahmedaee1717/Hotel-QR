@@ -23621,14 +23621,13 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
             container.innerHTML = data.sessions.map(session => {
               const available = session.current_bookings < session.max_capacity;
               const clickHandler = available ? 'selectTimeSlot(' + session.session_id + ', "' + session.session_time + '")' : '';
-              return \`
-                <div class="time-slot p-4 border-2 rounded-lg text-center \${!available ? 'disabled' : ''}"
-                     onclick="\${clickHandler}">
-                  <div class="font-bold">\${session.session_time}</div>
-                  <div class="text-xs text-gray-600 mt-1">\${session.session_type}</div>
-                  \${!available ? '<div class="text-xs text-red-600 mt-1">Fully Booked</div>' : ''}
-                </div>
-              \`;
+              const disabledClass = !available ? 'disabled' : '';
+              const fullyBookedMsg = !available ? '<div class="text-xs text-red-600 mt-1">Fully Booked</div>' : '';
+              return '<div class="time-slot p-4 border-2 rounded-lg text-center ' + disabledClass + '" onclick="' + clickHandler + '">' +
+                '<div class="font-bold">' + session.session_time + '</div>' +
+                '<div class="text-xs text-gray-600 mt-1">' + session.session_type + '</div>' +
+                fullyBookedMsg +
+                '</div>';
             }).join('');
             showStep(2);
           } else {
@@ -23690,10 +23689,9 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
             tableEl.style.alignItems = 'center';
             tableEl.style.justifyContent = 'center';
             
-            tableEl.innerHTML = \`
-              <div class="font-bold text-sm">\${table.table_number}</div>
-              <div class="text-xs text-gray-600"><i class="fas fa-user"></i> \${table.capacity}</div>
-            \`;
+            tableEl.innerHTML = 
+              '<div class="font-bold text-sm">' + table.table_number + '</div>' +
+              '<div class="text-xs text-gray-600"><i class="fas fa-user"></i> ' + table.capacity + '</div>';
             
             if (!isReserved) {
               tableEl.onclick = () => selectTable(table);
@@ -23714,7 +23712,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         
         document.getElementById('selectedTableInfo').classList.remove('hidden');
         document.getElementById('selectedTableDetails').textContent = 
-          \`Table \${table.table_number} - \${table.table_name || ''} (Seats \${table.capacity})\`;
+          'Table ' + table.table_number + ' - ' + (table.table_name || '') + ' (Seats ' + table.capacity + ')';
         document.getElementById('continueToConfirm').disabled = false;
       }
 
