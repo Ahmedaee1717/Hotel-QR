@@ -23810,6 +23810,20 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         opacity: 0.6;
         cursor: not-allowed;
       }
+      .table-item-mobile {
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .table-item-mobile:hover:not(.reserved) {
+        border-color: #3B82F6 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      }
+      .table-item-mobile.selected {
+        border-color: #10B981 !important;
+        border-width: 3px !important;
+        background: #D1FAE5 !important;
+      }
       .time-slot {
         cursor: pointer;
         transition: all 0.2s;
@@ -23970,8 +23984,8 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                 </div>
             </div>
             
-            <div id="tableCanvas" class="relative bg-gray-100 rounded-lg" style="height: 600px; width: 100%;">
-                <!-- Tables loaded dynamically -->
+            <div id="tableCanvas" class="relative bg-gray-100 rounded-lg" style="height: 600px; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch;">
+                <!-- Tables loaded dynamically - responsive floor plan view -->
             </div>
             
             <div id="selectedTableInfo" class="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg hidden">
@@ -24141,28 +24155,63 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           // Filter tables by capacity
           const suitableTables = availableTables.filter(t => t.capacity >= selectedGuests);
           
-          // Render tables
+          // Render tables - ALWAYS use floor plan view (mobile-first for QR code scanning)
           const canvas = document.getElementById('tableCanvas');
           canvas.innerHTML = '';
+          
+          // Calculate responsive scale based on screen width
+          // Mobile: scale down to fit screen, Desktop: use 0.8 scale
+          const screenWidth = window.innerWidth;
+          const isMobile = screenWidth < 768;
+          
+          // Find the rightmost table position to calculate required width
+          const maxX = Math.max(...availableTables.map(t => t.position_x + t.width));
+          const designWidth = maxX + 50; // Add some padding
+          
+          // Calculate scale factor
+          // Mobile: fit within screen width minus padding
+          // Desktop: use standard 0.8 scale
+          let scaleFactor;
+          if (isMobile) {
+            const availableWidth = screenWidth - 32; // 16px padding on each side
+            scaleFactor = availableWidth / designWidth;
+            // Ensure minimum readable size but not too large
+            scaleFactor = Math.min(scaleFactor, 0.6);
+            scaleFactor = Math.max(scaleFactor, 0.3);
+          } else {
+            scaleFactor = 0.8;
+          }
+          
+          // Calculate canvas height based on tallest table position
+          const maxY = Math.max(...availableTables.map(t => t.position_y + t.height));
+          const canvasHeight = (maxY + 50) * scaleFactor;
+          
+          canvas.style.height = canvasHeight + 'px';
+          canvas.style.display = 'block';
+          canvas.style.position = 'relative';
+          canvas.style.overflow = 'auto';
+          canvas.style.touchAction = 'pan-y pinch-zoom'; // Allow pinch-to-zoom on mobile
           
           suitableTables.forEach(table => {
             const isReserved = reservedTables.includes(table.table_id);
             const tableEl = document.createElement('div');
             tableEl.className = 'table-item table-' + table.shape + (isReserved ? ' reserved' : '');
             tableEl.style.position = 'absolute';
-            tableEl.style.left = (table.position_x * 0.8) + 'px';
-            tableEl.style.top = (table.position_y * 0.8) + 'px';
-            tableEl.style.width = (table.width * 0.8) + 'px';
-            tableEl.style.height = (table.height * 0.8) + 'px';
+            tableEl.style.left = (table.position_x * scaleFactor) + 'px';
+            tableEl.style.top = (table.position_y * scaleFactor) + 'px';
+            tableEl.style.width = (table.width * scaleFactor) + 'px';
+            tableEl.style.height = (table.height * scaleFactor) + 'px';
             tableEl.style.background = 'white';
             tableEl.style.display = 'flex';
             tableEl.style.flexDirection = 'column';
             tableEl.style.alignItems = 'center';
             tableEl.style.justifyContent = 'center';
+            tableEl.style.fontSize = isMobile ? '11px' : '14px'; // Smaller text on mobile
+            tableEl.style.borderRadius = '4px';
             
             tableEl.innerHTML = 
-              '<div class="font-bold text-sm">' + table.table_number + '</div>' +
-              '<div class="text-xs text-gray-600"><i class="fas fa-user"></i> ' + table.capacity + '</div>';
+              '<div class="font-bold" style="margin-bottom: 2px;">' + table.table_number + '</div>' +
+              '<div class="text-gray-600" style="font-size: ' + (isMobile ? '9px' : '11px') + ';"><i class="fas fa-user"></i> ' + table.capacity + '</div>';
             
             if (!isReserved) {
               tableEl.onclick = () => selectTable(table);
@@ -24178,8 +24227,8 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
 
       window.selectTable = function(table) {
         selectedTableId = table.table_id;
-        document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
-        event.target.closest('.table-item').classList.add('selected');
+        document.querySelectorAll('.table-item, .table-item-mobile').forEach(el => el.classList.remove('selected'));
+        event.target.closest('.table-item, .table-item-mobile').classList.add('selected');
         
         document.getElementById('selectedTableInfo').classList.remove('hidden');
         document.getElementById('selectedTableDetails').textContent = 
