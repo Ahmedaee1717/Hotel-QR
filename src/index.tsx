@@ -3051,6 +3051,120 @@ app.put('/api/admin/qr-card/:property_id', async (c) => {
   }
 })
 
+// Notification Settings API - Get settings
+app.get('/api/admin/notification-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const settings = await DB.prepare(`
+      SELECT * FROM notification_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (!settings) {
+      // Return default settings if none exist
+      return c.json({
+        property_id: parseInt(property_id),
+        sound_enabled: 1,
+        persistent_beep: 0,
+        beep_interval_ms: 3000,
+        beep_frequency: 800,
+        beep_duration_ms: 500,
+        persistent_new_bookings: 1,
+        persistent_new_callbacks: 1,
+        persistent_new_feedback: 0,
+        persistent_new_chat: 0,
+        show_popup: 1,
+        popup_auto_close_seconds: 0,
+        refresh_interval_ms: 300000
+      })
+    }
+    
+    return c.json(settings)
+  } catch (error) {
+    console.error('Get notification settings error:', error)
+    return c.json({ error: 'Failed to get settings' }, 500)
+  }
+})
+
+// Notification Settings API - Update settings
+app.put('/api/admin/notification-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    // Check if settings exist
+    const existing = await DB.prepare(`
+      SELECT setting_id FROM notification_settings WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (existing) {
+      // Update existing settings
+      await DB.prepare(`
+        UPDATE notification_settings
+        SET sound_enabled = ?,
+            persistent_beep = ?,
+            beep_interval_ms = ?,
+            beep_frequency = ?,
+            beep_duration_ms = ?,
+            persistent_new_bookings = ?,
+            persistent_new_callbacks = ?,
+            persistent_new_feedback = ?,
+            persistent_new_chat = ?,
+            show_popup = ?,
+            popup_auto_close_seconds = ?,
+            refresh_interval_ms = ?,
+            updated_at = datetime('now')
+        WHERE property_id = ?
+      `).bind(
+        data.sound_enabled ? 1 : 0,
+        data.persistent_beep ? 1 : 0,
+        data.beep_interval_ms || 3000,
+        data.beep_frequency || 800,
+        data.beep_duration_ms || 500,
+        data.persistent_new_bookings ? 1 : 0,
+        data.persistent_new_callbacks ? 1 : 0,
+        data.persistent_new_feedback ? 1 : 0,
+        data.persistent_new_chat ? 1 : 0,
+        data.show_popup ? 1 : 0,
+        data.popup_auto_close_seconds || 0,
+        data.refresh_interval_ms || 300000,
+        property_id
+      ).run()
+    } else {
+      // Insert new settings
+      await DB.prepare(`
+        INSERT INTO notification_settings (
+          property_id, sound_enabled, persistent_beep, beep_interval_ms,
+          beep_frequency, beep_duration_ms, persistent_new_bookings,
+          persistent_new_callbacks, persistent_new_feedback, persistent_new_chat,
+          show_popup, popup_auto_close_seconds, refresh_interval_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        data.sound_enabled ? 1 : 0,
+        data.persistent_beep ? 1 : 0,
+        data.beep_interval_ms || 3000,
+        data.beep_frequency || 800,
+        data.beep_duration_ms || 500,
+        data.persistent_new_bookings ? 1 : 0,
+        data.persistent_new_callbacks ? 1 : 0,
+        data.persistent_new_feedback ? 1 : 0,
+        data.persistent_new_chat ? 1 : 0,
+        data.show_popup ? 1 : 0,
+        data.popup_auto_close_seconds || 0,
+        data.refresh_interval_ms || 300000
+      ).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Save notification settings error:', error)
+    return c.json({ error: 'Failed to save settings' }, 500)
+  }
+})
+
 // Get all vendors
 app.get('/api/admin/vendors', async (c) => {
   const { DB } = c.env
