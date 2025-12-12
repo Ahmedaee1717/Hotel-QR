@@ -25341,21 +25341,36 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const canvasRect = canvas.getBoundingClientRect();
         const x = e.clientX - canvasRect.left - dragOffset.x;
         const y = e.clientY - canvasRect.top - dragOffset.y;
+        const scale = masterScale / 100;
         
         if (selectedTable) {
-          selectedTable.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedTable.width));
-          selectedTable.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedTable.height));
+          // Store UNSCALED positions in the table object (for database)
+          const unscaledX = x / scale;
+          const unscaledY = y / scale;
+          const unscaledWidth = selectedTable.width;
+          const unscaledHeight = selectedTable.height;
           
+          selectedTable.position_x = Math.max(0, Math.min(unscaledX, (canvasRect.width / scale) - unscaledWidth));
+          selectedTable.position_y = Math.max(0, Math.min(unscaledY, (canvasRect.height / scale) - unscaledHeight));
+          
+          // But display with scaled positions
           const div = document.getElementById(\`table-\${selectedTable.table_id}\`);
-          div.style.left = selectedTable.position_x + 'px';
-          div.style.top = selectedTable.position_y + 'px';
+          div.style.left = (selectedTable.position_x * scale) + 'px';
+          div.style.top = (selectedTable.position_y * scale) + 'px';
         } else if (selectedElement) {
-          selectedElement.position_x = Math.max(0, Math.min(x, canvasRect.width - selectedElement.width));
-          selectedElement.position_y = Math.max(0, Math.min(y, canvasRect.height - selectedElement.height));
+          // Store UNSCALED positions in the element object (for database)
+          const unscaledX = x / scale;
+          const unscaledY = y / scale;
+          const unscaledWidth = selectedElement.width;
+          const unscaledHeight = selectedElement.height;
           
+          selectedElement.position_x = Math.max(0, Math.min(unscaledX, (canvasRect.width / scale) - unscaledWidth));
+          selectedElement.position_y = Math.max(0, Math.min(unscaledY, (canvasRect.height / scale) - unscaledHeight));
+          
+          // But display with scaled positions
           const div = document.getElementById(\`element-\${selectedElement.element_id}\`);
-          div.style.left = selectedElement.position_x + 'px';
-          div.style.top = selectedElement.position_y + 'px';
+          div.style.left = (selectedElement.position_x * scale) + 'px';
+          div.style.top = (selectedElement.position_y * scale) + 'px';
         }
       }
 
@@ -25731,14 +25746,19 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         const canvas = document.getElementById('canvas');
         const rect = canvas.getBoundingClientRect();
-        const x = Math.round(e.clientX - rect.left);
-        const y = Math.round(e.clientY - rect.top);
+        const scale = masterScale / 100;
+        
+        // Get click position and convert to UNSCALED coordinates for storage
+        const scaledX = Math.round(e.clientX - rect.left);
+        const scaledY = Math.round(e.clientY - rect.top);
+        const x = Math.round(scaledX / scale);
+        const y = Math.round(scaledY / scale);
         
         if (!wallStartPoint) {
-          // Set start point
+          // Set start point (UNSCALED)
           wallStartPoint = { x, y };
         } else {
-          // Set end point and create wall
+          // Set end point and create wall (UNSCALED coordinates)
           const wallData = {
             offering_id: offeringId,
             property_id: 1,
