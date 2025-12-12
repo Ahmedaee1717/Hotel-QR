@@ -2950,7 +2950,7 @@ app.get('/api/admin/qr-card/:property_id', async (c) => {
 
   try {
     const card = await DB.prepare(`
-      SELECT * FROM qr_card_templates WHERE property_id = ?
+      SELECT * FROM qr_card_designs WHERE property_id = ?
     `).bind(property_id).first()
 
     if (!card) {
@@ -2995,55 +2995,52 @@ app.put('/api/admin/qr-card/:property_id', async (c) => {
   try {
     // Check if template exists
     const existing = await DB.prepare(`
-      SELECT template_id FROM qr_card_templates WHERE property_id = ?
+      SELECT design_id FROM qr_card_designs WHERE property_id = ?
     `).bind(property_id).first()
 
     if (existing) {
       // Update existing template
       await DB.prepare(`
-        UPDATE qr_card_templates 
+        UPDATE qr_card_designs 
         SET card_title = ?,
             card_subtitle = ?,
-            background_color = ?,
+            bottom_message = ?,
+            card_bg_color = ?,
             text_color = ?,
             qr_size = ?,
-            border_radius = ?,
             show_logo = ?,
             festive_overlay = ?,
-            custom_message = ?,
             updated_at = datetime('now')
         WHERE property_id = ?
       `).bind(
         card_title,
         card_subtitle,
-        background_color,
-        text_color,
-        qr_size,
-        border_radius,
+        custom_message || 'Scan for more information',
+        background_color || '#FFFFFF',
+        text_color || '#1F2937',
+        qr_size || 'large',
         show_logo ? 1 : 0,
-        festive_overlay,
-        custom_message,
+        festive_overlay || 'none',
         property_id
       ).run()
     } else {
       // Insert new template
       await DB.prepare(`
-        INSERT INTO qr_card_templates (
-          property_id, card_title, card_subtitle, background_color,
-          text_color, qr_size, border_radius, show_logo,
-          festive_overlay, custom_message
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO qr_card_designs (
+          property_id, card_title, card_subtitle, bottom_message,
+          card_bg_color, text_color, qr_size, show_logo,
+          festive_overlay
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         card_title,
         card_subtitle,
-        background_color,
-        text_color,
-        qr_size,
-        border_radius,
+        custom_message || 'Scan for more information',
+        background_color || '#FFFFFF',
+        text_color || '#1F2937',
+        qr_size || 'large',
         show_logo ? 1 : 0,
-        festive_overlay,
-        custom_message
+        festive_overlay || 'none'
       ).run()
     }
 
