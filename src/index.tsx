@@ -4486,7 +4486,7 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   try {
     const sessions = await DB.prepare(`
       SELECT * FROM dining_sessions 
-      WHERE offering_id = ? AND session_date = ?
+      WHERE offering_id = ? AND session_date = ? AND status != 'cancelled'
       ORDER BY session_time
     `).bind(offering_id, date).all()
     
