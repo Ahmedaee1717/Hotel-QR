@@ -11608,6 +11608,11 @@ app.get('/welcome/:property_slug/:room_token', async (c) => {
           body { font-family: 'Inter', system-ui, sans-serif; }
           .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
           .activity-card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+          @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          .animate-slide-in { animation: slideIn 0.3s ease-out; }
         </style>
     </head>
     <body class="bg-gray-50">
@@ -18134,6 +18139,156 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                 </div>
             </div>
+            
+            <!-- Notification Settings Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">
+                        <i class="fas fa-bell mr-2 text-yellow-500"></i>
+                        Notification Settings
+                    </h2>
+                    <button onclick="testNotificationSound()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-volume-up mr-2"></i>Test Sound
+                    </button>
+                </div>
+                
+                <form id="notificationSettingsForm" class="space-y-6">
+                    <!-- Sound Enable/Disable -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-volume-high mr-2"></i>Sound Settings
+                        </h3>
+                        
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="soundEnabled" class="w-5 h-5 text-blue-600 rounded">
+                                    <span class="font-semibold text-lg">Enable Notification Sounds</span>
+                                </label>
+                                <p class="text-sm text-gray-500 ml-8 mt-1">Turn on/off all notification beeps</p>
+                            </div>
+                        </div>
+                        
+                        <div id="soundOptions" class="mt-4 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Beep Frequency (Hz)</label>
+                                    <input type="number" id="beepFrequency" min="200" max="2000" step="50" 
+                                           class="w-full px-4 py-2 border rounded-lg" value="800">
+                                    <p class="text-xs text-gray-500 mt-1">Higher = sharper sound (200-2000)</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Beep Duration (ms)</label>
+                                    <input type="number" id="beepDuration" min="100" max="2000" step="100" 
+                                           class="w-full px-4 py-2 border rounded-lg" value="500">
+                                    <p class="text-xs text-gray-500 mt-1">Length of each beep (100-2000)</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Repeat Interval (ms)</label>
+                                    <input type="number" id="beepInterval" min="1000" max="10000" step="500" 
+                                           class="w-full px-4 py-2 border rounded-lg" value="3000">
+                                    <p class="text-xs text-gray-500 mt-1">Time between beeps (1000-10000)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Persistent Beep Settings -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-repeat mr-2"></i>Persistent Beeping
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            When enabled, notifications will continue beeping until you click on them (like Facebook/WhatsApp).
+                        </p>
+                        
+                        <div class="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                            <div>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="persistentBeep" class="w-5 h-5 text-yellow-600 rounded">
+                                    <span class="font-semibold text-lg">⚡ Enable Persistent Beeping</span>
+                                </label>
+                                <p class="text-sm text-gray-500 ml-8 mt-1">Beep won't stop until you acknowledge the notification</p>
+                            </div>
+                        </div>
+                        
+                        <div id="persistentOptions" class="space-y-3">
+                            <p class="font-medium text-gray-700">Choose which notification types should beep persistently:</p>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" id="persistentBookings" class="w-5 h-5 text-blue-600 rounded">
+                                <i class="fas fa-calendar-check text-blue-600"></i>
+                                <div>
+                                    <span class="font-semibold">Restaurant Bookings</span>
+                                    <p class="text-xs text-gray-500">Beep until acknowledged when new table reservations arrive</p>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" id="persistentCallbacks" class="w-5 h-5 text-green-600 rounded">
+                                <i class="fas fa-phone text-green-600"></i>
+                                <div>
+                                    <span class="font-semibold">Callback Requests</span>
+                                    <p class="text-xs text-gray-500">Beep until acknowledged when guests request callbacks</p>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" id="persistentFeedback" class="w-5 h-5 text-purple-600 rounded">
+                                <i class="fas fa-star text-purple-600"></i>
+                                <div>
+                                    <span class="font-semibold">Feedback Submissions</span>
+                                    <p class="text-xs text-gray-500">Beep until acknowledged when new feedback is received</p>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <input type="checkbox" id="persistentChat" class="w-5 h-5 text-orange-600 rounded">
+                                <i class="fas fa-comments text-orange-600"></i>
+                                <div>
+                                    <span class="font-semibold">Chat Messages</span>
+                                    <p class="text-xs text-gray-500">Beep until acknowledged when new chat messages arrive</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Popup Settings -->
+                    <div class="border-b pb-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-800">
+                            <i class="fas fa-window-maximize mr-2"></i>Popup Settings
+                        </h3>
+                        
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-4">
+                            <div>
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="showPopup" class="w-5 h-5 text-blue-600 rounded">
+                                    <span class="font-semibold text-lg">Show Notification Popup</span>
+                                </label>
+                                <p class="text-sm text-gray-500 ml-8 mt-1">Display a popup when new notifications arrive</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Auto-Close Timer (seconds)</label>
+                            <input type="number" id="popupAutoClose" min="0" max="60" 
+                                   class="w-full px-4 py-2 border rounded-lg" value="0">
+                            <p class="text-xs text-gray-500 mt-1">0 = Manual close only, 1-60 = Auto-close after X seconds</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Save Button -->
+                    <div class="flex justify-end gap-3">
+                        <button type="button" onclick="loadNotificationSettings()" 
+                                class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                            <i class="fas fa-undo mr-2"></i>Reset
+                        </button>
+                        <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save Notification Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -21612,6 +21767,207 @@ app.get('/admin/dashboard', (c) => {
         window.open(homepageUrl, '_blank');
       }
       
+      // ========================================
+      // NOTIFICATION SETTINGS FUNCTIONS
+      // ========================================
+      let persistentBeepInterval = null;
+      let acknowledgedNotifications = new Set();
+      
+      async function loadNotificationSettings() {
+        try {
+          const response = await fetch('/api/admin/notification-settings/1');
+          const settings = await response.json();
+          
+          // Sound settings
+          document.getElementById('soundEnabled').checked = settings.sound_enabled;
+          document.getElementById('beepFrequency').value = settings.beep_frequency || 800;
+          document.getElementById('beepDuration').value = settings.beep_duration_ms || 500;
+          document.getElementById('beepInterval').value = settings.beep_interval_ms || 3000;
+          
+          // Persistent beep settings
+          document.getElementById('persistentBeep').checked = settings.persistent_beep;
+          document.getElementById('persistentBookings').checked = settings.persistent_new_bookings;
+          document.getElementById('persistentCallbacks').checked = settings.persistent_new_callbacks;
+          document.getElementById('persistentFeedback').checked = settings.persistent_new_feedback;
+          document.getElementById('persistentChat').checked = settings.persistent_new_chat;
+          
+          // Popup settings
+          document.getElementById('showPopup').checked = settings.show_popup;
+          document.getElementById('popupAutoClose').value = settings.popup_auto_close_seconds || 0;
+          
+          // Update global variables
+          soundEnabled = settings.sound_enabled;
+          refreshIntervalMs = settings.refresh_interval_ms || 300000;
+          
+          // Toggle visibility of options
+          document.getElementById('soundOptions').style.display = settings.sound_enabled ? 'block' : 'none';
+          document.getElementById('persistentOptions').style.display = settings.persistent_beep ? 'block' : 'none';
+        } catch (error) {
+          console.error('Load notification settings error:', error);
+        }
+      }
+      
+      function testNotificationSound() {
+        const frequency = parseInt(document.getElementById('beepFrequency').value) || 800;
+        const duration = parseInt(document.getElementById('beepDuration').value) || 500;
+        
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = frequency;
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + (duration / 1000));
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + (duration / 1000));
+        } catch (error) {
+          console.error('Sound test error:', error);
+          alert('Could not play test sound. Please check your browser permissions.');
+        }
+      }
+      
+      function startPersistentBeep(notificationType) {
+        // Check if persistent beeping is enabled for this type
+        const persistentBeepEnabled = document.getElementById('persistentBeep')?.checked;
+        if (!persistentBeepEnabled) return;
+        
+        const typeCheckboxId = 'persistent' + notificationType.charAt(0).toUpperCase() + notificationType.slice(1);
+        const typeEnabled = document.getElementById(typeCheckboxId)?.checked;
+        if (!typeEnabled) return;
+        
+        // Get beep settings
+        const interval = parseInt(document.getElementById('beepInterval')?.value) || 3000;
+        
+        // Play initial beep
+        playNotificationSound();
+        
+        // Start interval for persistent beeping
+        if (persistentBeepInterval) {
+          clearInterval(persistentBeepInterval);
+        }
+        
+        persistentBeepInterval = setInterval(() => {
+          playNotificationSound();
+        }, interval);
+      }
+      
+      function stopPersistentBeep() {
+        if (persistentBeepInterval) {
+          clearInterval(persistentBeepInterval);
+          persistentBeepInterval = null;
+        }
+      }
+      
+      function acknowledgeNotification(notificationType) {
+        acknowledgedNotifications.add(notificationType);
+        stopPersistentBeep();
+        
+        // Hide notification popup if exists
+        const popup = document.getElementById('notificationPopup');
+        if (popup) {
+          popup.remove();
+        }
+      }
+      
+      function showNotificationPopup(type, message, count) {
+        const showPopup = document.getElementById('showPopup')?.checked;
+        if (!showPopup) return;
+        
+        // Remove existing popup
+        const existingPopup = document.getElementById('notificationPopup');
+        if (existingPopup) {
+          existingPopup.remove();
+        }
+        
+        // Create popup
+        const popup = document.createElement('div');
+        popup.id = 'notificationPopup';
+        popup.className = 'fixed top-20 right-4 bg-white border-l-4 border-blue-600 shadow-2xl rounded-lg p-4 max-w-sm z-50 animate-slide-in';
+        popup.innerHTML = 
+          '<div class="flex items-start gap-3">' +
+            '<div class="flex-shrink-0">' +
+              '<i class="fas fa-bell text-2xl text-blue-600"></i>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<h4 class="font-bold text-gray-900 mb-1">' + type + '</h4>' +
+              '<p class="text-sm text-gray-600 mb-3">' + message + '</p>' +
+              '<button onclick="acknowledgeNotification(\'' + type.toLowerCase() + '\')" ' +
+                      'class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">' +
+                '<i class="fas fa-check mr-2"></i>Acknowledge & Stop Beeping' +
+              '</button>' +
+            '</div>' +
+            '<button onclick="acknowledgeNotification(\'' + type.toLowerCase() + '\')" ' +
+                    'class="flex-shrink-0 text-gray-400 hover:text-gray-600">' +
+              '<i class="fas fa-times"></i>' +
+            '</button>' +
+          '</div>';
+        
+        document.body.appendChild(popup);
+        
+        // Auto-close if configured
+        const autoClose = parseInt(document.getElementById('popupAutoClose')?.value) || 0;
+        if (autoClose > 0) {
+          setTimeout(() => {
+            popup.remove();
+          }, autoClose * 1000);
+        }
+      }
+      
+      // Form submit handler for notification settings
+      document.getElementById('notificationSettingsForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const settingsData = {
+          sound_enabled: document.getElementById('soundEnabled').checked,
+          persistent_beep: document.getElementById('persistentBeep').checked,
+          beep_interval_ms: parseInt(document.getElementById('beepInterval').value),
+          beep_frequency: parseInt(document.getElementById('beepFrequency').value),
+          beep_duration_ms: parseInt(document.getElementById('beepDuration').value),
+          persistent_new_bookings: document.getElementById('persistentBookings').checked,
+          persistent_new_callbacks: document.getElementById('persistentCallbacks').checked,
+          persistent_new_feedback: document.getElementById('persistentFeedback').checked,
+          persistent_new_chat: document.getElementById('persistentChat').checked,
+          show_popup: document.getElementById('showPopup').checked,
+          popup_auto_close_seconds: parseInt(document.getElementById('popupAutoClose').value)
+        };
+        
+        try {
+          const response = await fetch('/api/admin/notification-settings/1', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settingsData)
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ Notification settings saved successfully!');
+            loadNotificationSettings(); // Reload to apply
+          } else {
+            alert('❌ Failed to save settings: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Save notification settings error:', error);
+          alert('❌ Error saving settings');
+        }
+      });
+      
+      // Toggle visibility of sound options
+      document.getElementById('soundEnabled')?.addEventListener('change', function() {
+        document.getElementById('soundOptions').style.display = this.checked ? 'block' : 'none';
+      });
+      
+      // Toggle visibility of persistent options
+      document.getElementById('persistentBeep')?.addEventListener('change', function() {
+        document.getElementById('persistentOptions').style.display = this.checked ? 'block' : 'none';
+      });
+      
       document.getElementById('settingsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -23046,9 +23402,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               !previousBeachBookings.some(pb => pb.booking_reference === b.booking_reference)
             );
             
-            if (newBookings.length > 0) {
-              playNotificationSound();
+            if (newBookings.length > 0 && !acknowledgedNotifications.has('bookings')) {
+              startPersistentBeep('bookings');
               showNewBadge('beachBookingsHeader', newBookings.length);
+              showNotificationPopup('New Bookings', newBookings.length + ' new booking(s) received', newBookings.length);
               
               // Browser notification
               if (Notification.permission === 'granted') {
@@ -23087,9 +23444,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               !previousCallbacks.some(pc => pc.request_id === c.request_id)
             );
             
-            if (newCallbacks.length > 0) {
-              playNotificationSound();
+            if (newCallbacks.length > 0 && !acknowledgedNotifications.has('callbacks')) {
+              startPersistentBeep('callbacks');
               showNewBadge('callbacksHeader', newCallbacks.length);
+              showNotificationPopup('New Callback Requests', newCallbacks.length + ' new callback request(s)', newCallbacks.length);
               
               if (Notification.permission === 'granted') {
                 new Notification('New Activity Booking Request!', {
@@ -23124,9 +23482,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               !previousFeedback.some(pf => pf.submission_id === f.submission_id)
             );
             
-            if (newFeedback.length > 0) {
-              playNotificationSound();
+            if (newFeedback.length > 0 && !acknowledgedNotifications.has('feedback')) {
+              startPersistentBeep('feedback');
               showNewBadge('feedbackHeader', newFeedback.length);
+              showNotificationPopup('New Feedback', newFeedback.length + ' new feedback submission(s)', newFeedback.length);
               
               if (Notification.permission === 'granted') {
                 new Notification('New Feedback Submission!', {
@@ -23221,9 +23580,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
       
-      // Initialize auto-refresh when page loads
+      // Initialize notification settings and auto-refresh when page loads
       setTimeout(() => {
         requestNotificationPermission();
+        loadNotificationSettings();
         
         // Start auto-refresh for active sections
         if (document.getElementById('beachBookingsList')) {
