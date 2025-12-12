@@ -23592,11 +23592,11 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
       let reservedTables = [];
 
       // Step navigation
-      function goToStep1() {
+      window.goToStep1 = function() {
         showStep(1);
       }
 
-      function goToStep2() {
+      window.goToStep2 = function() {
         const date = document.getElementById('reservationDate').value;
         const guests = document.getElementById('numGuests').value;
         
@@ -23639,13 +23639,13 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         }
       }
 
-      function selectTimeSlot(sessionId, time) {
+      window.selectTimeSlot = function(sessionId, time) {
         selectedSessionId = sessionId;
         document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
         event.target.closest('.time-slot').classList.add('selected');
       }
 
-      async function goToStep3() {
+      window.goToStep3 = async function() {
         if (!selectedSessionId) {
           alert('Please select a time slot');
           return;
@@ -23706,7 +23706,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         }
       }
 
-      function selectTable(table) {
+      window.selectTable = function(table) {
         selectedTableId = table.table_id;
         document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
         event.target.closest('.table-item').classList.add('selected');
@@ -23717,7 +23717,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         document.getElementById('continueToConfirm').disabled = false;
       }
 
-      function goToStep4() {
+      window.goToStep4 = function() {
         if (!selectedTableId) {
           alert('Please select a table');
           return;
@@ -23732,7 +23732,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         showStep(4);
       }
 
-      async function submitReservation() {
+      window.submitReservation = async function() {
         const name = document.getElementById('guestName').value;
         const email = document.getElementById('guestEmail').value;
         const phone = document.getElementById('guestPhone').value;
