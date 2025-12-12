@@ -23810,6 +23810,16 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         opacity: 0.6;
         cursor: not-allowed;
       }
+      /* Table shapes */
+      .table-rectangle {
+        border-radius: 8px;
+      }
+      .table-circle {
+        border-radius: 50%;
+      }
+      .table-square {
+        border-radius: 4px;
+      }
       .table-item-mobile {
         cursor: pointer;
         transition: all 0.3s;
@@ -24199,15 +24209,28 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
             tableEl.style.position = 'absolute';
             tableEl.style.left = (table.position_x * scaleFactor) + 'px';
             tableEl.style.top = (table.position_y * scaleFactor) + 'px';
-            tableEl.style.width = (table.width * scaleFactor) + 'px';
-            tableEl.style.height = (table.height * scaleFactor) + 'px';
+            
+            // For circles, ensure width = height (use average for perfect circle)
+            // For other shapes, use actual dimensions scaled
+            let width = table.width * scaleFactor;
+            let height = table.height * scaleFactor;
+            
+            if (table.shape === 'circle') {
+              // Make circles perfect circles by using the larger dimension
+              const size = Math.max(width, height);
+              width = size;
+              height = size;
+            }
+            
+            tableEl.style.width = width + 'px';
+            tableEl.style.height = height + 'px';
             tableEl.style.background = 'white';
             tableEl.style.display = 'flex';
             tableEl.style.flexDirection = 'column';
             tableEl.style.alignItems = 'center';
             tableEl.style.justifyContent = 'center';
             tableEl.style.fontSize = isMobile ? '11px' : '14px'; // Smaller text on mobile
-            tableEl.style.borderRadius = '4px';
+            // DON'T override borderRadius - let CSS classes handle shape
             
             tableEl.innerHTML = 
               '<div class="font-bold" style="margin-bottom: 2px;">' + table.table_number + '</div>' +
