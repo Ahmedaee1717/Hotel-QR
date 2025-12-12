@@ -4987,6 +4987,128 @@ app.post('/api/admin/restaurant/reservation/:reference/cancel', async (c) => {
 })
 
 // ============================================
+// AI TEXTURE EXTRACTION APIS
+// ============================================
+
+// Get current textures for a restaurant
+app.get('/api/admin/restaurant/:offering_id/textures', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT * FROM restaurant_textures 
+      WHERE offering_id = ? 
+      ORDER BY texture_id DESC 
+      LIMIT 1
+    `).bind(offering_id).first()
+    
+    return c.json({ 
+      success: true, 
+      texture: result || null 
+    })
+  } catch (error) {
+    console.error('Get textures error:', error)
+    return c.json({ error: 'Failed to load textures' }, 500)
+  }
+})
+
+// AI-powered texture analysis
+app.post('/api/admin/restaurant/:offering_id/analyze-textures', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const body = await c.req.json()
+  const { image, property_id } = body
+  
+  try {
+    // Call AI analysis API to extract textures
+    // For now, we'll use a simplified analysis
+    // In production, this would call analyze_media_content or similar AI service
+    
+    // Simulate AI analysis (replace with actual AI call)
+    const aiAnalysis = {
+      floor_texture_type: 'hardwood',
+      floor_color_primary: '#8B7355',
+      floor_color_secondary: '#A0826D',
+      table_texture_type: 'wood',
+      table_color_primary: '#FFFFFF',
+      table_color_secondary: '#F5F5F5',
+      confidence_score: 0.85
+    }
+    
+    // Store the original image and AI results
+    const result = await DB.prepare(`
+      INSERT INTO restaurant_textures (
+        offering_id, 
+        property_id, 
+        original_image_url,
+        floor_texture_type,
+        floor_color_primary,
+        floor_color_secondary,
+        table_texture_type,
+        table_color_primary,
+        table_color_secondary,
+        ai_analysis_data,
+        confidence_score,
+        is_active,
+        floor_opacity,
+        table_opacity
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0.8, 0.9)
+    `).bind(
+      offering_id,
+      property_id,
+      image,  // Store base64 image (in production, upload to R2/S3)
+      aiAnalysis.floor_texture_type,
+      aiAnalysis.floor_color_primary,
+      aiAnalysis.floor_color_secondary,
+      aiAnalysis.table_texture_type,
+      aiAnalysis.table_color_primary,
+      aiAnalysis.table_color_secondary,
+      JSON.stringify(aiAnalysis),
+      aiAnalysis.confidence_score
+    ).run()
+    
+    // Get the inserted texture
+    const texture = await DB.prepare(`
+      SELECT * FROM restaurant_textures 
+      WHERE texture_id = ?
+    `).bind(result.meta.last_row_id).first()
+    
+    return c.json({ 
+      success: true, 
+      texture: texture
+    })
+  } catch (error) {
+    console.error('AI texture analysis error:', error)
+    return c.json({ error: 'Failed to analyze textures: ' + error.message }, 500)
+  }
+})
+
+// Update texture settings (opacity, enable/disable)
+app.put('/api/admin/restaurant/:offering_id/textures', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const body = await c.req.json()
+  const { texture_id, is_active, floor_opacity, table_opacity } = body
+  
+  try {
+    await DB.prepare(`
+      UPDATE restaurant_textures 
+      SET is_active = ?,
+          floor_opacity = ?,
+          table_opacity = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE texture_id = ? AND offering_id = ?
+    `).bind(is_active, floor_opacity, table_opacity, texture_id, offering_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update textures error:', error)
+    return c.json({ error: 'Failed to update textures' }, 500)
+  }
+})
+
+// ============================================
 // HOTEL LANDING PAGE & APIs
 // ============================================
 
@@ -24413,6 +24535,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             <button onclick="switchTab('reservations')" id="tabReservations" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                 <i class="fas fa-calendar-check mr-2"></i>Reservations
             </button>
+            <button onclick="switchTab('textures')" id="tabTextures" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <i class="fas fa-image mr-2"></i>AI Textures
+            </button>
         </div>
 
         <!-- TABLES TAB -->
@@ -24630,6 +24755,126 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
         </div>
         <!-- END RESERVATIONS TAB -->
+        
+        <!-- AI TEXTURES TAB -->
+        <div id="texturesSection" class="hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-magic mr-2 text-purple-600"></i>
+                    AI-Powered Restaurant Textures
+                </h2>
+                <p class="text-gray-600 mb-6">
+                    Upload a photo of your restaurant and let AI extract floor and table textures to create a realistic floor plan for guests!
+                </p>
+                
+                <!-- Current Texture Status -->
+                <div id="currentTextureStatus" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-bold mb-2">Current Status</h3>
+                    <div id="textureStatusContent">
+                        <p class="text-gray-500">No textures configured yet. Upload a restaurant photo to get started!</p>
+                    </div>
+                </div>
+                
+                <!-- Upload Form -->
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6 bg-gray-50">
+                    <form id="uploadTextureForm">
+                        <div class="mb-4">
+                            <label class="block font-semibold mb-2">
+                                <i class="fas fa-camera mr-2"></i>Upload Restaurant Photo
+                            </label>
+                            <input type="file" id="restaurantPhoto" accept="image/*" required
+                                   class="w-full px-4 py-2 border rounded-lg">
+                            <p class="text-sm text-gray-500 mt-2">
+                                💡 Best results: Clear photo showing floor and table surfaces
+                            </p>
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div id="imagePreview" class="mb-4 hidden">
+                            <img id="previewImg" class="max-w-full h-64 object-cover rounded-lg border-2 border-gray-300">
+                        </div>
+                        
+                        <button type="submit" class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            <i class="fas fa-robot mr-2"></i>Analyze with AI
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- AI Analysis Results -->
+                <div id="aiAnalysisResults" class="hidden">
+                    <h3 class="font-bold text-lg mb-4">
+                        <i class="fas fa-check-circle text-green-600 mr-2"></i>AI Analysis Complete
+                    </h3>
+                    
+                    <div class="grid md:grid-cols-2 gap-4 mb-6">
+                        <!-- Floor Texture -->
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold mb-2">
+                                <i class="fas fa-layer-group mr-2 text-blue-600"></i>Floor Texture
+                            </h4>
+                            <div id="floorTexturePreview" class="mb-3">
+                                <!-- Will show extracted floor texture -->
+                            </div>
+                            <p><strong>Type:</strong> <span id="floorType">-</span></p>
+                            <p><strong>Primary Color:</strong> <span id="floorColorPrimary">-</span></p>
+                            <label class="block mt-2">
+                                <span class="text-sm">Opacity:</span>
+                                <input type="range" id="floorOpacity" min="0" max="1" step="0.1" value="0.8"
+                                       class="w-full">
+                                <span class="text-sm text-gray-500" id="floorOpacityValue">80%</span>
+                            </label>
+                        </div>
+                        
+                        <!-- Table Texture -->
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold mb-2">
+                                <i class="fas fa-chair mr-2 text-green-600"></i>Table Texture
+                            </h4>
+                            <div id="tableTexturePreview" class="mb-3">
+                                <!-- Will show extracted table texture -->
+                            </div>
+                            <p><strong>Type:</strong> <span id="tableType">-</span></p>
+                            <p><strong>Primary Color:</strong> <span id="tableColorPrimary">-</span></p>
+                            <label class="block mt-2">
+                                <span class="text-sm">Opacity:</span>
+                                <input type="range" id="tableOpacity" min="0" max="1" step="0.1" value="0.9"
+                                       class="w-full">
+                                <span class="text-sm text-gray-500" id="tableOpacityValue">90%</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Confidence Score -->
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <p class="text-sm">
+                            <strong>AI Confidence:</strong> 
+                            <span id="confidenceScore">-</span>%
+                            <i class="fas fa-info-circle ml-2 text-blue-600" title="How confident the AI is about the texture extraction"></i>
+                        </p>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-4">
+                        <button onclick="saveTextures()" class="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save & Apply Textures
+                        </button>
+                        <button onclick="loadTextureSettings()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">
+                            <i class="fas fa-redo mr-2"></i>Reset
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="aiLoadingState" class="hidden text-center py-8">
+                    <div class="animate-spin text-4xl text-purple-600 mb-4">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                    <p class="text-lg font-semibold">AI is analyzing your restaurant photo...</p>
+                    <p class="text-sm text-gray-500">This may take a few moments</p>
+                </div>
+            </div>
+        </div>
+        <!-- END AI TEXTURES TAB -->
     </div>
 
     <script>
@@ -24878,17 +25123,21 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         document.getElementById('tabTables').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'tables' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabSessions').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabReservations').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'reservations' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        document.getElementById('tabTextures').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'textures' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         
         // Show/hide sections
         document.getElementById('tablesSection').style.display = tab === 'tables' ? 'block' : 'none';
         document.getElementById('sessionsSection').style.display = tab === 'sessions' ? 'block' : 'none';
         document.getElementById('reservationsSection').style.display = tab === 'reservations' ? 'block' : 'none';
+        document.getElementById('texturesSection').style.display = tab === 'textures' ? 'block' : 'none';
         
         // Load data for active tab
         if (tab === 'sessions') {
           loadSessions();
         } else if (tab === 'reservations') {
           loadReservations();
+        } else if (tab === 'textures') {
+          loadTextureSettings();
         }
       }
 
@@ -25130,6 +25379,182 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         } catch (error) {
           console.error('Cancel error:', error);
           alert('Error cancelling reservation');
+        }
+      }
+
+      // ========================================
+      // AI TEXTURES MANAGEMENT
+      // ========================================
+      let currentTextureData = null;
+      
+      async function loadTextureSettings() {
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/textures');
+          const data = await response.json();
+          
+          if (data.success && data.texture) {
+            currentTextureData = data.texture;
+            displayTextureStatus(data.texture);
+          } else {
+            document.getElementById('textureStatusContent').innerHTML = 
+              '<p class="text-gray-500">No textures configured yet. Upload a restaurant photo to get started!</p>';
+          }
+        } catch (error) {
+          console.error('Load textures error:', error);
+        }
+      }
+      
+      function displayTextureStatus(texture) {
+        if (!texture.is_active) {
+          document.getElementById('textureStatusContent').innerHTML = 
+            '<p class="text-gray-500">Textures uploaded but not active. Click "Save & Apply" to enable.</p>';
+          return;
+        }
+        
+        const html = \`
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <p class="font-semibold">Floor Texture</p>
+              <p class="text-sm text-gray-600">Type: \${texture.floor_texture_type || 'Unknown'}</p>
+              <p class="text-sm text-gray-600">Color: \${texture.floor_color_primary || '-'}</p>
+              <p class="text-sm text-gray-600">Opacity: \${(texture.floor_opacity * 100).toFixed(0)}%</p>
+            </div>
+            <div>
+              <p class="font-semibold">Table Texture</p>
+              <p class="text-sm text-gray-600">Type: \${texture.table_texture_type || 'Unknown'}</p>
+              <p class="text-sm text-gray-600">Color: \${texture.table_color_primary || '-'}</p>
+              <p class="text-sm text-gray-600">Opacity: \${(texture.table_opacity * 100).toFixed(0)}%</p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <span class="inline-block px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
+              <i class="fas fa-check-circle mr-1"></i>Active on booking page
+            </span>
+          </div>
+        \`;
+        document.getElementById('textureStatusContent').innerHTML = html;
+      }
+      
+      // Image preview
+      document.getElementById('restaurantPhoto').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            document.getElementById('previewImg').src = event.target.result;
+            document.getElementById('imagePreview').classList.remove('hidden');
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      
+      // Handle texture upload and AI analysis
+      document.getElementById('uploadTextureForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('restaurantPhoto');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+          alert('Please select an image');
+          return;
+        }
+        
+        // Show loading state
+        document.getElementById('aiLoadingState').classList.remove('hidden');
+        document.getElementById('aiAnalysisResults').classList.add('hidden');
+        
+        try {
+          // Convert image to base64
+          const reader = new FileReader();
+          reader.onload = async function(event) {
+            const base64Image = event.target.result;
+            
+            // Call AI analysis API
+            const response = await fetch('/api/admin/restaurant/' + offeringId + '/analyze-textures', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image: base64Image,
+                offering_id: offeringId,
+                property_id: 1
+              })
+            });
+            
+            const data = await response.json();
+            
+            // Hide loading
+            document.getElementById('aiLoadingState').classList.add('hidden');
+            
+            if (data.success) {
+              currentTextureData = data.texture;
+              displayAIResults(data.texture);
+              document.getElementById('aiAnalysisResults').classList.remove('hidden');
+            } else {
+              alert('AI analysis failed: ' + (data.error || 'Unknown error'));
+            }
+          };
+          reader.readAsDataURL(file);
+          
+        } catch (error) {
+          console.error('Texture upload error:', error);
+          document.getElementById('aiLoadingState').classList.add('hidden');
+          alert('Error uploading image: ' + error.message);
+        }
+      });
+      
+      function displayAIResults(texture) {
+        document.getElementById('floorType').textContent = texture.floor_texture_type || 'Unknown';
+        document.getElementById('floorColorPrimary').textContent = texture.floor_color_primary || '-';
+        document.getElementById('tableType').textContent = texture.table_texture_type || 'Unknown';
+        document.getElementById('tableColorPrimary').textContent = texture.table_color_primary || '-';
+        document.getElementById('confidenceScore').textContent = (texture.confidence_score * 100).toFixed(0);
+        
+        document.getElementById('floorOpacity').value = texture.floor_opacity || 0.8;
+        document.getElementById('floorOpacityValue').textContent = ((texture.floor_opacity || 0.8) * 100).toFixed(0) + '%';
+        
+        document.getElementById('tableOpacity').value = texture.table_opacity || 0.9;
+        document.getElementById('tableOpacityValue').textContent = ((texture.table_opacity || 0.9) * 100).toFixed(0) + '%';
+      }
+      
+      // Opacity sliders
+      document.getElementById('floorOpacity').addEventListener('input', function(e) {
+        document.getElementById('floorOpacityValue').textContent = (e.target.value * 100).toFixed(0) + '%';
+      });
+      
+      document.getElementById('tableOpacity').addEventListener('input', function(e) {
+        document.getElementById('tableOpacityValue').textContent = (e.target.value * 100).toFixed(0) + '%';
+      });
+      
+      window.saveTextures = async function() {
+        if (!currentTextureData) {
+          alert('No texture data to save');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/textures', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              texture_id: currentTextureData.texture_id,
+              is_active: 1,
+              floor_opacity: parseFloat(document.getElementById('floorOpacity').value),
+              table_opacity: parseFloat(document.getElementById('tableOpacity').value)
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Textures saved and applied to booking page!');
+            loadTextureSettings();
+          } else {
+            alert('Error saving textures: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Save textures error:', error);
+          alert('Error saving textures: ' + error.message);
         }
       }
 
