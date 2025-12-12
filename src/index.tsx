@@ -4710,6 +4710,29 @@ app.get('/api/restaurant/session/:session_id/availability', async (c) => {
   }
 })
 
+// Get AI-extracted textures for restaurant (public endpoint for guest booking page)
+app.get('/api/restaurant/:offering_id/textures', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const texture = await DB.prepare(`
+      SELECT * FROM restaurant_textures 
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY texture_id DESC 
+      LIMIT 1
+    `).bind(offering_id).first()
+    
+    return c.json({ 
+      success: true, 
+      texture: texture || null 
+    })
+  } catch (error) {
+    console.error('Get public textures error:', error)
+    return c.json({ success: false, texture: null })
+  }
+})
+
 // Create table reservation
 app.post('/api/restaurant/reserve', async (c) => {
   const { DB } = c.env
@@ -5021,19 +5044,92 @@ app.post('/api/admin/restaurant/:offering_id/analyze-textures', async (c) => {
   const { image, property_id } = body
   
   try {
-    // Call AI analysis API to extract textures
-    // For now, we'll use a simplified analysis
-    // In production, this would call analyze_media_content or similar AI service
+    // Real AI-powered texture analysis
+    // Analyze the restaurant image to extract floor and table materials
+    const aiPrompt = `Analyze this restaurant interior photo and extract texture information:
+
+1. FLOOR ANALYSIS:
+   - Material type (hardwood, tile, marble, carpet, concrete, stone, vinyl, laminate, terrazzo)
+   - Primary color (hex code)
+   - Secondary color if pattern exists (hex code)
+   - Texture description
+
+2. TABLE ANALYSIS:
+   - Material type (wood, glass, metal, marble, granite, laminate, plastic)
+   - Primary color (hex code)
+   - Secondary color if applicable (hex code)
+   - Surface finish (polished, matte, glossy, textured)
+
+3. CONFIDENCE SCORE:
+   - Overall confidence in analysis (0.0 to 1.0)
+
+Return JSON format:
+{
+  "floor_texture_type": "material name",
+  "floor_color_primary": "#hexcode",
+  "floor_color_secondary": "#hexcode or null",
+  "floor_description": "brief description",
+  "table_texture_type": "material name",
+  "table_color_primary": "#hexcode",
+  "table_color_secondary": "#hexcode or null",
+  "table_description": "brief description",
+  "confidence_score": 0.0-1.0
+}
+
+Be specific and accurate with hex colors. Look at the dominant surfaces in the image.`
+
+    // Call AI vision analysis
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (c.env.OPENAI_API_KEY || '')
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: aiPrompt },
+              { type: 'image_url', image_url: { url: image } }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.3
+      })
+    })
     
-    // Simulate AI analysis (replace with actual AI call)
-    const aiAnalysis = {
-      floor_texture_type: 'hardwood',
-      floor_color_primary: '#8B7355',
-      floor_color_secondary: '#A0826D',
-      table_texture_type: 'wood',
-      table_color_primary: '#FFFFFF',
-      table_color_secondary: '#F5F5F5',
-      confidence_score: 0.85
+    const aiResult = await aiResponse.json()
+    
+    // Parse AI response
+    let aiAnalysis
+    try {
+      const aiText = aiResult.choices[0].message.content
+      // Extract JSON from response (might be wrapped in markdown)
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/)
+      aiAnalysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {
+        floor_texture_type: 'hardwood',
+        floor_color_primary: '#8B7355',
+        floor_color_secondary: '#A0826D',
+        table_texture_type: 'wood',
+        table_color_primary: '#FFFFFF',
+        table_color_secondary: '#F5F5F5',
+        confidence_score: 0.5
+      }
+    } catch (parseError) {
+      console.error('AI response parse error:', parseError)
+      // Fallback to defaults
+      aiAnalysis = {
+        floor_texture_type: 'hardwood',
+        floor_color_primary: '#8B7355',
+        floor_color_secondary: '#A0826D',
+        table_texture_type: 'wood',
+        table_color_primary: '#FFFFFF',
+        table_color_secondary: '#F5F5F5',
+        confidence_score: 0.5
+      }
     }
     
     // Store the original image and AI results
@@ -24274,6 +24370,18 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
 
       async function loadTablesAndAvailability() {
         try {
+          // Load AI-extracted textures for this restaurant
+          let restaurantTextures = null;
+          try {
+            const textureResponse = await fetch('/api/restaurant/' + offeringId + '/textures');
+            const textureData = await textureResponse.json();
+            if (textureData.success && textureData.texture && textureData.texture.is_active) {
+              restaurantTextures = textureData.texture;
+            }
+          } catch (err) {
+            console.log('No textures available, using defaults');
+          }
+          
           // Load all tables
           const tablesResponse = await fetch('/api/restaurant/' + offeringId + '/tables');
           const tablesData = await tablesResponse.json();
@@ -24290,6 +24398,21 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           // Render tables - ALWAYS use floor plan view (mobile-first for QR code scanning)
           const canvas = document.getElementById('tableCanvas');
           canvas.innerHTML = '';
+          
+          // Apply AI-extracted floor texture if available
+          if (restaurantTextures) {
+            canvas.style.background = restaurantTextures.floor_color_primary || '#F3F4F6';
+            canvas.style.backgroundImage = 'linear-gradient(45deg, ' + 
+              (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 25%, ' +
+              (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 25%, ' +
+              (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 50%, ' +
+              (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 50%, ' +
+              (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 75%, ' +
+              (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 75%, ' +
+              (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ')';
+            canvas.style.backgroundSize = '40px 40px';
+            canvas.style.opacity = restaurantTextures.floor_opacity || 0.8;
+          }
           
           // Calculate responsive scale based on screen width
           // Mobile: scale down to fit screen, Desktop: use 0.8 scale
@@ -24346,7 +24469,18 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
             
             tableEl.style.width = width + 'px';
             tableEl.style.height = height + 'px';
-            tableEl.style.background = 'white';
+            
+            // Apply AI-extracted table texture if available
+            if (restaurantTextures && !isReserved) {
+              const tableColor = restaurantTextures.table_color_primary || '#FFFFFF';
+              const tableSecondary = restaurantTextures.table_color_secondary || tableColor;
+              tableEl.style.background = 'linear-gradient(135deg, ' + tableColor + ' 0%, ' + tableSecondary + ' 100%)';
+              tableEl.style.opacity = restaurantTextures.table_opacity || 0.9;
+              tableEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15), inset 0 1px 3px rgba(255,255,255,0.3)';
+            } else {
+              tableEl.style.background = 'white';
+            }
+            
             tableEl.style.display = 'flex';
             tableEl.style.flexDirection = 'column';
             tableEl.style.alignItems = 'center';
