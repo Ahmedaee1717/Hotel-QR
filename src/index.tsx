@@ -4609,6 +4609,26 @@ app.post('/api/restaurant/reserve', async (c) => {
       return c.json({ error: 'Table is already reserved' }, 400)
     }
     
+    // Create or get guest
+    let guest = await DB.prepare(`
+      SELECT guest_id FROM guests WHERE email = ?
+    `).bind(data.guest_email).first()
+    
+    let guestId = guest?.guest_id
+    
+    if (!guestId) {
+      const newGuest = await DB.prepare(`
+        INSERT INTO guests (email, name, phone, language_preference)
+        VALUES (?, ?, ?, 'en')
+      `).bind(data.guest_email, data.guest_name, data.guest_phone).run()
+      guestId = newGuest.meta.last_row_id
+    }
+    
+    // Get session details for reservation_time
+    const session = await DB.prepare(`
+      SELECT session_time FROM dining_sessions WHERE session_id = ?
+    `).bind(data.session_id).first()
+    
     // Create reservation
     const result = await DB.prepare(`
       INSERT INTO table_reservations (
@@ -4619,13 +4639,14 @@ app.post('/api/restaurant/reserve', async (c) => {
     `).bind(
       data.session_id,
       data.table_id,
-      data.guest_id,
+      guestId,
       data.property_id,
       data.reservation_date,
-      data.reservation_time,
+      session.session_time,
       data.num_guests,
       data.special_requests || null,
-      data.dietary_requirements || null
+      data.special_requests || null, // Use special_requests for dietary_requirements too
+      'confirmed'
     ).run()
     
     // Update session booking count
@@ -9610,8 +9631,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 const title = getTranslatedField(r, 'title');
                 const description = getTranslatedField(r, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${r.offering_id})">
-                    <div class="relative">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
+                    <div class="relative cursor-pointer" onclick="viewOffering(\${r.offering_id})">
                         <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
                              class="w-full h-48 object-cover">
@@ -9620,15 +9641,21 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800 cursor-pointer" onclick="viewOffering(\${r.offering_id})">\${title}</h3>
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
                             <span>\${translateLocation(r.location)}</span>
                         </div>
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('explore-menu')}</span>
-                            <i class="fas fa-arrow-right text-blue-600"></i>
+                        <div class="pt-3 border-t border-gray-100 flex gap-2">
+                            <button onclick="window.location.href='/hotel/' + propertySlug + '/restaurant/' + \${r.offering_id} + '/book'" 
+                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
+                                <i class="fas fa-calendar-plus mr-2"></i>Book Table
+                            </button>
+                            <button onclick="viewOffering(\${r.offering_id})" 
+                                    class="px-4 py-2.5 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -23000,6 +23027,529 @@ app.get('/:property_slug?', async (c) => {
 })
 
 // Restaurant Table Management Page
+// ============================================
+// GUEST RESTAURANT BOOKING PAGE
+// ============================================
+
+app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
+  const { DB } = c.env
+  const { slug, offering_id } = c.req.param()
+  
+  try {
+    // Get property details
+    const property = await DB.prepare(`
+      SELECT * FROM properties WHERE slug = ?
+    `).bind(slug).first()
+    
+    if (!property) {
+      return c.text('Property not found', 404)
+    }
+    
+    // Get restaurant details
+    const restaurant = await DB.prepare(`
+      SELECT * FROM hotel_offerings WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    if (!restaurant) {
+      return c.text('Restaurant not found', 404)
+    }
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Table - ${restaurant.title_en}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+      .table-item {
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 2px solid #D1D5DB;
+      }
+      .table-item:hover {
+        border-color: #3B82F6;
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      }
+      .table-item.selected {
+        border-color: #10B981;
+        border-width: 3px;
+        background: #D1FAE5 !important;
+      }
+      .table-item.reserved {
+        background: #FEE2E2 !important;
+        border-color: #DC2626;
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .time-slot {
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .time-slot:hover:not(.disabled) {
+        background: #DBEAFE !important;
+        transform: scale(1.02);
+      }
+      .time-slot.selected {
+        background: #3B82F6 !important;
+        color: white !important;
+        font-weight: bold;
+      }
+      .time-slot.disabled {
+        background: #F3F4F6 !important;
+        color: #9CA3AF !important;
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      .step-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #E5E7EB;
+        color: #6B7280;
+        font-weight: bold;
+      }
+      .step-indicator.active {
+        background: #3B82F6;
+        color: white;
+      }
+      .step-indicator.completed {
+        background: #10B981;
+        color: white;
+      }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 px-4 shadow-lg">
+        <div class="max-w-6xl mx-auto">
+            <a href="/hotel/${slug}" class="inline-block mb-4 text-white/80 hover:text-white">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Hotel
+            </a>
+            <h1 class="text-3xl font-bold">${restaurant.title_en}</h1>
+            <p class="text-white/90 mt-2">${restaurant.short_description_en || 'Reserve your table'}</p>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Progress Steps -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between max-w-2xl mx-auto">
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator active" id="step1-indicator">1</div>
+                    <span class="text-xs mt-2 font-semibold">Date & Guests</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-4"></div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator" id="step2-indicator">2</div>
+                    <span class="text-xs mt-2">Time Slot</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-4"></div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator" id="step3-indicator">3</div>
+                    <span class="text-xs mt-2">Select Table</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-4"></div>
+                <div class="flex flex-col items-center">
+                    <div class="step-indicator" id="step4-indicator">4</div>
+                    <span class="text-xs mt-2">Confirm</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Date & Number of Guests -->
+        <div id="step1" class="bg-white rounded-lg shadow-lg p-8">
+            <h2 class="text-2xl font-bold mb-6">
+                <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>
+                Select Date & Number of Guests
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Date</label>
+                    <input type="date" id="reservationDate" 
+                           class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                           min="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">Number of Guests</label>
+                    <select id="numGuests" class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                        <option value="">Select...</option>
+                        <option value="1">1 Guest</option>
+                        <option value="2">2 Guests</option>
+                        <option value="3">3 Guests</option>
+                        <option value="4">4 Guests</option>
+                        <option value="5">5 Guests</option>
+                        <option value="6">6 Guests</option>
+                        <option value="7">7 Guests</option>
+                        <option value="8">8 Guests</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button onclick="goToStep2()" class="mt-6 w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                Continue to Time Selection
+                <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- Step 2: Time Slot Selection -->
+        <div id="step2" class="bg-white rounded-lg shadow-lg p-8 hidden">
+            <h2 class="text-2xl font-bold mb-6">
+                <i class="fas fa-clock mr-2 text-blue-600"></i>
+                Select Time Slot
+            </h2>
+            
+            <div id="timeSlotsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <!-- Time slots loaded dynamically -->
+            </div>
+            
+            <div class="flex gap-4">
+                <button onclick="goToStep1()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="goToStep3()" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    Continue to Table Selection
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Table Selection -->
+        <div id="step3" class="bg-white rounded-lg shadow-lg p-8 hidden">
+            <h2 class="text-2xl font-bold mb-6">
+                <i class="fas fa-chair mr-2 text-blue-600"></i>
+                Select Your Table
+            </h2>
+            
+            <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                <div class="flex items-center gap-4 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 border-2 border-gray-400 bg-white"></div>
+                        <span>Available</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 border-2 border-red-600 bg-red-100"></div>
+                        <span>Reserved</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 border-3 border-green-600 bg-green-100"></div>
+                        <span>Your Selection</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="tableCanvas" class="relative bg-gray-100 rounded-lg" style="height: 600px; width: 100%;">
+                <!-- Tables loaded dynamically -->
+            </div>
+            
+            <div id="selectedTableInfo" class="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg hidden">
+                <h3 class="font-bold text-green-900">Selected Table:</h3>
+                <p id="selectedTableDetails" class="text-green-800 mt-1"></p>
+            </div>
+            
+            <div class="flex gap-4 mt-6">
+                <button onclick="goToStep2()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="goToStep4()" id="continueToConfirm" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold" disabled>
+                    Continue to Confirmation
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Confirmation -->
+        <div id="step4" class="bg-white rounded-lg shadow-lg p-8 hidden">
+            <h2 class="text-2xl font-bold mb-6">
+                <i class="fas fa-check-circle mr-2 text-green-600"></i>
+                Confirm Your Reservation
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold mb-4 text-lg">Reservation Details</h3>
+                    <div class="space-y-3 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Restaurant:</span>
+                            <span class="font-semibold">${restaurant.title_en}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Date:</span>
+                            <span class="font-semibold" id="confirmDate"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Time:</span>
+                            <span class="font-semibold" id="confirmTime"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Guests:</span>
+                            <span class="font-semibold" id="confirmGuests"></span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Table:</span>
+                            <span class="font-semibold" id="confirmTable"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="font-bold mb-4 text-lg">Your Information</h3>
+                    <div class="space-y-3">
+                        <input type="text" id="guestName" placeholder="Full Name *" required
+                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
+                        <input type="email" id="guestEmail" placeholder="Email *" required
+                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
+                        <input type="tel" id="guestPhone" placeholder="Phone Number *" required
+                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
+                        <input type="text" id="roomNumber" placeholder="Room Number (if hotel guest)"
+                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
+                        <textarea id="specialRequests" placeholder="Special Requests / Dietary Requirements" rows="3"
+                                  class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex gap-4 mt-6">
+                <button onclick="goToStep3()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="submitReservation()" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                    <i class="fas fa-check mr-2"></i>Confirm Reservation
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const offeringId = ${offering_id};
+      const propertyId = ${property.property_id};
+      let selectedDate = '';
+      let selectedGuests = 0;
+      let selectedSessionId = null;
+      let selectedTableId = null;
+      let availableTables = [];
+      let reservedTables = [];
+
+      // Step navigation
+      function goToStep1() {
+        showStep(1);
+      }
+
+      function goToStep2() {
+        const date = document.getElementById('reservationDate').value;
+        const guests = document.getElementById('numGuests').value;
+        
+        if (!date || !guests) {
+          alert('Please select date and number of guests');
+          return;
+        }
+        
+        selectedDate = date;
+        selectedGuests = parseInt(guests);
+        loadTimeSlotsAndShow();
+      }
+
+      async function loadTimeSlotsAndShow() {
+        try {
+          const response = await fetch('/api/restaurant/' + offeringId + '/sessions?date=' + selectedDate);
+          const data = await response.json();
+          
+          const container = document.getElementById('timeSlotsContainer');
+          
+          if (data.success && data.sessions && data.sessions.length > 0) {
+            container.innerHTML = data.sessions.map(session => {
+              const available = session.current_bookings < session.max_capacity;
+              return \`
+                <div class="time-slot p-4 border-2 rounded-lg text-center \${!available ? 'disabled' : ''}"
+                     onclick="\${available ? 'selectTimeSlot(' + session.session_id + ', \\\\'' + session.session_time + '\\\\')' : ''}">
+                  <div class="font-bold">\${session.session_time}</div>
+                  <div class="text-xs text-gray-600 mt-1">\${session.session_type}</div>
+                  \${!available ? '<div class="text-xs text-red-600 mt-1">Fully Booked</div>' : ''}
+                </div>
+              \`;
+            }).join('');
+            showStep(2);
+          } else {
+            alert('No available time slots for this date');
+          }
+        } catch (error) {
+          console.error('Load sessions error:', error);
+          alert('Error loading time slots');
+        }
+      }
+
+      function selectTimeSlot(sessionId, time) {
+        selectedSessionId = sessionId;
+        document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
+        event.target.closest('.time-slot').classList.add('selected');
+      }
+
+      async function goToStep3() {
+        if (!selectedSessionId) {
+          alert('Please select a time slot');
+          return;
+        }
+        
+        await loadTablesAndAvailability();
+        showStep(3);
+      }
+
+      async function loadTablesAndAvailability() {
+        try {
+          // Load all tables
+          const tablesResponse = await fetch('/api/restaurant/' + offeringId + '/tables');
+          const tablesData = await tablesResponse.json();
+          availableTables = tablesData.tables || [];
+          
+          // Load availability for selected session
+          const availabilityResponse = await fetch('/api/restaurant/session/' + selectedSessionId + '/availability');
+          const availabilityData = await availabilityResponse.json();
+          reservedTables = availabilityData.reserved_tables || [];
+          
+          // Filter tables by capacity
+          const suitableTables = availableTables.filter(t => t.capacity >= selectedGuests);
+          
+          // Render tables
+          const canvas = document.getElementById('tableCanvas');
+          canvas.innerHTML = '';
+          
+          suitableTables.forEach(table => {
+            const isReserved = reservedTables.includes(table.table_id);
+            const tableEl = document.createElement('div');
+            tableEl.className = 'table-item table-' + table.shape + (isReserved ? ' reserved' : '');
+            tableEl.style.position = 'absolute';
+            tableEl.style.left = (table.position_x * 0.8) + 'px';
+            tableEl.style.top = (table.position_y * 0.8) + 'px';
+            tableEl.style.width = (table.width * 0.8) + 'px';
+            tableEl.style.height = (table.height * 0.8) + 'px';
+            tableEl.style.background = 'white';
+            tableEl.style.display = 'flex';
+            tableEl.style.flexDirection = 'column';
+            tableEl.style.alignItems = 'center';
+            tableEl.style.justifyContent = 'center';
+            
+            tableEl.innerHTML = \`
+              <div class="font-bold text-sm">\${table.table_number}</div>
+              <div class="text-xs text-gray-600"><i class="fas fa-user"></i> \${table.capacity}</div>
+            \`;
+            
+            if (!isReserved) {
+              tableEl.onclick = () => selectTable(table);
+            }
+            
+            canvas.appendChild(tableEl);
+          });
+        } catch (error) {
+          console.error('Load tables error:', error);
+          alert('Error loading tables');
+        }
+      }
+
+      function selectTable(table) {
+        selectedTableId = table.table_id;
+        document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
+        event.target.closest('.table-item').classList.add('selected');
+        
+        document.getElementById('selectedTableInfo').classList.remove('hidden');
+        document.getElementById('selectedTableDetails').textContent = 
+          \`Table \${table.table_number} - \${table.table_name || ''} (Seats \${table.capacity})\`;
+        document.getElementById('continueToConfirm').disabled = false;
+      }
+
+      function goToStep4() {
+        if (!selectedTableId) {
+          alert('Please select a table');
+          return;
+        }
+        
+        // Populate confirmation details
+        document.getElementById('confirmDate').textContent = selectedDate;
+        document.getElementById('confirmTime').textContent = document.querySelector('.time-slot.selected .font-bold').textContent;
+        document.getElementById('confirmGuests').textContent = selectedGuests + ' Guest' + (selectedGuests > 1 ? 's' : '');
+        document.getElementById('confirmTable').textContent = document.getElementById('selectedTableDetails').textContent;
+        
+        showStep(4);
+      }
+
+      async function submitReservation() {
+        const name = document.getElementById('guestName').value;
+        const email = document.getElementById('guestEmail').value;
+        const phone = document.getElementById('guestPhone').value;
+        
+        if (!name || !email || !phone) {
+          alert('Please fill in all required fields');
+          return;
+        }
+        
+        const roomNumber = document.getElementById('roomNumber').value;
+        const specialRequests = document.getElementById('specialRequests').value;
+        
+        try {
+          const response = await fetch('/api/restaurant/reserve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: selectedSessionId,
+              table_id: selectedTableId,
+              property_id: propertyId,
+              guest_name: name,
+              guest_email: email,
+              guest_phone: phone,
+              room_number: roomNumber,
+              num_guests: selectedGuests,
+              special_requests: specialRequests,
+              reservation_date: selectedDate
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Reservation confirmed! \\n\\nConfirmation details have been sent to your email.');
+            window.location.href = '/hotel/${slug}';
+          } else {
+            alert('❌ ' + (data.error || 'Failed to create reservation'));
+          }
+        } catch (error) {
+          console.error('Submit reservation error:', error);
+          alert('❌ Error submitting reservation');
+        }
+      }
+
+      function showStep(stepNum) {
+        // Hide all steps
+        for (let i = 1; i <= 4; i++) {
+          document.getElementById('step' + i).classList.add('hidden');
+          const indicator = document.getElementById('step' + i + '-indicator');
+          indicator.classList.remove('active', 'completed');
+          if (i < stepNum) {
+            indicator.classList.add('completed');
+          } else if (i === stepNum) {
+            indicator.classList.add('active');
+          }
+        }
+        
+        // Show current step
+        document.getElementById('step' + stepNum).classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Restaurant booking page error:', error)
+    return c.text('Error loading booking page', 500)
+  }
+})
+
 app.get('/admin/restaurant/:offering_id', (c) => {
   const { offering_id } = c.req.param()
   
