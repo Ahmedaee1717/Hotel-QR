@@ -21898,12 +21898,12 @@ app.get('/admin/dashboard', (c) => {
             '<div class="flex-1">' +
               '<h4 class="font-bold text-gray-900 mb-1">' + type + '</h4>' +
               '<p class="text-sm text-gray-600 mb-3">' + message + '</p>' +
-              '<button onclick="acknowledgeNotification(\'' + type.toLowerCase() + '\')" ' +
+              '<button onclick="acknowledgeNotification(\\'' + type.toLowerCase() + '\\')" ' +
                       'class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">' +
                 '<i class="fas fa-check mr-2"></i>Acknowledge & Stop Beeping' +
               '</button>' +
             '</div>' +
-            '<button onclick="acknowledgeNotification(\'' + type.toLowerCase() + '\')" ' +
+            '<button onclick="acknowledgeNotification(\\'' + type.toLowerCase() + '\\')" ' +
                     'class="flex-shrink-0 text-gray-400 hover:text-gray-600">' +
               '<i class="fas fa-times"></i>' +
             '</button>' +
