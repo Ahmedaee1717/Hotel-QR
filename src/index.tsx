@@ -25237,7 +25237,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let isDragging = false;
       let dragOffset = { x: 0, y: 0 };
       let currentTab = 'tables';
-      let masterScale = 1.0; // 100% by default
+      let masterScale = 100; // 100% by default
 
       async function init() {
         await loadRestaurant();
