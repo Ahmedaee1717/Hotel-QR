@@ -4675,6 +4675,70 @@ function getElementIcon(type: string) {
   return icons[type] || 'fa-shapes'
 }
 
+// Wall Drawing APIs
+app.get('/api/admin/restaurant/:offering_id/walls', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const walls = await DB.prepare(`
+      SELECT * FROM restaurant_walls 
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY wall_id ASC
+    `).bind(offering_id).all()
+    
+    return c.json({ success: true, walls: walls.results })
+  } catch (error) {
+    console.error('Get walls error:', error)
+    return c.json({ error: 'Failed to load walls' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant/wall', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO restaurant_walls (
+        offering_id, property_id, start_x, start_y, end_x, end_y,
+        thickness, color, style
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.offering_id,
+      body.property_id,
+      body.start_x,
+      body.start_y,
+      body.end_x,
+      body.end_y,
+      body.thickness,
+      body.color,
+      body.style
+    ).run()
+    
+    return c.json({ success: true, wall_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create wall error:', error)
+    return c.json({ error: 'Failed to create wall' }, 500)
+  }
+})
+
+app.delete('/api/admin/restaurant/wall/:wall_id', async (c) => {
+  const { DB } = c.env
+  const { wall_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE restaurant_walls SET is_active = 0 WHERE wall_id = ?
+    `).bind(wall_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete wall error:', error)
+    return c.json({ error: 'Failed to delete wall' }, 500)
+  }
+})
+
 // Get dining sessions for a restaurant
 app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   const { DB } = c.env
@@ -24814,7 +24878,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             <option value="exit">⬅️ Exit</option>
                             <option value="restroom">🚻 Restroom</option>
                             <option value="window">🪟 Window</option>
-                            <option value="wall">🧱 Wall</option>
                             <option value="plant">🌿 Plant</option>
                             <option value="stage">🎤 Stage</option>
                         </select>
@@ -24826,6 +24889,28 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             <i class="fas fa-plus mr-2"></i>Add Element
                         </button>
                     </form>
+                </div>
+
+                <!-- Wall Drawing Tool -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-border-all mr-2 text-gray-600"></i>Draw Walls</h2>
+                    <p class="text-sm text-gray-600 mb-4">Click two points on the canvas to draw a wall</p>
+                    <div class="space-y-3">
+                        <select id="wallStyle" class="w-full px-3 py-2 border rounded-lg text-sm">
+                            <option value="solid">⬛ Solid Wall</option>
+                            <option value="dashed">⚊ Dashed Line</option>
+                            <option value="door">🚪 Doorway</option>
+                            <option value="window">🪟 Window Opening</option>
+                        </select>
+                        <input type="number" id="wallThickness" placeholder="Thickness (px)" value="4" min="1" max="20" class="w-full px-3 py-2 border rounded-lg text-sm">
+                        <input type="color" id="wallColor" value="#64748B" class="w-full h-10 border rounded-lg">
+                        <button id="startWallDrawing" onclick="toggleWallDrawing()" class="w-full bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
+                            <i class="fas fa-pen mr-2"></i>Start Drawing Walls
+                        </button>
+                        <div id="wallDrawingHint" class="hidden text-sm text-blue-600 bg-blue-50 p-2 rounded">
+                            <i class="fas fa-info-circle mr-1"></i>Click canvas to set start point, then click again for end point
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Selected Table Info -->
@@ -25136,6 +25221,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         await loadRestaurant();
         await loadTables();
         await loadFloorElements();
+        await loadWalls();
       }
 
       async function loadRestaurant() {
@@ -25463,6 +25549,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const rect = div.getBoundingClientRect();
         dragOffset.x = e.clientX - rect.left;
         dragOffset.y = e.clientY - rect.top;
+        
+        // Register drag listeners
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
       }
 
       function selectElement(element) {
@@ -25504,6 +25594,144 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         } catch (error) {
           console.error('Add element error:', error);
           alert('Failed to add floor element');
+        }
+      });
+
+      // ========================================
+      // WALL DRAWING TOOL
+      // ========================================
+      let isDrawingWall = false;
+      let wallStartPoint = null;
+      let walls = [];
+      let tempWallLine = null;
+
+      async function loadWalls() {
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/walls');
+          const data = await response.json();
+          walls = data.walls || [];
+          renderWalls();
+        } catch (error) {
+          console.error('Load walls error:', error);
+        }
+      }
+
+      function renderWalls() {
+        const canvas = document.getElementById('canvas');
+        canvas.querySelectorAll('.wall-line').forEach(el => el.remove());
+        
+        walls.forEach(wall => {
+          const line = createWallElement(wall);
+          canvas.appendChild(line);
+        });
+      }
+
+      function createWallElement(wall) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.className = 'wall-line';
+        svg.style.position = 'absolute';
+        svg.style.pointerEvents = 'none';
+        svg.style.zIndex = '0';
+        
+        const minX = Math.min(wall.start_x, wall.end_x);
+        const minY = Math.min(wall.start_y, wall.end_y);
+        const width = Math.abs(wall.end_x - wall.start_x);
+        const height = Math.abs(wall.end_y - wall.start_y);
+        
+        svg.style.left = minX + 'px';
+        svg.style.top = minY + 'px';
+        svg.style.width = (width + 10) + 'px';
+        svg.style.height = (height + 10) + 'px';
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', wall.start_x - minX);
+        line.setAttribute('y1', wall.start_y - minY);
+        line.setAttribute('x2', wall.end_x - minX);
+        line.setAttribute('y2', wall.end_y - minY);
+        line.setAttribute('stroke', wall.color || '#64748B');
+        line.setAttribute('stroke-width', wall.thickness || 4);
+        
+        if (wall.style === 'dashed') {
+          line.setAttribute('stroke-dasharray', '10,5');
+        } else if (wall.style === 'door') {
+          line.setAttribute('stroke', '#10B981');
+          line.setAttribute('stroke-dasharray', '15,10');
+        } else if (wall.style === 'window') {
+          line.setAttribute('stroke', '#3B82F6');
+          line.setAttribute('stroke-dasharray', '5,5');
+        }
+        
+        svg.appendChild(line);
+        return svg;
+      }
+
+      window.toggleWallDrawing = function() {
+        isDrawingWall = !isDrawingWall;
+        const button = document.getElementById('startWallDrawing');
+        const hint = document.getElementById('wallDrawingHint');
+        
+        if (isDrawingWall) {
+          button.textContent = '🛑 Cancel Drawing';
+          button.className = 'w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700';
+          hint.classList.remove('hidden');
+          wallStartPoint = null;
+        } else {
+          button.innerHTML = '<i class="fas fa-pen mr-2"></i>Start Drawing Walls';
+          button.className = 'w-full bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700';
+          hint.classList.add('hidden');
+          wallStartPoint = null;
+          if (tempWallLine) {
+            tempWallLine.remove();
+            tempWallLine = null;
+          }
+        }
+      }
+
+      document.getElementById('canvas').addEventListener('click', async function(e) {
+        if (!isDrawingWall) return;
+        
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.round(e.clientX - rect.left);
+        const y = Math.round(e.clientY - rect.top);
+        
+        if (!wallStartPoint) {
+          // Set start point
+          wallStartPoint = { x, y };
+        } else {
+          // Set end point and create wall
+          const wallData = {
+            offering_id: offeringId,
+            property_id: 1,
+            start_x: wallStartPoint.x,
+            start_y: wallStartPoint.y,
+            end_x: x,
+            end_y: y,
+            thickness: parseInt(document.getElementById('wallThickness').value),
+            color: document.getElementById('wallColor').value,
+            style: document.getElementById('wallStyle').value
+          };
+          
+          try {
+            const response = await fetch('/api/admin/restaurant/wall', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(wallData)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+              await loadWalls();
+              wallStartPoint = null;
+              if (tempWallLine) {
+                tempWallLine.remove();
+                tempWallLine = null;
+              }
+            }
+          } catch (error) {
+            console.error('Create wall error:', error);
+            alert('Failed to create wall');
+          }
         }
       });
 
