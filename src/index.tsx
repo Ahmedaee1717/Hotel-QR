@@ -16421,6 +16421,25 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Auto-Refresh Control Panel -->
+    <div class="bg-gradient-to-r from-green-50 to-blue-50 border-b border-green-200 py-2 px-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-bell text-green-600"></i>
+                <span class="text-sm font-semibold text-gray-700">Real-time Notifications</span>
+                <span class="text-xs text-gray-500">(Refreshes every 5 minutes)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition text-sm">
+                    <i class="fas fa-toggle-on mr-2"></i>Auto-refresh: ON
+                </button>
+                <button id="soundToggle" onclick="toggleSound()" class="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition text-sm">
+                    <i class="fas fa-volume-up mr-2"></i>Sound: ON
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Sidebar + Content Layout -->
     <div class="flex min-h-screen bg-gray-50">
         <!-- Sidebar Navigation -->
@@ -17242,7 +17261,12 @@ app.get('/admin/dashboard', (c) => {
         <!-- Callbacks Tab -->
         <div id="callbacksTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-4"><i class="fas fa-phone mr-2 text-orange-600"></i>Callback Requests</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <div id="callbacksHeader" class="flex items-center">
+                        <h2 class="text-2xl font-bold"><i class="fas fa-phone mr-2 text-orange-600"></i>Callback Requests</h2>
+                    </div>
+                    <span id="callbacksTimestamp" class="text-xs text-gray-500"></span>
+                </div>
                 <div id="callbacksList" class="space-y-3"></div>
             </div>
         </div>
@@ -18205,10 +18229,15 @@ app.get('/admin/dashboard', (c) => {
             <!-- Beach Bookings -->
             <div class="bg-white rounded-lg border p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-xl font-bold">
-                        <i class="fas fa-calendar-check mr-2 text-green-600"></i>Today's Beach Bookings
-                    </h3>
-                    <input type="date" id="beachBookingDate" class="px-4 py-2 border rounded-lg" onchange="loadBeachBookings()">
+                    <div id="beachBookingsHeader" class="flex items-center">
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-calendar-check mr-2 text-green-600"></i>Today's Beach Bookings
+                        </h3>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="beachBookingsTimestamp" class="text-xs text-gray-500"></span>
+                        <input type="date" id="beachBookingDate" class="px-4 py-2 border rounded-lg" onchange="loadBeachBookings()">
+                    </div>
                 </div>
                 <div id="beachBookingsList" class="space-y-3">
                     <p class="text-gray-500 text-center py-8">No bookings for today</p>
@@ -18305,7 +18334,12 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Recent Submissions -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4"><i class="fas fa-clock mr-2 text-blue-600"></i>Recent Feedback</h3>
+            <div class="flex items-center justify-between mb-4">
+                <div id="feedbackHeader" class="flex items-center">
+                    <h3 class="text-xl font-bold"><i class="fas fa-clock mr-2 text-blue-600"></i>Recent Feedback</h3>
+                </div>
+                <span id="feedbackTimestamp" class="text-xs text-gray-500"></span>
+            </div>
             <div id="recentSubmissions" class="space-y-3">
                 <div class="text-center text-gray-500 py-4">
                     <p>No submissions yet</p>
@@ -22533,6 +22567,285 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       function editForm(formId) {
         alert('Edit form functionality - Coming soon!\\n\\nFor now, you can delete and recreate the form.');
       }
+
+      // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
+
+      // ========== AUTO-REFRESH & NOTIFICATION SYSTEM ==========
+      
+      // Store previous data to detect new bookings
+      let previousBeachBookings = [];
+      let previousCallbacks = [];
+      let previousFeedback = [];
+      
+      // Auto-refresh settings
+      let autoRefreshEnabled = true;
+      let soundEnabled = true;
+      let refreshIntervalMs = 300000; // 5 minutes
+      let refreshTimers = {};
+      
+      // Notification sound (simple beep)
+      function playNotificationSound() {
+        if (!soundEnabled) return;
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 800; // Frequency in Hz
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (error) {
+          console.error('Sound error:', error);
+        }
+      }
+      
+      // Show notification badge
+      function showNewBadge(containerId, count) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const existingBadge = container.querySelector('.new-items-badge');
+        if (existingBadge) {
+          existingBadge.textContent = count + ' NEW';
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'new-items-badge bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full ml-2 animate-pulse';
+          badge.textContent = count + ' NEW';
+          container.appendChild(badge);
+        }
+      }
+      
+      // Clear notification badge
+      function clearNewBadge(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        const badge = container.querySelector('.new-items-badge');
+        if (badge) badge.remove();
+      }
+      
+      // Update last refreshed timestamp
+      function updateLastRefreshed(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        const now = new Date();
+        element.textContent = 'Last updated: ' + now.toLocaleTimeString();
+      }
+      
+      // Enhanced loadBeachBookings with change detection
+      const originalLoadBeachBookings = window.loadBeachBookings;
+      window.loadBeachBookings = async function(detectChanges = false) {
+        try {
+          const date = document.getElementById('beachBookingDate')?.value;
+          const response = await fetch('/api/admin/beach/bookings?property_id=1&date=' + date);
+          const data = await response.json();
+          
+          if (detectChanges && data.success && data.bookings) {
+            const newBookings = data.bookings.filter(b => 
+              !previousBeachBookings.some(pb => pb.booking_reference === b.booking_reference)
+            );
+            
+            if (newBookings.length > 0) {
+              playNotificationSound();
+              showNewBadge('beachBookingsHeader', newBookings.length);
+              
+              // Browser notification
+              if (Notification.permission === 'granted') {
+                new Notification('New Beach Booking!', {
+                  body: newBookings.length + ' new beach booking(s) received',
+                  icon: 'https://cdn-icons-png.flaticon.com/512/2921/2921822.png'
+                });
+              }
+            }
+            
+            previousBeachBookings = data.bookings || [];
+          } else if (!detectChanges) {
+            previousBeachBookings = data.bookings || [];
+          }
+          
+          // Call original function
+          if (originalLoadBeachBookings) {
+            await originalLoadBeachBookings();
+          }
+          
+          updateLastRefreshed('beachBookingsTimestamp');
+        } catch (error) {
+          console.error('Auto-refresh beach bookings error:', error);
+        }
+      };
+      
+      // Enhanced loadCallbacks with change detection
+      const originalLoadCallbacks = loadCallbacks;
+      const enhancedLoadCallbacks = async function(detectChanges = false) {
+        try {
+          const response = await fetch('/api/admin/callback-requests?property_id=1');
+          const data = await response.json();
+          
+          if (detectChanges && data.requests) {
+            const newCallbacks = data.requests.filter(c => 
+              !previousCallbacks.some(pc => pc.request_id === c.request_id)
+            );
+            
+            if (newCallbacks.length > 0) {
+              playNotificationSound();
+              showNewBadge('callbacksHeader', newCallbacks.length);
+              
+              if (Notification.permission === 'granted') {
+                new Notification('New Activity Booking Request!', {
+                  body: newCallbacks.length + ' new callback request(s)',
+                  icon: 'https://cdn-icons-png.flaticon.com/512/3585/3585596.png'
+                });
+              }
+            }
+            
+            previousCallbacks = data.requests || [];
+          } else if (!detectChanges) {
+            previousCallbacks = data.requests || [];
+          }
+          
+          // Call original function
+          await originalLoadCallbacks();
+          updateLastRefreshed('callbacksTimestamp');
+        } catch (error) {
+          console.error('Auto-refresh callbacks error:', error);
+        }
+      };
+      
+      // Enhanced loadFeedbackTab with change detection
+      const originalLoadFeedbackTab = loadFeedbackTab;
+      const enhancedLoadFeedbackTab = async function(detectChanges = false) {
+        try {
+          const analyticsRes = await fetch('/api/admin/feedback/analytics/' + propertyId);
+          const analyticsData = await analyticsRes.json();
+          
+          if (detectChanges && analyticsData.success && analyticsData.recent_submissions) {
+            const newFeedback = analyticsData.recent_submissions.filter(f => 
+              !previousFeedback.some(pf => pf.submission_id === f.submission_id)
+            );
+            
+            if (newFeedback.length > 0) {
+              playNotificationSound();
+              showNewBadge('feedbackHeader', newFeedback.length);
+              
+              if (Notification.permission === 'granted') {
+                new Notification('New Feedback Submission!', {
+                  body: newFeedback.length + ' new feedback submission(s)',
+                  icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828640.png'
+                });
+              }
+            }
+            
+            previousFeedback = analyticsData.recent_submissions || [];
+          } else if (!detectChanges) {
+            previousFeedback = analyticsData.recent_submissions || [];
+          }
+          
+          // Call original function
+          await originalLoadFeedbackTab();
+          updateLastRefreshed('feedbackTimestamp');
+        } catch (error) {
+          console.error('Auto-refresh feedback error:', error);
+        }
+      };
+      
+      // Start auto-refresh for a specific section
+      function startAutoRefresh(section) {
+        if (refreshTimers[section]) {
+          clearInterval(refreshTimers[section]);
+        }
+        
+        if (!autoRefreshEnabled) return;
+        
+        refreshTimers[section] = setInterval(() => {
+          if (section === 'beach' && document.getElementById('beachBookingsList')) {
+            window.loadBeachBookings(true);
+          } else if (section === 'callbacks' && document.getElementById('callbacksList')) {
+            enhancedLoadCallbacks(true);
+          } else if (section === 'feedback' && document.getElementById('recentSubmissions')) {
+            enhancedLoadFeedbackTab(true);
+          }
+        }, refreshIntervalMs);
+      }
+      
+      // Stop auto-refresh
+      function stopAutoRefresh(section) {
+        if (refreshTimers[section]) {
+          clearInterval(refreshTimers[section]);
+          delete refreshTimers[section];
+        }
+      }
+      
+      // Toggle auto-refresh
+      window.toggleAutoRefresh = function() {
+        autoRefreshEnabled = !autoRefreshEnabled;
+        const button = document.getElementById('autoRefreshToggle');
+        if (button) {
+          button.innerHTML = autoRefreshEnabled ? 
+            '<i class="fas fa-toggle-on mr-2"></i>Auto-refresh: ON' : 
+            '<i class="fas fa-toggle-off mr-2"></i>Auto-refresh: OFF';
+          button.className = autoRefreshEnabled ?
+            'px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition' :
+            'px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition';
+        }
+        
+        if (autoRefreshEnabled) {
+          startAutoRefresh('beach');
+          startAutoRefresh('callbacks');
+          startAutoRefresh('feedback');
+        } else {
+          stopAutoRefresh('beach');
+          stopAutoRefresh('callbacks');
+          stopAutoRefresh('feedback');
+        }
+      };
+      
+      // Toggle sound
+      window.toggleSound = function() {
+        soundEnabled = !soundEnabled;
+        const button = document.getElementById('soundToggle');
+        if (button) {
+          button.innerHTML = soundEnabled ? 
+            '<i class="fas fa-volume-up mr-2"></i>Sound: ON' : 
+            '<i class="fas fa-volume-mute mr-2"></i>Sound: OFF';
+          button.className = soundEnabled ?
+            'px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition' :
+            'px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition';
+        }
+      };
+      
+      // Request notification permission
+      function requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
+      
+      // Initialize auto-refresh when page loads
+      setTimeout(() => {
+        requestNotificationPermission();
+        
+        // Start auto-refresh for active sections
+        if (document.getElementById('beachBookingsList')) {
+          startAutoRefresh('beach');
+        }
+        if (document.getElementById('callbacksList')) {
+          startAutoRefresh('callbacks');
+        }
+        if (document.getElementById('recentSubmissions')) {
+          startAutoRefresh('feedback');
+        }
+      }, 2000);
+      
+      // ========== END AUTO-REFRESH & NOTIFICATION SYSTEM ==========
 
       // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
     </script>
