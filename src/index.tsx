@@ -10884,6 +10884,7 @@ app.get('/hotel/:property_slug', async (c) => {
             
             const bookTableText = t('book-table');
             const reservationsText = t('reservations');
+            const viewDetailsText = t('view-details');
             
             const cardsHtml = await Promise.all(restaurants.map(async r => {
                 const title = await getTranslatedField(r, 'title');
@@ -10908,7 +10909,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <div class="pt-3 border-t border-gray-100 flex gap-2">
                             <button onclick="viewOffering(\${r.offering_id})" 
                                     class="flex-1 bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
-                                <i class="fas fa-info-circle mr-2"></i>View Details
+                                <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
                             </button>
                         </div>
                     </div>
