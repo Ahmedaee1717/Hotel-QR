@@ -7574,7 +7574,13 @@ app.post('/api/admin/beach/settings', async (c) => {
       loungers_desc,
       daybeds_label,
       daybeds_desc,
-      button_text
+      button_text,
+      bg_color_from,
+      bg_color_to,
+      text_color,
+      button_color_from,
+      button_color_to,
+      button_text_color
     } = body
     
     // Check if settings exist
