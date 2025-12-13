@@ -24757,11 +24757,27 @@ app.get('/admin/dashboard', (c) => {
 
       window.saveBeachCardCustomization = async function() {
         try {
+          // Get basic settings to preserve them
+          const beachBookingEnabled = document.getElementById('beachBookingEnabled')?.checked ? 1 : 0;
+          const freeForGuests = document.getElementById('freeForGuests')?.checked ? 1 : 0;
+          const openingTime = document.getElementById('openingTime')?.value || '08:00';
+          const closingTime = document.getElementById('closingTime')?.value || '18:00';
+          const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
+          const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
+          
           const response = await fetch('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               property_id: 1,
+              // Preserve basic settings
+              beach_booking_enabled: beachBookingEnabled,
+              free_for_hotel_guests: freeForGuests,
+              opening_time: openingTime,
+              closing_time: closingTime,
+              advance_booking_days: advanceBookingDays,
+              max_booking_duration_hours: maxDurationHours,
+              // Card customization
               card_title: document.getElementById('cardTitle').value,
               card_subtitle: document.getElementById('cardSubtitle').value,
               feature1_text: document.getElementById('feature1Text').value,
@@ -24800,6 +24816,30 @@ app.get('/admin/dashboard', (c) => {
       
       window.saveBeachSettings = async function() {
         try {
+          // Get current color values to preserve them
+          const bgColorFrom = document.getElementById('bgColorFrom')?.value || '#3b82f6';
+          const bgColorTo = document.getElementById('bgColorTo')?.value || '#06b6d4';
+          const textColor = document.getElementById('textColor')?.value || '#1f2937';
+          const buttonColorFrom = document.getElementById('buttonColorFrom')?.value || '#ffffff';
+          const buttonColorTo = document.getElementById('buttonColorTo')?.value || '#ffffff';
+          const buttonTextColor = document.getElementById('buttonTextColor')?.value || '#3b82f6';
+          
+          // Get current text values to preserve them
+          const cardTitle = document.getElementById('cardTitle')?.value || 'Beach Booking';
+          const cardSubtitle = document.getElementById('cardSubtitle')?.value || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
+          const feature1Text = document.getElementById('feature1Text')?.value || 'Free for Hotel Guests';
+          const feature2Text = document.getElementById('feature2Text')?.value || 'Book Up to 7 Days Ahead';
+          const feature3Text = document.getElementById('feature3Text')?.value || 'QR Code Check-in';
+          const umbrellasLabel = document.getElementById('umbrellasLabel')?.value || 'Umbrellas';
+          const umbrellasDesc = document.getElementById('umbrellasDesc')?.value || 'Classic Beach';
+          const cabanasLabel = document.getElementById('cabanasLabel')?.value || 'Cabanas';
+          const cabanasDesc = document.getElementById('cabanasDesc')?.value || 'Private & Cozy';
+          const loungersLabel = document.getElementById('loungersLabel')?.value || 'Loungers';
+          const loungersDesc = document.getElementById('loungersDesc')?.value || 'Relax in Style';
+          const daybedsLabel = document.getElementById('daybedsLabel')?.value || 'Daybeds';
+          const daybedsDesc = document.getElementById('daybedsDesc')?.value || 'Ultimate Comfort';
+          const buttonText = document.getElementById('buttonText')?.value || 'Book Your Spot Now';
+          
           const response = await fetch('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -24810,7 +24850,29 @@ app.get('/admin/dashboard', (c) => {
               opening_time: document.getElementById('openingTime').value,
               closing_time: document.getElementById('closingTime').value,
               advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
-              max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value)
+              max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
+              // Preserve colors
+              bg_color_from: bgColorFrom,
+              bg_color_to: bgColorTo,
+              text_color: textColor,
+              button_color_from: buttonColorFrom,
+              button_color_to: buttonColorTo,
+              button_text_color: buttonTextColor,
+              // Preserve text customization
+              card_title: cardTitle,
+              card_subtitle: cardSubtitle,
+              feature1_text: feature1Text,
+              feature2_text: feature2Text,
+              feature3_text: feature3Text,
+              umbrellas_label: umbrellasLabel,
+              umbrellas_desc: umbrellasDesc,
+              cabanas_label: cabanasLabel,
+              cabanas_desc: cabanasDesc,
+              loungers_label: loungersLabel,
+              loungers_desc: loungersDesc,
+              daybeds_label: daybedsLabel,
+              daybeds_desc: daybedsDesc,
+              button_text: buttonText
             })
           });
           
