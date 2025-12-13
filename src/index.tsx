@@ -21174,17 +21174,25 @@ app.get('/admin/dashboard', (c) => {
           
           if (property) {
             const hotelURL = window.location.origin + '/hotel/' + property.slug;
-            document.getElementById('hotelURL').textContent = hotelURL;
-            document.getElementById('propertyName').textContent = property.name;
-            document.getElementById('propertySlug').textContent = property.slug;
+            const hotelURLEl = document.getElementById('hotelURL');
+            const propertyNameEl = document.getElementById('propertyName');
+            const propertySlugEl = document.getElementById('propertySlug');
+            const qrImageEl = document.getElementById('qrImage');
+            const previewHotelNameEl = document.getElementById('previewHotelName');
+            
+            if (hotelURLEl) hotelURLEl.textContent = hotelURL;
+            if (propertyNameEl) propertyNameEl.textContent = property.name;
+            if (propertySlugEl) propertySlugEl.textContent = property.slug;
+            if (previewHotelNameEl) previewHotelNameEl.textContent = property.name;
             
             // Generate QR code using QR Code API
             const qrURL = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(hotelURL);
-            document.getElementById('qrCodeDisplay').innerHTML = '<img src="' + qrURL + '" alt="QR Code" class="w-64 h-64">';
+            if (qrImageEl) qrImageEl.src = qrURL;
           }
         } catch (error) {
           console.error('QR Code load error:', error);
-          document.getElementById('qrCodeDisplay').innerHTML = '<div class="text-red-500"><i class="fas fa-exclamation-triangle"></i><p>Error loading QR code</p></div>';
+          const qrImageEl = document.getElementById('qrImage');
+          if (qrImageEl) qrImageEl.src = '';
         }
       }
       
