@@ -17037,20 +17037,8 @@ app.get('/admin/dashboard', (c) => {
     <div class="bg-white border-b border-gray-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <!-- Logo and Brand -->
-            <div class="flex items-center gap-4" style="margin-left: -8px;">
-                <div class="flex items-center gap-2">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-                        <i class="fas fa-concierge-bell text-white text-2xl"></i>
-                    </div>
-                    <div>
-                        <div class="text-xl font-bold text-gray-900">GuestConnect</div>
-                        <div class="text-xs text-gray-500">Property Platform</div>
-                    </div>
-                </div>
-                <div class="hidden lg:block border-l border-gray-300 pl-4 ml-2">
-                    <h1 class="text-lg font-semibold text-gray-700">Admin Dashboard</h1>
-                    <p class="text-xs text-gray-500">Manage your property</p>
-                </div>
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
             </div>
             
             <!-- Action Buttons -->
@@ -17097,6 +17085,19 @@ app.get('/admin/dashboard', (c) => {
     <div class="flex min-h-screen bg-gray-50">
         <!-- Sidebar Navigation -->
         <aside id="sidebar" class="w-64 bg-white shadow-xl fixed left-0 top-16 bottom-0 overflow-y-auto transition-all duration-300 z-40">
+            <!-- GuestConnect Logo at Top -->
+            <div class="px-6 py-5 border-b border-gray-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                        <i class="fas fa-concierge-bell text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-gray-900">GuestConnect</div>
+                        <div class="text-xs text-gray-500">Property System</div>
+                    </div>
+                </div>
+            </div>
+            
             <nav class="py-4">
                 <!-- Core Section -->
                 <div class="px-3 mb-6">
