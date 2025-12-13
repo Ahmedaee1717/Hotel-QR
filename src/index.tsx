@@ -21809,6 +21809,101 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Question Creation Modal -->
+    <div id="questionCreationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[60] p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-xl">
+                <h3 class="text-2xl font-bold"><i class="fas fa-plus-circle mr-2"></i>Create New Question</h3>
+                <p class="text-sm text-purple-100 mt-1">Fill in the details below</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Question Type Display -->
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center">
+                            <i id="questionTypeIcon" class="fas fa-font text-2xl text-purple-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">Question Type</p>
+                            <p id="questionTypeLabel" class="text-lg font-bold text-gray-900">Short Text</p>
+                        </div>
+                    </div>
+                    <button onclick="closeQuestionCreationModal(); document.getElementById('questionTypeModal').classList.remove('hidden');" 
+                            class="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-100 transition-colors text-sm font-semibold">
+                        <i class="fas fa-exchange-alt mr-2"></i>Change Type
+                    </button>
+                </div>
+
+                <!-- Question Text -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-question-circle mr-2 text-purple-600"></i>Question Text
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="questionTextInput" 
+                              class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                              rows="3" 
+                              placeholder="Enter your question here... (e.g., How satisfied are you with our service?)"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-lightbulb mr-1"></i>
+                        Tip: Make your question clear and specific
+                    </p>
+                </div>
+
+                <!-- Required Toggle -->
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-asterisk text-red-500"></i>
+                        <div>
+                            <p class="font-semibold text-gray-900">Required Question</p>
+                            <p class="text-xs text-gray-600">Guests must answer this question</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="questionRequiredToggle" checked class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+
+                <!-- Options (for multiple choice) -->
+                <div id="optionsSection" class="hidden">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-list mr-2 text-purple-600"></i>Answer Options
+                        <span class="text-red-500">*</span>
+                    </label>
+                    <div id="optionsList" class="space-y-2 mb-3">
+                        <!-- Options will be added here -->
+                    </div>
+                    <button onclick="addOption()" class="w-full px-4 py-2 border-2 border-dashed border-purple-300 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-semibold">
+                        <i class="fas fa-plus mr-2"></i>Add Option
+                    </button>
+                </div>
+
+                <!-- Preview -->
+                <div class="border-t-2 pt-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-eye mr-2 text-purple-600"></i>Preview
+                    </label>
+                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-6 border-2 border-gray-200">
+                        <div id="questionPreview" class="text-gray-500 italic">
+                            Enter a question above to see preview...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="sticky bottom-0 bg-white border-t p-4 flex gap-3">
+                <button onclick="closeQuestionCreationModal()" class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-semibold">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button onclick="saveQuestion()" class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-semibold shadow-lg">
+                    <i class="fas fa-check mr-2"></i>Add Question
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- View Submission Modal -->
     <div id="submissionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -25643,30 +25738,195 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         document.getElementById('questionTypeModal').classList.add('hidden');
       }
 
+      let currentQuestionType = null;
+      let questionOptions = [];
+
       function selectQuestionType(type) {
         closeQuestionTypeModal();
+        currentQuestionType = type;
+        questionOptions = [];
         
-        const questionText = prompt('Enter your question:');
-        if (!questionText) return;
+        // Show question creation modal
+        const modal = document.getElementById('questionCreationModal');
+        const typeIcon = document.getElementById('questionTypeIcon');
+        const typeLabel = document.getElementById('questionTypeLabel');
+        const optionsSection = document.getElementById('optionsSection');
+        const questionTextInput = document.getElementById('questionTextInput');
+        
+        // Reset form
+        questionTextInput.value = '';
+        document.getElementById('questionRequiredToggle').checked = true;
+        
+        // Configure modal based on type
+        const typeConfig = {
+          'text': { icon: 'fa-font', label: 'Short Text' },
+          'textarea': { icon: 'fa-align-left', label: 'Long Text' },
+          'rating': { icon: 'fa-star', label: 'Rating (1-5 stars)' },
+          'scale': { icon: 'fa-sliders-h', label: 'Scale (1-10)' },
+          'multiple_choice': { icon: 'fa-list-ul', label: 'Multiple Choice' },
+          'yes_no': { icon: 'fa-check-circle', label: 'Yes/No' },
+          'nps': { icon: 'fa-chart-line', label: 'NPS (0-10)' }
+        };
+        
+        const config = typeConfig[type];
+        typeIcon.className = \`fas \${config.icon} text-2xl text-purple-600\`;
+        typeLabel.textContent = config.label;
+        
+        // Show options section for multiple choice
+        if (type === 'multiple_choice') {
+          optionsSection.classList.remove('hidden');
+          renderOptionsList();
+        } else {
+          optionsSection.classList.add('hidden');
+        }
+        
+        modal.classList.remove('hidden');
+        
+        // Setup preview listener
+        questionTextInput.addEventListener('input', updateQuestionPreview);
+        updateQuestionPreview();
+      }
+
+      function updateQuestionPreview() {
+        const questionText = document.getElementById('questionTextInput').value;
+        const preview = document.getElementById('questionPreview');
+        const isRequired = document.getElementById('questionRequiredToggle').checked;
+        
+        if (!questionText.trim()) {
+          preview.innerHTML = '<p class="text-gray-500 italic">Enter a question above to see preview...</p>';
+          return;
+        }
+        
+        let previewHTML = \`
+          <p class="font-semibold text-gray-900 mb-3">
+            \${questionText}
+            \${isRequired ? '<span class="text-red-500 ml-1">*</span>' : ''}
+          </p>
+        \`;
+        
+        // Add preview input based on type
+        switch(currentQuestionType) {
+          case 'text':
+            previewHTML += '<input type="text" class="w-full px-4 py-2 border rounded-lg" placeholder="Guest will type here..." disabled>';
+            break;
+          case 'textarea':
+            previewHTML += '<textarea class="w-full px-4 py-2 border rounded-lg" rows="4" placeholder="Guest will type here..." disabled></textarea>';
+            break;
+          case 'rating':
+            previewHTML += '<div class="flex gap-2">' + 
+              Array(5).fill(0).map(() => '<i class="fas fa-star text-2xl text-gray-300"></i>').join('') + 
+              '</div>';
+            break;
+          case 'scale':
+            previewHTML += '<input type="range" min="1" max="10" class="w-full" disabled>';
+            break;
+          case 'multiple_choice':
+            if (questionOptions.length > 0) {
+              previewHTML += '<div class="space-y-2">' +
+                questionOptions.map(opt => \`
+                  <label class="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="preview" class="w-4 h-4" disabled>
+                    <span>\${opt}</span>
+                  </label>
+                \`).join('') +
+                '</div>';
+            } else {
+              previewHTML += '<p class="text-gray-500 italic">Add options below...</p>';
+            }
+            break;
+          case 'yes_no':
+            previewHTML += \`
+              <div class="flex gap-3">
+                <button class="flex-1 px-6 py-3 border-2 border-green-500 text-green-700 rounded-lg hover:bg-green-50 font-semibold">
+                  <i class="fas fa-check mr-2"></i>Yes
+                </button>
+                <button class="flex-1 px-6 py-3 border-2 border-red-500 text-red-700 rounded-lg hover:bg-red-50 font-semibold">
+                  <i class="fas fa-times mr-2"></i>No
+                </button>
+              </div>
+            \`;
+            break;
+          case 'nps':
+            previewHTML += '<div class="flex gap-1">' +
+              Array(11).fill(0).map((_, i) => \`
+                <button class="flex-1 px-3 py-2 border rounded hover:bg-purple-100 text-sm font-semibold">\${i}</button>
+              \`).join('') +
+              '</div><div class="flex justify-between text-xs text-gray-600 mt-1"><span>Not likely</span><span>Very likely</span></div>';
+            break;
+        }
+        
+        preview.innerHTML = previewHTML;
+      }
+
+      function renderOptionsList() {
+        const container = document.getElementById('optionsList');
+        if (questionOptions.length === 0) {
+          container.innerHTML = '<p class="text-gray-500 text-sm italic py-2">No options yet. Click "Add Option" below.</p>';
+          return;
+        }
+        
+        container.innerHTML = questionOptions.map((opt, idx) => \`
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center font-bold text-sm">\${idx + 1}</span>
+            <input type="text" value="\${opt}" 
+                   onchange="updateOption(\${idx}, this.value)" 
+                   class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   placeholder="Option \${idx + 1}">
+            <button onclick="removeOption(\${idx})" class="w-10 h-10 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        \`).join('');
+      }
+
+      function addOption() {
+        questionOptions.push('Option ' + (questionOptions.length + 1));
+        renderOptionsList();
+        updateQuestionPreview();
+      }
+
+      function updateOption(idx, value) {
+        questionOptions[idx] = value;
+        updateQuestionPreview();
+      }
+
+      function removeOption(idx) {
+        questionOptions.splice(idx, 1);
+        renderOptionsList();
+        updateQuestionPreview();
+      }
+
+      function closeQuestionCreationModal() {
+        document.getElementById('questionCreationModal').classList.add('hidden');
+        currentQuestionType = null;
+        questionOptions = [];
+      }
+
+      function saveQuestion() {
+        const questionText = document.getElementById('questionTextInput').value.trim();
+        const isRequired = document.getElementById('questionRequiredToggle').checked;
+        
+        if (!questionText) {
+          alert('Please enter a question text');
+          return;
+        }
+        
+        if (currentQuestionType === 'multiple_choice' && questionOptions.length === 0) {
+          alert('Please add at least one option for multiple choice questions');
+          return;
+        }
         
         const question = {
           question_text: questionText,
-          question_type: type,
-          is_required: true,
-          options: null,
+          question_type: currentQuestionType,
+          is_required: isRequired,
+          options: currentQuestionType === 'multiple_choice' ? questionOptions : null,
           display_order: formQuestions.length
         };
         
-        // For multiple choice, get options
-        if (type === 'multiple_choice') {
-          const optionsStr = prompt('Enter options (comma-separated):');
-          if (optionsStr) {
-            question.options = optionsStr.split(',').map(o => o.trim());
-          }
-        }
-        
         formQuestions.push(question);
         renderQuestions();
+        closeQuestionCreationModal();
       }
 
       function renderQuestions() {
