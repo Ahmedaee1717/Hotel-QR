@@ -9393,8 +9393,67 @@ app.get('/hotel/:property_slug', async (c) => {
             return dict[key] || uiTranslations['en'][key] || key;
         }
         
-        // Helper function to get translated field
-        function getTranslatedField(item, fieldName) {
+        // Cache for AI translations
+        const translationCache = new Map();
+        
+        // Helper function to translate text using AI
+        async function translateText(text, targetLanguage) {
+            if (!text || targetLanguage === 'en') return text;
+            
+            // Check cache first
+            const cacheKey = text + '__' + targetLanguage;
+            if (translationCache.has(cacheKey)) {
+                return translationCache.get(cacheKey);
+            }
+            
+            try {
+                const languageNames = {
+                    'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
+                    'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
+                    'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
+                    'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
+                    'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+                    'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
+                    'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
+                    'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
+                    'ms': 'Malay'
+                };
+                
+                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are a professional translator. Translate the given text to ' + targetLangName + '. Return ONLY the translation, no explanations or additional text.'
+                            },
+                            {
+                                role: 'user',
+                                content: text
+                            }
+                        ],
+                        property_id: propertyId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const translated = data.message || text;
+                    translationCache.set(cacheKey, translated);
+                    return translated;
+                }
+            } catch (error) {
+                console.warn('Translation failed:', error);
+            }
+            
+            return text; // Fallback to original text
+        }
+        
+        // Helper function to get translated field with AI fallback
+        async function getTranslatedField(item, fieldName) {
             if (!item) return '';
             
             // If English, use _en field
@@ -9408,8 +9467,17 @@ app.get('/hotel/:property_slug', async (c) => {
                 return translatedField;
             }
             
+            // Get English text
+            const englishText = item[fieldName + '_en'] || item[fieldName] || '';
+            
+            // Use AI translation if available
+            if (englishText && currentLanguage !== 'en') {
+                const aiTranslated = await translateText(englishText, currentLanguage);
+                return aiTranslated;
+            }
+            
             // Fallback to English
-            return item[fieldName + '_en'] || item[fieldName] || '';
+            return englishText;
         }
         
         // Helper function to translate location text
@@ -10758,20 +10826,19 @@ app.get('/hotel/:property_slug', async (c) => {
               container.appendChild(sectionElements['hotel-map']);
             }
             
-            // Render each section's content
-            renderRestaurants();
-            renderEvents();
-            renderSpa();
-            renderServices();
-            renderActivities();
-            renderHotelMap();
-            
-            // Render custom sections
-            customSections.forEach(section => {
-              if (section.is_visible === 1) {
-                renderCustomSection(section.section_key);
-              }
-            });
+            // Render each section's content (await all async renders)
+            Promise.all([
+                renderRestaurants(),
+                renderEvents(),
+                renderSpa(),
+                renderServices(),
+                renderActivities(),
+                renderHotelMap(),
+                // Render custom sections
+                ...customSections.map(section => 
+                    section.is_visible === 1 ? renderCustomSection(section.section_key) : Promise.resolve()
+                )
+            ]).catch(err => console.error('Render error:', err));
             
             updateSectionVisibility();
             
@@ -10781,7 +10848,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
         }
 
-        function renderRestaurants() {
+        async function renderRestaurants() {
             const restaurants = allOfferings.filter(o => o.offering_type === 'restaurant');
             const grid = document.getElementById('restaurants-grid');
             
@@ -10795,11 +10862,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = restaurants.map(r => {
-                const title = getTranslatedField(r, 'title');
-                const description = getTranslatedField(r, 'short_description');
-                const bookTableText = t('book-table');
-                const reservationsText = t('reservations');
+            const bookTableText = t('book-table');
+            const reservationsText = t('reservations');
+            
+            const cardsHtml = await Promise.all(restaurants.map(async r => {
+                const title = await getTranslatedField(r, 'title');
+                const description = await getTranslatedField(r, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
                     <div class="relative cursor-pointer" onclick="viewOffering(\${r.offering_id})">
@@ -10830,10 +10898,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
 
-        function renderEvents() {
+        async function renderEvents() {
             const events = allOfferings.filter(o => o.offering_type === 'event');
             const grid = document.getElementById('events-grid');
             
@@ -10847,9 +10917,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = events.map(e => {
-                const title = getTranslatedField(e, 'title');
-                const description = getTranslatedField(e, 'short_description');
+            const cardsHtml = await Promise.all(events.map(async e => {
+                const title = await getTranslatedField(e, 'title');
+                const description = await getTranslatedField(e, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${e.offering_id})">
                     <div class="relative">
@@ -10874,10 +10944,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
 
-        function renderSpa() {
+        async function renderSpa() {
             const spa = allOfferings.filter(o => o.offering_type === 'spa');
             const grid = document.getElementById('spa-grid');
             
@@ -10891,11 +10963,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = spa.map(s => {
-                const title = getTranslatedField(s, 'title');
-                const description = getTranslatedField(s, 'short_description');
-                const discoverText = t('discover');
-                const minutesText = t('minutes');
+            const discoverText = t('discover');
+            const minutesText = t('minutes');
+            
+            const cardsHtml = await Promise.all(spa.map(async s => {
+                const title = await getTranslatedField(s, 'title');
+                const description = await getTranslatedField(s, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
@@ -10918,10 +10991,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
 
-        function renderServices() {
+        async function renderServices() {
             const services = allOfferings.filter(o => o.offering_type === 'service');
             const grid = document.getElementById('service-grid');
             
@@ -10935,10 +11010,11 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = services.map(s => {
-                const title = getTranslatedField(s, 'title');
-                const description = getTranslatedField(s, 'short_description');
-                const viewDetailsText = t('view-details');
+            const viewDetailsText = t('view-details');
+            
+            const cardsHtml = await Promise.all(services.map(async s => {
+                const title = await getTranslatedField(s, 'title');
+                const description = await getTranslatedField(s, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
@@ -10958,10 +11034,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
 
-        function renderActivities() {
+        async function renderActivities() {
             const grid = document.getElementById('activities-grid');
             
             if (!grid) {
@@ -10974,15 +11052,20 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
-            grid.innerHTML = allActivities.map(a => {
+            const curatedByText = t('curated-by');
+            const minutesText = t('minutes');
+            const bookNowText = t('book-now');
+            
+            const cardsHtml = await Promise.all(allActivities.map(async a => {
+                // Translate title and description using AI
+                const title = await translateText(a.title, currentLanguage);
+                const description = await translateText(a.short_description, currentLanguage);
+                
                 // Use global escapeHtml to prevent syntax errors from special characters
-                const safeTitle = escapeHtml(a.title);
-                const safeDescription = escapeHtml(a.short_description);
+                const safeTitle = escapeHtml(title);
+                const safeDescription = escapeHtml(description);
                 const safeBusinessName = escapeHtml(a.business_name);
                 const safeCategoryName = escapeHtml(a.category_name);
-                const curatedByText = t('curated-by');
-                const minutesText = t('minutes');
-                const bookNowText = t('book-now');
                 
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewActivity(\${a.activity_id})">
@@ -11010,7 +11093,9 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
         
         function renderCustomSection(sectionKey) {
@@ -11031,11 +11116,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 return;
             }
             
+            const reservationsText = t('reservations');
+            
             // Render as elegant cards (similar to other sections)
-            grid.innerHTML = sectionOfferings.map(o => {
-                const title = getTranslatedField(o, 'title');
-                const description = getTranslatedField(o, 'short_description');
-                const reservationsText = t('reservations');
+            const cardsHtml = await Promise.all(sectionOfferings.map(async o => {
+                const title = await getTranslatedField(o, 'title');
+                const description = await getTranslatedField(o, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${o.offering_id})">
                     <div class="relative">
@@ -11064,7 +11150,9 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                 </div>
                 \`;
-            }).join('');
+            }));
+            
+            grid.innerHTML = cardsHtml.join('');
         }
 
         async function renderHotelMap() {
