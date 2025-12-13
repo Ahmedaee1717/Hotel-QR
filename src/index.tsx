@@ -21811,8 +21811,8 @@ app.get('/admin/dashboard', (c) => {
                                     <i class="fas fa-heading mr-2 text-gray-600"></i>Text Color
                                 </label>
                                 <div class="flex gap-2">
-                                    <input type="color" id="textColor" value="#1f2937" class="w-20 h-10 rounded cursor-pointer">
-                                    <input type="text" id="textColorText" value="#1f2937" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                    <input type="color" id="textColor" value="#ffffff" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="textColorText" value="#ffffff" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">Main text color</p>
                             </div>
@@ -21854,8 +21854,8 @@ app.get('/admin/dashboard', (c) => {
                         <!-- Color Preview -->
                         <div class="mt-6 p-6 rounded-xl shadow-lg" id="colorPreview" style="background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);">
                             <div class="text-center">
-                                <h3 class="text-2xl font-bold mb-2" id="previewTitle" style="color: #1f2937;">Beach Booking</h3>
-                                <p class="mb-4 opacity-80" id="previewSubtitle" style="color: #1f2937;">Reserve your perfect spot</p>
+                                <h3 class="text-2xl font-bold mb-2" id="previewTitle" style="color: #ffffff;">Beach Booking</h3>
+                                <p class="mb-4 opacity-80" id="previewSubtitle" style="color: #ffffff;">Reserve your perfect spot</p>
                                 <button class="px-6 py-3 rounded-xl font-semibold shadow-lg transition-transform hover:scale-105" id="previewButton" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); color: #3b82f6;">
                                     Book Your Spot Now
                                 </button>
