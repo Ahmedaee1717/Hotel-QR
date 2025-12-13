@@ -17086,14 +17086,17 @@ app.get('/admin/dashboard', (c) => {
         <!-- Sidebar Navigation -->
         <aside id="sidebar" class="w-64 bg-white shadow-xl fixed left-0 top-16 bottom-0 overflow-y-auto transition-all duration-300 z-40">
             <!-- GuestConnect Logo at Top -->
-            <div class="px-6 py-5 border-b border-gray-200">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-                        <i class="fas fa-concierge-bell text-white text-xl"></i>
-                    </div>
-                    <div>
-                        <div class="text-lg font-bold text-gray-900">GuestConnect</div>
-                        <div class="text-xs text-gray-500">Property System</div>
+            <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+                <div class="flex flex-col items-center">
+                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect" class="w-32 h-auto mb-2" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div style="display:none;" class="flex-col items-center">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md mb-2">
+                            <i class="fas fa-concierge-bell text-white text-3xl"></i>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-lg font-bold text-gray-900">GuestConnect</div>
+                            <div class="text-xs text-gray-500">Property System</div>
+                        </div>
                     </div>
                 </div>
             </div>
