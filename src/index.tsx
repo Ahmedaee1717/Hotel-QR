@@ -12844,6 +12844,10 @@ app.get('/offering-detail', async (c) => {
             }
         };
 
+        function t(key) {
+            return translations[currentLanguage]?.[key] || translations['en'][key] || key;
+        }
+
         async function init() {
             try {
                 // Fetch property data for settings and slug
