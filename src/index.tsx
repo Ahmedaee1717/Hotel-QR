@@ -9139,14 +9139,14 @@ app.get('/hotel/:property_slug', async (c) => {
 
                 <!-- Beach Booking Section -->
                 <section id="beach-booking-section" class="mb-12 hidden">
-                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 text-white shadow-xl">
+                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 shadow-xl">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="flex-1">
                                 <h2 class="text-3xl font-bold mb-3 flex items-center">
                                     <i class="fas fa-umbrella-beach mr-3"></i>
                                     Beach Booking
                                 </h2>
-                                <p class="text-blue-100 mb-4">
+                                <p class="mb-4">
                                     Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.
                                 </p>
                                 <div class="flex flex-wrap gap-3 text-sm">
@@ -9178,22 +9178,22 @@ app.get('/hotel/:property_slug', async (c) => {
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                                     <div class="text-3xl mb-2">🏖️</div>
                                     <div class="font-semibold">Umbrellas</div>
-                                    <div class="text-sm text-blue-100">Classic Beach</div>
+                                    <div class="text-sm">Classic Beach</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                                     <div class="text-3xl mb-2">🏕️</div>
                                     <div class="font-semibold">Cabanas</div>
-                                    <div class="text-sm text-blue-100">Private & Cozy</div>
+                                    <div class="text-sm">Private & Cozy</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                                     <div class="text-3xl mb-2">🛏️</div>
                                     <div class="font-semibold">Loungers</div>
-                                    <div class="text-sm text-blue-100">Relax in Style</div>
+                                    <div class="text-sm">Relax in Style</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                                     <div class="text-3xl mb-2">☀️</div>
                                     <div class="font-semibold">Daybeds</div>
-                                    <div class="text-sm text-blue-100">Ultimate Comfort</div>
+                                    <div class="text-sm">Ultimate Comfort</div>
                                 </div>
                             </div>
                         </div>
