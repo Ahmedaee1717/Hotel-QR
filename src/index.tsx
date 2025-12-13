@@ -38,7 +38,51 @@ const SUPPORTED_LANGUAGES = {
   'it': { name: 'Italian', native: 'Italiano', flag: '🇮🇹' },
   'fr': { name: 'French', native: 'Français', flag: '🇫🇷' },
   'cs': { name: 'Czech', native: 'Čeština', flag: '🇨🇿' },
-  'uk': { name: 'Ukrainian', native: 'Українська', flag: '🇺🇦' }
+  'uk': { name: 'Ukrainian', native: 'Українська', flag: '🇺🇦' },
+  'zh': { name: 'Chinese (Simplified)', native: '简体中文', flag: '🇨🇳' },
+  'es': { name: 'Spanish', native: 'Español', flag: '🇪🇸' },
+  'ja': { name: 'Japanese', native: '日本語', flag: '🇯🇵' },
+  'pt': { name: 'Portuguese', native: 'Português', flag: '🇵🇹' },
+  'ko': { name: 'Korean', native: '한국어', flag: '🇰🇷' },
+  'hi': { name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
+  'tr': { name: 'Turkish', native: 'Türkçe', flag: '🇹🇷' },
+  'el': { name: 'Greek', native: 'Ελληνικά', flag: '🇬🇷' },
+  'sv': { name: 'Swedish', native: 'Svenska', flag: '🇸🇪' },
+  'no': { name: 'Norwegian', native: 'Norsk', flag: '🇳🇴' },
+  'da': { name: 'Danish', native: 'Dansk', flag: '🇩🇰' },
+  'ro': { name: 'Romanian', native: 'Română', flag: '🇷🇴' },
+  'hu': { name: 'Hungarian', native: 'Magyar', flag: '🇭🇺' },
+  'fi': { name: 'Finnish', native: 'Suomi', flag: '🇫🇮' },
+  'hr': { name: 'Croatian', native: 'Hrvatski', flag: '🇭🇷' },
+  'sk': { name: 'Slovak', native: 'Slovenčina', flag: '🇸🇰' },
+  'bg': { name: 'Bulgarian', native: 'Български', flag: '🇧🇬' },
+  'sr': { name: 'Serbian', native: 'Српски', flag: '🇷🇸' },
+  'sl': { name: 'Slovenian', native: 'Slovenščina', flag: '🇸🇮' },
+  'th': { name: 'Thai', native: 'ไทย', flag: '🇹🇭' },
+  'id': { name: 'Indonesian', native: 'Bahasa Indonesia', flag: '🇮🇩' },
+  'vi': { name: 'Vietnamese', native: 'Tiếng Việt', flag: '🇻🇳' },
+  'tl': { name: 'Filipino', native: 'Tagalog', flag: '🇵🇭' },
+  'ms': { name: 'Malay', native: 'Bahasa Melayu', flag: '🇲🇾' }
+}
+
+// Helper function to populate language selectors (called from guest pages)
+function populateLanguageSelector(selectorId: string, enabledLangs: string[] | null = null) {
+  const selector = document.getElementById(selectorId) as HTMLSelectElement
+  if (!selector) return
+  
+  // If no enabled languages specified, show all
+  const langsToShow = enabledLangs || Object.keys(SUPPORTED_LANGUAGES)
+  
+  selector.innerHTML = ''
+  langsToShow.forEach(code => {
+    const lang = SUPPORTED_LANGUAGES[code]
+    if (lang) {
+      const option = document.createElement('option')
+      option.value = code
+      option.textContent = `${lang.flag} ${lang.native}`
+      selector.appendChild(option)
+    }
+  })
 }
 
 // AI Translation using OpenAI GPT-4 (for 100% accurate tourism translations)
@@ -53,7 +97,31 @@ async function translateWithAI(texts: string[], targetLang: string, apiKey: stri
     'it': 'Italian',
     'fr': 'French',
     'cs': 'Czech',
-    'uk': 'Ukrainian'
+    'uk': 'Ukrainian',
+    'zh': 'Simplified Chinese',
+    'es': 'Spanish',
+    'ja': 'Japanese',
+    'pt': 'Portuguese',
+    'ko': 'Korean',
+    'hi': 'Hindi',
+    'tr': 'Turkish',
+    'el': 'Greek',
+    'sv': 'Swedish',
+    'no': 'Norwegian',
+    'da': 'Danish',
+    'ro': 'Romanian',
+    'hu': 'Hungarian',
+    'fi': 'Finnish',
+    'hr': 'Croatian',
+    'sk': 'Slovak',
+    'bg': 'Bulgarian',
+    'sr': 'Serbian',
+    'sl': 'Slovenian',
+    'th': 'Thai',
+    'id': 'Indonesian',
+    'vi': 'Vietnamese',
+    'tl': 'Filipino/Tagalog',
+    'ms': 'Malay'
   }
   
   try {
@@ -1684,7 +1752,7 @@ app.post('/api/vendor/activities/:activity_id/translate', async (c) => {
     }
     
     // Translate to all languages
-    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
     const translations: any = {}
     
     for (const lang of languages) {
@@ -3638,7 +3706,7 @@ app.put('/api/admin/info-pages/:page_id', async (c) => {
     if (data.show_in_menu !== undefined) { updates.push('show_in_menu = ?'); values.push(data.show_in_menu); }
     
     // Add multilingual fields
-    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh'];
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
     languages.forEach(lang => {
       if (data[`title_${lang}`] !== undefined) {
         updates.push(`title_${lang} = ?`);
@@ -3795,7 +3863,7 @@ app.post('/api/admin/offerings', async (c) => {
       c.executionCtx.waitUntil((async () => {
         try {
           // Only translate to languages that exist in DB schema
-          const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+          const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
           const translations: any = {}
           
           for (const lang of languages) {
@@ -4045,7 +4113,7 @@ app.post('/api/admin/offerings/:offering_id/translate', async (c) => {
     }
     
     // Translate to all languages
-    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
     const translations: any = {}
     
     for (const lang of languages) {
@@ -4119,7 +4187,7 @@ app.post('/api/admin/offerings/translate-all', async (c) => {
       return c.json({ error: 'No offerings found' }, 404)
     }
     
-    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
     let translatedCount = 0
     let failedCount = 0
     
@@ -4211,7 +4279,7 @@ app.post('/api/admin/activities/translate-all', async (c) => {
       return c.json({ error: 'No activities found' }, 404)
     }
     
-    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const languages = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
     let translatedCount = 0
     let failedCount = 0
     
@@ -4300,7 +4368,7 @@ app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
       return c.json({ error: 'Property or tagline not found' }, 404)
     }
     
-    const languages = ['de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    const languages = ['de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms']
     const translations: any = {}
     
     for (const lang of languages) {
@@ -8879,15 +8947,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             <span class="hidden sm:inline">Info</span>
                         </button>
                         <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
-                            <option value="en">🇬🇧 English</option>
-                            <option value="ar">🇸🇦 العربية</option>
-                            <option value="de">🇩🇪 Deutsch</option>
-                            <option value="ru">🇷🇺 Русский</option>
-                            <option value="pl">🇵🇱 Polski</option>
-                            <option value="it">🇮🇹 Italiano</option>
-                            <option value="fr">🇫🇷 Français</option>
-                            <option value="cs">🇨🇿 Čeština</option>
-                            <option value="uk">🇺🇦 Українська</option>
+                            <!-- Language options will be populated dynamically -->
                         </select>
                     </div>
                     <!-- Profile Picture - Overlaps at bottom left of cover -->
@@ -9899,6 +9959,390 @@ app.get('/hotel/:property_slug', async (c) => {
             beachfront: 'Набережна',
             rooftop: 'Дах',
             garden: 'Сад'
+          },
+          zh: { 
+            all: '全部', 
+            restaurants: '餐饮', 
+            events: '活动与娱乐', 
+            spa: '水疗', 
+            services: '设施与服务', 
+            activities: '活动',
+            discoverAll: '探索我们的所有服务',
+            viewMenu: '查看菜单',
+            location: '位置',
+            mainLobby: '大堂',
+            poolside: '泳池边',
+            beachfront: '海滨',
+            rooftop: '屋顶',
+            garden: '花园'
+          },
+          es: { 
+            all: 'Todo', 
+            restaurants: 'Comida y bebidas', 
+            events: 'Eventos y entretenimiento', 
+            spa: 'Spa', 
+            services: 'Instalaciones y servicios', 
+            activities: 'Actividades',
+            discoverAll: 'Descubre todo lo que ofrecemos',
+            viewMenu: 'Ver menú',
+            location: 'Ubicación',
+            mainLobby: 'Lobby principal',
+            poolside: 'Junto a la piscina',
+            beachfront: 'Frente a la playa',
+            rooftop: 'Azotea',
+            garden: 'Jardín'
+          },
+          ja: { 
+            all: 'すべて', 
+            restaurants: '飲食', 
+            events: 'イベント＆エンターテイメント', 
+            spa: 'スパ', 
+            services: '施設＆サービス', 
+            activities: 'アクティビティ',
+            discoverAll: 'すべてのサービスを見る',
+            viewMenu: 'メニューを見る',
+            location: '場所',
+            mainLobby: 'メインロビー',
+            poolside: 'プールサイド',
+            beachfront: 'ビーチフロント',
+            rooftop: '屋上',
+            garden: '庭園'
+          },
+          pt: { 
+            all: 'Tudo', 
+            restaurants: 'Comida e bebidas', 
+            events: 'Eventos e entretenimento', 
+            spa: 'Spa', 
+            services: 'Instalações e serviços', 
+            activities: 'Atividades',
+            discoverAll: 'Descubra tudo o que oferecemos',
+            viewMenu: 'Ver menu',
+            location: 'Localização',
+            mainLobby: 'Lobby principal',
+            poolside: 'À beira da piscina',
+            beachfront: 'Beira-mar',
+            rooftop: 'Cobertura',
+            garden: 'Jardim'
+          },
+          ko: { 
+            all: '전체', 
+            restaurants: '식음료', 
+            events: '이벤트 및 엔터테인먼트', 
+            spa: '스파', 
+            services: '시설 및 서비스', 
+            activities: '액티비티',
+            discoverAll: '모든 서비스 보기',
+            viewMenu: '메뉴 보기',
+            location: '위치',
+            mainLobby: '메인 로비',
+            poolside: '수영장',
+            beachfront: '해변',
+            rooftop: '루프탑',
+            garden: '정원'
+          },
+          hi: { 
+            all: 'सभी', 
+            restaurants: 'भोजन और पेय', 
+            events: 'कार्यक्रम और मनोरंजन', 
+            spa: 'स्पा', 
+            services: 'सुविधाएं और सेवाएं', 
+            activities: 'गतिविधियाँ',
+            discoverAll: 'हमारी सभी सेवाओं की खोज करें',
+            viewMenu: 'मेनू देखें',
+            location: 'स्थान',
+            mainLobby: 'मुख्य लॉबी',
+            poolside: 'पूलसाइड',
+            beachfront: 'बीचफ्रंट',
+            rooftop: 'छत',
+            garden: 'बगीचा'
+          },
+          tr: { 
+            all: 'Tümü', 
+            restaurants: 'Yeme içme', 
+            events: 'Etkinlikler ve eğlence', 
+            spa: 'Spa', 
+            services: 'Tesisler ve hizmetler', 
+            activities: 'Aktiviteler',
+            discoverAll: 'Tüm hizmetlerimizi keşfedin',
+            viewMenu: 'Menüyü görüntüle',
+            location: 'Konum',
+            mainLobby: 'Ana lobi',
+            poolside: 'Havuz kenarı',
+            beachfront: 'Sahil',
+            rooftop: 'Çatı katı',
+            garden: 'Bahçe'
+          },
+          el: { 
+            all: 'Όλα', 
+            restaurants: 'Φαγητό και ποτά', 
+            events: 'Εκδηλώσεις και διασκέδαση', 
+            spa: 'Σπα', 
+            services: 'Εγκαταστάσεις και υπηρεσίες', 
+            activities: 'Δραστηριότητες',
+            discoverAll: 'Ανακαλύψτε όλες τις υπηρεσίες μας',
+            viewMenu: 'Δείτε το μενού',
+            location: 'Τοποθεσία',
+            mainLobby: 'Κύριο λόμπι',
+            poolside: 'Δίπλα στην πισίνα',
+            beachfront: 'Μπροστά στην παραλία',
+            rooftop: 'Ταράτσα',
+            garden: 'Κήπος'
+          },
+          sv: { 
+            all: 'Alla', 
+            restaurants: 'Mat och dryck', 
+            events: 'Evenemang och underhållning', 
+            spa: 'Spa', 
+            services: 'Faciliteter och tjänster', 
+            activities: 'Aktiviteter',
+            discoverAll: 'Upptäck alla våra tjänster',
+            viewMenu: 'Se meny',
+            location: 'Plats',
+            mainLobby: 'Huvudlobbyn',
+            poolside: 'Vid poolen',
+            beachfront: 'Strandfront',
+            rooftop: 'Takfönster',
+            garden: 'Trädgård'
+          },
+          no: { 
+            all: 'Alle', 
+            restaurants: 'Mat og drikke', 
+            events: 'Arrangementer og underholdning', 
+            spa: 'Spa', 
+            services: 'Fasiliteter og tjenester', 
+            activities: 'Aktiviteter',
+            discoverAll: 'Oppdag alle våre tjenester',
+            viewMenu: 'Se meny',
+            location: 'Plassering',
+            mainLobby: 'Hovedlobbyen',
+            poolside: 'Ved bassenget',
+            beachfront: 'Strandfront',
+            rooftop: 'Takterrasse',
+            garden: 'Hage'
+          },
+          da: { 
+            all: 'Alle', 
+            restaurants: 'Mad og drikke', 
+            events: 'Begivenheder og underholdning', 
+            spa: 'Spa', 
+            services: 'Faciliteter og tjenester', 
+            activities: 'Aktiviteter',
+            discoverAll: 'Opdag alle vores tjenester',
+            viewMenu: 'Se menu',
+            location: 'Placering',
+            mainLobby: 'Hovedlobby',
+            poolside: 'Ved poolen',
+            beachfront: 'Strandfront',
+            rooftop: 'Tagterrasse',
+            garden: 'Have'
+          },
+          ro: { 
+            all: 'Toate', 
+            restaurants: 'Mâncare și băuturi', 
+            events: 'Evenimente și divertisment', 
+            spa: 'Spa', 
+            services: 'Facilități și servicii', 
+            activities: 'Activități',
+            discoverAll: 'Descoperă toate serviciile noastre',
+            viewMenu: 'Vezi meniu',
+            location: 'Locație',
+            mainLobby: 'Lobby principal',
+            poolside: 'Lângă piscină',
+            beachfront: 'Front de plajă',
+            rooftop: 'Terasă',
+            garden: 'Grădină'
+          },
+          hu: { 
+            all: 'Összes', 
+            restaurants: 'Étel és ital', 
+            events: 'Események és szórakozás', 
+            spa: 'Spa', 
+            services: 'Létesítmények és szolgáltatások', 
+            activities: 'Tevékenységek',
+            discoverAll: 'Fedezze fel minden szolgáltatásunkat',
+            viewMenu: 'Menü megtekintése',
+            location: 'Helyszín',
+            mainLobby: 'Fő előcsarnok',
+            poolside: 'Medence mellett',
+            beachfront: 'Tengerpart',
+            rooftop: 'Tetőterasz',
+            garden: 'Kert'
+          },
+          fi: { 
+            all: 'Kaikki', 
+            restaurants: 'Ruoka ja juoma', 
+            events: 'Tapahtumat ja viihde', 
+            spa: 'Kylpylä', 
+            services: 'Tilat ja palvelut', 
+            activities: 'Aktiviteetit',
+            discoverAll: 'Tutustu kaikkiin palveluihimme',
+            viewMenu: 'Näytä menu',
+            location: 'Sijainti',
+            mainLobby: 'Pääaula',
+            poolside: 'Uima-altaan vieressä',
+            beachfront: 'Rantakatu',
+            rooftop: 'Kattoterassi',
+            garden: 'Puutarha'
+          },
+          hr: { 
+            all: 'Sve', 
+            restaurants: 'Hrana i piće', 
+            events: 'Događaji i zabava', 
+            spa: 'Spa', 
+            services: 'Sadržaji i usluge', 
+            activities: 'Aktivnosti',
+            discoverAll: 'Otkrijte sve naše usluge',
+            viewMenu: 'Pogledaj meni',
+            location: 'Lokacija',
+            mainLobby: 'Glavni lobi',
+            poolside: 'Uz bazen',
+            beachfront: 'Plaža',
+            rooftop: 'Terasa na krovu',
+            garden: 'Vrt'
+          },
+          sk: { 
+            all: 'Všetko', 
+            restaurants: 'Jedlo a nápoje', 
+            events: 'Udalosti a zábava', 
+            spa: 'Spa', 
+            services: 'Zariadenia a služby', 
+            activities: 'Aktivity',
+            discoverAll: 'Objavte všetky naše služby',
+            viewMenu: 'Zobraziť menu',
+            location: 'Umiestnenie',
+            mainLobby: 'Hlavná hala',
+            poolside: 'Pri bazéne',
+            beachfront: 'Pobrežie',
+            rooftop: 'Strecha',
+            garden: 'Záhrada'
+          },
+          bg: { 
+            all: 'Всички', 
+            restaurants: 'Храна и напитки', 
+            events: 'Събития и развлечения', 
+            spa: 'Спа', 
+            services: 'Съоръжения и услуги', 
+            activities: 'Дейности',
+            discoverAll: 'Открийте всички наши услуги',
+            viewMenu: 'Вижте менюто',
+            location: 'Местоположение',
+            mainLobby: 'Главно фоайе',
+            poolside: 'До басейна',
+            beachfront: 'Плажна линия',
+            rooftop: 'Покривна тераса',
+            garden: 'Градина'
+          },
+          sr: { 
+            all: 'Све', 
+            restaurants: 'Храна и пиће', 
+            events: 'Догађаји и забава', 
+            spa: 'Спа', 
+            services: 'Садржаји и услуге', 
+            activities: 'Активности',
+            discoverAll: 'Откријте све наше услуге',
+            viewMenu: 'Погледајте мени',
+            location: 'Локација',
+            mainLobby: 'Главни лоби',
+            poolside: 'Код базена',
+            beachfront: 'Плажа',
+            rooftop: 'Тераса на крову',
+            garden: 'Башта'
+          },
+          sl: { 
+            all: 'Vse', 
+            restaurants: 'Hrana in pijača', 
+            events: 'Dogodki in zabava', 
+            spa: 'Spa', 
+            services: 'Objekti in storitve', 
+            activities: 'Dejavnosti',
+            discoverAll: 'Odkrijte vse naše storitve',
+            viewMenu: 'Ogled menija',
+            location: 'Lokacija',
+            mainLobby: 'Glavna avla',
+            poolside: 'Ob bazenu',
+            beachfront: 'Obmorska fronta',
+            rooftop: 'Strešna terasa',
+            garden: 'Vrt'
+          },
+          th: { 
+            all: 'ทั้งหมด', 
+            restaurants: 'อาหารและเครื่องดื่ม', 
+            events: 'กิจกรรมและความบันเทิง', 
+            spa: 'สปา', 
+            services: 'สิ่งอำนวยความสะดวกและบริการ', 
+            activities: 'กิจกรรม',
+            discoverAll: 'ค้นพบบริการทั้งหมดของเรา',
+            viewMenu: 'ดูเมนู',
+            location: 'ที่ตั้ง',
+            mainLobby: 'ล็อบบี้หลัก',
+            poolside: 'ริมสระว่ายน้ำ',
+            beachfront: 'ชายหาด',
+            rooftop: 'ดาดฟ้า',
+            garden: 'สวน'
+          },
+          id: { 
+            all: 'Semua', 
+            restaurants: 'Makanan dan minuman', 
+            events: 'Acara dan hiburan', 
+            spa: 'Spa', 
+            services: 'Fasilitas dan layanan', 
+            activities: 'Kegiatan',
+            discoverAll: 'Temukan semua layanan kami',
+            viewMenu: 'Lihat menu',
+            location: 'Lokasi',
+            mainLobby: 'Lobi utama',
+            poolside: 'Di tepi kolam',
+            beachfront: 'Tepi pantai',
+            rooftop: 'Atap',
+            garden: 'Taman'
+          },
+          vi: { 
+            all: 'Tất cả', 
+            restaurants: 'Ẩm thực và đồ uống', 
+            events: 'Sự kiện và giải trí', 
+            spa: 'Spa', 
+            services: 'Tiện nghi và dịch vụ', 
+            activities: 'Hoạt động',
+            discoverAll: 'Khám phá tất cả dịch vụ của chúng tôi',
+            viewMenu: 'Xem thực đơn',
+            location: 'Vị trí',
+            mainLobby: 'Sảnh chính',
+            poolside: 'Bên hồ bơi',
+            beachfront: 'Mặt tiền bãi biển',
+            rooftop: 'Sân thượng',
+            garden: 'Vườn'
+          },
+          tl: { 
+            all: 'Lahat', 
+            restaurants: 'Pagkain at inumin', 
+            events: 'Mga kaganapan at aliw', 
+            spa: 'Spa', 
+            services: 'Mga pasilidad at serbisyo', 
+            activities: 'Mga aktibidad',
+            discoverAll: 'Tuklasin ang lahat ng aming mga serbisyo',
+            viewMenu: 'Tingnan ang menu',
+            location: 'Lokasyon',
+            mainLobby: 'Pangunahing lobby',
+            poolside: 'Sa tabi ng pool',
+            beachfront: 'Harap ng dalampasigan',
+            rooftop: 'Bubungan',
+            garden: 'Hardin'
+          },
+          ms: { 
+            all: 'Semua', 
+            restaurants: 'Makanan dan minuman', 
+            events: 'Acara dan hiburan', 
+            spa: 'Spa', 
+            services: 'Kemudahan dan perkhidmatan', 
+            activities: 'Aktiviti',
+            discoverAll: 'Terokai semua perkhidmatan kami',
+            viewMenu: 'Lihat menu',
+            location: 'Lokasi',
+            mainLobby: 'Lobi utama',
+            poolside: 'Tepi kolam',
+            beachfront: 'Tepi pantai',
+            rooftop: 'Bumbung',
+            garden: 'Taman'
           }
         };
 
@@ -10036,6 +10480,55 @@ app.get('/hotel/:property_slug', async (c) => {
 
         async function init() {
             try {
+                // Populate language selector with all available languages
+                const languageSelector = document.getElementById('languageSelector');
+                if (languageSelector) {
+                    const supportedLangs = {
+                        'en': { flag: '🇬🇧', native: 'English' },
+                        'ar': { flag: '🇸🇦', native: 'العربية' },
+                        'de': { flag: '🇩🇪', native: 'Deutsch' },
+                        'ru': { flag: '🇷🇺', native: 'Русский' },
+                        'pl': { flag: '🇵🇱', native: 'Polski' },
+                        'it': { flag: '🇮🇹', native: 'Italiano' },
+                        'fr': { flag: '🇫🇷', native: 'Français' },
+                        'cs': { flag: '🇨🇿', native: 'Čeština' },
+                        'uk': { flag: '🇺🇦', native: 'Українська' },
+                        'zh': { flag: '🇨🇳', native: '简体中文' },
+                        'es': { flag: '🇪🇸', native: 'Español' },
+                        'ja': { flag: '🇯🇵', native: '日本語' },
+                        'pt': { flag: '🇵🇹', native: 'Português' },
+                        'ko': { flag: '🇰🇷', native: '한국어' },
+                        'hi': { flag: '🇮🇳', native: 'हिन्दी' },
+                        'tr': { flag: '🇹🇷', native: 'Türkçe' },
+                        'el': { flag: '🇬🇷', native: 'Ελληνικά' },
+                        'sv': { flag: '🇸🇪', native: 'Svenska' },
+                        'no': { flag: '🇳🇴', native: 'Norsk' },
+                        'da': { flag: '🇩🇰', native: 'Dansk' },
+                        'ro': { flag: '🇷🇴', native: 'Română' },
+                        'hu': { flag: '🇭🇺', native: 'Magyar' },
+                        'fi': { flag: '🇫🇮', native: 'Suomi' },
+                        'hr': { flag: '🇭🇷', native: 'Hrvatski' },
+                        'sk': { flag: '🇸🇰', native: 'Slovenčina' },
+                        'bg': { flag: '🇧🇬', native: 'Български' },
+                        'sr': { flag: '🇷🇸', native: 'Српски' },
+                        'sl': { flag: '🇸🇮', native: 'Slovenščina' },
+                        'th': { flag: '🇹🇭', native: 'ไทย' },
+                        'id': { flag: '🇮🇩', native: 'Bahasa Indonesia' },
+                        'vi': { flag: '🇻🇳', native: 'Tiếng Việt' },
+                        'tl': { flag: '🇵🇭', native: 'Tagalog' },
+                        'ms': { flag: '🇲🇾', native: 'Bahasa Melayu' }
+                    };
+                    
+                    languageSelector.innerHTML = '';
+                    Object.entries(supportedLangs).forEach(([code, lang]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = \`\${lang.flag} \${lang.native}\`;
+                        languageSelector.appendChild(option);
+                    });
+                    languageSelector.value = currentLanguage;
+                }
+                
                 // Get property details
                 const propResponse = await fetch(\`/api/properties?slug=\${propertySlug}\`);
                 const propData = await propResponse.json();
