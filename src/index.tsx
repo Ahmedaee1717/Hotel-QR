@@ -10728,8 +10728,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Render category pills including custom sections
                 renderCategoryPills();
                 
-                // Render all content
-                renderContent();
+                // Render all content (await because it's now async)
+                await renderContent();
                 
                 // Update section headings with translations
                 updateSectionHeadings();
@@ -10759,7 +10759,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
         }
 
-        function renderContent() {
+        async function renderContent() {
             // Get section order from property settings
             const sectionOrder = propertyData.homepage_section_order ? 
               JSON.parse(propertyData.homepage_section_order) : 
@@ -10827,7 +10827,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             // Render each section's content (await all async renders)
-            Promise.all([
+            await Promise.all([
                 renderRestaurants(),
                 renderEvents(),
                 renderSpa(),
