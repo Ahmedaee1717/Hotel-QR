@@ -9158,6 +9158,12 @@ app.get('/hotel/:property_slug', async (c) => {
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         console.log('🌐 Current language loaded:', currentLanguage);
         
+        // Expose propertyData to window so chatbot and other functions can access it
+        Object.defineProperty(window, 'propertyData', {
+            get: () => propertyData,
+            set: (value) => { propertyData = value; }
+        });
+        
         // Track QR code scan on page load
         async function trackQRScan() {
           try {
@@ -11844,7 +11850,7 @@ app.get('/hotel/:property_slug', async (c) => {
           // Load chatbot settings and show if enabled
           window.initChatbot = async function() {
               try {
-                const response = await fetch('/api/chatbot/settings/' + propertyData.property_id);
+                const response = await fetch('/api/chatbot/settings/' + window.propertyData.property_id);
                 const data = await response.json();
                 
                 if (data.success && data.settings && data.settings.chatbot_enabled === 1) {
@@ -11953,7 +11959,7 @@ app.get('/hotel/:property_slug', async (c) => {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    property_id: propertyData.property_id,
+                    property_id: window.propertyData.property_id,
                     session_id: chatSessionId,
                     message: message,
                     conversation_id: chatConversationId
