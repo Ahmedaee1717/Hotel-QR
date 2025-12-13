@@ -11898,8 +11898,64 @@ app.get('/hotel/:property_slug', async (c) => {
                 if (data.success && data.settings && data.settings.beach_booking_enabled === 1) {
                     const section = document.getElementById('beach-booking-section');
                     if (section) {
+                        const s = data.settings;
+                        
+                        // Apply custom colors
+                        const bgFrom = s.bg_color_from || '#3b82f6';
+                        const bgTo = s.bg_color_to || '#06b6d4';
+                        const textColor = s.text_color || '#ffffff';
+                        const btnFrom = s.button_color_from || '#ffffff';
+                        const btnTo = s.button_color_to || '#ffffff';
+                        const btnTextColor = s.button_text_color || '#3b82f6';
+                        
+                        const card = section.querySelector('.bg-gradient-to-r');
+                        if (card) {
+                            card.style.background = 'linear-gradient(to right, ' + bgFrom + ', ' + bgTo + ')';
+                        }
+                        
+                        // Apply custom text
+                        const title = section.querySelector('h2');
+                        if (title) {
+                            title.innerHTML = '<i class=\"fas fa-umbrella-beach mr-3\"></i>' + (s.card_title || 'Beach Booking');
+                            title.style.color = textColor;
+                        }
+                        
+                        const subtitle = section.querySelector('p');
+                        if (subtitle) {
+                            subtitle.textContent = s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
+                            subtitle.style.color = textColor;
+                        }
+                        
+                        // Update features
+                        const features = section.querySelectorAll('.flex.items-center.gap-2 span');
+                        if (features[0]) features[0].textContent = s.feature1_text || 'Free for Hotel Guests';
+                        if (features[1]) features[1].textContent = s.feature2_text || 'Book Up to 7 Days Ahead';
+                        if (features[2]) features[2].textContent = s.feature3_text || 'QR Code Check-in';
+                        
+                        // Update button
+                        const button = section.querySelector('button');
+                        if (button) {
+                            button.style.background = 'linear-gradient(to right, ' + btnFrom + ', ' + btnTo + ')';
+                            button.style.color = btnTextColor;
+                            const btnText = button.querySelector('.fa-calendar-check').nextSibling;
+                            if (btnText) btnText.textContent = ' ' + (s.button_text || 'Book Your Spot Now');
+                        }
+                        
+                        // Update spot categories
+                        const spots = section.querySelectorAll('#beach-spots-preview .font-semibold');
+                        if (spots[0]) spots[0].textContent = s.umbrellas_label || 'Umbrellas';
+                        if (spots[1]) spots[1].textContent = s.cabanas_label || 'Cabanas';
+                        if (spots[2]) spots[2].textContent = s.loungers_label || 'Loungers';
+                        if (spots[3]) spots[3].textContent = s.daybeds_label || 'Daybeds';
+                        
+                        const spotDescs = section.querySelectorAll('#beach-spots-preview .text-sm');
+                        if (spotDescs[0]) spotDescs[0].textContent = s.umbrellas_desc || 'Classic Beach';
+                        if (spotDescs[1]) spotDescs[1].textContent = s.cabanas_desc || 'Private & Cozy';
+                        if (spotDescs[2]) spotDescs[2].textContent = s.loungers_desc || 'Relax in Style';
+                        if (spotDescs[3]) spotDescs[3].textContent = s.daybeds_desc || 'Ultimate Comfort';
+                        
                         section.classList.remove('hidden');
-                        console.log('Beach booking section shown!');
+                        console.log('Beach booking section shown with custom styling!');
                     } else {
                         console.error('Beach booking section element not found');
                     }
