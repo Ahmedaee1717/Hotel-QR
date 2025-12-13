@@ -9767,6 +9767,9 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: \${secondaryColor}22 !important; color: \${secondaryColor} !important; }
               .bg-blue-100 { background-color: \${primaryColor}22 !important; color: \${primaryColor} !important; }
+              .bg-secondary { background: \${secondaryColor} !important; }
+              .bg-secondary:hover { opacity: 0.9; }
+              .text-secondary { color: \${secondaryColor} !important; }
               
               /* Floating Map Button */
               #mapFloatingBtn {
@@ -9851,6 +9854,9 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: transparent !important; color: \${secondaryColor} !important; border: 1px solid \${secondaryColor}; }
               .bg-blue-100 { background-color: transparent !important; color: \${primaryColor} !important; border: 1px solid \${primaryColor}; }
+              .bg-secondary { background: \${secondaryColor} !important; }
+              .bg-secondary:hover { opacity: 0.9; }
+              .text-secondary { color: \${secondaryColor} !important; }
               
               /* Floating Map Button */
               #mapFloatingBtn {
