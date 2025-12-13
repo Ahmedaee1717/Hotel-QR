@@ -9146,7 +9146,7 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
         </div>
 
-        <script>
+        <script type="module">
         const propertySlug = '${property_slug}';
         let propertyData = null;
         let allOfferings = [];
