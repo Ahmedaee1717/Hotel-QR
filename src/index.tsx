@@ -17163,6 +17163,20 @@ app.get('/admin/dashboard', (c) => {
                         <i class="fas fa-key w-5"></i><span>Code</span>
                     </button>
                 </div>
+                
+                <!-- Help & Documentation Section -->
+                <div class="px-3 mb-6">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Help & Support</h3>
+                    <button data-tab="documentation" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-book w-5"></i><span>Documentation</span>
+                    </button>
+                    <button data-tab="tutorials" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-graduation-cap w-5"></i><span>Tutorials</span>
+                    </button>
+                    <button data-tab="faq" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-question-circle w-5"></i><span>FAQ</span>
+                    </button>
+                </div>
             </nav>
         </aside>
 
@@ -17522,6 +17536,1123 @@ app.get('/admin/dashboard', (c) => {
                         <li>They enter the code along with their business details</li>
                         <li>Once registered, they can immediately add activities to your hotel</li>
                     </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- =============================================
+             DOCUMENTATION TAB
+             ============================================= -->
+        <div id="documentationTab" class="tab-content hidden">
+            <div class="max-w-6xl mx-auto">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+                    <h1 class="text-4xl font-bold mb-3 flex items-center gap-3">
+                        <i class="fas fa-book"></i>
+                        GuestConnect Documentation
+                    </h1>
+                    <p class="text-blue-100 text-lg">Complete guide to managing your property with GuestConnect</p>
+                </div>
+
+                <!-- Quick Navigation -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <button onclick="scrollToDocSection('getting-started')" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all text-left group">
+                        <i class="fas fa-rocket text-3xl text-blue-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                        <h3 class="font-bold text-lg mb-2">Getting Started</h3>
+                        <p class="text-sm text-gray-600">Initial setup and configuration</p>
+                    </button>
+                    <button onclick="scrollToDocSection('features')" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all text-left group">
+                        <i class="fas fa-star text-3xl text-purple-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                        <h3 class="font-bold text-lg mb-2">Core Features</h3>
+                        <p class="text-sm text-gray-600">All system capabilities explained</p>
+                    </button>
+                    <button onclick="scrollToDocSection('best-practices')" class="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all text-left group">
+                        <i class="fas fa-lightbulb text-3xl text-yellow-600 mb-3 group-hover:scale-110 transition-transform"></i>
+                        <h3 class="font-bold text-lg mb-2">Best Practices</h3>
+                        <p class="text-sm text-gray-600">Tips for optimal results</p>
+                    </button>
+                </div>
+
+                <!-- Documentation Content -->
+                <div class="space-y-6">
+                    
+                    <!-- GETTING STARTED -->
+                    <div id="getting-started" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-rocket text-blue-600 mr-3"></i>Getting Started
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-blue-900">1. Initial Property Setup</h3>
+                                <p class="text-gray-700 mb-4">Your property is already configured with default settings. Customize these to match your brand:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><i class="fas fa-check-circle text-green-600 mr-2"></i><strong>Settings Tab:</strong> Upload your logo, set property name, contact details, and social media links</li>
+                                    <li><i class="fas fa-check-circle text-green-600 mr-2"></i><strong>QR Code Tab:</strong> Design your primary QR code with custom colors and decorations</li>
+                                    <li><i class="fas fa-check-circle text-green-600 mr-2"></i><strong>Print Your QR:</strong> Download and place QR codes around your property</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900">2. Add Your Offerings</h3>
+                                <p class="text-gray-700 mb-4">Create the services and amenities guests can discover and book:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><i class="fas fa-utensils text-orange-600 mr-2"></i><strong>Restaurants:</strong> Add dining options with menus, hours, and booking capabilities</li>
+                                    <li><i class="fas fa-swimmer text-blue-600 mr-2"></i><strong>Activities:</strong> Add spa services, excursions, water sports, etc.</li>
+                                    <li><i class="fas fa-umbrella-beach text-yellow-600 mr-2"></i><strong>Beach Services:</strong> Sunbed/umbrella rentals with interactive map</li>
+                                    <li><i class="fas fa-info-circle text-green-600 mr-2"></i><strong>Info Pages:</strong> Hotel policies, WiFi info, local attractions</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-green-900">3. Enable AI Features</h3>
+                                <p class="text-gray-700 mb-4">Let AI help your guests 24/7:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><i class="fas fa-robot text-blue-600 mr-2"></i><strong>AI Chatbot:</strong> Upload FAQs and hotel information as knowledge base</li>
+                                    <li><i class="fas fa-language text-purple-600 mr-2"></i><strong>Multi-language:</strong> Automatic translation to 8+ languages</li>
+                                    <li><i class="fas fa-magic text-pink-600 mr-2"></i><strong>AI Proofreading:</strong> Improve your content with one click</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-yellow-50 border-l-4 border-yellow-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-yellow-900">4. Monitor & Optimize</h3>
+                                <p class="text-gray-700 mb-4">Track performance and improve guest experience:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><i class="fas fa-chart-line text-green-600 mr-2"></i><strong>Analytics Tab:</strong> View bookings, popular items, revenue insights</li>
+                                    <li><i class="fas fa-comments text-blue-600 mr-2"></i><strong>Feedback Tab:</strong> Read guest reviews and respond promptly</li>
+                                    <li><i class="fas fa-bell text-red-600 mr-2"></i><strong>Callbacks:</strong> Manage guest service requests in real-time</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CORE FEATURES -->
+                    <div id="features" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-star text-purple-600 mr-3"></i>Core Features Guide
+                        </h2>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <!-- QR Code Designer -->
+                            <div class="border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-qrcode text-2xl text-purple-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">QR Code Designer</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">Create beautiful, branded QR codes for your property.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Upload custom logo (center of QR code)</li>
+                                    <li>• Choose colors to match your brand</li>
+                                    <li>• Add festive decorations (seasonal themes)</li>
+                                    <li>• Custom text and multilingual support</li>
+                                    <li>• Print-ready high-resolution output</li>
+                                </ul>
+                            </div>
+
+                            <!-- Restaurant Bookings -->
+                            <div class="border-2 border-orange-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-utensils text-2xl text-orange-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">Restaurant System</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">Complete restaurant management with visual table booking.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Interactive floor plan with drag-and-drop tables</li>
+                                    <li>• AI-powered texture extraction from photos</li>
+                                    <li>• Real-time table availability</li>
+                                    <li>• Multiple time slot management</li>
+                                    <li>• Menu photo galleries</li>
+                                    <li>• Guest-facing booking interface</li>
+                                </ul>
+                            </div>
+
+                            <!-- Beach Services -->
+                            <div class="border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-umbrella-beach text-2xl text-blue-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">Beach Management</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">Visual sunbed and umbrella rental system.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Interactive beach map</li>
+                                    <li>• Click-to-select sunbeds/umbrellas</li>
+                                    <li>• Real-time availability updates</li>
+                                    <li>• Automated booking confirmations</li>
+                                    <li>• Pricing per item or packages</li>
+                                </ul>
+                            </div>
+
+                            <!-- AI Chatbot -->
+                            <div class="border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-robot text-2xl text-green-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">AI Chatbot</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">24/7 intelligent guest assistance powered by AI.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Upload knowledge base (FAQs, policies, amenities)</li>
+                                    <li>• Natural language understanding</li>
+                                    <li>• Automatic multilingual responses</li>
+                                    <li>• Context-aware answers</li>
+                                    <li>• Analytics on common questions</li>
+                                    <li>• Seamless handoff to human staff</li>
+                                </ul>
+                            </div>
+
+                            <!-- Custom Sections -->
+                            <div class="border-2 border-pink-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-puzzle-piece text-2xl text-pink-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">Custom Sections</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">Build any custom content page for your guests.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Drag-and-drop page builder</li>
+                                    <li>• Rich text editor</li>
+                                    <li>• Image galleries and videos</li>
+                                    <li>• Custom icons and emojis</li>
+                                    <li>• Mobile-optimized layouts</li>
+                                </ul>
+                            </div>
+
+                            <!-- Analytics -->
+                            <div class="border-2 border-indigo-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-chart-line text-2xl text-indigo-600"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold">Analytics Dashboard</h3>
+                                </div>
+                                <p class="text-gray-700 mb-3">Comprehensive insights into guest behavior.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li>• Booking statistics and trends</li>
+                                    <li>• Revenue tracking by service</li>
+                                    <li>• Most popular offerings</li>
+                                    <li>• Peak booking times</li>
+                                    <li>• Guest feedback scores</li>
+                                    <li>• QR code scan analytics</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BEST PRACTICES -->
+                    <div id="best-practices" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-lightbulb text-yellow-600 mr-3"></i>Best Practices & Tips
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-image text-blue-600"></i>
+                                    Image Quality Matters
+                                </h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• Use high-resolution images (1920x1080 or higher)</li>
+                                    <li>• Compress images before uploading (use TinyPNG)</li>
+                                    <li>• Show your property in best lighting conditions</li>
+                                    <li>• Include variety: wide shots, detail shots, ambiance</li>
+                                    <li>• Update seasonal imagery (summer vs winter themes)</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-pen text-green-600"></i>
+                                    Content Writing Tips
+                                </h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• Keep descriptions concise but informative</li>
+                                    <li>• Highlight unique selling points first</li>
+                                    <li>• Use emotional, inviting language</li>
+                                    <li>• Always use AI Proofreading before publishing</li>
+                                    <li>• Include practical details (hours, location, pricing)</li>
+                                    <li>• Write in present tense for immediacy</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-clock text-purple-600"></i>
+                                    Timing & Updates
+                                </h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• Check and respond to feedback daily</li>
+                                    <li>• Update availability in real-time</li>
+                                    <li>• Refresh seasonal offerings quarterly</li>
+                                    <li>• Review analytics weekly to spot trends</li>
+                                    <li>• Update chatbot knowledge base monthly</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-users text-orange-600"></i>
+                                    Guest Experience First
+                                </h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• Make QR codes easily accessible (lobby, rooms, poolside)</li>
+                                    <li>• Test the booking flow yourself regularly</li>
+                                    <li>• Respond to callback requests within 10 minutes</li>
+                                    <li>• Offer incentives for first-time bookers</li>
+                                    <li>• Monitor feedback scores and act on issues quickly</li>
+                                    <li>• Train staff on how to use the system</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6">
+                                <h3 class="text-xl font-bold mb-3 flex items-center gap-2">
+                                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                                    Common Pitfalls to Avoid
+                                </h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>• ❌ Using blurry or poorly lit images</li>
+                                    <li>• ❌ Forgetting to update availability calendar</li>
+                                    <li>• ❌ Not responding to guest feedback</li>
+                                    <li>• ❌ Overcomplicating descriptions with jargon</li>
+                                    <li>• ❌ Setting unrealistic expectations</li>
+                                    <li>• ❌ Ignoring analytics insights</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TECHNICAL REFERENCE -->
+                    <div class="bg-white rounded-xl shadow-lg p-8">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-code text-gray-600 mr-3"></i>Technical Reference
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <h3 class="text-xl font-bold mb-3">Supported Image Formats</h3>
+                                <p class="text-gray-700">JPG, PNG, WebP, GIF (static and animated)</p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-xl font-bold mb-3">Supported Languages</h3>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-gray-700">
+                                    <div>🇬🇧 English</div>
+                                    <div>🇸🇦 Arabic</div>
+                                    <div>🇩🇪 German</div>
+                                    <div>🇷🇺 Russian</div>
+                                    <div>🇵🇱 Polish</div>
+                                    <div>🇮🇹 Italian</div>
+                                    <div>🇫🇷 French</div>
+                                    <div>🇨🇿 Czech</div>
+                                    <div>🇺🇦 Ukrainian</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="text-xl font-bold mb-3">Browser Support</h3>
+                                <p class="text-gray-700">Chrome 90+, Safari 14+, Firefox 88+, Edge 90+</p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-xl font-bold mb-3">Mobile Compatibility</h3>
+                                <p class="text-gray-700">Fully responsive on all iOS and Android devices</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- =============================================
+             TUTORIALS TAB
+             ============================================= -->
+        <div id="tutorialsTab" class="tab-content hidden">
+            <div class="max-w-6xl mx-auto">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+                    <h1 class="text-4xl font-bold mb-3 flex items-center gap-3">
+                        <i class="fas fa-graduation-cap"></i>
+                        Video Tutorials & Guides
+                    </h1>
+                    <p class="text-purple-100 text-lg">Step-by-step video walkthroughs for every feature</p>
+                </div>
+
+                <!-- Tutorial Categories -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Quick Start Tutorial -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-play-circle text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">Quick Start</h3>
+                            <p class="text-blue-100 text-sm">Get up and running in 10 minutes</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('quick-start-1'); return false;" class="block p-4 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-blue-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Initial Setup</h4>
+                                                <p class="text-xs text-gray-500">3:45 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-blue-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('quick-start-2'); return false;" class="block p-4 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-blue-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Your First QR Code</h4>
+                                                <p class="text-xs text-gray-500">2:20 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-blue-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('quick-start-3'); return false;" class="block p-4 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-blue-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-blue-600">Adding Your First Service</h4>
+                                                <p class="text-xs text-gray-500">4:10 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-blue-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Restaurant Management -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-orange-500 to-red-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-utensils text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">Restaurants</h3>
+                            <p class="text-orange-100 text-sm">Complete restaurant setup guide</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('restaurant-1'); return false;" class="block p-4 bg-gray-50 hover:bg-orange-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-orange-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-orange-600">Creating a Restaurant</h4>
+                                                <p class="text-xs text-gray-500">5:30 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-orange-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('restaurant-2'); return false;" class="block p-4 bg-gray-50 hover:bg-orange-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-orange-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-orange-600">Floor Plan Designer</h4>
+                                                <p class="text-xs text-gray-500">7:45 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-orange-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('restaurant-3'); return false;" class="block p-4 bg-gray-50 hover:bg-orange-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-orange-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-orange-600">AI Texture Extraction</h4>
+                                                <p class="text-xs text-gray-500">3:20 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-orange-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('restaurant-4'); return false;" class="block p-4 bg-gray-50 hover:bg-orange-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-orange-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-orange-600">Managing Bookings</h4>
+                                                <p class="text-xs text-gray-500">4:55 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-orange-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Beach Services -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-cyan-500 to-blue-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-umbrella-beach text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">Beach Services</h3>
+                            <p class="text-cyan-100 text-sm">Sunbed & umbrella rental setup</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('beach-1'); return false;" class="block p-4 bg-gray-50 hover:bg-cyan-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-cyan-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-cyan-600">Beach Map Setup</h4>
+                                                <p class="text-xs text-gray-500">6:15 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-cyan-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('beach-2'); return false;" class="block p-4 bg-gray-50 hover:bg-cyan-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-cyan-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-cyan-600">Pricing & Availability</h4>
+                                                <p class="text-xs text-gray-500">3:40 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-cyan-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Chatbot -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-green-500 to-emerald-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-robot text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">AI Chatbot</h3>
+                            <p class="text-green-100 text-sm">Setup intelligent guest assistant</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('chatbot-1'); return false;" class="block p-4 bg-gray-50 hover:bg-green-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-green-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-green-600">Knowledge Base Upload</h4>
+                                                <p class="text-xs text-gray-500">5:00 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-green-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('chatbot-2'); return false;" class="block p-4 bg-gray-50 hover:bg-green-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-green-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-green-600">Training Your AI</h4>
+                                                <p class="text-xs text-gray-500">4:30 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-green-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('chatbot-3'); return false;" class="block p-4 bg-gray-50 hover:bg-green-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-green-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-green-600">Monitoring Conversations</h4>
+                                                <p class="text-xs text-gray-500">3:15 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-green-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR Code Designer -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-purple-500 to-indigo-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-qrcode text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">QR Codes</h3>
+                            <p class="text-purple-100 text-sm">Design beautiful branded QR codes</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('qr-1'); return false;" class="block p-4 bg-gray-50 hover:bg-purple-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-purple-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-purple-600">Custom Branding</h4>
+                                                <p class="text-xs text-gray-500">4:20 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-purple-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('qr-2'); return false;" class="block p-4 bg-gray-50 hover:bg-purple-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-purple-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-purple-600">Print-Ready Export</h4>
+                                                <p class="text-xs text-gray-500">2:50 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-purple-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics -->
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-shadow">
+                        <div class="bg-gradient-to-br from-yellow-500 to-orange-600 p-6 text-white">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                                <i class="fas fa-chart-line text-4xl"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-2">Analytics</h3>
+                            <p class="text-yellow-100 text-sm">Understanding your data</p>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-3">
+                                <a href="#" onclick="playTutorial('analytics-1'); return false;" class="block p-4 bg-gray-50 hover:bg-yellow-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-yellow-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-yellow-600">Reading Your Dashboard</h4>
+                                                <p class="text-xs text-gray-500">6:00 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-yellow-600"></i>
+                                    </div>
+                                </a>
+                                
+                                <a href="#" onclick="playTutorial('analytics-2'); return false;" class="block p-4 bg-gray-50 hover:bg-yellow-50 rounded-lg transition-colors group">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <i class="fas fa-video text-yellow-600"></i>
+                                            <div>
+                                                <h4 class="font-semibold text-gray-800 group-hover:text-yellow-600">Optimizing Performance</h4>
+                                                <p class="text-xs text-gray-500">5:30 min</p>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-arrow-right text-gray-400 group-hover:text-yellow-600"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Coming Soon Notice -->
+                <div class="mt-8 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-xl p-8 text-center">
+                    <i class="fas fa-video text-5xl text-indigo-600 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-3">📹 Video Tutorials Coming Soon!</h3>
+                    <p class="text-gray-700 mb-4">We're currently recording comprehensive video tutorials for every feature. Check back soon!</p>
+                    <p class="text-sm text-gray-600">In the meantime, explore the <button onclick="switchToTab('documentation')" class="text-blue-600 hover:underline font-semibold">Documentation</button> for detailed written guides.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- =============================================
+             FAQ TAB
+             ============================================= -->
+        <div id="faqTab" class="tab-content hidden">
+            <div class="max-w-5xl mx-auto">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-green-600 to-teal-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+                    <h1 class="text-4xl font-bold mb-3 flex items-center gap-3">
+                        <i class="fas fa-question-circle"></i>
+                        Frequently Asked Questions
+                    </h1>
+                    <p class="text-green-100 text-lg">Quick answers to common questions</p>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="mb-8">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="faqSearch" 
+                            placeholder="Search FAQs... (e.g., 'how to add restaurant', 'QR code not working')"
+                            class="w-full px-6 py-4 pr-12 rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:outline-none text-lg"
+                            onkeyup="searchFAQs()"
+                        >
+                        <i class="fas fa-search absolute right-5 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl"></i>
+                    </div>
+                </div>
+
+                <!-- FAQ Categories -->
+                <div class="space-y-4" id="faqContainer">
+                    
+                    <!-- Getting Started -->
+                    <div class="faq-category" data-category="getting-started">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-rocket text-blue-600"></i>
+                            Getting Started
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="setup begin start first time new account initial configure">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I set up my property for the first time?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Follow these simple steps to get started:</p>
+                                    <ol class="list-decimal list-inside space-y-2 text-gray-700 ml-4">
+                                        <li><strong>Go to Settings Tab:</strong> Upload your logo, set property name, and add contact details</li>
+                                        <li><strong>Create Your First QR Code:</strong> Navigate to QR Code tab, customize design with your brand colors</li>
+                                        <li><strong>Add Services:</strong> Go to Offerings tab and add your restaurants, activities, and amenities</li>
+                                        <li><strong>Print QR Codes:</strong> Download and place them in strategic locations (lobby, rooms, poolside)</li>
+                                        <li><strong>Test Everything:</strong> Scan your QR code and try booking something to ensure it works</li>
+                                    </ol>
+                                    <div class="mt-4 bg-blue-50 p-4 rounded-lg">
+                                        <p class="text-sm text-blue-800"><i class="fas fa-lightbulb mr-2"></i><strong>Tip:</strong> Use the AI Assistant (blue button bottom-right) for step-by-step guidance!</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="qr code scan print download not working broken">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        My QR code isn't scanning. What should I do?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Try these troubleshooting steps:</p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Print Quality:</strong> Ensure the QR code is printed in high resolution (at least 300 DPI)</li>
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Size Matters:</strong> QR code should be at least 2cm x 2cm in size</li>
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Clean Surface:</strong> Make sure the QR code isn't damaged, dirty, or behind reflective material</li>
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Lighting:</strong> Scan in good lighting conditions, avoid shadows</li>
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Camera Focus:</strong> Hold phone steady and let camera auto-focus</li>
+                                        <li><i class="fas fa-check text-green-600 mr-2"></i><strong>Test URL:</strong> Try typing the URL manually to check if it's a QR code or system issue</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="cost price free trial paid subscription billing payment">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        Is GuestConnect free? What are the pricing plans?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">GuestConnect offers flexible pricing:</p>
+                                    <div class="grid md:grid-cols-3 gap-4">
+                                        <div class="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                                            <h4 class="font-bold text-green-800 mb-2">Free Tier</h4>
+                                            <ul class="text-sm text-gray-700 space-y-1">
+                                                <li>• Up to 3 services</li>
+                                                <li>• Basic QR codes</li>
+                                                <li>• 50 bookings/month</li>
+                                                <li>• Email support</li>
+                                            </ul>
+                                        </div>
+                                        <div class="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                                            <h4 class="font-bold text-blue-800 mb-2">Pro ($49/mo)</h4>
+                                            <ul class="text-sm text-gray-700 space-y-1">
+                                                <li>• Unlimited services</li>
+                                                <li>• Advanced QR design</li>
+                                                <li>• Unlimited bookings</li>
+                                                <li>• Priority support</li>
+                                                <li>• Analytics dashboard</li>
+                                            </ul>
+                                        </div>
+                                        <div class="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
+                                            <h4 class="font-bold text-purple-800 mb-2">Enterprise</h4>
+                                            <ul class="text-sm text-gray-700 space-y-1">
+                                                <li>• Everything in Pro</li>
+                                                <li>• White-label option</li>
+                                                <li>• Custom integrations</li>
+                                                <li>• Dedicated account manager</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Restaurants & Bookings -->
+                    <div class="faq-category" data-category="restaurants">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-utensils text-orange-600"></i>
+                            Restaurants & Bookings
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="restaurant add create new dining setup menu">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I add a new restaurant?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4"><strong>Step-by-step instructions:</strong></p>
+                                    <ol class="list-decimal list-inside space-y-3 text-gray-700 ml-4">
+                                        <li><strong>Go to Offerings Tab:</strong> Click "Offerings" in the left sidebar</li>
+                                        <li><strong>Select Type:</strong> Choose "Restaurant" from the type dropdown</li>
+                                        <li><strong>Fill Details:</strong>
+                                            <ul class="ml-6 mt-2 space-y-1 list-disc">
+                                                <li>Name and description (use AI Proofreading!)</li>
+                                                <li>Location within property</li>
+                                                <li>Operating hours</li>
+                                                <li>Price range</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Upload Images:</strong> Add high-quality photos of food, ambiance, and interior</li>
+                                        <li><strong>Add Menus:</strong> In the "Restaurant Menus" section, paste URLs of menu images</li>
+                                        <li><strong>Configure Booking:</strong> Enable "Requires Booking" if guests should reserve tables</li>
+                                        <li><strong>Design Floor Plan:</strong> Go to Restaurants tab to create interactive floor plan with drag-and-drop tables</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="floor plan table layout design drag drop move arrange">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How does the floor plan designer work?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">The floor plan designer lets guests see and select specific tables:</p>
+                                    <ul class="space-y-3 text-gray-700">
+                                        <li><i class="fas fa-magic text-purple-600 mr-2"></i><strong>AI Texture Extraction:</strong> Upload a photo of your restaurant, and AI will extract the floor/wall textures automatically</li>
+                                        <li><i class="fas fa-table text-blue-600 mr-2"></i><strong>Add Tables:</strong> Click "Add Table", choose size (2/4/6/8 seats), and place on canvas</li>
+                                        <li><i class="fas fa-arrows-alt text-green-600 mr-2"></i><strong>Drag to Position:</strong> Simply drag tables to arrange your actual layout</li>
+                                        <li><i class="fas fa-pen text-orange-600 mr-2"></i><strong>Draw Walls:</strong> Use wall drawing tool to outline rooms, sections, or outdoor areas</li>
+                                        <li><i class="fas fa-shapes text-red-600 mr-2"></i><strong>Add Elements:</strong> Place decorative elements like bars, buffets, plants, etc.</li>
+                                        <li><i class="fas fa-ruler text-teal-600 mr-2"></i><strong>Scale Control:</strong> Use Master Scale Slider to resize everything proportionally</li>
+                                    </ul>
+                                    <div class="mt-4 bg-orange-50 p-4 rounded-lg">
+                                        <p class="text-sm text-orange-800"><i class="fas fa-info-circle mr-2"></i><strong>Note:</strong> Positions are automatically saved. Guests will see exactly what you designed!</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="booking reservation manage time slots availability calendar">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I manage restaurant bookings and time slots?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Managing bookings is simple:</p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li><i class="fas fa-clock text-blue-600 mr-2"></i><strong>Set Time Slots:</strong> In Restaurants tab, configure available booking times (e.g., 18:00, 19:00, 20:00)</li>
+                                        <li><i class="fas fa-calendar text-green-600 mr-2"></i><strong>View Bookings:</strong> All reservations appear in Analytics tab with date, time, table, and guest details</li>
+                                        <li><i class="fas fa-ban text-red-600 mr-2"></i><strong>Block Tables:</strong> Manually mark tables as unavailable for maintenance or private events</li>
+                                        <li><i class="fas fa-sync text-purple-600 mr-2"></i><strong>Auto-Refresh:</strong> Dashboard updates automatically every 5 minutes (toggle in header)</li>
+                                        <li><i class="fas fa-bell text-yellow-600 mr-2"></i><strong>Notifications:</strong> Enable sound alerts for new bookings</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI & Automation -->
+                    <div class="faq-category" data-category="ai">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-robot text-green-600"></i>
+                            AI & Automation
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="chatbot ai assistant knowledge base upload train faq">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I set up the AI chatbot for my guests?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Setting up the AI chatbot is easy:</p>
+                                    <ol class="list-decimal list-inside space-y-3 text-gray-700 ml-4">
+                                        <li><strong>Go to AI Chatbot Tab:</strong> Find it in the left sidebar under "AI & Advanced"</li>
+                                        <li><strong>Upload Knowledge Base:</strong>
+                                            <ul class="ml-6 mt-2 space-y-1 list-disc">
+                                                <li>Click "Upload Knowledge Base Documents"</li>
+                                                <li>Add text files with FAQs, hotel policies, amenity information, local attractions</li>
+                                                <li>Supported formats: TXT, PDF, DOC, DOCX</li>
+                                            </ul>
+                                        </li>
+                                        <li><strong>Test Your Bot:</strong> Use the live preview to ask sample questions</li>
+                                        <li><strong>Refine Responses:</strong> If answers aren't accurate, add more detailed information to knowledge base</li>
+                                        <li><strong>Enable for Guests:</strong> Toggle "Active" to make chatbot available on guest pages</li>
+                                    </ol>
+                                    <div class="mt-4 bg-green-50 p-4 rounded-lg">
+                                        <p class="text-sm text-green-800"><i class="fas fa-lightbulb mr-2"></i><strong>Best Practice:</strong> Include common questions like WiFi password, check-out time, breakfast hours, parking info, etc.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="language translation multilingual arabic german russian french">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        Does the system support multiple languages?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4"><strong>Yes! GuestConnect supports 9 languages with automatic translation:</strong></p>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇬🇧</span>
+                                            <span class="text-gray-700">English</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇸🇦</span>
+                                            <span class="text-gray-700">Arabic</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇩🇪</span>
+                                            <span class="text-gray-700">German</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇷🇺</span>
+                                            <span class="text-gray-700">Russian</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇵🇱</span>
+                                            <span class="text-gray-700">Polish</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇮🇹</span>
+                                            <span class="text-gray-700">Italian</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇫🇷</span>
+                                            <span class="text-gray-700">French</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇨🇿</span>
+                                            <span class="text-gray-700">Czech</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                                            <span class="text-2xl">🇺🇦</span>
+                                            <span class="text-gray-700">Ukrainian</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-700 mb-2"><strong>How it works:</strong></p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li>• Guests select their preferred language from a dropdown</li>
+                                        <li>• All content (menus, descriptions, chatbot responses) translates automatically</li>
+                                        <li>• Translations use AI (GPT-4) for natural, context-aware results</li>
+                                        <li>• You only need to enter content in English - translations happen automatically</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="ai proofreading grammar spelling check improve text">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        What is AI Proofreading and how do I use it?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">AI Proofreading improves your text with one click:</p>
+                                    <ul class="space-y-2 text-gray-700 mb-4">
+                                        <li><i class="fas fa-spell-check text-blue-600 mr-2"></i>Fixes grammar and spelling errors</li>
+                                        <li><i class="fas fa-pen-fancy text-purple-600 mr-2"></i>Improves sentence structure and clarity</li>
+                                        <li><i class="fas fa-magic text-pink-600 mr-2"></i>Makes text more engaging and professional</li>
+                                        <li><i class="fas fa-language text-green-600 mr-2"></i>Maintains your original meaning and tone</li>
+                                    </ul>
+                                    <p class="text-gray-700 mb-2"><strong>How to use:</strong></p>
+                                    <ol class="list-decimal list-inside space-y-1 text-gray-700 ml-4">
+                                        <li>Write your text in any description field</li>
+                                        <li>Click the purple "✨ AI Proofread" button above the field</li>
+                                        <li>Wait 2-3 seconds for AI to process</li>
+                                        <li>Review the improved text and save</li>
+                                    </ol>
+                                    <div class="mt-4 bg-purple-50 p-4 rounded-lg">
+                                        <p class="text-sm text-purple-800"><i class="fas fa-gift mr-2"></i><strong>Free Tier:</strong> 10 proofreading requests per day. Pro plans get unlimited usage!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Beach Services -->
+                    <div class="faq-category" data-category="beach">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-umbrella-beach text-cyan-600"></i>
+                            Beach Services
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="beach sunbed umbrella rental setup map">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I set up beach sunbed and umbrella rentals?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Setting up beach rentals is visual and intuitive:</p>
+                                    <ol class="list-decimal list-inside space-y-3 text-gray-700 ml-4">
+                                        <li><strong>Go to Beach Tab:</strong> Find it in the left sidebar under "Bookings"</li>
+                                        <li><strong>Upload Beach Photo:</strong> Add a top-down or aerial view of your beach area</li>
+                                        <li><strong>Place Sunbeds:</strong> Click on the image where each sunbed is located</li>
+                                        <li><strong>Add Umbrellas:</strong> Similarly mark umbrella positions</li>
+                                        <li><strong>Set Pricing:</strong> Configure individual prices or package deals (e.g., sunbed + umbrella)</li>
+                                        <li><strong>Publish:</strong> Guests can now click on specific sunbeds/umbrellas to book</li>
+                                    </ol>
+                                    <div class="mt-4 bg-cyan-50 p-4 rounded-lg">
+                                        <p class="text-sm text-cyan-800"><i class="fas fa-info-circle mr-2"></i><strong>Tip:</strong> Use a high-quality image with clear view of the beach layout for best results.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical Issues -->
+                    <div class="faq-category" data-category="technical">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-wrench text-red-600"></i>
+                            Technical Issues
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="slow loading performance lag speed">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        The system is slow or not loading properly. What should I do?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Try these troubleshooting steps:</p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li><i class="fas fa-sync text-blue-600 mr-2"></i><strong>Refresh Page:</strong> Press Ctrl+R (Windows) or Cmd+R (Mac)</li>
+                                        <li><i class="fas fa-trash text-red-600 mr-2"></i><strong>Clear Cache:</strong> Clear browser cache and cookies, then reload</li>
+                                        <li><i class="fas fa-wifi text-green-600 mr-2"></i><strong>Check Internet:</strong> Ensure you have stable internet connection</li>
+                                        <li><i class="fas fa-browser text-purple-600 mr-2"></i><strong>Try Another Browser:</strong> Test in Chrome, Safari, or Firefox</li>
+                                        <li><i class="fas fa-compress text-orange-600 mr-2"></i><strong>Image Size:</strong> Large images can slow loading - compress them before uploading</li>
+                                        <li><i class="fas fa-clock text-teal-600 mr-2"></i><strong>Peak Times:</strong> System may be slower during high-traffic periods</li>
+                                    </ul>
+                                    <div class="mt-4 bg-red-50 p-4 rounded-lg">
+                                        <p class="text-sm text-red-800"><i class="fas fa-life-ring mr-2"></i><strong>Still Not Working?</strong> Click "Get Support" in the header to contact our team.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="booking not working error failed broken">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        Guests are saying bookings aren't working. How do I fix this?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Check these common issues:</p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li><i class="fas fa-toggle-on text-green-600 mr-2"></i><strong>Booking Enabled:</strong> In Offerings tab, ensure "Requires Booking" is checked</li>
+                                        <li><i class="fas fa-calendar text-blue-600 mr-2"></i><strong>Availability Set:</strong> Make sure time slots and dates are configured</li>
+                                        <li><i class="fas fa-ban text-red-600 mr-2"></i><strong>No Conflicts:</strong> Check if tables/time slots aren't already booked</li>
+                                        <li><i class="fas fa-database text-purple-600 mr-2"></i><strong>Database Connection:</strong> Verify system is connected (check Analytics tab)</li>
+                                        <li><i class="fas fa-mobile text-orange-600 mr-2"></i><strong>Mobile Testing:</strong> Test the booking flow on a mobile device yourself</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics & Reports -->
+                    <div class="faq-category" data-category="analytics">
+                        <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-3">
+                            <i class="fas fa-chart-line text-indigo-600"></i>
+                            Analytics & Reports
+                        </h2>
+                        
+                        <div class="space-y-3">
+                            <div class="faq-item bg-white rounded-lg shadow-md overflow-hidden" data-keywords="analytics dashboard statistics data report metrics">
+                                <button onclick="toggleFAQ(this)" class="w-full text-left p-6 hover:bg-gray-50 transition-colors flex items-center justify-between group">
+                                    <h3 class="font-semibold text-lg text-gray-800 group-hover:text-blue-600 pr-4">
+                                        How do I view booking statistics and analytics?
+                                    </h3>
+                                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-blue-600 transform transition-transform"></i>
+                                </button>
+                                <div class="faq-answer hidden px-6 pb-6">
+                                    <p class="text-gray-700 mb-4">Access comprehensive analytics in the Analytics tab:</p>
+                                    <ul class="space-y-2 text-gray-700">
+                                        <li><i class="fas fa-calendar-check text-blue-600 mr-2"></i><strong>Booking Overview:</strong> Total bookings, revenue, and trends over time</li>
+                                        <li><i class="fas fa-trophy text-yellow-600 mr-2"></i><strong>Top Performers:</strong> Most popular services and peak booking times</li>
+                                        <li><i class="fas fa-dollar-sign text-green-600 mr-2"></i><strong>Revenue Tracking:</strong> Income by service, date range, and category</li>
+                                        <li><i class="fas fa-users text-purple-600 mr-2"></i><strong>Guest Insights:</strong> Demographics, preferences, and repeat customers</li>
+                                        <li><i class="fas fa-star text-orange-600 mr-2"></i><strong>Feedback Scores:</strong> Average ratings and review summaries</li>
+                                        <li><i class="fas fa-download text-gray-600 mr-2"></i><strong>Export Data:</strong> Download reports as CSV or PDF</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Still Have Questions? -->
+                <div class="mt-12 bg-gradient-to-r from-blue-100 to-purple-100 rounded-xl p-8 text-center">
+                    <i class="fas fa-headset text-5xl text-blue-600 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-3">Still Have Questions?</h3>
+                    <p class="text-gray-700 mb-6">Our support team is here to help!</p>
+                    <div class="flex flex-wrap justify-center gap-4">
+                        <button onclick="openSupportModal()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-life-ring mr-2"></i>Contact Support
+                        </button>
+                        <button onclick="openLiveChat()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-comments mr-2"></i>Live Chat
+                        </button>
+                        <button onclick="toggleAssistant()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-robot mr-2"></i>AI Assistant
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -24311,6 +25442,97 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       setTimeout(createAssistant, 1000);
       
       // ========== END AI ASSISTANT SYSTEM ==========
+      
+      // ========== DOCUMENTATION & FAQ FUNCTIONS ==========
+      
+      // Scroll to documentation section
+      window.scrollToDocSection = function(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+      
+      // Toggle FAQ answer
+      window.toggleFAQ = function(button) {
+        const answer = button.nextElementSibling;
+        const icon = button.querySelector('.fa-chevron-down');
+        
+        if (answer.classList.contains('hidden')) {
+          answer.classList.remove('hidden');
+          icon.style.transform = 'rotate(180deg)';
+          button.parentElement.classList.add('ring-2', 'ring-blue-500');
+        } else {
+          answer.classList.add('hidden');
+          icon.style.transform = 'rotate(0deg)';
+          button.parentElement.classList.remove('ring-2', 'ring-blue-500');
+        }
+      };
+      
+      // Search FAQs
+      window.searchFAQs = function() {
+        const searchInput = document.getElementById('faqSearch');
+        const searchTerm = searchInput.value.toLowerCase();
+        const faqItems = document.querySelectorAll('.faq-item');
+        const categories = document.querySelectorAll('.faq-category');
+        
+        if (searchTerm === '') {
+          // Show all if search is empty
+          faqItems.forEach(item => item.style.display = 'block');
+          categories.forEach(cat => cat.style.display = 'block');
+          return;
+        }
+        
+        let visibleCategoryCounts = {};
+        
+        faqItems.forEach(item => {
+          const question = item.querySelector('h3').textContent.toLowerCase();
+          const answer = item.querySelector('.faq-answer').textContent.toLowerCase();
+          const keywords = item.dataset.keywords ? item.dataset.keywords.toLowerCase() : '';
+          const category = item.closest('.faq-category').dataset.category;
+          
+          const matches = question.includes(searchTerm) || 
+                         answer.includes(searchTerm) || 
+                         keywords.includes(searchTerm);
+          
+          if (matches) {
+            item.style.display = 'block';
+            visibleCategoryCounts[category] = (visibleCategoryCounts[category] || 0) + 1;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+        
+        // Hide categories with no visible items
+        categories.forEach(cat => {
+          const category = cat.dataset.category;
+          if (visibleCategoryCounts[category]) {
+            cat.style.display = 'block';
+          } else {
+            cat.style.display = 'none';
+          }
+        });
+      };
+      
+      // Play tutorial (placeholder)
+      window.playTutorial = function(tutorialId) {
+        alert('🎥 Video tutorial "' + tutorialId + '" coming soon!\\n\\nWe\\'re currently recording comprehensive video walkthroughs for all features.\\n\\nIn the meantime, check out the Documentation tab for detailed written guides.');
+      };
+      
+      // Switch to specific tab
+      window.switchToTab = function(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+        document.getElementById(tabName + 'Tab').classList.remove('hidden');
+        
+        document.querySelectorAll('.sidebar-btn').forEach(btn => {
+          btn.classList.remove('tab-active');
+          if (btn.dataset.tab === tabName) {
+            btn.classList.add('tab-active');
+          }
+        });
+      };
+      
+      // ========== END DOCUMENTATION & FAQ FUNCTIONS ==========
     </script>
 </body>
 </html>
