@@ -24535,6 +24535,26 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           const tablesData = await tablesResponse.json();
           availableTables = tablesData.tables || [];
           
+          // Load floor elements (buffet, bar, kitchen, etc.)
+          let floorElements = [];
+          try {
+            const elementsResponse = await fetch('/api/admin/restaurant/' + offeringId + '/floor-elements');
+            const elementsData = await elementsResponse.json();
+            floorElements = elementsData.elements || [];
+          } catch (err) {
+            console.log('No floor elements available');
+          }
+          
+          // Load walls
+          let walls = [];
+          try {
+            const wallsResponse = await fetch('/api/admin/restaurant/' + offeringId + '/walls');
+            const wallsData = await wallsResponse.json();
+            walls = wallsData.walls || [];
+          } catch (err) {
+            console.log('No walls available');
+          }
+          
           // Load availability for selected session
           const availabilityResponse = await fetch('/api/restaurant/session/' + selectedSessionId + '/availability');
           const availabilityData = await availabilityResponse.json();
@@ -24595,6 +24615,88 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           canvas.style.overflow = 'auto';
           canvas.style.touchAction = 'pan-y pinch-zoom'; // Allow pinch-to-zoom on mobile
           
+          // Render walls first (behind everything)
+          walls.forEach(wall => {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.style.position = 'absolute';
+            svg.style.pointerEvents = 'none';
+            svg.style.zIndex = '0';
+            
+            const scaledStartX = wall.start_x * scaleFactor;
+            const scaledStartY = wall.start_y * scaleFactor;
+            const scaledEndX = wall.end_x * scaleFactor;
+            const scaledEndY = wall.end_y * scaleFactor;
+            
+            const minX = Math.min(scaledStartX, scaledEndX);
+            const minY = Math.min(scaledStartY, scaledEndY);
+            const width = Math.abs(scaledEndX - scaledStartX);
+            const height = Math.abs(scaledEndY - scaledStartY);
+            
+            svg.style.left = minX + 'px';
+            svg.style.top = minY + 'px';
+            svg.style.width = (width + 10) + 'px';
+            svg.style.height = (height + 10) + 'px';
+            
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', scaledStartX - minX);
+            line.setAttribute('y1', scaledStartY - minY);
+            line.setAttribute('x2', scaledEndX - minX);
+            line.setAttribute('y2', scaledEndY - minY);
+            line.setAttribute('stroke', wall.color || '#64748B');
+            line.setAttribute('stroke-width', (wall.thickness || 4) * scaleFactor);
+            
+            if (wall.style === 'dashed') {
+              line.setAttribute('stroke-dasharray', '10,5');
+            } else if (wall.style === 'door') {
+              line.setAttribute('stroke-dasharray', '20,10');
+            } else if (wall.style === 'window') {
+              line.setAttribute('stroke-dasharray', '5,5');
+            }
+            
+            svg.appendChild(line);
+            canvas.appendChild(svg);
+          });
+          
+          // Render floor elements (buffet, bar, kitchen, etc.)
+          floorElements.forEach(element => {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.left = (element.position_x * scaleFactor) + 'px';
+            div.style.top = (element.position_y * scaleFactor) + 'px';
+            div.style.width = (element.width * scaleFactor) + 'px';
+            div.style.height = (element.height * scaleFactor) + 'px';
+            div.style.background = element.color || '#94A3B8';
+            div.style.border = '2px solid ' + (element.border_color || '#64748B');
+            div.style.borderRadius = '8px';
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'center';
+            div.style.fontSize = (isMobile ? '10px' : '12px');
+            div.style.fontWeight = 'bold';
+            div.style.color = '#1F2937';
+            div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            div.style.zIndex = '1';
+            div.style.pointerEvents = 'none'; // Can't click on floor elements
+            
+            // Get icon based on element type
+            const iconMap = {
+              'buffet': 'fas fa-utensils',
+              'bar': 'fas fa-wine-glass-alt',
+              'kitchen': 'fas fa-fire-burner',
+              'entrance': 'fas fa-door-open',
+              'restroom': 'fas fa-restroom',
+              'stage': 'fas fa-music',
+              'plant': 'fas fa-leaf',
+              'decoration': 'fas fa-star'
+            };
+            const icon = iconMap[element.element_type] || 'fas fa-square';
+            const fontSize = Math.max(8, 12 * scaleFactor);
+            
+            div.innerHTML = '<div class="text-center"><i class="' + icon + ' mr-1"></i><br><span style="font-size: ' + (fontSize * 0.8) + 'px;">' + element.element_label + '</span></div>';
+            canvas.appendChild(div);
+          });
+          
+          // Render tables (on top of everything)
           suitableTables.forEach(table => {
             const isReserved = reservedTables.includes(table.table_id);
             const tableEl = document.createElement('div');
