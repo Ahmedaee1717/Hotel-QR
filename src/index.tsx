@@ -18707,7 +18707,7 @@ app.get('/admin/dashboard', (c) => {
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Text Color</label>
-                                    <input type="color" id="textColor" class="w-full h-10 border rounded cursor-pointer" value="#000000" />
+                                    <input type="color" id="qrTextColor" class="w-full h-10 border rounded cursor-pointer" value="#000000" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">QR Size</label>
@@ -22596,7 +22596,7 @@ app.get('/admin/dashboard', (c) => {
           document.getElementById('cardSubtitle').value = data.card_subtitle || qrCardConfig.subtitle;
           document.getElementById('cardMessage').value = data.custom_message || '';
           document.getElementById('bgColor').value = data.background_color || qrCardConfig.bgColor;
-          document.getElementById('textColor').value = data.text_color || qrCardConfig.textColor;
+          document.getElementById('qrTextColor').value = data.text_color || qrCardConfig.textColor;
           document.getElementById('qrSize').value = data.qr_size || qrCardConfig.qrSize;
           document.getElementById('borderRadius').value = data.border_radius || qrCardConfig.borderRadius;
           
@@ -22747,7 +22747,7 @@ app.get('/admin/dashboard', (c) => {
         document.getElementById('cardSubtitle').value = 'Access all amenities and services';
         document.getElementById('cardMessage').value = '';
         document.getElementById('bgColor').value = '#ffffff';
-        document.getElementById('textColor').value = '#000000';
+        document.getElementById('qrTextColor').value = '#000000';
         document.getElementById('qrSize').value = '300';
         document.getElementById('borderRadius').value = '10';
         
@@ -22812,7 +22812,7 @@ app.get('/admin/dashboard', (c) => {
         updateQRCardPreview();
       });
       
-      document.getElementById('textColor').addEventListener('input', (e) => {
+      document.getElementById('qrTextColor').addEventListener('input', (e) => {
         qrCardConfig.textColor = e.target.value;
         updateQRCardPreview();
       });
