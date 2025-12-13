@@ -10750,6 +10750,8 @@ app.get('/hotel/:property_slug', async (c) => {
             grid.innerHTML = restaurants.map(r => {
                 const title = getTranslatedField(r, 'title');
                 const description = getTranslatedField(r, 'short_description');
+                const bookTableText = t('book-table');
+                const reservationsText = t('reservations');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
                     <div class="relative cursor-pointer" onclick="viewOffering(\${r.offering_id})">
@@ -10757,7 +10759,7 @@ app.get('/hotel/:property_slug', async (c) => {
                              alt="\${title}" 
                              class="w-full h-48 object-cover">
                         <div class="absolute top-3 right-3">
-                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + t('reservations') + '</span>' : ''}
+                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
                         </div>
                     </div>
                     <div class="p-5">
@@ -10770,7 +10772,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <div class="pt-3 border-t border-gray-100 flex gap-2">
                             <button onclick="window.location.href='/hotel/' + propertySlug + '/restaurant/' + \${r.offering_id} + '/book'" 
                                     class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
-                                <i class="fas fa-calendar-plus mr-2"></i>\${t('book-table')}
+                                <i class="fas fa-calendar-plus mr-2"></i>\${bookTableText}
                             </button>
                             <button onclick="viewOffering(\${r.offering_id})" 
                                     class="px-4 py-2.5 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -10844,6 +10846,8 @@ app.get('/hotel/:property_slug', async (c) => {
             grid.innerHTML = spa.map(s => {
                 const title = getTranslatedField(s, 'title');
                 const description = getTranslatedField(s, 'short_description');
+                const discoverText = t('discover');
+                const minutesText = t('minutes');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
@@ -10857,10 +10861,10 @@ app.get('/hotel/:property_slug', async (c) => {
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${s.duration_minutes} \${t('minutes')}</span>
+                            <span>\${s.duration_minutes} \${minutesText}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('discover')}</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${discoverText}</span>
                             <i class="fas fa-arrow-right text-green-600"></i>
                         </div>
                     </div>
@@ -10886,6 +10890,7 @@ app.get('/hotel/:property_slug', async (c) => {
             grid.innerHTML = services.map(s => {
                 const title = getTranslatedField(s, 'title');
                 const description = getTranslatedField(s, 'short_description');
+                const viewDetailsText = t('view-details');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
                     <div class="relative">
@@ -10899,7 +10904,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + translateLocation(s.location) + '</span></div>' : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('view-details')}</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${viewDetailsText}</span>
                             <i class="fas fa-arrow-right text-indigo-600"></i>
                         </div>
                     </div>
@@ -10927,6 +10932,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 const safeDescription = escapeHtml(a.short_description);
                 const safeBusinessName = escapeHtml(a.business_name);
                 const safeCategoryName = escapeHtml(a.category_name);
+                const curatedByText = t('curated-by');
+                const minutesText = t('minutes');
+                const bookNowText = t('book-now');
                 
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewActivity(\${a.activity_id})">
@@ -10941,14 +10949,14 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                     <div class="p-5">
                         <h3 class="font-bold text-xl mb-1 text-gray-800">\${safeTitle}</h3>
-                        <p class="text-xs text-gray-500 mb-3">\${t('curated-by')} \${safeBusinessName}</p>
+                        <p class="text-xs text-gray-500 mb-3">\${curatedByText} \${safeBusinessName}</p>
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${safeDescription}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${a.duration_minutes} \${t('minutes')}</span>
+                            <span>\${a.duration_minutes} \${minutesText}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('book-now')}</span>
+                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${bookNowText}</span>
                             <i class="fas fa-arrow-right text-orange-600"></i>
                         </div>
                     </div>
@@ -10979,6 +10987,7 @@ app.get('/hotel/:property_slug', async (c) => {
             grid.innerHTML = sectionOfferings.map(o => {
                 const title = getTranslatedField(o, 'title');
                 const description = getTranslatedField(o, 'short_description');
+                const reservationsText = t('reservations');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${o.offering_id})">
                     <div class="relative">
@@ -10987,7 +10996,7 @@ app.get('/hotel/:property_slug', async (c) => {
                              class="w-full h-48 object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                         <div class="absolute top-3 right-3">
-                            \${o.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + t('reservations') + '</span>' : ''}
+                            \${o.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
                         </div>
                     </div>
                     <div class="p-5">
