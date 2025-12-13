@@ -10897,13 +10897,9 @@ app.get('/hotel/:property_slug', async (c) => {
                             <span>\${translateLocation(r.location)}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex gap-2">
-                            <button onclick="window.location.href='/hotel/' + propertySlug + '/restaurant/' + \${r.offering_id} + '/book'" 
-                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
-                                <i class="fas fa-calendar-plus mr-2"></i>\${bookTableText}
-                            </button>
                             <button onclick="viewOffering(\${r.offering_id})" 
-                                    class="px-4 py-2.5 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                                <i class="fas fa-info-circle"></i>
+                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
+                                <i class="fas fa-info-circle mr-2"></i>View Details
                             </button>
                         </div>
                     </div>
@@ -11387,16 +11383,8 @@ app.get('/hotel/:property_slug', async (c) => {
 
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
-            
-            // Check if this is a restaurant offering
-            const offering = allOfferings.find(o => o.offering_id === offeringId);
-            if (offering && offering.offering_type === 'restaurant') {
-                // Redirect to table picker booking page for restaurants
-                window.location.href = '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/book';
-            } else {
-                // For other offerings, go to detail page
-                window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
-            }
+            // Always go to detail page first to show info
+            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
         }
 
         function viewActivity(activityId) {
@@ -12538,7 +12526,15 @@ app.get('/offering-detail', async (c) => {
 
             // Show restaurant-specific fields and load menus
             if (offeringData.offering_type === 'restaurant') {
-                document.getElementById('restaurantFields').classList.remove('hidden');
+                // Hide the generic booking form and show Book Table button
+                const bookingSection = document.getElementById('bookingSection');
+                if (bookingSection) {
+                    bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">Ready to Dine?</h3>' +
+                        '<p class="text-gray-600 mb-4">Reserve your table and choose your preferred seating</p>' +
+                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
+                        'class="w-full bg-green-600 text-white py-4 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors text-lg">' +
+                        '<i class="fas fa-calendar-check mr-2"></i>Book a Table</button>';
+                }
                 loadRestaurantMenus();
             }
 
