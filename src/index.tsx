@@ -26632,9 +26632,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           // Update modal title
           document.querySelector('#formBuilderModal .text-2xl').innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Feedback Form';
           
-          // Show step 2 (questions) since we're editing
-          document.getElementById('formStep1').classList.add('hidden');
-          document.getElementById('formStep2').classList.remove('hidden');
+          // Show the modal
           document.getElementById('formBuilderModal').classList.remove('hidden');
           
           renderQuestions();
