@@ -17033,40 +17033,53 @@ app.get('/admin/dashboard', (c) => {
     </style>
 </head>
 <body class="bg-gray-50 transition-colors duration-300">
-    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-3 md:py-4 px-3 md:px-4 shadow-lg transition-colors duration-300">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div><h1 class="text-lg md:text-2xl font-bold">Admin Dashboard</h1></div>
-            <div class="flex items-center gap-2 md:gap-3">
-                <button onclick="openSupportModal()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Get Support">
-                  <i class="fas fa-life-ring"></i><span class="hidden md:inline ml-2">Support</span>
+    <!-- Professional Header with Logo -->
+    <div class="bg-white border-b border-gray-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <!-- Logo and Brand -->
+            <div class="flex items-center gap-3">
+                <img src="/guestconnect-logo.png" alt="GuestConnect" class="h-10 w-auto">
+                <div class="hidden md:block border-l border-gray-300 pl-3 ml-3">
+                    <h1 class="text-xl font-bold text-gray-800">Admin Dashboard</h1>
+                    <p class="text-xs text-gray-500">Property Management System</p>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="openSupportModal()" class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Get Support">
+                  <i class="fas fa-life-ring text-lg"></i>
                 </button>
-                <button onclick="openLiveChat()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Live Chat">
-                  <i class="fas fa-comments"></i><span class="hidden md:inline ml-2">Chat</span>
+                <button onclick="openLiveChat()" class="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Live Chat">
+                  <i class="fas fa-comments text-lg"></i>
                 </button>
-                <button onclick="toggleDarkMode()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base transition-colors" title="Toggle Dark Mode">
-                  <i id="darkModeIcon" class="fas fa-moon"></i><span class="hidden md:inline ml-2" id="darkModeText">Dark</span>
+                <button onclick="toggleDarkMode()" class="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Toggle Dark Mode">
+                  <i id="darkModeIcon" class="fas fa-moon text-lg"></i>
                 </button>
-                <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-3 md:px-4 py-2 rounded-lg text-sm md:text-base">
-                  <i class="fas fa-sign-out-alt mr-0 md:mr-2"></i><span class="hidden md:inline">Logout</span>
+                <div class="hidden md:block w-px h-8 bg-gray-300 mx-2"></div>
+                <button onclick="logout()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium text-sm">
+                  <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Auto-Refresh Control Panel -->
-    <div class="bg-gradient-to-r from-green-50 to-blue-50 border-b border-green-200 py-2 px-4">
+    <!-- Notification & Status Bar -->
+    <div class="bg-gray-50 border-b border-gray-200 py-2 px-4">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <i class="fas fa-bell text-green-600"></i>
-                <span class="text-sm font-semibold text-gray-700">Real-time Notifications</span>
-                <span class="text-xs text-gray-500">(Refreshes every 5 minutes)</span>
+                <div class="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+                    <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="text-xs font-medium text-green-700">Live</span>
+                </div>
+                <span class="text-xs text-gray-600">Real-time notifications enabled</span>
             </div>
             <div class="flex items-center gap-2">
-                <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition text-sm">
-                    <i class="fas fa-toggle-on mr-2"></i>Auto-refresh: ON
+                <button id="autoRefreshToggle" onclick="toggleAutoRefresh()" class="px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded-lg transition">
+                    <i class="fas fa-sync-alt mr-1"></i><span class="hidden md:inline">Auto-refresh: </span>ON
                 </button>
-                <button id="soundToggle" onclick="toggleSound()" class="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition text-sm">
-                    <i class="fas fa-volume-up mr-2"></i>Sound: ON
+                <button id="soundToggle" onclick="toggleSound()" class="px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg transition">
+                    <i class="fas fa-volume-up mr-1"></i><span class="hidden md:inline">Sound: </span>ON
                 </button>
             </div>
         </div>
