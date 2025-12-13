@@ -8941,7 +8941,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="restaurants-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-utensils text-blue-500 mr-3"></i>
-                        <span id="section-heading-restaurants">Our Restaurants</span>
+                        <span id="section-heading-restaurants">Dining & Drinks</span>
                     </h2>
                     <div id="restaurants-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
@@ -8974,7 +8974,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <section id="service-section" class="mb-12">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-concierge-bell text-indigo-500 mr-3"></i>
-                        <span id="section-heading-service">Hotel Services</span>
+                        <span id="section-heading-service">Facilities & Amenities</span>
                     </h2>
                     <div id="service-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Loaded dynamically -->
@@ -9758,10 +9758,10 @@ app.get('/hotel/:property_slug', async (c) => {
         const translations = {
           en: { 
             all: 'All', 
-            restaurants: 'Restaurants', 
-            events: 'Events', 
+            restaurants: 'Dining & Drinks', 
+            events: 'Events & Entertainment', 
             spa: 'Spa', 
-            services: 'Services', 
+            services: 'Facilities & Amenities', 
             activities: 'Activities',
             discoverAll: 'Discover all we have to offer',
             viewMenu: 'View Menu',
@@ -9774,10 +9774,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           ar: { 
             all: 'الكل', 
-            restaurants: 'مطاعم', 
-            events: 'فعاليات', 
+            restaurants: 'مطاعم ومشروبات', 
+            events: 'فعاليات وترفيه', 
             spa: 'سبا', 
-            services: 'خدمات', 
+            services: 'مرافق ووسائل راحة', 
             activities: 'أنشطة',
             discoverAll: 'اكتشف كل ما لدينا لنقدمه',
             viewMenu: 'عرض القائمة',
@@ -9790,10 +9790,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           de: { 
             all: 'Alle', 
-            restaurants: 'Restaurants', 
-            events: 'Veranstaltungen', 
+            restaurants: 'Essen und Getränke', 
+            events: 'Events und Unterhaltung', 
             spa: 'Spa', 
-            services: 'Dienstleistungen', 
+            services: 'Einrichtungen und Annehmlichkeiten', 
             activities: 'Aktivitäten',
             discoverAll: 'Entdecken Sie alles, was wir zu bieten haben',
             viewMenu: 'Menü ansehen',
@@ -9806,10 +9806,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           ru: { 
             all: 'Все', 
-            restaurants: 'Рестораны', 
-            events: 'События', 
+            restaurants: 'Еда и напитки', 
+            events: 'События и развлечения', 
             spa: 'Спа', 
-            services: 'Услуги', 
+            services: 'Удобства и услуги', 
             activities: 'Мероприятия',
             discoverAll: 'Откройте для себя все, что мы предлагаем',
             viewMenu: 'Посмотреть меню',
@@ -9822,10 +9822,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           pl: { 
             all: 'Wszystko', 
-            restaurants: 'Restauracje', 
-            events: 'Wydarzenia', 
+            restaurants: 'Jedzenie i napoje', 
+            events: 'Wydarzenia i rozrywka', 
             spa: 'Spa', 
-            services: 'Usługi', 
+            services: 'Udogodnienia', 
             activities: 'Zajęcia',
             discoverAll: 'Odkryj wszystko, co mamy do zaoferowania',
             viewMenu: 'Zobacz menu',
@@ -9838,10 +9838,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           it: { 
             all: 'Tutti', 
-            restaurants: 'Ristoranti', 
-            events: 'Eventi', 
+            restaurants: 'Cibo e bevande', 
+            events: 'Eventi e intrattenimento', 
             spa: 'Spa', 
-            services: 'Servizi', 
+            services: 'Strutture e servizi', 
             activities: 'Attività',
             discoverAll: 'Scopri tutto ciò che abbiamo da offrire',
             viewMenu: 'Visualizza menu',
@@ -9854,10 +9854,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           fr: { 
             all: 'Tout', 
-            restaurants: 'Restaurants', 
-            events: 'Événements', 
+            restaurants: 'Restaurants et boissons', 
+            events: 'Événements et divertissement', 
             spa: 'Spa', 
-            services: 'Services', 
+            services: 'Installations et commodités', 
             activities: 'Activités',
             discoverAll: 'Découvrez tout ce que nous avons à offrir',
             viewMenu: 'Voir le menu',
@@ -9870,10 +9870,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           cs: { 
             all: 'Vše', 
-            restaurants: 'Restaurace', 
-            events: 'Akce', 
+            restaurants: 'Jídlo a nápoje', 
+            events: 'Akce a zábava', 
             spa: 'Spa', 
-            services: 'Služby', 
+            services: 'Zařízení a vybavení', 
             activities: 'Aktivity',
             discoverAll: 'Objevte vše, co nabízíme',
             viewMenu: 'Zobrazit menu',
@@ -9886,10 +9886,10 @@ app.get('/hotel/:property_slug', async (c) => {
           },
           uk: { 
             all: 'Все', 
-            restaurants: 'Ресторани', 
-            events: 'Події', 
+            restaurants: 'Їжа та напої', 
+            events: 'Події та розваги', 
             spa: 'Спа', 
-            services: 'Послуги', 
+            services: 'Зручності та послуги', 
             activities: 'Заходи',
             discoverAll: 'Відкрийте для себе все, що ми пропонуємо',
             viewMenu: 'Переглянути меню',
@@ -18665,10 +18665,10 @@ app.get('/admin/dashboard', (c) => {
                     <div class="grid md:grid-cols-2 gap-4">
                         <select id="offeringType" required class="px-4 py-2 border rounded-lg">
                             <option value="">Select Type...</option>
-                            <option value="restaurant">Restaurant</option>
-                            <option value="event">Event</option>
+                            <option value="restaurant">Dining & Drinks</option>
+                            <option value="event">Events & Entertainment</option>
                             <option value="spa">Spa/Wellness</option>
-                            <option value="service">Other Service</option>
+                            <option value="service">Facilities & Amenities</option>
                         </select>
                         <input type="text" id="offeringTitle" placeholder="Title (English)" required class="px-4 py-2 border rounded-lg">
                     </div>
@@ -18752,8 +18752,8 @@ app.get('/admin/dashboard', (c) => {
                 </div>
                 <div class="mb-4 flex gap-2">
                     <button onclick="filterOfferings('all')" class="offering-filter-btn px-4 py-2 rounded bg-blue-500 text-white" data-type="all">All</button>
-                    <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant"><span id="admin-pill-restaurants">Restaurants</span></button>
-                    <button onclick="filterOfferings('event')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="event"><span id="admin-pill-events">Events</span></button>
+                    <button onclick="filterOfferings('restaurant')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="restaurant"><span id="admin-pill-restaurants">Dining & Drinks</span></button>
+                    <button onclick="filterOfferings('event')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="event"><span id="admin-pill-events">Events & Entertainment</span></button>
                     <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa"><span id="admin-pill-spa">Spa</span></button>
                 </div>
                 <div id="offeringsList" class="space-y-3"></div>
@@ -22442,8 +22442,8 @@ app.get('/admin/dashboard', (c) => {
         
         // Update admin panel filter button text with custom section names
         const sections = [
-          { key: 'restaurant', elementId: 'admin-pill-restaurants', settingKey: 'section_restaurants_en', default: 'Restaurants', optionValue: 'restaurant', optionDefault: 'Restaurant' },
-          { key: 'event', elementId: 'admin-pill-events', settingKey: 'section_events_en', default: 'Events', optionValue: 'event', optionDefault: 'Event' },
+          { key: 'restaurant', elementId: 'admin-pill-restaurants', settingKey: 'section_restaurants_en', default: 'Dining & Drinks', optionValue: 'restaurant', optionDefault: 'Dining & Drinks' },
+          { key: 'event', elementId: 'admin-pill-events', settingKey: 'section_events_en', default: 'Events & Entertainment', optionValue: 'event', optionDefault: 'Events & Entertainment' },
           { key: 'spa', elementId: 'admin-pill-spa', settingKey: 'section_spa_en', default: 'Spa', optionValue: 'spa', optionDefault: 'Spa/Wellness' }
         ];
         
