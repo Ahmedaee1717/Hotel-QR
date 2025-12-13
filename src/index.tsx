@@ -9930,6 +9930,9 @@ app.get('/hotel/:property_slug', async (c) => {
               .text-orange-600 { color: \${accentColor} !important; }
               .bg-green-100 { background-color: \${secondaryColor}11 !important; color: \${secondaryColor} !important; }
               .bg-blue-100 { background-color: \${primaryColor}11 !important; color: \${primaryColor} !important; }
+              .bg-secondary { background: \${secondaryColor} !important; }
+              .bg-secondary:hover { opacity: 0.9; }
+              .text-secondary { color: \${secondaryColor} !important; }
               
               /* Floating Map Button */
               #mapFloatingBtn {
@@ -10898,7 +10901,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex gap-2">
                             <button onclick="viewOffering(\${r.offering_id})" 
-                                    class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
+                                    class="flex-1 bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>View Details
                             </button>
                         </div>
@@ -10993,7 +10996,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${discoverText}</span>
-                            <i class="fas fa-arrow-right text-green-600"></i>
+                            <i class="fas fa-arrow-right text-secondary"></i>
                         </div>
                     </div>
                 </div>
@@ -11036,7 +11039,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + translateLocation(s.location) + '</span></div>' : ''}
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${viewDetailsText}</span>
-                            <i class="fas fa-arrow-right text-indigo-600"></i>
+                            <i class="fas fa-arrow-right text-secondary"></i>
                         </div>
                     </div>
                 </div>
@@ -11095,7 +11098,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${bookNowText}</span>
-                            <i class="fas fa-arrow-right text-orange-600"></i>
+                            <i class="fas fa-arrow-right text-secondary"></i>
                         </div>
                     </div>
                 </div>
@@ -12346,7 +12349,10 @@ app.get('/offering-detail', async (c) => {
                 '.text-blue-500, .text-blue-600 { color: ' + primaryColor + ' !important; }' +
                 '.bg-blue-600 { background: ' + (useGradient ? heroBackground : primaryColor) + ' !important; }' +
                 '.bg-blue-600:hover { background: ' + secondaryColor + ' !important; transform: scale(1.05); }' +
-                '.bg-blue-50 { background: ' + primaryColor + '15 !important; }';
+                '.bg-blue-50 { background: ' + primaryColor + '15 !important; }' +
+                '.bg-secondary { background: ' + secondaryColor + ' !important; }' +
+                '.bg-secondary:hover { opacity: 0.9; }' +
+                '.text-secondary { color: ' + secondaryColor + ' !important; }';
             document.head.appendChild(style);
             
             // Apply colors to Info button and modal (if they exist on this page)
@@ -12532,7 +12538,7 @@ app.get('/offering-detail', async (c) => {
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">Ready to Dine?</h3>' +
                         '<p class="text-gray-600 mb-4">Reserve your table and choose your preferred seating</p>' +
                         '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
-                        'class="w-full bg-green-600 text-white py-4 px-6 rounded-lg font-semibold hover:bg-green-700 transition-colors text-lg">' +
+                        'class="w-full bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-calendar-check mr-2"></i>Book a Table</button>';
                 }
                 loadRestaurantMenus();
