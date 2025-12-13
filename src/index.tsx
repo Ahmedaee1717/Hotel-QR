@@ -17035,13 +17035,21 @@ app.get('/admin/dashboard', (c) => {
 <body class="bg-gray-50 transition-colors duration-300">
     <!-- Professional Header with Logo -->
     <div class="bg-white border-b border-gray-200 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <!-- Logo and Brand -->
-            <div class="flex items-center gap-3">
-                <img src="/guestconnect-logo.png" alt="GuestConnect" class="h-10 w-auto">
-                <div class="hidden md:block border-l border-gray-300 pl-3 ml-3">
-                    <h1 class="text-xl font-bold text-gray-800">Admin Dashboard</h1>
-                    <p class="text-xs text-gray-500">Property Management System</p>
+            <div class="flex items-center gap-4" style="margin-left: -8px;">
+                <div class="flex items-center gap-2">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                        <i class="fas fa-concierge-bell text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-xl font-bold text-gray-900">GuestConnect</div>
+                        <div class="text-xs text-gray-500">Property Platform</div>
+                    </div>
+                </div>
+                <div class="hidden lg:block border-l border-gray-300 pl-4 ml-2">
+                    <h1 class="text-lg font-semibold text-gray-700">Admin Dashboard</h1>
+                    <p class="text-xs text-gray-500">Manage your property</p>
                 </div>
             </div>
             
