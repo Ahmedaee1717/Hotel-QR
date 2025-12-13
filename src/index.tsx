@@ -9460,12 +9460,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const el = document.getElementById('section-heading-' + section);
                 if (el) {
                     const fieldName = 'section_' + section;
-                    // Try database first, then fall back to translations object
-                    let translated = getTranslatedField(propertyData, fieldName);
-                    if (!translated && translations[currentLanguage]) {
-                        // Map 'service' to 'services' for translations object
+                    // Check if database has THIS language's field
+                    const dbField = propertyData[fieldName + '_' + currentLanguage];
+                    let translated;
+                    if (dbField) {
+                        // Use database value if exists
+                        translated = dbField;
+                    } else if (translations[currentLanguage]) {
+                        // Fall back to translations object for languages not in database
                         const translationKey = section === 'service' ? 'services' : section;
                         translated = translations[currentLanguage][translationKey];
+                    } else {
+                        // Final fallback to English
+                        translated = propertyData[fieldName + '_en'] || '';
                     }
                     console.log('  ' + section + ': "' + translated + '"');
                     if (translated) {
@@ -9477,12 +9484,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const pillEl = document.getElementById('pill-' + section);
                 if (pillEl) {
                     const fieldName = 'section_' + section;
-                    // Try database first, then fall back to translations object
-                    let translated = getTranslatedField(propertyData, fieldName);
-                    if (!translated && translations[currentLanguage]) {
-                        // Map 'service' to 'services' for translations object
+                    // Check if database has THIS language's field
+                    const dbField = propertyData[fieldName + '_' + currentLanguage];
+                    let translated;
+                    if (dbField) {
+                        // Use database value if exists
+                        translated = dbField;
+                    } else if (translations[currentLanguage]) {
+                        // Fall back to translations object for languages not in database
                         const translationKey = section === 'service' ? 'services' : section;
                         translated = translations[currentLanguage][translationKey];
+                    } else {
+                        // Final fallback to English
+                        translated = propertyData[fieldName + '_en'] || '';
                     }
                     if (translated) {
                         pillEl.textContent = translated;
@@ -10394,11 +10408,19 @@ app.get('/hotel/:property_slug', async (c) => {
             const headingEl = document.getElementById(\`section-heading-\${section}\`);
             if (headingEl) {
               const key = \`section_\${section}_\${lang}\`;
-              // Try database, then English fallback, then translations object
-              let text = propertyData[key] || propertyData[\`section_\${section}_en\`];
-              if (!text && translations[lang]) {
+              // Check if database has THIS language's field
+              const dbField = propertyData[key];
+              let text;
+              if (dbField) {
+                // Use database value if exists
+                text = dbField;
+              } else if (translations[lang]) {
+                // Fall back to translations object for languages not in database
                 const translationKey = section === 'service' ? 'services' : section;
                 text = translations[lang][translationKey];
+              } else {
+                // Final fallback to English
+                text = propertyData[\`section_\${section}_en\`] || '';
               }
               if (text) headingEl.textContent = text;
             }
