@@ -22018,6 +22018,29 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Analytics Dashboard Modal -->
+    <div id="analyticsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-2xl font-bold"><i class="fas fa-chart-line mr-2"></i>Feedback Analytics Dashboard</h3>
+                    <p class="text-sm text-blue-100 mt-1">Comprehensive insights & trends</p>
+                </div>
+                <button onclick="closeAnalyticsModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div id="analyticsContent">
+                    <div class="text-center py-12">
+                        <i class="fas fa-spinner fa-spin text-5xl text-blue-600 mb-4"></i>
+                        <p class="text-gray-600 text-lg">Loading analytics...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
@@ -26415,8 +26438,243 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // View analytics
-      function viewAnalytics() {
-        alert('Detailed analytics dashboard - Coming soon!');
+      async function viewAnalytics() {
+        const modal = document.getElementById('analyticsModal');
+        modal.classList.remove('hidden');
+        await loadAnalyticsData();
+      }
+
+      async function loadAnalyticsData() {
+        try {
+          const response = await fetch('/api/admin/feedback/analytics/' + propertyId);
+          const data = await response.json();
+          
+          if (!data.success) {
+            throw new Error('Failed to load analytics');
+          }
+          
+          const stats = data.stats;
+          const recentSubmissions = data.recent_submissions || [];
+          const insights = data.insights || [];
+          
+          const container = document.getElementById('analyticsContent');
+          
+          // Calculate percentages
+          const totalSubmissions = stats.total_submissions || 0;
+          const positivePercent = totalSubmissions > 0 ? ((stats.positive_count / totalSubmissions) * 100).toFixed(1) : 0;
+          const negativePercent = totalSubmissions > 0 ? ((stats.negative_count / totalSubmissions) * 100).toFixed(1) : 0;
+          const neutralPercent = totalSubmissions > 0 ? (100 - positivePercent - negativePercent).toFixed(1) : 0;
+          
+          container.innerHTML = \`
+            <!-- Key Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                  <i class="fas fa-inbox text-4xl opacity-80"></i>
+                  <span class="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">Total</span>
+                </div>
+                <h4 class="text-3xl font-bold mb-1">\${totalSubmissions}</h4>
+                <p class="text-blue-100 text-sm">Total Submissions</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                  <i class="fas fa-smile text-4xl opacity-80"></i>
+                  <span class="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">\${positivePercent}%</span>
+                </div>
+                <h4 class="text-3xl font-bold mb-1">\${stats.positive_count || 0}</h4>
+                <p class="text-green-100 text-sm">Positive Feedback</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                  <i class="fas fa-frown text-4xl opacity-80"></i>
+                  <span class="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">\${negativePercent}%</span>
+                </div>
+                <h4 class="text-3xl font-bold mb-1">\${stats.negative_count || 0}</h4>
+                <p class="text-red-100 text-sm">Negative Feedback</p>
+              </div>
+              
+              <div class="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                  <i class="fas fa-exclamation-triangle text-4xl opacity-80"></i>
+                  <span class="text-xs font-semibold bg-white/20 px-3 py-1 rounded-full">Urgent</span>
+                </div>
+                <h4 class="text-3xl font-bold mb-1">\${stats.urgent_count || 0}</h4>
+                <p class="text-orange-100 text-sm">Requires Attention</p>
+              </div>
+            </div>
+
+            <!-- Sentiment Overview -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <!-- Sentiment Distribution -->
+              <div class="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md">
+                <h4 class="text-xl font-bold mb-4 flex items-center">
+                  <i class="fas fa-chart-pie mr-2 text-indigo-600"></i>
+                  Sentiment Distribution
+                </h4>
+                <div class="space-y-4">
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-sm font-semibold text-gray-700">
+                        <i class="fas fa-smile text-green-600 mr-2"></i>Positive
+                      </span>
+                      <span class="text-sm font-bold text-green-600">\${stats.positive_count || 0} (\${positivePercent}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                      <div class="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all duration-500" style="width: \${positivePercent}%"></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-sm font-semibold text-gray-700">
+                        <i class="fas fa-meh text-yellow-600 mr-2"></i>Neutral
+                      </span>
+                      <span class="text-sm font-bold text-yellow-600">\${totalSubmissions - (stats.positive_count || 0) - (stats.negative_count || 0)} (\${neutralPercent}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                      <div class="bg-gradient-to-r from-yellow-400 to-yellow-600 h-3 rounded-full transition-all duration-500" style="width: \${neutralPercent}%"></div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <span class="text-sm font-semibold text-gray-700">
+                        <i class="fas fa-frown text-red-600 mr-2"></i>Negative
+                      </span>
+                      <span class="text-sm font-bold text-red-600">\${stats.negative_count || 0} (\${negativePercent}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                      <div class="bg-gradient-to-r from-red-400 to-red-600 h-3 rounded-full transition-all duration-500" style="width: \${negativePercent}%"></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-semibold text-gray-700">Average Sentiment Score</span>
+                    <span class="text-2xl font-bold text-indigo-600">\${((stats.avg_sentiment || 0) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div class="bg-gradient-to-r from-indigo-400 to-indigo-600 h-2 rounded-full" style="width: \${(stats.avg_sentiment || 0) * 100}%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Active Insights -->
+              <div class="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md">
+                <h4 class="text-xl font-bold mb-4 flex items-center justify-between">
+                  <span>
+                    <i class="fas fa-lightbulb mr-2 text-orange-600"></i>
+                    Active Insights
+                  </span>
+                  <span class="px-3 py-1 bg-orange-100 text-orange-800 text-sm font-bold rounded-full">\${insights.length}</span>
+                </h4>
+                
+                \${insights.length > 0 ? \`
+                  <div class="space-y-3 max-h-80 overflow-y-auto">
+                    \${insights.slice(0, 5).map(insight => \`
+                      <div class="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg">
+                        <div class="flex items-start justify-between mb-2">
+                          <h5 class="font-bold text-gray-900 flex-1">\${insight.title}</h5>
+                          <span class="px-2 py-1 bg-\${insight.priority === 'critical' ? 'red' : insight.priority === 'high' ? 'orange' : 'yellow'}-100 text-\${insight.priority === 'critical' ? 'red' : insight.priority === 'high' ? 'orange' : 'yellow'}-800 text-xs font-bold rounded uppercase ml-2">
+                            \${insight.priority}
+                          </span>
+                        </div>
+                        <p class="text-sm text-gray-700 mb-2">\${insight.description}</p>
+                        <p class="text-xs text-gray-600">
+                          <i class="fas fa-wrench mr-1"></i>
+                          <strong>Action:</strong> \${insight.action_suggested}
+                        </p>
+                      </div>
+                    \`).join('')}
+                  </div>
+                \` : \`
+                  <div class="text-center py-8">
+                    <i class="fas fa-check-circle text-5xl text-green-500 mb-3"></i>
+                    <p class="text-gray-600">No active insights</p>
+                    <p class="text-sm text-gray-500 mt-1">All issues have been resolved!</p>
+                  </div>
+                \`}
+              </div>
+            </div>
+
+            <!-- Recent Submissions Timeline -->
+            <div class="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md">
+              <h4 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fas fa-clock mr-2 text-blue-600"></i>
+                Recent Submissions
+              </h4>
+              
+              \${recentSubmissions.length > 0 ? \`
+                <div class="space-y-3">
+                  \${recentSubmissions.map((sub, idx) => {
+                    const date = new Date(sub.submitted_at);
+                    const sentimentColor = sub.sentiment_label === 'positive' ? 'green' : 
+                                          sub.sentiment_label === 'negative' ? 'red' : 'yellow';
+                    const sentimentIcon = sub.sentiment_label === 'positive' ? 'smile' : 
+                                         sub.sentiment_label === 'negative' ? 'frown' : 'meh';
+                    
+                    return \`
+                      <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:shadow-md transition-shadow cursor-pointer" onclick="viewSubmissionDetail('\${sub.submission_id}')">
+                        <div class="flex-shrink-0 w-12 h-12 bg-\${sentimentColor}-100 rounded-full flex items-center justify-center">
+                          <i class="fas fa-\${sentimentIcon} text-2xl text-\${sentimentColor}-600"></i>
+                        </div>
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2 mb-1">
+                            <h5 class="font-bold text-gray-900">\${sub.form_name}</h5>
+                            \${sub.is_urgent ? '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full">URGENT</span>' : ''}
+                          </div>
+                          <p class="text-sm text-gray-600">
+                            \${sub.guest_name || 'Anonymous'} 
+                            \${sub.room_number ? '• Room ' + sub.room_number : ''}
+                            • \${date.toLocaleString()}
+                          </p>
+                        </div>
+                        <div class="text-right">
+                          <span class="px-3 py-1 bg-\${sentimentColor}-100 text-\${sentimentColor}-800 text-sm font-semibold rounded-full">
+                            \${(sub.sentiment_score * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    \`;
+                  }).join('')}
+                </div>
+              \` : \`
+                <div class="text-center py-12">
+                  <i class="fas fa-inbox text-5xl text-gray-300 mb-3"></i>
+                  <p class="text-gray-500">No submissions yet</p>
+                </div>
+              \`}
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-6 flex gap-4">
+              <button onclick="closeAnalyticsModal()" class="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-semibold">
+                <i class="fas fa-arrow-left mr-2"></i>Close
+              </button>
+              <button onclick="alert('Export feature coming soon!')" class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold shadow-lg">
+                <i class="fas fa-download mr-2"></i>Export Report
+              </button>
+            </div>
+          \`;
+        } catch (error) {
+          console.error('Load analytics error:', error);
+          document.getElementById('analyticsContent').innerHTML = \`
+            <div class="text-center py-12">
+              <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+              <p class="text-red-600 text-lg font-semibold">Failed to load analytics</p>
+              <button onclick="loadAnalyticsData()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <i class="fas fa-redo mr-2"></i>Retry
+              </button>
+            </div>
+          \`;
+        }
+      }
+
+      function closeAnalyticsModal() {
+        document.getElementById('analyticsModal').classList.add('hidden');
       }
 
       // View insights
