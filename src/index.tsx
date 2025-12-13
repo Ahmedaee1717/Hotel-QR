@@ -9460,7 +9460,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 const el = document.getElementById('section-heading-' + section);
                 if (el) {
                     const fieldName = 'section_' + section;
-                    const translated = getTranslatedField(propertyData, fieldName);
+                    // Try database first, then fall back to translations object
+                    let translated = getTranslatedField(propertyData, fieldName);
+                    if (!translated && translations[currentLanguage]) {
+                        // Map 'service' to 'services' for translations object
+                        const translationKey = section === 'service' ? 'services' : section;
+                        translated = translations[currentLanguage][translationKey];
+                    }
                     console.log('  ' + section + ': "' + translated + '"');
                     if (translated) {
                         el.textContent = translated;
@@ -9471,7 +9477,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 const pillEl = document.getElementById('pill-' + section);
                 if (pillEl) {
                     const fieldName = 'section_' + section;
-                    const translated = getTranslatedField(propertyData, fieldName);
+                    // Try database first, then fall back to translations object
+                    let translated = getTranslatedField(propertyData, fieldName);
+                    if (!translated && translations[currentLanguage]) {
+                        // Map 'service' to 'services' for translations object
+                        const translationKey = section === 'service' ? 'services' : section;
+                        translated = translations[currentLanguage][translationKey];
+                    }
                     if (translated) {
                         pillEl.textContent = translated;
                     }
@@ -10382,7 +10394,13 @@ app.get('/hotel/:property_slug', async (c) => {
             const headingEl = document.getElementById(\`section-heading-\${section}\`);
             if (headingEl) {
               const key = \`section_\${section}_\${lang}\`;
-              headingEl.textContent = propertyData[key] || propertyData[\`section_\${section}_en\`] || headingEl.textContent;
+              // Try database, then English fallback, then translations object
+              let text = propertyData[key] || propertyData[\`section_\${section}_en\`];
+              if (!text && translations[lang]) {
+                const translationKey = section === 'service' ? 'services' : section;
+                text = translations[lang][translationKey];
+              }
+              if (text) headingEl.textContent = text;
             }
           });
           
