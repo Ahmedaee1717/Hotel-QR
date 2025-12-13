@@ -9616,6 +9616,9 @@ app.get('/hotel/:property_slug', async (c) => {
             console.log('🔄 Reloading page with new language...');
             window.location.reload();
         }
+        
+        // Make changeLanguage available globally for inline event handler
+        window.changeLanguage = changeLanguage;
 
         function applyDesignSettings(settings) {
           // Font family mapping
@@ -11399,6 +11402,16 @@ app.get('/hotel/:property_slug', async (c) => {
                 languageSelector.value = currentLanguage;
                 console.log('🎯 Language selector initialized to:', currentLanguage);
             }
+            
+            // Expose functions to window for inline event handlers (required for type="module")
+            window.viewOffering = viewOffering;
+            window.viewActivity = viewActivity;
+            window.filterOfferings = filterOfferings;
+            window.goToBeachBooking = goToBeachBooking;
+            window.openMapModal = openMapModal;
+            window.closeMapModal = closeMapModal;
+            window.showHotspotInfo = showHotspotInfo;
+            window.closeHotspotModal = closeHotspotModal;
             
             // Initialize the page
             init().then(() => {
