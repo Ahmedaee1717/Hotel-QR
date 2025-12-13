@@ -21871,6 +21871,49 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- Submissions Modal -->
+    <div id="submissionsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-2xl font-bold"><i class="fas fa-comments mr-2"></i>Form Submissions</h3>
+                    <p class="text-sm text-blue-100 mt-1" id="submissionsFormName"></p>
+                </div>
+                <button onclick="closeSubmissionsModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div id="submissionsList">
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+                        <p class="text-gray-600">Loading submissions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Submission Detail Modal -->
+    <div id="submissionDetailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>Submission Details</h3>
+                <button onclick="closeSubmissionDetailModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div id="submissionDetailContent">
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+                        <p class="text-gray-600">Loading details...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
@@ -25401,7 +25444,7 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="generateQR(\${form.form_id}, '\${form.form_name}')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 whitespace-nowrap">
                       <i class="fas fa-qrcode mr-1"></i>QR Code
                     </button>
-                    <button onclick="viewFormSubmissions(\${form.form_id})" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 whitespace-nowrap">
+                    <button onclick="viewFormSubmissions(\${form.form_id}, '\${form.form_name.replace(/'/g, "\\\\'")}')" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 whitespace-nowrap">
                       <i class="fas fa-eye mr-1"></i>View Responses
                     </button>
                     <button onclick="copyFormLink(\${form.form_id})" class="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 whitespace-nowrap">
@@ -25855,9 +25898,228 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // View form submissions
-      function viewFormSubmissions(formId) {
-        // TODO: Implement detailed submissions view
-        alert('Form submissions view - Coming soon!');
+      async function viewFormSubmissions(formId, formName) {
+        const modal = document.getElementById('submissionsModal');
+        const formNameEl = document.getElementById('submissionsFormName');
+        formNameEl.textContent = formName || 'Loading...';
+        modal.classList.remove('hidden');
+        await loadSubmissions(formId);
+      }
+
+      async function loadSubmissions(formId) {
+        try {
+          const response = await fetch('/api/admin/feedback/forms/' + formId + '/submissions');
+          const data = await response.json();
+          
+          const container = document.getElementById('submissionsList');
+          
+          if (!data.submissions || data.submissions.length === 0) {
+            container.innerHTML = \`
+              <div class="text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No submissions yet</p>
+                <p class="text-gray-400 text-sm mt-2">Submissions will appear here once guests complete this form</p>
+              </div>
+            \`;
+            return;
+          }
+
+          container.innerHTML = \`
+            <div class="space-y-4">
+              \${data.submissions.map(sub => {
+                const date = new Date(sub.submitted_at);
+                const sentimentColor = sub.sentiment_label === 'positive' ? 'green' : 
+                                      sub.sentiment_label === 'negative' ? 'red' : 'yellow';
+                const sentimentIcon = sub.sentiment_label === 'positive' ? 'smile' : 
+                                     sub.sentiment_label === 'negative' ? 'frown' : 'meh';
+                
+                return \`
+                  <div class="bg-white border-2 \${sub.is_urgent ? 'border-red-500' : 'border-gray-200'} rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer"
+                       onclick="viewSubmissionDetail('\${sub.submission_id}')">
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                          <h4 class="font-bold text-lg text-gray-900">\${sub.guest_name || 'Anonymous'}</h4>
+                          \${sub.is_urgent ? '<span class="px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full"><i class="fas fa-exclamation-triangle mr-1"></i>URGENT</span>' : ''}
+                          <span class="px-2 py-1 bg-\${sentimentColor}-100 text-\${sentimentColor}-800 text-xs font-semibold rounded-full">
+                            <i class="fas fa-\${sentimentIcon} mr-1"></i>\${sub.sentiment_label}
+                          </span>
+                        </div>
+                        <div class="text-sm text-gray-600 space-y-1">
+                          <p><i class="fas fa-door-open mr-2"></i>Room: <strong>\${sub.room_number || 'N/A'}</strong></p>
+                          <p><i class="fas fa-envelope mr-2"></i>\${sub.guest_email || 'No email'}</p>
+                          <p><i class="fas fa-clock mr-2"></i>\${date.toLocaleString()}</p>
+                          <p><i class="fas fa-chart-line mr-2"></i>Sentiment Score: <strong>\${(sub.sentiment_score * 100).toFixed(1)}%</strong></p>
+                        </div>
+                      </div>
+                      <button class="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-eye mr-2"></i>View Details
+                      </button>
+                    </div>
+                  </div>
+                \`;
+              }).join('')}
+            </div>
+          \`;
+        } catch (error) {
+          console.error('Load submissions error:', error);
+          document.getElementById('submissionsList').innerHTML = \`
+            <div class="text-center py-12">
+              <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+              <p class="text-red-600 text-lg">Failed to load submissions</p>
+              <button onclick="loadSubmissions('\${formId}')" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <i class="fas fa-redo mr-2"></i>Retry
+              </button>
+            </div>
+          \`;
+        }
+      }
+
+      function closeSubmissionsModal() {
+        document.getElementById('submissionsModal').classList.add('hidden');
+      }
+
+      async function viewSubmissionDetail(submissionId) {
+        const modal = document.getElementById('submissionDetailModal');
+        modal.classList.remove('hidden');
+        await loadSubmissionDetail(submissionId);
+      }
+
+      async function loadSubmissionDetail(submissionId) {
+        try {
+          const response = await fetch('/api/admin/feedback/submissions/' + submissionId);
+          const data = await response.json();
+          
+          const container = document.getElementById('submissionDetailContent');
+          const submission = data.submission;
+          const date = new Date(submission.submitted_at);
+          
+          const sentimentColor = submission.sentiment_label === 'positive' ? 'green' : 
+                                submission.sentiment_label === 'negative' ? 'red' : 'yellow';
+          const sentimentIcon = submission.sentiment_label === 'positive' ? 'smile' : 
+                               submission.sentiment_label === 'negative' ? 'frown' : 'meh';
+          
+          container.innerHTML = \`
+            <div class="space-y-6">
+              <!-- Header Info -->
+              <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6">
+                <h4 class="text-2xl font-bold text-gray-900 mb-4">\${submission.form_name}</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-white rounded-lg p-4 shadow-sm">
+                    <p class="text-sm text-gray-600 mb-1"><i class="fas fa-user mr-2"></i>Guest Name</p>
+                    <p class="text-lg font-bold text-gray-900">\${submission.guest_name || 'Anonymous'}</p>
+                  </div>
+                  <div class="bg-white rounded-lg p-4 shadow-sm">
+                    <p class="text-sm text-gray-600 mb-1"><i class="fas fa-door-open mr-2"></i>Room Number</p>
+                    <p class="text-lg font-bold text-gray-900">\${submission.room_number || 'N/A'}</p>
+                  </div>
+                  <div class="bg-white rounded-lg p-4 shadow-sm">
+                    <p class="text-sm text-gray-600 mb-1"><i class="fas fa-envelope mr-2"></i>Email</p>
+                    <p class="text-lg font-bold text-gray-900 break-all">\${submission.guest_email || 'N/A'}</p>
+                  </div>
+                  <div class="bg-white rounded-lg p-4 shadow-sm">
+                    <p class="text-sm text-gray-600 mb-1"><i class="fas fa-clock mr-2"></i>Submitted</p>
+                    <p class="text-lg font-bold text-gray-900">\${date.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sentiment Analysis -->
+              <div class="bg-white border-2 border-gray-200 rounded-lg p-6">
+                <h5 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-brain mr-2"></i>AI Sentiment Analysis</h5>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="text-center p-4 bg-\${sentimentColor}-50 rounded-lg">
+                    <i class="fas fa-\${sentimentIcon} text-4xl text-\${sentimentColor}-600 mb-2"></i>
+                    <p class="text-sm text-gray-600">Sentiment</p>
+                    <p class="text-xl font-bold text-\${sentimentColor}-700 capitalize">\${submission.sentiment_label}</p>
+                  </div>
+                  <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <i class="fas fa-chart-line text-4xl text-blue-600 mb-2"></i>
+                    <p class="text-sm text-gray-600">Confidence Score</p>
+                    <p class="text-xl font-bold text-blue-700">\${(submission.sentiment_score * 100).toFixed(1)}%</p>
+                  </div>
+                </div>
+                \${submission.is_urgent ? \`
+                  <div class="mt-4 p-4 bg-red-50 border-2 border-red-500 rounded-lg">
+                    <p class="text-red-800 font-bold">
+                      <i class="fas fa-exclamation-triangle mr-2"></i>
+                      URGENT: This submission requires immediate attention
+                    </p>
+                  </div>
+                \` : ''}
+              </div>
+
+              <!-- Answers -->
+              <div class="bg-white border-2 border-gray-200 rounded-lg p-6">
+                <h5 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-comments mr-2"></i>Responses</h5>
+                <div class="space-y-4">
+                  \${submission.answers.map((answer, idx) => {
+                    let answerDisplay = answer.answer_text;
+                    
+                    // Handle rating display
+                    if (answer.question_type === 'rating' && answer.answer_text) {
+                      const rating = parseInt(answer.answer_text);
+                      answerDisplay = '<div class="flex items-center gap-1">' + 
+                        Array(5).fill(0).map((_, i) => 
+                          \`<i class="fas fa-star text-xl \${i < rating ? 'text-yellow-500' : 'text-gray-300'}"></i>\`
+                        ).join('') + 
+                        \`<span class="ml-2 text-gray-600">(\${rating}/5)</span></div>\`;
+                    }
+                    
+                    // Handle yes/no display
+                    if (answer.question_type === 'yes_no') {
+                      const isYes = answer.answer_text?.toLowerCase() === 'yes';
+                      answerDisplay = \`
+                        <span class="inline-flex items-center px-4 py-2 rounded-full \${isYes ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                          <i class="fas fa-\${isYes ? 'check' : 'times'} mr-2"></i>
+                          \${answer.answer_text}
+                        </span>
+                      \`;
+                    }
+
+                    return \`
+                      <div class="p-4 bg-gray-50 rounded-lg">
+                        <p class="text-sm font-semibold text-gray-700 mb-2">
+                          <i class="fas fa-question-circle mr-2 text-purple-600"></i>
+                          Question \${idx + 1}
+                        </p>
+                        <p class="text-gray-900 font-medium mb-3">\${answer.question_text}</p>
+                        <div class="pl-4 border-l-4 border-purple-600">
+                          \${answerDisplay}
+                        </div>
+                      </div>
+                    \`;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex gap-4">
+                <button onclick="closeSubmissionDetailModal()" class="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-semibold">
+                  <i class="fas fa-arrow-left mr-2"></i>Back to List
+                </button>
+                <button onclick="alert('Export feature coming soon!')" class="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold">
+                  <i class="fas fa-download mr-2"></i>Export PDF
+                </button>
+              </div>
+            </div>
+          \`;
+        } catch (error) {
+          console.error('Load submission detail error:', error);
+          document.getElementById('submissionDetailContent').innerHTML = \`
+            <div class="text-center py-12">
+              <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+              <p class="text-red-600 text-lg">Failed to load submission details</p>
+              <button onclick="loadSubmissionDetail('\${submissionId}')" class="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <i class="fas fa-redo mr-2"></i>Retry
+              </button>
+            </div>
+          \`;
+        }
+      }
+
+      function closeSubmissionDetailModal() {
+        document.getElementById('submissionDetailModal').classList.add('hidden');
       }
 
       // View analytics
