@@ -10436,22 +10436,21 @@ app.get('/hotel/:property_slug', async (c) => {
             if (key === 'pill-all') {
               el.textContent = translations[lang].all;
             } else if (key === 'pill-restaurants') {
-              const customName = getTranslatedField(propertyData, 'section_restaurants');
-              console.log('  pill-restaurants: getTranslatedField returned:', customName);
-              el.textContent = customName || translations[lang].restaurants;
-              console.log('  pill-restaurants: final value:', el.textContent);
+              const dbField = propertyData['section_restaurants_' + lang];
+              el.textContent = dbField || translations[lang].restaurants;
+              console.log('  pill-restaurants:', el.textContent);
             } else if (key === 'pill-events') {
-              const customName = getTranslatedField(propertyData, 'section_events');
-              el.textContent = customName || translations[lang].events;
+              const dbField = propertyData['section_events_' + lang];
+              el.textContent = dbField || translations[lang].events;
             } else if (key === 'pill-spa') {
-              const customName = getTranslatedField(propertyData, 'section_spa');
-              el.textContent = customName || translations[lang].spa;
+              const dbField = propertyData['section_spa_' + lang];
+              el.textContent = dbField || translations[lang].spa;
             } else if (key === 'pill-services') {
-              const customName = getTranslatedField(propertyData, 'section_service');
-              el.textContent = customName || translations[lang].services;
+              const dbField = propertyData['section_service_' + lang];
+              el.textContent = dbField || translations[lang].services;
             } else if (key === 'pill-activities') {
-              const customName = getTranslatedField(propertyData, 'section_activities');
-              el.textContent = customName || translations[lang].activities;
+              const dbField = propertyData['section_activities_' + lang];
+              el.textContent = dbField || translations[lang].activities;
             }
           });
         }
