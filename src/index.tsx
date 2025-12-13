@@ -10405,9 +10405,9 @@ app.get('/hotel/:property_slug', async (c) => {
           // Update section headings
           const sections = ['restaurants', 'events', 'spa', 'service', 'activities'];
           sections.forEach(section => {
-            const headingEl = document.getElementById(\`section-heading-\${section}\`);
+            const headingEl = document.getElementById('section-heading-' + section);
             if (headingEl) {
-              const key = \`section_\${section}_\${lang}\`;
+              const key = 'section_' + section + '_' + lang;
               // Check if database has THIS language's field
               const dbField = propertyData[key];
               let text;
@@ -10420,9 +10420,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 text = translations[lang][translationKey];
               } else {
                 // Final fallback to English
-                text = propertyData[\`section_\${section}_en\`] || '';
+                text = propertyData['section_' + section + '_en'] || '';
               }
-              if (text) headingEl.textContent = text;
+              if (text) {
+                console.log('🔄 Updating section heading:', section, '→', text);
+                headingEl.textContent = text;
+              }
             }
           });
           
