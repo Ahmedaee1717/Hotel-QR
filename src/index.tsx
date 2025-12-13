@@ -9154,6 +9154,7 @@ app.get('/hotel/:property_slug', async (c) => {
         let customSections = [];
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        console.log('🌐 Current language loaded:', currentLanguage);
         
         // Track QR code scan on page load
         async function trackQRScan() {
