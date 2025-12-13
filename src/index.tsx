@@ -7645,7 +7645,7 @@ app.post('/api/admin/beach/settings', async (c) => {
         button_text || 'Book Your Spot Now',
         bg_color_from || '#3b82f6',
         bg_color_to || '#06b6d4',
-        text_color || '#1f2937',
+        text_color || '#ffffff',
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
         button_text_color || '#3b82f6',
@@ -7688,7 +7688,7 @@ app.post('/api/admin/beach/settings', async (c) => {
         button_text || 'Book Your Spot Now',
         bg_color_from || '#3b82f6',
         bg_color_to || '#06b6d4',
-        text_color || '#1f2937',
+        text_color || '#ffffff',
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
         button_text_color || '#3b82f6'
@@ -24770,8 +24770,8 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('bgColorFromText').value = s.bg_color_from || '#3b82f6';
             document.getElementById('bgColorTo').value = s.bg_color_to || '#06b6d4';
             document.getElementById('bgColorToText').value = s.bg_color_to || '#06b6d4';
-            document.getElementById('textColor').value = s.text_color || '#1f2937';
-            document.getElementById('textColorText').value = s.text_color || '#1f2937';
+            document.getElementById('textColor').value = s.text_color || '#ffffff';
+            document.getElementById('textColorText').value = s.text_color || '#ffffff';
             document.getElementById('buttonColorFrom').value = s.button_color_from || '#ffffff';
             document.getElementById('buttonColorFromText').value = s.button_color_from || '#ffffff';
             document.getElementById('buttonColorTo').value = s.button_color_to || '#ffffff';
