@@ -21720,13 +21720,22 @@ app.get('/admin/dashboard', (c) => {
                 <!-- Display Options -->
                 <div class="mb-6 bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
                     <h4 class="text-lg font-bold mb-3 text-purple-900"><i class="fas fa-eye mr-2"></i>Display Options</h4>
-                    <label class="flex items-center space-x-3 cursor-pointer">
-                        <input type="checkbox" id="showOnHomepage" class="w-5 h-5 text-purple-600">
-                        <div>
-                            <span class="font-semibold">Show on Homepage</span>
-                            <p class="text-sm text-gray-600">Display this feedback form next to the Info tab on guest homepage</p>
-                        </div>
-                    </label>
+                    <div class="space-y-3">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="isActiveToggle" checked class="w-5 h-5 text-green-600">
+                            <div>
+                                <span class="font-semibold">Form Active</span>
+                                <p class="text-sm text-gray-600">Allow guests to submit this form</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="showOnHomepage" class="w-5 h-5 text-purple-600">
+                            <div>
+                                <span class="font-semibold">Show on Homepage</span>
+                                <p class="text-sm text-gray-600">Display this feedback form next to the Info tab on guest homepage</p>
+                            </div>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Questions Builder -->
@@ -25727,6 +25736,23 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       function closeFormBuilder() {
         document.getElementById('formBuilderModal').classList.add('hidden');
+        editingFormId = null;
+        formQuestions = [];
+        
+        // Reset form
+        document.getElementById('formName').value = '';
+        document.getElementById('formDescription').value = '';
+        document.getElementById('formType').value = 'feedback';
+        document.getElementById('requireRoomNumber').checked = false;
+        document.getElementById('requireGuestName').checked = false;
+        document.getElementById('requireEmail').checked = false;
+        document.getElementById('requirePhone').checked = false;
+        document.getElementById('thankYouMessage').value = '';
+        document.getElementById('isActiveToggle').checked = true;
+        document.getElementById('showOnHomepage').checked = false;
+        
+        // Reset modal title
+        document.querySelector('#formBuilderModal .text-2xl').innerHTML = '<i class="fas fa-edit mr-2"></i>Form Builder';
       }
 
       // Add question
@@ -25963,6 +25989,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       // Save form
       async function saveForm() {
+        // Check if we're in edit mode
+        if (editingFormId) {
+          await saveEditedForm();
+          return;
+        }
+        
         const formName = document.getElementById('formName').value;
         if (!formName) {
           alert('Please enter a form name');
@@ -26560,8 +26592,132 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
 
-      function editForm(formId) {
-        alert('Edit form functionality - Coming soon!\\n\\nFor now, you can delete and recreate the form.');
+      let editingFormId = null;
+
+      async function editForm(formId) {
+        try {
+          // Fetch form details
+          const response = await fetch('/api/admin/feedback/forms/' + formId + '/details');
+          const data = await response.json();
+          
+          if (!data.success) {
+            alert('Failed to load form details');
+            return;
+          }
+          
+          const form = data.form;
+          editingFormId = formId;
+          
+          // Populate form modal with existing data
+          document.getElementById('formName').value = form.form_name;
+          document.getElementById('formDescription').value = form.form_description || '';
+          document.getElementById('formType').value = form.form_type;
+          document.getElementById('requireRoomNumber').checked = form.require_room_number === 1;
+          document.getElementById('requireGuestName').checked = form.require_guest_name === 1;
+          document.getElementById('requireEmail').checked = form.require_email === 1;
+          document.getElementById('requirePhone').checked = form.require_phone === 1;
+          document.getElementById('thankYouMessage').value = form.thank_you_message || '';
+          document.getElementById('isActiveToggle').checked = form.is_active === 1;
+          
+          // Load existing questions
+          formQuestions = form.questions.map(q => ({
+            question_id: q.question_id, // Keep question_id for updates
+            question_text: q.question_text,
+            question_type: q.question_type,
+            is_required: q.is_required === 1,
+            options: q.options,
+            display_order: q.display_order
+          }));
+          
+          // Update modal title
+          document.querySelector('#formBuilderModal .text-2xl').innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Feedback Form';
+          
+          // Show step 2 (questions) since we're editing
+          document.getElementById('formStep1').classList.add('hidden');
+          document.getElementById('formStep2').classList.remove('hidden');
+          document.getElementById('formBuilderModal').classList.remove('hidden');
+          
+          renderQuestions();
+        } catch (error) {
+          console.error('Edit form error:', error);
+          alert('Failed to load form for editing');
+        }
+      }
+
+      async function saveEditedForm() {
+        const formName = document.getElementById('formName').value.trim();
+        const formDescription = document.getElementById('formDescription').value.trim();
+        const formType = document.getElementById('formType').value;
+        const requireRoomNumber = document.getElementById('requireRoomNumber').checked;
+        const requireGuestName = document.getElementById('requireGuestName').checked;
+        const requireEmail = document.getElementById('requireEmail').checked;
+        const requirePhone = document.getElementById('requirePhone').checked;
+        const thankYouMessage = document.getElementById('thankYouMessage').value.trim();
+        const isActive = document.getElementById('isActiveToggle').checked;
+        
+        if (!formName) {
+          alert('Please enter a form name');
+          return;
+        }
+        
+        if (formQuestions.length === 0) {
+          alert('Please add at least one question');
+          return;
+        }
+        
+        try {
+          // Update form details
+          const updateResponse = await fetch('/api/admin/feedback/forms/' + editingFormId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              form_name: formName,
+              form_description: formDescription,
+              is_active: isActive,
+              require_room_number: requireRoomNumber,
+              require_guest_name: requireGuestName,
+              require_email: requireEmail,
+              require_phone: requirePhone,
+              thank_you_message: thankYouMessage
+            })
+          });
+          
+          if (!updateResponse.ok) {
+            throw new Error('Failed to update form');
+          }
+          
+          // Delete all existing questions
+          const existingQuestions = formQuestions.filter(q => q.question_id);
+          for (const q of existingQuestions) {
+            await fetch('/api/admin/feedback/questions/' + q.question_id, {
+              method: 'DELETE'
+            });
+          }
+          
+          // Add all questions (both new and existing)
+          for (const question of formQuestions) {
+            await fetch('/api/admin/feedback/questions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                form_id: editingFormId,
+                question_text: question.question_text,
+                question_type: question.question_type,
+                is_required: question.is_required,
+                options: question.options,
+                display_order: question.display_order
+              })
+            });
+          }
+          
+          alert('✅ Form updated successfully!');
+          closeFormBuilder();
+          loadFeedbackTab();
+          editingFormId = null;
+        } catch (error) {
+          console.error('Save edited form error:', error);
+          alert('Failed to update form. Please try again.');
+        }
       }
 
       // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
