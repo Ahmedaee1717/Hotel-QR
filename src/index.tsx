@@ -9197,12 +9197,15 @@ app.get('/hotel/:property_slug', async (c) => {
                 'pill-services': 'Services',
                 'pill-activities': 'Activities',
                 'book-now': 'BOOK NOW',
+                'book-table': 'Book Table',
                 'reservations': 'Reservations',
                 'explore-menu': 'Explore Menu',
                 'learn-more': 'Learn More',
                 'discover': 'Discover',
                 'view-details': 'View Details',
                 'explore-more': 'Explore More',
+                'curated-by': 'Curated by',
+                'minutes': 'minutes',
                 'activities-experiences': 'Activities & Experiences',
                 'curated-experiences': 'Curated experiences from our trusted partners',
                 'hotel-map': 'Hotel Map & Layout',
@@ -9215,12 +9218,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             es: {
                 'book-now': 'RESERVAR AHORA',
+                'book-table': 'Reservar Mesa',
                 'reservations': 'Reservas',
                 'explore-menu': 'Explorar Men\u00fa',
                 'learn-more': 'Saber M\u00e1s',
                 'discover': 'Descubrir',
                 'view-details': 'Ver Detalles',
                 'explore-more': 'Explorar M\u00e1s',
+                'curated-by': 'Curado por',
+                'minutes': 'minutos',
                 'activities-experiences': 'Actividades y Experiencias',
                 'curated-experiences': 'Experiencias seleccionadas de nuestros socios de confianza',
                 'hotel-map': 'Mapa y Dise\u00f1o del Hotel',
@@ -9233,12 +9239,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             fr: {
                 'book-now': 'R\u00c9SERVER MAINTENANT',
+                'book-table': 'R\u00e9server une Table',
                 'reservations': 'R\u00e9servations',
                 'explore-menu': 'Explorer le Menu',
                 'learn-more': 'En Savoir Plus',
                 'discover': 'D\u00e9couvrir',
                 'view-details': 'Voir les D\u00e9tails',
                 'explore-more': 'Explorer Plus',
+                'curated-by': 'S\u00e9lectionn\u00e9 par',
+                'minutes': 'minutes',
                 'activities-experiences': 'Activit\u00e9s et Exp\u00e9riences',
                 'curated-experiences': 'Exp\u00e9riences s\u00e9lectionn\u00e9es par nos partenaires de confiance',
                 'hotel-map': 'Plan et Agencement de l\\'H\u00f4tel',
@@ -9251,12 +9260,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             de: {
                 'book-now': 'JETZT BUCHEN',
+                'book-table': 'Tisch Reservieren',
                 'reservations': 'Reservierungen',
                 'explore-menu': 'Men\u00fc Erkunden',
                 'learn-more': 'Mehr Erfahren',
                 'discover': 'Entdecken',
                 'view-details': 'Details Anzeigen',
                 'explore-more': 'Mehr Erkunden',
+                'curated-by': 'Kuratiert von',
+                'minutes': 'Minuten',
                 'activities-experiences': 'Aktivit\u00e4ten und Erlebnisse',
                 'curated-experiences': 'Ausgew\u00e4hlte Erlebnisse von unseren vertrauensw\u00fcrdigen Partnern',
                 'hotel-map': 'Hotelplan und Layout',
@@ -9269,12 +9281,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             it: {
                 'book-now': 'PRENOTA ORA',
+                'book-table': 'Prenota Tavolo',
                 'reservations': 'Prenotazioni',
                 'explore-menu': 'Esplora il Menu',
                 'learn-more': 'Scopri di Pi\u00f9',
                 'discover': 'Scopri',
                 'view-details': 'Vedi Dettagli',
                 'explore-more': 'Esplora di Pi\u00f9',
+                'curated-by': 'Curato da',
+                'minutes': 'minuti',
                 'activities-experiences': 'Attivit\u00e0 ed Esperienze',
                 'curated-experiences': 'Esperienze selezionate dai nostri partner fidati',
                 'hotel-map': 'Mappa e Layout dell\\'Hotel',
@@ -9287,12 +9302,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             pt: {
                 'book-now': 'RESERVAR AGORA',
+                'book-table': 'Reservar Mesa',
                 'reservations': 'Reservas',
                 'explore-menu': 'Explorar Menu',
                 'learn-more': 'Saiba Mais',
                 'discover': 'Descobrir',
                 'view-details': 'Ver Detalhes',
                 'explore-more': 'Explorar Mais',
+                'curated-by': 'Selecionado por',
+                'minutes': 'minutos',
                 'activities-experiences': 'Atividades e Experi\u00eancias',
                 'curated-experiences': 'Experi\u00eancias selecionadas de nossos parceiros confi\u00e1veis',
                 'hotel-map': 'Mapa e Layout do Hotel',
@@ -9305,12 +9323,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             ru: {
                 'book-now': '\u0417\u0410\u0411\u0420\u041e\u041d\u0418\u0420\u041e\u0412\u0410\u0422\u042c \u0421\u0415\u0419\u0427\u0410\u0421',
+                'book-table': '\u0417\u0430\u0431\u0440\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0442\u043e\u043b\u0438\u043a',
                 'reservations': '\u0411\u0440\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f',
                 'explore-menu': '\u041f\u043e\u0441\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u043c\u0435\u043d\u044e',
                 'learn-more': '\u0423\u0437\u043d\u0430\u0442\u044c \u0431\u043e\u043b\u044c\u0448\u0435',
                 'discover': '\u041e\u0442\u043a\u0440\u044b\u0442\u044c',
                 'view-details': '\u041f\u043e\u0434\u0440\u043e\u0431\u043d\u043e\u0441\u0442\u0438',
                 'explore-more': '\u0418\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u044c \u0431\u043e\u043b\u044c\u0448\u0435',
+                'curated-by': '\u041f\u043e\u0434\u043e\u0431\u0440\u0430\u043d\u043e',
+                'minutes': '\u043c\u0438\u043d\u0443\u0442',
                 'activities-experiences': '\u0410\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u0438 \u043e\u043f\u044b\u0442',
                 'curated-experiences': '\u0422\u0449\u0430\u0442\u0435\u043b\u044c\u043d\u043e \u043e\u0442\u043e\u0431\u0440\u0430\u043d\u043d\u044b\u0435 \u0432\u043f\u0435\u0447\u0430\u0442\u043b\u0435\u043d\u0438\u044f \u043e\u0442 \u043d\u0430\u0448\u0438\u0445 \u043d\u0430\u0434\u0435\u0436\u043d\u044b\u0445 \u043f\u0430\u0440\u0442\u043d\u0435\u0440\u043e\u0432',
                 'hotel-map': '\u041a\u0430\u0440\u0442\u0430 \u0438 \u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u043a\u0430 \u043e\u0442\u0435\u043b\u044f',
@@ -9323,12 +9344,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             ar: {
                 'book-now': '\u0627\u062d\u062c\u0632 \u0627\u0644\u0622\u0646',
+                'book-table': '\u0627\u062d\u062c\u0632 \u0637\u0627\u0648\u0644\u0629',
                 'reservations': '\u0627\u0644\u062d\u062c\u0648\u0632\u0627\u062a',
                 'explore-menu': '\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0642\u0627\u0626\u0645\u0629',
                 'learn-more': '\u0627\u0639\u0631\u0641 \u0627\u0644\u0645\u0632\u064a\u062f',
                 'discover': '\u0627\u0643\u062a\u0634\u0641',
                 'view-details': '\u0639\u0631\u0636 \u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644',
                 'explore-more': '\u0627\u0633\u062a\u0643\u0634\u0641 \u0627\u0644\u0645\u0632\u064a\u062f',
+                'curated-by': '\u0645\u0646\u062a\u0642\u0649 \u0645\u0646',
+                'minutes': '\u062f\u0642\u0627\u0626\u0642',
                 'activities-experiences': '\u0627\u0644\u0623\u0646\u0634\u0637\u0629 \u0648\u0627\u0644\u062a\u062c\u0627\u0631\u0628',
                 'curated-experiences': '\u062a\u062c\u0627\u0631\u0628 \u0645\u0646\u062a\u0642\u0627\u0629 \u0645\u0646 \u0634\u0631\u0643\u0627\u0626\u0646\u0627 \u0627\u0644\u0645\u0648\u062b\u0648\u0642\u064a\u0646',
                 'hotel-map': '\u062e\u0631\u064a\u0637\u0629 \u0648\u062a\u0635\u0645\u064a\u0645 \u0627\u0644\u0641\u0646\u062f\u0642',
@@ -9341,12 +9365,15 @@ app.get('/hotel/:property_slug', async (c) => {
             },
             zh: {
                 'book-now': '\u7acb\u5373\u9884\u8ba2',
+                'book-table': '\u9884\u8ba2\u9910\u684c',
                 'reservations': '\u9884\u8ba2',
                 'explore-menu': '\u63a2\u7d22\u83dc\u5355',
                 'learn-more': '\u4e86\u89e3\u66f4\u591a',
                 'discover': '\u53d1\u73b0',
                 'view-details': '\u67e5\u770b\u8be6\u60c5',
                 'explore-more': '\u63a2\u7d22\u66f4\u591a',
+                'curated-by': '\u7cbe\u9009\u81ea',
+                'minutes': '\u5206\u949f',
                 'activities-experiences': '\u6d3b\u52a8\u548c\u4f53\u9a8c',
                 'curated-experiences': '\u7531\u6211\u4eec\u7684\u53ef\u4fe1\u8d56\u5408\u4f5c\u4f19\u4f34\u7cbe\u9009\u7684\u4f53\u9a8c',
                 'hotel-map': '\u9152\u5e97\u5730\u56fe\u548c\u5e03\u5c40',
@@ -10716,7 +10743,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (restaurants.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full">No restaurants available</p>';
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">' + t('no-restaurants') + '</p>';
                 return;
             }
             
@@ -10743,7 +10770,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <div class="pt-3 border-t border-gray-100 flex gap-2">
                             <button onclick="window.location.href='/hotel/' + propertySlug + '/restaurant/' + \${r.offering_id} + '/book'" 
                                     class="flex-1 bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
-                                <i class="fas fa-calendar-plus mr-2"></i>Book Table
+                                <i class="fas fa-calendar-plus mr-2"></i>\${t('book-table')}
                             </button>
                             <button onclick="viewOffering(\${r.offering_id})" 
                                     class="px-4 py-2.5 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -10766,7 +10793,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (events.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500">No upcoming events</p>';
+                grid.innerHTML = '<p class="text-gray-500">' + t('no-events') + '</p>';
                 return;
             }
             
@@ -10810,7 +10837,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (spa.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full">No spa services available</p>';
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">' + t('no-spa') + '</p>';
                 return;
             }
             
@@ -10830,7 +10857,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${s.duration_minutes} minutes</span>
+                            <span>\${s.duration_minutes} \${t('minutes')}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('discover')}</span>
@@ -10852,7 +10879,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (services.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full">No services available</p>';
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">' + t('no-services') + '</p>';
                 return;
             }
             
@@ -10890,7 +10917,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (allActivities.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full">No activities available</p>';
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">' + t('no-activities') + '</p>';
                 return;
             }
             
@@ -10914,11 +10941,11 @@ app.get('/hotel/:property_slug', async (c) => {
                     </div>
                     <div class="p-5">
                         <h3 class="font-bold text-xl mb-1 text-gray-800">\${safeTitle}</h3>
-                        <p class="text-xs text-gray-500 mb-3">Curated by \${safeBusinessName}</p>
+                        <p class="text-xs text-gray-500 mb-3">\${t('curated-by')} \${safeBusinessName}</p>
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${safeDescription}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${a.duration_minutes} minutes</span>
+                            <span>\${a.duration_minutes} \${t('minutes')}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
                             <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('book-now')}</span>
@@ -10944,7 +10971,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             if (sectionOfferings.length === 0) {
-                grid.innerHTML = '<p class="text-gray-500 col-span-full">No items available in this section</p>';
+                grid.innerHTML = '<p class="text-gray-500 col-span-full">' + t('no-items') + '</p>';
                 return;
             }
             
