@@ -23990,6 +23990,327 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // ========== END AUTO-REFRESH & NOTIFICATION SYSTEM ==========
 
       // ========== END FEEDBACK MANAGEMENT FUNCTIONS ==========
+      
+      // ========== AI ASSISTANT SYSTEM ==========
+      
+      // Assistant state and configuration
+      const assistantConfig = {
+        tips: {
+          qrcode: [
+            { icon: '🎨', title: 'Design Your First QR Code', description: 'Upload your logo, choose colors, and create a professional QR code in under 2 minutes!', action: 'Start Now' },
+            { icon: '💡', title: 'Pro Tip', description: 'Medium size QR codes work best for printing on cards and posters.', action: null },
+            { icon: '📱', title: 'Test Before Printing', description: 'Always scan your QR code with multiple devices before mass printing.', action: null }
+          ],
+          analytics: [
+            { icon: '📊', title: 'Track Guest Engagement', description: 'See how many guests scan your QR codes and which services are most popular.', action: null },
+            { icon: '📈', title: 'Export Reports', description: 'Download CSV reports to analyze trends over time.', action: null }
+          ],
+          settings: [
+            { icon: '🏨', title: 'Complete Your Profile', description: 'Add your hotel logo, brand colors, and contact information for a professional look.', action: 'Go to Settings' },
+            { icon: '🎨', title: 'Customize Branding', description: 'Match your hotel\\'s brand by setting custom colors and fonts.', action: null }
+          ],
+          offerings: [
+            { icon: '🍽️', title: 'Add Your First Restaurant', description: 'Showcase your dining options with photos, menus, and booking details.', action: 'Create Restaurant' },
+            { icon: '🎭', title: 'Add Events & Activities', description: 'Let guests discover spa treatments, excursions, and special events.', action: null }
+          ],
+          restaurants: [
+            { icon: '📋', title: 'Restaurant Floor Designer', description: 'Create interactive floor plans so guests can choose their preferred table.', action: 'Open Designer' },
+            { icon: '📸', title: 'Add Photos', description: 'Upload high-quality images of your food and ambiance.', action: null }
+          ],
+          activities: [
+            { icon: '🎫', title: 'Create Activity Packages', description: 'Bundle experiences and let guests book directly through your QR codes.', action: null }
+          ],
+          default: [
+            { icon: '🚀', title: 'Quick Start Guide', description: 'New here? Let me walk you through the 5 essential setup steps.', action: 'Start Tour' },
+            { icon: '💼', title: 'Getting Started', description: 'Upload your logo, create a QR code, and add your first offering.', action: null }
+          ]
+        },
+        
+        quickActions: {
+          qrcode: [
+            { icon: '🎨', text: 'Design QR Code', desc: '2 min', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
+            { icon: '📥', text: 'Download QR', desc: '1 min', action: () => document.getElementById('downloadCard')?.click() }
+          ],
+          settings: [
+            { icon: '📤', text: 'Upload Logo', desc: '1 min', action: () => document.getElementById('logoUpload')?.click() },
+            { icon: '🎨', text: 'Set Colors', desc: '2 min', action: () => document.querySelector('[data-tab="settings"]')?.click() }
+          ],
+          offerings: [
+            { icon: '➕', text: 'Add Restaurant', desc: '3 min', action: () => document.getElementById('addOfferingBtn')?.click() },
+            { icon: '🍽️', text: 'View Offerings', desc: '1 min', action: () => window.location.reload() }
+          ],
+          default: [
+            { icon: '🎨', text: 'Create QR Code', desc: '2 min', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
+            { icon: '➕', text: 'Add Content', desc: '3 min', action: () => document.querySelector('[data-tab="offerings"]')?.click() },
+            { icon: '⚙️', text: 'Settings', desc: '5 min', action: () => document.querySelector('[data-tab="settings"]')?.click() }
+          ]
+        }
+      };
+      
+      // Get current active tab
+      function getCurrentTab() {
+        const activeBtn = document.querySelector('.sidebar-btn.tab-active');
+        return activeBtn ? activeBtn.getAttribute('data-tab') : 'default';
+      }
+      
+      // Calculate setup progress
+      function calculateProgress() {
+        const tasks = [
+          { key: 'hasLogo', check: () => document.querySelector('#logoPreview img')?.src },
+          { key: 'hasColors', check: () => localStorage.getItem('brandColors') },
+          { key: 'hasQRCode', check: () => document.getElementById('qrCodePreview')?.innerHTML },
+          { key: 'hasOfferings', check: () => document.querySelectorAll('.offering-item').length > 0 }
+        ];
+        
+        const completed = tasks.filter(task => task.check()).length;
+        return Math.round((completed / tasks.length) * 100);
+      }
+      
+      // Create assistant UI
+      function createAssistant() {
+        const assistantHTML = \`
+          <!-- AI Assistant Floating Button -->
+          <div id="aiAssistantBtn" class="fixed bottom-6 right-6 z-50">
+            <button onclick="toggleAssistant()" class="relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full w-16 h-16 shadow-2xl transition-all duration-300 flex items-center justify-center group hover:scale-110">
+              <i class="fas fa-robot text-2xl"></i>
+              <span id="assistantBadge" class="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">3</span>
+              <div class="absolute -top-12 right-0 bg-gray-900 text-white px-3 py-1 rounded-lg text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                Need help? Ask me! 🤖
+              </div>
+            </button>
+          </div>
+          
+          <!-- AI Assistant Panel -->
+          <div id="aiAssistantPanel" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 hidden transform transition-all duration-300 border-2 border-indigo-100" style="max-height: 600px;">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                  <i class="fas fa-robot text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                  <h3 class="font-bold text-lg">GuestConnect Assistant</h3>
+                  <p class="text-xs text-blue-100">Here to help you succeed! 🚀</p>
+                </div>
+              </div>
+              <button onclick="toggleAssistant()" class="hover:bg-white/20 rounded-full p-2 transition">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-gray-700">Setup Progress</span>
+                <span id="progressPercent" class="text-sm font-bold text-indigo-600">0%</span>
+              </div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progressBar" class="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+            
+            <!-- Content -->
+            <div class="overflow-y-auto" style="max-height: 420px;">
+              <!-- Quick Actions -->
+              <div class="p-4 border-b">
+                <h4 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <i class="fas fa-bolt text-yellow-500"></i>
+                  Quick Actions
+                </h4>
+                <div id="quickActionsContainer" class="space-y-2">
+                  <!-- Dynamic quick actions -->
+                </div>
+              </div>
+              
+              <!-- Tips & Guidance -->
+              <div class="p-4">
+                <h4 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <i class="fas fa-lightbulb text-yellow-500"></i>
+                  Tips for This Page
+                </h4>
+                <div id="tipsContainer" class="space-y-3">
+                  <!-- Dynamic tips -->
+                </div>
+              </div>
+              
+              <!-- Resources -->
+              <div class="p-4 bg-gray-50 border-t">
+                <h4 class="text-sm font-bold text-gray-700 mb-3">📚 Resources</h4>
+                <div class="space-y-2">
+                  <button onclick="showTutorialModal()" class="w-full text-left px-3 py-2 bg-white rounded-lg hover:bg-blue-50 transition flex items-center gap-2 text-sm">
+                    <i class="fas fa-play-circle text-blue-600"></i>
+                    <span>Video Tutorials</span>
+                  </button>
+                  <button onclick="showDocumentation()" class="w-full text-left px-3 py-2 bg-white rounded-lg hover:bg-blue-50 transition flex items-center gap-2 text-sm">
+                    <i class="fas fa-book text-indigo-600"></i>
+                    <span>Documentation</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Welcome Modal (First-Time Users) -->
+          <div id="welcomeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-2xl w-full p-8 transform transition-all">
+              <div class="text-center">
+                <div class="w-20 h-20 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i class="fas fa-robot text-white text-3xl"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome to GuestConnect! 🎉</h2>
+                <p class="text-gray-600 mb-6">I'm your AI assistant, here to help you get started in just 5 minutes.</p>
+                
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6">
+                  <h3 class="font-bold text-lg mb-4">Quick Start Checklist:</h3>
+                  <div class="space-y-3 text-left">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">1</div>
+                      <span>Upload your hotel logo (1 min)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">2</div>
+                      <span>Design your first QR code (2 min)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">3</div>
+                      <span>Add a restaurant or activity (3 min)</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="flex gap-3 justify-center">
+                  <button onclick="startTour()" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transition">
+                    <i class="fas fa-play mr-2"></i>Start Quick Tour
+                  </button>
+                  <button onclick="dismissWelcome()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition">
+                    Skip for Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        \`;
+        
+        document.body.insertAdjacentHTML('beforeend', assistantHTML);
+        
+        // Show welcome modal for first-time users
+        if (!localStorage.getItem('welcomeShown')) {
+          setTimeout(() => {
+            document.getElementById('welcomeModal').classList.remove('hidden');
+          }, 1000);
+        }
+        
+        updateAssistantContent();
+      }
+      
+      // Toggle assistant panel
+      window.toggleAssistant = function() {
+        const panel = document.getElementById('aiAssistantPanel');
+        if (panel.classList.contains('hidden')) {
+          panel.classList.remove('hidden');
+          setTimeout(() => panel.classList.add('scale-100'), 10);
+          updateAssistantContent();
+        } else {
+          panel.classList.add('hidden');
+        }
+      };
+      
+      // Update assistant content based on current page
+      function updateAssistantContent() {
+        const currentTab = getCurrentTab();
+        const tips = assistantConfig.tips[currentTab] || assistantConfig.tips.default;
+        const actions = assistantConfig.quickActions[currentTab] || assistantConfig.quickActions.default;
+        
+        // Update tips
+        const tipsContainer = document.getElementById('tipsContainer');
+        if (tipsContainer) {
+          tipsContainer.innerHTML = tips.map(tip => \`
+            <div class="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md transition">
+              <div class="flex items-start gap-3">
+                <span class="text-2xl">\${tip.icon}</span>
+                <div class="flex-1">
+                  <h5 class="font-semibold text-sm text-gray-900 mb-1">\${tip.title}</h5>
+                  <p class="text-xs text-gray-600">\${tip.description}</p>
+                  \${tip.action ? \`<button class="mt-2 text-xs text-blue-600 hover:text-blue-700 font-semibold">\${tip.action} →</button>\` : ''}
+                </div>
+              </div>
+            </div>
+          \`).join('');
+        }
+        
+        // Update quick actions
+        const actionsContainer = document.getElementById('quickActionsContainer');
+        if (actionsContainer) {
+          actionsContainer.innerHTML = actions.map((action, idx) => \`
+            <button onclick="quickAction(\${idx}, '\${currentTab}')" class="w-full flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg hover:from-blue-100 hover:to-indigo-100 transition border border-blue-200">
+              <span class="text-2xl">\${action.icon}</span>
+              <div class="flex-1 text-left">
+                <div class="font-semibold text-sm">\${action.text}</div>
+                <div class="text-xs text-gray-600">\${action.desc}</div>
+              </div>
+              <i class="fas fa-arrow-right text-blue-600"></i>
+            </button>
+          \`).join('');
+        }
+        
+        // Update progress
+        const progress = calculateProgress();
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        if (progressBar && progressPercent) {
+          progressBar.style.width = progress + '%';
+          progressPercent.textContent = progress + '%';
+        }
+        
+        // Update badge
+        const badge = document.getElementById('assistantBadge');
+        if (badge && progress < 100) {
+          badge.textContent = tips.length;
+        } else if (badge) {
+          badge.style.display = 'none';
+        }
+      }
+      
+      // Quick action handler
+      window.quickAction = function(idx, tab) {
+        const actions = assistantConfig.quickActions[tab] || assistantConfig.quickActions.default;
+        if (actions[idx] && actions[idx].action) {
+          actions[idx].action();
+        }
+      };
+      
+      // Welcome modal actions
+      window.dismissWelcome = function() {
+        document.getElementById('welcomeModal').classList.add('hidden');
+        localStorage.setItem('welcomeShown', 'true');
+      };
+      
+      window.startTour = function() {
+        dismissWelcome();
+        toggleAssistant();
+        // Could integrate with intro.js or driver.js here
+        alert('🎉 Tour feature coming soon! For now, explore the assistant panel for tips.');
+      };
+      
+      window.showTutorialModal = function() {
+        alert('📹 Video tutorials coming soon! Check back later.');
+      };
+      
+      window.showDocumentation = function() {
+        alert('📖 Documentation portal coming soon!');
+      };
+      
+      // Update assistant when tab changes
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('.sidebar-btn')) {
+          setTimeout(updateAssistantContent, 100);
+        }
+      });
+      
+      // Initialize assistant
+      setTimeout(createAssistant, 1000);
+      
+      // ========== END AI ASSISTANT SYSTEM ==========
     </script>
 </body>
 </html>
