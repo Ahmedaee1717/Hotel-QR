@@ -25966,6 +25966,13 @@ app.get('/admin/dashboard', (c) => {
           if (btn.dataset.tab === 'settings') {
             loadSeasonalSettings();
           }
+          if (btn.dataset.tab === 'beach') {
+            // Setup color pickers when beach tab is clicked
+            setTimeout(() => {
+              setupColorPickers();
+              updateColorPreview();
+            }, 100);
+          }
         });
       });
 
