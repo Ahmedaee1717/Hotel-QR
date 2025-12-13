@@ -9148,6 +9148,8 @@ app.get('/hotel/:property_slug', async (c) => {
 
         <script type="module">
         const propertySlug = '${property_slug}';
+        window.propertySlug = propertySlug; // Make available globally for inline handlers
+        
         let propertyData = null;
         let allOfferings = [];
         let allActivities = [];
@@ -11379,7 +11381,16 @@ app.get('/hotel/:property_slug', async (c) => {
 
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
-            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
+            
+            // Check if this is a restaurant offering
+            const offering = allOfferings.find(o => o.offering_id === offeringId);
+            if (offering && offering.offering_type === 'restaurant') {
+                // Redirect to table picker booking page for restaurants
+                window.location.href = '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/book';
+            } else {
+                // For other offerings, go to detail page
+                window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
+            }
         }
 
         function viewActivity(activityId) {
