@@ -7607,6 +7607,12 @@ app.post('/api/admin/beach/settings', async (c) => {
             daybeds_label = ?,
             daybeds_desc = ?,
             button_text = ?,
+            bg_color_from = ?,
+            bg_color_to = ?,
+            text_color = ?,
+            button_color_from = ?,
+            button_color_to = ?,
+            button_text_color = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE property_id = ?
       `).bind(
@@ -7631,6 +7637,12 @@ app.post('/api/admin/beach/settings', async (c) => {
         daybeds_label || 'Daybeds',
         daybeds_desc || 'Ultimate Comfort',
         button_text || 'Book Your Spot Now',
+        bg_color_from || '#3b82f6',
+        bg_color_to || '#06b6d4',
+        text_color || '#1f2937',
+        button_color_from || '#ffffff',
+        button_color_to || '#ffffff',
+        button_text_color || '#3b82f6',
         property_id
       ).run()
     } else {
@@ -7642,8 +7654,9 @@ app.post('/api/admin/beach/settings', async (c) => {
           max_booking_duration_hours, free_for_hotel_guests,
           card_title, card_subtitle, feature1_text, feature2_text, feature3_text,
           umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
-          loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text,
+          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         beach_booking_enabled || 0,
@@ -7666,7 +7679,13 @@ app.post('/api/admin/beach/settings', async (c) => {
         loungers_desc || 'Relax in Style',
         daybeds_label || 'Daybeds',
         daybeds_desc || 'Ultimate Comfort',
-        button_text || 'Book Your Spot Now'
+        button_text || 'Book Your Spot Now',
+        bg_color_from || '#3b82f6',
+        bg_color_to || '#06b6d4',
+        text_color || '#1f2937',
+        button_color_from || '#ffffff',
+        button_color_to || '#ffffff',
+        button_text_color || '#3b82f6'
       ).run()
     }
     
@@ -15742,6 +15761,7 @@ app.get('/beach-booking/:property_id', async (c) => {
         let selectedTimeSlot = null;
         let spots = [];
         let bookings = [];
+        let settings = {};
         const propertyId = ${property_id};
         
         const canvas = document.getElementById('beachCanvas');
@@ -15751,9 +15771,37 @@ app.get('/beach-booking/:property_id', async (c) => {
         document.getElementById('bookingDate').min = today;
         document.getElementById('bookingDate').value = today;
         
+        // Apply custom colors from settings
+        async function loadAndApplySettings() {
+            try {
+                const response = await fetch('/api/admin/beach/settings');
+                const data = await response.json();
+                
+                if (data.success && data.settings) {
+                    settings = data.settings;
+                    
+                    // Apply colors
+                    const bgFrom = settings.bg_color_from || '#3b82f6';
+                    const bgTo = settings.bg_color_to || '#06b6d4';
+                    const textColor = settings.text_color || '#1f2937';
+                    
+                    // Apply to header gradient
+                    const header = document.querySelector('.bg-gradient-to-r.from-blue-600.to-purple-600');
+                    if (header) {
+                        header.style.backgroundImage = 'linear-gradient(to right, ' + bgFrom + ', ' + bgTo + ')';
+                    }
+                }
+            } catch (error) {
+                console.error('Load settings error:', error);
+            }
+        }
+        
         // Load beach spots and bookings
         async function loadBeachData() {
             try {
+                // Load settings first
+                await loadAndApplySettings();
+                
                 // Load spots
                 const spotsResponse = await fetch('/api/admin/beach/spots/' + propertyId);
                 const spotsData = await spotsResponse.json();
@@ -21629,6 +21677,90 @@ app.get('/admin/dashboard', (c) => {
                         <input type="text" id="buttonText" placeholder="Book Your Spot Now" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
                         <p class="text-xs text-gray-500 mt-1">Text for the main call-to-action button</p>
                     </div>
+                    
+                    <div class="col-span-full border-t pt-4 mt-4">
+                        <h4 class="text-lg font-bold mb-4">
+                            <i class="fas fa-palette mr-2 text-purple-600"></i>Color Customization
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-paint-brush mr-2 text-blue-600"></i>Background Color (From)
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="bgColorFrom" value="#3b82f6" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="bgColorFromText" value="#3b82f6" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Starting gradient color</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-paint-brush mr-2 text-cyan-600"></i>Background Color (To)
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="bgColorTo" value="#06b6d4" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="bgColorToText" value="#06b6d4" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Ending gradient color</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-heading mr-2 text-gray-600"></i>Text Color
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="textColor" value="#1f2937" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="textColorText" value="#1f2937" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Main text color</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-mouse-pointer mr-2 text-purple-600"></i>Button Color (From)
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="buttonColorFrom" value="#ffffff" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="buttonColorFromText" value="#ffffff" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Button background start</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-mouse-pointer mr-2 text-purple-600"></i>Button Color (To)
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="buttonColorTo" value="#ffffff" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="buttonColorToText" value="#ffffff" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Button background end</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block font-medium mb-2">
+                                    <i class="fas fa-font mr-2 text-white"></i>Button Text Color
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="buttonTextColor" value="#3b82f6" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="buttonTextColorText" value="#3b82f6" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Button text color</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Color Preview -->
+                        <div class="mt-6 p-6 rounded-xl shadow-lg" id="colorPreview" style="background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);">
+                            <div class="text-center">
+                                <h3 class="text-2xl font-bold mb-2" id="previewTitle" style="color: #1f2937;">Beach Booking</h3>
+                                <p class="mb-4 opacity-80" id="previewSubtitle" style="color: #1f2937;">Reserve your perfect spot</p>
+                                <button class="px-6 py-3 rounded-xl font-semibold shadow-lg transition-transform hover:scale-105" id="previewButton" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); color: #3b82f6;">
+                                    Book Your Spot Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <button onclick="saveBeachCardCustomization()" class="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition shadow-lg">
@@ -24532,6 +24664,22 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('daybedsDesc').value = s.daybeds_desc || 'Ultimate Comfort';
             document.getElementById('buttonText').value = s.button_text || 'Book Your Spot Now';
             
+            // Load color settings
+            document.getElementById('bgColorFrom').value = s.bg_color_from || '#3b82f6';
+            document.getElementById('bgColorFromText').value = s.bg_color_from || '#3b82f6';
+            document.getElementById('bgColorTo').value = s.bg_color_to || '#06b6d4';
+            document.getElementById('bgColorToText').value = s.bg_color_to || '#06b6d4';
+            document.getElementById('textColor').value = s.text_color || '#1f2937';
+            document.getElementById('textColorText').value = s.text_color || '#1f2937';
+            document.getElementById('buttonColorFrom').value = s.button_color_from || '#ffffff';
+            document.getElementById('buttonColorFromText').value = s.button_color_from || '#ffffff';
+            document.getElementById('buttonColorTo').value = s.button_color_to || '#ffffff';
+            document.getElementById('buttonColorToText').value = s.button_color_to || '#ffffff';
+            document.getElementById('buttonTextColor').value = s.button_text_color || '#3b82f6';
+            document.getElementById('buttonTextColorText').value = s.button_text_color || '#3b82f6';
+            updateColorPreview();
+            setupColorPickers();
+            
             // Load beach spots
             await loadBeachSpots();
             
@@ -24565,7 +24713,13 @@ app.get('/admin/dashboard', (c) => {
               loungers_desc: document.getElementById('loungersDesc').value,
               daybeds_label: document.getElementById('daybedsLabel').value,
               daybeds_desc: document.getElementById('daybedsDesc').value,
-              button_text: document.getElementById('buttonText').value
+              button_text: document.getElementById('buttonText').value,
+              bg_color_from: document.getElementById('bgColorFrom').value,
+              bg_color_to: document.getElementById('bgColorTo').value,
+              text_color: document.getElementById('textColor').value,
+              button_color_from: document.getElementById('buttonColorFrom').value,
+              button_color_to: document.getElementById('buttonColorTo').value,
+              button_text_color: document.getElementById('buttonTextColor').value
             })
           });
           
@@ -24646,6 +24800,52 @@ app.get('/admin/dashboard', (c) => {
           }
         } catch (error) {
           console.error('Load beach spots error:', error);
+        }
+      }
+      
+      // Color picker sync
+      function setupColorPickers() {
+        const colorInputs = [
+          { picker: 'bgColorFrom', text: 'bgColorFromText' },
+          { picker: 'bgColorTo', text: 'bgColorToText' },
+          { picker: 'textColor', text: 'textColorText' },
+          { picker: 'buttonColorFrom', text: 'buttonColorFromText' },
+          { picker: 'buttonColorTo', text: 'buttonColorToText' },
+          { picker: 'buttonTextColor', text: 'buttonTextColorText' }
+        ];
+        
+        colorInputs.forEach(({ picker, text }) => {
+          const pickerEl = document.getElementById(picker);
+          const textEl = document.getElementById(text);
+          
+          if (pickerEl && textEl) {
+            pickerEl.addEventListener('input', (e) => {
+              textEl.value = e.target.value;
+              updateColorPreview();
+            });
+          }
+        });
+      }
+      
+      function updateColorPreview() {
+        const bgFrom = document.getElementById('bgColorFrom').value;
+        const bgTo = document.getElementById('bgColorTo').value;
+        const textColor = document.getElementById('textColor').value;
+        const btnFrom = document.getElementById('buttonColorFrom').value;
+        const btnTo = document.getElementById('buttonColorTo').value;
+        const btnText = document.getElementById('buttonTextColor').value;
+        
+        const preview = document.getElementById('colorPreview');
+        const title = document.getElementById('previewTitle');
+        const subtitle = document.getElementById('previewSubtitle');
+        const button = document.getElementById('previewButton');
+        
+        if (preview) preview.style.background = 'linear-gradient(135deg, ' + bgFrom + ' 0%, ' + bgTo + ' 100%)';
+        if (title) title.style.color = textColor;
+        if (subtitle) subtitle.style.color = textColor;
+        if (button) {
+          button.style.background = 'linear-gradient(135deg, ' + btnFrom + ' 0%, ' + btnTo + ' 100%)';
+          button.style.color = btnText;
         }
       }
       
