@@ -25532,6 +25532,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Remove old elements
         canvas.querySelectorAll('.floor-element').forEach(el => el.remove());
         
+        const scale = masterScale / 100;
+        
         floorElements.forEach(element => {
           const div = document.createElement('div');
           div.className = 'floor-element';
@@ -25539,7 +25541,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.position = 'absolute';
           
           // Apply master scale
-          const scale = masterScale / 100;
           div.style.left = (element.position_x * scale) + 'px';
           div.style.top = (element.position_y * scale) + 'px';
           div.style.width = (element.width * scale) + 'px';
@@ -25556,7 +25557,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
           
           // Scale font size
-          const scale = masterScale / 100;
           const fontSize = Math.max(8, 12 * scale);
           div.style.fontSize = fontSize + 'px';
           div.style.fontWeight = 'bold';
@@ -25685,10 +25685,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         svg.style.zIndex = '0';
         
         // Apply master scale to wall coordinates
-        const scaledStartX = wall.start_x * masterScale;
-        const scaledStartY = wall.start_y * masterScale;
-        const scaledEndX = wall.end_x * masterScale;
-        const scaledEndY = wall.end_y * masterScale;
+        const scale = masterScale / 100;
+        const scaledStartX = wall.start_x * scale;
+        const scaledStartY = wall.start_y * scale;
+        const scaledEndX = wall.end_x * scale;
+        const scaledEndY = wall.end_y * scale;
         
         const minX = Math.min(scaledStartX, scaledEndX);
         const minY = Math.min(scaledStartY, scaledEndY);
@@ -25706,7 +25707,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         line.setAttribute('x2', scaledEndX - minX);
         line.setAttribute('y2', scaledEndY - minY);
         line.setAttribute('stroke', wall.color || '#64748B');
-        const scale = masterScale / 100;
         line.setAttribute('stroke-width', (wall.thickness || 4) * scale);
         
         if (wall.style === 'dashed') {
@@ -25802,7 +25802,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // MASTER SCALE CONTROL
       // ========================================
       window.updateMasterScale = function(value) {
-        masterScale = value / 100; // Convert percentage to decimal
+        masterScale = parseFloat(value); // Store as percentage (30-150)
         document.getElementById('scaleValue').textContent = value + '%';
         
         // Re-render everything with new scale
