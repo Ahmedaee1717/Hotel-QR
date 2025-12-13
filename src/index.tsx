@@ -7560,7 +7560,21 @@ app.post('/api/admin/beach/settings', async (c) => {
       closing_time,
       advance_booking_days,
       max_booking_duration_hours,
-      free_for_hotel_guests
+      free_for_hotel_guests,
+      card_title,
+      card_subtitle,
+      feature1_text,
+      feature2_text,
+      feature3_text,
+      umbrellas_label,
+      umbrellas_desc,
+      cabanas_label,
+      cabanas_desc,
+      loungers_label,
+      loungers_desc,
+      daybeds_label,
+      daybeds_desc,
+      button_text
     } = body
     
     // Check if settings exist
@@ -7579,6 +7593,20 @@ app.post('/api/admin/beach/settings', async (c) => {
             advance_booking_days = ?,
             max_booking_duration_hours = ?,
             free_for_hotel_guests = ?,
+            card_title = ?,
+            card_subtitle = ?,
+            feature1_text = ?,
+            feature2_text = ?,
+            feature3_text = ?,
+            umbrellas_label = ?,
+            umbrellas_desc = ?,
+            cabanas_label = ?,
+            cabanas_desc = ?,
+            loungers_label = ?,
+            loungers_desc = ?,
+            daybeds_label = ?,
+            daybeds_desc = ?,
+            button_text = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE property_id = ?
       `).bind(
@@ -7589,6 +7617,20 @@ app.post('/api/admin/beach/settings', async (c) => {
         advance_booking_days || 7,
         max_booking_duration_hours || 12,
         free_for_hotel_guests || 1,
+        card_title || 'Beach Booking',
+        card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.',
+        feature1_text || 'Free for Hotel Guests',
+        feature2_text || 'Book Up to 7 Days Ahead',
+        feature3_text || 'QR Code Check-in',
+        umbrellas_label || 'Umbrellas',
+        umbrellas_desc || 'Classic Beach',
+        cabanas_label || 'Cabanas',
+        cabanas_desc || 'Private & Cozy',
+        loungers_label || 'Loungers',
+        loungers_desc || 'Relax in Style',
+        daybeds_label || 'Daybeds',
+        daybeds_desc || 'Ultimate Comfort',
+        button_text || 'Book Your Spot Now',
         property_id
       ).run()
     } else {
@@ -7597,8 +7639,11 @@ app.post('/api/admin/beach/settings', async (c) => {
         INSERT INTO beach_settings (
           property_id, beach_booking_enabled, beach_map_image_url,
           opening_time, closing_time, advance_booking_days,
-          max_booking_duration_hours, free_for_hotel_guests
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          max_booking_duration_hours, free_for_hotel_guests,
+          card_title, card_subtitle, feature1_text, feature2_text, feature3_text,
+          umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
+          loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         beach_booking_enabled || 0,
@@ -7607,7 +7652,21 @@ app.post('/api/admin/beach/settings', async (c) => {
         closing_time || '18:00',
         advance_booking_days || 7,
         max_booking_duration_hours || 12,
-        free_for_hotel_guests || 1
+        free_for_hotel_guests || 1,
+        card_title || 'Beach Booking',
+        card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.',
+        feature1_text || 'Free for Hotel Guests',
+        feature2_text || 'Book Up to 7 Days Ahead',
+        feature3_text || 'QR Code Check-in',
+        umbrellas_label || 'Umbrellas',
+        umbrellas_desc || 'Classic Beach',
+        cabanas_label || 'Cabanas',
+        cabanas_desc || 'Private & Cozy',
+        loungers_label || 'Loungers',
+        loungers_desc || 'Relax in Style',
+        daybeds_label || 'Daybeds',
+        daybeds_desc || 'Ultimate Comfort',
+        button_text || 'Book Your Spot Now'
       ).run()
     }
     
@@ -21452,6 +21511,131 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
 
+            <!-- Beach Card Customization -->
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 mb-6 border-2 border-purple-200">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-palette mr-2 text-purple-600"></i>Beach Card Customization
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">Customize the text displayed on the guest-facing beach booking card</p>
+                
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block font-medium mb-2">
+                            <i class="fas fa-heading mr-2 text-purple-600"></i>Card Title
+                        </label>
+                        <input type="text" id="cardTitle" placeholder="Beach Booking" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <p class="text-xs text-gray-500 mt-1">Main heading for the beach booking section</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block font-medium mb-2">
+                            <i class="fas fa-text-height mr-2 text-purple-600"></i>Card Subtitle
+                        </label>
+                        <input type="text" id="cardSubtitle" placeholder="Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <p class="text-xs text-gray-500 mt-1">Description text below the title</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-check-circle mr-2 text-green-600"></i>Feature 1 Text
+                            </label>
+                            <input type="text" id="feature1Text" placeholder="Free for Hotel Guests" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-check-circle mr-2 text-green-600"></i>Feature 2 Text
+                            </label>
+                            <input type="text" id="feature2Text" placeholder="Book Up to 7 Days Ahead" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-check-circle mr-2 text-green-600"></i>Feature 3 Text
+                            </label>
+                            <input type="text" id="feature3Text" placeholder="QR Code Check-in" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>Umbrellas Category Label
+                            </label>
+                            <input type="text" id="umbrellasLabel" placeholder="Umbrellas" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>Umbrellas Description
+                            </label>
+                            <input type="text" id="umbrellasDesc" placeholder="Classic Beach" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-home mr-2 text-orange-600"></i>Cabanas Category Label
+                            </label>
+                            <input type="text" id="cabanasLabel" placeholder="Cabanas" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-home mr-2 text-orange-600"></i>Cabanas Description
+                            </label>
+                            <input type="text" id="cabanasDesc" placeholder="Private & Cozy" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-bed mr-2 text-purple-600"></i>Loungers Category Label
+                            </label>
+                            <input type="text" id="loungersLabel" placeholder="Loungers" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-bed mr-2 text-purple-600"></i>Loungers Description
+                            </label>
+                            <input type="text" id="loungersDesc" placeholder="Relax in Style" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-star mr-2 text-yellow-600"></i>Daybeds Category Label
+                            </label>
+                            <input type="text" id="daybedsLabel" placeholder="Daybeds" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block font-medium mb-2">
+                                <i class="fas fa-star mr-2 text-yellow-600"></i>Daybeds Description
+                            </label>
+                            <input type="text" id="daybedsDesc" placeholder="Ultimate Comfort" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block font-medium mb-2">
+                            <i class="fas fa-mouse-pointer mr-2 text-purple-600"></i>Button Text
+                        </label>
+                        <input type="text" id="buttonText" placeholder="Book Your Spot Now" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <p class="text-xs text-gray-500 mt-1">Text for the main call-to-action button</p>
+                    </div>
+                </div>
+                
+                <button onclick="saveBeachCardCustomization()" class="mt-4 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition shadow-lg">
+                    <i class="fas fa-save mr-2"></i>Save Card Customization
+                </button>
+            </div>
+
             <!-- Beach Map Designer -->
             <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-4">
@@ -24332,6 +24516,22 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('advanceBookingDays').value = s.advance_booking_days || 7;
             document.getElementById('maxDurationHours').value = s.max_booking_duration_hours || 12;
             
+            // Load card customization fields
+            document.getElementById('cardTitle').value = s.card_title || 'Beach Booking';
+            document.getElementById('cardSubtitle').value = s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
+            document.getElementById('feature1Text').value = s.feature1_text || 'Free for Hotel Guests';
+            document.getElementById('feature2Text').value = s.feature2_text || 'Book Up to 7 Days Ahead';
+            document.getElementById('feature3Text').value = s.feature3_text || 'QR Code Check-in';
+            document.getElementById('umbrellasLabel').value = s.umbrellas_label || 'Umbrellas';
+            document.getElementById('umbrellasDesc').value = s.umbrellas_desc || 'Classic Beach';
+            document.getElementById('cabanasLabel').value = s.cabanas_label || 'Cabanas';
+            document.getElementById('cabanasDesc').value = s.cabanas_desc || 'Private & Cozy';
+            document.getElementById('loungersLabel').value = s.loungers_label || 'Loungers';
+            document.getElementById('loungersDesc').value = s.loungers_desc || 'Relax in Style';
+            document.getElementById('daybedsLabel').value = s.daybeds_label || 'Daybeds';
+            document.getElementById('daybedsDesc').value = s.daybeds_desc || 'Ultimate Comfort';
+            document.getElementById('buttonText').value = s.button_text || 'Book Your Spot Now';
+            
             // Load beach spots
             await loadBeachSpots();
             
@@ -24344,6 +24544,43 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load beach settings error:', error);
         }
       }
+
+      window.saveBeachCardCustomization = async function() {
+        try {
+          const response = await fetch('/api/admin/beach/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              card_title: document.getElementById('cardTitle').value,
+              card_subtitle: document.getElementById('cardSubtitle').value,
+              feature1_text: document.getElementById('feature1Text').value,
+              feature2_text: document.getElementById('feature2Text').value,
+              feature3_text: document.getElementById('feature3Text').value,
+              umbrellas_label: document.getElementById('umbrellasLabel').value,
+              umbrellas_desc: document.getElementById('umbrellasDesc').value,
+              cabanas_label: document.getElementById('cabanasLabel').value,
+              cabanas_desc: document.getElementById('cabanasDesc').value,
+              loungers_label: document.getElementById('loungersLabel').value,
+              loungers_desc: document.getElementById('loungersDesc').value,
+              daybeds_label: document.getElementById('daybedsLabel').value,
+              daybeds_desc: document.getElementById('daybedsDesc').value,
+              button_text: document.getElementById('buttonText').value
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Beach card customization saved successfully!');
+          } else {
+            alert('❌ Failed to save customization: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Save beach card customization error:', error);
+          alert('❌ Error saving customization');
+        }
+      };
       
       window.saveBeachSettings = async function() {
         try {
