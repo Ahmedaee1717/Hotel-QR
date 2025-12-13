@@ -11098,7 +11098,7 @@ app.get('/hotel/:property_slug', async (c) => {
             grid.innerHTML = cardsHtml.join('');
         }
         
-        function renderCustomSection(sectionKey) {
+        async function renderCustomSection(sectionKey) {
             // Filter offerings by custom_section_key
             const sectionOfferings = allOfferings.filter(o => 
               o.offering_type === 'custom' && o.custom_section_key === sectionKey
