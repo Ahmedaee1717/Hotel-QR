@@ -12977,6 +12977,18 @@ app.get('/offering-detail', async (c) => {
                     el.textContent = dict[key];
                 }
             });
+            
+            // Re-render restaurant booking section if it's a restaurant
+            if (offeringData && offeringData.offering_type === 'restaurant') {
+                const bookingSection = document.getElementById('bookingSection');
+                if (bookingSection) {
+                    bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
+                        '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
+                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
+                        'class="w-full bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
+                        '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>';
+                }
+            }
         }
 
         async function translateContent(text, targetLang) {
