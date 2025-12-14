@@ -13028,8 +13028,9 @@ app.get('/hotel/:property_slug', async (c) => {
             // Check beach booking after property data is loaded and DOM is ready
             if (propertyData && propertyData.property_id) {
                 setTimeout(() => {
+                    console.log('Calling checkBeachBookingEnabled after 500ms delay');
                     checkBeachBookingEnabled();
-                }, 100);
+                }, 500);
             }
         }
 
@@ -13514,7 +13515,11 @@ app.get('/hotel/:property_slug', async (c) => {
                 console.log('Beach settings response:', data);
                 
                 if (data.success && data.settings && data.settings.beach_booking_enabled === 1) {
+                    console.log('Beach booking is enabled, looking for section element...');
+                    console.log('document.body:', !!document.body);
+                    console.log('All sections with beach in id:', document.querySelectorAll('[id*="beach"]').length);
                     const section = document.getElementById('beach-booking-section');
+                    console.log('Beach section element found:', !!section);
                     if (section) {
                         const s = data.settings;
                         
