@@ -10805,7 +10805,7 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
         </div>
 
-        <script type="module">
+        <script>
         const propertySlug = '${property_slug}';
         window.propertySlug = propertySlug; // Make available globally for inline handlers
         
@@ -13027,10 +13027,13 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // Check beach booking after property data is loaded and DOM is ready
             if (propertyData && propertyData.property_id) {
-                setTimeout(() => {
-                    console.log('Calling checkBeachBookingEnabled after 500ms delay');
-                    checkBeachBookingEnabled();
-                }, 500);
+                // Use requestAnimationFrame to ensure DOM is painted
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        console.log('Calling checkBeachBookingEnabled after DOM paint');
+                        checkBeachBookingEnabled();
+                    }, 1000);
+                });
             }
         }
 
@@ -13651,6 +13654,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
             } catch (error) {
                 console.error('Check beach booking error:', error);
+                console.error('Error type:', typeof error);
+                console.error('Error message:', error?.message);
+                console.error('Error stack:', error?.stack);
             }
             return false;
         }
