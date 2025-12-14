@@ -7833,7 +7833,8 @@ app.post('/api/admin/beach/spots', async (c) => {
       max_capacity,
       price_full_day,
       price_half_day,
-      price_hourly
+      price_hourly,
+      zone_name
     } = body
     
     // Create default zone if none exists
@@ -7858,8 +7859,9 @@ app.post('/api/admin/beach/spots', async (c) => {
       INSERT INTO beach_spots (
         property_id, zone_id, spot_number, spot_type,
         position_x, position_y, max_capacity,
-        price_full_day, price_half_day, price_hourly
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        price_full_day, price_half_day, price_hourly,
+        zone_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,
       zoneIdToUse,
@@ -7870,7 +7872,8 @@ app.post('/api/admin/beach/spots', async (c) => {
       max_capacity || 2,
       price_full_day || 0,
       price_half_day || 0,
-      price_hourly || 0
+      price_hourly || 0,
+      zone_name || 'General Area'
     ).run()
     
     return c.json({ success: true })
@@ -14840,6 +14843,20 @@ app.get('/admin/beach-map-designer', (c) => {
                         <input type="number" id="spotCapacity" min="1" max="10" value="2" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1">
+                            <i class="fas fa-map-marker-alt mr-1 text-purple-600"></i>Zone
+                        </label>
+                        <select id="spotZone" class="w-full px-3 py-2 border rounded-lg bg-white">
+                            <option value="General Area">General Area</option>
+                            <option value="Quiet Zone">Quiet Zone</option>
+                            <option value="Family Area">Family Area</option>
+                            <option value="VIP Section">VIP Section</option>
+                            <option value="Beach Front">Beach Front</option>
+                            <option value="Pool Side">Pool Side</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Organize spots by zone for analytics</p>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1">Price (Full Day)</label>
                         <input type="number" id="spotPrice" min="0" step="5" value="0" class="w-full px-3 py-2 border rounded-lg">
                     </div>
@@ -14956,6 +14973,7 @@ app.get('/admin/beach-map-designer', (c) => {
                 y: y,
                 number: 'S' + spotIdCounter,
                 capacity: 2,
+                zone: 'General Area',
                 price: 0,
                 premium: false
             };
@@ -15023,6 +15041,7 @@ app.get('/admin/beach-map-designer', (c) => {
             if (spot) {
                 document.getElementById('spotNumber').value = spot.number;
                 document.getElementById('spotCapacity').value = spot.capacity;
+                document.getElementById('spotZone').value = spot.zone || 'General Area';
                 document.getElementById('spotPrice').value = spot.price;
                 document.getElementById('spotPremium').checked = spot.premium;
                 spotDetails.classList.remove('hidden');
@@ -15034,9 +15053,11 @@ app.get('/admin/beach-map-designer', (c) => {
             if (spot) {
                 spot.number = document.getElementById('spotNumber').value;
                 spot.capacity = parseInt(document.getElementById('spotCapacity').value);
+                spot.zone = document.getElementById('spotZone').value;
                 spot.price = parseFloat(document.getElementById('spotPrice').value);
                 spot.premium = document.getElementById('spotPremium').checked;
                 updateSpotsList();
+                renderSpots();
                 alert('✅ Spot details updated!');
             }
         }
@@ -15064,6 +15085,9 @@ app.get('/admin/beach-map-designer', (c) => {
                     '<div class="flex items-center justify-between">' +
                         '<span>' + getSpotIcon(spot.type) + ' ' + spot.number + '</span>' +
                         '<span class="text-xs text-gray-500">' + spot.capacity + ' guests</span>' +
+                    '</div>' +
+                    '<div class="text-xs text-purple-600 mt-1">' +
+                        '<i class="fas fa-map-marker-alt mr-1"></i>' + (spot.zone || 'General Area') +
                     '</div>' +
                 '</div>'
             ).join('');
@@ -15100,7 +15124,8 @@ app.get('/admin/beach-map-designer', (c) => {
                             position_y: Math.round(spot.y),
                             max_capacity: spot.capacity,
                             price_full_day: spot.price,
-                            is_premium: spot.premium ? 1 : 0
+                            is_premium: spot.premium ? 1 : 0,
+                            zone_name: spot.zone || 'General Area'
                         })
                     });
                 }
