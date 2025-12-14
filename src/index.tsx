@@ -13539,7 +13539,7 @@ app.get('/hotel/:property_slug', async (c) => {
                                     class="flex-1 bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
                             </button>
-                            <button onclick="window.open('/hotel/${property.slug}/restaurant/' + \${r.offering_id} + '/menu', '_blank')" 
+                            <button onclick="window.open('/hotel/' + window.propertyData.slug + '/restaurant/' + \${r.offering_id} + '/menu', '_blank')" 
                                     class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-utensils mr-2"></i>View Menu
                             </button>
