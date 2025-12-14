@@ -20583,6 +20583,40 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Analytics Tab -->
         <div id="analyticsTab" class="tab-content hidden">
+            <!-- Beach Analytics Quick Link -->
+            <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-xl p-6 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-bold text-white mb-2 flex items-center">
+                            <i class="fas fa-umbrella-beach mr-3"></i>
+                            Beach Analytics Dashboard
+                        </h3>
+                        <p class="text-blue-100 mb-4">
+                            Comprehensive beach analytics with live occupancy tracking, revenue insights, peak hours heatmap, AI-powered recommendations, and no-show monitoring.
+                        </p>
+                        <div class="flex flex-wrap gap-3">
+                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
+                                <i class="fas fa-signal mr-1"></i>Live Occupancy
+                            </span>
+                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
+                                <i class="fas fa-brain mr-1"></i>AI Insights
+                            </span>
+                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
+                                <i class="fas fa-fire mr-1"></i>Peak Hours
+                            </span>
+                            <span class="text-sm bg-white/20 text-white px-3 py-1 rounded-full">
+                                <i class="fas fa-dollar-sign mr-1"></i>Revenue Analytics
+                            </span>
+                        </div>
+                    </div>
+                    <a href="/admin/beach-analytics" class="bg-white hover:bg-gray-100 text-blue-600 px-6 py-3 rounded-lg font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 whitespace-nowrap">
+                        <i class="fas fa-chart-bar"></i>
+                        Open Dashboard
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
                     <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-0"><i class="fas fa-chart-line mr-2 text-green-600"></i>Analytics & Usage Stats</h2>
