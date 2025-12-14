@@ -34459,8 +34459,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         <!-- END INFO TAB -->
 
         <!-- TABLES TAB -->
-        <div id="tablesSection" class="hidden">
-        <div id="tablesSection">
+        <div id="tablesSection" style="display: none;">
         <div class="grid md:grid-cols-3 gap-6">
             <!-- Left Panel: Table Controls -->
             <div class="space-y-6">
@@ -34625,7 +34624,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         <!-- END TABLES TAB -->
 
         <!-- SESSIONS TAB -->
-        <div id="sessionsSection" class="hidden">
+        <div id="sessionsSection" style="display: none;">
             <div class="grid md:grid-cols-2 gap-6">
                 <!-- Create Session Form -->
                 <div class="bg-white rounded-lg shadow-lg p-6">
@@ -34688,7 +34687,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         <!-- END SESSIONS TAB -->
 
         <!-- RESERVATIONS TAB -->
-        <div id="reservationsSection" class="hidden">
+        <div id="reservationsSection" style="display: none;">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <!-- Filter Controls -->
                 <div class="grid md:grid-cols-4 gap-4 mb-6">
@@ -34753,7 +34752,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         <!-- END RESERVATIONS TAB -->
         
         <!-- AI TEXTURES TAB -->
-        <div id="texturesSection" class="hidden">
+        <div id="texturesSection" style="display: none;">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">
                     <i class="fas fa-magic mr-2 text-purple-600"></i>
@@ -34873,7 +34872,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         <!-- END AI TEXTURES TAB -->
 
         <!-- MENUS TAB - OCR & Translation System -->
-        <div id="menusSection" class="hidden">
+        <div id="menusSection" style="display: none;">
             <div class="grid md:grid-cols-2 gap-6">
                 <!-- Left: Upload & Manage Menus -->
                 <div class="space-y-6">
