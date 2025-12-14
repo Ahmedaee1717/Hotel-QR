@@ -12922,6 +12922,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
                 
+                // Check beach booking AFTER content div is visible
+                if (propertyData && propertyData.property_id) {
+                    console.log('Checking beach booking after content is visible');
+                    checkBeachBookingEnabled();
+                }
+                
                 // Initialize chatbot after all data is loaded
                 if (typeof initChatbot === 'function') {
                     initChatbot();
@@ -13034,12 +13040,6 @@ app.get('/hotel/:property_slug', async (c) => {
             });
             
             updateSectionVisibility();
-            
-            // Check beach booking after property data is loaded and DOM is ready
-            if (propertyData && propertyData.property_id) {
-                console.log('Calling checkBeachBookingEnabled IMMEDIATELY');
-                checkBeachBookingEnabled();
-            }
         }
 
         // Generate chic occupancy badge for restaurants
