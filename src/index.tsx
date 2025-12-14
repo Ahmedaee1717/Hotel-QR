@@ -14823,6 +14823,30 @@ app.get('/admin/beach-map-designer', (c) => {
                 </div>
             </div>
             
+            <!-- Zone Drawing Tools -->
+            <div class="mb-6 bg-purple-50 p-4 rounded-lg border-2 border-purple-200">
+                <h3 class="font-bold mb-3 text-purple-700">
+                    <i class="fas fa-draw-polygon mr-2"></i>Zone Overlays
+                </h3>
+                <p class="text-xs text-gray-600 mb-3">Draw colored zones to help guests identify areas</p>
+                <div class="grid grid-cols-1 gap-2">
+                    <button onclick="setTool('zone-rect')" id="zoneRectTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-purple-100">
+                        <i class="fas fa-square mr-1"></i>Draw Rectangle Zone
+                    </button>
+                    <button onclick="toggleZonesList()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-list mr-1"></i>Manage Zones (<span id="zonesCount">0</span>)
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Zones List (Hidden by default) -->
+            <div id="zonesList" class="mb-6 hidden">
+                <h3 class="font-bold mb-3">Zones</h3>
+                <div id="zonesListContainer" class="space-y-2 max-h-60 overflow-y-auto">
+                    <p class="text-sm text-gray-500">No zones created yet</p>
+                </div>
+            </div>
+            
             <!-- Upload Beach Photo -->
             <div class="mb-6">
                 <h3 class="font-bold mb-3">Beach Photo</h3>
@@ -14914,6 +14938,13 @@ app.get('/admin/beach-map-designer', (c) => {
         let isDragging = false;
         let dragOffset = { x: 0, y: 0 };
         
+        // Zone overlay variables
+        let zones = [];
+        let zoneIdCounter = 1;
+        let isDrawingZone = false;
+        let zoneStartPoint = null;
+        let currentZone = null;
+        
         const canvas = document.getElementById('beachCanvas');
         const spotDetails = document.getElementById('spotDetails');
         
@@ -14959,13 +14990,21 @@ app.get('/admin/beach-map-designer', (c) => {
             return icons[type] || '🔵';
         }
         
-        canvas.addEventListener('click', (e) => {
-            if (currentTool === 'select') return;
-            
+        canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
+            if (currentTool === 'select') return;
+            
+            // Handle zone drawing
+            if (currentTool === 'zone-rect') {
+                isDrawingZone = true;
+                zoneStartPoint = { x, y };
+                return;
+            }
+            
+            // Handle spot placement
             const spot = {
                 id: spotIdCounter++,
                 type: currentTool,
@@ -14980,6 +15019,55 @@ app.get('/admin/beach-map-designer', (c) => {
             
             spots.push(spot);
             renderSpots();
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawingZone || !zoneStartPoint) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Draw temporary zone rectangle
+            renderZones();
+            renderTempZone(zoneStartPoint.x, zoneStartPoint.y, x, y);
+        });
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDrawingZone || !zoneStartPoint) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Calculate zone coordinates
+            const minX = Math.min(zoneStartPoint.x, x);
+            const minY = Math.min(zoneStartPoint.y, y);
+            const width = Math.abs(x - zoneStartPoint.x);
+            const height = Math.abs(y - zoneStartPoint.y);
+            
+            if (width > 20 && height > 20) {
+                const zoneName = prompt('Enter zone name:', 'Quiet Zone');
+                if (zoneName) {
+                    const zone = {
+                        id: zoneIdCounter++,
+                        name: zoneName,
+                        type: 'rectangle',
+                        x: minX,
+                        y: minY,
+                        width: width,
+                        height: height,
+                        color: getZoneColor(zoneName),
+                        opacity: 0.3
+                    };
+                    zones.push(zone);
+                    renderZones();
+                    updateZonesList();
+                }
+            }
+            
+            isDrawingZone = false;
+            zoneStartPoint = null;
         });
         
         function renderSpots() {
@@ -15145,6 +15233,116 @@ app.get('/admin/beach-map-designer', (c) => {
                 renderSpots();
             }
         }
+        
+        // Zone overlay functions
+        function renderZones() {
+            document.querySelectorAll('.zone-overlay').forEach(el => el.remove());
+            
+            zones.forEach(zone => {
+                const zoneEl = document.createElement('div');
+                zoneEl.className = 'zone-overlay';
+                zoneEl.style.position = 'absolute';
+                zoneEl.style.left = zone.x + 'px';
+                zoneEl.style.top = zone.y + 'px';
+                zoneEl.style.width = zone.width + 'px';
+                zoneEl.style.height = zone.height + 'px';
+                zoneEl.style.backgroundColor = zone.color;
+                zoneEl.style.opacity = zone.opacity;
+                zoneEl.style.border = '2px dashed ' + zone.color;
+                zoneEl.style.pointerEvents = 'none';
+                zoneEl.style.borderRadius = '8px';
+                
+                const label = document.createElement('div');
+                label.style.position = 'absolute';
+                label.style.top = '5px';
+                label.style.left = '5px';
+                label.style.backgroundColor = zone.color;
+                label.style.color = 'white';
+                label.style.padding = '4px 8px';
+                label.style.borderRadius = '4px';
+                label.style.fontSize = '12px';
+                label.style.fontWeight = 'bold';
+                label.style.opacity = '0.9';
+                label.textContent = zone.name;
+                zoneEl.appendChild(label);
+                
+                canvas.appendChild(zoneEl);
+            });
+        }
+        
+        function renderTempZone(x1, y1, x2, y2) {
+            document.querySelectorAll('.temp-zone').forEach(el => el.remove());
+            
+            const minX = Math.min(x1, x2);
+            const minY = Math.min(y1, y2);
+            const width = Math.abs(x2 - x1);
+            const height = Math.abs(y2 - y1);
+            
+            const tempZone = document.createElement('div');
+            tempZone.className = 'zone-overlay temp-zone';
+            tempZone.style.position = 'absolute';
+            tempZone.style.left = minX + 'px';
+            tempZone.style.top = minY + 'px';
+            tempZone.style.width = width + 'px';
+            tempZone.style.height = height + 'px';
+            tempZone.style.backgroundColor = '#8b5cf6';
+            tempZone.style.opacity = '0.3';
+            tempZone.style.border = '2px dashed #8b5cf6';
+            tempZone.style.pointerEvents = 'none';
+            tempZone.style.borderRadius = '8px';
+            canvas.appendChild(tempZone);
+        }
+        
+        function getZoneColor(zoneName) {
+            const colors = {
+                'Quiet Zone': '#10b981',
+                'Family Area': '#f59e0b',
+                'VIP Section': '#8b5cf6',
+                'Beach Front': '#3b82f6',
+                'Pool Side': '#06b6d4',
+                'General Area': '#6b7280'
+            };
+            return colors[zoneName] || '#8b5cf6';
+        }
+        
+        function updateZonesList() {
+            const container = document.getElementById('zonesListContainer');
+            const count = document.getElementById('zonesCount');
+            count.textContent = zones.length;
+            
+            if (zones.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500">No zones created yet</p>';
+                return;
+            }
+            
+            container.innerHTML = zones.map(zone =>
+                '<div class="p-3 border rounded-lg bg-white">' +
+                    '<div class="flex items-center justify-between mb-2">' +
+                        '<div class="flex items-center gap-2">' +
+                            '<div class="w-4 h-4 rounded" style="background-color: ' + zone.color + ';"></div>' +
+                            '<span class="font-medium">' + zone.name + '</span>' +
+                        '</div>' +
+                        '<button onclick="deleteZone(' + zone.id + ')" class="text-red-600 hover:text-red-800">' +
+                            '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="text-xs text-gray-500">' + zone.width + 'x' + zone.height + ' px</div>' +
+                '</div>'
+            ).join('');
+        }
+        
+        window.toggleZonesList = function() {
+            const list = document.getElementById('zonesList');
+            list.classList.toggle('hidden');
+        };
+        
+        window.deleteZone = function(id) {
+            if (confirm('Delete this zone overlay?')) {
+                zones = zones.filter(z => z.id !== id);
+                renderZones();
+                updateZonesList();
+            }
+        };
         
         // Beach photo upload
         document.getElementById('beachPhotoUpload').addEventListener('change', (e) => {
