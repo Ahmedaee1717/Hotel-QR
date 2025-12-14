@@ -4257,6 +4257,35 @@ app.post('/api/admin/offerings/translate-all', async (c) => {
   }
 })
 
+// API: Update Restaurant Occupancy Status
+app.post('/api/admin/offerings/:offering_id/occupancy', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const { occupancy_status, updated_by } = await c.req.json()
+  
+  try {
+    // Validate status
+    const validStatuses = ['quiet', 'moderate', 'busy', 'very_busy', 'full'];
+    if (!validStatuses.includes(occupancy_status)) {
+      return c.json({ error: 'Invalid occupancy status' }, 400)
+    }
+    
+    // Update occupancy status
+    await DB.prepare(`
+      UPDATE hotel_offerings
+      SET occupancy_status = ?,
+          occupancy_status_updated_at = CURRENT_TIMESTAMP,
+          occupancy_status_updated_by = ?
+      WHERE offering_id = ?
+    `).bind(occupancy_status, updated_by || 'Admin', offering_id).run()
+    
+    return c.json({ success: true, occupancy_status })
+  } catch (error) {
+    console.error('Update occupancy status error:', error)
+    return c.json({ error: 'Failed to update occupancy status' }, 500)
+  }
+})
+
 // Batch translate ALL activities to all languages (Admin)
 app.post('/api/admin/activities/translate-all', async (c) => {
   const { DB } = c.env
@@ -12133,6 +12162,44 @@ app.get('/hotel/:property_slug', async (c) => {
             }
         }
 
+        // Generate chic occupancy badge for restaurants
+        function generateOccupancyBadge(status) {
+            if (!status || status === 'moderate') return ''; // Don't show badge for moderate (default)
+            
+            let bgColor, textColor, icon, text;
+            
+            switch(status) {
+                case 'quiet':
+                    bgColor = '#d1fae5';
+                    textColor = '#047857';
+                    icon = 'fa-leaf';
+                    text = 'Quiet';
+                    break;
+                case 'busy':
+                    bgColor = '#fef3c7';
+                    textColor = '#a16207';
+                    icon = 'fa-chart-line';
+                    text = 'Busy';
+                    break;
+                case 'very_busy':
+                    bgColor = '#fed7aa';
+                    textColor = '#c2410c';
+                    icon = 'fa-fire';
+                    text = 'Very Busy';
+                    break;
+                case 'full':
+                    bgColor = '#fecaca';
+                    textColor = '#b91c1c';
+                    icon = 'fa-times-circle';
+                    text = 'Full';
+                    break;
+                default:
+                    return '';
+            }
+            
+            return '<span class="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1.5" style="background-color: ' + bgColor + '; color: ' + textColor + ';"><i class="fas ' + icon + '"></i><span>' + text + '</span></span>';
+        }
+        
         async function renderRestaurants() {
             const restaurants = allOfferings.filter(o => o.offering_type === 'restaurant');
             const grid = document.getElementById('restaurants-grid');
@@ -12160,8 +12227,11 @@ app.get('/hotel/:property_slug', async (c) => {
                         <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
                              class="w-full h-48 object-cover">
-                        <div class="absolute top-3 right-3">
-                            \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
+                        <div class="absolute top-3 left-3 right-3 flex items-start justify-between gap-2">
+                            \${generateOccupancyBadge(r.occupancy_status)}
+                            <div class="flex-shrink-0">
+                                \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
+                            </div>
                         </div>
                     </div>
                     <div class="p-5">
@@ -32363,6 +32433,40 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     </div>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Live Occupancy Status Control -->
+        <div class="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg shadow-lg mb-6 p-6 border-2 border-orange-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <i class="fas fa-chart-line text-orange-600"></i>
+                        Live Occupancy Status
+                    </h2>
+                    <p class="text-sm text-gray-600 mt-1">Set current restaurant occupancy for guests to see</p>
+                </div>
+                <div id="currentOccupancyBadge" class="px-4 py-2 rounded-full font-semibold text-sm">
+                    Moderate
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <button onclick="setOccupancyStatus('quiet')" class="occupancy-btn px-4 py-3 bg-green-100 hover:bg-green-200 text-green-800 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-transparent">
+                    <i class="fas fa-leaf mr-2"></i>Quiet
+                </button>
+                <button onclick="setOccupancyStatus('moderate')" class="occupancy-btn px-4 py-3 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-transparent">
+                    <i class="fas fa-users mr-2"></i>Moderate
+                </button>
+                <button onclick="setOccupancyStatus('busy')" class="occupancy-btn px-4 py-3 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-transparent">
+                    <i class="fas fa-chart-line mr-2"></i>Busy
+                </button>
+                <button onclick="setOccupancyStatus('very_busy')" class="occupancy-btn px-4 py-3 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-transparent">
+                    <i class="fas fa-fire mr-2"></i>Very Busy
+                </button>
+                <button onclick="setOccupancyStatus('full')" class="occupancy-btn px-4 py-3 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg font-semibold transition-all hover:scale-105 border-2 border-transparent">
+                    <i class="fas fa-times-circle mr-2"></i>Full
+                </button>
+            </div>
+            <p id="occupancyLastUpdated" class="text-xs text-gray-500 mt-3 text-center">Last updated: Never</p>
+        </div>
+        
         <!-- Tab Navigation -->
         <div class="bg-white rounded-lg shadow-lg mb-6 p-2 flex gap-2">
             <button onclick="switchTab('tables')" id="tabTables" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-blue-600 text-white">
@@ -32822,6 +32926,105 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           ).join('');
         } catch (error) {
           console.error('Load restaurant error:', error);
+        }
+      }
+      
+      // Occupancy Status Management
+      async function setOccupancyStatus(status) {
+        try {
+          const response = await fetch('/api/admin/offerings/' + offeringId + '/occupancy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              occupancy_status: status,
+              updated_by: 'Restaurant Manager'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            updateOccupancyUI(status);
+            alert('✅ Occupancy status updated to: ' + status.replace('_', ' '));
+          } else {
+            alert('❌ Failed to update occupancy status');
+          }
+        } catch (error) {
+          console.error('Update occupancy error:', error);
+          alert('❌ Error updating occupancy status');
+        }
+      }
+      
+      function updateOccupancyUI(status) {
+        const badge = document.getElementById('currentOccupancyBadge');
+        const lastUpdated = document.getElementById('occupancyLastUpdated');
+        
+        // Update badge
+        let bgColor, textColor, displayText;
+        
+        switch(status) {
+          case 'quiet':
+            bgColor = '#d1fae5';
+            textColor = '#047857';
+            displayText = 'Quiet';
+            break;
+          case 'moderate':
+            bgColor = '#dbeafe';
+            textColor = '#1e40af';
+            displayText = 'Moderate';
+            break;
+          case 'busy':
+            bgColor = '#fef3c7';
+            textColor = '#a16207';
+            displayText = 'Busy';
+            break;
+          case 'very_busy':
+            bgColor = '#fed7aa';
+            textColor = '#c2410c';
+            displayText = 'Very Busy';
+            break;
+          case 'full':
+            bgColor = '#fecaca';
+            textColor = '#b91c1c';
+            displayText = 'Full';
+            break;
+        }
+        
+        if (badge) {
+          badge.style.backgroundColor = bgColor;
+          badge.style.color = textColor;
+          badge.textContent = displayText;
+        }
+        
+        // Update timestamp
+        if (lastUpdated) {
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          lastUpdated.textContent = 'Last updated: ' + timeStr;
+        }
+        
+        // Highlight selected button
+        document.querySelectorAll('.occupancy-btn').forEach(btn => {
+          btn.style.borderColor = 'transparent';
+        });
+        const selectedBtn = document.querySelector('[onclick="setOccupancyStatus(\\'' + status + '\\')"]');
+        if (selectedBtn) {
+          selectedBtn.style.borderColor = '#3b82f6';
+          selectedBtn.style.borderWidth = '2px';
+        }
+      }
+      
+      async function loadOccupancyStatus() {
+        try {
+          const response = await fetch('/api/hotel-offerings/1');
+          const data = await response.json();
+          const restaurant = data.offerings?.find(o => o.offering_id == offeringId);
+          
+          if (restaurant && restaurant.occupancy_status) {
+            updateOccupancyUI(restaurant.occupancy_status);
+          }
+        } catch (error) {
+          console.error('Load occupancy error:', error);
         }
       }
       
@@ -33819,6 +34022,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       document.getElementById('filterReservationDate').value = new Date().toISOString().split('T')[0];
       document.getElementById('sessionDate').value = new Date().toISOString().split('T')[0];
 
+      // Load occupancy status
+      loadOccupancyStatus();
+      
       init();
     </script>
 </body>
