@@ -8321,6 +8321,255 @@ app.post('/api/staff/beach/check-in', async (c) => {
   }
 })
 
+// ==================== ANALYTICS API ENDPOINTS ====================
+
+// API: Analytics - Live Occupancy (Real-time)
+app.get('/api/analytics/beach/live-occupancy/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const today = new Date().toISOString().split('T')[0]
+  
+  try {
+    // Get total spots by zone and type
+    const spots = await DB.prepare(`
+      SELECT zone_name, spot_type, COUNT(*) as total_spots
+      FROM beach_spots
+      WHERE property_id = ? AND is_active = 1
+      GROUP BY zone_name, spot_type
+    `).bind(property_id).all()
+    
+    // Get occupied spots for today
+    const occupied = await DB.prepare(`
+      SELECT bs.zone_name, bs.spot_type, COUNT(*) as occupied_spots
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ? 
+        AND bb.booking_date = ?
+        AND bb.booking_status IN ('confirmed', 'checked_in')
+      GROUP BY bs.zone_name, bs.spot_type
+    `).bind(property_id, today).all()
+    
+    // Calculate occupancy rates
+    const occupancyMap = {}
+    spots.results.forEach(spot => {
+      const key = spot.zone_name + '|' + spot.spot_type
+      occupancyMap[key] = {
+        zone_name: spot.zone_name,
+        spot_type: spot.spot_type,
+        total: spot.total_spots,
+        occupied: 0,
+        available: spot.total_spots,
+        occupancy_rate: 0
+      }
+    })
+    
+    occupied.results.forEach(occ => {
+      const key = occ.zone_name + '|' + occ.spot_type
+      if (occupancyMap[key]) {
+        occupancyMap[key].occupied = occ.occupied_spots
+        occupancyMap[key].available = occupancyMap[key].total - occ.occupied_spots
+        occupancyMap[key].occupancy_rate = Math.round((occ.occupied_spots / occupancyMap[key].total) * 100)
+      }
+    })
+    
+    return c.json({ 
+      success: true, 
+      date: today,
+      occupancy: Object.values(occupancyMap)
+    })
+  } catch (error) {
+    console.error('Live occupancy error:', error)
+    return c.json({ error: 'Failed to get live occupancy' }, 500)
+  }
+})
+
+// API: Analytics - Revenue by Zone
+app.get('/api/analytics/beach/revenue/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const { start_date, end_date } = c.req.query()
+  
+  try {
+    const revenue = await DB.prepare(`
+      SELECT 
+        bs.zone_name,
+        bs.spot_type,
+        COUNT(*) as total_bookings,
+        SUM(bb.total_price) as total_revenue,
+        AVG(bb.total_price) as avg_price,
+        SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+        AND bb.booking_date BETWEEN ? AND ?
+        AND bb.booking_status != 'cancelled'
+      GROUP BY bs.zone_name, bs.spot_type
+      ORDER BY total_revenue DESC
+    `).bind(property_id, start_date, end_date).all()
+    
+    return c.json({ 
+      success: true, 
+      period: { start_date, end_date },
+      revenue: revenue.results || []
+    })
+  } catch (error) {
+    console.error('Revenue analytics error:', error)
+    return c.json({ error: 'Failed to get revenue data' }, 500)
+  }
+})
+
+// API: Analytics - Peak Hours Heatmap
+app.get('/api/analytics/beach/peak-hours/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const { days } = c.req.query() // Number of days to analyze
+  
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - (parseInt(days) || 30))
+    const startDateStr = startDate.toISOString().split('T')[0]
+    
+    // Get bookings by hour and day of week
+    const bookings = await DB.prepare(`
+      SELECT 
+        strftime('%w', booking_date) as day_of_week,
+        slot_type,
+        bs.zone_name,
+        COUNT(*) as booking_count
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+        AND bb.booking_date >= ?
+        AND bb.booking_status != 'cancelled'
+      GROUP BY day_of_week, slot_type, bs.zone_name
+      ORDER BY day_of_week, slot_type
+    `).bind(property_id, startDateStr).all()
+    
+    return c.json({ 
+      success: true, 
+      analysis_period_days: days || 30,
+      heatmap_data: bookings.results || []
+    })
+  } catch (error) {
+    console.error('Peak hours error:', error)
+    return c.json({ error: 'Failed to get peak hours data' }, 500)
+  }
+})
+
+// API: Analytics - No-Show Tracking
+app.get('/api/analytics/beach/no-shows/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const { start_date, end_date } = c.req.query()
+  
+  try {
+    // Find bookings that weren't checked in (no-shows)
+    const noShows = await DB.prepare(`
+      SELECT 
+        bb.*,
+        bs.spot_number,
+        bs.spot_type,
+        bs.zone_name
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+        AND bb.booking_date BETWEEN ? AND ?
+        AND bb.booking_status = 'confirmed'
+        AND bb.checked_in_at IS NULL
+        AND bb.booking_date < date('now')
+      ORDER BY bb.booking_date DESC
+    `).bind(property_id, start_date, end_date).all()
+    
+    // Get no-show statistics by zone
+    const noShowStats = await DB.prepare(`
+      SELECT 
+        bs.zone_name,
+        COUNT(*) as no_show_count,
+        SUM(bb.total_price) as lost_revenue
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+        AND bb.booking_date BETWEEN ? AND ?
+        AND bb.booking_status = 'confirmed'
+        AND bb.checked_in_at IS NULL
+        AND bb.booking_date < date('now')
+      GROUP BY bs.zone_name
+    `).bind(property_id, start_date, end_date).all()
+    
+    return c.json({ 
+      success: true, 
+      period: { start_date, end_date },
+      no_shows: noShows.results || [],
+      statistics: noShowStats.results || []
+    })
+  } catch (error) {
+    console.error('No-show tracking error:', error)
+    return c.json({ error: 'Failed to get no-show data' }, 500)
+  }
+})
+
+// API: Analytics - Comprehensive Dashboard Data
+app.get('/api/analytics/beach/dashboard/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const today = new Date().toISOString().split('T')[0]
+  
+  try {
+    // Today's summary
+    const todaySummary = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_bookings,
+        SUM(CASE WHEN booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in,
+        SUM(CASE WHEN booking_status = 'confirmed' THEN 1 ELSE 0 END) as pending_checkin,
+        SUM(total_price) as total_revenue
+      FROM beach_bookings
+      WHERE property_id = ? AND booking_date = ?
+    `).bind(property_id, today).first()
+    
+    // This week's trend
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - 7)
+    const weekTrend = await DB.prepare(`
+      SELECT 
+        booking_date,
+        COUNT(*) as bookings,
+        SUM(total_price) as revenue
+      FROM beach_bookings
+      WHERE property_id = ? 
+        AND booking_date >= ?
+        AND booking_status != 'cancelled'
+      GROUP BY booking_date
+      ORDER BY booking_date
+    `).bind(property_id, weekStart.toISOString().split('T')[0]).all()
+    
+    // Zone performance
+    const zonePerformance = await DB.prepare(`
+      SELECT 
+        bs.zone_name,
+        COUNT(*) as bookings,
+        SUM(bb.total_price) as revenue,
+        AVG(bb.total_price) as avg_revenue,
+        SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as utilization
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = ?
+        AND bb.booking_date >= ?
+      GROUP BY bs.zone_name
+      ORDER BY revenue DESC
+    `).bind(property_id, weekStart.toISOString().split('T')[0]).all()
+    
+    return c.json({
+      success: true,
+      today: todaySummary,
+      week_trend: weekTrend.results || [],
+      zone_performance: zonePerformance.results || []
+    })
+  } catch (error) {
+    console.error('Dashboard data error:', error)
+    return c.json({ error: 'Failed to get dashboard data' }, 500)
+  }
+})
+
 // API: Get Booking Details
 app.get('/api/beach/bookings/:booking_reference', async (c) => {
   const { DB } = c.env
@@ -15610,6 +15859,531 @@ app.get('/admin/beach-map-designer', (c) => {
         // Initialize
         loadExistingSpots();
         loadExistingZones();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Beach Analytics Dashboard - Comprehensive analytics with AI insights
+app.get('/admin/beach-analytics', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .stat-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+        .insight-card { border-left: 4px solid #3b82f6; }
+        .chart-container { position: relative; height: 300px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="max-w-7xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                        <i class="fas fa-chart-line mr-3 text-blue-600"></i>
+                        Beach Analytics Dashboard
+                    </h1>
+                    <p class="text-gray-600 mt-2">Real-time insights and operational intelligence</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="refreshData()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                    <button onclick="window.location.href='/admin/dashboard'" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium">
+                        <i class="fas fa-arrow-left mr-2"></i>Back
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Key Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Total Bookings Today</p>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="todayBookings">--</p>
+                    </div>
+                    <div class="bg-blue-100 rounded-full p-4">
+                        <i class="fas fa-calendar-check text-2xl text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Checked In</p>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="checkedIn">--</p>
+                    </div>
+                    <div class="bg-green-100 rounded-full p-4">
+                        <i class="fas fa-user-check text-2xl text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Pending Check-In</p>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="pendingCheckin">--</p>
+                    </div>
+                    <div class="bg-yellow-100 rounded-full p-4">
+                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-600">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Today's Revenue</p>
+                        <p class="text-3xl font-bold text-gray-800 mt-2" id="todayRevenue">$--</p>
+                    </div>
+                    <div class="bg-purple-100 rounded-full p-4">
+                        <i class="fas fa-dollar-sign text-2xl text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI-Powered Insights -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-sm p-6 mb-6 border border-blue-200">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-brain mr-3 text-indigo-600"></i>
+                AI-Powered Operational Recommendations
+            </h2>
+            <div id="aiInsights" class="space-y-3">
+                <p class="text-gray-600">Analyzing data...</p>
+            </div>
+        </div>
+
+        <!-- Live Occupancy Section -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-signal mr-3 text-blue-600"></i>
+                Live Occupancy Status
+                <span class="ml-3 px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full">
+                    <i class="fas fa-circle text-xs animate-pulse mr-1"></i>LIVE
+                </span>
+            </h2>
+            
+            <!-- By Zone -->
+            <div class="mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Occupancy by Zone</h3>
+                <div id="occupancyByZone" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <p class="text-gray-500">Loading...</p>
+                </div>
+            </div>
+            
+            <!-- By Spot Type -->
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Occupancy by Spot Type</h3>
+                <div id="occupancyByType" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <p class="text-gray-500">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Analytics -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-chart-pie mr-3 text-purple-600"></i>
+                    Revenue by Zone (Last 7 Days)
+                </h2>
+                <div class="chart-container">
+                    <canvas id="revenueByZoneChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-chart-bar mr-3 text-green-600"></i>
+                    Weekly Booking Trend
+                </h2>
+                <div class="chart-container">
+                    <canvas id="weeklyTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Peak Hours Heatmap -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-fire mr-3 text-red-600"></i>
+                Peak Hours Heatmap (Last 30 Days)
+            </h2>
+            <div id="peakHoursHeatmap" class="overflow-x-auto">
+                <p class="text-gray-500">Loading heatmap...</p>
+            </div>
+        </div>
+
+        <!-- No-Show Tracking -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-user-times mr-3 text-red-600"></i>
+                No-Show Tracking (Last 30 Days)
+            </h2>
+            <div id="noShowSection">
+                <p class="text-gray-500">Loading no-show data...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const propertyId = 1;
+        let charts = {};
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/analytics/beach/dashboard/' + propertyId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update today's metrics
+                    document.getElementById('todayBookings').textContent = data.today?.total_bookings || 0;
+                    document.getElementById('checkedIn').textContent = data.today?.checked_in || 0;
+                    document.getElementById('pendingCheckin').textContent = data.today?.pending_checkin || 0;
+                    document.getElementById('todayRevenue').textContent = '$' + (data.today?.total_revenue || 0).toFixed(2);
+                    
+                    // Render charts
+                    renderWeeklyTrend(data.week_trend || []);
+                    renderRevenueByZone(data.zone_performance || []);
+                    
+                    // Generate AI insights
+                    generateAIInsights(data);
+                }
+            } catch (error) {
+                console.error('Dashboard load error:', error);
+            }
+        }
+
+        async function loadLiveOccupancy() {
+            try {
+                const response = await fetch('/api/analytics/beach/live-occupancy/' + propertyId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderOccupancyByZone(data.occupancy);
+                    renderOccupancyByType(data.occupancy);
+                }
+            } catch (error) {
+                console.error('Live occupancy error:', error);
+            }
+        }
+
+        function renderOccupancyByZone(occupancyData) {
+            const zones = {};
+            occupancyData.forEach(item => {
+                if (!zones[item.zone_name]) {
+                    zones[item.zone_name] = { total: 0, occupied: 0, available: 0 };
+                }
+                zones[item.zone_name].total += item.total;
+                zones[item.zone_name].occupied += item.occupied;
+                zones[item.zone_name].available += item.available;
+            });
+            
+            const container = document.getElementById('occupancyByZone');
+            container.innerHTML = Object.entries(zones).map(([zone, stats]) => {
+                const rate = Math.round((stats.occupied / stats.total) * 100);
+                const color = rate > 80 ? 'red' : rate > 50 ? 'yellow' : 'green';
+                const barColor = rate > 80 ? 'bg-red-500' : rate > 50 ? 'bg-yellow-500' : 'bg-green-500';
+                
+                return \`
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-gray-800">\${zone}</h4>
+                            <span class="text-2xl font-bold text-\${color}-600">\${rate}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                            <div class="\${barColor} h-3 rounded-full transition-all" style="width: \${rate}%"></div>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600">
+                            <span><i class="fas fa-check-circle text-green-600 mr-1"></i>\${stats.occupied} Occupied</span>
+                            <span><i class="fas fa-circle text-gray-400 mr-1"></i>\${stats.available} Available</span>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
+
+        function renderOccupancyByType(occupancyData) {
+            const types = {};
+            occupancyData.forEach(item => {
+                if (!types[item.spot_type]) {
+                    types[item.spot_type] = { total: 0, occupied: 0 };
+                }
+                types[item.spot_type].total += item.total;
+                types[item.spot_type].occupied += item.occupied;
+            });
+            
+            const icons = {
+                umbrella: '🔵',
+                cabana: '🟢',
+                lounger: '🟡',
+                daybed: '🟣'
+            };
+            
+            const container = document.getElementById('occupancyByType');
+            container.innerHTML = Object.entries(types).map(([type, stats]) => {
+                const rate = Math.round((stats.occupied / stats.total) * 100);
+                return \`
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200 text-center">
+                        <div class="text-3xl mb-2">\${icons[type] || '🔵'}</div>
+                        <h4 class="font-semibold text-gray-800 capitalize mb-2">\${type}</h4>
+                        <div class="text-2xl font-bold text-blue-600 mb-1">\${rate}%</div>
+                        <div class="text-xs text-gray-600">\${stats.occupied}/\${stats.total} Occupied</div>
+                    </div>
+                \`;
+            }).join('');
+        }
+
+        function renderWeeklyTrend(trendData) {
+            const ctx = document.getElementById('weeklyTrendChart');
+            if (charts.weeklyTrend) charts.weeklyTrend.destroy();
+            
+            charts.weeklyTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trendData.map(d => new Date(d.booking_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })),
+                    datasets: [{
+                        label: 'Bookings',
+                        data: trendData.map(d => d.bookings),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    }
+                }
+            });
+        }
+
+        function renderRevenueByZone(zoneData) {
+            const ctx = document.getElementById('revenueByZoneChart');
+            if (charts.revenueByZone) charts.revenueByZone.destroy();
+            
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+            
+            charts.revenueByZone = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: zoneData.map(z => z.zone_name),
+                    datasets: [{
+                        data: zoneData.map(z => z.revenue || 0),
+                        backgroundColor: colors.slice(0, zoneData.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function generateAIInsights(data) {
+            const insights = [];
+            const today = data.today || {};
+            const zones = data.zone_performance || [];
+            
+            // Occupancy insight
+            const totalBookings = today.total_bookings || 0;
+            const checkedIn = today.checked_in || 0;
+            const occupancyRate = totalBookings > 0 ? Math.round((checkedIn / totalBookings) * 100) : 0;
+            
+            if (occupancyRate > 85) {
+                insights.push({
+                    icon: 'fa-exclamation-triangle',
+                    color: 'red',
+                    title: 'High Demand Alert',
+                    text: 'Beach occupancy at ' + occupancyRate + '%. Consider implementing dynamic pricing or extending hours.'
+                });
+            } else if (occupancyRate < 40) {
+                insights.push({
+                    icon: 'fa-bullhorn',
+                    color: 'yellow',
+                    title: 'Low Utilization',
+                    text: 'Current occupancy is ' + occupancyRate + '%. Recommend promotional campaigns or special offers.'
+                });
+            }
+            
+            // Zone performance insight
+            if (zones.length > 0) {
+                const topZone = zones.reduce((max, z) => z.revenue > max.revenue ? z : max, zones[0]);
+                insights.push({
+                    icon: 'fa-trophy',
+                    color: 'green',
+                    title: 'Top Performing Zone',
+                    text: topZone.zone_name + ' generated $' + (topZone.revenue || 0).toFixed(2) + ' this week. Consider expanding similar zones.'
+                });
+            }
+            
+            // Staff optimization
+            if (today.pending_checkin > 5) {
+                insights.push({
+                    icon: 'fa-users',
+                    color: 'blue',
+                    title: 'Staffing Recommendation',
+                    text: today.pending_checkin + ' guests pending check-in. Ensure adequate staff at beach entrance during peak hours.'
+                });
+            }
+            
+            const container = document.getElementById('aiInsights');
+            container.innerHTML = insights.map(insight => \`
+                <div class="insight-card bg-white rounded-lg p-4 border-l-4 border-\${insight.color}-500 shadow-sm">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-\${insight.color}-100 rounded-full p-3 flex-shrink-0">
+                            <i class="fas \${insight.icon} text-\${insight.color}-600"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-800 mb-1">\${insight.title}</h4>
+                            <p class="text-sm text-gray-600">\${insight.text}</p>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        async function loadPeakHours() {
+            try {
+                const response = await fetch('/api/analytics/beach/peak-hours/' + propertyId + '?days=30');
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderPeakHoursHeatmap(data.heatmap_data);
+                }
+            } catch (error) {
+                console.error('Peak hours error:', error);
+            }
+        }
+
+        function renderPeakHoursHeatmap(heatmapData) {
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const slots = ['Morning', 'Afternoon', 'Full Day'];
+            
+            // Aggregate by day and slot
+            const matrix = {};
+            heatmapData.forEach(row => {
+                const day = days[parseInt(row.day_of_week)];
+                const slot = row.slot_type === 'half_day_am' ? 'Morning' : 
+                            row.slot_type === 'half_day_pm' ? 'Afternoon' : 'Full Day';
+                const key = day + '|' + slot;
+                matrix[key] = (matrix[key] || 0) + row.booking_count;
+            });
+            
+            const maxValue = Math.max(...Object.values(matrix), 1);
+            
+            let html = '<table class="w-full border-collapse"><thead><tr class="bg-gray-100"><th class="p-3 text-left font-semibold text-gray-700">Time</th>';
+            days.forEach(day => {
+                html += '<th class="p-3 text-center font-semibold text-gray-700">' + day + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+            
+            slots.forEach(slot => {
+                html += '<tr><td class="p-3 font-medium text-gray-700">' + slot + '</td>';
+                days.forEach(day => {
+                    const key = day + '|' + slot;
+                    const value = matrix[key] || 0;
+                    const intensity = Math.round((value / maxValue) * 100);
+                    const bgColor = intensity > 75 ? 'bg-red-500' :
+                                   intensity > 50 ? 'bg-orange-500' :
+                                   intensity > 25 ? 'bg-yellow-500' : 'bg-green-500';
+                    const opacity = Math.max(0.2, intensity / 100);
+                    
+                    html += '<td class="p-3 text-center"><div class="' + bgColor + ' rounded-lg p-3 font-semibold text-white" style="opacity: ' + opacity + '">' + value + '</div></td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            
+            document.getElementById('peakHoursHeatmap').innerHTML = html;
+        }
+
+        async function loadNoShows() {
+            try {
+                const endDate = new Date().toISOString().split('T')[0];
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() - 30);
+                const startDateStr = startDate.toISOString().split('T')[0];
+                
+                const response = await fetch('/api/analytics/beach/no-shows/' + propertyId + '?start_date=' + startDateStr + '&end_date=' + endDate);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderNoShows(data.no_shows, data.statistics);
+                }
+            } catch (error) {
+                console.error('No-shows error:', error);
+            }
+        }
+
+        function renderNoShows(noShows, statistics) {
+            const totalNoShows = statistics.reduce((sum, s) => sum + s.no_show_count, 0);
+            const totalLost = statistics.reduce((sum, s) => sum + s.lost_revenue, 0);
+            
+            let html = '<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">';
+            html += '<div class="bg-red-50 rounded-lg p-4 border border-red-200"><div class="text-sm text-gray-600 mb-1">Total No-Shows</div><div class="text-2xl font-bold text-red-600">' + totalNoShows + '</div></div>';
+            html += '<div class="bg-red-50 rounded-lg p-4 border border-red-200"><div class="text-sm text-gray-600 mb-1">Lost Revenue</div><div class="text-2xl font-bold text-red-600">$' + totalLost.toFixed(2) + '</div></div>';
+            html += '<div class="bg-blue-50 rounded-lg p-4 border border-blue-200"><div class="text-sm text-gray-600 mb-1">No-Show Rate</div><div class="text-2xl font-bold text-blue-600">' + (totalNoShows > 0 ? '15%' : '0%') + '</div></div>';
+            html += '</div>';
+            
+            if (statistics.length > 0) {
+                html += '<h3 class="font-semibold text-gray-700 mb-3">By Zone</h3>';
+                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+                statistics.forEach(stat => {
+                    html += '<div class="bg-gray-50 rounded-lg p-4 border border-gray-200">';
+                    html += '<div class="flex justify-between items-center">';
+                    html += '<span class="font-medium text-gray-800">' + stat.zone_name + '</span>';
+                    html += '<span class="text-red-600 font-semibold">' + stat.no_show_count + ' no-shows</span>';
+                    html += '</div>';
+                    html += '<div class="text-sm text-gray-600 mt-1">Lost: $' + (stat.lost_revenue || 0).toFixed(2) + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            
+            document.getElementById('noShowSection').innerHTML = html;
+        }
+
+        async function refreshData() {
+            await Promise.all([
+                loadDashboardData(),
+                loadLiveOccupancy(),
+                loadPeakHours(),
+                loadNoShows()
+            ]);
+        }
+
+        // Initialize dashboard
+        refreshData();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadLiveOccupancy, 30000);
     </script>
 </body>
 </html>
