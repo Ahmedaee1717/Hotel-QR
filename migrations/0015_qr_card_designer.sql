@@ -47,18 +47,3 @@ CREATE TABLE IF NOT EXISTS qr_card_designs (
 
 CREATE INDEX IF NOT EXISTS idx_qr_card_property ON qr_card_designs(property_id);
 CREATE INDEX IF NOT EXISTS idx_qr_card_default ON qr_card_designs(is_default);
-
--- Insert default design for existing property
-INSERT OR IGNORE INTO qr_card_designs (
-  property_id, 
-  card_title, 
-  bottom_message,
-  template_name,
-  is_default
-) VALUES (
-  1, 
-  'Welcome to Paradise Resort!', 
-  'Scan here to explore our services',
-  'Default',
-  1
-);

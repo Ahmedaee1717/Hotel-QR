@@ -38,6 +38,3 @@ CREATE TABLE IF NOT EXISTS seasonal_settings (
 
 CREATE INDEX IF NOT EXISTS idx_seasonal_property ON seasonal_settings(property_id);
 CREATE INDEX IF NOT EXISTS idx_seasonal_active ON seasonal_settings(is_active);
-
--- Insert default settings for existing property
-INSERT OR IGNORE INTO seasonal_settings (property_id, active_theme) VALUES (1, 'none');

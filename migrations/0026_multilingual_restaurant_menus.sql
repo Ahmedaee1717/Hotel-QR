@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS restaurant_menus (
   created_by INTEGER,
   
   FOREIGN KEY (offering_id) REFERENCES hotel_offerings(offering_id),
-  FOREIGN KEY (created_by) REFERENCES users(id)
+  FOREIGN KEY (created_by) REFERENCES users(user_id)
 );
 
 -- Menu translations table (supports unlimited languages)
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS restaurant_menu_translations (
   translated_by INTEGER, -- user_id who performed/verified translation
   
   FOREIGN KEY (menu_id) REFERENCES restaurant_menus(menu_id) ON DELETE CASCADE,
-  FOREIGN KEY (translated_by) REFERENCES users(id),
+  FOREIGN KEY (translated_by) REFERENCES users(user_id),
   UNIQUE(menu_id, language_code)
 );
 
