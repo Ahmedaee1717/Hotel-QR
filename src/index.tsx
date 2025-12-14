@@ -18378,7 +18378,7 @@ Bring your QR code (printed or on phone)
 Beach towels provided by hotel
 Late arrivals may result in reduced time\`;
                     const infoText = data.settings.important_information || defaultInfo;
-                    const infoLines = infoText.split('\n').filter(line => line.trim());
+                    const infoLines = infoText.split(String.fromCharCode(10)).filter(line => line.trim());
                     
                     const listHtml = infoLines.map(line => 
                         '<li><i class="fas fa-check mr-2 text-green-600"></i>' + line + '</li>'
