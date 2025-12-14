@@ -6512,6 +6512,237 @@ app.get('/api/properties', async (c) => {
 })
 
 // ============================================
+// MENU DESIGN CUSTOMIZATION API
+// ============================================
+
+// Get menu design settings for a restaurant
+app.get('/api/restaurant/:offering_id/menu-design', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    let design = await DB.prepare(`
+      SELECT * FROM restaurant_menu_design WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    // Create default if doesn't exist
+    if (!design) {
+      await DB.prepare(`
+        INSERT INTO restaurant_menu_design (offering_id) VALUES (?)
+      `).bind(offering_id).run()
+      
+      design = await DB.prepare(`
+        SELECT * FROM restaurant_menu_design WHERE offering_id = ?
+      `).bind(offering_id).first()
+    }
+    
+    return c.json({ success: true, design })
+  } catch (error) {
+    console.error('Get menu design error:', error)
+    return c.json({ error: 'Failed to fetch menu design' }, 500)
+  }
+})
+
+// Update menu design settings (admin)
+app.put('/api/admin/restaurant/:offering_id/menu-design', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const settings = await c.req.json()
+  
+  try {
+    // Build UPDATE query dynamically
+    const allowedFields = [
+      'layout_style', 'columns_count', 'item_spacing',
+      'primary_color', 'secondary_color', 'accent_color', 'background_color', 'text_color', 'price_color',
+      'heading_font', 'body_font', 'font_size_base', 'heading_size', 'item_name_size',
+      'show_images', 'image_position', 'image_size', 'show_dividers', 'divider_style', 'show_category_icons',
+      'show_restaurant_logo', 'header_style', 'show_restaurant_name', 'show_restaurant_description',
+      'header_background_color', 'header_text_color',
+      'show_descriptions', 'show_prices', 'price_position', 'show_dietary_icons', 'show_spice_level',
+      'hover_effect', 'animation_style', 'border_radius', 'shadow_intensity',
+      'language_switcher_position', 'language_switcher_style', 'custom_css'
+    ]
+    
+    const updates = []
+    const values = []
+    
+    for (const field of allowedFields) {
+      if (settings[field] !== undefined) {
+        updates.push(`${field} = ?`)
+        values.push(settings[field])
+      }
+    }
+    
+    if (updates.length === 0) {
+      return c.json({ error: 'No valid fields to update' }, 400)
+    }
+    
+    updates.push('updated_at = CURRENT_TIMESTAMP')
+    values.push(offering_id)
+    
+    await DB.prepare(`
+      UPDATE restaurant_menu_design
+      SET ${updates.join(', ')}
+      WHERE offering_id = ?
+    `).bind(...values).run()
+    
+    // Return updated design
+    const design = await DB.prepare(`
+      SELECT * FROM restaurant_menu_design WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    return c.json({ success: true, design })
+  } catch (error) {
+    console.error('Update menu design error:', error)
+    return c.json({ error: 'Failed to update menu design' }, 500)
+  }
+})
+
+// Get guest menu display (with translations)
+app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const language = c.req.query('language') || 'en'
+  
+  try {
+    // Get restaurant info
+    const restaurant = await DB.prepare(`
+      SELECT * FROM hotel_offerings WHERE offering_id = ? AND offering_type = 'restaurant'
+    `).bind(offering_id).first()
+    
+    if (!restaurant) {
+      return c.json({ error: 'Restaurant not found' }, 404)
+    }
+    
+    // Get design settings
+    let design = await DB.prepare(`
+      SELECT * FROM restaurant_menu_design WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    if (!design) {
+      // Create default design
+      await DB.prepare(`
+        INSERT INTO restaurant_menu_design (offering_id) VALUES (?)
+      `).bind(offering_id).run()
+      design = await DB.prepare(`
+        SELECT * FROM restaurant_menu_design WHERE offering_id = ?
+      `).bind(offering_id).first()
+    }
+    
+    // Get menus with their categories and items
+    const menus = await DB.prepare(`
+      SELECT * FROM restaurant_menus
+      WHERE offering_id = ? AND ocr_status = 'completed'
+      ORDER BY display_order, created_at
+    `).bind(offering_id).all()
+    
+    const menusWithContent = []
+    
+    for (const menu of menus.results) {
+      // Get translated menu text if available
+      let menuText = menu.extracted_text
+      const translation = await DB.prepare(`
+        SELECT translated_text FROM restaurant_menu_translations
+        WHERE menu_id = ? AND language_code = ?
+      `).bind(menu.menu_id, language).first()
+      
+      if (translation && translation.translated_text) {
+        menuText = translation.translated_text
+      }
+      
+      // Get categories for this menu
+      const categories = await DB.prepare(`
+        SELECT * FROM menu_categories
+        WHERE menu_id = ?
+        ORDER BY display_order
+      `).bind(menu.menu_id).all()
+      
+      const categoriesWithItems = []
+      
+      for (const category of categories.results) {
+        // Get translated category name/desc
+        let catName = category.category_name
+        let catDesc = category.category_description
+        
+        const catTrans = await DB.prepare(`
+          SELECT * FROM menu_category_translations
+          WHERE category_id = ? AND language_code = ?
+        `).bind(category.category_id, language).first()
+        
+        if (catTrans) {
+          catName = catTrans.category_name || catName
+          catDesc = catTrans.category_description || catDesc
+        }
+        
+        // Get items
+        const items = await DB.prepare(`
+          SELECT * FROM menu_items
+          WHERE category_id = ? AND is_available = 1
+          ORDER BY display_order
+        `).bind(category.category_id).all()
+        
+        const itemsWithTranslations = []
+        
+        for (const item of items.results) {
+          let itemName = item.item_name
+          let itemDesc = item.description
+          
+          const itemTrans = await DB.prepare(`
+            SELECT * FROM menu_item_translations
+            WHERE item_id = ? AND language_code = ?
+          `).bind(item.item_id, language).first()
+          
+          if (itemTrans) {
+            itemName = itemTrans.item_name || itemName
+            itemDesc = itemTrans.description || itemDesc
+          }
+          
+          itemsWithTranslations.push({
+            ...item,
+            item_name: itemName,
+            description: itemDesc
+          })
+        }
+        
+        categoriesWithItems.push({
+          ...category,
+          category_name: catName,
+          category_description: catDesc,
+          items: itemsWithTranslations
+        })
+      }
+      
+      menusWithContent.push({
+        ...menu,
+        extracted_text: menuText,
+        categories: categoriesWithItems
+      })
+    }
+    
+    // Get available languages for this restaurant's menus
+    const availableLanguages = await DB.prepare(`
+      SELECT DISTINCT language_code
+      FROM restaurant_menu_translations
+      WHERE menu_id IN (
+        SELECT menu_id FROM restaurant_menus WHERE offering_id = ?
+      )
+    `).bind(offering_id).all()
+    
+    return c.json({
+      success: true,
+      restaurant,
+      design,
+      menus: menusWithContent,
+      available_languages: availableLanguages.results.map(l => l.language_code),
+      current_language: language
+    })
+  } catch (error) {
+    console.error('Get menu display error:', error)
+    return c.json({ error: 'Failed to fetch menu display' }, 500)
+  }
+})
+
+// ============================================
 // SEASONAL EFFECTS API
 // ============================================
 
@@ -33932,6 +34163,303 @@ app.get('/:property_slug?', async (c) => {
 // GUEST RESTAURANT BOOKING PAGE
 // ============================================
 
+// Guest menu display page
+app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
+  const { DB } = c.env
+  const { slug, offering_id } = c.req.param()
+  
+  try {
+    const property = await DB.prepare(`SELECT * FROM properties WHERE slug = ?`).bind(slug).first()
+    if (!property) return c.text('Property not found', 404)
+    
+    const restaurant = await DB.prepare(`SELECT * FROM hotel_offerings WHERE offering_id = ?`).bind(offering_id).first()
+    if (!restaurant) return c.text('Restaurant not found', 404)
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${restaurant.title_en} - Digital Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style id="dynamicStyles"></style>
+</head>
+<body class="antialiased">
+    <div id="menuContainer" class="min-h-screen"></div>
+    
+    <script>
+    const offeringId = '${offering_id}';
+    let currentLanguage = 'en';
+    let menuData = null;
+    let designSettings = null;
+    
+    async function loadMenuData() {
+      try {
+        const response = await fetch('/api/restaurant/' + offeringId + '/menu-display?language=' + currentLanguage);
+        const data = await response.json();
+        
+        if (data.success) {
+          menuData = data;
+          designSettings = data.design;
+          applyDesignSettings();
+          renderMenu();
+        }
+      } catch (error) {
+        console.error('Failed to load menu:', error);
+        document.getElementById('menuContainer').innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="text-center"><i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i><p class="text-xl text-gray-700">Failed to load menu</p></div></div>';
+      }
+    }
+    
+    function applyDesignSettings() {
+      const d = designSettings;
+      if (!d) return;
+      
+      const styles = \`
+        :root {
+          --primary-color: \${d.primary_color};
+          --secondary-color: \${d.secondary_color};
+          --accent-color: \${d.accent_color};
+          --background-color: \${d.background_color};
+          --text-color: \${d.text_color};
+          --price-color: \${d.price_color};
+          --heading-font: '\${d.heading_font}', serif;
+          --body-font: '\${d.body_font}', sans-serif;
+          --font-size-base: \${d.font_size_base}px;
+          --heading-size: \${d.heading_size}px;
+          --item-name-size: \${d.item_name_size}px;
+          --border-radius: \${d.border_radius}px;
+        }
+        
+        body {
+          background-color: var(--background-color);
+          color: var(--text-color);
+          font-family: var(--body-font);
+          font-size: var(--font-size-base);
+        }
+        
+        .menu-heading {
+          font-family: var(--heading-font);
+          font-size: var(--heading-size);
+          color: var(--primary-color);
+        }
+        
+        .category-heading {
+          font-family: var(--heading-font);
+          font-size: calc(var(--heading-size) * 0.75);
+          color: var(--primary-color);
+          border-bottom: 2px solid var(--accent-color);
+          padding-bottom: 0.5rem;
+          margin-bottom: 1.5rem;
+        }
+        
+        .menu-item-name {
+          font-family: var(--heading-font);
+          font-size: var(--item-name-size);
+          color: var(--primary-color);
+          font-weight: 600;
+        }
+        
+        .menu-item-price {
+          font-size: calc(var(--item-name-size) * 0.9);
+          color: var(--price-color);
+          font-weight: 700;
+        }
+        
+        .menu-item {
+          border-radius: var(--border-radius);
+          transition: all 0.3s ease;
+        }
+        
+        \${d.hover_effect === 'subtle' ? '.menu-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }' : ''}
+        \${d.hover_effect === 'bold' ? '.menu-item:hover { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }' : ''}
+        
+        \${d.shadow_intensity === 'light' ? '.menu-item { box-shadow: 0 1px 3px rgba(0,0,0,0.05); }' : ''}
+        \${d.shadow_intensity === 'medium' ? '.menu-item { box-shadow: 0 4px 6px rgba(0,0,0,0.1); }' : ''}
+        \${d.shadow_intensity === 'strong' ? '.menu-item { box-shadow: 0 10px 25px rgba(0,0,0,0.15); }' : ''}
+        
+        .menu-divider {
+          \${d.divider_style === 'line' ? 'border-top: 1px solid var(--secondary-color); opacity: 0.3;' : ''}
+          \${d.divider_style === 'dots' ? 'border-top: 2px dotted var(--secondary-color); opacity: 0.3;' : ''}
+          margin: 1.5rem 0;
+        }
+        
+        \${d.custom_css || ''}
+      \`;
+      
+      document.getElementById('dynamicStyles').textContent = styles;
+    }
+    
+    function renderMenu() {
+      const d = designSettings;
+      const restaurant = menuData.restaurant;
+      const menus = menuData.menus;
+      
+      let html = '';
+      
+      // Header
+      if (d.show_restaurant_name || d.show_restaurant_description) {
+        html += '<div class="py-12 px-4" style="background-color: ' + d.header_background_color + '; color: ' + d.header_text_color + ';">';
+        html += '<div class="max-w-6xl mx-auto text-center">';
+        
+        if (d.show_restaurant_logo && restaurant.images) {
+          const logo = restaurant.images.split(',')[0];
+          html += '<img src="' + logo + '" alt="Logo" class="w-32 h-32 mx-auto rounded-full mb-4 object-cover border-4" style="border-color: ' + d.accent_color + '">';
+        }
+        
+        if (d.show_restaurant_name) {
+          html += '<h1 class="text-5xl font-bold mb-4" style="font-family: var(--heading-font)">' + restaurant.title_en + '</h1>';
+        }
+        
+        if (d.show_restaurant_description && restaurant.short_description_en) {
+          html += '<p class="text-xl opacity-90 max-w-2xl mx-auto">' + restaurant.short_description_en + '</p>';
+        }
+        
+        html += '</div></div>';
+      }
+      
+      // Language Switcher
+      if (menuData.available_languages && menuData.available_languages.length > 1) {
+        const position = d.language_switcher_position || 'top-right';
+        const positionClasses = position === 'top-right' ? 'top-4 right-4' : position === 'top-left' ? 'top-4 left-4' : 'top-4 right-4';
+        
+        html += '<div class="fixed ' + positionClasses + ' z-50">';
+        html += '<select onchange="changeLanguage(this.value)" class="px-4 py-2 rounded-lg shadow-lg border-2 font-semibold" style="background-color: white; border-color: ' + d.accent_color + '; color: ' + d.primary_color + ';">';
+        
+        const languageNames = {
+          'en': '🇬🇧 English',
+          'ar': '🇸🇦 العربية',
+          'fr': '🇫🇷 Français',
+          'de': '🇩🇪 Deutsch',
+          'es': '🇪🇸 Español',
+          'it': '🇮🇹 Italiano',
+          'zh': '🇨🇳 中文',
+          'ja': '🇯🇵 日本語'
+        };
+        
+        menuData.available_languages.forEach(lang => {
+          const selected = lang === currentLanguage ? 'selected' : '';
+          html += '<option value="' + lang + '" ' + selected + '>' + (languageNames[lang] || lang.toUpperCase()) + '</option>';
+        });
+        
+        html += '</select></div>';
+      }
+      
+      // Menu Content
+      html += '<div class="max-w-6xl mx-auto px-4 py-8">';
+      
+      // Column layout based on settings
+      const colsClass = d.columns_count === 2 ? 'md:grid-cols-2' : d.columns_count === 3 ? 'md:grid-cols-3' : '';
+      const gapClass = d.item_spacing === 'compact' ? 'gap-4' : d.item_spacing === 'spacious' ? 'gap-8' : 'gap-6';
+      
+      menus.forEach(menu => {
+        html += '<div class="mb-12">';
+        html += '<h2 class="menu-heading text-center mb-8">' + menu.menu_name + '</h2>';
+        
+        menu.categories.forEach(category => {
+          html += '<div class="mb-10">';
+          html += '<h3 class="category-heading flex items-center gap-3">';
+          if (d.show_category_icons) {
+            html += '<i class="fas fa-utensils" style="color: ' + d.accent_color + '"></i>';
+          }
+          html += category.category_name;
+          html += '</h3>';
+          
+          if (category.category_description) {
+            html += '<p class="text-lg mb-6 italic" style="color: ' + d.secondary_color + '">' + category.category_description + '</p>';
+          }
+          
+          html += '<div class="grid ' + colsClass + ' ' + gapClass + '">';
+          
+          category.items.forEach(item => {
+            html += '<div class="menu-item p-6 bg-white">';
+            
+            // Item layout based on settings
+            if (d.image_position === 'top' && item.image_url && d.show_images) {
+              html += '<img src="' + item.image_url + '" class="w-full h-48 object-cover rounded-lg mb-4">';
+            }
+            
+            html += '<div class="flex justify-between items-start gap-4">';
+            
+            if (d.image_position === 'left' && item.image_url && d.show_images) {
+              const imgSize = d.image_size === 'small' ? 'w-16 h-16' : d.image_size === 'large' ? 'w-32 h-32' : 'w-24 h-24';
+              html += '<img src="' + item.image_url + '" class="' + imgSize + ' object-cover rounded-lg flex-shrink-0">';
+            }
+            
+            html += '<div class="flex-1">';
+            html += '<div class="flex justify-between items-baseline gap-4">';
+            html += '<h4 class="menu-item-name">' + item.item_name + '</h4>';
+            
+            if (d.show_prices && item.price && d.price_position === 'right') {
+              html += '<span class="menu-item-price flex-shrink-0">' + item.price + ' ' + (item.currency || 'USD') + '</span>';
+            }
+            
+            html += '</div>';
+            
+            if (d.show_descriptions && item.description) {
+              html += '<p class="mt-2 text-sm leading-relaxed" style="color: ' + d.secondary_color + '">' + item.description + '</p>';
+            }
+            
+            if (d.show_prices && item.price && d.price_position === 'below') {
+              html += '<div class="mt-3"><span class="menu-item-price">' + item.price + ' ' + (item.currency || 'USD') + '</span></div>';
+            }
+            
+            // Dietary icons
+            if (d.show_dietary_icons && (item.is_vegetarian || item.is_vegan || item.is_gluten_free)) {
+              html += '<div class="mt-3 flex gap-2">';
+              if (item.is_vegan) html += '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">🌱 Vegan</span>';
+              if (item.is_vegetarian) html += '<span class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800">🥬 Vegetarian</span>';
+              if (item.is_gluten_free) html += '<span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">🌾 Gluten-Free</span>';
+              html += '</div>';
+            }
+            
+            html += '</div>';
+            
+            if (d.image_position === 'right' && item.image_url && d.show_images) {
+              const imgSize = d.image_size === 'small' ? 'w-16 h-16' : d.image_size === 'large' ? 'w-32 h-32' : 'w-24 h-24';
+              html += '<img src="' + item.image_url + '" class="' + imgSize + ' object-cover rounded-lg flex-shrink-0">';
+            }
+            
+            html += '</div>';
+            html += '</div>';
+          });
+          
+          html += '</div>';
+          
+          if (d.show_dividers) {
+            html += '<div class="menu-divider"></div>';
+          }
+          
+          html += '</div>';
+        });
+        
+        html += '</div>';
+      });
+      
+      html += '</div>';
+      
+      document.getElementById('menuContainer').innerHTML = html;
+    }
+    
+    window.changeLanguage = function(lang) {
+      currentLanguage = lang;
+      loadMenuData();
+    };
+    
+    // Initial load
+    loadMenuData();
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Menu display error:', error)
+    return c.text('Error loading menu', 500)
+  }
+})
+
 app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
   const { DB } = c.env
   const { slug, offering_id } = c.req.param()
@@ -34792,6 +35320,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             <button onclick="switchTab('menus')" id="tabMenus" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                 <i class="fas fa-utensils mr-2"></i>Menus & Translation
             </button>
+            <button onclick="switchTab('menuDesign')" id="tabMenuDesign" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <i class="fas fa-palette mr-2"></i>Menu Design
+            </button>
         </div>
 
         <!-- INFO TAB -->
@@ -35384,6 +35915,188 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
         </div>
         <!-- END MENUS TAB -->
+        
+        <!-- MENU DESIGN TAB -->
+        <div id="menuDesignSection" style="display: none;">
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl shadow-2xl p-8 mb-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                            <i class="fas fa-palette text-purple-600"></i>
+                            Menu Design Customization
+                        </h2>
+                        <p class="text-gray-600 mt-2">Create a beautiful, professional digital menu that matches your restaurant's brand</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="previewMenu()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition">
+                            <i class="fas fa-eye mr-2"></i>Preview Menu
+                        </button>
+                        <button onclick="saveMenuDesign()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow-lg transition">
+                            <i class="fas fa-save mr-2"></i>Save Design
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Layout & Style -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-layer-group text-blue-600"></i>Layout & Style
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Layout Style</label>
+                            <select id="layoutStyle" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="classic">Classic - Traditional elegant menu</option>
+                                <option value="modern">Modern - Clean contemporary design</option>
+                                <option value="elegant">Elegant - Luxury fine dining</option>
+                                <option value="minimal">Minimal - Simple & focused</option>
+                                <option value="grid">Grid - Card-based layout</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Columns</label>
+                            <select id="columnsCount" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="1">Single Column</option>
+                                <option value="2">Two Columns</option>
+                                <option value="3">Three Columns</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Item Spacing</label>
+                            <select id="itemSpacing" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="compact">Compact</option>
+                                <option value="comfortable">Comfortable</option>
+                                <option value="spacious">Spacious</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colors -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-paint-brush text-purple-600"></i>Color Theme
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Primary Color</label>
+                                <input type="color" id="primaryColor" class="w-full h-12 rounded-lg border-2 border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Accent Color</label>
+                                <input type="color" id="accentColor" class="w-full h-12 rounded-lg border-2 border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Background</label>
+                                <input type="color" id="backgroundColor" class="w-full h-12 rounded-lg border-2 border-gray-300">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Price Color</label>
+                                <input type="color" id="priceColor" class="w-full h-12 rounded-lg border-2 border-gray-300">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Typography -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-font text-green-600"></i>Typography
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Heading Font</label>
+                            <select id="headingFont" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="Playfair Display">Playfair Display - Elegant Serif</option>
+                                <option value="Cormorant Garamond">Cormorant Garamond - Classic Serif</option>
+                                <option value="Montserrat">Montserrat - Modern Sans</option>
+                                <option value="Lato">Lato - Clean Sans</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Body Font</label>
+                            <select id="bodyFont" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="Lato">Lato - Clean & Readable</option>
+                                <option value="Montserrat">Montserrat - Modern</option>
+                                <option value="Playfair Display">Playfair Display - Elegant</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Base Size</label>
+                                <input type="number" id="fontSizeBase" min="12" max="24" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Heading</label>
+                                <input type="number" id="headingSize" min="24" max="48" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Item Name</label>
+                                <input type="number" id="itemNameSize" min="16" max="32" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Visual Options -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-magic text-yellow-600"></i>Visual Options
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between py-2 border-b">
+                            <span class="font-semibold">Show Images</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="showImages" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b">
+                            <span class="font-semibold">Show Prices</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="showPrices" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b">
+                            <span class="font-semibold">Show Descriptions</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="showDescriptions" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b">
+                            <span class="font-semibold">Show Dietary Icons</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="showDietaryIcons" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Hover Effect</label>
+                            <select id="hoverEffect" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="subtle">Subtle</option>
+                                <option value="bold">Bold</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Shadow Intensity</label>
+                            <select id="shadowIntensity" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-500 outline-none">
+                                <option value="none">None</option>
+                                <option value="light">Light</option>
+                                <option value="medium">Medium</option>
+                                <option value="strong">Strong</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END MENU DESIGN TAB -->
     </div>
 
     <script>
@@ -36212,18 +36925,22 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         currentTab = tab;
         
         // Update button styles
+        document.getElementById('tabInfo').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'info' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabTables').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'tables' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabSessions').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabReservations').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'reservations' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabTextures').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'textures' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabMenus').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'menus' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        document.getElementById('tabMenuDesign').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'menuDesign' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         
         // Show/hide sections
+        document.getElementById('infoSection').style.display = tab === 'info' ? 'block' : 'none';
         document.getElementById('tablesSection').style.display = tab === 'tables' ? 'block' : 'none';
         document.getElementById('sessionsSection').style.display = tab === 'sessions' ? 'block' : 'none';
         document.getElementById('reservationsSection').style.display = tab === 'reservations' ? 'block' : 'none';
         document.getElementById('texturesSection').style.display = tab === 'textures' ? 'block' : 'none';
         document.getElementById('menusSection').style.display = tab === 'menus' ? 'block' : 'none';
+        document.getElementById('menuDesignSection').style.display = tab === 'menuDesign' ? 'block' : 'none';
         
         // Load data for active tab
         if (tab === 'sessions') {
@@ -36232,9 +36949,94 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           loadReservations();
         } else if (tab === 'textures') {
           loadTextureSettings();
+        } else if (tab === 'menuDesign') {
+          loadMenuDesign();
         }
       }
 
+      // ========================================
+      // MENU DESIGN MANAGEMENT
+      // ========================================
+      async function loadMenuDesign() {
+        try {
+          const response = await fetch('/api/restaurant/' + offeringId + '/menu-design');
+          const data = await response.json();
+          
+          if (data.success && data.design) {
+            const d = data.design;
+            document.getElementById('layoutStyle').value = d.layout_style || 'classic';
+            document.getElementById('columnsCount').value = d.columns_count || 1;
+            document.getElementById('itemSpacing').value = d.item_spacing || 'comfortable';
+            document.getElementById('primaryColor').value = d.primary_color || '#1a1a1a';
+            document.getElementById('accentColor').value = d.accent_color || '#d4af37';
+            document.getElementById('backgroundColor').value = d.background_color || '#ffffff';
+            document.getElementById('priceColor').value = d.price_color || '#d4af37';
+            document.getElementById('headingFont').value = d.heading_font || 'Playfair Display';
+            document.getElementById('bodyFont').value = d.body_font || 'Lato';
+            document.getElementById('fontSizeBase').value = d.font_size_base || 16;
+            document.getElementById('headingSize').value = d.heading_size || 32;
+            document.getElementById('itemNameSize').value = d.item_name_size || 20;
+            document.getElementById('showImages').checked = d.show_images === 1;
+            document.getElementById('showPrices').checked = d.show_prices === 1;
+            document.getElementById('showDescriptions').checked = d.show_descriptions === 1;
+            document.getElementById('showDietaryIcons').checked = d.show_dietary_icons === 1;
+            document.getElementById('hoverEffect').value = d.hover_effect || 'subtle';
+            document.getElementById('shadowIntensity').value = d.shadow_intensity || 'medium';
+          }
+        } catch (error) {
+          console.error('Load menu design error:', error);
+          alert('Failed to load menu design settings');
+        }
+      }
+      
+      async function saveMenuDesign() {
+        const settings = {
+          layout_style: document.getElementById('layoutStyle').value,
+          columns_count: parseInt(document.getElementById('columnsCount').value),
+          item_spacing: document.getElementById('itemSpacing').value,
+          primary_color: document.getElementById('primaryColor').value,
+          accent_color: document.getElementById('accentColor').value,
+          background_color: document.getElementById('backgroundColor').value,
+          price_color: document.getElementById('priceColor').value,
+          heading_font: document.getElementById('headingFont').value,
+          body_font: document.getElementById('bodyFont').value,
+          font_size_base: parseInt(document.getElementById('fontSizeBase').value),
+          heading_size: parseInt(document.getElementById('headingSize').value),
+          item_name_size: parseInt(document.getElementById('itemNameSize').value),
+          show_images: document.getElementById('showImages').checked ? 1 : 0,
+          show_prices: document.getElementById('showPrices').checked ? 1 : 0,
+          show_descriptions: document.getElementById('showDescriptions').checked ? 1 : 0,
+          show_dietary_icons: document.getElementById('showDietaryIcons').checked ? 1 : 0,
+          hover_effect: document.getElementById('hoverEffect').value,
+          shadow_intensity: document.getElementById('shadowIntensity').value
+        };
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menu-design', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Menu design saved successfully!');
+          } else {
+            alert('❌ Failed to save menu design');
+          }
+        } catch (error) {
+          console.error('Save menu design error:', error);
+          alert('❌ Failed to save menu design');
+        }
+      }
+      
+      function previewMenu() {
+        const propertySlug = window.location.pathname.split('/')[2] || 'hilton-marsa-alam';
+        const previewUrl = '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/menu';
+        window.open(previewUrl, '_blank');
+      }
+      
       // ========================================
       // SESSIONS MANAGEMENT
       // ========================================
