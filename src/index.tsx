@@ -24880,15 +24880,15 @@ app.get('/admin/dashboard', (c) => {
             '<div class="grid grid-cols-1 md:grid-cols-4 gap-3">' +
               '<div>' +
                 '<label class="block text-sm font-medium mb-1">Slot Name</label>' +
-                '<input type="text" value="' + slot.name + '" onchange="updateTimeSlot(' + index + ', \'name\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+                '<input type="text" value="' + slot.name + '" onchange="updateTimeSlot(' + index + ', &quot;name&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
               '</div>' +
               '<div>' +
                 '<label class="block text-sm font-medium mb-1">Start Time</label>' +
-                '<input type="time" value="' + slot.start + '" onchange="updateTimeSlot(' + index + ', \'start\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+                '<input type="time" value="' + slot.start + '" onchange="updateTimeSlot(' + index + ', &quot;start&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
               '</div>' +
               '<div>' +
                 '<label class="block text-sm font-medium mb-1">End Time</label>' +
-                '<input type="time" value="' + slot.end + '" onchange="updateTimeSlot(' + index + ', \'end\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+                '<input type="time" value="' + slot.end + '" onchange="updateTimeSlot(' + index + ', &quot;end&quot;, this.value)" class="w-full px-3 py-2 border rounded-lg">' +
               '</div>' +
               '<div class="flex items-end">' +
                 '<button onclick="removeTimeSlot(' + index + ')" class="w-full px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">' +
