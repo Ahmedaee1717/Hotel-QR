@@ -36248,6 +36248,244 @@ app.get('/admin/restaurant/:offering_id', (c) => {
   `)
 })
 
+// ========================================
+// MENU BUILDER - Admin Interface  
+// ========================================
+app.get('/admin/menu-builder/:menu_id', async (c) => {
+  const { menu_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <a href="/admin/restaurant/1" class="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Restaurant
+                </a>
+                <h1 class="text-3xl font-bold text-gray-900">Menu Builder</h1>
+                <p class="text-gray-600 mt-1">Edit your menu - Update prices, descriptions, and organize categories</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="saveAllChanges()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">
+                    <i class="fas fa-save mr-2"></i>Save Changes
+                </button>
+                <button onclick="translateAllCategories()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition">
+                    <i class="fas fa-language mr-2"></i>Translate All
+                </button>
+                <a href="/menu/${menu_id}" target="_blank" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition inline-block">
+                    <i class="fas fa-eye mr-2"></i>Preview
+                </a>
+            </div>
+        </div>
+
+        <div id="menuBuilder" class="space-y-6">
+            <div class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-600">Loading menu...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const menuId = '${menu_id}';
+        let menuData = { categories: [] };
+
+        async function loadMenu() {
+            try {
+                const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/structure');
+                const data = await response.json();
+                
+                if (data.success) {
+                    menuData = data;
+                    renderMenuBuilder();
+                } else {
+                    alert('Error loading menu');
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Failed to load menu');
+            }
+        }
+
+        function renderMenuBuilder() {
+            const container = document.getElementById('menuBuilder');
+            
+            if (menuData.categories.length === 0) {
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-12 text-center"><i class="fas fa-utensils text-6xl text-gray-300 mb-4"></i><p class="text-gray-600 text-lg">No categories found. Try parsing the menu again.</p></div>';
+                return;
+            }
+
+            container.innerHTML = menuData.categories.map((category, catIndex) => {
+                const items = (category.items || []).map((item, itemIndex) => {
+                    const badges = '';
+                    if (item.is_vegetarian) badges += '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">🌱 Veg</span> ';
+                    if (item.is_vegan) badges += '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">🌾 Vegan</span> ';
+                    if (item.spice_level && item.spice_level !== 'none') badges += '<span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">🌶️ ' + item.spice_level + '</span> ';
+
+                    return '<div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition">' +
+                        '<div class="flex items-start justify-between">' +
+                            '<div class="flex-1 mr-4">' +
+                                '<input type="text" value="' + (item.item_name || '') + '" onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'name\', this.value)" class="font-semibold text-gray-900 border-0 border-b border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
+                                '<textarea onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'description\', this.value)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-2 resize-none" rows="2" placeholder="Description">' + (item.description || '') + '</textarea>' +
+                                '<div class="flex gap-2 mt-2">' + badges + '</div>' +
+                            '</div>' +
+                            '<div class="flex flex-col items-end gap-2">' +
+                                '<input type="number" step="0.01" value="' + (item.price || 0) + '" onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'price\', this.value)" class="text-xl font-bold text-green-600 border-0 border-b border-transparent hover:border-green-500 focus:border-green-600 outline-none px-2 py-1 w-24 text-right">' +
+                                '<button onclick="deleteItem(' + item.item_id + ', ' + catIndex + ', ' + itemIndex + ')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition">' +
+                                    '<i class="fas fa-trash"></i>' +
+                                '</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+
+                return '<div class="bg-white rounded-lg shadow-lg p-6">' +
+                    '<div class="flex items-center justify-between mb-4">' +
+                        '<div class="flex-1">' +
+                            '<input type="text" value="' + (category.category_name || '') + '" onchange="updateCategory(' + catIndex + ', \'name\', this.value)" class="text-2xl font-bold text-gray-900 border-0 border-b-2 border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
+                            '<input type="text" value="' + (category.category_description || '') + '" onchange="updateCategory(' + catIndex + ', \'description\', this.value)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-1" placeholder="Category description">' +
+                        '</div>' +
+                        '<button onclick="deleteCategory(' + category.category_id + ', ' + catIndex + ')" class="ml-4 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition">' +
+                            '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="space-y-3">' + items + '</div>' +
+                    '<button onclick="translateCategory(' + category.category_id + ')" class="mt-4 w-full py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition">' +
+                        '<i class="fas fa-language mr-2"></i>Translate this Category' +
+                    '</button>' +
+                '</div>';
+            }).join('');
+        }
+
+        function updateCategory(catIndex, field, value) {
+            if (field === 'name') menuData.categories[catIndex].category_name = value;
+            if (field === 'description') menuData.categories[catIndex].category_description = value;
+        }
+
+        function updateItem(catIndex, itemIndex, field, value) {
+            const item = menuData.categories[catIndex].items[itemIndex];
+            if (field === 'name') item.item_name = value;
+            if (field === 'description') item.description = value;
+            if (field === 'price') item.price = parseFloat(value);
+        }
+
+        async function saveAllChanges() {
+            const btn = event.target;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+            btn.disabled = true;
+
+            try {
+                for (const category of menuData.categories) {
+                    await fetch('/api/admin/restaurant/menu-categories/' + category.category_id, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            category_name: category.category_name,
+                            category_description: category.category_description,
+                            display_order: category.display_order
+                        })
+                    });
+
+                    for (const item of category.items) {
+                        await fetch('/api/admin/restaurant/menu-items/' + item.item_id, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(item)
+                        });
+                    }
+                }
+
+                alert('✅ All changes saved successfully!');
+                btn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Changes';
+                btn.disabled = false;
+            } catch (error) {
+                alert('Error saving: ' + error.message);
+                btn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Changes';
+                btn.disabled = false;
+            }
+        }
+
+        async function translateCategory(categoryId) {
+            const lang = prompt('Enter language code (ar=Arabic, de=German, ru=Russian, es=Spanish, fr=French, it=Italian, zh=Chinese):');
+            if (!lang) return;
+
+            try {
+                const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId + '/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_language: lang })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Translation error: ' + error.message);
+            }
+        }
+
+        async function translateAllCategories() {
+            const lang = prompt('Enter language code to translate ALL categories (ar, de, ru, es, fr, it, zh):');
+            if (!lang) return;
+
+            for (const category of menuData.categories) {
+                await translateCategory(category.category_id);
+            }
+        }
+
+        async function deleteCategory(categoryId, index) {
+            if (!confirm('Delete this category and all its items?')) return;
+
+            try {
+                const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    menuData.categories.splice(index, 1);
+                    renderMenuBuilder();
+                }
+            } catch (error) {
+                alert('Delete error: ' + error.message);
+            }
+        }
+
+        async function deleteItem(itemId, catIndex, itemIndex) {
+            if (!confirm('Delete this item?')) return;
+
+            try {
+                const response = await fetch('/api/admin/restaurant/menu-items/' + itemId, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    menuData.categories[catIndex].items.splice(itemIndex, 1);
+                    renderMenuBuilder();
+                }
+            } catch (error) {
+                alert('Delete error: ' + error.message);
+            }
+        }
+
+        loadMenu();
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Feedback submission page - serve HTML directly
 app.get('/feedback/:form_id', async (c) => {
   const formId = c.req.param('form_id')
