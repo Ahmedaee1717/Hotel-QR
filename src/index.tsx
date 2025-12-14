@@ -33586,6 +33586,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       .table-square { border-radius: 8px; }
       #canvas { position: relative; background: #F3F4F6; border: 2px dashed #9CA3AF; }
     </style>
+    <script>
+      // Define switchTab EARLY so onclick handlers in HTML work immediately
+      function switchTab(tab) {
+        const tabs = ['tables', 'sessions', 'reservations', 'textures', 'menus'];
+        tabs.forEach(t => {
+          const btnId = 'tab' + t.charAt(0).toUpperCase() + t.slice(1);
+          const sectionId = t + 'Section';
+          const btn = document.getElementById(btnId);
+          const section = document.getElementById(sectionId);
+          if (btn) btn.className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (t === tab ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+          if (section) section.style.display = t === tab ? 'block' : 'none';
+        });
+      }
+    </script>
 </head>
 <body class="bg-gray-50">
     <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
