@@ -30206,7 +30206,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             const completedIcon = isCompleted ? '<i class="fas fa-check-circle text-green-600"></i>' : '<i class="fas fa-arrow-right text-blue-600"></i>';
             const completedBadge = isCompleted ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full ml-2">✓ Done</span>' : '';
             
-            return '<button onclick="quickAction(' + idx + ', \'' + currentTab + '\')" class="w-full flex items-center gap-3 p-3 ' + completedClass + ' rounded-lg hover:shadow-md transition border">' +
+            return '<button onclick="quickAction(' + idx + ', &quot;' + currentTab + '&quot;)" class="w-full flex items-center gap-3 p-3 ' + completedClass + ' rounded-lg hover:shadow-md transition border">' +
               '<span class="text-2xl">' + action.icon + '</span>' +
               '<div class="flex-1 text-left">' +
                 '<div class="font-semibold text-sm flex items-center">' +
