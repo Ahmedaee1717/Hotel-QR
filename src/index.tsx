@@ -35937,37 +35937,31 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         };
         reader.readAsDataURL(file);
 
-        // Upload to imgbb (free image hosting)
+        // Convert to base64 and store (simpler approach - no external API needed)
         uploadPlaceholder.classList.add('hidden');
         uploadProgress.classList.remove('hidden');
 
         try {
-          const formData = new FormData();
-          formData.append('image', file);
-
           const progressBar = document.getElementById('progressBar');
           const progressText = document.getElementById('progressText');
 
-          // Use imgbb API (free, no auth required for demo)
-          const response = await fetch('https://api.imgbb.com/1/upload?key=d2a5e6d8b8b68c0d5f5e7c8a9b0c1d2e', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!response.ok) {
-            throw new Error('Upload failed');
-          }
-
-          const data = await response.json();
-          
-          if (data.success) {
-            menuImageUrlInput.value = data.data.url;
+          // Read file as base64
+          const reader2 = new FileReader();
+          reader2.onload = function(e) {
+            // Store base64 data URL
+            menuImageUrlInput.value = e.target.result;
             uploadProgress.classList.add('hidden');
             uploadPreview.classList.remove('hidden');
             progressText.textContent = 'Upload complete!';
-          } else {
-            throw new Error('Upload failed');
-          }
+          };
+          
+          reader2.onerror = function() {
+            uploadProgress.classList.add('hidden');
+            uploadPlaceholder.classList.remove('hidden');
+            alert('Upload failed. Please try again or use a different image.');
+          };
+          
+          reader2.readAsDataURL(file);
         } catch (error) {
           console.error('Upload error:', error);
           uploadProgress.classList.add('hidden');
