@@ -7900,6 +7900,80 @@ app.delete('/api/admin/beach/spots/:spot_id', async (c) => {
   }
 })
 
+// API: Get Zone Overlays
+app.get('/api/admin/beach/zone-overlays/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const overlays = await DB.prepare(`
+      SELECT * FROM beach_zone_overlays 
+      WHERE property_id = ? AND is_active = 1
+      ORDER BY display_order, overlay_id
+    `).bind(property_id).all()
+    
+    return c.json({ overlays: overlays.results || [] })
+  } catch (error) {
+    console.error('Get zone overlays error:', error)
+    return c.json({ error: 'Failed to load zone overlays' }, 500)
+  }
+})
+
+// API: Save Zone Overlay
+app.post('/api/admin/beach/zone-overlays', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const {
+      property_id,
+      zone_name,
+      shape_type,
+      coordinates,
+      color,
+      opacity,
+      display_order
+    } = body
+    
+    await DB.prepare(`
+      INSERT INTO beach_zone_overlays (
+        property_id, zone_name, shape_type, coordinates,
+        color, opacity, display_order, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    `).bind(
+      property_id,
+      zone_name,
+      shape_type || 'rectangle',
+      coordinates,
+      color || '#3b82f6',
+      opacity || 0.3,
+      display_order || 0
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Save zone overlay error:', error)
+    return c.json({ error: 'Failed to save zone overlay' }, 500)
+  }
+})
+
+// API: Delete All Zone Overlays for Property
+app.delete('/api/admin/beach/zone-overlays/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE beach_zone_overlays SET is_active = 0 WHERE property_id = ?
+    `).bind(property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete zone overlays error:', error)
+    return c.json({ error: 'Failed to delete zone overlays' }, 500)
+  }
+})
+
 // API: Get Beach Bookings (Admin)
 app.get('/api/admin/beach/bookings', async (c) => {
   const { DB } = c.env
@@ -14963,12 +15037,40 @@ app.get('/admin/beach-map-designer', (c) => {
                         number: spot.spot_number,
                         capacity: spot.max_capacity,
                         price: spot.price_full_day,
-                        premium: spot.is_premium === 1
+                        premium: spot.is_premium === 1,
+                        zone: spot.zone_name || 'General Area'
                     }));
                     renderSpots();
                 }
             } catch (error) {
                 console.error('Load spots error:', error);
+            }
+        }
+        
+        // Load existing zone overlays
+        async function loadExistingZones() {
+            try {
+                const response = await fetch('/api/admin/beach/zone-overlays/1');
+                const data = await response.json();
+                
+                if (data.overlays && data.overlays.length > 0) {
+                    zones = data.overlays.map(overlay => {
+                        const coords = JSON.parse(overlay.coordinates);
+                        return {
+                            id: overlay.overlay_id,
+                            name: overlay.zone_name,
+                            x: coords.x,
+                            y: coords.y,
+                            width: coords.width,
+                            height: coords.height,
+                            color: overlay.color,
+                            opacity: overlay.opacity
+                        };
+                    });
+                    renderZones();
+                }
+            } catch (error) {
+                console.error('Load zones error:', error);
             }
         }
         
@@ -15182,8 +15284,8 @@ app.get('/admin/beach-map-designer', (c) => {
         }
         
         async function saveLayout() {
-            if (spots.length === 0) {
-                alert('⚠️ Please add at least one spot to the beach');
+            if (spots.length === 0 && zones.length === 0) {
+                alert('⚠️ Please add at least one spot or zone to the beach');
                 return;
             }
             
@@ -15197,6 +15299,9 @@ app.get('/admin/beach-map-designer', (c) => {
                         await fetch('/api/admin/beach/spots/' + spot.spot_id, { method: 'DELETE' });
                     }
                 }
+                
+                // Delete all existing zone overlays
+                await fetch('/api/admin/beach/zone-overlays/1', { method: 'DELETE' });
                 
                 // Create all new spots
                 for (const spot of spots) {
@@ -15218,7 +15323,30 @@ app.get('/admin/beach-map-designer', (c) => {
                     });
                 }
                 
-                alert('✅ Beach layout saved successfully!\\n' + spots.length + ' spots saved.');
+                // Save all zone overlays
+                for (let i = 0; i < zones.length; i++) {
+                    const zone = zones[i];
+                    await fetch('/api/admin/beach/zone-overlays', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            property_id: 1,
+                            zone_name: zone.name,
+                            shape_type: 'rectangle',
+                            coordinates: JSON.stringify({
+                                x: Math.round(zone.x),
+                                y: Math.round(zone.y),
+                                width: Math.round(zone.width),
+                                height: Math.round(zone.height)
+                            }),
+                            color: zone.color,
+                            opacity: zone.opacity,
+                            display_order: i
+                        })
+                    });
+                }
+                
+                alert('✅ Beach layout saved successfully!\\n' + spots.length + ' spots and ' + zones.length + ' zones saved.');
             } catch (error) {
                 console.error('Save error:', error);
                 alert('❌ Failed to save beach layout');
@@ -15358,6 +15486,7 @@ app.get('/admin/beach-map-designer', (c) => {
         
         // Initialize
         loadExistingSpots();
+        loadExistingZones();
     </script>
 </body>
 </html>
@@ -16192,42 +16321,28 @@ app.get('/beach-booking/:property_id', async (c) => {
                     spots = spotsData.spots;
                 }
                 
-                // Load sample zones (will be replaced with API call later)
-                zones = [
-                    {
-                        id: 1,
-                        name: 'Quiet Zone',
-                        type: 'rectangle',
-                        x: 50,
-                        y: 50,
-                        width: 200,
-                        height: 150,
-                        color: '#10b981',
-                        opacity: 0.25
-                    },
-                    {
-                        id: 2,
-                        name: 'Family Area',
-                        type: 'rectangle',
-                        x: 300,
-                        y: 50,
-                        width: 250,
-                        height: 150,
-                        color: '#f59e0b',
-                        opacity: 0.25
-                    },
-                    {
-                        id: 3,
-                        name: 'VIP Section',
-                        type: 'rectangle',
-                        x: 150,
-                        y: 250,
-                        width: 300,
-                        height: 180,
-                        color: '#8b5cf6',
-                        opacity: 0.25
-                    }
-                ];
+                // Load zone overlays from database
+                const zonesResponse = await fetch('/api/admin/beach/zone-overlays/' + propertyId);
+                const zonesData = await zonesResponse.json();
+                
+                if (zonesData.overlays && zonesData.overlays.length > 0) {
+                    zones = zonesData.overlays.map(overlay => {
+                        const coords = JSON.parse(overlay.coordinates);
+                        return {
+                            id: overlay.overlay_id,
+                            name: overlay.zone_name,
+                            type: overlay.shape_type,
+                            x: coords.x,
+                            y: coords.y,
+                            width: coords.width,
+                            height: coords.height,
+                            color: overlay.color,
+                            opacity: overlay.opacity
+                        };
+                    });
+                } else {
+                    zones = []; // No zones defined yet
+                }
                 
                 // Load bookings for selected date
                 await loadBookingsForDate();
