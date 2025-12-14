@@ -7850,6 +7850,53 @@ app.get('/api/admin/beach/spots/:property_id', async (c) => {
   }
 })
 
+// API: Get Beach Spots with Booking Status (for live map)
+app.get('/api/admin/beach/spots', async (c) => {
+  const { DB } = c.env
+  const { property_id, date, time_slot } = c.req.query()
+  
+  if (!property_id) {
+    return c.json({ error: 'property_id is required' }, 400)
+  }
+  
+  try {
+    const bookingDate = date || new Date().toISOString().split('T')[0]
+    
+    let query = `
+      SELECT 
+        s.*,
+        z.zone_name,
+        bb.booking_status,
+        bb.booking_code,
+        bb.guest_name,
+        bb.booking_reference
+      FROM beach_spots s
+      LEFT JOIN beach_zones z ON s.zone_id = z.zone_id
+      LEFT JOIN beach_bookings bb ON s.spot_id = bb.spot_id 
+        AND bb.booking_date = ?
+        AND bb.booking_status IN ('confirmed', 'checked_in')
+    `
+    
+    const params = [bookingDate]
+    
+    // Add time slot filter if specified
+    if (time_slot && time_slot !== 'all') {
+      query += ` AND (bb.slot_type = ? OR bb.slot_type = 'full_day' OR bb.slot_type IS NULL)`
+      params.push(time_slot)
+    }
+    
+    query += ` WHERE s.property_id = ? AND s.is_active = 1 ORDER BY s.spot_number`
+    params.push(property_id)
+    
+    const spots = await DB.prepare(query).bind(...params).all()
+    
+    return c.json({ success: true, spots: spots.results || [] })
+  } catch (error) {
+    console.error('Get beach spots with booking status error:', error)
+    return c.json({ error: 'Failed to get beach spots' }, 500)
+  }
+})
+
 // API: Create Beach Spot
 app.post('/api/admin/beach/spots', async (c) => {
   const { DB } = c.env
