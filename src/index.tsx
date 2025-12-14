@@ -30247,7 +30247,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           // Mark task as complete after action
           if (actions[idx].taskKey) {
             setTimeout(() => {
-              const confirmed = confirm('✅ Did you complete this task?\n\nClick OK to mark it as complete and update your progress.');
+              const confirmed = confirm('Did you complete this task?\\n\\nClick OK to mark it as complete and update your progress.');
               if (confirmed) {
                 localStorage.setItem(actions[idx].taskKey, 'true');
                 updateAssistantContent();
