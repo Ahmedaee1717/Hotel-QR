@@ -22464,7 +22464,7 @@ app.get('/admin/dashboard', (c) => {
                 <div class="px-3 mb-6">
                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Services</h3>
                     <button data-tab="restaurants" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
-                        <i class="fas fa-utensils w-5"></i><span>Restaurants</span>
+                        <i class="fas fa-utensils w-5"></i><span>F&B</span>
                     </button>
                     <button data-tab="vendors" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-store w-5"></i><span>Vendors</span>
@@ -25437,13 +25437,20 @@ app.get('/admin/dashboard', (c) => {
     <!-- Restaurants Management Tab -->
     <div id="restaurantsTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4">
-                <i class="fas fa-utensils mr-2 text-orange-600"></i>
-                Restaurant Reservations
-            </h2>
-            <p class="text-gray-600 mb-6">
-                Manage restaurant table bookings, time slots, and floor plans. Select a restaurant below to view its management dashboard.
-            </p>
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold">
+                        <i class="fas fa-utensils mr-2 text-orange-600"></i>
+                        F&B Management
+                    </h2>
+                    <p class="text-gray-600 mt-2">
+                        Create and manage your restaurants, bars, and dining venues. Configure table bookings, time slots, and floor plans.
+                    </p>
+                </div>
+                <button onclick="createNewRestaurant()" class="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>Create New Restaurant
+                </button>
+            </div>
             
             <!-- Restaurant Selector -->
             <div class="mb-6">
@@ -32238,9 +32245,110 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
       
+      function createNewRestaurant() {
+        const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">' +
+          '<div class="bg-gradient-to-br from-white to-orange-50 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">' +
+            '<div class="flex items-center mb-6">' +
+              '<div class="bg-gradient-to-br from-orange-600 to-red-600 text-white rounded-full p-3 mr-4">' +
+                '<i class="fas fa-utensils text-2xl"></i>' +
+              '</div>' +
+              '<h2 class="text-2xl font-bold text-gray-900">Create New Restaurant</h2>' +
+            '</div>' +
+            '<div class="space-y-4 mb-6">' +
+              '<div>' +
+                '<label class="block text-sm font-semibold text-gray-700 mb-2">Restaurant Name *</label>' +
+                '<input type="text" id="newRestaurantName" placeholder="e.g., Sunset Terrace" value="" class="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition" autofocus>' +
+              '</div>' +
+              '<div>' +
+                '<label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>' +
+                '<textarea id="newRestaurantDescription" placeholder="Brief description of your restaurant..." rows="3" class="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition resize-none"></textarea>' +
+              '</div>' +
+              '<div>' +
+                '<label class="block text-sm font-semibold text-gray-700 mb-2">Cuisine Type</label>' +
+                '<select id="newRestaurantCuisine" class="w-full px-4 py-3 border-2 border-orange-200 rounded-xl focus:border-orange-500 outline-none transition">' +
+                  '<option value="">Select cuisine...</option>' +
+                  '<option value="italian">Italian</option>' +
+                  '<option value="french">French</option>' +
+                  '<option value="asian">Asian</option>' +
+                  '<option value="mediterranean">Mediterranean</option>' +
+                  '<option value="seafood">Seafood</option>' +
+                  '<option value="steakhouse">Steakhouse</option>' +
+                  '<option value="international">International</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex gap-3">' +
+              '<button id="cancelNewRestaurant" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition">Cancel</button>' +
+              '<button id="submitNewRestaurant" class="flex-1 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">' +
+                '<i class="fas fa-check mr-2"></i>Create Restaurant' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+        
+        const modal = document.createElement('div');
+        modal.innerHTML = modalHtml;
+        const modalDiv = modal.firstChild;
+        document.body.appendChild(modalDiv);
+        
+        setTimeout(() => {
+          document.getElementById('newRestaurantName').focus();
+        }, 100);
+        
+        document.getElementById('cancelNewRestaurant').addEventListener('click', () => {
+          document.body.removeChild(modalDiv);
+        });
+        
+        document.getElementById('submitNewRestaurant').addEventListener('click', async () => {
+          const name = document.getElementById('newRestaurantName').value.trim();
+          const description = document.getElementById('newRestaurantDescription').value.trim();
+          const cuisine = document.getElementById('newRestaurantCuisine').value;
+          
+          if (!name) {
+            alert('⚠️ Please enter a restaurant name');
+            return;
+          }
+          
+          document.getElementById('submitNewRestaurant').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+          document.getElementById('submitNewRestaurant').disabled = true;
+          
+          try {
+            const response = await fetch('/api/hotel-offerings/1', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                property_id: propertyId,
+                offering_type: 'restaurant',
+                title_en: name,
+                description_en: description || 'Our restaurant offers a delightful dining experience.',
+                cuisine_type: cuisine || 'international',
+                requires_booking: true,
+                is_active: true
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              document.body.removeChild(modalDiv);
+              alert('✅ Restaurant created successfully!');
+              // Reload restaurants list
+              await loadRestaurantsTab();
+            } else {
+              alert('Error: ' + (data.error || 'Failed to create restaurant'));
+              document.body.removeChild(modalDiv);
+            }
+          } catch (error) {
+            console.error('Create restaurant error:', error);
+            alert('Error creating restaurant: ' + error.message);
+            document.body.removeChild(modalDiv);
+          }
+        });
+      }
+      
       function openRestaurantManagement() {
         if (selectedRestaurantId) {
-          window.open('/admin/restaurant/' + selectedRestaurantId, '_blank');
+          window.location('/admin/restaurant/' + selectedRestaurantId, '_blank');
         } else {
           alert('Please select a restaurant first');
         }
