@@ -30301,35 +30301,35 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       const systemKnowledge = {
         beachBooking: {
           settings: 'Go to Admin Dashboard → Beach Booking Management tab. Here you can configure opening hours, advance booking days, enable/disable booking, set it as free for guests, and customize the beach card appearance.',
-          mapDesigner: 'Click "Design Beach Map" button in Beach Booking Management. Upload a beach photo, draw zones by clicking "Draw Zone", place spots (umbrellas, cabanas, loungers) by selecting from the toolbar, then click "Save Beach Layout".',
-          zones: 'Zones are colored overlays on the beach map. In Beach Map Designer, click "Draw Zone", draw on the canvas, name it, and save. Guests will see these zones with a legend.',
+          mapDesigner: 'Click Design Beach Map button in Beach Booking Management. Upload a beach photo, draw zones by clicking Draw Zone, place spots (umbrellas, cabanas, loungers) by selecting from the toolbar, then click Save Beach Layout.',
+          zones: 'Zones are colored overlays on the beach map. In Beach Map Designer, click Draw Zone, draw on the canvas, name it, and save. Guests will see these zones with a legend.',
           spots: 'Add spots by selecting umbrella/cabana/lounger/daybed icons in Beach Map Designer. Click the canvas to place them. Edit details like spot number, capacity, price, and premium status in the right panel.',
           qrCode: 'Beach bookings automatically generate QR codes with 6-digit booking codes. Staff can scan these at /staff/beach-check-in.',
           analytics: 'Visit /admin/beach-analytics for comprehensive analytics including live occupancy by zone, peak hours heatmaps, revenue by zone, no-show tracking, and AI recommendations.',
-          importantInfo: 'Go to Beach Booking Management → scroll to "Important Information" section (blue gradient card). Edit the text (one line = one bullet point) and click Save. This appears on guest confirmation pages.'
+          importantInfo: 'Go to Beach Booking Management → scroll to Important Information section (blue gradient card). Edit the text (one line = one bullet point) and click Save. This appears on guest confirmation pages.'
         },
         qrCodes: {
-          create: 'Navigate to QR Codes tab → click "Create New QR Code" → enter destination URL → customize design with logo, colors, and frame → download as PNG or SVG.',
+          create: 'Navigate to QR Codes tab → click Create New QR Code → enter destination URL → customize design with logo, colors, and frame → download as PNG or SVG.',
           customize: 'In QR Code designer, upload your logo, select foreground/background colors, choose frame style, and adjust corner style for a branded QR code.',
           download: 'After designing, click the download button to get your QR code as PNG (print quality) or SVG (vector format for scaling).'
         },
         analytics: {
           view: 'Click Analytics tab in the sidebar. You will see guest engagement metrics, QR code scans, popular services, and trends over time.',
-          export: 'In Analytics tab, click "Export Data" button to download CSV reports of your metrics.',
-          beach: 'For beach-specific analytics, visit Beach Booking Management → click "Open Dashboard" in the Analytics card, or go directly to /admin/beach-analytics.'
+          export: 'In Analytics tab, click Export Data button to download CSV reports of your metrics.',
+          beach: 'For beach-specific analytics, visit Beach Booking Management → click Open Dashboard in the Analytics card, or go directly to /admin/beach-analytics.'
         },
         settings: {
-          logo: 'Go to Settings tab → Hotel Information section → click "Upload Logo" → select your image file. Your logo appears throughout the platform.',
+          logo: 'Go to Settings tab → Hotel Information section → click Upload Logo → select your image file. Your logo appears throughout the platform.',
           colors: 'In Settings → Branding section, use color pickers to set primary and secondary brand colors that apply to guest-facing pages.',
           profile: 'Complete your hotel profile in Settings → Hotel Information. Add name, address, phone, email, and website for a professional appearance.'
         },
         restaurants: {
-          add: 'Go to Offerings tab → click "Add New Offering" → select "Restaurant" → fill in name, description, upload photos, add menu, set operating hours.',
-          floorPlan: 'In restaurant edit page, click "Floor Plan Designer" → upload restaurant layout image → place table markers → save. Guests can select preferred tables.'
+          add: 'Go to Offerings tab → click Add New Offering → select Restaurant → fill in name, description, upload photos, add menu, set operating hours.',
+          floorPlan: 'In restaurant edit page, click Floor Plan Designer → upload restaurant layout image → place table markers → save. Guests can select preferred tables.'
         },
         staff: {
           checkIn: 'Staff can check in guests at /staff/beach-check-in. Scan the QR code or manually enter the 6-digit booking code. System validates and marks guest as checked in.',
-          management: 'View all bookings in Beach Booking Management → Today\\'s Bookings section. See guest details, spot assignments, and check-in status.'
+          management: 'View all bookings in Beach Booking Management → Todays Bookings section. See guest details, spot assignments, and check-in status.'
         }
       };
       
@@ -30397,7 +30397,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
         
         // Default response
-        return { text: 'I\\'m here to help! Try asking me about:\n• "How do I change beach settings?"\n• "Show me analytics"\n• "How to create a QR code?"\n• "How to add zones?"\n• "How to check in guests?"\n\nOr tell me what you\\'re trying to accomplish!', action: null };
+        return { text: 'I am here to help! Try asking me about:\\n• How do I change beach settings?\\n• Show me analytics\\n• How to create a QR code?\\n• How to add zones?\\n• How to check in guests?\\n\\nOr tell me what you are trying to accomplish!', action: null };
       }
       
       // Send chat message
