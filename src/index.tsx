@@ -36342,20 +36342,23 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
 
             container.innerHTML = menuData.categories.map((category, catIndex) => {
                 const items = (category.items || []).map((item, itemIndex) => {
-                    const badges = '';
+                    let badges = '';
                     if (item.is_vegetarian) badges += '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">🌱 Veg</span> ';
                     if (item.is_vegan) badges += '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">🌾 Vegan</span> ';
                     if (item.spice_level && item.spice_level !== 'none') badges += '<span class="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">🌶️ ' + item.spice_level + '</span> ';
 
+                    // Escape HTML to prevent XSS and quote issues
+                    const escapeHtml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                    
                     return '<div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition">' +
                         '<div class="flex items-start justify-between">' +
                             '<div class="flex-1 mr-4">' +
-                                '<input type="text" value="' + (item.item_name || '') + '" onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'name\', this.value)" class="font-semibold text-gray-900 border-0 border-b border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
-                                '<textarea onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'description\', this.value)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-2 resize-none" rows="2" placeholder="Description">' + (item.description || '') + '</textarea>' +
+                                '<input type="text" value="' + escapeHtml(item.item_name || '') + '" data-cat="' + catIndex + '" data-item="' + itemIndex + '" data-field="name" onchange="updateItemFromEvent(this)" class="font-semibold text-gray-900 border-0 border-b border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
+                                '<textarea data-cat="' + catIndex + '" data-item="' + itemIndex + '" data-field="description" onchange="updateItemFromEvent(this)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-2 resize-none" rows="2" placeholder="Description">' + escapeHtml(item.description || '') + '</textarea>' +
                                 '<div class="flex gap-2 mt-2">' + badges + '</div>' +
                             '</div>' +
                             '<div class="flex flex-col items-end gap-2">' +
-                                '<input type="number" step="0.01" value="' + (item.price || 0) + '" onchange="updateItem(' + catIndex + ', ' + itemIndex + ', \'price\', this.value)" class="text-xl font-bold text-green-600 border-0 border-b border-transparent hover:border-green-500 focus:border-green-600 outline-none px-2 py-1 w-24 text-right">' +
+                                '<input type="number" step="0.01" value="' + (item.price || 0) + '" data-cat="' + catIndex + '" data-item="' + itemIndex + '" data-field="price" onchange="updateItemFromEvent(this)" class="text-xl font-bold text-green-600 border-0 border-b border-transparent hover:border-green-500 focus:border-green-600 outline-none px-2 py-1 w-24 text-right">' +
                                 '<button onclick="deleteItem(' + item.item_id + ', ' + catIndex + ', ' + itemIndex + ')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition">' +
                                     '<i class="fas fa-trash"></i>' +
                                 '</button>' +
@@ -36364,11 +36367,13 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
                     '</div>';
                 }).join('');
 
+                const escapeHtml = (str) => String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
                 return '<div class="bg-white rounded-lg shadow-lg p-6">' +
                     '<div class="flex items-center justify-between mb-4">' +
                         '<div class="flex-1">' +
-                            '<input type="text" value="' + (category.category_name || '') + '" onchange="updateCategory(' + catIndex + ', \'name\', this.value)" class="text-2xl font-bold text-gray-900 border-0 border-b-2 border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
-                            '<input type="text" value="' + (category.category_description || '') + '" onchange="updateCategory(' + catIndex + ', \'description\', this.value)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-1" placeholder="Category description">' +
+                            '<input type="text" value="' + escapeHtml(category.category_name || '') + '" data-cat="' + catIndex + '" data-field="name" onchange="updateCategoryFromEvent(this)" class="text-2xl font-bold text-gray-900 border-0 border-b-2 border-transparent hover:border-blue-500 focus:border-blue-600 outline-none px-2 py-1 w-full">' +
+                            '<input type="text" value="' + escapeHtml(category.category_description || '') + '" data-cat="' + catIndex + '" data-field="description" onchange="updateCategoryFromEvent(this)" class="text-sm text-gray-600 border-0 border-b border-transparent hover:border-gray-300 focus:border-gray-400 outline-none px-2 py-1 w-full mt-1" placeholder="Category description">' +
                         '</div>' +
                         '<button onclick="deleteCategory(' + category.category_id + ', ' + catIndex + ')" class="ml-4 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition">' +
                             '<i class="fas fa-trash"></i>' +
@@ -36382,6 +36387,28 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
             }).join('');
         }
 
+        function updateCategoryFromEvent(element) {
+            const catIndex = parseInt(element.getAttribute('data-cat'));
+            const field = element.getAttribute('data-field');
+            const value = element.value;
+            
+            if (field === 'name') menuData.categories[catIndex].category_name = value;
+            if (field === 'description') menuData.categories[catIndex].category_description = value;
+        }
+
+        function updateItemFromEvent(element) {
+            const catIndex = parseInt(element.getAttribute('data-cat'));
+            const itemIndex = parseInt(element.getAttribute('data-item'));
+            const field = element.getAttribute('data-field');
+            const value = element.value;
+            
+            const item = menuData.categories[catIndex].items[itemIndex];
+            if (field === 'name') item.item_name = value;
+            if (field === 'description') item.description = value;
+            if (field === 'price') item.price = parseFloat(value);
+        }
+
+        // Backward compatibility
         function updateCategory(catIndex, field, value) {
             if (field === 'name') menuData.categories[catIndex].category_name = value;
             if (field === 'description') menuData.categories[catIndex].category_description = value;
