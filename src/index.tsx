@@ -8365,9 +8365,32 @@ Answer the admin's question about the GuestConnect platform:`
     if (!response.ok) {
       const errorText = await response.text()
       console.error('OpenAI API Error:', errorText)
+      
+      // Smart fallback with pattern matching
+      const msg = message.toLowerCase()
+      let fallbackResponse = ''
+      
+      if (msg.includes('restaurant') && (msg.includes('add') || msg.includes('create'))) {
+        fallbackResponse = 'To add a restaurant:\n\n1. Go to the Offerings tab in the left sidebar\n2. Click the "Add New Offering" button\n3. Select "Restaurant" from the offering type dropdown\n4. Fill in the restaurant details:\n   - Name (e.g., "Sunset Terrace")\n   - Description\n   - Operating hours\n   - Menu items\n5. Upload high-quality photos of your restaurant\n6. Click "Save" to publish\n\nGuests will then see your restaurant in their app!'
+      } else if (msg.includes('beach') && (msg.includes('setting') || msg.includes('config'))) {
+        fallbackResponse = 'To configure beach settings:\n\n1. Go to Admin Dashboard\n2. Click on "Beach Booking Management" tab\n3. Here you can configure:\n   - Opening/closing hours\n   - Advance booking days (how far ahead guests can book)\n   - Enable/disable booking system\n   - Set it as free for hotel guests or charge fees\n   - Customize the beach card appearance\n4. Scroll down to configure time slots (Morning, Afternoon, Full Day)\n5. Click "Save Settings" when done'
+      } else if (msg.includes('zone') || msg.includes('overlay')) {
+        fallbackResponse = 'To create beach zones:\n\n1. Go to Beach Booking Management tab\n2. Click "Design Beach Map" button\n3. Click the "Draw Zone" button\n4. Click and drag on the canvas to draw a zone area\n5. Name your zone (e.g., "Quiet Zone", "VIP Area")\n6. Choose a color for the zone\n7. Repeat for additional zones\n8. Click "Save Beach Layout"\n\nGuests will see these zones as colored overlays with a legend!'
+      } else if (msg.includes('analytic')) {
+        fallbackResponse = 'To view analytics:\n\n1. For general analytics: Click "Analytics" tab in the sidebar\n2. For beach-specific analytics:\n   - Go to Beach Booking Management tab\n   - Click "Open Dashboard" in the Analytics card\n   - Or go directly to /admin/beach-analytics\n\nYou will see:\n- Live occupancy by zone\n- Peak hours heatmaps\n- Revenue by zone\n- No-show tracking\n- AI-powered recommendations'
+      } else if (msg.includes('qr') && msg.includes('code')) {
+        fallbackResponse = 'To create a QR code:\n\n1. Click the "QR Codes" tab in the sidebar\n2. Click "Create New QR Code" button\n3. Enter the destination URL\n4. Customize your QR code:\n   - Upload your hotel logo (center)\n   - Choose foreground color\n   - Choose background color\n   - Select frame style\n   - Adjust corner style\n5. Preview your QR code\n6. Download as PNG (for printing) or SVG (for scaling)'
+      } else if (msg.includes('staff') || msg.includes('check') && msg.includes('in')) {
+        fallbackResponse = 'Staff check-in process:\n\n1. Staff go to /staff/beach-check-in\n2. Two methods to check in guests:\n   - Scan the guest QR code from their confirmation\n   - OR manually enter the 6-digit booking code\n3. System validates the booking\n4. Shows guest details (name, room, spot, time)\n5. Click "Check In" to mark guest as arrived\n6. Guest status updates in real-time in the system'
+      } else if (msg.includes('important') && msg.includes('info')) {
+        fallbackResponse = 'To edit important information:\n\n1. Go to Beach Booking Management tab\n2. Scroll down to the "Important Information" section (blue gradient card)\n3. Edit the text in the textarea\n4. Each line becomes a bullet point on the guest confirmation page\n5. Click "Save Important Information"\n\nThis text appears on every guest confirmation page, so use it for check-in instructions, policies, or helpful tips!'
+      } else {
+        fallbackResponse = 'I am having trouble connecting to my AI system right now, but I can still help!\n\nI can guide you with:\n\n- Adding restaurants and offerings\n- Configuring beach booking settings\n- Creating and managing beach zones\n- Viewing analytics and reports\n- Generating QR codes\n- Staff check-in procedures\n- Beach map designer\n- Important information editing\n\nPlease ask your question again, and I will do my best to help!'
+      }
+      
       return c.json({ 
-        success: false, 
-        response: 'I apologize, but I am having trouble connecting to my AI brain right now. However, I can still help! Try asking about:\n\n- How to add a restaurant\n- How to configure beach settings\n- How to view analytics\n- How to create QR codes\n\nWhat would you like to know?' 
+        success: true, 
+        response: fallbackResponse 
       })
     }
 
