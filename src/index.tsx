@@ -18271,7 +18271,7 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
     </div>
 
     <script>
-        let propertySlug = 'paradise-resort';
+        let propertySlug = 'paradise-resort'; // Will be updated after loading booking
         const BOOKING_REFERENCE = '${booking_reference}';
         
         async function loadBookingDetails() {
@@ -18306,6 +18306,19 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                     if (roomNumberEl) roomNumberEl.textContent = booking.guest_room_number || 'N/A';
                     
                     console.log('UI updated with booking details');
+                    
+                    // Fetch property slug for "Back to Hotel" button
+                    if (booking.property_id) {
+                        fetch('/api/properties/' + booking.property_id)
+                            .then(res => res.json())
+                            .then(propData => {
+                                if (propData.slug) {
+                                    propertySlug = propData.slug;
+                                    console.log('Property slug updated to:', propertySlug);
+                                }
+                            })
+                            .catch(err => console.error('Error fetching property:', err));
+                    }
                     
                     // Generate QR code with booking data
                     const qrData = booking.qr_code_data || JSON.stringify({
@@ -18360,7 +18373,10 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                 console.log('Important information data:', data);
                 
                 if (data.success && data.settings) {
-                    const defaultInfo = 'Please arrive 10 minutes before your time slot\nBring your QR code (printed or on phone)\nBeach towels provided by hotel\nLate arrivals may result in reduced time';
+                    const defaultInfo = \`Please arrive 10 minutes before your time slot
+Bring your QR code (printed or on phone)
+Beach towels provided by hotel
+Late arrivals may result in reduced time\`;
                     const infoText = data.settings.important_information || defaultInfo;
                     const infoLines = infoText.split('\n').filter(line => line.trim());
                     
