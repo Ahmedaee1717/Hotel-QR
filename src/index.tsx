@@ -3268,6 +3268,75 @@ app.get('/api/admin/vendors', async (c) => {
   }
 })
 
+// Create vendor (Admin)
+app.post('/api/admin/vendors', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+
+  try {
+    // Generate unique slug from business name
+    const baseSlug = data.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    
+    // Check if slug exists and add number if needed
+    let slug = baseSlug
+    let counter = 1
+    while (true) {
+      const existing = await DB.prepare('SELECT vendor_id FROM vendors WHERE slug = ?').bind(slug).first()
+      if (!existing) break
+      slug = `${baseSlug}-${counter}`
+      counter++
+    }
+    
+    // Use provided password or default
+    const password = data.password || 'vendor123'
+
+    // Check if email already exists
+    const existing = await DB.prepare(`
+      SELECT vendor_id FROM vendors WHERE email = ?
+    `).bind(data.email).first()
+    
+    if (existing) {
+      return c.json({ error: 'Email already registered' }, 400)
+    }
+
+    const result = await DB.prepare(`
+      INSERT INTO vendors (
+        business_name, slug, description_en, category_id,
+        contact_person, email, phone, password_hash,
+        commission_rate, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+    `).bind(
+      data.business_name,
+      slug,
+      data.description_en || '',
+      data.category_id || null,
+      data.contact_person || '',
+      data.email,
+      data.phone || '',
+      password,
+      data.commission_rate || 0
+    ).run()
+
+    const vendor_id = result.meta.last_row_id
+
+    // Link vendor to property (required)
+    const property_id = data.property_id || 1
+    await DB.prepare(`
+      INSERT INTO vendor_properties (vendor_id, property_id, custom_commission_rate, joined_via)
+      VALUES (?, ?, ?, 'admin')
+    `).bind(vendor_id, property_id, data.commission_rate || 15).run()
+
+    return c.json({ 
+      success: true, 
+      vendor_id,
+      message: 'Vendor created successfully. Default password: vendor123'
+    })
+  } catch (error) {
+    console.error('Create vendor error:', error)
+    return c.json({ error: 'Failed to create vendor', details: error.message }, 500)
+  }
+})
+
 // Update vendor status
 app.patch('/api/admin/vendors/:vendor_id', async (c) => {
   const { DB } = c.env
