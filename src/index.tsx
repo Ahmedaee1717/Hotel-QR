@@ -8784,9 +8784,8 @@ app.post('/api/admin/beach/spots', async (c) => {
       INSERT INTO beach_spots (
         property_id, zone_id, spot_number, spot_type,
         position_x, position_y, max_capacity,
-        price_full_day, price_half_day, price_hourly,
-        zone_name
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        price_full_day, price_half_day, price_hourly
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,
       zoneIdToUse,
@@ -8797,8 +8796,7 @@ app.post('/api/admin/beach/spots', async (c) => {
       max_capacity || 2,
       price_full_day || 0,
       price_half_day || 0,
-      price_hourly || 0,
-      zone_name || 'General Area'
+      price_hourly || 0
     ).run()
     
     return c.json({ success: true })
