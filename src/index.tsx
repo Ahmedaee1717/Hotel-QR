@@ -13010,7 +13010,8 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             // Render each section's content (await all async renders)
-            await Promise.all([
+            // Use Promise.allSettled to continue even if some renders fail
+            const renderResults = await Promise.allSettled([
                 renderRestaurants(),
                 renderEvents(),
                 renderSpa(),
@@ -13021,7 +13022,15 @@ app.get('/hotel/:property_slug', async (c) => {
                 ...customSections.map(section => 
                     section.is_visible === 1 ? renderCustomSection(section.section_key) : Promise.resolve()
                 )
-            ]).catch(err => console.error('Render error:', err));
+            ]);
+            
+            // Log any render failures
+            renderResults.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    const sectionNames = ['restaurants', 'events', 'spa', 'services', 'activities', 'hotel-map'];
+                    console.error('Render error in ' + (sectionNames[index] || 'custom-section') + ':', result.reason);
+                }
+            });
             
             updateSectionVisibility();
             
