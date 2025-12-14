@@ -4755,6 +4755,24 @@ app.put('/api/admin/restaurant/floor-element/:element_id', async (c) => {
   }
 })
 
+app.delete('/api/admin/restaurant/floor-element/:element_id', async (c) => {
+  const { DB } = c.env
+  const { element_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE floor_plan_elements 
+      SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE element_id = ?
+    `).bind(element_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete floor element error:', error)
+    return c.json({ error: 'Failed to delete floor element' }, 500)
+  }
+})
+
 function getElementIcon(type: string) {
   const icons: Record<string, string> = {
     'buffet': 'fa-utensils',
@@ -35075,7 +35093,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       function renderTables() {
         const canvas = document.getElementById('canvas');
-        canvas.innerHTML = '';
+        // Remove only old tables, not elements or walls
+        canvas.querySelectorAll('.table-item').forEach(el => el.remove());
         
         let totalCap = 0;
         
@@ -35400,6 +35419,44 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const div = document.getElementById('element-' + element.element_id);
         if (div) div.style.borderColor = '#10B981';
       }
+
+      async function deleteSelectedElement() {
+        if (!selectedElement) {
+          alert('Please select an element to delete');
+          return;
+        }
+        
+        if (!confirm('Delete this floor element?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            selectedElement = null;
+            await loadFloorElements();
+            alert('Floor element deleted!');
+          }
+        } catch (error) {
+          console.error('Delete element error:', error);
+          alert('Failed to delete floor element');
+        }
+      }
+      
+      // Add keyboard delete support (Delete/Backspace keys)
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (selectedElement) {
+            e.preventDefault();
+            deleteSelectedElement();
+          } else if (selectedTable) {
+            e.preventDefault();
+            deleteSelectedTable();
+          }
+        }
+      });
 
       document.getElementById('addElementForm').addEventListener('submit', async function(e) {
         e.preventDefault();
