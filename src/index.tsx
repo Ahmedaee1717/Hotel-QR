@@ -13011,7 +13011,11 @@ app.get('/hotel/:property_slug', async (c) => {
               }
             });
             
-            // Always append hotel map at the end (unless it's in the order already)
+            // Always append beach booking and hotel map at the end (unless they're in the order already)
+            if (sectionElements['beach-booking'] && !sectionOrder.includes('beach-booking')) {
+              container.appendChild(sectionElements['beach-booking']);
+            }
+            
             if (sectionElements['hotel-map'] && !sectionOrder.includes('hotel-map')) {
               container.appendChild(sectionElements['hotel-map']);
             }
