@@ -24021,13 +24021,19 @@ app.get('/admin/dashboard', (c) => {
                 <h2 class="text-2xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-green-600"></i>Add New Hotel Offering</h2>
                 <form id="addOfferingForm" class="space-y-4">
                     <div class="grid md:grid-cols-2 gap-4">
-                        <select id="offeringType" required class="px-4 py-2 border rounded-lg">
-                            <option value="">Select Type...</option>
-                            <option value="restaurant">Dining & Drinks</option>
-                            <option value="event">Events & Entertainment</option>
-                            <option value="spa">Spa/Wellness</option>
-                            <option value="service">Facilities & Amenities</option>
-                        </select>
+                        <div>
+                            <select id="offeringType" required class="px-4 py-2 border rounded-lg w-full">
+                                <option value="">Select Type...</option>
+                                <!-- Restaurant option removed - Use F&B tab to create restaurants -->
+                                <option value="event">Events & Entertainment</option>
+                                <option value="spa">Spa/Wellness</option>
+                                <option value="service">Facilities & Amenities</option>
+                            </select>
+                            <p class="text-xs text-orange-600 mt-1">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                <strong>Note:</strong> To add restaurants, use the <strong>F&B tab</strong> in the sidebar
+                            </p>
+                        </div>
                         <input type="text" id="offeringTitle" placeholder="Title (English)" required class="px-4 py-2 border rounded-lg">
                     </div>
                     <div>
@@ -32313,17 +32319,25 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           document.getElementById('submitNewRestaurant').disabled = true;
           
           try {
-            const response = await fetch('/api/hotel-offerings/1', {
+            const response = await fetch('/api/admin/offerings', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                property_id: propertyId,
+                property_id: 1,
                 offering_type: 'restaurant',
                 title_en: name,
-                description_en: description || 'Our restaurant offers a delightful dining experience.',
-                cuisine_type: cuisine || 'international',
-                requires_booking: true,
-                is_active: true
+                short_description_en: description || 'Our restaurant offers a delightful dining experience.',
+                full_description_en: description || 'Our restaurant offers a delightful dining experience.',
+                price: 0,
+                location: '',
+                duration_minutes: null,
+                requires_booking: 1,
+                images: JSON.stringify([]),
+                video_url: null,
+                event_date: null,
+                event_start_time: null,
+                event_end_time: null,
+                menu_urls: null
               })
             });
 
