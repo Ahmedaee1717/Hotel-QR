@@ -34473,6 +34473,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             <i class="fas fa-plus mr-2"></i>Add Element
                         </button>
                     </form>
+                    <div class="mt-4 pt-4 border-t">
+                        <button onclick="deleteSelectedElement()" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                            <i class="fas fa-trash mr-2"></i>Delete Selected Element
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2 text-center">
+                            <i class="fas fa-info-circle mr-1"></i>Click an element to select it (green border), then click delete or press Delete/Backspace key
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Wall Drawing Tool -->
