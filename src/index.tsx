@@ -32381,7 +32381,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       function openRestaurantManagement() {
         if (selectedRestaurantId) {
-          window.location('/admin/restaurant/' + selectedRestaurantId, '_blank');
+          window.open('/admin/restaurant/' + selectedRestaurantId, '_blank');
         } else {
           alert('Please select a restaurant first');
         }
