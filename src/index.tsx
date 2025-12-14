@@ -30206,19 +30206,17 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             const completedIcon = isCompleted ? '<i class="fas fa-check-circle text-green-600"></i>' : '<i class="fas fa-arrow-right text-blue-600"></i>';
             const completedBadge = isCompleted ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full ml-2">✓ Done</span>' : '';
             
-            return \`
-              <button onclick="quickAction(\${idx}, '\${currentTab}')" class="w-full flex items-center gap-3 p-3 \${completedClass} rounded-lg hover:shadow-md transition border">
-                <span class="text-2xl">\${action.icon}</span>
-                <div class="flex-1 text-left">
-                  <div class="font-semibold text-sm flex items-center">
-                    \${action.text}
-                    \${completedBadge}
-                  </div>
-                  <div class="text-xs text-gray-600">\${action.desc}</div>
-                </div>
-                \${completedIcon}
-              </button>
-            \`;
+            return '<button onclick="quickAction(' + idx + ', \'' + currentTab + '\')" class="w-full flex items-center gap-3 p-3 ' + completedClass + ' rounded-lg hover:shadow-md transition border">' +
+              '<span class="text-2xl">' + action.icon + '</span>' +
+              '<div class="flex-1 text-left">' +
+                '<div class="font-semibold text-sm flex items-center">' +
+                  action.text +
+                  completedBadge +
+                '</div>' +
+                '<div class="text-xs text-gray-600">' + action.desc + '</div>' +
+              '</div>' +
+              completedIcon +
+            '</button>';
           }).join('');
         }
         
@@ -30410,16 +30408,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         // Add user message
         const chatMessages = document.getElementById('chatMessages');
-        chatMessages.innerHTML += \`
-          <div class="flex gap-2 justify-end">
-            <div class="bg-indigo-600 text-white rounded-lg p-3 max-w-[80%]">
-              <p class="text-sm">\${message}</p>
-            </div>
-            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <i class="fas fa-user text-indigo-600"></i>
-            </div>
-          </div>
-        \`;
+        const userMessageHTML = '<div class="flex gap-2 justify-end">' +
+          '<div class="bg-indigo-600 text-white rounded-lg p-3 max-w-[80%]">' +
+            '<p class="text-sm">' + message + '</p>' +
+          '</div>' +
+          '<div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">' +
+            '<i class="fas fa-user text-indigo-600"></i>' +
+          '</div>' +
+        '</div>';
+        chatMessages.innerHTML += userMessageHTML;
         
         input.value = '';
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -30428,19 +30425,18 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         setTimeout(() => {
           const response = generateChatResponse(message);
           const actionButton = response.action ? 
-            \`<button onclick="executeChatAction()" class="mt-2 text-xs px-3 py-1 bg-white text-blue-600 rounded-full hover:bg-blue-50 transition font-semibold">Take me there →</button>\` : '';
+            '<button onclick="executeChatAction()" class="mt-2 text-xs px-3 py-1 bg-white text-blue-600 rounded-full hover:bg-blue-50 transition font-semibold">Take me there →</button>' : '';
           
-          chatMessages.innerHTML += \`
-            <div class="flex gap-2">
-              <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-robot text-blue-600"></i>
-              </div>
-              <div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">
-                <p class="text-sm text-gray-800 whitespace-pre-line">\${response.text}</p>
-                \${actionButton}
-              </div>
-            </div>
-          \`;
+          const aiMessageHTML = '<div class="flex gap-2">' +
+            '<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">' +
+              '<i class="fas fa-robot text-blue-600"></i>' +
+            '</div>' +
+            '<div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">' +
+              '<p class="text-sm text-gray-800 whitespace-pre-line">' + response.text + '</p>' +
+              actionButton +
+            '</div>' +
+          '</div>';
+          chatMessages.innerHTML += aiMessageHTML;
           
           chatMessages.scrollTop = chatMessages.scrollHeight;
           
