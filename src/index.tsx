@@ -5744,6 +5744,8 @@ Extract:
 1. Categories (Appetizers, Main Course, Desserts, Beverages, etc.)
 2. For each item: name, description, price, currency, dietary info (vegetarian/vegan/gluten-free), spice level, allergens
 
+IMPORTANT: For spice_level, ONLY use these exact values: "none", "mild", "medium", "hot", "extra_hot"
+
 Menu Text:
 ${menu.extracted_text}
 
@@ -5762,13 +5764,15 @@ Return ONLY valid JSON in this exact format:
           "is_vegetarian": false,
           "is_vegan": false,
           "is_gluten_free": false,
-          "spice_level": "medium",
+          "spice_level": "none",
           "allergens": ["nuts", "dairy"]
         }
       ]
     }
   ]
-}`
+}
+
+Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "extra_hot"`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -5816,6 +5820,24 @@ Return ONLY valid JSON in this exact format:
       for (let itemIndex = 0; itemIndex < category.items.length; itemIndex++) {
         const item = category.items[itemIndex]
         
+        // Normalize spice level to valid values
+        const validSpiceLevels = ['none', 'mild', 'medium', 'hot', 'extra_hot']
+        let spiceLevel = 'none'
+        if (item.spice_level) {
+          const normalized = item.spice_level.toLowerCase().trim()
+          if (validSpiceLevels.includes(normalized)) {
+            spiceLevel = normalized
+          } else if (normalized.includes('extra') || normalized.includes('very')) {
+            spiceLevel = 'extra_hot'
+          } else if (normalized.includes('hot') || normalized.includes('spicy')) {
+            spiceLevel = 'hot'
+          } else if (normalized.includes('medium') || normalized.includes('moderate')) {
+            spiceLevel = 'medium'
+          } else if (normalized.includes('mild') || normalized.includes('low') || normalized.includes('light')) {
+            spiceLevel = 'mild'
+          }
+        }
+        
         await DB.prepare(`
           INSERT INTO menu_items (
             category_id, item_name, description, price, currency,
@@ -5831,7 +5853,7 @@ Return ONLY valid JSON in this exact format:
           item.is_vegetarian ? 1 : 0,
           item.is_vegan ? 1 : 0,
           item.is_gluten_free ? 1 : 0,
-          item.spice_level || 'none',
+          spiceLevel,
           JSON.stringify(item.allergens || []),
           itemIndex
         ).run()
