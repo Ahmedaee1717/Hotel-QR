@@ -27463,23 +27463,13 @@ app.get('/admin/dashboard', (c) => {
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Draw beach background
-        ctx.fillStyle = '#f0f9ff';
+        // Draw full sandy beach background
+        const sandGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        sandGradient.addColorStop(0, '#fef3c7');  // Light sand at top
+        sandGradient.addColorStop(0.5, '#fde68a'); // Medium sand in middle
+        sandGradient.addColorStop(1, '#fcd34d');   // Golden sand at bottom
+        ctx.fillStyle = sandGradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw sand gradient
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#fef3c7');
-        gradient.addColorStop(1, '#fde68a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-        
-        // Draw water
-        const waterGradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 100);
-        waterGradient.addColorStop(0, '#0ea5e9');
-        waterGradient.addColorStop(1, '#38bdf8');
-        ctx.fillStyle = waterGradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height - 100);
         
         // Draw spots
         const spots = window.liveBeachMapData.spots;
