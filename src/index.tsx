@@ -5740,11 +5740,77 @@ Please provide a complete, accurate transcription that preserves the menu's layo
       ) VALUES (?, ?, ?, 'ocr', CURRENT_TIMESTAMP)
     `).bind(menu_id, menu.base_language, extractedText).run()
     
+    // Auto-translate to all supported languages
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'zh']
+    const languagesToTranslate = supportedLanguages.filter(lang => lang !== menu.base_language)
+    
+    // Get language information for all languages
+    const languages = await DB.prepare(`
+      SELECT language_code, language_name_en, language_name_native 
+      FROM supported_languages 
+      WHERE language_code IN (${languagesToTranslate.map(() => '?').join(',')})
+    `).bind(...languagesToTranslate).all()
+    
+    // Translate to each language
+    const translationResults = []
+    for (const lang of languages.results) {
+      try {
+        // Call OpenAI for translation
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{
+              role: 'system',
+              content: `You are a professional restaurant menu translator. Translate the menu to ${lang.language_name_en} (${lang.language_name_native}). Maintain:
+- Section headers and structure
+- Accurate food terminology
+- Cultural appropriateness
+- Price formatting
+- Professional tone
+
+Provide ONLY the translated text, preserving the exact format and structure.`
+            }, {
+              role: 'user',
+              content: extractedText
+            }],
+            max_tokens: 4000,
+            temperature: 0.3
+          })
+        })
+        
+        if (openaiResponse.ok) {
+          const translationResult = await openaiResponse.json()
+          const translatedText = translationResult.choices[0].message.content
+          
+          // Store translation
+          await DB.prepare(`
+            INSERT OR REPLACE INTO restaurant_menu_translations (
+              menu_id, language_code, translated_text, translation_method, translated_at
+            ) VALUES (?, ?, ?, 'auto', CURRENT_TIMESTAMP)
+          `).bind(menu_id, lang.language_code, translatedText).run()
+          
+          translationResults.push({ language: lang.language_code, success: true })
+        } else {
+          translationResults.push({ language: lang.language_code, success: false })
+        }
+      } catch (error) {
+        console.error(`Auto-translate to ${lang.language_code} failed:`, error)
+        translationResults.push({ language: lang.language_code, success: false, error: error.message })
+      }
+    }
+    
     return c.json({ 
       success: true, 
       extracted_text: extractedText,
-      message: 'OCR processing completed successfully for ' + imageUrls.length + ' image(s)',
-      images_processed: imageUrls.length
+      message: 'OCR processing completed successfully for ' + imageUrls.length + ' image(s). Auto-translated to ' + translationResults.filter(r => r.success).length + ' languages.',
+      images_processed: imageUrls.length,
+      auto_translated: true,
+      translation_results: translationResults
     })
   } catch (error) {
     // Update status to failed
@@ -38186,12 +38252,13 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
                 <button onclick="saveAllChanges()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">
                     <i class="fas fa-save mr-2"></i>Save Changes
                 </button>
-                <button onclick="translateAllCategories()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition">
-                    <i class="fas fa-language mr-2"></i>Translate All
-                </button>
                 <a href="/menu/${menu_id}" target="_blank" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition inline-block">
                     <i class="fas fa-eye mr-2"></i>Preview
                 </a>
+                <div class="flex-1 text-right text-sm text-gray-500 flex items-center justify-end">
+                    <i class="fas fa-language mr-2"></i>
+                    <span>Menus auto-translate to all languages</span>
+                </div>
             </div>
         </div>
 
@@ -38382,15 +38449,6 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
                 }
             } catch (error) {
                 alert('Translation error: ' + error.message);
-            }
-        }
-
-        async function translateAllCategories() {
-            const lang = prompt('Enter language code to translate ALL categories (ar, de, ru, es, fr, it, zh):');
-            if (!lang) return;
-
-            for (const category of menuData.categories) {
-                await translateCategory(category.category_id);
             }
         }
 
