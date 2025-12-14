@@ -20392,7 +20392,7 @@ app.get('/vendor/dashboard', (c) => {
             <form id="profileForm" class="space-y-4">
                 <div class="flex items-center gap-6 mb-6">
                     <div class="relative">
-                        <img id="profileImagePreview" src="https://via.placeholder.com/150" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-gray-200">
+                        <img id="profileImagePreview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Crect fill='%23ddd' width='150' height='150'/%3E%3Ctext fill='%23999' font-family='sans-serif' font-size='20' dy='10.5' font-weight='bold' x='50%25' y='50%25' text-anchor='middle'%3EProfile%3C/text%3E%3C/svg%3E" alt="Profile" class="w-32 h-32 rounded-full object-cover border-4 border-gray-200">
                         <label for="profileImageInput" class="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700">
                             <i class="fas fa-camera"></i>
                             <input type="file" id="profileImageInput" accept="image/*" class="hidden">
