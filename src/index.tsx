@@ -13539,6 +13539,10 @@ app.get('/hotel/:property_slug', async (c) => {
                                     class="flex-1 bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
                             </button>
+                            <button onclick="window.open('/hotel/${property.slug}/restaurant/' + \${r.offering_id} + '/menu', '_blank')" 
+                                    class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
+                                <i class="fas fa-utensils mr-2"></i>View Menu
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -34304,10 +34308,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
         html += '<div class="py-12 px-4" style="background-color: ' + d.header_background_color + '; color: ' + d.header_text_color + ';">';
         html += '<div class="max-w-6xl mx-auto text-center">';
         
-        if (d.show_restaurant_logo && restaurant.images) {
-          const logo = restaurant.images.split(',')[0];
-          html += '<img src="' + logo + '" alt="Logo" class="w-32 h-32 mx-auto rounded-full mb-4 object-cover border-4" style="border-color: ' + d.accent_color + '">';
-        }
+        // Logo removed - keeping it simple as requested
         
         if (d.show_restaurant_name) {
           html += '<h1 class="text-5xl font-bold mb-4" style="font-family: var(--heading-font)">' + restaurant.title_en + '</h1>';
@@ -35931,9 +35932,39 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         <button onclick="previewMenu()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition">
                             <i class="fas fa-eye mr-2"></i>Preview Menu
                         </button>
+                        <button onclick="generateMenuQR()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-lg transition">
+                            <i class="fas fa-qrcode mr-2"></i>Generate QR Code
+                        </button>
                         <button onclick="saveMenuDesign()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold shadow-lg transition">
                             <i class="fas fa-save mr-2"></i>Save Design
                         </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- QR Code Display -->
+            <div id="menuQRSection" class="bg-white rounded-xl shadow-lg p-8 mb-6" style="display: none;">
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold mb-4 flex items-center justify-center gap-3">
+                        <i class="fas fa-qrcode text-purple-600"></i>
+                        Menu QR Code - Print for Tables
+                    </h3>
+                    <p class="text-gray-600 mb-6">Print this QR code and place it on restaurant tables so guests can scan and view the menu</p>
+                    <div id="menuQRCode" class="inline-block p-8 bg-white border-4 border-gray-300 rounded-2xl shadow-xl mb-6"></div>
+                    <div class="flex justify-center gap-4">
+                        <button onclick="downloadMenuQR()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition">
+                            <i class="fas fa-download mr-2"></i>Download QR Code
+                        </button>
+                        <button onclick="printMenuQR()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition">
+                            <i class="fas fa-print mr-2"></i>Print QR Code
+                        </button>
+                        <button onclick="hideMenuQR()" class="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl font-semibold transition">
+                            <i class="fas fa-times mr-2"></i>Close
+                        </button>
+                    </div>
+                    <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                        <p class="text-sm text-gray-700"><strong>Menu URL:</strong></p>
+                        <p id="menuURL" class="text-sm text-blue-600 font-mono mt-2"></p>
                     </div>
                 </div>
             </div>
@@ -37035,6 +37066,77 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const propertySlug = window.location.pathname.split('/')[2] || 'hilton-marsa-alam';
         const previewUrl = '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/menu';
         window.open(previewUrl, '_blank');
+      }
+      
+      function generateMenuQR() {
+        const propertySlug = window.location.pathname.split('/')[2] || 'hilton-marsa-alam';
+        const menuUrl = window.location.origin + '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/menu';
+        
+        document.getElementById('menuURL').textContent = menuUrl;
+        document.getElementById('menuQRSection').style.display = 'block';
+        
+        // Clear previous QR code
+        document.getElementById('menuQRCode').innerHTML = '';
+        
+        // Generate QR code using qrcode.js library
+        const qr = document.createElement('div');
+        qr.id = 'qrcode-temp';
+        document.getElementById('menuQRCode').appendChild(qr);
+        
+        // Use API to generate QR code image
+        const qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(menuUrl);
+        
+        const img = document.createElement('img');
+        img.src = qrApiUrl;
+        img.className = 'mx-auto';
+        img.alt = 'Menu QR Code';
+        
+        document.getElementById('menuQRCode').innerHTML = '';
+        document.getElementById('menuQRCode').appendChild(img);
+        
+        // Scroll to QR section
+        document.getElementById('menuQRSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      
+      function hideMenuQR() {
+        document.getElementById('menuQRSection').style.display = 'none';
+      }
+      
+      function downloadMenuQR() {
+        const propertySlug = window.location.pathname.split('/')[2] || 'hilton-marsa-alam';
+        const menuUrl = window.location.origin + '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/menu';
+        const qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=' + encodeURIComponent(menuUrl);
+        
+        const link = document.createElement('a');
+        link.href = qrApiUrl;
+        link.download = 'restaurant-menu-qr-code.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert('✅ QR Code downloaded! Print it and place on restaurant tables.');
+      }
+      
+      function printMenuQR() {
+        const propertySlug = window.location.pathname.split('/')[2] || 'hilton-marsa-alam';
+        const menuUrl = window.location.origin + '/hotel/' + propertySlug + '/restaurant/' + offeringId + '/menu';
+        const qrApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=' + encodeURIComponent(menuUrl);
+        
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write('<html><head><title>Restaurant Menu QR Code</title>');
+        printWindow.document.write('<style>');
+        printWindow.document.write('body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }');
+        printWindow.document.write('img { max-width: 600px; border: 10px solid #000; padding: 20px; }');
+        printWindow.document.write('h1 { font-size: 32px; margin-bottom: 20px; }');
+        printWindow.document.write('p { font-size: 18px; margin-top: 20px; }');
+        printWindow.document.write('@media print { button { display: none; } }');
+        printWindow.document.write('</style></head><body>');
+        printWindow.document.write('<h1>Scan to View Menu</h1>');
+        printWindow.document.write('<img src="' + qrApiUrl + '" alt="Menu QR Code">');
+        printWindow.document.write('<p>Scan this QR code with your phone to view our digital menu</p>');
+        printWindow.document.write('<button onclick="window.print()" style="margin-top: 30px; padding: 15px 30px; font-size: 18px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Print</button>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
       }
       
       // ========================================
