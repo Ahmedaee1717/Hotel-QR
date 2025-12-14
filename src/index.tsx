@@ -25523,7 +25523,7 @@ app.get('/admin/dashboard', (c) => {
                     <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
                     Beach Booking Management
                 </h2>
-                <button onclick="window.open('/admin/beach-management/' + currentPropertyId, '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
+                <button onclick="window.open('/admin/beach-management/1', '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
                     <i class="fas fa-external-link-alt"></i>
                     Open Beach Management Portal
                     <span class="text-xs bg-white/20 px-2 py-1 rounded">STAFF</span>
