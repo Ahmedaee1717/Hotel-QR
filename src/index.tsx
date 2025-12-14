@@ -35359,29 +35359,27 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
           const languages = menu.available_languages ? menu.available_languages.split(',') : [];
           const translationBadge = languages.length > 0 ?
-            String.fromCharCode(96) + '<span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"><i class="fas fa-language mr-1"></i>' + String.fromCharCode(36) + '{languages.length} Language' + String.fromCharCode(36) + '{languages.length > 1 ? "s" : ""}' + String.fromCharCode(125) + '</span>' + String.fromCharCode(96) : '';
+            '<span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"><i class="fas fa-language mr-1"></i>' + languages.length + ' Language' + (languages.length > 1 ? 's' : '') + '</span>' : '';
 
-          return String.fromCharCode(96) +
-            '<div class="border-2 border-gray-200 rounded-xl p-4 hover:border-blue-400 transition">' +
+          return '<div class="border-2 border-gray-200 rounded-xl p-4 hover:border-blue-400 transition">' +
               '<div class="flex items-start justify-between mb-3">' +
                 '<div class="flex-1">' +
-                  '<h3 class="font-bold text-lg text-gray-900">' + String.fromCharCode(36) + '{menu.menu_name}</h3>' +
-                  '<p class="text-sm text-gray-600 capitalize"><i class="fas fa-tag mr-1"></i>' + String.fromCharCode(36) + '{menu.menu_type}</p>' +
+                  '<h3 class="font-bold text-lg text-gray-900">' + menu.menu_name + '</h3>' +
+                  '<p class="text-sm text-gray-600 capitalize"><i class="fas fa-tag mr-1"></i>' + menu.menu_type + '</p>' +
                 '</div>' +
-                '<img src="' + String.fromCharCode(36) + '{menu.original_image_url}" alt="Menu" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-300" onerror="this.src=' + String.fromCharCode(39) + 'data:image/svg+xml,%3Csvg xmlns=' + String.fromCharCode(34) + 'http://www.w3.org/2000/svg' + String.fromCharCode(34) + ' width=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + ' height=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + '%3E%3Crect fill=' + String.fromCharCode(34) + '%23e5e7eb' + String.fromCharCode(34) + ' width=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + ' height=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + '/%3E%3Ctext x=' + String.fromCharCode(34) + '50%25' + String.fromCharCode(34) + ' y=' + String.fromCharCode(34) + '50%25' + String.fromCharCode(34) + ' text-anchor=' + String.fromCharCode(34) + 'middle' + String.fromCharCode(34) + ' fill=' + String.fromCharCode(34) + '%23999' + String.fromCharCode(34) + '%3EMenu%3C/text%3E%3C/svg%3E' + String.fromCharCode(39) + '">' +
+                '<img src="' + menu.original_image_url + '" alt="Menu" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-300" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 fill=%22%23999%22%3EMenu%3C/text%3E%3C/svg%3E\'"> ' +
               '</div>' +
               '<div class="flex flex-wrap gap-2 mb-3">' +
-                String.fromCharCode(36) + '{statusBadge}' +
-                String.fromCharCode(36) + '{translationBadge}' +
+                statusBadge +
+                translationBadge +
               '</div>' +
               '<div class="flex gap-2">' +
                 (menu.ocr_status === 'pending' ?
-                  '<button onclick="processOCR(' + String.fromCharCode(36) + '{menu.menu_id})" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition"><i class="fas fa-robot mr-1"></i>Extract Text</button>' :
-                  '<button onclick="viewMenu(' + String.fromCharCode(36) + '{menu.menu_id})" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition"><i class="fas fa-eye mr-1"></i>View & Translate</button>') +
-                '<button onclick="deleteMenu(' + String.fromCharCode(36) + '{menu.menu_id})" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-lg transition"><i class="fas fa-trash"></i></button>' +
+                  '<button onclick="processOCR(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition"><i class="fas fa-robot mr-1"></i>Extract Text</button>' :
+                  '<button onclick="viewMenu(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition"><i class="fas fa-eye mr-1"></i>View & Translate</button>') +
+                '<button onclick="deleteMenu(' + menu.menu_id + ')" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-lg transition"><i class="fas fa-trash"></i></button>' +
               '</div>' +
-            '</div>' +
-            String.fromCharCode(96);
+            '</div>';
         }).join('');
       }
 
