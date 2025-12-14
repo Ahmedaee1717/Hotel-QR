@@ -13825,7 +13825,6 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 });
             });
-            });
         
         // Seasonal Effects (inline)
         async function initSeasonalEffects() {
