@@ -3382,6 +3382,13 @@ app.get('/api/admin/vendor-analytics/:vendor_id', async (c) => {
       WHERE vendor_id = ? AND booking_status IN ('confirmed', 'completed')
     `).bind(vendor_id).first()
 
+    // Get total activities count
+    const activitiesResult = await DB.prepare(`
+      SELECT COUNT(*) as total_activities
+      FROM activities
+      WHERE vendor_id = ?
+    `).bind(vendor_id).first()
+
     // Get total revenue and commission
     const revenueResult = await DB.prepare(`
       SELECT 
@@ -3401,6 +3408,7 @@ app.get('/api/admin/vendor-analytics/:vendor_id', async (c) => {
       success: true,
       analytics: {
         total_bookings: bookingsResult?.total_bookings || 0,
+        total_activities: activitiesResult?.total_activities || 0,
         total_revenue: total_revenue,
         commission_rate: commission_rate,
         commission_earned: commission_earned
@@ -27357,20 +27365,26 @@ app.get('/admin/dashboard', (c) => {
                   '<i class="fas ' + statusIcon + ' mr-1"></i>' + v.status +
                 '</span>' +
               '</div>' +
-              '<div class="grid grid-cols-3 gap-3 mb-4 bg-gray-50 p-4 rounded-lg">' +
+              '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 bg-gray-50 p-4 rounded-lg">' +
                 '<div class="text-center">' +
+                  '<div class="text-2xl font-bold text-purple-600">' + (analytics.total_activities || 0) + '</div>' +
+                  '<div class="text-xs text-gray-600 mt-1">' +
+                    '<i class="fas fa-star mr-1"></i>Activities' +
+                  '</div>' +
+                '</div>' +
+                '<div class="text-center border-l border-gray-300">' +
                   '<div class="text-2xl font-bold text-blue-600">' + (analytics.total_bookings || 0) + '</div>' +
                   '<div class="text-xs text-gray-600 mt-1">' +
                     '<i class="fas fa-calendar-check mr-1"></i>Bookings' +
                   '</div>' +
                 '</div>' +
-                '<div class="text-center border-l border-r border-gray-300">' +
+                '<div class="text-center border-l border-gray-300">' +
                   '<div class="text-2xl font-bold text-green-600">$' + (analytics.total_revenue || 0).toFixed(2) + '</div>' +
                   '<div class="text-xs text-gray-600 mt-1">' +
                     '<i class="fas fa-dollar-sign mr-1"></i>Revenue' +
                   '</div>' +
                 '</div>' +
-                '<div class="text-center">' +
+                '<div class="text-center border-l border-gray-300">' +
                   '<div class="text-2xl font-bold text-orange-600">$' + (analytics.commission_earned || 0).toFixed(2) + '</div>' +
                   '<div class="text-xs text-gray-600 mt-1">' +
                     '<i class="fas fa-percent mr-1"></i>Commission' +
