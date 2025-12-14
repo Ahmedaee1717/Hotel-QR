@@ -13534,14 +13534,10 @@ app.get('/hotel/:property_slug', async (c) => {
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
                             <span>\${translateLocation(r.location)}</span>
                         </div>
-                        <div class="pt-3 border-t border-gray-100 flex gap-2">
+                        <div class="pt-3 border-t border-gray-100">
                             <button onclick="viewOffering(\${r.offering_id})" 
-                                    class="flex-1 bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
+                                    class="w-full bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
-                            </button>
-                            <button onclick="window.open('/hotel/' + window.propertyData.slug + '/restaurant/' + \${r.offering_id} + '/menu', '_blank')" 
-                                    class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
-                                <i class="fas fa-utensils mr-2"></i>View Menu
                             </button>
                         </div>
                     </div>
@@ -14981,6 +14977,7 @@ app.get('/offering-detail', async (c) => {
                 'book-table': 'Prenota un Tavolo',
                 'ready-to-dine': 'Ready to Dine?',
                 'reserve-table-description': 'Reserve your table and choose your preferred seating',
+                'view-menu': 'View Menu',
                 'book-table': 'Book a Table',
                 'your-name': 'Your Name',
                 'phone-number': 'Phone Number',
@@ -15006,6 +15003,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': '¿Listo para cenar?',
                 'reserve-table-description': 'Reserva tu mesa y elige tu asiento preferido',
                 'book-table': 'Reservar Mesa',
+                'view-menu': 'Ver Menú',
                 'your-name': 'Tu nombre',
                 'phone-number': 'Número de teléfono',
                 'email': 'Correo electrónico',
@@ -15027,6 +15025,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'Prêt à dîner?',
                 'reserve-table-description': 'Réservez votre table et choisissez votre place préférée',
                 'book-table': 'Réserver une Table',
+                'view-menu': 'Voir le Menu',
                 'your-name': 'Votre nom',
                 'phone-number': 'Numéro de téléphone',
                 'email': 'Email',
@@ -15045,6 +15044,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'Pronto a cenare?',
                 'reserve-table-description': 'Prenota il tuo tavolo e scegli il tuo posto preferito',
                 'book-table': 'Prenota un Tavolo',
+                'view-menu': 'Menü ansehen',
                 'your-name': 'Ihr Name',
                 'phone-number': 'Telefonnummer',
                 'email': 'E-Mail',
@@ -15063,6 +15063,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'Pronto a cenare?',
                 'reserve-table-description': 'Prenota il tuo tavolo e scegli il tuo posto preferito',
                 'book-table': 'Prenota un Tavolo',
+                'view-menu': 'Visualizza Menu',
                 'your-name': 'Il tuo nome',
                 'phone-number': 'Numero di telefono',
                 'email': 'Email',
@@ -15081,6 +15082,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'Pronto para jantar?',
                 'reserve-table-description': 'Reserve sua mesa e escolha seu assento preferido',
                 'book-table': 'Reservar Mesa',
+                'view-menu': 'Ver Cardápio',
                 'your-name': 'Seu nome',
                 'phone-number': 'Número de telefone',
                 'email': 'Email',
@@ -15099,6 +15101,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'Готовы поужинать?',
                 'reserve-table-description': 'Забронируйте столик и выберите предпочтительное место',
                 'book-table': 'Забронировать Столик',
+                'view-menu': 'Посмотреть меню',
                 'your-name': 'Ваше имя',
                 'phone-number': 'Номер телефона',
                 'email': 'Электронная почта',
@@ -15117,6 +15120,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': 'هل أنت مستعد لتناول الطعام؟',
                 'reserve-table-description': 'احجز طاولتك واختر مقعدك المفضل',
                 'book-table': 'حجز طاولة',
+                'view-menu': 'عرض القائمة',
                 'your-name': 'اسمك',
                 'phone-number': 'رقم الهاتف',
                 'email': 'البريد الإلكتروني',
@@ -15135,6 +15139,7 @@ app.get('/offering-detail', async (c) => {
                 'ready-to-dine': '准备用餐了吗？',
                 'reserve-table-description': '预订您的餐桌并选择您喜欢的座位',
                 'book-table': '预订餐桌',
+                'view-menu': '查看菜单',
                 'your-name': '您的姓名',
                 'phone-number': '电话号码',
                 'email': '电子邮件',
@@ -15291,9 +15296,14 @@ app.get('/offering-detail', async (c) => {
                 if (bookingSection) {
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
+                        '<div class="flex gap-3">' +
+                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/menu\\', \\'_blank\\')" ' +
+                        'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
+                        '<i class="fas fa-utensils mr-2"></i>' + t('view-menu') + '</button>' +
                         '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
-                        'class="w-full bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
-                        '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>';
+                        'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
+                        '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>' +
+                        '</div>';
                 }
             }
         }
@@ -15413,14 +15423,19 @@ app.get('/offering-detail', async (c) => {
 
             // Show restaurant-specific fields and load menus
             if (offeringData.offering_type === 'restaurant') {
-                // Hide the generic booking form and show Book Table button
+                // Hide the generic booking form and show View Menu + Book Table buttons
                 const bookingSection = document.getElementById('bookingSection');
                 if (bookingSection) {
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
+                        '<div class="flex gap-3">' +
+                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/menu\\', \\'_blank\\')" ' +
+                        'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
+                        '<i class="fas fa-utensils mr-2"></i>' + t('view-menu') + '</button>' +
                         '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
-                        'class="w-full bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
-                        '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>';
+                        'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
+                        '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>' +
+                        '</div>';
                 }
                 loadRestaurantMenus();
             }
