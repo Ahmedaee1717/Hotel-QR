@@ -7580,7 +7580,8 @@ app.post('/api/admin/beach/settings', async (c) => {
       text_color,
       button_color_from,
       button_color_to,
-      button_text_color
+      button_text_color,
+      time_slots
     } = body
     
     // Check if settings exist
@@ -7619,6 +7620,7 @@ app.post('/api/admin/beach/settings', async (c) => {
             button_color_from = ?,
             button_color_to = ?,
             button_text_color = ?,
+            time_slots = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE property_id = ?
       `).bind(
@@ -7649,6 +7651,7 @@ app.post('/api/admin/beach/settings', async (c) => {
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
         button_text_color || '#3b82f6',
+        time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]',
         property_id
       ).run()
     } else {
@@ -7661,8 +7664,8 @@ app.post('/api/admin/beach/settings', async (c) => {
           card_title, card_subtitle, feature1_text, feature2_text, feature3_text,
           umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
           loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text,
-          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color, time_slots
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         beach_booking_enabled || 0,
@@ -7691,7 +7694,8 @@ app.post('/api/admin/beach/settings', async (c) => {
         text_color || '#ffffff',
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
-        button_text_color || '#3b82f6'
+        button_text_color || '#3b82f6',
+        time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]'
       ).run()
     }
     
@@ -15800,19 +15804,8 @@ app.get('/beach-booking/:property_id', async (c) => {
                         <label class="block text-sm font-semibold mb-3">
                             <i class="fas fa-clock mr-2 text-purple-500"></i>Duration
                         </label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="selectTimeSlot('half_day_am')" data-slot="half_day_am" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
-                                <div class="text-sm">Morning</div>
-                                <div class="text-xs text-gray-600">8AM - 1PM</div>
-                            </button>
-                            <button onclick="selectTimeSlot('half_day_pm')" data-slot="half_day_pm" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
-                                <div class="text-sm">Afternoon</div>
-                                <div class="text-xs text-gray-600">1PM - 6PM</div>
-                            </button>
-                            <button onclick="selectTimeSlot('full_day')" data-slot="full_day" class="time-slot col-span-2 px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium">
-                                <div class="text-sm">Full Day</div>
-                                <div class="text-xs text-gray-600">8AM - 6PM</div>
-                            </button>
+                        <div id="timeSlotsGrid" class="grid grid-cols-2 gap-2">
+                            <!-- Time slots will be dynamically loaded -->
                         </div>
                     </div>
 
@@ -15891,10 +15884,49 @@ app.get('/beach-booking/:property_id', async (c) => {
                     if (header) {
                         header.style.backgroundImage = 'linear-gradient(to right, ' + bgFrom + ', ' + bgTo + ')';
                     }
+                    
+                    // Load and render time slots
+                    renderTimeSlots(settings.time_slots);
                 }
             } catch (error) {
                 console.error('Load settings error:', error);
             }
+        }
+        
+        function renderTimeSlots(timeSlotsJson) {
+            try {
+                const timeSlots = timeSlotsJson ? JSON.parse(timeSlotsJson) : [
+                    {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
+                    {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
+                    {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
+                ];
+                
+                const grid = document.getElementById('timeSlotsGrid');
+                if (!grid) return;
+                
+                const html = timeSlots.map(slot => {
+                    const startTime = slot.start.split(':')[0];
+                    const endTime = slot.end.split(':')[0];
+                    const isFullDay = (parseInt(endTime) - parseInt(startTime)) >= 8;
+                    
+                    return '<button onclick="selectTimeSlot(\\'' + slot.id + '\\')" data-slot="' + slot.id + '" class="time-slot px-4 py-3 border-2 border-gray-200 rounded-xl hover:border-blue-400 font-medium ' + (isFullDay ? 'col-span-2' : '') + '">' +
+                        '<div class="text-sm">' + slot.name + '</div>' +
+                        '<div class="text-xs text-gray-600">' + formatTime(slot.start) + ' - ' + formatTime(slot.end) + '</div>' +
+                    '</button>';
+                }).join('');
+                
+                grid.innerHTML = html;
+            } catch (error) {
+                console.error('Render time slots error:', error);
+            }
+        }
+        
+        function formatTime(time) {
+            const [hours, minutes] = time.split(':');
+            const h = parseInt(hours);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+            return displayHour + ampm;
         }
         
         // Load beach spots and bookings
@@ -21660,6 +21692,27 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
 
+            <!-- Time Slots Management -->
+            <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-6 mb-6 border-2 border-green-200">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-clock mr-2 text-green-600"></i>Time Slots Management
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">Configure booking time slots that guests can choose from</p>
+                
+                <div id="timeSlotsContainer" class="space-y-4 mb-4">
+                    <!-- Time slots will be dynamically loaded here -->
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="addTimeSlot()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-plus mr-2"></i>Add Time Slot
+                    </button>
+                    <button onclick="saveTimeSlots()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-save mr-2"></i>Save Time Slots
+                    </button>
+                </div>
+            </div>
+
             <!-- Beach Card Customization -->
             <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 mb-6 border-2 border-purple-200">
                 <h3 class="text-xl font-bold mb-4">
@@ -24788,11 +24841,113 @@ app.get('/admin/dashboard', (c) => {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('beachBookingDate').value = today;
             await loadBeachBookings();
+            
+            // Load time slots
+            loadTimeSlots(s.time_slots);
           }
         } catch (error) {
           console.error('Load beach settings error:', error);
         }
       }
+
+      function loadTimeSlots(timeSlotsJson) {
+        try {
+          const timeSlots = timeSlotsJson ? JSON.parse(timeSlotsJson) : [
+            {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
+            {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
+            {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
+          ];
+          
+          window.beachTimeSlots = timeSlots;
+          renderTimeSlots();
+        } catch (error) {
+          console.error('Load time slots error:', error);
+          window.beachTimeSlots = [
+            {id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00'},
+            {id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00'},
+            {id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00'}
+          ];
+          renderTimeSlots();
+        }
+      }
+
+      function renderTimeSlots() {
+        const container = document.getElementById('timeSlotsContainer');
+        if (!container) return;
+        
+        const html = window.beachTimeSlots.map((slot, index) => 
+          '<div class="bg-white p-4 rounded-lg border-2 border-green-200">' +
+            '<div class="grid grid-cols-1 md:grid-cols-4 gap-3">' +
+              '<div>' +
+                '<label class="block text-sm font-medium mb-1">Slot Name</label>' +
+                '<input type="text" value="' + slot.name + '" onchange="updateTimeSlot(' + index + ', \'name\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+              '</div>' +
+              '<div>' +
+                '<label class="block text-sm font-medium mb-1">Start Time</label>' +
+                '<input type="time" value="' + slot.start + '" onchange="updateTimeSlot(' + index + ', \'start\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+              '</div>' +
+              '<div>' +
+                '<label class="block text-sm font-medium mb-1">End Time</label>' +
+                '<input type="time" value="' + slot.end + '" onchange="updateTimeSlot(' + index + ', \'end\', this.value)" class="w-full px-3 py-2 border rounded-lg">' +
+              '</div>' +
+              '<div class="flex items-end">' +
+                '<button onclick="removeTimeSlot(' + index + ')" class="w-full px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">' +
+                  '<i class="fas fa-trash mr-1"></i>Remove' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        ).join('');
+        
+        container.innerHTML = html;
+      }
+
+      window.addTimeSlot = function() {
+        const newId = 'slot_' + Date.now();
+        window.beachTimeSlots.push({
+          id: newId,
+          name: 'New Slot',
+          start: '09:00',
+          end: '12:00'
+        });
+        renderTimeSlots();
+      };
+
+      window.updateTimeSlot = function(index, field, value) {
+        if (window.beachTimeSlots[index]) {
+          window.beachTimeSlots[index][field] = value;
+        }
+      };
+
+      window.removeTimeSlot = function(index) {
+        if (confirm('Remove this time slot?')) {
+          window.beachTimeSlots.splice(index, 1);
+          renderTimeSlots();
+        }
+      };
+
+      window.saveTimeSlots = async function() {
+        try {
+          const response = await fetch('/api/admin/beach/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              time_slots: JSON.stringify(window.beachTimeSlots)
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ Time slots saved successfully!');
+          } else {
+            alert('❌ Failed to save time slots: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Save time slots error:', error);
+          alert('❌ Error saving time slots');
+        }
+      };
 
       window.saveBeachCardCustomization = async function() {
         try {
