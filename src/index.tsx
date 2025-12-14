@@ -13808,8 +13808,9 @@ app.get('/hotel/:property_slug', async (c) => {
             window.showHotspotInfo = showHotspotInfo;
             window.closeHotspotModal = closeHotspotModal;
             
-            // Initialize the page
-            init().then(() => {
+            // Initialize the page after DOM is fully loaded
+            document.addEventListener('DOMContentLoaded', () => {
+                init().then(() => {
                 // Double-check selector value after init
                 if (languageSelector) {
                     languageSelector.value = currentLanguage;
@@ -13822,8 +13823,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 if (typeof window.initChatbot === 'function') {
                     window.initChatbot();
                 }
+                });
             });
-        });
+            });
         
         // Seasonal Effects (inline)
         async function initSeasonalEffects() {
