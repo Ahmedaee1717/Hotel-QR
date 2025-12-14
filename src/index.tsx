@@ -26603,7 +26603,7 @@ app.get('/admin/dashboard', (c) => {
             setupColorPickers();
             
             // Load important information
-            const defaultInfo = 'Please arrive 10 minutes before your time slot\nBring your QR code (printed or on phone)\nBeach towels provided by hotel\nLate arrivals may result in reduced time';
+            const defaultInfo = 'Please arrive 10 minutes before your time slot\\nBring your QR code (printed or on phone)\\nBeach towels provided by hotel\\nLate arrivals may result in reduced time';
             document.getElementById('importantInformation').value = s.important_information || defaultInfo;
             
             // Load beach spots
