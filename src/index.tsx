@@ -16120,28 +16120,13 @@ app.get('/beach-booking/:property_id', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- Zone Legend -->
-                    <div class="mt-4 pt-4 border-t border-gray-200">
+                    <!-- Zone Legend - Dynamic -->
+                    <div id="zoneLegend" class="mt-4 pt-4 border-t border-gray-200" style="display: none;">
                         <h4 class="font-semibold text-sm mb-3 text-gray-700">
                             <i class="fas fa-map-marker-alt mr-2 text-purple-600"></i>Beach Zones
                         </h4>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 rounded" style="background-color: #10b981; opacity: 0.6;"></div>
-                                <span class="text-gray-600">Quiet Zone</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 rounded" style="background-color: #f59e0b; opacity: 0.6;"></div>
-                                <span class="text-gray-600">Family Area</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 rounded" style="background-color: #8b5cf6; opacity: 0.6;"></div>
-                                <span class="text-gray-600">VIP Section</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div class="w-4 h-4 rounded" style="background-color: #3b82f6; opacity: 0.6;"></div>
-                                <span class="text-gray-600">Beach Front</span>
-                            </div>
+                        <div id="zoneLegendItems" class="grid grid-cols-2 gap-2 text-xs">
+                            <!-- Zone legend items will be populated dynamically -->
                         </div>
                     </div>
                 </div>
@@ -16344,6 +16329,9 @@ app.get('/beach-booking/:property_id', async (c) => {
                     zones = []; // No zones defined yet
                 }
                 
+                // Update zone legend
+                updateZoneLegend();
+                
                 // Load bookings for selected date
                 await loadBookingsForDate();
                 renderSpots();
@@ -16384,6 +16372,27 @@ app.get('/beach-booking/:property_id', async (c) => {
                 booking.slot_type === timeSlot &&
                 booking.booking_status !== 'cancelled'
             );
+        }
+        
+        function updateZoneLegend() {
+            const legendContainer = document.getElementById('zoneLegend');
+            const legendItems = document.getElementById('zoneLegendItems');
+            
+            if (zones.length === 0) {
+                legendContainer.style.display = 'none';
+                return;
+            }
+            
+            legendContainer.style.display = 'block';
+            legendItems.innerHTML = '';
+            
+            zones.forEach(zone => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2';
+                item.innerHTML = '<div class="w-4 h-4 rounded" style="background-color: ' + zone.color + '; opacity: 0.6;"></div>' +
+                                 '<span class="text-gray-600">' + zone.name + '</span>';
+                legendItems.appendChild(item);
+            });
         }
         
         function renderZones() {
