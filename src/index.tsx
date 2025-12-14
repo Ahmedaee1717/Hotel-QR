@@ -16116,8 +16116,10 @@ app.get('/admin/beach-management/:property_id', (c) => {
             
             // Draw spots
             spots.forEach(spot => {
-                const x = spot.position_x * canvas.width;
-                const y = spot.position_y * canvas.height;
+                // If position values are > 1, assume they're pixel values and normalize them
+                // Otherwise treat them as 0-1 normalized values
+                const x = spot.position_x > 1 ? spot.position_x : spot.position_x * canvas.width;
+                const y = spot.position_y > 1 ? spot.position_y : spot.position_y * canvas.height;
                 const size = 40;
                 
                 // Determine color based on status
