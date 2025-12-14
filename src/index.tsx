@@ -8712,9 +8712,8 @@ app.get('/api/admin/beach/spots', async (c) => {
         s.*,
         z.zone_name,
         bb.booking_status,
-        bb.booking_code,
-        bb.guest_name,
-        bb.booking_reference
+        bb.booking_reference,
+        bb.guest_name
       FROM beach_spots s
       LEFT JOIN beach_zones z ON s.zone_id = z.zone_id
       LEFT JOIN beach_bookings bb ON s.spot_id = bb.spot_id 
@@ -8731,7 +8730,7 @@ app.get('/api/admin/beach/spots', async (c) => {
     }
     
     query += ` WHERE s.property_id = ? AND s.is_active = 1 ORDER BY s.spot_number`
-    params.push(property_id)
+    params.push(Number(property_id))
     
     const spots = await DB.prepare(query).bind(...params).all()
     
