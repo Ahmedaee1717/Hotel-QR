@@ -35555,52 +35555,52 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!menu) return;
 
         // Create modal HTML
-        const modalHTML = String.fromCharCode(96) +
-          '<div id="menuModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeMenuModal(event)">' +
+        const languageOptions = supportedLanguages.map(lang => 
+          '<option value="' + lang.language_code + '">' + lang.language_name_en + ' (' + lang.language_name_native + ')</option>'
+        ).join('');
+
+        const modalHTML = '<div id="menuModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeMenuModal(event)">' +
             '<div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">' +
               '<div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">' +
                 '<div class="flex items-center justify-between">' +
-                  '<h2 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>' + String.fromCharCode(36) + '{menu.menu_name}</h2>' +
-                  '<button onclick="document.getElementById(' + String.fromCharCode(39) + 'menuModal' + String.fromCharCode(39) + ').remove()" class="text-white hover:bg-white/20 rounded-full p-2 transition"><i class="fas fa-times text-2xl"></i></button>' +
+                  '<h2 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>' + menu.menu_name + '</h2>' +
+                  '<button onclick="document.getElementById(\'menuModal\').remove()" class="text-white hover:bg-white/20 rounded-full p-2 transition"><i class="fas fa-times text-2xl"></i></button>' +
                 '</div>' +
               '</div>' +
               '<div class="p-6">' +
                 '<div class="mb-6">' +
-                  '<img src="' + String.fromCharCode(36) + '{menu.original_image_url}" alt="Original Menu" class="w-full max-h-96 object-contain border-2 border-gray-200 rounded-xl">' +
+                  '<img src="' + menu.original_image_url + '" alt="Original Menu" class="w-full max-h-96 object-contain border-2 border-gray-200 rounded-xl">' +
                 '</div>' +
                 '<div class="grid md:grid-cols-2 gap-4 mb-6">' +
                   '<div>' +
                     '<label class="block text-sm font-semibold text-gray-700 mb-2">Select Language</label>' +
                     '<select id="targetLanguage" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg">' +
-                      supportedLanguages.map(lang => 
-                        '<option value="' + String.fromCharCode(36) + '{lang.language_code}">' + String.fromCharCode(36) + '{lang.language_name_en} (' + String.fromCharCode(36) + '{lang.language_name_native})</option>'
-                      ).join('') +
+                      languageOptions +
                     '</select>' +
                   '</div>' +
                   '<div>' +
                     '<label class="block text-sm font-semibold text-gray-700 mb-2">Action</label>' +
-                    '<button onclick="translateMenu(' + String.fromCharCode(36) + '{menuId})" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold transition shadow-lg">' +
+                    '<button onclick="translateMenu(' + menuId + ')" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold transition shadow-lg">' +
                       '<i class="fas fa-language mr-2"></i>Translate Menu' +
                     '</button>' +
                   '</div>' +
                 '</div>' +
                 '<div id="menuContent" class="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">' +
                   '<div class="prose max-w-none">' +
-                    '<pre class="whitespace-pre-wrap text-sm">' + String.fromCharCode(36) + '{menu.extracted_text || "Loading..."}</pre>' +
+                    '<pre class="whitespace-pre-wrap text-sm">' + (menu.extracted_text || 'Loading...') + '</pre>' +
                   '</div>' +
                 '</div>' +
                 '<div class="mt-6 flex gap-3">' +
-                  '<button onclick="generateMenuQR(' + String.fromCharCode(36) + '{menuId})" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">' +
+                  '<button onclick="generateMenuQR(' + menuId + ')" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">' +
                     '<i class="fas fa-qrcode mr-2"></i>Generate QR Code' +
                   '</button>' +
-                  '<button onclick="shareMenu(' + String.fromCharCode(36) + '{menuId})" class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">' +
+                  '<button onclick="shareMenu(' + menuId + ')" class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">' +
                     '<i class="fas fa-share-alt mr-2"></i>Share Menu Link' +
                   '</button>' +
                 '</div>' +
               '</div>' +
             '</div>' +
-          '</div>' +
-          String.fromCharCode(96);
+          '</div>';
 
         document.body.insertAdjacentHTML('beforeend', modalHTML);
       }
@@ -35637,16 +35637,15 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const data = await response.json();
 
           if (data.success) {
-            contentDiv.innerHTML = String.fromCharCode(96) +
+            contentDiv.innerHTML = 
               '<div class="bg-green-50 border-2 border-green-300 rounded-lg p-4 mb-4">' +
-                '<p class="text-green-800 font-semibold"><i class="fas fa-check-circle mr-2"></i>' + String.fromCharCode(36) + '{data.message}</p>' +
+                '<p class="text-green-800 font-semibold"><i class="fas fa-check-circle mr-2"></i>' + data.message + '</p>' +
               '</div>' +
               '<div class="prose max-w-none">' +
-                '<pre class="whitespace-pre-wrap text-sm">' + String.fromCharCode(36) + '{data.translated_text}</pre>' +
-              '</div>' +
-              String.fromCharCode(96);
+                '<pre class="whitespace-pre-wrap text-sm">' + data.translated_text + '</pre>' +
+              '</div>';
           } else {
-            contentDiv.innerHTML = String.fromCharCode(96) + '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-4xl mb-4"></i><p>' + String.fromCharCode(36) + '{data.error}</p></div>' + String.fromCharCode(96);
+            contentDiv.innerHTML = '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-4xl mb-4"></i><p>' + data.error + '</p></div>';
           }
         } catch (error) {
           console.error('Translation error:', error);
