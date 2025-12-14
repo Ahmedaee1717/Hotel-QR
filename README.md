@@ -35,6 +35,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ Session-based guest tracking
 - ✅ Mobile-first responsive design
 - ✅ Multi-language support (EN/AR in database)
+- ✅ **Live Beach Occupancy Traffic Light** 🆕 - Real-time beach availability indicator on guest homepage
 
 ### 🏢 Vendor Portal
 - ✅ Secure vendor login
@@ -397,6 +398,42 @@ npm run deploy:prod
 4. Click "Refresh" to get latest data
 5. Click "Book for Walk-In Guest" to create instant bookings
 6. View updated statistics and map in real-time
+
+### Live Beach Occupancy Traffic Light (Guest-Facing) 🆕
+
+**Purpose:** Show guests real-time beach availability at a glance on the homepage
+
+**Key Features:**
+- 🚦 **Traffic Light Indicator** - Color-coded occupancy status with animated pulse
+- 🟢 **Green Light** - Plenty of spots available (0-69% occupancy)
+- 🟡 **Yellow Light** - Filling up fast (70-89% occupancy)
+- 🔴 **Red Light** - Almost full (90%+ occupancy)
+- 📊 **Live Stats** - Shows available spots count and current occupancy percentage
+- 🔄 **Auto-Refresh** - Updates every 60 seconds automatically
+- 💬 **Status Messages** - Clear text indicators ("Plenty of spots available", "Filling up fast", "Almost full")
+- 🎨 **Seamless Integration** - Appears in the beach booking card on guest homepage
+
+**Location:** Guest Homepage → Beach Booking Card (top-right corner)
+
+**Technical Implementation:**
+- Real-time API: `/api/beach/occupancy/:property_id`
+- Calculates current day's occupancy from active bookings
+- Returns status, available spots, occupancy rate, and status text
+- Auto-refreshes every 60 seconds for live updates
+- Responsive design with backdrop blur effect
+
+**Guest Experience:**
+1. Guest opens hotel homepage via QR code
+2. Sees Beach Booking card with live traffic light
+3. Instantly knows if beach has availability
+4. Can make informed decision to book or visit later
+5. Traffic light updates automatically while browsing
+
+**Use Cases:**
+- Guests can check beach capacity before leaving their room
+- Reduces unnecessary trips to fully booked beach
+- Encourages bookings during low-occupancy periods
+- Improves guest satisfaction with transparency
 
 ---
 
