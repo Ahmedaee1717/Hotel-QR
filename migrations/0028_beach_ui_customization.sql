@@ -1,0 +1,21 @@
+-- Add UI customization columns to beach_settings table
+ALTER TABLE beach_settings ADD COLUMN card_title TEXT DEFAULT 'Beach Paradise';
+ALTER TABLE beach_settings ADD COLUMN card_subtitle TEXT DEFAULT 'Your Exclusive Beach Experience';
+ALTER TABLE beach_settings ADD COLUMN feature1_text TEXT DEFAULT 'Premium Beach Spots';
+ALTER TABLE beach_settings ADD COLUMN feature2_text TEXT DEFAULT 'All-Day Comfort';
+ALTER TABLE beach_settings ADD COLUMN feature3_text TEXT DEFAULT 'Complimentary Service';
+ALTER TABLE beach_settings ADD COLUMN umbrellas_label TEXT DEFAULT 'Beach Umbrellas';
+ALTER TABLE beach_settings ADD COLUMN umbrellas_desc TEXT DEFAULT 'Shaded comfort zones';
+ALTER TABLE beach_settings ADD COLUMN cabanas_label TEXT DEFAULT 'Luxury Cabanas';
+ALTER TABLE beach_settings ADD COLUMN cabanas_desc TEXT DEFAULT 'Private retreat spaces';
+ALTER TABLE beach_settings ADD COLUMN loungers_label TEXT DEFAULT 'Sun Loungers';
+ALTER TABLE beach_settings ADD COLUMN loungers_desc TEXT DEFAULT 'Relaxation essentials';
+ALTER TABLE beach_settings ADD COLUMN daybeds_label TEXT DEFAULT 'Daybeds';
+ALTER TABLE beach_settings ADD COLUMN daybeds_desc TEXT DEFAULT 'Ultimate comfort';
+ALTER TABLE beach_settings ADD COLUMN button_text TEXT DEFAULT 'Book Your Spot';
+ALTER TABLE beach_settings ADD COLUMN bg_color_from TEXT DEFAULT '#0ea5e9';
+ALTER TABLE beach_settings ADD COLUMN bg_color_to TEXT DEFAULT '#06b6d4';
+ALTER TABLE beach_settings ADD COLUMN text_color TEXT DEFAULT '#ffffff';
+ALTER TABLE beach_settings ADD COLUMN button_color_from TEXT DEFAULT '#f97316';
+ALTER TABLE beach_settings ADD COLUMN button_color_to TEXT DEFAULT '#ea580c';
+ALTER TABLE beach_settings ADD COLUMN button_text_color TEXT DEFAULT '#ffffff';
