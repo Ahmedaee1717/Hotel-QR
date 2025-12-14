@@ -9176,22 +9176,22 @@ app.get('/hotel/:property_slug', async (c) => {
                         <div id="beach-spots-preview" class="mt-6 pt-6 border-t border-white/20">
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                    <div class="text-3xl mb-2">🏖️</div>
+                                    <div class="text-3xl mb-2">🔵</div>
                                     <div class="font-semibold">Umbrellas</div>
                                     <div class="text-sm">Classic Beach</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                    <div class="text-3xl mb-2">🏕️</div>
+                                    <div class="text-3xl mb-2">🟢</div>
                                     <div class="font-semibold">Cabanas</div>
                                     <div class="text-sm">Private & Cozy</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                    <div class="text-3xl mb-2">🛏️</div>
+                                    <div class="text-3xl mb-2">🟡</div>
                                     <div class="font-semibold">Loungers</div>
                                     <div class="text-sm">Relax in Style</div>
                                 </div>
                                 <div class="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                    <div class="text-3xl mb-2">☀️</div>
+                                    <div class="text-3xl mb-2">🟣</div>
                                     <div class="font-semibold">Daybeds</div>
                                     <div class="text-sm">Ultimate Comfort</div>
                                 </div>
@@ -14799,16 +14799,16 @@ app.get('/admin/beach-map-designer', (c) => {
                         <i class="fas fa-mouse-pointer mr-1"></i>Select
                     </button>
                     <button onclick="setTool('umbrella')" id="umbrellaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🏖️ Umbrella
+                        🔵 Umbrella
                     </button>
                     <button onclick="setTool('cabana')" id="cabanaTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🏕️ Cabana
+                        🟢 Cabana
                     </button>
                     <button onclick="setTool('lounger')" id="loungerTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        🛏️ Lounger
+                        🟡 Lounger
                     </button>
                     <button onclick="setTool('daybed')" id="daybedTool" class="tool-btn px-4 py-2 border rounded-lg hover:bg-gray-50">
-                        ☀️ Daybed
+                        🟣 Daybed
                     </button>
                     <button onclick="deleteSelected()" class="tool-btn px-4 py-2 border rounded-lg hover:bg-red-50 text-red-600">
                         <i class="fas fa-trash mr-1"></i>Delete
@@ -14930,12 +14930,12 @@ app.get('/admin/beach-map-designer', (c) => {
         
         function getSpotIcon(type) {
             const icons = {
-                umbrella: '🏖️',
-                cabana: '🏕️',
-                lounger: '🛏️',
-                daybed: '☀️'
+                umbrella: '🔵',
+                cabana: '🟢',
+                lounger: '🟡',
+                daybed: '🟣'
             };
-            return icons[type] || '🏖️';
+            return icons[type] || '🔵';
         }
         
         canvas.addEventListener('click', (e) => {
@@ -15935,12 +15935,12 @@ app.get('/beach-booking/:property_id', async (c) => {
         
         function getSpotIcon(type) {
             const icons = {
-                umbrella: '🏖️',
-                cabana: '🏕️',
-                lounger: '🛏️',
-                daybed: '☀️'
+                umbrella: '🔵',
+                cabana: '🟢',
+                lounger: '🟡',
+                daybed: '🟣'
             };
-            return icons[type] || '🏖️';
+            return icons[type] || '🔵';
         }
         
         function isSpotAvailable(spotId, timeSlot) {
@@ -16256,12 +16256,12 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
         
         function getSpotIcon(type) {
             const icons = {
-                umbrella: '🏖️',
-                cabana: '🏕️',
-                lounger: '🛏️',
-                daybed: '☀️'
+                umbrella: '🔵',
+                cabana: '🟢',
+                lounger: '🟡',
+                daybed: '🟣'
             };
-            return icons[type] || '🏖️';
+            return icons[type] || '🔵';
         }
         
         function formatSlotType(slot) {
