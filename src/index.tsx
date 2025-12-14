@@ -5424,6 +5424,287 @@ Be specific and accurate with hex colors. Look at the dominant surfaces in the i
   }
 })
 
+// ============================================================================
+// RESTAURANT MENU MANAGEMENT - OCR & TRANSLATION SYSTEM
+// ============================================================================
+
+// Get all menus for a restaurant
+app.get('/api/admin/restaurant/:offering_id/menus', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const menus = await DB.prepare(`
+      SELECT 
+        m.*,
+        COUNT(DISTINCT t.translation_id) as translation_count,
+        GROUP_CONCAT(DISTINCT t.language_code) as available_languages
+      FROM restaurant_menus m
+      LEFT JOIN restaurant_menu_translations t ON m.menu_id = t.menu_id
+      WHERE m.offering_id = ?
+      GROUP BY m.menu_id
+      ORDER BY m.display_order, m.created_at DESC
+    `).bind(offering_id).all()
+    
+    return c.json({ success: true, menus: menus.results })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch menus: ' + error.message }, 500)
+  }
+})
+
+// Upload and process menu image (with OCR)
+app.post('/api/admin/restaurant/:offering_id/menus', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const body = await c.req.json()
+  const { menu_name, menu_type, original_image_url, base_language } = body
+  
+  try {
+    // Insert menu
+    const result = await DB.prepare(`
+      INSERT INTO restaurant_menus (
+        offering_id, menu_name, menu_type, original_image_url, 
+        base_language, ocr_status, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+    `).bind(offering_id, menu_name, menu_type || 'full', original_image_url, base_language || 'en').run()
+    
+    const menuId = result.meta.last_row_id
+    
+    // Return menu details
+    const menu = await DB.prepare(`
+      SELECT * FROM restaurant_menus WHERE menu_id = ?
+    `).bind(menuId).first()
+    
+    return c.json({ success: true, menu })
+  } catch (error) {
+    return c.json({ error: 'Failed to create menu: ' + error.message }, 500)
+  }
+})
+
+// Process OCR for a menu (extract text from image)
+app.post('/api/admin/restaurant/menus/:menu_id/process-ocr', async (c) => {
+  const { DB } = c.env
+  const { menu_id } = c.req.param()
+  
+  try {
+    // Get menu details
+    const menu = await DB.prepare(`
+      SELECT * FROM restaurant_menus WHERE menu_id = ?
+    `).bind(menu_id).first()
+    
+    if (!menu) {
+      return c.json({ error: 'Menu not found' }, 404)
+    }
+    
+    // Update status to processing
+    await DB.prepare(`
+      UPDATE restaurant_menus 
+      SET ocr_status = 'processing' 
+      WHERE menu_id = ?
+    `).bind(menu_id).run()
+    
+    // Call OpenAI Vision API for OCR
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Extract ALL text from this restaurant menu image. Format it cleanly with:
+- Section headers in UPPERCASE
+- Menu items with prices clearly formatted
+- Descriptions on separate lines
+- Maintain the menu structure and organization
+- Include ALL text visible in the image
+
+Please provide a complete, accurate transcription that preserves the menu's layout and readability.`
+            },
+            {
+              type: 'image_url',
+              image_url: { url: menu.original_image_url }
+            }
+          ]
+        }],
+        max_tokens: 4000
+      })
+    })
+    
+    if (!openaiResponse.ok) {
+      throw new Error('OCR processing failed')
+    }
+    
+    const ocrResult = await openaiResponse.json()
+    const extractedText = ocrResult.choices[0].message.content
+    
+    // Update menu with extracted text
+    await DB.prepare(`
+      UPDATE restaurant_menus 
+      SET extracted_text = ?,
+          ocr_status = 'completed',
+          ocr_processed_at = CURRENT_TIMESTAMP
+      WHERE menu_id = ?
+    `).bind(extractedText, menu_id).run()
+    
+    // Auto-translate to base language (stores as translation)
+    await DB.prepare(`
+      INSERT OR REPLACE INTO restaurant_menu_translations (
+        menu_id, language_code, translated_text, translation_method, translated_at
+      ) VALUES (?, ?, ?, 'ocr', CURRENT_TIMESTAMP)
+    `).bind(menu_id, menu.base_language, extractedText).run()
+    
+    return c.json({ 
+      success: true, 
+      extracted_text: extractedText,
+      message: 'OCR processing completed successfully'
+    })
+  } catch (error) {
+    // Update status to failed
+    await DB.prepare(`
+      UPDATE restaurant_menus 
+      SET ocr_status = 'failed' 
+      WHERE menu_id = ?
+    `).bind(menu_id).run()
+    
+    return c.json({ error: 'OCR processing failed: ' + error.message }, 500)
+  }
+})
+
+// Translate menu to a specific language
+app.post('/api/admin/restaurant/menus/:menu_id/translate', async (c) => {
+  const { DB } = c.env
+  const { menu_id } = c.req.param()
+  const body = await c.req.json()
+  const { target_language, source_text } = body
+  
+  try {
+    // Get language name
+    const langInfo = await DB.prepare(`
+      SELECT language_name_en, language_name_native 
+      FROM supported_languages 
+      WHERE language_code = ?
+    `).bind(target_language).first()
+    
+    if (!langInfo) {
+      return c.json({ error: 'Unsupported language' }, 400)
+    }
+    
+    // Call OpenAI for translation
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'system',
+          content: `You are a professional restaurant menu translator. Translate the menu to ${langInfo.language_name_en} (${langInfo.language_name_native}). Maintain:
+- Section headers and structure
+- Accurate food terminology
+- Cultural appropriateness
+- Price formatting
+- Professional tone
+
+Provide ONLY the translated text, preserving the exact format and structure.`
+        }, {
+          role: 'user',
+          content: source_text
+        }],
+        max_tokens: 4000,
+        temperature: 0.3
+      })
+    })
+    
+    if (!openaiResponse.ok) {
+      throw new Error('Translation failed')
+    }
+    
+    const translationResult = await openaiResponse.json()
+    const translatedText = translationResult.choices[0].message.content
+    
+    // Store translation
+    await DB.prepare(`
+      INSERT OR REPLACE INTO restaurant_menu_translations (
+        menu_id, language_code, translated_text, translation_method, translated_at
+      ) VALUES (?, ?, ?, 'ai', CURRENT_TIMESTAMP)
+    `).bind(menu_id, target_language, translatedText).run()
+    
+    return c.json({ 
+      success: true, 
+      translated_text: translatedText,
+      language: target_language,
+      message: `Menu translated to ${langInfo.language_name_en} successfully`
+    })
+  } catch (error) {
+    return c.json({ error: 'Translation failed: ' + error.message }, 500)
+  }
+})
+
+// Get menu translation
+app.get('/api/restaurant/menus/:menu_id/translation/:language', async (c) => {
+  const { DB } = c.env
+  const { menu_id, language } = c.req.param()
+  
+  try {
+    const translation = await DB.prepare(`
+      SELECT t.*, m.menu_name, m.menu_type
+      FROM restaurant_menu_translations t
+      JOIN restaurant_menus m ON t.menu_id = m.menu_id
+      WHERE t.menu_id = ? AND t.language_code = ?
+    `).bind(menu_id, language).first()
+    
+    if (!translation) {
+      return c.json({ error: 'Translation not found' }, 404)
+    }
+    
+    // Log access
+    await DB.prepare(`
+      INSERT INTO restaurant_menu_access_logs (menu_id, language_code, accessed_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+    `).bind(menu_id, language).run()
+    
+    return c.json({ success: true, translation })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch translation: ' + error.message }, 500)
+  }
+})
+
+// Get supported languages
+app.get('/api/languages', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const languages = await DB.prepare(`
+      SELECT * FROM supported_languages WHERE is_active = 1 ORDER BY display_order
+    `).all()
+    
+    return c.json({ success: true, languages: languages.results })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch languages: ' + error.message }, 500)
+  }
+})
+
+// Delete menu
+app.delete('/api/admin/restaurant/menus/:menu_id', async (c) => {
+  const { DB } = c.env
+  const { menu_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`DELETE FROM restaurant_menus WHERE menu_id = ?`).bind(menu_id).run()
+    return c.json({ success: true, message: 'Menu deleted successfully' })
+  } catch (error) {
+    return c.json({ error: 'Failed to delete menu: ' + error.message }, 500)
+  }
+})
+
 // Update texture settings (opacity, enable/disable)
 app.put('/api/admin/restaurant/:offering_id/textures', async (c) => {
   const { DB } = c.env
@@ -33377,6 +33658,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             <button onclick="switchTab('textures')" id="tabTextures" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                 <i class="fas fa-image mr-2"></i>AI Textures
             </button>
+            <button onclick="switchTab('menus')" id="tabMenus" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
+                <i class="fas fa-utensils mr-2"></i>Menus & Translation
+            </button>
         </div>
 
         <!-- TABLES TAB -->
@@ -33783,6 +34067,97 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
         </div>
         <!-- END AI TEXTURES TAB -->
+
+        <!-- MENUS TAB - OCR & Translation System -->
+        <div id="menusSection" class="hidden">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Left: Upload & Manage Menus -->
+                <div class="space-y-6">
+                    <!-- Upload Menu Card -->
+                    <div class="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold text-green-900 mb-4 flex items-center">
+                            <i class="fas fa-cloud-upload-alt mr-3 text-green-600"></i>
+                            Upload Menu Image
+                        </h2>
+                        <p class="text-sm text-green-800 mb-6">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Upload a menu image. AI will extract text and enable translation to 30+ languages!
+                        </p>
+                        
+                        <form id="uploadMenuForm" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Menu Name *</label>
+                                <input type="text" id="menuName" required placeholder="e.g., Breakfast Menu, Lunch Menu" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Menu Type</label>
+                                <select id="menuType" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 outline-none">
+                                    <option value="full">Full Menu</option>
+                                    <option value="breakfast">Breakfast</option>
+                                    <option value="lunch">Lunch</option>
+                                    <option value="dinner">Dinner</option>
+                                    <option value="drinks">Drinks</option>
+                                    <option value="desserts">Desserts</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Menu Image URL *</label>
+                                <input type="url" id="menuImageUrl" required placeholder="https://example.com/menu.jpg" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition">
+                                <p class="text-xs text-gray-600 mt-1">
+                                    <i class="fas fa-lightbulb mr-1"></i>
+                                    Upload to Imgur, Cloudinary, or use any image host
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Original Language</label>
+                                <select id="baseLanguage" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 outline-none">
+                                    <option value="en">English</option>
+                                    <option value="ar">Arabic</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="it">Italian</option>
+                                    <option value="zh">Chinese</option>
+                                    <option value="ja">Japanese</option>
+                                </select>
+                            </div>
+                            
+                            <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+                                <i class="fas fa-upload mr-2"></i>Upload & Process Menu
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Right: Menu List -->
+                <div class="space-y-6">
+                    <!-- Menu List Card -->
+                    <div class="bg-white rounded-xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center justify-between">
+                            <span>
+                                <i class="fas fa-list mr-3 text-blue-600"></i>
+                                Your Menus
+                            </span>
+                            <button onclick="loadMenus()" class="text-sm px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg transition">
+                                <i class="fas fa-sync-alt mr-1"></i>Refresh
+                            </button>
+                        </h2>
+                        
+                        <div id="menusList" class="space-y-4">
+                            <div class="text-center py-12 text-gray-400">
+                                <i class="fas fa-utensils text-6xl mb-4 opacity-50"></i>
+                                <p class="text-lg">No menus uploaded yet</p>
+                                <p class="text-sm mt-2">Upload your first menu image to get started!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END MENUS TAB -->
     </div>
 
     <script>
@@ -34478,12 +34853,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         document.getElementById('tabSessions').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'sessions' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabReservations').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'reservations' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         document.getElementById('tabTextures').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'textures' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
+        document.getElementById('tabMenus').className = 'flex-1 px-4 py-3 rounded-lg font-semibold ' + (tab === 'menus' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200');
         
         // Show/hide sections
         document.getElementById('tablesSection').style.display = tab === 'tables' ? 'block' : 'none';
         document.getElementById('sessionsSection').style.display = tab === 'sessions' ? 'block' : 'none';
         document.getElementById('reservationsSection').style.display = tab === 'reservations' ? 'block' : 'none';
         document.getElementById('texturesSection').style.display = tab === 'textures' ? 'block' : 'none';
+        document.getElementById('menusSection').style.display = tab === 'menus' ? 'block' : 'none';
         
         // Load data for active tab
         if (tab === 'sessions') {
@@ -34911,6 +35288,295 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           alert('Error saving textures: ' + error.message);
         }
       }
+
+      // ========================================
+      // MENU MANAGEMENT - OCR & TRANSLATION
+      // ========================================
+      let currentMenus = [];
+      let supportedLanguages = [];
+
+      // Load all languages
+      async function loadLanguages() {
+        try {
+          const response = await fetch('/api/languages');
+          const data = await response.json();
+          if (data.success) {
+            supportedLanguages = data.languages;
+          }
+        } catch (error) {
+          console.error('Load languages error:', error);
+        }
+      }
+
+      // Load menus
+      async function loadMenus() {
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus');
+          const data = await response.json();
+          
+          if (data.success) {
+            currentMenus = data.menus;
+            renderMenus();
+          }
+        } catch (error) {
+          console.error('Load menus error:', error);
+          document.getElementById('menusList').innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-4xl mb-2"></i><p>Error loading menus</p></div>';
+        }
+      }
+
+      // Render menus list
+      function renderMenus() {
+        const container = document.getElementById('menusList');
+        
+        if (currentMenus.length === 0) {
+          container.innerHTML = '<div class="text-center py-12 text-gray-400"><i class="fas fa-utensils text-6xl mb-4 opacity-50"></i><p class="text-lg">No menus uploaded yet</p><p class="text-sm mt-2">Upload your first menu image to get started!</p></div>';
+          return;
+        }
+
+        container.innerHTML = currentMenus.map(menu => {
+          const statusBadge = menu.ocr_status === 'completed' ? 
+            '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"><i class="fas fa-check mr-1"></i>OCR Complete</span>' :
+            menu.ocr_status === 'processing' ?
+            '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"><i class="fas fa-spinner fa-spin mr-1"></i>Processing</span>' :
+            '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full"><i class="fas fa-clock mr-1"></i>Pending</span>';
+
+          const languages = menu.available_languages ? menu.available_languages.split(',') : [];
+          const translationBadge = languages.length > 0 ?
+            String.fromCharCode(96) + '<span class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"><i class="fas fa-language mr-1"></i>' + String.fromCharCode(36) + '{languages.length} Language' + String.fromCharCode(36) + '{languages.length > 1 ? "s" : ""}' + String.fromCharCode(125) + '</span>' + String.fromCharCode(96) : '';
+
+          return String.fromCharCode(96) +
+            '<div class="border-2 border-gray-200 rounded-xl p-4 hover:border-blue-400 transition">' +
+              '<div class="flex items-start justify-between mb-3">' +
+                '<div class="flex-1">' +
+                  '<h3 class="font-bold text-lg text-gray-900">' + String.fromCharCode(36) + '{menu.menu_name}</h3>' +
+                  '<p class="text-sm text-gray-600 capitalize"><i class="fas fa-tag mr-1"></i>' + String.fromCharCode(36) + '{menu.menu_type}</p>' +
+                '</div>' +
+                '<img src="' + String.fromCharCode(36) + '{menu.original_image_url}" alt="Menu" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-300" onerror="this.src=' + String.fromCharCode(39) + 'data:image/svg+xml,%3Csvg xmlns=' + String.fromCharCode(34) + 'http://www.w3.org/2000/svg' + String.fromCharCode(34) + ' width=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + ' height=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + '%3E%3Crect fill=' + String.fromCharCode(34) + '%23e5e7eb' + String.fromCharCode(34) + ' width=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + ' height=' + String.fromCharCode(34) + '100' + String.fromCharCode(34) + '/%3E%3Ctext x=' + String.fromCharCode(34) + '50%25' + String.fromCharCode(34) + ' y=' + String.fromCharCode(34) + '50%25' + String.fromCharCode(34) + ' text-anchor=' + String.fromCharCode(34) + 'middle' + String.fromCharCode(34) + ' fill=' + String.fromCharCode(34) + '%23999' + String.fromCharCode(34) + '%3EMenu%3C/text%3E%3C/svg%3E' + String.fromCharCode(39) + '">' +
+              '</div>' +
+              '<div class="flex flex-wrap gap-2 mb-3">' +
+                String.fromCharCode(36) + '{statusBadge}' +
+                String.fromCharCode(36) + '{translationBadge}' +
+              '</div>' +
+              '<div class="flex gap-2">' +
+                (menu.ocr_status === 'pending' ?
+                  '<button onclick="processOCR(' + String.fromCharCode(36) + '{menu.menu_id})" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition"><i class="fas fa-robot mr-1"></i>Extract Text</button>' :
+                  '<button onclick="viewMenu(' + String.fromCharCode(36) + '{menu.menu_id})" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition"><i class="fas fa-eye mr-1"></i>View & Translate</button>') +
+                '<button onclick="deleteMenu(' + String.fromCharCode(36) + '{menu.menu_id})" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-lg transition"><i class="fas fa-trash"></i></button>' +
+              '</div>' +
+            '</div>' +
+            String.fromCharCode(96);
+        }).join('');
+      }
+
+      // Upload menu form submission
+      document.getElementById('uploadMenuForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const menuName = document.getElementById('menuName').value;
+        const menuType = document.getElementById('menuType').value;
+        const menuImageUrl = document.getElementById('menuImageUrl').value;
+        const baseLanguage = document.getElementById('baseLanguage').value;
+
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              menu_name: menuName,
+              menu_type: menuType,
+              original_image_url: menuImageUrl,
+              base_language: baseLanguage
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ Menu uploaded successfully! Click "Extract Text" to process with OCR.');
+            document.getElementById('uploadMenuForm').reset();
+            loadMenus();
+          } else {
+            alert('Error: ' + (data.error || 'Upload failed'));
+          }
+        } catch (error) {
+          console.error('Upload menu error:', error);
+          alert('Error uploading menu: ' + error.message);
+        }
+      });
+
+      // Process OCR
+      async function processOCR(menuId) {
+        if (!confirm('Process OCR to extract text from this menu image?')) return;
+
+        try {
+          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/process-ocr', {
+            method: 'POST'
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ OCR processing completed!\\n\\nExtracted text saved. You can now translate to other languages.');
+            loadMenus();
+          } else {
+            alert('Error: ' + (data.error || 'OCR failed'));
+          }
+        } catch (error) {
+          console.error('OCR error:', error);
+          alert('Error processing OCR: ' + error.message);
+        }
+      }
+
+      // View and translate menu
+      async function viewMenu(menuId) {
+        const menu = currentMenus.find(m => m.menu_id === menuId);
+        if (!menu) return;
+
+        // Create modal HTML
+        const modalHTML = String.fromCharCode(96) +
+          '<div id="menuModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onclick="closeMenuModal(event)">' +
+            '<div class="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">' +
+              '<div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">' +
+                '<div class="flex items-center justify-between">' +
+                  '<h2 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>' + String.fromCharCode(36) + '{menu.menu_name}</h2>' +
+                  '<button onclick="document.getElementById(' + String.fromCharCode(39) + 'menuModal' + String.fromCharCode(39) + ').remove()" class="text-white hover:bg-white/20 rounded-full p-2 transition"><i class="fas fa-times text-2xl"></i></button>' +
+                '</div>' +
+              '</div>' +
+              '<div class="p-6">' +
+                '<div class="mb-6">' +
+                  '<img src="' + String.fromCharCode(36) + '{menu.original_image_url}" alt="Original Menu" class="w-full max-h-96 object-contain border-2 border-gray-200 rounded-xl">' +
+                '</div>' +
+                '<div class="grid md:grid-cols-2 gap-4 mb-6">' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Select Language</label>' +
+                    '<select id="targetLanguage" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg">' +
+                      supportedLanguages.map(lang => 
+                        '<option value="' + String.fromCharCode(36) + '{lang.language_code}">' + String.fromCharCode(36) + '{lang.language_name_en} (' + String.fromCharCode(36) + '{lang.language_name_native})</option>'
+                      ).join('') +
+                    '</select>' +
+                  '</div>' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Action</label>' +
+                    '<button onclick="translateMenu(' + String.fromCharCode(36) + '{menuId})" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold transition shadow-lg">' +
+                      '<i class="fas fa-language mr-2"></i>Translate Menu' +
+                    '</button>' +
+                  '</div>' +
+                '</div>' +
+                '<div id="menuContent" class="bg-gray-50 border-2 border-gray-200 rounded-xl p-6">' +
+                  '<div class="prose max-w-none">' +
+                    '<pre class="whitespace-pre-wrap text-sm">' + String.fromCharCode(36) + '{menu.extracted_text || "Loading..."}</pre>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="mt-6 flex gap-3">' +
+                  '<button onclick="generateMenuQR(' + String.fromCharCode(36) + '{menuId})" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">' +
+                    '<i class="fas fa-qrcode mr-2"></i>Generate QR Code' +
+                  '</button>' +
+                  '<button onclick="shareMenu(' + String.fromCharCode(36) + '{menuId})" class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">' +
+                    '<i class="fas fa-share-alt mr-2"></i>Share Menu Link' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          String.fromCharCode(96);
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+      }
+
+      function closeMenuModal(event) {
+        if (event.target.id === 'menuModal') {
+          document.getElementById('menuModal').remove();
+        }
+      }
+
+      // Translate menu
+      async function translateMenu(menuId) {
+        const targetLang = document.getElementById('targetLanguage').value;
+        const menu = currentMenus.find(m => m.menu_id === menuId);
+        
+        if (!menu || !menu.extracted_text) {
+          alert('Menu text not extracted yet');
+          return;
+        }
+
+        const contentDiv = document.getElementById('menuContent');
+        contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i><p class="text-lg font-semibold">Translating menu...</p></div>';
+
+        try {
+          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              target_language: targetLang,
+              source_text: menu.extracted_text
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            contentDiv.innerHTML = String.fromCharCode(96) +
+              '<div class="bg-green-50 border-2 border-green-300 rounded-lg p-4 mb-4">' +
+                '<p class="text-green-800 font-semibold"><i class="fas fa-check-circle mr-2"></i>' + String.fromCharCode(36) + '{data.message}</p>' +
+              '</div>' +
+              '<div class="prose max-w-none">' +
+                '<pre class="whitespace-pre-wrap text-sm">' + String.fromCharCode(36) + '{data.translated_text}</pre>' +
+              '</div>' +
+              String.fromCharCode(96);
+          } else {
+            contentDiv.innerHTML = String.fromCharCode(96) + '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-4xl mb-4"></i><p>' + String.fromCharCode(36) + '{data.error}</p></div>' + String.fromCharCode(96);
+          }
+        } catch (error) {
+          console.error('Translation error:', error);
+          contentDiv.innerHTML = '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-circle text-4xl mb-4"></i><p>Translation failed: ' + error.message + '</p></div>';
+        }
+      }
+
+      // Generate QR code
+      function generateMenuQR(menuId) {
+        alert('QR Code generation coming soon! Will create guest-facing menu page with language selector.');
+      }
+
+      // Share menu
+      function shareMenu(menuId) {
+        const menuUrl = window.location.origin + '/menu/' + menuId;
+        navigator.clipboard.writeText(menuUrl).then(() => {
+          alert('✅ Menu URL copied to clipboard!\\n\\n' + menuUrl);
+        });
+      }
+
+      // Delete menu
+      async function deleteMenu(menuId) {
+        if (!confirm('Delete this menu? This action cannot be undone.')) return;
+
+        try {
+          const response = await fetch('/api/admin/restaurant/menus/' + menuId, {
+            method: 'DELETE'
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ Menu deleted successfully');
+            loadMenus();
+          } else {
+            alert('Error: ' + (data.error || 'Delete failed'));
+          }
+        } catch (error) {
+          console.error('Delete menu error:', error);
+          alert('Error deleting menu: ' + error.message);
+        }
+      }
+
+      // Initialize menus when tab is switched
+      const originalSwitchTab = switchTab;
+      switchTab = function(tab) {
+        originalSwitchTab(tab);
+        if (tab === 'menus') {
+          loadLanguages();
+          loadMenus();
+        }
+      };
 
       // Initialize on page load
       // Set today's date as default for filters
