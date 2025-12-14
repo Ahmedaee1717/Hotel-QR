@@ -8059,6 +8059,61 @@ app.get('/api/beach/availability/:property_id/:date', async (c) => {
   }
 })
 
+// API: Get Live Beach Occupancy Status (Guest)
+app.get('/api/beach/occupancy/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const today = new Date().toISOString().split('T')[0]
+  
+  try {
+    // Get total active spots
+    const totalSpots = await DB.prepare(`
+      SELECT COUNT(*) as count FROM beach_spots
+      WHERE property_id = ? AND is_active = 1 AND maintenance_mode = 0
+    `).bind(property_id).first()
+    
+    // Get today's bookings (confirmed and checked in)
+    const occupiedSpots = await DB.prepare(`
+      SELECT COUNT(DISTINCT spot_id) as count FROM beach_bookings
+      WHERE property_id = ? 
+        AND booking_date = ? 
+        AND booking_status IN ('confirmed', 'checked_in')
+    `).bind(property_id, today).first()
+    
+    const total = totalSpots.count || 0
+    const occupied = occupiedSpots.count || 0
+    const available = total - occupied
+    const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0
+    
+    // Determine traffic light status
+    let status = 'green'  // Low occupancy (0-60%)
+    let statusText = 'Plenty of spots available'
+    
+    if (occupancyRate >= 90) {
+      status = 'red'
+      statusText = 'Almost full'
+    } else if (occupancyRate >= 70) {
+      status = 'yellow'
+      statusText = 'Filling up fast'
+    }
+    
+    return c.json({ 
+      success: true, 
+      occupancy: {
+        total,
+        occupied,
+        available,
+        occupancyRate,
+        status,
+        statusText
+      }
+    })
+  } catch (error) {
+    console.error('Get beach occupancy error:', error)
+    return c.json({ error: 'Failed to get beach occupancy' }, 500)
+  }
+})
+
 // API: Create Beach Booking (Guest)
 app.post('/api/beach/bookings', async (c) => {
   const { DB } = c.env
@@ -9745,10 +9800,20 @@ app.get('/hotel/:property_slug', async (c) => {
                     <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 shadow-xl">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="flex-1">
-                                <h2 class="text-3xl font-bold mb-3 flex items-center">
-                                    <i class="fas fa-umbrella-beach mr-3"></i>
-                                    Beach Booking
-                                </h2>
+                                <div class="flex items-center justify-between mb-3">
+                                    <h2 class="text-3xl font-bold flex items-center">
+                                        <i class="fas fa-umbrella-beach mr-3"></i>
+                                        Beach Booking
+                                    </h2>
+                                    <!-- Live Occupancy Traffic Light -->
+                                    <div id="beach-traffic-light" class="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                                        <div class="flex items-center gap-1">
+                                            <div id="traffic-light-indicator" class="w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
+                                            <span id="traffic-light-text" class="text-sm font-semibold">Loading...</span>
+                                        </div>
+                                        <span id="traffic-occupancy-rate" class="text-xs opacity-80"></span>
+                                    </div>
+                                </div>
                                 <p class="mb-4">
                                     Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.
                                 </p>
@@ -12598,6 +12663,9 @@ app.get('/hotel/:property_slug', async (c) => {
                         
                         section.classList.remove('hidden');
                         console.log('Beach booking section shown with custom styling!');
+                        
+                        // Load live occupancy traffic light
+                        loadBeachOccupancy();
                     } else {
                         console.error('Beach booking section element not found');
                     }
@@ -12607,6 +12675,44 @@ app.get('/hotel/:property_slug', async (c) => {
                 console.error('Check beach booking error:', error);
             }
             return false;
+        }
+        
+        // Load live beach occupancy traffic light
+        async function loadBeachOccupancy() {
+            try {
+                const response = await fetch('/api/beach/occupancy/' + (propertyData?.property_id || 1));
+                const data = await response.json();
+                
+                if (data.success && data.occupancy) {
+                    const { status, statusText, occupancyRate, available } = data.occupancy;
+                    
+                    const indicator = document.getElementById('traffic-light-indicator');
+                    const text = document.getElementById('traffic-light-text');
+                    const rateEl = document.getElementById('traffic-occupancy-rate');
+                    
+                    // Set traffic light color
+                    let color = '#10b981'; // green
+                    if (status === 'yellow') color = '#eab308';
+                    if (status === 'red') color = '#ef4444';
+                    
+                    if (indicator) {
+                        indicator.style.backgroundColor = color;
+                    }
+                    
+                    if (text) {
+                        text.textContent = statusText;
+                    }
+                    
+                    if (rateEl) {
+                        rateEl.textContent = available + ' spots • ' + occupancyRate + '%';
+                    }
+                    
+                    // Refresh every 60 seconds
+                    setTimeout(loadBeachOccupancy, 60000);
+                }
+            } catch (error) {
+                console.error('Failed to load beach occupancy:', error);
+            }
         }
         
         function goToBeachBooking() {
