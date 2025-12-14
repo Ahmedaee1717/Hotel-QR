@@ -33599,6 +33599,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           if (section) section.style.display = t === tab ? 'block' : 'none';
         });
       }
+      
+      // Define updateMasterScale early for oninput handlers
+      window.updateMasterScale = function(value) {
+        // Placeholder - will be overridden by full implementation
+        console.log('Master scale:', value);
+      };
     </script>
 </head>
 <body class="bg-gray-50">
@@ -34119,7 +34125,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Upload Menu Image *</label>
                                 <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-50" id="uploadArea">
-                                    <input type="file" id="menuImageFile" accept="image/*" class="hidden" required>
+                                    <input type="file" id="menuImageFile" accept="image/*" class="hidden">
                                     <div id="uploadPlaceholder">
                                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
                                         <p class="text-gray-600 font-semibold mb-1">Click to upload or drag & drop</p>
@@ -35584,7 +35590,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               '<div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">' +
                 '<div class="flex items-center justify-between">' +
                   '<h2 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>' + menu.menu_name + '</h2>' +
-                  '<button onclick="document.getElementById(\'menuModal\').remove()" class="text-white hover:bg-white/20 rounded-full p-2 transition"><i class="fas fa-times text-2xl"></i></button>' +
+                  '<button onclick="closeMenuModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition"><i class="fas fa-times text-2xl"></i></button>' +
                 '</div>' +
               '</div>' +
               '<div class="p-6">' +
@@ -35626,8 +35632,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       }
 
       function closeMenuModal(event) {
-        if (event.target.id === 'menuModal') {
-          document.getElementById('menuModal').remove();
+        const modal = document.getElementById('menuModal');
+        if (!event || event.target.id === 'menuModal' || !event.target) {
+          if (modal) modal.remove();
         }
       }
 
