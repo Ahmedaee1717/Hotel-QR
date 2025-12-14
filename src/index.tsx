@@ -5438,7 +5438,8 @@ app.get('/api/admin/restaurant/:offering_id/menus', async (c) => {
       SELECT 
         m.*,
         COUNT(DISTINCT t.translation_id) as translation_count,
-        GROUP_CONCAT(DISTINCT t.language_code) as available_languages
+        GROUP_CONCAT(DISTINCT t.language_code) as available_languages,
+        CASE WHEN EXISTS (SELECT 1 FROM menu_categories WHERE menu_id = m.menu_id) THEN 1 ELSE 0 END as is_parsed
       FROM restaurant_menus m
       LEFT JOIN restaurant_menu_translations t ON m.menu_id = t.menu_id
       WHERE m.offering_id = ?
@@ -5705,6 +5706,356 @@ app.delete('/api/admin/restaurant/menus/:menu_id', async (c) => {
   }
 })
 
+// ========================================
+// STRUCTURED MENU SYSTEM - AI PARSING
+// ========================================
+
+// Parse OCR text into structured menu (categories → items → prices)
+app.post('/api/admin/restaurant/menus/:menu_id/parse-structure', async (c) => {
+  const { menu_id } = c.req.param()
+  const { DB, OPENAI_API_KEY } = c.env
+  
+  if (!OPENAI_API_KEY) {
+    return c.json({ error: 'OpenAI API key not configured' }, 500)
+  }
+
+  try {
+    // Get menu with extracted text
+    const menu = await DB.prepare(`
+      SELECT menu_id, menu_name, extracted_text 
+      FROM restaurant_menus 
+      WHERE menu_id = ?
+    `).bind(menu_id).first()
+
+    if (!menu || !menu.extracted_text) {
+      return c.json({ error: 'Menu text not extracted yet' }, 400)
+    }
+
+    // Create parsing log
+    await DB.prepare(`
+      INSERT INTO menu_parsing_logs (menu_id, raw_text, parsing_status)
+      VALUES (?, ?, 'processing')
+    `).bind(menu_id, menu.extracted_text).run()
+
+    // AI prompt for structured parsing
+    const prompt = `You are a restaurant menu parser. Parse the following menu text into structured JSON format.
+
+Extract:
+1. Categories (Appetizers, Main Course, Desserts, Beverages, etc.)
+2. For each item: name, description, price, currency, dietary info (vegetarian/vegan/gluten-free), spice level, allergens
+
+Menu Text:
+${menu.extracted_text}
+
+Return ONLY valid JSON in this exact format:
+{
+  "categories": [
+    {
+      "name": "Category Name",
+      "description": "Optional category description",
+      "items": [
+        {
+          "name": "Item Name",
+          "description": "Item description",
+          "price": 12.99,
+          "currency": "USD",
+          "is_vegetarian": false,
+          "is_vegan": false,
+          "is_gluten_free": false,
+          "spice_level": "medium",
+          "allergens": ["nuts", "dairy"]
+        }
+      ]
+    }
+  ]
+}`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a menu parsing expert. Return only valid JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 3000
+      })
+    })
+
+    const data = await response.json()
+    const aiResponse = data.choices[0].message.content.trim()
+    
+    // Parse AI response
+    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('AI did not return valid JSON')
+    }
+    
+    const parsed = JSON.parse(jsonMatch[0])
+    
+    // Save parsed data to database
+    let totalItems = 0
+    
+    for (let catIndex = 0; catIndex < parsed.categories.length; catIndex++) {
+      const category = parsed.categories[catIndex]
+      
+      // Insert category
+      const catResult = await DB.prepare(`
+        INSERT INTO menu_categories (menu_id, category_name, category_description, display_order)
+        VALUES (?, ?, ?, ?)
+      `).bind(menu_id, category.name, category.description || '', catIndex).run()
+      
+      const categoryId = catResult.meta.last_row_id
+      
+      // Insert items
+      for (let itemIndex = 0; itemIndex < category.items.length; itemIndex++) {
+        const item = category.items[itemIndex]
+        
+        await DB.prepare(`
+          INSERT INTO menu_items (
+            category_id, item_name, description, price, currency,
+            is_vegetarian, is_vegan, is_gluten_free, spice_level,
+            allergens, display_order
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          categoryId,
+          item.name,
+          item.description || '',
+          item.price || 0,
+          item.currency || 'USD',
+          item.is_vegetarian ? 1 : 0,
+          item.is_vegan ? 1 : 0,
+          item.is_gluten_free ? 1 : 0,
+          item.spice_level || 'none',
+          JSON.stringify(item.allergens || []),
+          itemIndex
+        ).run()
+        
+        totalItems++
+      }
+    }
+
+    // Update parsing log
+    await DB.prepare(`
+      UPDATE menu_parsing_logs 
+      SET parsed_json = ?, categories_found = ?, items_found = ?, parsing_status = 'completed'
+      WHERE menu_id = ? AND parsing_status = 'processing'
+    `).bind(JSON.stringify(parsed), parsed.categories.length, totalItems, menu_id).run()
+
+    return c.json({
+      success: true,
+      message: `Menu parsed! Found ${parsed.categories.length} categories with ${totalItems} items`,
+      categories: parsed.categories.length,
+      items: totalItems
+    })
+
+  } catch (error) {
+    console.error('Menu parsing error:', error)
+    
+    // Update log with error
+    await DB.prepare(`
+      UPDATE menu_parsing_logs 
+      SET parsing_status = 'failed', error_message = ?
+      WHERE menu_id = ? AND parsing_status = 'processing'
+    `).bind(error.message, menu_id).run()
+    
+    return c.json({ error: 'Menu parsing failed: ' + error.message }, 500)
+  }
+})
+
+// Get structured menu data
+app.get('/api/admin/restaurant/menus/:menu_id/structure', async (c) => {
+  const { menu_id } = c.req.param()
+  const { DB } = c.env
+
+  try {
+    // Get categories with items
+    const categories = await DB.prepare(`
+      SELECT category_id, category_name, category_description, display_order
+      FROM menu_categories
+      WHERE menu_id = ?
+      ORDER BY display_order ASC
+    `).bind(menu_id).all()
+
+    const result = []
+    
+    for (const category of categories.results) {
+      const items = await DB.prepare(`
+        SELECT * FROM menu_items
+        WHERE category_id = ?
+        ORDER BY display_order ASC
+      `).bind(category.category_id).all()
+      
+      result.push({
+        ...category,
+        items: items.results.map(item => ({
+          ...item,
+          allergens: JSON.parse(item.allergens || '[]')
+        }))
+      })
+    }
+
+    return c.json({ success: true, categories: result })
+  } catch (error) {
+    return c.json({ error: 'Failed to get menu structure: ' + error.message }, 500)
+  }
+})
+
+// Update category
+app.put('/api/admin/restaurant/menu-categories/:category_id', async (c) => {
+  const { category_id } = c.req.param()
+  const { DB } = c.env
+  const { category_name, category_description, display_order } = await c.req.json()
+
+  try {
+    await DB.prepare(`
+      UPDATE menu_categories 
+      SET category_name = ?, category_description = ?, display_order = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE category_id = ?
+    `).bind(category_name, category_description, display_order, category_id).run()
+
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to update category: ' + error.message }, 500)
+  }
+})
+
+// Delete category (and all its items)
+app.delete('/api/admin/restaurant/menu-categories/:category_id', async (c) => {
+  const { category_id } = c.req.param()
+  const { DB } = c.env
+
+  try {
+    await DB.prepare(`DELETE FROM menu_categories WHERE category_id = ?`).bind(category_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to delete category: ' + error.message }, 500)
+  }
+})
+
+// Update menu item
+app.put('/api/admin/restaurant/menu-items/:item_id', async (c) => {
+  const { item_id } = c.req.param()
+  const { DB } = c.env
+  const body = await c.req.json()
+
+  try {
+    await DB.prepare(`
+      UPDATE menu_items 
+      SET item_name = ?, description = ?, price = ?, currency = ?,
+          is_vegetarian = ?, is_vegan = ?, is_gluten_free = ?,
+          spice_level = ?, allergens = ?, display_order = ?,
+          is_available = ?, is_popular = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE item_id = ?
+    `).bind(
+      body.item_name, body.description, body.price, body.currency,
+      body.is_vegetarian ? 1 : 0, body.is_vegan ? 1 : 0, body.is_gluten_free ? 1 : 0,
+      body.spice_level, JSON.stringify(body.allergens || []), body.display_order,
+      body.is_available ? 1 : 0, body.is_popular ? 1 : 0, item_id
+    ).run()
+
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to update item: ' + error.message }, 500)
+  }
+})
+
+// Delete menu item
+app.delete('/api/admin/restaurant/menu-items/:item_id', async (c) => {
+  const { item_id } = c.req.param()
+  const { DB } = c.env
+
+  try {
+    await DB.prepare(`DELETE FROM menu_items WHERE item_id = ?`).bind(item_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to delete item: ' + error.message }, 500)
+  }
+})
+
+// Translate all menu items in a category
+app.post('/api/admin/restaurant/menu-categories/:category_id/translate', async (c) => {
+  const { category_id } = c.req.param()
+  const { DB, OPENAI_API_KEY } = c.env
+  const { target_language } = await c.req.json()
+
+  if (!OPENAI_API_KEY) {
+    return c.json({ error: 'OpenAI API key not configured' }, 500)
+  }
+
+  try {
+    // Get category and items
+    const category = await DB.prepare(`SELECT * FROM menu_categories WHERE category_id = ?`).bind(category_id).first()
+    const items = await DB.prepare(`SELECT * FROM menu_items WHERE category_id = ?`).bind(category_id).all()
+
+    // Translate category
+    const catPrompt = `Translate to ${target_language}:\nCategory: ${category.category_name}\nDescription: ${category.category_description}`
+    
+    const catResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a professional translator for restaurant menus.' },
+          { role: 'user', content: catPrompt }
+        ],
+        temperature: 0.3
+      })
+    })
+
+    const catData = await catResponse.json()
+    const catTranslation = catData.choices[0].message.content
+
+    // Save category translation
+    await DB.prepare(`
+      INSERT OR REPLACE INTO menu_category_translations (category_id, language_code, category_name, category_description)
+      VALUES (?, ?, ?, ?)
+    `).bind(category_id, target_language, catTranslation, '').run()
+
+    // Translate each item
+    for (const item of items.results) {
+      const itemPrompt = `Translate to ${target_language}:\nItem: ${item.item_name}\nDescription: ${item.description}`
+      
+      const itemResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a professional translator for restaurant menus.' },
+            { role: 'user', content: itemPrompt }
+          ],
+          temperature: 0.3
+        })
+      })
+
+      const itemData = await itemResponse.json()
+      const [translatedName, translatedDesc] = itemData.choices[0].message.content.split('\n')
+
+      await DB.prepare(`
+        INSERT OR REPLACE INTO menu_item_translations (item_id, language_code, item_name, description)
+        VALUES (?, ?, ?, ?)
+      `).bind(item.item_id, target_language, translatedName, translatedDesc || '').run()
+    }
+
+    return c.json({ success: true, message: `Translated ${items.results.length} items` })
+  } catch (error) {
+    return c.json({ error: 'Translation failed: ' + error.message }, 500)
+  }
+})
+
 // Update texture settings (opacity, enable/disable)
 app.put('/api/admin/restaurant/:offering_id/textures', async (c) => {
   const { DB } = c.env
@@ -5726,6 +6077,124 @@ app.put('/api/admin/restaurant/:offering_id/textures', async (c) => {
   } catch (error) {
     console.error('Update textures error:', error)
     return c.json({ error: 'Failed to update textures' }, 500)
+  }
+})
+
+// ========================================
+// GUEST-FACING MENU API
+// ========================================
+
+// Get menu for guests with translations
+app.get('/api/guest/menu/:menu_id', async (c) => {
+  const { menu_id } = c.req.param()
+  const { DB } = c.env
+  const language = c.req.query('language') || 'en'
+
+  try {
+    // Get menu basic info
+    const menu = await DB.prepare(`
+      SELECT m.*, rm.restaurant_name
+      FROM restaurant_menus m
+      LEFT JOIN hotel_offerings rm ON m.offering_id = rm.offering_id
+      WHERE m.menu_id = ? AND m.is_active = 1
+    `).bind(menu_id).first()
+
+    if (!menu) {
+      return c.json({ error: 'Menu not found' }, 404)
+    }
+
+    // Get categories
+    const categories = await DB.prepare(`
+      SELECT category_id, category_name, category_description, display_order
+      FROM menu_categories
+      WHERE menu_id = ? AND is_active = 1
+      ORDER BY display_order ASC
+    `).bind(menu_id).all()
+
+    const result = []
+
+    for (const category of categories.results) {
+      // Get translation if not English
+      let catName = category.category_name
+      let catDesc = category.category_description
+
+      if (language !== 'en') {
+        const catTranslation = await DB.prepare(`
+          SELECT category_name, category_description
+          FROM menu_category_translations
+          WHERE category_id = ? AND language_code = ?
+        `).bind(category.category_id, language).first()
+
+        if (catTranslation) {
+          catName = catTranslation.category_name || catName
+          catDesc = catTranslation.category_description || catDesc
+        }
+      }
+
+      // Get items
+      const items = await DB.prepare(`
+        SELECT * FROM menu_items
+        WHERE category_id = ? AND is_available = 1
+        ORDER BY display_order ASC
+      `).bind(category.category_id).all()
+
+      const translatedItems = []
+
+      for (const item of items.results) {
+        let itemName = item.item_name
+        let itemDesc = item.description
+
+        if (language !== 'en') {
+          const itemTranslation = await DB.prepare(`
+            SELECT item_name, description
+            FROM menu_item_translations
+            WHERE item_id = ? AND language_code = ?
+          `).bind(item.item_id, language).first()
+
+          if (itemTranslation) {
+            itemName = itemTranslation.item_name || itemName
+            itemDesc = itemTranslation.description || itemDesc
+          }
+        }
+
+        translatedItems.push({
+          item_id: item.item_id,
+          name: itemName,
+          description: itemDesc,
+          price: item.price,
+          currency: item.currency,
+          is_vegetarian: item.is_vegetarian,
+          is_vegan: item.is_vegan,
+          is_gluten_free: item.is_gluten_free,
+          spice_level: item.spice_level,
+          allergens: JSON.parse(item.allergens || '[]'),
+          is_popular: item.is_popular
+        })
+      }
+
+      result.push({
+        category_id: category.category_id,
+        name: catName,
+        description: catDesc,
+        items: translatedItems
+      })
+    }
+
+    return c.json({
+      success: true,
+      menu: {
+        menu_id: menu.menu_id,
+        menu_name: menu.menu_name,
+        menu_type: menu.menu_type,
+        restaurant_name: menu.restaurant_name
+      },
+      categories: result,
+      language: language
+    })
+
+  } catch (error) {
+    console.error('Guest menu error:', error)
+    return c.json({ error: 'Failed to load menu: ' + error.message }, 500)
   }
 })
 
@@ -35396,7 +35865,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               '<div class="flex gap-2">' +
                 (menu.ocr_status === 'pending' ?
                   '<button onclick="processOCR(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition"><i class="fas fa-robot mr-1"></i>Extract Text</button>' :
-                  '<button onclick="viewMenu(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition"><i class="fas fa-eye mr-1"></i>View & Translate</button>') +
+                  menu.ocr_status === 'completed' && !menu.is_parsed ?
+                  '<button onclick="parseMenuStructure(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition"><i class="fas fa-brain mr-1"></i>Parse Menu</button>' +
+                  '<button onclick="viewMenu(' + menu.menu_id + ')" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition"><i class="fas fa-eye"></i></button>' :
+                  '<button onclick="openMenuBuilder(' + menu.menu_id + ')" class="flex-1 px-3 py-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white text-sm rounded-lg transition"><i class="fas fa-edit mr-1"></i>Edit Menu</button>' +
+                  '<button onclick="viewGuestMenu(' + menu.menu_id + ')" class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm rounded-lg transition"><i class="fas fa-external-link-alt"></i></button>') +
                 '<button onclick="deleteMenu(' + menu.menu_id + ')" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-lg transition"><i class="fas fa-trash"></i></button>' +
               '</div>' +
             '</div>';
@@ -35714,6 +36187,39 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           console.error('Delete menu error:', error);
           alert('Error deleting menu: ' + error.message);
         }
+      }
+
+      // Parse menu structure with AI
+      async function parseMenuStructure(menuId) {
+        if (!confirm('Parse this menu into categories and items using AI?\\n\\nThis will analyze the extracted text and create a structured digital menu.')) return;
+
+        try {
+          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/parse-structure', {
+            method: 'POST'
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ Menu parsed successfully!\\n\\n' + data.message + '\\n\\nYou can now edit and translate the menu.');
+            loadMenus();
+          } else {
+            alert('Error: ' + (data.error || 'Parsing failed'));
+          }
+        } catch (error) {
+          console.error('Parse menu error:', error);
+          alert('Error parsing menu: ' + error.message);
+        }
+      }
+
+      // Open menu builder (structured editor)
+      function openMenuBuilder(menuId) {
+        window.location.href = '/admin/menu-builder/' + menuId;
+      }
+
+      // View guest menu (preview)
+      function viewGuestMenu(menuId) {
+        window.open('/menu/' + menuId, '_blank');
       }
 
       // Initialize menus when tab is switched
