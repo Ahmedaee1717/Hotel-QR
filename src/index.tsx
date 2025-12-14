@@ -7581,6 +7581,7 @@ app.post('/api/admin/beach/settings', async (c) => {
       button_color_from,
       button_color_to,
       button_text_color,
+      traffic_light_text_color,
       time_slots
     } = body
     
@@ -7620,6 +7621,7 @@ app.post('/api/admin/beach/settings', async (c) => {
             button_color_from = ?,
             button_color_to = ?,
             button_text_color = ?,
+            traffic_light_text_color = ?,
             time_slots = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE property_id = ?
@@ -7651,6 +7653,7 @@ app.post('/api/admin/beach/settings', async (c) => {
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
         button_text_color || '#3b82f6',
+        traffic_light_text_color || '#ffffff',
         time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]',
         property_id
       ).run()
@@ -7664,8 +7667,8 @@ app.post('/api/admin/beach/settings', async (c) => {
           card_title, card_subtitle, feature1_text, feature2_text, feature3_text,
           umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
           loungers_label, loungers_desc, daybeds_label, daybeds_desc, button_text,
-          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color, time_slots
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          bg_color_from, bg_color_to, text_color, button_color_from, button_color_to, button_text_color, traffic_light_text_color, time_slots
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         beach_booking_enabled || 0,
@@ -7695,6 +7698,7 @@ app.post('/api/admin/beach/settings', async (c) => {
         button_color_from || '#ffffff',
         button_color_to || '#ffffff',
         button_text_color || '#3b82f6',
+        traffic_light_text_color || '#ffffff',
         time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]'
       ).run()
     }
@@ -9806,12 +9810,17 @@ app.get('/hotel/:property_slug', async (c) => {
                                         Beach Booking
                                     </h2>
                                     <!-- Live Occupancy Traffic Light -->
-                                    <div id="beach-traffic-light" class="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                                        <div class="flex items-center gap-1">
+                                    <div id="beach-traffic-light" class="flex flex-col items-end gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2">
+                                        <div class="flex items-center gap-2">
                                             <div id="traffic-light-indicator" class="w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
                                             <span id="traffic-light-text" class="text-sm font-semibold">Loading...</span>
                                         </div>
-                                        <span id="traffic-occupancy-rate" class="text-xs opacity-80"></span>
+                                        <div class="flex items-center gap-2 text-xs opacity-90">
+                                            <i class="fas fa-clock"></i>
+                                            <span id="traffic-live-time">--:--</span>
+                                            <span>•</span>
+                                            <span id="traffic-occupancy-rate"></span>
+                                        </div>
                                     </div>
                                 </div>
                                 <p class="mb-4">
@@ -12664,6 +12673,26 @@ app.get('/hotel/:property_slug', async (c) => {
                             spotDescs[3].style.setProperty('color', textColor, 'important');
                         }
                         
+                        // Apply traffic light text color
+                        const trafficLightTextColor = s.traffic_light_text_color || '#ffffff';
+                        const trafficLightText = section.querySelector('#traffic-light-text');
+                        const trafficLightRate = section.querySelector('#traffic-occupancy-rate');
+                        const trafficLightTime = section.querySelector('#traffic-live-time');
+                        const trafficLightIcon = section.querySelector('#beach-traffic-light i');
+                        
+                        if (trafficLightText) {
+                            trafficLightText.style.setProperty('color', trafficLightTextColor, 'important');
+                        }
+                        if (trafficLightRate) {
+                            trafficLightRate.style.setProperty('color', trafficLightTextColor, 'important');
+                        }
+                        if (trafficLightTime) {
+                            trafficLightTime.style.setProperty('color', trafficLightTextColor, 'important');
+                        }
+                        if (trafficLightIcon) {
+                            trafficLightIcon.style.setProperty('color', trafficLightTextColor, 'important');
+                        }
+                        
                         section.classList.remove('hidden');
                         console.log('Beach booking section shown with custom styling!');
                         
@@ -12692,8 +12721,9 @@ app.get('/hotel/:property_slug', async (c) => {
                     const indicator = document.getElementById('traffic-light-indicator');
                     const text = document.getElementById('traffic-light-text');
                     const rateEl = document.getElementById('traffic-occupancy-rate');
+                    const timeEl = document.getElementById('traffic-live-time');
                     
-                    // Set traffic light color
+                    // Set traffic light color (indicator dot)
                     let color = '#10b981'; // green
                     if (status === 'yellow') color = '#eab308';
                     if (status === 'red') color = '#ef4444';
@@ -12708,6 +12738,14 @@ app.get('/hotel/:property_slug', async (c) => {
                     
                     if (rateEl) {
                         rateEl.textContent = available + ' spots • ' + occupancyRate + '%';
+                    }
+                    
+                    // Update live time from user's device
+                    if (timeEl) {
+                        const now = new Date();
+                        const hours = now.getHours().toString().padStart(2, '0');
+                        const minutes = now.getMinutes().toString().padStart(2, '0');
+                        timeEl.textContent = hours + ':' + minutes;
                     }
                     
                     // Refresh every 60 seconds
@@ -24006,6 +24044,14 @@ app.get('/admin/dashboard', (c) => {
                                 </div>
                                 <p class="text-xs text-gray-500 mt-1">Button text color</p>
                             </div>
+                            <div>
+                                <label class="block font-medium mb-2">Traffic Light Text Color</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="trafficLightTextColor" value="#ffffff" class="w-20 h-10 rounded cursor-pointer">
+                                    <input type="text" id="trafficLightTextColorText" value="#ffffff" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm" readonly>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Live occupancy indicator text color</p>
+                            </div>
                         </div>
                         
                         <!-- Color Preview -->
@@ -26955,6 +27001,8 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('buttonColorToText').value = s.button_color_to || '#ffffff';
             document.getElementById('buttonTextColor').value = s.button_text_color || '#3b82f6';
             document.getElementById('buttonTextColorText').value = s.button_text_color || '#3b82f6';
+            document.getElementById('trafficLightTextColor').value = s.traffic_light_text_color || '#ffffff';
+            document.getElementById('trafficLightTextColorText').value = s.traffic_light_text_color || '#ffffff';
             updateColorPreview();
             setupColorPickers();
             
@@ -27122,7 +27170,8 @@ app.get('/admin/dashboard', (c) => {
               text_color: document.getElementById('textColor').value,
               button_color_from: document.getElementById('buttonColorFrom').value,
               button_color_to: document.getElementById('buttonColorTo').value,
-              button_text_color: document.getElementById('buttonTextColor').value
+              button_text_color: document.getElementById('buttonTextColor').value,
+              traffic_light_text_color: document.getElementById('trafficLightTextColor').value
             })
           });
           
@@ -27188,6 +27237,7 @@ app.get('/admin/dashboard', (c) => {
           const buttonColorFrom = document.getElementById('buttonColorFrom')?.value || '#ffffff';
           const buttonColorTo = document.getElementById('buttonColorTo')?.value || '#ffffff';
           const buttonTextColor = document.getElementById('buttonTextColor')?.value || '#3b82f6';
+          const trafficLightTextColor = document.getElementById('trafficLightTextColor')?.value || '#ffffff';
           
           // Get current text values to preserve them
           const cardTitle = document.getElementById('cardTitle')?.value || 'Beach Booking';
@@ -27223,6 +27273,7 @@ app.get('/admin/dashboard', (c) => {
               button_color_from: buttonColorFrom,
               button_color_to: buttonColorTo,
               button_text_color: buttonTextColor,
+              traffic_light_text_color: trafficLightTextColor,
               // Preserve text customization
               card_title: cardTitle,
               card_subtitle: cardSubtitle,
@@ -27300,7 +27351,8 @@ app.get('/admin/dashboard', (c) => {
           { picker: 'textColor', text: 'textColorText' },
           { picker: 'buttonColorFrom', text: 'buttonColorFromText' },
           { picker: 'buttonColorTo', text: 'buttonColorToText' },
-          { picker: 'buttonTextColor', text: 'buttonTextColorText' }
+          { picker: 'buttonTextColor', text: 'buttonTextColorText' },
+          { picker: 'trafficLightTextColor', text: 'trafficLightTextColorText' }
         ];
         
         colorInputs.forEach(({ picker, text }) => {
