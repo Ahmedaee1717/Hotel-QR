@@ -30393,11 +30393,11 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         // General help
         if (msg.includes('help') || msg.includes('how')) {
-          return { text: 'I can help you with:\n\n🏖️ Beach booking settings and configuration\n📊 Analytics and reports\n🎨 QR code design\n⚙️ Settings and branding\n🍽️ Restaurant management\n👥 Staff check-in\n\nWhat would you like to know more about?', action: null };
+          return { text: 'I can help you with:\\n\\n- Beach booking settings and configuration\\n- Analytics and reports\\n- QR code design\\n- Settings and branding\\n- Restaurant management\\n- Staff check-in\\n\\nWhat would you like to know more about?', action: null };
         }
         
         // Default response
-        return { text: 'I am here to help! Try asking me about:\\n• How do I change beach settings?\\n• Show me analytics\\n• How to create a QR code?\\n• How to add zones?\\n• How to check in guests?\\n\\nOr tell me what you are trying to accomplish!', action: null };
+        return { text: 'I am here to help! Try asking me about:\\n- How do I change beach settings?\\n- Show me analytics\\n- How to create a QR code?\\n- How to add zones?\\n- How to check in guests?\\n\\nOr tell me what you are trying to accomplish!', action: null };
       }
       
       // Send chat message
