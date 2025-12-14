@@ -34139,7 +34139,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                                         <p class="text-sm text-gray-600"><span id="progressText">Uploading...</span></p>
                                     </div>
                                 </div>
-                                <input type="hidden" id="menuImageUrl" required>
+                                <input type="hidden" id="menuImageUrl">
                             </div>
                             
                             <div>
@@ -35512,6 +35512,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const menuType = document.getElementById('menuType').value;
         const menuImageUrl = document.getElementById('menuImageUrl').value;
         const baseLanguage = document.getElementById('baseLanguage').value;
+
+        // Validate image URL
+        if (!menuImageUrl || menuImageUrl.trim() === '') {
+          alert('⚠️ Please upload a menu image first!');
+          return;
+        }
 
         try {
           const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
