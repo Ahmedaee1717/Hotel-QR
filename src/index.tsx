@@ -8111,15 +8111,29 @@ app.post('/api/beach/bookings', async (c) => {
     // Generate booking reference
     const bookingReference = 'BCH-' + Date.now() + '-' + Math.random().toString(36).substring(7).toUpperCase()
     
+    // Generate 6-digit booking code (e.g., B12345)
+    const bookingCode = 'B' + Math.floor(10000 + Math.random() * 90000).toString()
+    
+    // Generate QR code data (JSON with booking details)
+    const qrCodeData = JSON.stringify({
+      booking_reference: bookingReference,
+      booking_code: bookingCode,
+      spot_number: spot.spot_number,
+      booking_date: booking_date,
+      guest_name: guest_name
+    })
+    
     // Create booking
     await DB.prepare(`
       INSERT INTO beach_bookings (
-        booking_reference, property_id, spot_id, guest_name, guest_room_number,
+        booking_reference, booking_code, property_id, spot_id, guest_name, guest_room_number,
         guest_phone, guest_email, booking_date, slot_type, start_time, end_time,
-        num_guests, total_price, special_requests, booking_status, payment_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+        num_guests, total_price, special_requests, booking_status, payment_status,
+        qr_code_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
     `).bind(
       bookingReference,
+      bookingCode,
       property_id,
       spot_id,
       guest_name,
@@ -8133,15 +8147,18 @@ app.post('/api/beach/bookings', async (c) => {
       num_guests,
       totalPrice,
       special_requests || null,
-      totalPrice === 0 ? 'free' : 'pending'
+      totalPrice === 0 ? 'free' : 'pending',
+      qrCodeData
     ).run()
     
     return c.json({ 
       success: true, 
       booking: { 
         booking_reference: bookingReference,
+        booking_code: bookingCode,
         spot_number: spot.spot_number,
-        spot_type: spot.spot_type
+        spot_type: spot.spot_type,
+        qr_code_data: qrCodeData
       } 
     })
   } catch (error) {
@@ -8195,6 +8212,112 @@ app.post('/api/beach/bookings/:booking_reference/cancel', async (c) => {
   } catch (error) {
     console.error('Cancel beach booking error:', error)
     return c.json({ error: 'Failed to cancel booking' }, 500)
+  }
+})
+
+// API: Staff - Verify Booking (QR or Code)
+app.post('/api/staff/beach/verify', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { data, method } = body
+    
+    let booking = null
+    
+    if (method === 'manual') {
+      // Manual code entry - search by booking_code
+      booking = await DB.prepare(`
+        SELECT bb.*, bs.spot_number, bs.spot_type
+        FROM beach_bookings bb
+        JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+        WHERE bb.booking_code = ? AND bb.booking_status != 'cancelled'
+      `).bind(data).first()
+    } else if (method === 'qr') {
+      // QR code scan - parse JSON data
+      try {
+        const qrData = JSON.parse(data)
+        booking = await DB.prepare(`
+          SELECT bb.*, bs.spot_number, bs.spot_type
+          FROM beach_bookings bb
+          JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+          WHERE bb.booking_reference = ? OR bb.booking_code = ?
+        `).bind(qrData.booking_reference || data, qrData.booking_code || data).first()
+      } catch {
+        // If not JSON, try as booking reference
+        booking = await DB.prepare(`
+          SELECT bb.*, bs.spot_number, bs.spot_type
+          FROM beach_bookings bb
+          JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+          WHERE bb.booking_reference = ? OR bb.booking_code = ?
+        `).bind(data, data).first()
+      }
+    }
+    
+    if (!booking) {
+      return c.json({ success: false, error: 'Booking not found' }, 404)
+    }
+    
+    // Check if booking is for today
+    const today = new Date().toISOString().split('T')[0]
+    const bookingDate = new Date(booking.booking_date).toISOString().split('T')[0]
+    
+    if (bookingDate !== today) {
+      return c.json({ 
+        success: false, 
+        error: 'This booking is for ' + new Date(booking.booking_date).toLocaleDateString() 
+      }, 400)
+    }
+    
+    return c.json({ success: true, booking })
+  } catch (error) {
+    console.error('Verify booking error:', error)
+    return c.json({ success: false, error: 'Verification failed' }, 500)
+  }
+})
+
+// API: Staff - Check In Guest
+app.post('/api/staff/beach/check-in', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { booking_reference, staff_name } = body
+    
+    // Check if already checked in
+    const existing = await DB.prepare(`
+      SELECT booking_status FROM beach_bookings WHERE booking_reference = ?
+    `).bind(booking_reference).first()
+    
+    if (!existing) {
+      return c.json({ success: false, error: 'Booking not found' }, 404)
+    }
+    
+    if (existing.booking_status === 'checked_in') {
+      return c.json({ success: false, error: 'Already checked in' }, 400)
+    }
+    
+    // Update booking to checked_in
+    await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'checked_in',
+          checked_in_at = CURRENT_TIMESTAMP,
+          checked_in_by = ?
+      WHERE booking_reference = ?
+    `).bind(staff_name, booking_reference).run()
+    
+    // Get updated booking
+    const booking = await DB.prepare(`
+      SELECT bb.*, bs.spot_number, bs.spot_type
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.booking_reference = ?
+    `).bind(booking_reference).first()
+    
+    return c.json({ success: true, booking })
+  } catch (error) {
+    console.error('Check-in error:', error)
+    return c.json({ success: false, error: 'Check-in failed' }, 500)
   }
 })
 
@@ -15493,6 +15616,331 @@ app.get('/admin/beach-map-designer', (c) => {
   `)
 })
 
+// Staff Beach Check-In Interface - Verify bookings via QR or code
+app.get('/staff/beach-check-in', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Check-In - Staff</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-cyan-50 min-h-screen">
+    <div class="max-w-4xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent flex items-center">
+                <i class="fas fa-check-circle mr-3 text-blue-600"></i>
+                Beach Check-In
+            </h1>
+            <p class="text-gray-600 mt-2">Verify guest bookings with QR code or booking code</p>
+        </div>
+
+        <!-- Check-In Methods Tabs -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex gap-4 mb-6 border-b">
+                <button onclick="switchTab('qr')" id="qrTab" class="tab-btn active px-6 py-3 font-semibold border-b-4 border-blue-600 text-blue-600">
+                    <i class="fas fa-qrcode mr-2"></i>Scan QR Code
+                </button>
+                <button onclick="switchTab('manual')" id="manualTab" class="tab-btn px-6 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-keyboard mr-2"></i>Enter Code
+                </button>
+            </div>
+
+            <!-- QR Scanner Tab -->
+            <div id="qrContent" class="tab-content">
+                <div class="text-center">
+                    <div id="qr-reader" class="mx-auto max-w-md border-4 border-blue-200 rounded-xl overflow-hidden"></div>
+                    <p class="text-sm text-gray-600 mt-4">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Position the QR code within the frame
+                    </p>
+                    <button onclick="startQRScanner()" id="startScanBtn" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold">
+                        <i class="fas fa-camera mr-2"></i>Start Camera
+                    </button>
+                    <button onclick="stopQRScanner()" id="stopScanBtn" class="mt-4 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold hidden">
+                        <i class="fas fa-stop mr-2"></i>Stop Camera
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Entry Tab -->
+            <div id="manualContent" class="tab-content hidden">
+                <div class="max-w-md mx-auto">
+                    <label class="block text-lg font-semibold mb-3">Enter Booking Code</label>
+                    <input 
+                        type="text" 
+                        id="bookingCodeInput" 
+                        placeholder="B12345" 
+                        maxlength="6"
+                        class="w-full px-6 py-4 text-2xl font-bold text-center border-4 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none uppercase"
+                        onkeyup="this.value = this.value.toUpperCase()"
+                    >
+                    <button onclick="verifyManualCode()" class="w-full mt-4 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-lg">
+                        <i class="fas fa-check mr-2"></i>Verify Booking
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Result -->
+        <div id="resultCard" class="hidden">
+            <!-- Will be populated dynamically -->
+        </div>
+
+        <!-- Recent Check-Ins -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fas fa-history mr-3 text-gray-600"></i>
+                Recent Check-Ins
+            </h3>
+            <div id="recentCheckIns" class="space-y-3">
+                <p class="text-gray-500 text-center py-4">No check-ins yet today</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let html5QrCode = null;
+        let recentCheckIns = [];
+
+        function switchTab(tab) {
+            // Update tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            if (tab === 'qr') {
+                document.getElementById('qrTab').classList.add('active', 'border-blue-600', 'text-blue-600');
+                document.getElementById('qrContent').classList.remove('hidden');
+                document.getElementById('manualContent').classList.add('hidden');
+            } else {
+                document.getElementById('manualTab').classList.add('active', 'border-blue-600', 'text-blue-600');
+                document.getElementById('qrContent').classList.add('hidden');
+                document.getElementById('manualContent').classList.remove('hidden');
+                stopQRScanner();
+            }
+        }
+
+        async function startQRScanner() {
+            try {
+                html5QrCode = new Html5Qrcode("qr-reader");
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    onScanSuccess,
+                    onScanFailure
+                );
+                document.getElementById('startScanBtn').classList.add('hidden');
+                document.getElementById('stopScanBtn').classList.remove('hidden');
+            } catch (err) {
+                alert('Failed to start camera: ' + err);
+            }
+        }
+
+        function stopQRScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    document.getElementById('startScanBtn').classList.remove('hidden');
+                    document.getElementById('stopScanBtn').classList.add('hidden');
+                }).catch(err => console.error(err));
+            }
+        }
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            stopQRScanner();
+            await verifyBooking(decodedText, 'qr');
+        }
+
+        function onScanFailure(error) {
+            // Ignore scan failures (happens frequently)
+        }
+
+        async function verifyManualCode() {
+            const code = document.getElementById('bookingCodeInput').value.trim().toUpperCase();
+            if (!code || code.length < 5) {
+                alert('Please enter a valid booking code (e.g., B12345)');
+                return;
+            }
+            await verifyBooking(code, 'manual');
+        }
+
+        async function verifyBooking(data, method) {
+            try {
+                const response = await fetch('/api/staff/beach/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data, method })
+                });
+
+                const result = await response.json();
+                
+                if (result.success && result.booking) {
+                    showBookingDetails(result.booking);
+                } else {
+                    showError(result.error || 'Booking not found');
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError('Failed to verify booking');
+            }
+        }
+
+        function showBookingDetails(booking) {
+            const resultCard = document.getElementById('resultCard');
+            
+            const statusColor = booking.booking_status === 'checked_in' ? 'yellow' : 'green';
+            const statusText = booking.booking_status === 'checked_in' ? 'Already Checked In' : 'Valid Booking';
+            const statusIcon = booking.booking_status === 'checked_in' ? 'fa-exclamation-triangle' : 'fa-check-circle';
+            
+            resultCard.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl p-8 border-4 border-\${statusColor}-400">
+                    <div class="text-center mb-6">
+                        <div class="inline-block p-4 bg-\${statusColor}-100 rounded-full mb-3">
+                            <i class="fas \${statusIcon} text-4xl text-\${statusColor}-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800">\${statusText}</h2>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="p-4 bg-blue-50 rounded-xl">
+                            <p class="text-sm text-gray-600">Booking Code</p>
+                            <p class="text-3xl font-black text-blue-900">\${booking.booking_code}</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-purple-50 rounded-xl">
+                                <p class="text-xs text-gray-600">Spot</p>
+                                <p class="text-xl font-bold">\${getSpotIcon(booking.spot_type)} \${booking.spot_number}</p>
+                            </div>
+                            <div class="p-4 bg-green-50 rounded-xl">
+                                <p class="text-xs text-gray-600">Date</p>
+                                <p class="text-sm font-bold">\${new Date(booking.booking_date).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-pink-50 rounded-xl">
+                            <p class="text-xs text-gray-600">Guest</p>
+                            <p class="text-lg font-bold">\${booking.guest_name}</p>
+                            <p class="text-sm text-gray-600">Room: \${booking.guest_room_number || 'N/A'}</p>
+                        </div>
+                        
+                        \${booking.booking_status !== 'checked_in' ? \`
+                            <button onclick="checkInGuest('\${booking.booking_reference}')" class="w-full px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg">
+                                <i class="fas fa-check-double mr-2"></i>Confirm Check-In
+                            </button>
+                        \` : \`
+                            <div class="p-4 bg-yellow-50 rounded-xl border-2 border-yellow-300">
+                                <p class="text-sm font-semibold text-yellow-800">
+                                    <i class="fas fa-clock mr-2"></i>
+                                    Checked in at: \${new Date(booking.checked_in_at).toLocaleTimeString()}
+                                </p>
+                                <p class="text-xs text-gray-600 mt-1">By: \${booking.checked_in_by || 'Staff'}</p>
+                            </div>
+                        \`}
+                    </div>
+                </div>
+            \`;
+            
+            resultCard.classList.remove('hidden');
+        }
+
+        async function checkInGuest(bookingReference) {
+            const staffName = prompt('Enter your name:');
+            if (!staffName) return;
+            
+            try {
+                const response = await fetch('/api/staff/beach/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        booking_reference: bookingReference,
+                        staff_name: staffName
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Guest checked in successfully!');
+                    addToRecentCheckIns(result.booking);
+                    document.getElementById('resultCard').classList.add('hidden');
+                    document.getElementById('bookingCodeInput').value = '';
+                } else {
+                    alert('❌ ' + (result.error || 'Check-in failed'));
+                }
+            } catch (error) {
+                console.error('Check-in error:', error);
+                alert('❌ Failed to check in guest');
+            }
+        }
+
+        function showError(message) {
+            const resultCard = document.getElementById('resultCard');
+            resultCard.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl p-8 border-4 border-red-400">
+                    <div class="text-center">
+                        <div class="inline-block p-4 bg-red-100 rounded-full mb-3">
+                            <i class="fas fa-times-circle text-4xl text-red-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Booking Not Found</h2>
+                        <p class="text-gray-600">\${message}</p>
+                        <button onclick="document.getElementById('resultCard').classList.add('hidden')" class="mt-4 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-xl">
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            \`;
+            resultCard.classList.remove('hidden');
+        }
+
+        function addToRecentCheckIns(booking) {
+            recentCheckIns.unshift(booking);
+            if (recentCheckIns.length > 5) recentCheckIns.pop();
+            
+            const container = document.getElementById('recentCheckIns');
+            container.innerHTML = recentCheckIns.map(b => \`
+                <div class="flex items-center gap-4 p-4 bg-green-50 rounded-xl">
+                    <div class="flex-shrink-0 w-12 h-12 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-gray-800">\${b.guest_name}</p>
+                        <p class="text-sm text-gray-600">\${getSpotIcon(b.spot_type)} Spot \${b.spot_number} • \${b.booking_code}</p>
+                    </div>
+                    <div class="text-right text-xs text-gray-500">
+                        \${new Date(b.checked_in_at).toLocaleTimeString()}
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        function getSpotIcon(type) {
+            const icons = {
+                umbrella: '🔵',
+                cabana: '🟢',
+                lounger: '🟡',
+                daybed: '🟣'
+            };
+            return icons[type] || '🔵';
+        }
+
+        // Initialize
+        document.getElementById('bookingCodeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verifyManualCode();
+        });
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Interactive Hotel Map Builder - Admin tool to create clickable map hotspots
 app.get('/admin/interactive-map-builder', (c) => {
   return c.html(`
@@ -16615,6 +17063,13 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
             </h2>
 
             <div id="bookingDetails" class="space-y-4">
+                <!-- Booking Code - Prominently Displayed -->
+                <div class="text-center p-6 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl border-4 border-indigo-300">
+                    <p class="text-sm text-gray-600 mb-2">Your Booking Code</p>
+                    <p class="text-5xl font-black text-indigo-900 tracking-wider" id="bookingCode">------</p>
+                    <p class="text-xs text-gray-600 mt-2">Show this code to staff at check-in</p>
+                </div>
+                
                 <div class="flex items-start gap-4 p-4 bg-blue-50 rounded-xl">
                     <i class="fas fa-receipt text-blue-600 text-xl mt-1"></i>
                     <div>
@@ -16712,15 +17167,24 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                     const booking = data.booking;
                     
                     // Update UI
+                    document.getElementById('bookingCode').textContent = booking.booking_code || 'N/A';
                     document.getElementById('spotInfo').textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number;
                     document.getElementById('bookingDateInfo').textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     document.getElementById('slotInfo').textContent = formatSlotType(booking.slot_type);
                     document.getElementById('guestName').textContent = booking.guest_name;
-                    document.getElementById('roomNumber').textContent = booking.room_number;
+                    document.getElementById('roomNumber').textContent = booking.guest_room_number || 'N/A';
                     
-                    // Generate QR code
+                    // Generate QR code with booking data
+                    const qrData = booking.qr_code_data || JSON.stringify({
+                        booking_reference: booking.booking_reference,
+                        booking_code: booking.booking_code,
+                        spot_number: booking.spot_number,
+                        date: booking.booking_date,
+                        guest: booking.guest_name
+                    });
+                    
                     new QRCode(document.getElementById('qrcode'), {
-                        text: '${booking_reference}',
+                        text: qrData,
                         width: 200,
                         height: 200,
                         colorDark: '#1e3a8a',
