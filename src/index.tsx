@@ -15537,6 +15537,723 @@ app.get('/superadmin/dashboard', (c) => {
 // HOTEL ADMIN (existing)
 // ============================================
 
+// Beach Management - Staff interface for check-in, map, and walk-in bookings
+app.get('/admin/beach-management/:property_id', (c) => {
+  const { property_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beach Management - Staff Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        .tab-btn.active {
+            border-bottom: 4px solid #2563eb;
+            color: #2563eb;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl shadow-xl p-6 mb-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold flex items-center">
+                        <i class="fas fa-umbrella-beach mr-3"></i>
+                        Beach Management Portal
+                    </h1>
+                    <p class="mt-2 opacity-90">Check-in guests, view live availability, and manage walk-ins</p>
+                </div>
+                <button onclick="window.location.href='/admin/dashboard'" class="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl backdrop-blur-sm transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Navigation Tabs -->
+        <div class="bg-white rounded-xl shadow-lg mb-6">
+            <div class="flex border-b overflow-x-auto">
+                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 min-w-[200px] px-6 py-4 font-semibold transition">
+                    <i class="fas fa-qrcode mr-2"></i>QR Check-In
+                </button>
+                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 min-w-[200px] px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-map-marked-alt mr-2"></i>Live Beach Map
+                </button>
+                <button onclick="switchMainTab('walkin')" id="walkinTabBtn" class="tab-btn flex-1 min-w-[200px] px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-user-plus mr-2"></i>Walk-In Booking
+                </button>
+            </div>
+        </div>
+
+        <!-- Check-In Section -->
+        <div id="checkinSection" class="tab-content active">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- QR Scanner -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-camera text-blue-600 mr-3"></i>
+                        Scan Guest QR Code
+                    </h2>
+                    <div class="text-center">
+                        <div id="qr-reader" class="mx-auto border-4 border-blue-200 rounded-xl overflow-hidden mb-4"></div>
+                        <button onclick="toggleQRScanner()" id="scannerToggleBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-lg">
+                            <i class="fas fa-camera mr-2"></i>Start Camera
+                        </button>
+                        <p class="text-sm text-gray-600 mt-4">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Position QR code within the frame
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Manual Code Entry -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-keyboard text-green-600 mr-3"></i>
+                        Enter Booking Code
+                    </h2>
+                    <div>
+                        <label class="block text-lg font-semibold mb-3">6-Digit Booking Code</label>
+                        <input 
+                            type="text" 
+                            id="manualCodeInput" 
+                            placeholder="B12345" 
+                            maxlength="6"
+                            class="w-full px-6 py-4 text-3xl font-bold text-center border-4 border-green-200 rounded-xl focus:border-green-500 focus:outline-none uppercase mb-4"
+                            onkeyup="this.value = this.value.toUpperCase(); if(event.key === 'Enter') verifyManualCode()"
+                        >
+                        <button onclick="verifyManualCode()" class="w-full px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-lg transition shadow-lg">
+                            <i class="fas fa-check mr-2"></i>Verify & Check In
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Check-In Result -->
+            <div id="checkInResult" class="mt-6 hidden">
+                <!-- Will be populated dynamically -->
+            </div>
+
+            <!-- Recent Check-Ins -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mt-6">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-history text-gray-600 mr-3"></i>
+                    Recent Check-Ins Today
+                </h3>
+                <div id="recentCheckIns" class="space-y-3">
+                    <p class="text-gray-500 text-center py-8">Loading recent check-ins...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Beach Map Section -->
+        <div id="mapSection" class="tab-content">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold flex items-center">
+                        <i class="fas fa-map-marked-alt text-blue-600 mr-3"></i>
+                        Live Beach Availability
+                    </h2>
+                    <div class="flex gap-3">
+                        <input type="date" id="mapDate" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        <select id="mapTimeSlot" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                            <option value="all">All Time Slots</option>
+                            <option value="half_day_am">Morning</option>
+                            <option value="half_day_pm">Afternoon</option>
+                            <option value="full_day">Full Day</option>
+                        </select>
+                        <button onclick="refreshBeachMap()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div class="bg-gray-50 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-gray-800" id="totalSpots">-</div>
+                        <div class="text-sm text-gray-600 mt-1">Total Spots</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-green-600" id="availableSpots">-</div>
+                        <div class="text-sm text-gray-600 mt-1">Available</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-yellow-600" id="bookedSpots">-</div>
+                        <div class="text-sm text-gray-600 mt-1">Booked</div>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-blue-600" id="checkedInSpots">-</div>
+                        <div class="text-sm text-gray-600 mt-1">Checked In</div>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-4 text-center">
+                        <div class="text-3xl font-bold text-purple-600" id="occupancyRate">-</div>
+                        <div class="text-sm text-gray-600 mt-1">Occupancy</div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 bg-green-500 rounded mr-2"></div>
+                        <span class="text-sm">Available</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 bg-yellow-500 rounded mr-2"></div>
+                        <span class="text-sm">Booked</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 bg-blue-500 rounded mr-2"></div>
+                        <span class="text-sm">Checked In</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 bg-red-500 rounded mr-2"></div>
+                        <span class="text-sm">Blocked</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 border-4 border-purple-500 rounded mr-2"></div>
+                        <span class="text-sm">Premium</span>
+                    </div>
+                </div>
+
+                <!-- Beach Map Canvas -->
+                <div class="border-4 border-gray-200 rounded-xl overflow-hidden">
+                    <canvas id="beachMapCanvas" width="1200" height="600" class="w-full cursor-pointer"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Walk-In Booking Section -->
+        <div id="walkinSection" class="tab-content">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <i class="fas fa-user-plus text-green-600 mr-3"></i>
+                    Book Walk-In Guest
+                </h2>
+
+                <form id="walkinForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Guest Name *</label>
+                            <input type="text" id="walkinGuestName" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Room Number</label>
+                            <input type="text" id="walkinRoomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Phone Number</label>
+                            <input type="tel" id="walkinPhone" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Email</label>
+                            <input type="email" id="walkinEmail" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Date *</label>
+                            <input type="date" id="walkinDate" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Time Slot *</label>
+                            <select id="walkinTimeSlot" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                                <option value="">Select time slot</option>
+                                <option value="half_day_am">Morning (8AM - 1PM)</option>
+                                <option value="half_day_pm">Afternoon (1PM - 6PM)</option>
+                                <option value="full_day">Full Day (8AM - 6PM)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Number of Guests *</label>
+                            <input type="number" id="walkinNumGuests" required min="1" max="10" value="2" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Available Spots -->
+                    <div id="availableSpotsSection" class="hidden">
+                        <label class="block text-sm font-semibold mb-2">Select Available Spot *</label>
+                        <div id="availableSpotsList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button type="button" onclick="checkAvailability()" class="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-lg transition shadow-lg">
+                            <i class="fas fa-search mr-2"></i>Check Availability
+                        </button>
+                        <button type="submit" id="walkinSubmitBtn" class="flex-1 px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-lg transition shadow-lg hidden">
+                            <i class="fas fa-check mr-2"></i>Complete Booking
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Booking Result -->
+                <div id="walkinResult" class="mt-6 hidden">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PROPERTY_ID = '${property_id}';
+        let html5QrCode = null;
+        let scannerActive = false;
+        let selectedSpotId = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set today's date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('mapDate').value = today;
+            document.getElementById('walkinDate').value = today;
+            
+            loadRecentCheckIns();
+        });
+
+        // Tab Switching
+        function switchMainTab(tab) {
+            // Hide all sections
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('border-transparent', 'hover:bg-gray-50');
+                el.classList.remove('border-blue-600', 'text-blue-600');
+            });
+            
+            // Show selected section
+            if (tab === 'checkin') {
+                document.getElementById('checkinSection').classList.add('active');
+                document.getElementById('checkinTabBtn').classList.add('active');
+            } else if (tab === 'map') {
+                document.getElementById('mapSection').classList.add('active');
+                document.getElementById('mapTabBtn').classList.add('active');
+                refreshBeachMap();
+            } else if (tab === 'walkin') {
+                document.getElementById('walkinSection').classList.add('active');
+                document.getElementById('walkinTabBtn').classList.add('active');
+            }
+            
+            // Update active tab styling
+            document.querySelectorAll('.tab-btn.active').forEach(el => {
+                el.classList.remove('border-transparent', 'hover:bg-gray-50');
+                el.classList.add('border-blue-600', 'text-blue-600');
+            });
+        }
+
+        // QR Scanner Functions
+        function toggleQRScanner() {
+            if (scannerActive) {
+                stopQRScanner();
+            } else {
+                startQRScanner();
+            }
+        }
+
+        function startQRScanner() {
+            if (html5QrCode === null) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                onScanSuccess,
+                onScanError
+            ).then(() => {
+                scannerActive = true;
+                document.getElementById('scannerToggleBtn').innerHTML = '<i class="fas fa-stop mr-2"></i>Stop Camera';
+                document.getElementById('scannerToggleBtn').classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                document.getElementById('scannerToggleBtn').classList.add('bg-red-600', 'hover:bg-red-700');
+            }).catch(err => {
+                console.error('Error starting scanner:', err);
+                alert('Failed to start camera. Please check permissions.');
+            });
+        }
+
+        function stopQRScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    scannerActive = false;
+                    document.getElementById('scannerToggleBtn').innerHTML = '<i class="fas fa-camera mr-2"></i>Start Camera';
+                    document.getElementById('scannerToggleBtn').classList.remove('bg-red-600', 'hover:bg-red-700');
+                    document.getElementById('scannerToggleBtn').classList.add('bg-blue-600', 'hover:bg-blue-700');
+                }).catch(err => console.error('Error stopping scanner:', err));
+            }
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log('QR Code scanned:', decodedText);
+            stopQRScanner();
+            
+            try {
+                const data = JSON.parse(decodedText);
+                if (data.booking_reference || data.booking_code) {
+                    verifyAndCheckIn(data.booking_reference || data.booking_code);
+                }
+            } catch (e) {
+                // Try as booking code
+                verifyAndCheckIn(decodedText);
+            }
+        }
+
+        function onScanError(errorMessage) {
+            // Ignore scan errors (happens frequently during scanning)
+        }
+
+        // Manual Code Verification
+        function verifyManualCode() {
+            const code = document.getElementById('manualCodeInput').value.trim();
+            if (!code) {
+                alert('Please enter a booking code');
+                return;
+            }
+            verifyAndCheckIn(code);
+        }
+
+        // Verify and Check In
+        async function verifyAndCheckIn(code) {
+            try {
+                const response = await fetch('/api/staff/beach/check-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: code })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showCheckInSuccess(data.booking);
+                    loadRecentCheckIns();
+                    document.getElementById('manualCodeInput').value = '';
+                } else {
+                    showCheckInError(data.error || 'Booking not found');
+                }
+            } catch (error) {
+                console.error('Check-in error:', error);
+                showCheckInError('Failed to verify booking');
+            }
+        }
+
+        function showCheckInSuccess(booking) {
+            const resultHtml = \`
+                <div class="bg-green-50 border-4 border-green-500 rounded-xl p-6 animate-slide-in">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-check-circle text-6xl text-green-600 mb-2"></i>
+                        <h3 class="text-2xl font-bold text-green-800">Check-In Successful!</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Guest Name</p>
+                            <p class="text-lg font-bold">\${booking.guest_name}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Room Number</p>
+                            <p class="text-lg font-bold">\${booking.guest_room_number || 'N/A'}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Beach Spot</p>
+                            <p class="text-lg font-bold">Spot \${booking.spot_number}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Booking Code</p>
+                            <p class="text-lg font-bold">\${booking.booking_code}</p>
+                        </div>
+                    </div>
+                </div>
+            \`;
+            
+            document.getElementById('checkInResult').innerHTML = resultHtml;
+            document.getElementById('checkInResult').classList.remove('hidden');
+            
+            setTimeout(() => {
+                document.getElementById('checkInResult').classList.add('hidden');
+            }, 10000);
+        }
+
+        function showCheckInError(message) {
+            const resultHtml = \`
+                <div class="bg-red-50 border-4 border-red-500 rounded-xl p-6">
+                    <div class="text-center">
+                        <i class="fas fa-times-circle text-6xl text-red-600 mb-2"></i>
+                        <h3 class="text-2xl font-bold text-red-800">Check-In Failed</h3>
+                        <p class="text-gray-700 mt-2">\${message}</p>
+                    </div>
+                </div>
+            \`;
+            
+            document.getElementById('checkInResult').innerHTML = resultHtml;
+            document.getElementById('checkInResult').classList.remove('hidden');
+            
+            setTimeout(() => {
+                document.getElementById('checkInResult').classList.add('hidden');
+            }, 5000);
+        }
+
+        // Load Recent Check-Ins
+        async function loadRecentCheckIns() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}&date=\${today}&status=checked_in\`);
+                const data = await response.json();
+                
+                if (data.bookings && data.bookings.length > 0) {
+                    const html = data.bookings.slice(0, 10).map(booking => \`
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user text-blue-600"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold">\${booking.guest_name}</p>
+                                    <p class="text-sm text-gray-600">Spot \${booking.spot_number} • \${booking.booking_code}</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-600">\${new Date(booking.checked_in_at).toLocaleTimeString()}</p>
+                            </div>
+                        </div>
+                    \`).join('');
+                    document.getElementById('recentCheckIns').innerHTML = html;
+                } else {
+                    document.getElementById('recentCheckIns').innerHTML = '<p class="text-gray-500 text-center py-8">No check-ins yet today</p>';
+                }
+            } catch (error) {
+                console.error('Error loading recent check-ins:', error);
+            }
+        }
+
+        // Beach Map Functions
+        async function refreshBeachMap() {
+            const date = document.getElementById('mapDate').value;
+            const timeSlot = document.getElementById('mapTimeSlot').value;
+            
+            try {
+                const response = await fetch(\`/api/admin/beach/spots?property_id=\${PROPERTY_ID}&date=\${date}&time_slot=\${timeSlot}\`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderBeachMap(data.spots);
+                    updateStats(data.spots);
+                }
+            } catch (error) {
+                console.error('Error loading beach map:', error);
+            }
+        }
+
+        function renderBeachMap(spots) {
+            const canvas = document.getElementById('beachMapCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw sand background
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#fef3c7');
+            gradient.addColorStop(0.5, '#fde68a');
+            gradient.addColorStop(1, '#fcd34d');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw spots
+            spots.forEach(spot => {
+                const x = spot.position_x * canvas.width;
+                const y = spot.position_y * canvas.height;
+                const size = 40;
+                
+                // Determine color based on status
+                let color;
+                if (spot.booking_status === 'checked_in') color = '#3b82f6'; // Blue
+                else if (spot.booking_status === 'confirmed') color = '#eab308'; // Yellow
+                else if (spot.is_blocked) color = '#ef4444'; // Red
+                else color = '#22c55e'; // Green
+                
+                // Draw spot
+                ctx.fillStyle = color;
+                ctx.fillRect(x - size/2, y - size/2, size, size);
+                
+                // Draw premium border
+                if (spot.is_premium) {
+                    ctx.strokeStyle = '#a855f7';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(x - size/2, y - size/2, size, size);
+                }
+                
+                // Draw spot number
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(spot.spot_number, x, y);
+            });
+        }
+
+        function updateStats(spots) {
+            const total = spots.length;
+            const available = spots.filter(s => !s.booking_status && !s.is_blocked).length;
+            const booked = spots.filter(s => s.booking_status === 'confirmed').length;
+            const checkedIn = spots.filter(s => s.booking_status === 'checked_in').length;
+            const occupancy = total > 0 ? Math.round(((booked + checkedIn) / total) * 100) : 0;
+            
+            document.getElementById('totalSpots').textContent = total;
+            document.getElementById('availableSpots').textContent = available;
+            document.getElementById('bookedSpots').textContent = booked;
+            document.getElementById('checkedInSpots').textContent = checkedIn;
+            document.getElementById('occupancyRate').textContent = occupancy + '%';
+        }
+
+        // Walk-In Booking Functions
+        async function checkAvailability() {
+            const date = document.getElementById('walkinDate').value;
+            const timeSlot = document.getElementById('walkinTimeSlot').value;
+            
+            if (!date || !timeSlot) {
+                alert('Please select date and time slot');
+                return;
+            }
+            
+            try {
+                const response = await fetch(\`/api/beach/availability/\${PROPERTY_ID}/\${date}?time_slot=\${timeSlot}\`);
+                const data = await response.json();
+                
+                if (data.availableSpots && data.availableSpots.length > 0) {
+                    displayAvailableSpots(data.availableSpots);
+                } else {
+                    alert('No spots available for the selected date and time slot');
+                }
+            } catch (error) {
+                console.error('Error checking availability:', error);
+                alert('Failed to check availability');
+            }
+        }
+
+        function displayAvailableSpots(spots) {
+            const html = spots.map(spot => \`
+                <button type="button" onclick="selectSpot(\${spot.spot_id}, '\${spot.spot_number}')" 
+                    class="spot-btn px-4 py-3 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition" data-spot-id="\${spot.spot_id}">
+                    <div class="text-lg font-bold">\${spot.spot_number}</div>
+                    <div class="text-xs text-gray-600">\${spot.spot_type}</div>
+                </button>
+            \`).join('');
+            
+            document.getElementById('availableSpotsList').innerHTML = html;
+            document.getElementById('availableSpotsSection').classList.remove('hidden');
+            document.getElementById('walkinSubmitBtn').classList.remove('hidden');
+        }
+
+        function selectSpot(spotId, spotNumber) {
+            selectedSpotId = spotId;
+            
+            // Update UI
+            document.querySelectorAll('.spot-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'bg-blue-50');
+                btn.classList.add('border-gray-300');
+            });
+            
+            event.target.closest('.spot-btn').classList.remove('border-gray-300');
+            event.target.closest('.spot-btn').classList.add('border-blue-500', 'bg-blue-50');
+        }
+
+        // Walk-In Form Submission
+        document.getElementById('walkinForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!selectedSpotId) {
+                alert('Please select a spot');
+                return;
+            }
+            
+            const formData = {
+                property_id: PROPERTY_ID,
+                spot_id: selectedSpotId,
+                guest_name: document.getElementById('walkinGuestName').value,
+                guest_room_number: document.getElementById('walkinRoomNumber').value,
+                guest_phone: document.getElementById('walkinPhone').value,
+                guest_email: document.getElementById('walkinEmail').value,
+                booking_date: document.getElementById('walkinDate').value,
+                slot_type: document.getElementById('walkinTimeSlot').value,
+                num_guests: parseInt(document.getElementById('walkinNumGuests').value)
+            };
+            
+            try {
+                const response = await fetch('/api/beach/bookings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showWalkinSuccess(data.booking);
+                    document.getElementById('walkinForm').reset();
+                    document.getElementById('availableSpotsSection').classList.add('hidden');
+                    document.getElementById('walkinSubmitBtn').classList.add('hidden');
+                    selectedSpotId = null;
+                } else {
+                    alert('Booking failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to create booking');
+            }
+        });
+
+        function showWalkinSuccess(booking) {
+            const resultHtml = \`
+                <div class="bg-green-50 border-4 border-green-500 rounded-xl p-6 animate-slide-in">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-check-circle text-6xl text-green-600 mb-2"></i>
+                        <h3 class="text-2xl font-bold text-green-800">Booking Created Successfully!</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Booking Code</p>
+                            <p class="text-2xl font-bold text-blue-600">\${booking.booking_code}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Spot Number</p>
+                            <p class="text-2xl font-bold">\${booking.spot_number}</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-sm text-gray-600">Reference</p>
+                            <p class="text-sm font-mono">\${booking.booking_reference}</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <a href="/beach-booking-confirmation/\${booking.booking_reference}" target="_blank" 
+                           class="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">
+                            <i class="fas fa-print mr-2"></i>View & Print Confirmation
+                        </a>
+                    </div>
+                </div>
+            \`;
+            
+            document.getElementById('walkinResult').innerHTML = resultHtml;
+            document.getElementById('walkinResult').classList.remove('hidden');
+            
+            setTimeout(() => {
+                document.getElementById('walkinResult').classList.add('hidden');
+            }, 15000);
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Beach Map Designer - Interactive drag-and-drop interface
 app.get('/admin/beach-map-designer', (c) => {
   return c.html(`
@@ -23794,13 +24511,26 @@ app.get('/admin/dashboard', (c) => {
     <!-- Beach Management Tab -->
     <div id="beachTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4">
-                <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
-                Beach Booking Management
-            </h2>
-            <p class="text-gray-600 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold">
+                    <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
+                    Beach Booking Management
+                </h2>
+                <button onclick="window.open('/admin/beach-management/' + currentPropertyId, '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
+                    <i class="fas fa-external-link-alt"></i>
+                    Open Beach Management Portal
+                    <span class="text-xs bg-white/20 px-2 py-1 rounded">STAFF</span>
+                </button>
+            </div>
+            <p class="text-gray-600 mb-4">
                 Configure your beach spots, create interactive beach maps, and manage guest bookings for umbrellas, cabanas, and loungers.
             </p>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+                <p class="text-sm text-blue-900">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>New!</strong> Use the Beach Management Portal for staff operations: QR check-in, live beach map, and walk-in bookings all in one place.
+                </p>
+            </div>
             
             <!-- Live Beach Map -->
             <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 mb-6 border-2 border-green-200">
