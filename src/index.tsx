@@ -35381,7 +35381,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                   '<h3 class="font-bold text-lg text-gray-900">' + menu.menu_name + '</h3>' +
                   '<p class="text-sm text-gray-600 capitalize"><i class="fas fa-tag mr-1"></i>' + menu.menu_type + '</p>' +
                 '</div>' +
-                '<img src="' + menu.original_image_url + '" alt="Menu" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-300" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 fill=%22%23999%22%3EMenu%3C/text%3E%3C/svg%3E\'"> ' +
+                '<img src="' + menu.original_image_url + '" alt="Menu" class="w-20 h-20 object-cover rounded-lg border-2 border-gray-300"> ' +
               '</div>' +
               '<div class="flex flex-wrap gap-2 mb-3">' +
                 statusBadge +
