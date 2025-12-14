@@ -30081,7 +30081,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                     <i class="fas fa-robot text-blue-600"></i>
                   </div>
                   <div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">
-                    <p class="text-sm text-gray-800">Hi! I'm your GuestConnect Assistant. Ask me anything about managing your hotel dashboard, configuring beach bookings, analytics, or any feature! 🤖</p>
+                    <p class="text-sm text-gray-800">Hi! I am your GuestConnect Assistant. Ask me anything about managing your hotel dashboard, configuring beach bookings, analytics, or any feature!</p>
                   </div>
                 </div>
               </div>
@@ -30096,13 +30096,13 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 </div>
                 <div class="mt-2 flex flex-wrap gap-2">
                   <button onclick="sendQuickQuestion('How do I change beach settings?')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
-                    🏖️ Beach settings
+                    Beach settings
                   </button>
                   <button onclick="sendQuickQuestion('Show me analytics')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
-                    📊 Analytics
+                    Analytics
                   </button>
                   <button onclick="sendQuickQuestion('How to customize QR code?')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
-                    🎨 QR codes
+                    QR codes
                   </button>
                 </div>
               </div>
