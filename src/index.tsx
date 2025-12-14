@@ -23542,6 +23542,103 @@ app.get('/admin/dashboard', (c) => {
                 Configure your beach spots, create interactive beach maps, and manage guest bookings for umbrellas, cabanas, and loungers.
             </p>
             
+            <!-- Live Beach Map -->
+            <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 mb-6 border-2 border-green-200">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fas fa-map-marked-alt text-green-600"></i>
+                            Live Beach Map
+                            <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">LIVE</span>
+                        </h3>
+                        <p class="text-sm text-gray-600 mt-1">Real-time view of beach availability - Perfect for walk-in guests</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="liveMapDate" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="today">Today</option>
+                            <option value="tomorrow">Tomorrow</option>
+                        </select>
+                        <select id="liveMapSlot" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="all">All Times</option>
+                            <option value="half_day_am">Morning</option>
+                            <option value="half_day_pm">Afternoon</option>
+                            <option value="full_day">Full Day</option>
+                        </select>
+                        <button onclick="refreshLiveMap()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Legend -->
+                <div class="flex gap-4 mb-4 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-green-500 rounded"></div>
+                        <span>Available</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-yellow-500 rounded"></div>
+                        <span>Booked</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span>Checked In</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-red-500 rounded"></div>
+                        <span>Blocked</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-purple-500 rounded border-2 border-purple-700"></div>
+                        <span>Premium</span>
+                    </div>
+                </div>
+                
+                <!-- Live Map Canvas -->
+                <div class="bg-white rounded-lg p-4 border-2 border-gray-200 overflow-auto" style="max-height: 600px;">
+                    <div class="relative" style="min-width: 800px; min-height: 500px;">
+                        <canvas id="liveBeachCanvas" width="800" height="500" class="border border-gray-300 rounded"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Stats Summary -->
+                <div class="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="bg-white rounded-lg p-3 border border-gray-200 text-center">
+                        <div class="text-2xl font-bold text-gray-800" id="totalSpots">0</div>
+                        <div class="text-xs text-gray-600">Total Spots</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-3 border border-green-200 text-center">
+                        <div class="text-2xl font-bold text-green-600" id="availableSpots">0</div>
+                        <div class="text-xs text-gray-600">Available</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-3 border border-yellow-200 text-center">
+                        <div class="text-2xl font-bold text-yellow-600" id="bookedSpots">0</div>
+                        <div class="text-xs text-gray-600">Booked</div>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-3 border border-blue-200 text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="checkedInSpots">0</div>
+                        <div class="text-xs text-gray-600">Checked In</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 text-center">
+                        <div class="text-2xl font-bold text-gray-600" id="occupancyRate">0%</div>
+                        <div class="text-xs text-gray-600">Occupancy</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="mt-4 flex gap-2">
+                    <button onclick="openWalkInBooking()" class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:shadow-lg transition font-semibold">
+                        <i class="fas fa-user-plus mr-2"></i>
+                        Book for Walk-In Guest
+                    </button>
+                    <button onclick="window.location.href='/admin/beach-analytics'" class="px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                        <i class="fas fa-chart-bar mr-2"></i>
+                        View Analytics
+                    </button>
+                </div>
+            </div>
+            
             <!-- Beach Settings -->
             <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 mb-6 border-2 border-blue-200">
                 <h3 class="text-xl font-bold mb-4">
@@ -26760,6 +26857,9 @@ app.get('/admin/dashboard', (c) => {
             
             // Load time slots
             loadTimeSlots(s.time_slots);
+            
+            // Initialize live beach map
+            await initializeLiveMap();
           }
         } catch (error) {
           console.error('Load beach settings error:', error);
@@ -27267,6 +27367,415 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Cancel booking error:', error);
           alert('❌ Error cancelling booking');
+        }
+      };
+      
+      // ===== LIVE BEACH MAP FUNCTIONS =====
+      
+      // Store live map data globally
+      window.liveBeachMapData = {
+        spots: [],
+        bookings: [],
+        canvas: null,
+        ctx: null
+      };
+      
+      // Initialize live map on load
+      window.initializeLiveMap = async function() {
+        const canvas = document.getElementById('liveBeachCanvas');
+        if (!canvas) return;
+        
+        window.liveBeachMapData.canvas = canvas;
+        window.liveBeachMapData.ctx = canvas.getContext('2d');
+        
+        // Set up date selector change event
+        const dateSelector = document.getElementById('liveMapDate');
+        const slotSelector = document.getElementById('liveMapSlot');
+        
+        if (dateSelector) {
+          dateSelector.addEventListener('change', () => refreshLiveMap());
+        }
+        if (slotSelector) {
+          slotSelector.addEventListener('change', () => refreshLiveMap());
+        }
+        
+        // Load initial data
+        await refreshLiveMap();
+      };
+      
+      // Refresh live map data and render
+      window.refreshLiveMap = async function() {
+        try {
+          // Determine date based on selector
+          const dateSelector = document.getElementById('liveMapDate');
+          const selectedDate = dateSelector ? dateSelector.value : 'today';
+          
+          const today = new Date();
+          let targetDate;
+          
+          if (selectedDate === 'tomorrow') {
+            targetDate = new Date(today);
+            targetDate.setDate(targetDate.getDate() + 1);
+          } else {
+            targetDate = today;
+          }
+          
+          const dateStr = targetDate.toISOString().split('T')[0];
+          
+          // Get selected slot filter
+          const slotSelector = document.getElementById('liveMapSlot');
+          const selectedSlot = slotSelector ? slotSelector.value : 'all';
+          
+          // Fetch spots
+          const spotsResponse = await fetch('/api/admin/beach/spots/1');
+          const spotsData = await spotsResponse.json();
+          
+          // Fetch bookings for the date
+          const bookingsResponse = await fetch('/api/admin/beach/bookings?property_id=1&date=' + dateStr);
+          const bookingsData = await bookingsResponse.json();
+          
+          window.liveBeachMapData.spots = spotsData.spots || [];
+          window.liveBeachMapData.bookings = bookingsData.bookings || [];
+          
+          // Render the map
+          renderLiveBeachMap(selectedSlot);
+          
+          // Update stats
+          updateLiveMapStats(selectedSlot);
+        } catch (error) {
+          console.error('Refresh live map error:', error);
+        }
+      };
+      
+      // Render the live beach map on canvas
+      function renderLiveBeachMap(slotFilter) {
+        const ctx = window.liveBeachMapData.ctx;
+        const canvas = window.liveBeachMapData.canvas;
+        
+        if (!ctx || !canvas) return;
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw beach background
+        ctx.fillStyle = '#f0f9ff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw sand gradient
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#fef3c7');
+        gradient.addColorStop(1, '#fde68a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+        
+        // Draw water
+        const waterGradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 100);
+        waterGradient.addColorStop(0, '#0ea5e9');
+        waterGradient.addColorStop(1, '#38bdf8');
+        ctx.fillStyle = waterGradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height - 100);
+        
+        // Draw spots
+        const spots = window.liveBeachMapData.spots;
+        const bookings = window.liveBeachMapData.bookings;
+        
+        spots.forEach(spot => {
+          // Determine spot status
+          const spotBookings = bookings.filter(b => b.spot_id === spot.spot_id);
+          
+          let status = 'available'; // green
+          let bookingInfo = null;
+          
+          // Check bookings for this spot
+          for (const booking of spotBookings) {
+            if (booking.booking_status === 'cancelled') continue;
+            
+            // Apply slot filter
+            if (slotFilter !== 'all') {
+              if (booking.slot_type === 'full_day' || slotFilter === 'full_day') {
+                status = booking.booking_status === 'checked_in' ? 'checked_in' : 'booked';
+                bookingInfo = booking;
+                break;
+              } else if (booking.slot_type === slotFilter) {
+                status = booking.booking_status === 'checked_in' ? 'checked_in' : 'booked';
+                bookingInfo = booking;
+                break;
+              }
+            } else {
+              // Show if any booking exists
+              status = booking.booking_status === 'checked_in' ? 'checked_in' : 'booked';
+              bookingInfo = booking;
+              break;
+            }
+          }
+          
+          // Blocked spots
+          if (spot.maintenance_mode === 1 || spot.is_active === 0) {
+            status = 'blocked';
+          }
+          
+          // Color coding
+          let color;
+          switch (status) {
+            case 'available':
+              color = '#10b981'; // green
+              break;
+            case 'booked':
+              color = '#eab308'; // yellow
+              break;
+            case 'checked_in':
+              color = '#3b82f6'; // blue
+              break;
+            case 'blocked':
+              color = '#ef4444'; // red
+              break;
+            default:
+              color = '#6b7280'; // gray
+          }
+          
+          // Draw spot circle
+          ctx.beginPath();
+          ctx.arc(spot.position_x, spot.position_y, 20, 0, 2 * Math.PI);
+          ctx.fillStyle = color;
+          ctx.fill();
+          
+          // Premium border
+          if (spot.is_premium === 1) {
+            ctx.strokeStyle = '#9333ea';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+          
+          // Draw spot number
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 12px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(spot.spot_number, spot.position_x, spot.position_y);
+          
+          // Draw spot type icon below
+          ctx.fillStyle = '#1f2937';
+          ctx.font = '10px Arial';
+          let icon = '';
+          switch (spot.spot_type.toLowerCase()) {
+            case 'umbrella':
+              icon = '☂';
+              break;
+            case 'cabana':
+              icon = '🏖';
+              break;
+            case 'lounger':
+              icon = '🏝';
+              break;
+            case 'daybed':
+              icon = '🛏';
+              break;
+          }
+          ctx.fillText(icon, spot.position_x, spot.position_y + 35);
+        });
+        
+        // Draw title
+        ctx.fillStyle = '#1f2937';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Live Beach Map - Real-time Availability', 20, 30);
+      }
+      
+      // Update statistics summary
+      function updateLiveMapStats(slotFilter) {
+        const spots = window.liveBeachMapData.spots;
+        const bookings = window.liveBeachMapData.bookings;
+        
+        let totalSpots = spots.length;
+        let availableCount = 0;
+        let bookedCount = 0;
+        let checkedInCount = 0;
+        
+        spots.forEach(spot => {
+          if (spot.maintenance_mode === 1 || spot.is_active === 0) {
+            totalSpots--;
+            return;
+          }
+          
+          const spotBookings = bookings.filter(b => 
+            b.spot_id === spot.spot_id && b.booking_status !== 'cancelled'
+          );
+          
+          let hasBooking = false;
+          let isCheckedIn = false;
+          
+          for (const booking of spotBookings) {
+            if (slotFilter !== 'all') {
+              if (booking.slot_type === 'full_day' || slotFilter === 'full_day') {
+                hasBooking = true;
+                if (booking.booking_status === 'checked_in') isCheckedIn = true;
+                break;
+              } else if (booking.slot_type === slotFilter) {
+                hasBooking = true;
+                if (booking.booking_status === 'checked_in') isCheckedIn = true;
+                break;
+              }
+            } else {
+              hasBooking = true;
+              if (booking.booking_status === 'checked_in') isCheckedIn = true;
+              break;
+            }
+          }
+          
+          if (isCheckedIn) {
+            checkedInCount++;
+          } else if (hasBooking) {
+            bookedCount++;
+          } else {
+            availableCount++;
+          }
+        });
+        
+        const occupancyRate = totalSpots > 0 ? Math.round(((bookedCount + checkedInCount) / totalSpots) * 100) : 0;
+        
+        // Update DOM
+        const totalEl = document.getElementById('totalSpots');
+        const availableEl = document.getElementById('availableSpots');
+        const bookedEl = document.getElementById('bookedSpots');
+        const checkedInEl = document.getElementById('checkedInSpots');
+        const occupancyEl = document.getElementById('occupancyRate');
+        
+        if (totalEl) totalEl.textContent = totalSpots;
+        if (availableEl) availableEl.textContent = availableCount;
+        if (bookedEl) bookedEl.textContent = bookedCount;
+        if (checkedInEl) checkedInEl.textContent = checkedInCount;
+        if (occupancyEl) occupancyEl.textContent = occupancyRate + '%';
+      }
+      
+      // Open walk-in booking modal
+      window.openWalkInBooking = async function() {
+        // Get available spots
+        await refreshLiveMap();
+        
+        const dateSelector = document.getElementById('liveMapDate');
+        const selectedDate = dateSelector ? dateSelector.value : 'today';
+        
+        const today = new Date();
+        let targetDate;
+        
+        if (selectedDate === 'tomorrow') {
+          targetDate = new Date(today);
+          targetDate.setDate(targetDate.getDate() + 1);
+        } else {
+          targetDate = today;
+        }
+        
+        const dateStr = targetDate.toISOString().split('T')[0];
+        
+        // Get slot filter
+        const slotSelector = document.getElementById('liveMapSlot');
+        const selectedSlot = slotSelector ? slotSelector.value : 'full_day';
+        
+        // Find available spots
+        const spots = window.liveBeachMapData.spots;
+        const bookings = window.liveBeachMapData.bookings;
+        
+        const availableSpots = spots.filter(spot => {
+          if (spot.maintenance_mode === 1 || spot.is_active === 0) return false;
+          
+          const spotBookings = bookings.filter(b => 
+            b.spot_id === spot.spot_id && b.booking_status !== 'cancelled'
+          );
+          
+          // Check availability for selected slot
+          for (const booking of spotBookings) {
+            if (selectedSlot === 'all' || selectedSlot === 'full_day') {
+              return false; // Any booking blocks full day
+            }
+            if (booking.slot_type === 'full_day' || booking.slot_type === selectedSlot) {
+              return false;
+            }
+          }
+          
+          return true;
+        });
+        
+        if (availableSpots.length === 0) {
+          alert('⚠️ No available spots for the selected date and time slot. Please choose a different time or date.');
+          return;
+        }
+        
+        // Build spot selection options
+        const spotOptions = availableSpots.map(spot => {
+          const priceLabel = spot.price_full_day > 0 ? ' - $' + spot.price_full_day : ' (Free)';
+          return spot.spot_number + ' (' + spot.spot_type + ')' + priceLabel;
+        }).join('\\n');
+        
+        // Prompt for guest details
+        const guestName = prompt('Enter guest name:');
+        if (!guestName) return;
+        
+        const roomNumber = prompt('Enter room number (optional):') || '';
+        const phone = prompt('Enter phone number (optional):') || '';
+        
+        // Select spot
+        const spotSelection = prompt('Available spots:\\n\\n' + spotOptions + '\\n\\nEnter spot number:');
+        if (!spotSelection) return;
+        
+        const selectedSpot = availableSpots.find(s => s.spot_number === spotSelection.trim());
+        if (!selectedSpot) {
+          alert('❌ Invalid spot number');
+          return;
+        }
+        
+        // Determine time slot
+        let slotType = selectedSlot === 'all' ? 'full_day' : selectedSlot;
+        let startTime = '08:00';
+        let endTime = '18:00';
+        
+        if (slotType === 'half_day_am') {
+          slotType = 'morning';
+          startTime = '08:00';
+          endTime = '13:00';
+        } else if (slotType === 'half_day_pm') {
+          slotType = 'afternoon';
+          startTime = '13:00';
+          endTime = '18:00';
+        }
+        
+        // Create booking
+        try {
+          const response = await fetch('/api/beach/bookings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              spot_id: selectedSpot.spot_id,
+              guest_name: guestName,
+              guest_room_number: roomNumber,
+              guest_phone: phone,
+              booking_date: dateStr,
+              slot_type: slotType,
+              start_time: startTime,
+              end_time: endTime,
+              num_guests: 2,
+              special_requests: 'Walk-in booking'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Walk-in booking created!\\n\\nBooking Reference: ' + data.booking.booking_reference + '\\nSpot: ' + selectedSpot.spot_number + '\\nGuest: ' + guestName);
+            
+            // Refresh map
+            await refreshLiveMap();
+            
+            // Ask if they want to print QR code
+            if (confirm('Print QR code for guest?')) {
+              window.open('/api/beach/bookings/' + data.booking.booking_reference + '/qr', '_blank');
+            }
+          } else {
+            alert('❌ Failed to create booking: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Walk-in booking error:', error);
+          alert('❌ Error creating walk-in booking');
         }
       };
       
