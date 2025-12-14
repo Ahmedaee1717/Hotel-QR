@@ -3337,23 +3337,78 @@ app.post('/api/admin/vendors', async (c) => {
   }
 })
 
-// Update vendor status
+// Update vendor status and commission
 app.patch('/api/admin/vendors/:vendor_id', async (c) => {
   const { DB } = c.env
   const { vendor_id } = c.req.param()
-  const { status, commission_rate } = await c.req.json()
+  const { status, custom_commission_rate } = await c.req.json()
 
   try {
-    await DB.prepare(`
-      UPDATE vendors
-      SET status = ?, commission_rate = COALESCE(?, commission_rate), updated_at = datetime('now')
-      WHERE vendor_id = ?
-    `).bind(status, commission_rate, vendor_id).run()
+    // Update vendor status
+    if (status) {
+      await DB.prepare(`
+        UPDATE vendors
+        SET status = ?, updated_at = datetime('now')
+        WHERE vendor_id = ?
+      `).bind(status, vendor_id).run()
+    }
+
+    // Update commission rate in vendor_properties
+    if (custom_commission_rate !== undefined) {
+      await DB.prepare(`
+        UPDATE vendor_properties
+        SET custom_commission_rate = ?
+        WHERE vendor_id = ?
+      `).bind(custom_commission_rate, vendor_id).run()
+    }
 
     return c.json({ success: true, message: 'Vendor updated successfully' })
   } catch (error) {
     console.error('Update vendor error:', error)
     return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get vendor analytics (bookings, revenue, commission)
+app.get('/api/admin/vendor-analytics/:vendor_id', async (c) => {
+  const { DB } = c.env
+  const { vendor_id } = c.req.param()
+
+  try {
+    // Get total bookings count
+    const bookingsResult = await DB.prepare(`
+      SELECT COUNT(*) as total_bookings
+      FROM bookings
+      WHERE vendor_id = ? AND booking_status IN ('confirmed', 'completed')
+    `).bind(vendor_id).first()
+
+    // Get total revenue and commission
+    const revenueResult = await DB.prepare(`
+      SELECT 
+        COALESCE(SUM(b.total_price), 0) as total_revenue,
+        COALESCE(AVG(vp.custom_commission_rate), 15) as commission_rate
+      FROM bookings b
+      LEFT JOIN vendor_properties vp ON b.vendor_id = vp.vendor_id
+      WHERE b.vendor_id = ? AND b.booking_status IN ('confirmed', 'completed')
+      GROUP BY b.vendor_id
+    `).bind(vendor_id).first()
+
+    const total_revenue = revenueResult?.total_revenue || 0
+    const commission_rate = revenueResult?.commission_rate || 15
+    const commission_earned = (total_revenue * commission_rate) / 100
+
+    return c.json({
+      success: true,
+      analytics: {
+        total_bookings: bookingsResult?.total_bookings || 0,
+        total_revenue: total_revenue,
+        commission_rate: commission_rate,
+        commission_earned: commission_earned
+      }
+    })
+  } catch (error) {
+    console.error('Vendor analytics error:', error)
+    return c.json({ error: 'Internal server error: ' + error.message }, 500)
   }
 })
 
@@ -22954,6 +23009,46 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Vendors Tab -->
         <div id="vendorsTab" class="tab-content hidden">
+            <!-- Vendor Analytics Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-blue-100 text-sm">Total Vendors</p>
+                            <p class="text-3xl font-bold" id="totalVendorsCount">0</p>
+                        </div>
+                        <i class="fas fa-users text-2xl text-blue-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-green-100 text-sm">Total Bookings</p>
+                            <p class="text-3xl font-bold" id="vendorBookingsCount">0</p>
+                        </div>
+                        <i class="fas fa-calendar-check text-2xl text-green-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-purple-100 text-sm">Total Revenue</p>
+                            <p class="text-3xl font-bold" id="vendorRevenueTotal">$0</p>
+                        </div>
+                        <i class="fas fa-dollar-sign text-2xl text-purple-200"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <p class="text-orange-100 text-sm">Your Commission</p>
+                            <p class="text-3xl font-bold" id="totalCommissionEarned">$0</p>
+                        </div>
+                        <i class="fas fa-percent text-2xl text-orange-200"></i>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-4 md:mb-6">
                 <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4"><i class="fas fa-user-plus mr-2 text-green-600"></i>Add New Vendor</h2>
                 <form id="addVendorForm" class="space-y-4">
@@ -22968,7 +23063,7 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
-                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4">All Vendors</h2>
+                <h2 class="text-xl md:text-2xl font-bold mb-3 md:mb-4">All Vendors & Commission Management</h2>
                 <div id="vendorsList" class="space-y-3"></div>
             </div>
         </div>
@@ -27202,10 +27297,186 @@ app.get('/admin/dashboard', (c) => {
           const vendors = await response.json();
           const list = document.getElementById('vendorsList');
           
-          list.innerHTML = vendors.map(v => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><div class="font-bold text-lg">' + v.business_name + '</div><div class="text-sm text-gray-600">' + v.email + ' • ' + v.phone + '</div></div><div class="flex gap-2"><span class="px-3 py-1 rounded-full text-sm ' + (v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') + '">' + v.status + '</span><button onclick="removeVendor(' + v.vendor_id + ')" class="bg-red-100 text-red-700 px-4 py-2 rounded hover:bg-red-200"><i class="fas fa-trash mr-2"></i>Remove</button></div></div>').join('');
+          // Update global stats
+          document.getElementById('totalVendorsCount').textContent = vendors.length;
+          
+          // Fetch analytics for each vendor
+          const vendorsWithAnalytics = await Promise.all(
+            vendors.map(async (vendor) => {
+              try {
+                const analyticsRes = await fetch('/api/admin/vendor-analytics/' + vendor.vendor_id);
+                const analyticsData = await analyticsRes.json();
+                return { ...vendor, analytics: analyticsData.analytics || {} };
+              } catch (e) {
+                console.error('Failed to load analytics for vendor', vendor.vendor_id, e);
+                return { ...vendor, analytics: { total_bookings: 0, total_revenue: 0, commission_rate: 15, commission_earned: 0 } };
+              }
+            })
+          );
+          
+          // Calculate totals for stats cards
+          let totalBookings = 0;
+          let totalRevenue = 0;
+          let totalCommission = 0;
+          vendorsWithAnalytics.forEach(v => {
+            totalBookings += v.analytics.total_bookings || 0;
+            totalRevenue += v.analytics.total_revenue || 0;
+            totalCommission += v.analytics.commission_earned || 0;
+          });
+          
+          document.getElementById('vendorBookingsCount').textContent = totalBookings;
+          document.getElementById('vendorRevenueTotal').textContent = '$' + totalRevenue.toFixed(2);
+          document.getElementById('totalCommissionEarned').textContent = '$' + totalCommission.toFixed(2);
+          
+          // Render vendor cards with analytics
+          list.innerHTML = vendorsWithAnalytics.map(v => {
+            const analytics = v.analytics || {};
+            const statusBadgeClass = v.status === 'active' ? 'bg-green-100 text-green-700 border border-green-300' : 'bg-red-100 text-red-700 border border-red-300';
+            const statusIcon = v.status === 'active' ? 'fa-check-circle' : 'fa-times-circle';
+            const toggleBtnClass = v.status === 'active' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200';
+            const toggleIcon = v.status === 'active' ? 'fa-pause' : 'fa-play';
+            const toggleText = v.status === 'active' ? 'Suspend' : 'Activate';
+            
+            return '<div class="border-2 border-gray-200 rounded-xl p-6 hover:shadow-xl transition-all bg-white">' +
+              '<div class="flex justify-between items-start mb-4">' +
+                '<div class="flex-1">' +
+                  '<div class="flex items-center gap-3 mb-2">' +
+                    '<div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">' +
+                      v.business_name.charAt(0).toUpperCase() +
+                    '</div>' +
+                    '<div>' +
+                      '<div class="font-bold text-xl text-gray-800">' + v.business_name + '</div>' +
+                      '<div class="text-sm text-gray-500">' + v.email + '</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="text-sm text-gray-600">' +
+                    '<i class="fas fa-phone mr-1"></i>' + (v.phone || 'No phone') +
+                  '</div>' +
+                '</div>' +
+                '<span class="px-4 py-2 rounded-full text-sm font-semibold ' + statusBadgeClass + '">' +
+                  '<i class="fas ' + statusIcon + ' mr-1"></i>' + v.status +
+                '</span>' +
+              '</div>' +
+              '<div class="grid grid-cols-3 gap-3 mb-4 bg-gray-50 p-4 rounded-lg">' +
+                '<div class="text-center">' +
+                  '<div class="text-2xl font-bold text-blue-600">' + (analytics.total_bookings || 0) + '</div>' +
+                  '<div class="text-xs text-gray-600 mt-1">' +
+                    '<i class="fas fa-calendar-check mr-1"></i>Bookings' +
+                  '</div>' +
+                '</div>' +
+                '<div class="text-center border-l border-r border-gray-300">' +
+                  '<div class="text-2xl font-bold text-green-600">$' + (analytics.total_revenue || 0).toFixed(2) + '</div>' +
+                  '<div class="text-xs text-gray-600 mt-1">' +
+                    '<i class="fas fa-dollar-sign mr-1"></i>Revenue' +
+                  '</div>' +
+                '</div>' +
+                '<div class="text-center">' +
+                  '<div class="text-2xl font-bold text-orange-600">$' + (analytics.commission_earned || 0).toFixed(2) + '</div>' +
+                  '<div class="text-xs text-gray-600 mt-1">' +
+                    '<i class="fas fa-percent mr-1"></i>Commission' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">' +
+                '<div class="flex items-center gap-3">' +
+                  '<div class="flex-1">' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">' +
+                      '<i class="fas fa-percent text-orange-600 mr-1"></i>Commission Rate' +
+                    '</label>' +
+                    '<div class="flex items-center gap-2">' +
+                      '<input type="number" id="commission_rate_' + v.vendor_id + '" value="' + (analytics.commission_rate || 15) + '" min="0" max="100" step="0.5" class="w-24 px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent font-bold text-center">' +
+                      '<span class="text-lg font-semibold text-gray-700">%</span>' +
+                      '<button onclick="updateVendorCommission(' + v.vendor_id + ')" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-medium text-sm">' +
+                        '<i class="fas fa-save mr-1"></i>Update' +
+                      '</button>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="flex gap-2">' +
+                '<button onclick="viewVendorDetails(' + v.vendor_id + ')" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm">' +
+                  '<i class="fas fa-chart-line mr-2"></i>View Details' +
+                '</button>' +
+                '<button onclick="toggleVendorStatus(' + v.vendor_id + ', \'' + v.status + '\')" class="px-4 py-2 ' + toggleBtnClass + ' rounded-lg transition font-medium text-sm">' +
+                  '<i class="fas ' + toggleIcon + ' mr-1"></i>' + toggleText +
+                '</button>' +
+                '<button onclick="removeVendor(' + v.vendor_id + ')" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">' +
+                  '<i class="fas fa-trash mr-1"></i>Remove' +
+                '</button>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+          
         } catch (error) {
           console.error('Load vendors error:', error);
+          document.getElementById('vendorsList').innerHTML = '<div class="text-center py-12 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-3"></i><p>Failed to load vendors</p></div>';
         }
+      }
+      
+      // Update vendor commission rate
+      window.updateVendorCommission = async function(vendorId) {
+        const newRate = parseFloat(document.getElementById('commission_rate_' + vendorId).value);
+        
+        if (isNaN(newRate) || newRate < 0 || newRate > 100) {
+          alert('Please enter a valid commission rate between 0 and 100');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/vendors/' + vendorId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ custom_commission_rate: newRate })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('Commission rate updated successfully to ' + newRate + '%!');
+            loadVendors(); // Reload to show updated stats
+          } else {
+            alert('Failed to update commission rate');
+          }
+        } catch (error) {
+          console.error('Update commission error:', error);
+          alert('Failed to update commission rate');
+        }
+      }
+      
+      // Toggle vendor status (active/inactive)
+      window.toggleVendorStatus = async function(vendorId, currentStatus) {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+        const action = newStatus === 'active' ? 'activate' : 'suspend';
+        
+        if (!confirm('Are you sure you want to ' + action + ' this vendor?')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/vendors/' + vendorId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('Vendor ' + action + 'd successfully!');
+            loadVendors();
+          } else {
+            alert('Failed to ' + action + ' vendor');
+          }
+        } catch (error) {
+          console.error('Toggle vendor status error:', error);
+          alert('Failed to ' + action + ' vendor');
+        }
+      }
+      
+      // View vendor details (placeholder for future detailed analytics page)
+      window.viewVendorDetails = function(vendorId) {
+        alert('Detailed analytics view coming soon for vendor ID: ' + vendorId);
+        // TODO: Navigate to dedicated vendor analytics page
       }
 
       // INFO PAGES MANAGEMENT
