@@ -34312,7 +34312,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     <script>
       // Define switchTab EARLY so onclick handlers in HTML work immediately
       function switchTab(tab) {
-        const tabs = ['tables', 'sessions', 'reservations', 'textures', 'menus'];
+        const tabs = ['info', 'tables', 'sessions', 'reservations', 'textures', 'menus'];
         tabs.forEach(t => {
           const btnId = 'tab' + t.charAt(0).toUpperCase() + t.slice(1);
           const sectionId = t + 'Section';
@@ -34389,7 +34389,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         <!-- Tab Navigation -->
         <div class="bg-white rounded-lg shadow-lg mb-6 p-2 flex gap-2">
-            <button onclick="switchTab('tables')" id="tabTables" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-blue-600 text-white">
+            <button onclick="switchTab('info')" id="tabInfo" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-blue-600 text-white">
+                <i class="fas fa-info-circle mr-2"></i>Restaurant Info
+            </button>
+            <button onclick="switchTab('tables')" id="tabTables" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
                 <i class="fas fa-chair mr-2"></i>Tables & Floor Plan
             </button>
             <button onclick="switchTab('sessions')" id="tabSessions" class="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
@@ -34406,7 +34409,57 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </button>
         </div>
 
+        <!-- INFO TAB -->
+        <div id="infoSection">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>Restaurant Information
+                </h2>
+                
+                <form id="restaurantInfoForm" class="space-y-6">
+                    <!-- Restaurant Name -->
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Restaurant Name (English)</label>
+                        <input type="text" id="infoTitleEn" class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., Mediterranean Grill">
+                    </div>
+                    
+                    <!-- Short Description -->
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Short Description (English)</label>
+                        <textarea id="infoShortDescEn" rows="2" class="w-full px-4 py-2 border rounded-lg" placeholder="Brief description shown in restaurant list"></textarea>
+                    </div>
+                    
+                    <!-- Full Description -->
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Full Description (English)</label>
+                        <textarea id="infoFullDescEn" rows="5" class="w-full px-4 py-2 border rounded-lg" placeholder="Detailed description shown on restaurant info page"></textarea>
+                    </div>
+                    
+                    <!-- Restaurant Images -->
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Restaurant Images</label>
+                        <div class="space-y-3">
+                            <div id="currentImages" class="grid grid-cols-3 gap-3 mb-3"></div>
+                            <input type="text" id="imageUrl" class="w-full px-4 py-2 border rounded-lg" placeholder="Image URL (e.g., https://example.com/image.jpg)">
+                            <button type="button" onclick="addRestaurantImage()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                <i class="fas fa-plus mr-2"></i>Add Image
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Save Button -->
+                    <div class="flex gap-3">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save Restaurant Info
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- END INFO TAB -->
+
         <!-- TABLES TAB -->
+        <div id="tablesSection" class="hidden">
         <div id="tablesSection">
         <div class="grid md:grid-cols-3 gap-6">
             <!-- Left Panel: Table Controls -->
@@ -34960,6 +35013,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         await loadWalls();
       }
 
+      let currentRestaurantData = null;
+      
       async function loadRestaurant() {
         try {
           const response = await fetch('/api/hotel-offerings/1');
@@ -34968,8 +35023,17 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const restaurant = restaurants.find(o => o.offering_id == offeringId);
           
           if (restaurant) {
+            currentRestaurantData = restaurant;
             document.getElementById('restaurantName').textContent = restaurant.title_en || restaurant.title;
             document.title = \`\${restaurant.title_en || restaurant.title} - Restaurant Management\`;
+            
+            // Populate info form
+            document.getElementById('infoTitleEn').value = restaurant.title_en || '';
+            document.getElementById('infoShortDescEn').value = restaurant.short_description_en || '';
+            document.getElementById('infoFullDescEn').value = restaurant.full_description_en || '';
+            
+            // Display current images
+            displayRestaurantImages(restaurant.images);
           }
           
           // Populate restaurant selector
@@ -34981,6 +35045,93 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           console.error('Load restaurant error:', error);
         }
       }
+      
+      function displayRestaurantImages(imagesJson) {
+        const container = document.getElementById('currentImages');
+        container.innerHTML = '';
+        
+        let images = [];
+        try {
+          images = typeof imagesJson === 'string' ? JSON.parse(imagesJson) : (imagesJson || []);
+        } catch (e) {
+          images = [];
+        }
+        
+        images.forEach((img, index) => {
+          const div = document.createElement('div');
+          div.className = 'relative';
+          div.innerHTML = \`
+            <img src="\${img}" class="w-full h-32 object-cover rounded-lg">
+            <button onclick="removeRestaurantImage(\${index})" class="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs hover:bg-red-700">
+              ×
+            </button>
+          \`;
+          container.appendChild(div);
+        });
+      }
+      
+      window.addRestaurantImage = function() {
+        const imageUrl = document.getElementById('imageUrl').value.trim();
+        if (!imageUrl) {
+          alert('Please enter an image URL');
+          return;
+        }
+        
+        let images = [];
+        try {
+          images = typeof currentRestaurantData.images === 'string' ? JSON.parse(currentRestaurantData.images) : (currentRestaurantData.images || []);
+        } catch (e) {
+          images = [];
+        }
+        
+        images.push(imageUrl);
+        currentRestaurantData.images = JSON.stringify(images);
+        displayRestaurantImages(currentRestaurantData.images);
+        document.getElementById('imageUrl').value = '';
+      };
+      
+      window.removeRestaurantImage = function(index) {
+        let images = [];
+        try {
+          images = typeof currentRestaurantData.images === 'string' ? JSON.parse(currentRestaurantData.images) : (currentRestaurantData.images || []);
+        } catch (e) {
+          images = [];
+        }
+        
+        images.splice(index, 1);
+        currentRestaurantData.images = JSON.stringify(images);
+        displayRestaurantImages(currentRestaurantData.images);
+      };
+      
+      document.getElementById('restaurantInfoForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const updateData = {
+          title_en: document.getElementById('infoTitleEn').value,
+          short_description_en: document.getElementById('infoShortDescEn').value,
+          full_description_en: document.getElementById('infoFullDescEn').value,
+          images: currentRestaurantData.images
+        };
+        
+        try {
+          const response = await fetch('/api/admin/offerings/' + offeringId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData)
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('✅ Restaurant info updated successfully!');
+            await loadRestaurant();
+          } else {
+            alert('❌ Failed to update restaurant info');
+          }
+        } catch (error) {
+          console.error('Update restaurant info error:', error);
+          alert('❌ Error updating restaurant info');
+        }
+      });
       
       // Occupancy Status Management
       async function setOccupancyStatus(status) {
