@@ -10918,7 +10918,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 'minutes': 'minutes',
                 'activities-experiences': 'Activit\u00e9s et Exp\u00e9riences',
                 'curated-experiences': 'Exp\u00e9riences s\u00e9lectionn\u00e9es par nos partenaires de confiance',
-                'hotel-map': 'Plan et Agencement de l\\'H\u00f4tel',
+                'hotel-map': 'Plan et Agencement de l\\'Hôtel',
                 'no-restaurants': 'Aucun restaurant disponible',
                 'no-events': 'Aucun \u00e9v\u00e9nement \u00e0 venir',
                 'no-spa': 'Aucun service de spa disponible',
@@ -13825,6 +13825,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 });
             });
+        }); // Close first DOMContentLoaded listener
         
         // Seasonal Effects (inline)
         async function initSeasonalEffects() {
