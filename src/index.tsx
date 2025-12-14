@@ -8276,6 +8276,118 @@ app.post('/api/staff/beach/verify', async (c) => {
   }
 })
 
+// API: AI Assistant Chat
+app.post('/api/admin/assistant/chat', async (c) => {
+  try {
+    const { message } = await c.req.json()
+    
+    if (!message) {
+      return c.json({ success: false, error: 'Message is required' }, 400)
+    }
+
+    // System prompt with complete platform knowledge
+    const systemPrompt = `You are the GuestConnect AI Assistant, an expert helper for hotel administrators using the GuestConnect platform. You have complete knowledge of all platform features and can guide admins through any task.
+
+PLATFORM FEATURES YOU KNOW:
+
+1. BEACH BOOKING SYSTEM:
+   - Settings: Go to Admin Dashboard → Beach Booking Management tab to configure opening hours (opening_time, closing_time), advance booking days, enable/disable booking, set free for guests
+   - Beach Map Designer: Click "Design Beach Map" button → upload beach photo → draw zones by clicking "Draw Zone" → place spots (umbrellas, cabanas, loungers, daybeds) → edit spot details (number, capacity, price, premium status) → click "Save Beach Layout"
+   - Zones: Colored overlays on beach map. Create by clicking "Draw Zone", draw on canvas, name it, choose color. Guests see zones with legend
+   - Time Slots: Configure in Beach Booking Management → Time Slots section. Default: Morning (8AM-1PM), Afternoon (1PM-6PM), Full Day (8AM-6PM)
+   - Important Information: Scroll to "Important Information" section (blue gradient card) → edit text (one line = one bullet point) → appears on guest confirmation pages
+   - QR Codes: Automatically generated with 6-digit booking codes for each reservation. Staff scan at /staff/beach-check-in
+
+2. BEACH ANALYTICS:
+   - Access: Beach Booking Management → click "Open Dashboard" OR go directly to /admin/beach-analytics
+   - Features: Live occupancy by zone, peak hours heatmaps, revenue by zone, no-show tracking, AI-powered operational recommendations
+   - Real-time data showing current bookings, occupancy percentages, busiest times
+
+3. RESTAURANT MANAGEMENT:
+   - Add: Go to Offerings tab → click "Add New Offering" → select "Restaurant" → fill details (name, description, hours, menu)
+   - Photos: Upload high-quality images in restaurant edit page
+   - Floor Plan Designer: Click "Floor Plan Designer" → upload layout → place table markers → guests can select preferred tables
+
+4. QR CODE GENERATION:
+   - Create: QR Codes tab → "Create New QR Code" → enter URL → customize with logo, colors, frame style, corner style
+   - Download: PNG (print quality) or SVG (vector for scaling)
+   - Branding: Upload hotel logo, set foreground/background colors for branded QR codes
+
+5. ANALYTICS & REPORTS:
+   - View: Analytics tab in sidebar → see guest engagement, QR scans, popular services, trends
+   - Export: Click "Export Data" button to download CSV reports
+
+6. SETTINGS & BRANDING:
+   - Logo: Settings → Hotel Information → "Upload Logo" → appears throughout platform
+   - Colors: Settings → Branding → use color pickers for primary/secondary brand colors
+   - Profile: Complete hotel name, address, phone, email, website
+
+7. STAFF CHECK-IN:
+   - Access: /staff/beach-check-in
+   - Methods: Scan QR code OR manually enter 6-digit booking code
+   - Validation: System verifies booking, shows guest details, marks as checked in
+
+8. BEACH CARD CUSTOMIZATION:
+   - Location: Beach Booking Management → Beach Card Customization section
+   - Edit: Card title, subtitle, feature texts, category labels (umbrellas, cabanas, loungers, daybeds), button text
+   - Colors: Background gradient (from/to), text color, button colors
+
+RESPONSE GUIDELINES:
+- Provide clear, step-by-step instructions
+- Include exact navigation paths (Tab → Section → Button)
+- Mention specific field names and options
+- Suggest best practices when relevant
+- Be conversational and helpful
+- If user asks "how to add restaurant", give complete step-by-step guide
+- For complex tasks, break down into numbered steps
+- Always confirm you understand their question before answering
+
+Answer the admin's question about the GuestConnect platform:`
+
+    // Call OpenAI API
+    const response = await fetch('https://www.genspark.ai/api/llm_proxy/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'gsk-default-key'}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('OpenAI API Error:', errorText)
+      return c.json({ 
+        success: false, 
+        response: 'I apologize, but I am having trouble connecting to my AI brain right now. However, I can still help! Try asking about:\n\n- How to add a restaurant\n- How to configure beach settings\n- How to view analytics\n- How to create QR codes\n\nWhat would you like to know?' 
+      })
+    }
+
+    const data = await response.json()
+    const aiResponse = data.choices?.[0]?.message?.content || 'I am not sure how to help with that. Could you please rephrase your question?'
+
+    return c.json({ 
+      success: true, 
+      response: aiResponse 
+    })
+
+  } catch (error) {
+    console.error('AI Chat Error:', error)
+    return c.json({ 
+      success: false, 
+      response: 'I encountered an error processing your question. Please try again or contact support if the issue persists.' 
+    }, 500)
+  }
+})
+
 // API: Staff - Check In Guest
 app.post('/api/staff/beach/check-in', async (c) => {
   const { DB } = c.env
@@ -30401,7 +30513,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
       
       // Send chat message
-      window.sendChatMessage = function() {
+      window.sendChatMessage = async function() {
         const input = document.getElementById('chatInput');
         const message = input.value.trim();
         if (!message) return;
@@ -30421,28 +30533,68 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         input.value = '';
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // Generate AI response
-        setTimeout(() => {
-          const response = generateChatResponse(message);
-          const actionButton = response.action ? 
-            '<button onclick="executeChatAction()" class="mt-2 text-xs px-3 py-1 bg-white text-blue-600 rounded-full hover:bg-blue-50 transition font-semibold">Take me there →</button>' : '';
+        // Show typing indicator
+        const typingHTML = '<div class="flex gap-2" id="typingIndicator">' +
+          '<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">' +
+            '<i class="fas fa-robot text-blue-600"></i>' +
+          '</div>' +
+          '<div class="bg-blue-50 rounded-lg p-3">' +
+            '<div class="flex gap-1">' +
+              '<div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>' +
+              '<div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>' +
+              '<div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+        chatMessages.innerHTML += typingHTML;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Call AI API
+        try {
+          const response = await fetch('/api/admin/assistant/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+          });
           
+          const data = await response.json();
+          
+          // Remove typing indicator
+          const typingIndicator = document.getElementById('typingIndicator');
+          if (typingIndicator) typingIndicator.remove();
+          
+          // Add AI response
+          const aiText = data.response || 'I apologize, but I could not process your request. Please try again.';
           const aiMessageHTML = '<div class="flex gap-2">' +
             '<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">' +
               '<i class="fas fa-robot text-blue-600"></i>' +
             '</div>' +
             '<div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">' +
-              '<p class="text-sm text-gray-800 whitespace-pre-line">' + response.text + '</p>' +
-              actionButton +
+              '<p class="text-sm text-gray-800 whitespace-pre-line">' + aiText + '</p>' +
             '</div>' +
           '</div>';
           chatMessages.innerHTML += aiMessageHTML;
-          
           chatMessages.scrollTop = chatMessages.scrollHeight;
           
-          // Store action for button click
-          window.currentChatAction = response.action;
-        }, 500);
+        } catch (error) {
+          console.error('Chat error:', error);
+          
+          // Remove typing indicator
+          const typingIndicator = document.getElementById('typingIndicator');
+          if (typingIndicator) typingIndicator.remove();
+          
+          // Show error message
+          const errorHTML = '<div class="flex gap-2">' +
+            '<div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">' +
+              '<i class="fas fa-exclamation-triangle text-red-600"></i>' +
+            '</div>' +
+            '<div class="bg-red-50 rounded-lg p-3 max-w-[80%]">' +
+              '<p class="text-sm text-red-800">Sorry, I encountered an error. Please try again or contact support.</p>' +
+            '</div>' +
+          '</div>';
+          chatMessages.innerHTML += errorHTML;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
       };
       
       // Execute chat action
