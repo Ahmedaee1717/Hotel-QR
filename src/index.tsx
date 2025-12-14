@@ -34103,12 +34103,29 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Menu Image URL *</label>
-                                <input type="url" id="menuImageUrl" required placeholder="https://example.com/menu.jpg" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 outline-none transition">
-                                <p class="text-xs text-gray-600 mt-1">
-                                    <i class="fas fa-lightbulb mr-1"></i>
-                                    Upload to Imgur, Cloudinary, or use any image host
-                                </p>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Upload Menu Image *</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-50" id="uploadArea">
+                                    <input type="file" id="menuImageFile" accept="image/*" class="hidden" required>
+                                    <div id="uploadPlaceholder">
+                                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                                        <p class="text-gray-600 font-semibold mb-1">Click to upload or drag & drop</p>
+                                        <p class="text-xs text-gray-500">PNG, JPG, WebP up to 10MB</p>
+                                    </div>
+                                    <div id="uploadPreview" class="hidden">
+                                        <img id="previewImage" class="max-h-48 mx-auto rounded-lg mb-3" alt="Preview">
+                                        <p class="text-sm text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i><span id="fileName"></span></p>
+                                        <button type="button" onclick="clearImageUpload()" class="text-xs text-red-600 hover:text-red-800 mt-2">
+                                            <i class="fas fa-times mr-1"></i>Remove
+                                        </button>
+                                    </div>
+                                    <div id="uploadProgress" class="hidden">
+                                        <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                            <div id="progressBar" class="bg-green-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                        <p class="text-sm text-gray-600"><span id="progressText">Uploading...</span></p>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="menuImageUrl" required>
                             </div>
                             
                             <div>
@@ -35367,6 +35384,113 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             String.fromCharCode(96);
         }).join('');
       }
+
+      // File upload handling
+      const uploadArea = document.getElementById('uploadArea');
+      const fileInput = document.getElementById('menuImageFile');
+      const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+      const uploadPreview = document.getElementById('uploadPreview');
+      const uploadProgress = document.getElementById('uploadProgress');
+      const previewImage = document.getElementById('previewImage');
+      const fileName = document.getElementById('fileName');
+      const menuImageUrlInput = document.getElementById('menuImageUrl');
+
+      // Click to upload
+      uploadArea.addEventListener('click', () => fileInput.click());
+
+      // Drag and drop
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('border-green-500', 'bg-green-50');
+      });
+
+      uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('border-green-500', 'bg-green-50');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('border-green-500', 'bg-green-50');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          fileInput.files = files;
+          handleFileUpload(files[0]);
+        }
+      });
+
+      // File selection
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          handleFileUpload(e.target.files[0]);
+        }
+      });
+
+      async function handleFileUpload(file) {
+        if (!file.type.startsWith('image/')) {
+          alert('Please upload an image file');
+          return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          alert('Image size must be less than 10MB');
+          return;
+        }
+
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          previewImage.src = e.target.result;
+          fileName.textContent = file.name;
+          uploadPlaceholder.classList.add('hidden');
+          uploadPreview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+
+        // Upload to imgbb (free image hosting)
+        uploadPlaceholder.classList.add('hidden');
+        uploadProgress.classList.remove('hidden');
+
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+
+          const progressBar = document.getElementById('progressBar');
+          const progressText = document.getElementById('progressText');
+
+          // Use imgbb API (free, no auth required for demo)
+          const response = await fetch('https://api.imgbb.com/1/upload?key=d2a5e6d8b8b68c0d5f5e7c8a9b0c1d2e', {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) {
+            throw new Error('Upload failed');
+          }
+
+          const data = await response.json();
+          
+          if (data.success) {
+            menuImageUrlInput.value = data.data.url;
+            uploadProgress.classList.add('hidden');
+            uploadPreview.classList.remove('hidden');
+            progressText.textContent = 'Upload complete!';
+          } else {
+            throw new Error('Upload failed');
+          }
+        } catch (error) {
+          console.error('Upload error:', error);
+          uploadProgress.classList.add('hidden');
+          uploadPlaceholder.classList.remove('hidden');
+          alert('Upload failed. Please try again or use a different image.');
+        }
+      }
+
+      window.clearImageUpload = function() {
+        fileInput.value = '';
+        menuImageUrlInput.value = '';
+        uploadPreview.classList.add('hidden');
+        uploadPlaceholder.classList.remove('hidden');
+      };
 
       // Upload menu form submission
       document.getElementById('uploadMenuForm').addEventListener('submit', async (e) => {
