@@ -27397,7 +27397,7 @@ app.get('/admin/dashboard', (c) => {
                 '<button onclick="viewVendorDetails(' + v.vendor_id + ')" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm">' +
                   '<i class="fas fa-chart-line mr-2"></i>View Details' +
                 '</button>' +
-                '<button onclick="toggleVendorStatus(' + v.vendor_id + ', \'' + v.status + '\')" class="px-4 py-2 ' + toggleBtnClass + ' rounded-lg transition font-medium text-sm">' +
+                '<button onclick="toggleVendorStatus(' + v.vendor_id + ', &quot;' + v.status + '&quot;)" class="px-4 py-2 ' + toggleBtnClass + ' rounded-lg transition font-medium text-sm">' +
                   '<i class="fas ' + toggleIcon + ' mr-1"></i>' + toggleText +
                 '</button>' +
                 '<button onclick="removeVendor(' + v.vendor_id + ')" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium text-sm">' +
