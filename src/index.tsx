@@ -13027,13 +13027,8 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // Check beach booking after property data is loaded and DOM is ready
             if (propertyData && propertyData.property_id) {
-                // Use requestAnimationFrame to ensure DOM is painted
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        console.log('Calling checkBeachBookingEnabled after DOM paint');
-                        checkBeachBookingEnabled();
-                    }, 1000);
-                });
+                console.log('Calling checkBeachBookingEnabled IMMEDIATELY');
+                checkBeachBookingEnabled();
             }
         }
 
