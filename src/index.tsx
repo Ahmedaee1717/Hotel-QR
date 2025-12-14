@@ -13025,9 +13025,11 @@ app.get('/hotel/:property_slug', async (c) => {
             
             updateSectionVisibility();
             
-            // Check beach booking after property data is loaded
+            // Check beach booking after property data is loaded and DOM is ready
             if (propertyData && propertyData.property_id) {
-                checkBeachBookingEnabled();
+                setTimeout(() => {
+                    checkBeachBookingEnabled();
+                }, 100);
             }
         }
 
