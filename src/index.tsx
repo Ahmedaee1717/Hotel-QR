@@ -18272,11 +18272,12 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
 
     <script>
         let propertySlug = 'paradise-resort';
+        const BOOKING_REFERENCE = '${booking_reference}';
         
         async function loadBookingDetails() {
             try {
-                console.log('Fetching booking details for: ${booking_reference}');
-                const response = await fetch('/api/beach/bookings/${booking_reference}');
+                console.log('Fetching booking details for:', BOOKING_REFERENCE);
+                const response = await fetch('/api/beach/bookings/' + BOOKING_REFERENCE);
                 
                 if (!response.ok) {
                     throw new Error('HTTP error! status: ' + response.status);
