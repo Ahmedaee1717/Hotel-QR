@@ -8809,29 +8809,6 @@ app.get('/api/analytics/beach/dashboard/:property_id', async (c) => {
 })
 
 // API: Get Booking Details
-app.get('/api/beach/bookings/:booking_reference', async (c) => {
-  const { DB } = c.env
-  const { booking_reference } = c.req.param()
-  
-  try {
-    const booking = await DB.prepare(`
-      SELECT bb.*, bs.spot_number, bs.spot_type, bs.max_capacity
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      WHERE bb.booking_reference = ?
-    `).bind(booking_reference).first()
-    
-    if (!booking) {
-      return c.json({ error: 'Booking not found' }, 404)
-    }
-    
-    return c.json({ success: true, booking })
-  } catch (error) {
-    console.error('Get booking error:', error)
-    return c.json({ error: 'Failed to get booking' }, 500)
-  }
-})
-
 // ========== END BEACH BOOKING API ENDPOINTS ==========
 
 // ========== FEEDBACK SYSTEM API ENDPOINTS ==========
@@ -18163,7 +18140,7 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
     <title>Booking Confirmed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         @keyframes slideIn {
             from {
@@ -18298,19 +18275,36 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
         
         async function loadBookingDetails() {
             try {
+                console.log('Fetching booking details for: ${booking_reference}');
                 const response = await fetch('/api/beach/bookings/${booking_reference}');
+                
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                
                 const data = await response.json();
+                console.log('Booking data received:', data);
                 
                 if (data.success && data.booking) {
                     const booking = data.booking;
+                    console.log('Processing booking:', booking);
                     
-                    // Update UI
-                    document.getElementById('bookingCode').textContent = booking.booking_code || 'N/A';
-                    document.getElementById('spotInfo').textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number;
-                    document.getElementById('bookingDateInfo').textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                    document.getElementById('slotInfo').textContent = formatSlotType(booking.slot_type);
-                    document.getElementById('guestName').textContent = booking.guest_name;
-                    document.getElementById('roomNumber').textContent = booking.guest_room_number || 'N/A';
+                    // Update UI with null checks
+                    const bookingCodeEl = document.getElementById('bookingCode');
+                    const spotInfoEl = document.getElementById('spotInfo');
+                    const bookingDateInfoEl = document.getElementById('bookingDateInfo');
+                    const slotInfoEl = document.getElementById('slotInfo');
+                    const guestNameEl = document.getElementById('guestName');
+                    const roomNumberEl = document.getElementById('roomNumber');
+                    
+                    if (bookingCodeEl) bookingCodeEl.textContent = booking.booking_code || 'N/A';
+                    if (spotInfoEl) spotInfoEl.textContent = getSpotIcon(booking.spot_type) + ' Spot ' + booking.spot_number;
+                    if (bookingDateInfoEl) bookingDateInfoEl.textContent = new Date(booking.booking_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    if (slotInfoEl) slotInfoEl.textContent = formatSlotType(booking.slot_type);
+                    if (guestNameEl) guestNameEl.textContent = booking.guest_name || 'N/A';
+                    if (roomNumberEl) roomNumberEl.textContent = booking.guest_room_number || 'N/A';
+                    
+                    console.log('UI updated with booking details');
                     
                     // Generate QR code with booking data
                     const qrData = booking.qr_code_data || JSON.stringify({
@@ -18321,29 +18315,48 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                         guest: booking.guest_name
                     });
                     
-                    new QRCode(document.getElementById('qrcode'), {
-                        text: qrData,
-                        width: 200,
-                        height: 200,
-                        colorDark: '#1e3a8a',
-                        colorLight: '#ffffff'
-                    });
+                    console.log('Generating QR code with data:', qrData);
+                    
+                    // Check if QRCode library is loaded
+                    if (typeof QRCode === 'undefined') {
+                        console.error('QRCode library not loaded!');
+                        document.getElementById('qrcode').innerHTML = '<p class="text-red-600">QR Code library failed to load</p>';
+                    } else {
+                        const qrcodeEl = document.getElementById('qrcode');
+                        qrcodeEl.innerHTML = ''; // Clear any existing content
+                        new QRCode(qrcodeEl, {
+                            text: qrData,
+                            width: 200,
+                            height: 200,
+                            colorDark: '#1e3a8a',
+                            colorLight: '#ffffff'
+                        });
+                        console.log('QR code generated successfully');
+                    }
                     
                     // Load important information
-                    loadImportantInformation();
+                    loadImportantInformation(booking.property_id);
                 } else {
-                    alert('Failed to load booking details');
+                    console.error('Booking not found in response:', data);
+                    alert('Failed to load booking details: Booking not found');
                 }
             } catch (error) {
-                console.error('Load error:', error);
-                alert('Failed to load booking details');
+                console.error('Load booking details error:', error);
+                alert('Failed to load booking details: ' + error.message);
             }
         }
         
-        async function loadImportantInformation() {
+        async function loadImportantInformation(propertyId = 1) {
             try {
-                const response = await fetch('/api/admin/beach/settings/1');
+                console.log('Loading important information for property:', propertyId);
+                const response = await fetch('/api/admin/beach/settings/' + propertyId);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                
                 const data = await response.json();
+                console.log('Important information data:', data);
                 
                 if (data.success && data.settings) {
                     const defaultInfo = 'Please arrive 10 minutes before your time slot\nBring your QR code (printed or on phone)\nBeach towels provided by hotel\nLate arrivals may result in reduced time';
@@ -18354,16 +18367,23 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                         '<li><i class="fas fa-check mr-2 text-green-600"></i>' + line + '</li>'
                     ).join('');
                     
-                    document.getElementById('importantInfoList').innerHTML = listHtml;
+                    const infoListEl = document.getElementById('importantInfoList');
+                    if (infoListEl) {
+                        infoListEl.innerHTML = listHtml;
+                        console.log('Important information loaded successfully');
+                    }
                 }
             } catch (error) {
                 console.error('Load important information error:', error);
                 // Show default info on error
-                document.getElementById('importantInfoList').innerHTML = 
-                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Please arrive 10 minutes before your time slot</li>' +
-                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Bring your QR code (printed or on phone)</li>' +
-                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Beach towels provided by hotel</li>' +
-                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Late arrivals may result in reduced time</li>';
+                const infoListEl = document.getElementById('importantInfoList');
+                if (infoListEl) {
+                    infoListEl.innerHTML = 
+                        '<li><i class="fas fa-check mr-2 text-green-600"></i>Please arrive 10 minutes before your time slot</li>' +
+                        '<li><i class="fas fa-check mr-2 text-green-600"></i>Bring your QR code (printed or on phone)</li>' +
+                        '<li><i class="fas fa-check mr-2 text-green-600"></i>Beach towels provided by hotel</li>' +
+                        '<li><i class="fas fa-check mr-2 text-green-600"></i>Late arrivals may result in reduced time</li>';
+                }
             }
         }
         
