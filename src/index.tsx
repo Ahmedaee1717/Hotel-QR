@@ -34410,7 +34410,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         </div>
 
         <!-- INFO TAB -->
-        <div id="infoSection">
+        <div id="infoSection" style="display: block;">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-6">
                     <i class="fas fa-info-circle mr-2 text-blue-600"></i>Restaurant Information
