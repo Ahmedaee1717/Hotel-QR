@@ -16679,7 +16679,7 @@ app.get('/beach-booking/:property_id', async (c) => {
         // Apply custom colors from settings
         async function loadAndApplySettings() {
             try {
-                const response = await fetch('/api/admin/beach/settings');
+                const response = await fetch('/api/admin/beach/settings/' + propertyId);
                 const data = await response.json();
                 
                 if (data.success && data.settings) {
