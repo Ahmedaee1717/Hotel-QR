@@ -13818,9 +13818,8 @@ app.get('/hotel/:property_slug', async (c) => {
             window.showHotspotInfo = showHotspotInfo;
             window.closeHotspotModal = closeHotspotModal;
             
-            // Initialize the page after DOM is fully loaded
-            document.addEventListener('DOMContentLoaded', () => {
-                init().then(() => {
+            // Initialize the page directly (no nested DOMContentLoaded - it only fires once!)
+            init().then(() => {
                 // Double-check selector value after init
                 if (languageSelector) {
                     languageSelector.value = currentLanguage;
@@ -13834,8 +13833,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     window.initChatbot();
                 }
                 });
-            });
-        }); // Close first DOMContentLoaded listener
+        });
         
         // Seasonal Effects (inline)
         async function initSeasonalEffects() {
