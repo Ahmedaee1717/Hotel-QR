@@ -5960,6 +5960,35 @@ app.delete('/api/admin/restaurant/menu-categories/:category_id', async (c) => {
   }
 })
 
+// Create new category
+app.post('/api/admin/restaurant/menus/:menu_id/categories', async (c) => {
+  const { menu_id } = c.req.param()
+  const { DB } = c.env
+  const { category_name, category_description } = await c.req.json()
+
+  try {
+    // Get highest display_order
+    const maxOrder = await DB.prepare(`
+      SELECT MAX(display_order) as max_order FROM menu_categories WHERE menu_id = ?
+    `).bind(menu_id).first()
+
+    const newOrder = (maxOrder?.max_order || 0) + 1
+
+    const result = await DB.prepare(`
+      INSERT INTO menu_categories (menu_id, category_name, category_description, display_order)
+      VALUES (?, ?, ?, ?)
+    `).bind(menu_id, category_name, category_description || '', newOrder).run()
+
+    return c.json({ 
+      success: true, 
+      category_id: result.meta.last_row_id,
+      message: 'Category created successfully' 
+    })
+  } catch (error) {
+    return c.json({ error: 'Failed to create category: ' + error.message }, 500)
+  }
+})
+
 // Update menu item
 app.put('/api/admin/restaurant/menu-items/:item_id', async (c) => {
   const { item_id } = c.req.param()
@@ -5997,6 +6026,50 @@ app.delete('/api/admin/restaurant/menu-items/:item_id', async (c) => {
     return c.json({ success: true })
   } catch (error) {
     return c.json({ error: 'Failed to delete item: ' + error.message }, 500)
+  }
+})
+
+// Create new menu item
+app.post('/api/admin/restaurant/menu-categories/:category_id/items', async (c) => {
+  const { category_id } = c.req.param()
+  const { DB } = c.env
+  const body = await c.req.json()
+
+  try {
+    // Get highest display_order in this category
+    const maxOrder = await DB.prepare(`
+      SELECT MAX(display_order) as max_order FROM menu_items WHERE category_id = ?
+    `).bind(category_id).first()
+
+    const newOrder = (maxOrder?.max_order || 0) + 1
+
+    const result = await DB.prepare(`
+      INSERT INTO menu_items (
+        category_id, item_name, description, price, currency,
+        is_vegetarian, is_vegan, is_gluten_free, spice_level,
+        allergens, display_order, is_available
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).bind(
+      category_id,
+      body.item_name || 'New Item',
+      body.description || '',
+      body.price || 0,
+      body.currency || 'USD',
+      body.is_vegetarian ? 1 : 0,
+      body.is_vegan ? 1 : 0,
+      body.is_gluten_free ? 1 : 0,
+      body.spice_level || 'none',
+      JSON.stringify(body.allergens || []),
+      newOrder
+    ).run()
+
+    return c.json({ 
+      success: true, 
+      item_id: result.meta.last_row_id,
+      message: 'Item created successfully' 
+    })
+  } catch (error) {
+    return c.json({ error: 'Failed to create item: ' + error.message }, 500)
   }
 })
 
@@ -34584,6 +34657,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             <div class="grid md:grid-cols-2 gap-6">
                 <!-- Left: Upload & Manage Menus -->
                 <div class="space-y-6">
+                    <!-- Quick Action: Create Manual Menu -->
+                    <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl shadow-xl p-6 mb-6">
+                        <h3 class="text-xl font-bold text-purple-900 mb-3 flex items-center">
+                            <i class="fas fa-keyboard mr-3 text-purple-600"></i>
+                            Create Menu Manually
+                        </h3>
+                        <p class="text-sm text-purple-800 mb-4">
+                            Skip image upload and build your menu from scratch
+                        </p>
+                        <button onclick="createManualMenu()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">
+                            <i class="fas fa-plus-circle mr-2"></i>Create Manual Menu
+                        </button>
+                    </div>
+
                     <!-- Upload Menu Card -->
                     <div class="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl shadow-xl p-6">
                         <h2 class="text-2xl font-bold text-green-900 mb-4 flex items-center">
@@ -36238,6 +36325,37 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         window.open('/menu/' + menuId, '_blank');
       }
 
+      // Create manual menu (skip image upload)
+      async function createManualMenu() {
+        const menuName = prompt('Enter menu name:', 'New Menu');
+        if (!menuName) return;
+
+        try {
+          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              menu_name: menuName,
+              menu_type: 'full',
+              original_image_url: '',
+              base_language: 'en'
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ Menu created! Opening menu builder...');
+            window.location.href = '/admin/menu-builder/' + data.menu.menu_id;
+          } else {
+            alert('Error: ' + (data.error || 'Failed to create menu'));
+          }
+        } catch (error) {
+          console.error('Create manual menu error:', error);
+          alert('Error creating menu: ' + error.message);
+        }
+      }
+
       // Initialize menus when tab is switched
       const originalSwitchTab = switchTab;
       switchTab = function(tab) {
@@ -36380,11 +36498,19 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
                         '</button>' +
                     '</div>' +
                     '<div class="space-y-3">' + items + '</div>' +
-                    '<button onclick="translateCategory(' + category.category_id + ')" class="mt-4 w-full py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition">' +
-                        '<i class="fas fa-language mr-2"></i>Translate this Category' +
-                    '</button>' +
+                    '<div class="grid grid-cols-2 gap-3 mt-4">' +
+                        '<button onclick="addItem(' + category.category_id + ')" class="py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition font-semibold">' +
+                            '<i class="fas fa-plus mr-2"></i>Add Item' +
+                        '</button>' +
+                        '<button onclick="translateCategory(' + category.category_id + ')" class="py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition font-semibold">' +
+                            '<i class="fas fa-language mr-2"></i>Translate' +
+                        '</button>' +
+                    '</div>' +
                 '</div>';
-            }).join('');
+            }).join('') + 
+            '<div class="mt-6"><button onclick="addCategory()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition font-bold text-lg shadow-lg">' +
+                '<i class="fas fa-plus-circle mr-2"></i>Add New Category' +
+            '</button></div>';
         }
 
         function updateCategoryFromEvent(element) {
@@ -36519,6 +36645,64 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
                 }
             } catch (error) {
                 alert('Delete error: ' + error.message);
+            }
+        }
+
+        // Add new category
+        async function addCategory() {
+            const name = prompt('Enter category name:', 'New Category');
+            if (!name) return;
+
+            try {
+                const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category_name: name,
+                        category_description: ''
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Category added!');
+                    loadMenu();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error adding category: ' + error.message);
+            }
+        }
+
+        // Add new item to category
+        async function addItem(categoryId) {
+            const name = prompt('Enter item name:', 'New Item');
+            if (!name) return;
+
+            const price = parseFloat(prompt('Enter price:', '0') || '0');
+
+            try {
+                const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId + '/items', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        item_name: name,
+                        description: '',
+                        price: price,
+                        currency: 'USD'
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Item added!');
+                    loadMenu();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error adding item: ' + error.message);
             }
         }
 
