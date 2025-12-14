@@ -36326,34 +36326,93 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       }
 
       // Create manual menu (skip image upload)
-      async function createManualMenu() {
-        const menuName = prompt('Enter menu name:', 'New Menu');
-        if (!menuName) return;
-
-        try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              menu_name: menuName,
-              menu_type: 'full',
-              original_image_url: '',
-              base_language: 'en'
-            })
-          });
-
-          const data = await response.json();
-
-          if (data.success) {
-            alert('✅ Menu created! Opening menu builder...');
-            window.location.href = '/admin/menu-builder/' + data.menu.menu_id;
-          } else {
-            alert('Error: ' + (data.error || 'Failed to create menu'));
+      function createManualMenu() {
+        const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">' +
+          '<div class="bg-gradient-to-br from-white to-purple-50 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">' +
+            '<div class="flex items-center mb-6">' +
+              '<div class="bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full p-3 mr-4">' +
+                '<i class="fas fa-plus-circle text-2xl"></i>' +
+              '</div>' +
+              '<h2 class="text-2xl font-bold text-gray-900">Create New Menu</h2>' +
+            '</div>' +
+            '<div class="space-y-4 mb-6">' +
+              '<div>' +
+                '<label class="block text-sm font-semibold text-gray-700 mb-2">Menu Name *</label>' +
+                '<input type="text" id="newMenuName" placeholder="e.g., Dinner Menu" value="New Menu" class="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition" autofocus>' +
+              '</div>' +
+              '<div>' +
+                '<label class="block text-sm font-semibold text-gray-700 mb-2">Menu Type</label>' +
+                '<select id="newMenuType" class="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:border-purple-500 outline-none transition">' +
+                  '<option value="full">Full Menu</option>' +
+                  '<option value="breakfast">Breakfast</option>' +
+                  '<option value="lunch">Lunch</option>' +
+                  '<option value="dinner">Dinner</option>' +
+                  '<option value="drinks">Drinks</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="flex gap-3">' +
+              '<button id="cancelNewMenu" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition">Cancel</button>' +
+              '<button id="submitNewMenu" class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">' +
+                '<i class="fas fa-check mr-2"></i>Create Menu' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+        
+        const modal = document.createElement('div');
+        modal.innerHTML = modalHtml;
+        const modalDiv = modal.firstChild;
+        document.body.appendChild(modalDiv);
+        
+        setTimeout(() => {
+          document.getElementById('newMenuName').focus();
+          document.getElementById('newMenuName').select();
+        }, 100);
+        
+        document.getElementById('cancelNewMenu').addEventListener('click', () => {
+          document.body.removeChild(modalDiv);
+        });
+        
+        document.getElementById('submitNewMenu').addEventListener('click', async () => {
+          const menuName = document.getElementById('newMenuName').value.trim();
+          const menuType = document.getElementById('newMenuType').value;
+          
+          if (!menuName) {
+            alert('⚠️ Please enter a menu name');
+            return;
           }
-        } catch (error) {
-          console.error('Create manual menu error:', error);
-          alert('Error creating menu: ' + error.message);
-        }
+          
+          document.getElementById('submitNewMenu').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+          document.getElementById('submitNewMenu').disabled = true;
+          
+          try {
+            const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                menu_name: menuName,
+                menu_type: menuType,
+                original_image_url: '',
+                base_language: 'en'
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              document.body.removeChild(modalDiv);
+              window.location.href = '/admin/menu-builder/' + data.menu.menu_id;
+            } else {
+              alert('Error: ' + (data.error || 'Failed to create menu'));
+              document.body.removeChild(modalDiv);
+            }
+          } catch (error) {
+            console.error('Create manual menu error:', error);
+            alert('Error creating menu: ' + error.message);
+            document.body.removeChild(modalDiv);
+          }
+        });
       }
 
       // Initialize menus when tab is switched
@@ -36397,6 +36456,15 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
     <title>Menu Builder</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideUp {
+            animation: slideUp 0.3s ease-out;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-7xl mx-auto px-4 py-8">
@@ -36649,61 +36717,181 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
         }
 
         // Add new category
-        async function addCategory() {
-            const name = prompt('Enter category name:', 'New Category');
-            if (!name) return;
-
-            try {
+        function addCategory() {
+            const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">' +
+              '<div class="bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">' +
+                '<div class="flex items-center mb-6">' +
+                  '<div class="bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-full p-3 mr-4">' +
+                    '<i class="fas fa-folder-plus text-2xl"></i>' +
+                  '</div>' +
+                  '<h2 class="text-2xl font-bold text-gray-900">Add Category</h2>' +
+                '</div>' +
+                '<div class="space-y-4 mb-6">' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Category Name *</label>' +
+                    '<input type="text" id="newCategoryName" placeholder="e.g., Appetizers" value="New Category" class="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition" autofocus>' +
+                  '</div>' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>' +
+                    '<textarea id="newCategoryDescription" placeholder="Brief description..." rows="2" class="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition resize-none"></textarea>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="flex gap-3">' +
+                  '<button id="cancelNewCategory" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition">Cancel</button>' +
+                  '<button id="submitNewCategory" class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">' +
+                    '<i class="fas fa-check mr-2"></i>Add Category' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+            
+            const modal = document.createElement('div');
+            modal.innerHTML = modalHtml;
+            const modalDiv = modal.firstChild;
+            document.body.appendChild(modalDiv);
+            
+            setTimeout(() => {
+              document.getElementById('newCategoryName').focus();
+              document.getElementById('newCategoryName').select();
+            }, 100);
+            
+            document.getElementById('cancelNewCategory').addEventListener('click', () => {
+              document.body.removeChild(modalDiv);
+            });
+            
+            document.getElementById('submitNewCategory').addEventListener('click', async () => {
+              const name = document.getElementById('newCategoryName').value.trim();
+              const description = document.getElementById('newCategoryDescription').value.trim();
+              
+              if (!name) {
+                alert('⚠️ Please enter a category name');
+                return;
+              }
+              
+              document.getElementById('submitNewCategory').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+              document.getElementById('submitNewCategory').disabled = true;
+              
+              try {
                 const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/categories', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        category_name: name,
-                        category_description: ''
-                    })
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    category_name: name,
+                    category_description: description
+                  })
                 });
 
                 const data = await response.json();
                 if (data.success) {
-                    alert('✅ Category added!');
-                    loadMenu();
+                  document.body.removeChild(modalDiv);
+                  loadMenu();
                 } else {
-                    alert('Error: ' + data.error);
+                  alert('Error: ' + data.error);
+                  document.body.removeChild(modalDiv);
                 }
-            } catch (error) {
+              } catch (error) {
                 alert('Error adding category: ' + error.message);
-            }
+                document.body.removeChild(modalDiv);
+              }
+            });
         }
 
         // Add new item to category
-        async function addItem(categoryId) {
-            const name = prompt('Enter item name:', 'New Item');
-            if (!name) return;
-
-            const price = parseFloat(prompt('Enter price:', '0') || '0');
-
-            try {
+        function addItem(categoryId) {
+            const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">' +
+              '<div class="bg-gradient-to-br from-white to-green-50 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">' +
+                '<div class="flex items-center mb-6">' +
+                  '<div class="bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-full p-3 mr-4">' +
+                    '<i class="fas fa-utensils text-2xl"></i>' +
+                  '</div>' +
+                  '<h2 class="text-2xl font-bold text-gray-900">Add Menu Item</h2>' +
+                '</div>' +
+                '<div class="space-y-4 mb-6">' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Item Name *</label>' +
+                    '<input type="text" id="newItemName" placeholder="e.g., Caesar Salad" value="New Item" class="w-full px-4 py-3 border-2 border-green-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition" autofocus>' +
+                  '</div>' +
+                  '<div>' +
+                    '<label class="block text-sm font-semibold text-gray-700 mb-2">Description</label>' +
+                    '<textarea id="newItemDescription" placeholder="Describe the dish..." rows="2" class="w-full px-4 py-3 border-2 border-green-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition resize-none"></textarea>' +
+                  '</div>' +
+                  '<div class="grid grid-cols-2 gap-3">' +
+                    '<div>' +
+                      '<label class="block text-sm font-semibold text-gray-700 mb-2">Price *</label>' +
+                      '<input type="number" id="newItemPrice" placeholder="0.00" step="0.01" min="0" value="0" class="w-full px-4 py-3 border-2 border-green-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 outline-none transition">' +
+                    '</div>' +
+                    '<div>' +
+                      '<label class="block text-sm font-semibold text-gray-700 mb-2">Currency</label>' +
+                      '<select id="newItemCurrency" class="w-full px-4 py-3 border-2 border-green-200 rounded-xl focus:border-green-500 outline-none transition">' +
+                        '<option value="USD">USD $</option>' +
+                        '<option value="EUR">EUR €</option>' +
+                        '<option value="GBP">GBP £</option>' +
+                      '</select>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="flex gap-3">' +
+                  '<button id="cancelNewItem" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition">Cancel</button>' +
+                  '<button id="submitNewItem" class="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all transform hover:scale-105">' +
+                    '<i class="fas fa-check mr-2"></i>Add Item' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+            
+            const modal = document.createElement('div');
+            modal.innerHTML = modalHtml;
+            const modalDiv = modal.firstChild;
+            document.body.appendChild(modalDiv);
+            
+            setTimeout(() => {
+              document.getElementById('newItemName').focus();
+              document.getElementById('newItemName').select();
+            }, 100);
+            
+            document.getElementById('cancelNewItem').addEventListener('click', () => {
+              document.body.removeChild(modalDiv);
+            });
+            
+            document.getElementById('submitNewItem').addEventListener('click', async () => {
+              const name = document.getElementById('newItemName').value.trim();
+              const description = document.getElementById('newItemDescription').value.trim();
+              const price = parseFloat(document.getElementById('newItemPrice').value) || 0;
+              const currency = document.getElementById('newItemCurrency').value;
+              
+              if (!name) {
+                alert('⚠️ Please enter an item name');
+                return;
+              }
+              
+              document.getElementById('submitNewItem').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+              document.getElementById('submitNewItem').disabled = true;
+              
+              try {
                 const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId + '/items', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        item_name: name,
-                        description: '',
-                        price: price,
-                        currency: 'USD'
-                    })
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    item_name: name,
+                    description: description,
+                    price: price,
+                    currency: currency
+                  })
                 });
 
                 const data = await response.json();
                 if (data.success) {
-                    alert('✅ Item added!');
-                    loadMenu();
+                  document.body.removeChild(modalDiv);
+                  loadMenu();
                 } else {
-                    alert('Error: ' + data.error);
+                  alert('Error: ' + data.error);
+                  document.body.removeChild(modalDiv);
                 }
-            } catch (error) {
+              } catch (error) {
                 alert('Error adding item: ' + error.message);
-            }
+                document.body.removeChild(modalDiv);
+              }
+            });
         }
 
         loadMenu();
