@@ -6785,21 +6785,101 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
       })
     }
     
-    // Get available languages for this restaurant's menus
-    const availableLanguages = await DB.prepare(`
-      SELECT DISTINCT language_code
-      FROM restaurant_menu_translations
-      WHERE menu_id IN (
-        SELECT menu_id FROM restaurant_menus WHERE offering_id = ?
-      )
-    `).bind(offering_id).all()
+    // Get ALL supported languages
+    const allLanguagesResult = await DB.prepare(`
+      SELECT language_code, language_name_en, language_name_native
+      FROM supported_languages
+      WHERE is_active = 1
+      ORDER BY language_name_en
+    `).all()
+    
+    // Add flag emojis to each language
+    const flagMap = {
+      'ar': '🇸🇦', 'cs': '🇨🇿', 'da': '🇩🇰', 'de': '🇩🇪', 'el': '🇬🇷', 'en': '🇬🇧', 'es': '🇪🇸',
+      'fi': '🇫🇮', 'fr': '🇫🇷', 'hi': '🇮🇳', 'hu': '🇭🇺', 'id': '🇮🇩', 'it': '🇮🇹', 'ja': '🇯🇵',
+      'ko': '🇰🇷', 'nl': '🇳🇱', 'no': '🇳🇴', 'pl': '🇵🇱', 'pt': '🇵🇹', 'ro': '🇷🇴', 'ru': '🇷🇺',
+      'sv': '🇸🇪', 'th': '🇹🇭', 'tr': '🇹🇷', 'uk': '🇺🇦', 'vi': '🇻🇳', 'zh': '🇨🇳'
+    }
+    const allLanguages = allLanguagesResult.results.map(lang => ({
+      ...lang,
+      flag: flagMap[lang.language_code] || '🌐'
+    }))
+    
+    // If language is not English and translation doesn't exist, create on-demand translation
+    if (language !== 'en' && menusWithContent.length > 0) {
+      for (const menu of menusWithContent) {
+        // Check if translation exists
+        const existingTranslation = await DB.prepare(`
+          SELECT translated_text FROM restaurant_menu_translations
+          WHERE menu_id = ? AND language_code = ?
+        `).bind(menu.menu_id, language).first()
+        
+        if (!existingTranslation && menu.extracted_text) {
+          // Get language info
+          const langInfo = await DB.prepare(`
+            SELECT language_name_en, language_name_native
+            FROM supported_languages
+            WHERE language_code = ?
+          `).bind(language).first()
+          
+          if (langInfo) {
+            try {
+              // Auto-translate on-demand
+              const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o-mini',
+                  messages: [{
+                    role: 'system',
+                    content: `You are a professional restaurant menu translator. Translate the menu to ${langInfo.language_name_en} (${langInfo.language_name_native}). Maintain:
+- Section headers and structure
+- Accurate food terminology
+- Cultural appropriateness
+- Price formatting
+- Professional tone
+
+Provide ONLY the translated text, preserving the exact format and structure.`
+                  }, {
+                    role: 'user',
+                    content: menu.extracted_text
+                  }],
+                  max_tokens: 4000,
+                  temperature: 0.3
+                })
+              })
+              
+              if (openaiResponse.ok) {
+                const translationResult = await openaiResponse.json()
+                const translatedText = translationResult.choices[0].message.content
+                
+                // Store translation for future use
+                await DB.prepare(`
+                  INSERT OR REPLACE INTO restaurant_menu_translations (
+                    menu_id, language_code, translated_text, translation_method, translated_at
+                  ) VALUES (?, ?, ?, 'on-demand', CURRENT_TIMESTAMP)
+                `).bind(menu.menu_id, language, translatedText).run()
+                
+                // Update current menu text
+                menu.extracted_text = translatedText
+              }
+            } catch (error) {
+              console.error(`On-demand translation to ${language} failed:`, error)
+            }
+          }
+        }
+      }
+    }
     
     return c.json({
       success: true,
       restaurant,
       design,
       menus: menusWithContent,
-      available_languages: availableLanguages.results.map(l => l.language_code),
+      all_languages: allLanguages,
       current_language: language
     })
   } catch (error) {
@@ -34402,32 +34482,21 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
         html += '</div></div>';
       }
       
-      // Language Switcher
-      if (menuData.available_languages && menuData.available_languages.length > 1) {
-        const position = d.language_switcher_position || 'top-right';
-        const positionClasses = position === 'top-right' ? 'top-4 right-4' : position === 'top-left' ? 'top-4 left-4' : 'top-4 right-4';
-        
-        html += '<div class="fixed ' + positionClasses + ' z-50">';
-        html += '<select onchange="changeLanguage(this.value)" class="px-4 py-2 rounded-lg shadow-lg border-2 font-semibold" style="background-color: white; border-color: ' + d.accent_color + '; color: ' + d.primary_color + ';">';
-        
-        const languageNames = {
-          'en': '🇬🇧 English',
-          'ar': '🇸🇦 العربية',
-          'fr': '🇫🇷 Français',
-          'de': '🇩🇪 Deutsch',
-          'es': '🇪🇸 Español',
-          'it': '🇮🇹 Italiano',
-          'zh': '🇨🇳 中文',
-          'ja': '🇯🇵 日本語'
-        };
-        
-        menuData.available_languages.forEach(lang => {
-          const selected = lang === currentLanguage ? 'selected' : '';
-          html += '<option value="' + lang + '" ' + selected + '>' + (languageNames[lang] || lang.toUpperCase()) + '</option>';
-        });
-        
-        html += '</select></div>';
-      }
+      // Language Switcher - Always show, with ALL supported languages
+      const position = d.language_switcher_position || 'top-right';
+      const positionClasses = position === 'top-right' ? 'top-4 right-4' : position === 'top-left' ? 'top-4 left-4' : 'top-4 right-4';
+      
+      html += '<div class="fixed ' + positionClasses + ' z-50">';
+      html += '<select id="languageSelector" onchange="changeLanguage(this.value)" class="px-4 py-2 rounded-lg shadow-lg border-2 font-semibold" style="background-color: white; border-color: ' + d.accent_color + '; color: ' + d.primary_color + ';">';
+      
+      // Show ALL supported languages from the system
+      const allLanguages = menuData.all_languages || [];
+      allLanguages.forEach(lang => {
+        const selected = lang.language_code === currentLanguage ? 'selected' : '';
+        html += '<option value="' + lang.language_code + '" ' + selected + '>' + lang.flag + ' ' + lang.language_name_native + '</option>';
+      });
+      
+      html += '</select></div>';
       
       // Menu Content
       html += '<div class="max-w-6xl mx-auto px-4 py-8">';
