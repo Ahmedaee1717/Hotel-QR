@@ -36522,7 +36522,13 @@ app.get('/admin/menu-builder/:menu_id', async (c) => {
             const container = document.getElementById('menuBuilder');
             
             if (menuData.categories.length === 0) {
-                container.innerHTML = '<div class="bg-white rounded-lg shadow p-12 text-center"><i class="fas fa-utensils text-6xl text-gray-300 mb-4"></i><p class="text-gray-600 text-lg">No categories found. Try parsing the menu again.</p></div>';
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-12 text-center">' +
+                    '<i class="fas fa-utensils text-6xl text-gray-300 mb-4"></i>' +
+                    '<p class="text-gray-600 text-lg mb-6">No categories yet. Start building your menu!</p>' +
+                    '<button onclick="addCategory()" class="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105">' +
+                        '<i class="fas fa-plus-circle mr-2"></i>Add Your First Category' +
+                    '</button>' +
+                '</div>';
                 return;
             }
 
