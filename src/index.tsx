@@ -8345,20 +8345,29 @@ RESPONSE GUIDELINES:
 Answer the admin's question about the GuestConnect platform:`
 
     // Call OpenAI API
-    const response = await fetch('https://www.genspark.ai/api/llm_proxy/v1/chat/completions', {
+    const apiKey = c.env.OPENAI_API_KEY
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+    
+    if (!apiKey) {
+      console.error('No OpenAI API key configured')
+      // Use fallback immediately if no key
+      throw new Error('No API key configured')
+    }
+    
+    const response = await fetch(`${baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'gsk-default-key'}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 800
       })
     })
 
