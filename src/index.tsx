@@ -17920,11 +17920,8 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                 <i class="fas fa-exclamation-triangle mr-2 text-yellow-600"></i>
                 Important Information
             </h4>
-            <ul class="space-y-2 text-sm text-gray-700">
-                <li><i class="fas fa-check mr-2 text-green-600"></i>Please arrive 10 minutes before your time slot</li>
-                <li><i class="fas fa-check mr-2 text-green-600"></i>Bring your QR code (printed or on phone)</li>
-                <li><i class="fas fa-check mr-2 text-green-600"></i>Beach towels provided by hotel</li>
-                <li><i class="fas fa-check mr-2 text-green-600"></i>Late arrivals may result in reduced time</li>
+            <ul id="importantInfoList" class="space-y-2 text-sm text-gray-700">
+                <!-- Will be populated dynamically -->
             </ul>
         </div>
     </div>
@@ -17964,12 +17961,42 @@ app.get('/beach-booking-confirmation/:booking_reference', async (c) => {
                         colorDark: '#1e3a8a',
                         colorLight: '#ffffff'
                     });
+                    
+                    // Load important information
+                    loadImportantInformation();
                 } else {
                     alert('Failed to load booking details');
                 }
             } catch (error) {
                 console.error('Load error:', error);
                 alert('Failed to load booking details');
+            }
+        }
+        
+        async function loadImportantInformation() {
+            try {
+                const response = await fetch('/api/admin/beach/settings/1');
+                const data = await response.json();
+                
+                if (data.success && data.settings) {
+                    const defaultInfo = 'Please arrive 10 minutes before your time slot\nBring your QR code (printed or on phone)\nBeach towels provided by hotel\nLate arrivals may result in reduced time';
+                    const infoText = data.settings.important_information || defaultInfo;
+                    const infoLines = infoText.split('\n').filter(line => line.trim());
+                    
+                    const listHtml = infoLines.map(line => 
+                        '<li><i class="fas fa-check mr-2 text-green-600"></i>' + line + '</li>'
+                    ).join('');
+                    
+                    document.getElementById('importantInfoList').innerHTML = listHtml;
+                }
+            } catch (error) {
+                console.error('Load important information error:', error);
+                // Show default info on error
+                document.getElementById('importantInfoList').innerHTML = 
+                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Please arrive 10 minutes before your time slot</li>' +
+                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Bring your QR code (printed or on phone)</li>' +
+                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Beach towels provided by hotel</li>' +
+                    '<li><i class="fas fa-check mr-2 text-green-600"></i>Late arrivals may result in reduced time</li>';
             }
         }
         
@@ -23643,6 +23670,26 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
 
+            <!-- Important Information Customization -->
+            <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 mb-6 border-2 border-blue-200">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-info-circle mr-2 text-blue-600"></i>Important Information
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">Customize the important information displayed on the guest booking confirmation page</p>
+                
+                <div>
+                    <label class="block font-medium mb-2">
+                        <i class="fas fa-list-ul mr-2 text-blue-600"></i>Important Information (One item per line)
+                    </label>
+                    <textarea id="importantInformation" rows="6" placeholder="Please arrive 10 minutes before your time slot&#10;Bring your QR code (printed or on phone)&#10;Beach towels provided by hotel&#10;Late arrivals may result in reduced time" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Each line will appear as a separate bullet point on the confirmation page</p>
+                </div>
+                
+                <button onclick="saveImportantInformation()" class="mt-4 px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg hover:from-blue-700 hover:to-cyan-700 transition shadow-lg">
+                    <i class="fas fa-save mr-2"></i>Save Important Information
+                </button>
+            </div>
+
             <!-- Beach Map Designer -->
             <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-4">
@@ -26555,6 +26602,10 @@ app.get('/admin/dashboard', (c) => {
             updateColorPreview();
             setupColorPickers();
             
+            // Load important information
+            const defaultInfo = 'Please arrive 10 minutes before your time slot\nBring your QR code (printed or on phone)\nBeach towels provided by hotel\nLate arrivals may result in reduced time';
+            document.getElementById('importantInformation').value = s.important_information || defaultInfo;
+            
             // Load beach spots
             await loadBeachSpots();
             
@@ -26726,6 +26777,46 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Save beach card customization error:', error);
           alert('❌ Error saving customization');
+        }
+      };
+      
+      window.saveImportantInformation = async function() {
+        try {
+          // Get basic settings to preserve them
+          const beachBookingEnabled = document.getElementById('beachBookingEnabled')?.checked ? 1 : 0;
+          const freeForGuests = document.getElementById('freeForGuests')?.checked ? 1 : 0;
+          const openingTime = document.getElementById('openingTime')?.value || '08:00';
+          const closingTime = document.getElementById('closingTime')?.value || '18:00';
+          const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
+          const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
+          
+          const response = await fetch('/api/admin/beach/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              // Preserve basic settings
+              beach_booking_enabled: beachBookingEnabled,
+              free_for_hotel_guests: freeForGuests,
+              opening_time: openingTime,
+              closing_time: closingTime,
+              advance_booking_days: advanceBookingDays,
+              max_booking_duration_hours: maxDurationHours,
+              // Important Information
+              important_information: document.getElementById('importantInformation').value
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Important information saved successfully!');
+          } else {
+            alert('❌ Failed to save important information: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Save important information error:', error);
+          alert('❌ Error saving important information');
         }
       };
       
