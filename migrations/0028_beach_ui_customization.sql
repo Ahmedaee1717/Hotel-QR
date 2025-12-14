@@ -19,3 +19,4 @@ ALTER TABLE beach_settings ADD COLUMN text_color TEXT DEFAULT '#ffffff';
 ALTER TABLE beach_settings ADD COLUMN button_color_from TEXT DEFAULT '#f97316';
 ALTER TABLE beach_settings ADD COLUMN button_color_to TEXT DEFAULT '#ea580c';
 ALTER TABLE beach_settings ADD COLUMN button_text_color TEXT DEFAULT '#ffffff';
+ALTER TABLE beach_settings ADD COLUMN time_slots TEXT DEFAULT '[]';
