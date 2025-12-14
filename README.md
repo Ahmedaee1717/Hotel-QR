@@ -58,6 +58,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Documentation System** - Complete knowledge base with getting started guide, features reference, and best practices
 - ✅ **Tutorials Hub** - Video tutorial catalog (20+ topics) organized by category with coming soon placeholders
 - ✅ **FAQ System** - Searchable Q&A knowledge base with 15+ detailed answers across 6 categories
+- ✅ **Live Beach Map** 🆕 - Real-time spot availability visualization with color-coded status, stats dashboard, and walk-in booking
 
 ### 💳 Payment System
 - ✅ Pay at Venue/Vendor (immediate confirmation)
@@ -353,6 +354,49 @@ npm run db:migrate:prod
 # Deploy
 npm run deploy:prod
 ```
+
+---
+
+## 🏖️ Beach Booking System
+
+### Live Beach Map (NEW ✨)
+
+**Purpose:** Real-time visual dashboard for managing walk-in guests and beach spot availability
+
+**Key Features:**
+- 🗺️ **Visual Beach Map** - Canvas-based map with color-coded spots showing real-time status
+- 🎨 **Color-Coded Status** - Green (Available), Yellow (Booked), Blue (Checked In), Red (Blocked), Purple Border (Premium)
+- 📊 **Live Statistics Dashboard** - Total spots, available, booked, checked-in counts, and occupancy percentage
+- 📅 **Date Selector** - View availability for today or tomorrow
+- ⏰ **Time Slot Filter** - Filter by All Times, Morning, Afternoon, or Full Day
+- 🔄 **Auto-Refresh** - Real-time updates with manual refresh button
+- 👤 **Walk-In Booking** - Quick booking interface for walk-in guests with available spot selection
+- 📱 **QR Code Generation** - Instant QR code printing for walk-in bookings
+- 🏖️ **Beach Analytics Integration** - Quick link to detailed beach analytics dashboard
+
+**Location:** Admin Dashboard → Beach Booking Management (top card)
+
+**Use Cases:**
+1. **Walk-In Guest Management** - Quickly see available spots and book for guests who arrive at the beach
+2. **Capacity Monitoring** - Real-time view of beach occupancy and availability
+3. **Premium Spot Identification** - Easily identify premium spots with purple borders
+4. **Time Slot Planning** - Filter by time slots to manage morning/afternoon availability
+5. **Staff Coordination** - Visual reference for beach staff to guide guests to available spots
+
+**Technical Implementation:**
+- Canvas-based rendering for smooth performance
+- Real-time API integration with beach spots and bookings database
+- Automatic status calculation based on booking state and time slots
+- Responsive design with scrollable canvas area
+- Stats auto-update on map refresh
+
+**Admin Workflow:**
+1. Navigate to Beach Booking Management tab
+2. View Live Beach Map at the top of the page
+3. Use date and slot filters to check availability
+4. Click "Refresh" to get latest data
+5. Click "Book for Walk-In Guest" to create instant bookings
+6. View updated statistics and map in real-time
 
 ---
 
