@@ -5608,16 +5608,26 @@ app.post('/api/admin/restaurant/:offering_id/menus', async (c) => {
   const { DB } = c.env
   const { offering_id } = c.req.param()
   const body = await c.req.json()
-  const { menu_name, menu_type, original_image_url, base_language } = body
+  const { menu_name, menu_type, image_urls, original_image_url, base_language } = body
   
   try {
+    // Support both old (single image) and new (multiple images) formats
+    let imageUrlsToStore = image_urls;
+    if (!imageUrlsToStore && original_image_url) {
+      // Legacy support: convert single image to array
+      imageUrlsToStore = [original_image_url];
+    }
+    
+    // Store as JSON array
+    const imageUrlsJson = JSON.stringify(imageUrlsToStore || []);
+    
     // Insert menu
     const result = await DB.prepare(`
       INSERT INTO restaurant_menus (
         offering_id, menu_name, menu_type, original_image_url, 
         base_language, ocr_status, created_at
       ) VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
-    `).bind(offering_id, menu_name, menu_type || 'full', original_image_url, base_language || 'en').run()
+    `).bind(offering_id, menu_name, menu_type || 'full', imageUrlsJson, base_language || 'en').run()
     
     const menuId = result.meta.last_row_id
     
@@ -5626,13 +5636,13 @@ app.post('/api/admin/restaurant/:offering_id/menus', async (c) => {
       SELECT * FROM restaurant_menus WHERE menu_id = ?
     `).bind(menuId).first()
     
-    return c.json({ success: true, menu })
+    return c.json({ success: true, menu, image_count: imageUrlsToStore?.length || 0 })
   } catch (error) {
     return c.json({ error: 'Failed to create menu: ' + error.message }, 500)
   }
 })
 
-// Process OCR for a menu (extract text from image)
+// Process OCR for a menu (extract text from image - supports multiple images)
 app.post('/api/admin/restaurant/menus/:menu_id/process-ocr', async (c) => {
   const { DB } = c.env
   const { menu_id } = c.req.param()
@@ -5647,12 +5657,48 @@ app.post('/api/admin/restaurant/menus/:menu_id/process-ocr', async (c) => {
       return c.json({ error: 'Menu not found' }, 404)
     }
     
+    // Parse image URLs (can be single URL string or JSON array)
+    let imageUrls = [];
+    try {
+      imageUrls = JSON.parse(menu.original_image_url);
+      if (!Array.isArray(imageUrls)) {
+        imageUrls = [menu.original_image_url];
+      }
+    } catch {
+      // If not JSON, treat as single URL
+      imageUrls = [menu.original_image_url];
+    }
+    
     // Update status to processing
     await DB.prepare(`
       UPDATE restaurant_menus 
       SET ocr_status = 'processing' 
       WHERE menu_id = ?
     `).bind(menu_id).run()
+    
+    // Build content array for OpenAI (text + all images)
+    const contentArray = [
+      {
+        type: 'text',
+        text: `Extract ALL text from ${imageUrls.length > 1 ? 'these ' + imageUrls.length + ' menu pages' : 'this restaurant menu image'}. Format it cleanly with:
+- Section headers in UPPERCASE
+- Menu items with prices clearly formatted
+- Descriptions on separate lines
+- Maintain the menu structure and organization
+- Include ALL text visible in ${imageUrls.length > 1 ? 'all pages' : 'the image'}
+${imageUrls.length > 1 ? '- Process pages in order and indicate page breaks with "--- PAGE X ---"' : ''}
+
+Please provide a complete, accurate transcription that preserves the menu's layout and readability.`
+      }
+    ];
+    
+    // Add all images to the request
+    imageUrls.forEach((imageUrl) => {
+      contentArray.push({
+        type: 'image_url',
+        image_url: { url: imageUrl }
+      });
+    });
     
     // Call OpenAI Vision API for OCR
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -5665,23 +5711,7 @@ app.post('/api/admin/restaurant/menus/:menu_id/process-ocr', async (c) => {
         model: 'gpt-4o-mini',
         messages: [{
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Extract ALL text from this restaurant menu image. Format it cleanly with:
-- Section headers in UPPERCASE
-- Menu items with prices clearly formatted
-- Descriptions on separate lines
-- Maintain the menu structure and organization
-- Include ALL text visible in the image
-
-Please provide a complete, accurate transcription that preserves the menu's layout and readability.`
-            },
-            {
-              type: 'image_url',
-              image_url: { url: menu.original_image_url }
-            }
-          ]
+          content: contentArray
         }],
         max_tokens: 4000
       })
@@ -5713,7 +5743,8 @@ Please provide a complete, accurate transcription that preserves the menu's layo
     return c.json({ 
       success: true, 
       extracted_text: extractedText,
-      message: 'OCR processing completed successfully'
+      message: 'OCR processing completed successfully for ' + imageUrls.length + ' image(s)',
+      images_processed: imageUrls.length
     })
   } catch (error) {
     // Update status to failed
@@ -35274,19 +35305,26 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                             </div>
                             
                             <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Upload Menu Image *</label>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Upload Menu Images * 
+                                    <span class="text-xs text-gray-500 font-normal">(Multiple pages supported)</span>
+                                </label>
                                 <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-50" id="uploadArea">
-                                    <input type="file" id="menuImageFile" accept="image/*" class="hidden">
+                                    <input type="file" id="menuImageFile" accept="image/*" multiple class="hidden">
                                     <div id="uploadPlaceholder">
                                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
                                         <p class="text-gray-600 font-semibold mb-1">Click to upload or drag & drop</p>
-                                        <p class="text-xs text-gray-500">PNG, JPG, WebP up to 10MB</p>
+                                        <p class="text-xs text-gray-500">PNG, JPG, WebP up to 10MB per image</p>
+                                        <p class="text-xs text-green-600 mt-2 font-semibold">✨ Select multiple images for multi-page menus</p>
                                     </div>
-                                    <div id="uploadPreview" class="hidden">
-                                        <img id="previewImage" class="max-h-48 mx-auto rounded-lg mb-3" alt="Preview">
-                                        <p class="text-sm text-green-600 font-semibold"><i class="fas fa-check-circle mr-1"></i><span id="fileName"></span></p>
+                                    <div id="uploadPreview" class="hidden space-y-3">
+                                        <div id="imagePreviewGrid" class="grid grid-cols-2 gap-3"></div>
+                                        <p class="text-sm text-green-600 font-semibold">
+                                            <i class="fas fa-check-circle mr-1"></i>
+                                            <span id="imageCount">0</span> image(s) selected
+                                        </p>
                                         <button type="button" onclick="clearImageUpload()" class="text-xs text-red-600 hover:text-red-800 mt-2">
-                                            <i class="fas fa-times mr-1"></i>Remove
+                                            <i class="fas fa-times mr-1"></i>Clear All
                                         </button>
                                     </div>
                                     <div id="uploadProgress" class="hidden">
@@ -35296,7 +35334,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                                         <p class="text-sm text-gray-600"><span id="progressText">Uploading...</span></p>
                                     </div>
                                 </div>
-                                <input type="hidden" id="menuImageUrl">
+                                <input type="hidden" id="menuImageUrls">
                             </div>
                             
                             <div>
@@ -36701,9 +36739,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       const uploadPlaceholder = document.getElementById('uploadPlaceholder');
       const uploadPreview = document.getElementById('uploadPreview');
       const uploadProgress = document.getElementById('uploadProgress');
-      const previewImage = document.getElementById('previewImage');
-      const fileName = document.getElementById('fileName');
-      const menuImageUrlInput = document.getElementById('menuImageUrl');
+      const imagePreviewGrid = document.getElementById('imagePreviewGrid');
+      const imageCount = document.getElementById('imageCount');
+      const menuImageUrlsInput = document.getElementById('menuImageUrls');
+      
+      let uploadedImageUrls = [];
 
       // Click to upload
       uploadArea.addEventListener('click', () => fileInput.click());
@@ -36723,75 +36763,108 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         uploadArea.classList.remove('border-green-500', 'bg-green-50');
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-          fileInput.files = files;
-          handleFileUpload(files[0]);
+          handleMultipleFileUpload(files);
         }
       });
 
-      // File selection
+      // File selection - handle multiple files
       fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
-          handleFileUpload(e.target.files[0]);
+          handleMultipleFileUpload(e.target.files);
         }
       });
 
-      async function handleFileUpload(file) {
-        if (!file.type.startsWith('image/')) {
-          alert('Please upload an image file');
-          return;
+      async function handleMultipleFileUpload(files) {
+        const fileArray = Array.from(files);
+        
+        // Validate all files
+        for (const file of fileArray) {
+          if (!file.type.startsWith('image/')) {
+            alert('Only image files are allowed: ' + file.name);
+            return;
+          }
+          if (file.size > 10 * 1024 * 1024) {
+            alert('Image size must be less than 10MB: ' + file.name);
+            return;
+          }
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-          alert('Image size must be less than 10MB');
-          return;
-        }
-
-        // Show preview
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          previewImage.src = e.target.result;
-          fileName.textContent = file.name;
-          uploadPlaceholder.classList.add('hidden');
-          uploadPreview.classList.remove('hidden');
-        };
-        reader.readAsDataURL(file);
-
-        // Convert to base64 and store (simpler approach - no external API needed)
         uploadPlaceholder.classList.add('hidden');
         uploadProgress.classList.remove('hidden');
+        
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        uploadedImageUrls = [];
 
         try {
-          const progressBar = document.getElementById('progressBar');
-          const progressText = document.getElementById('progressText');
+          for (let i = 0; i < fileArray.length; i++) {
+            const file = fileArray[i];
+            progressText.textContent = 'Uploading ' + (i + 1) + ' of ' + fileArray.length + '...';
+            progressBar.style.width = ((i / fileArray.length) * 100) + '%';
 
-          // Read file as base64
-          const reader2 = new FileReader();
-          reader2.onload = function(e) {
-            // Store base64 data URL
-            menuImageUrlInput.value = e.target.result;
-            uploadProgress.classList.add('hidden');
-            uploadPreview.classList.remove('hidden');
-            progressText.textContent = 'Upload complete!';
-          };
+            // Read file as base64
+            const base64Data = await readFileAsBase64(file);
+            uploadedImageUrls.push(base64Data);
+          }
+
+          progressBar.style.width = '100%';
+          progressText.textContent = 'Upload complete!';
+
+          // Store all image URLs as JSON array
+          menuImageUrlsInput.value = JSON.stringify(uploadedImageUrls);
           
-          reader2.onerror = function() {
-            uploadProgress.classList.add('hidden');
-            uploadPlaceholder.classList.remove('hidden');
-            alert('Upload failed. Please try again or use a different image.');
-          };
+          // Show previews
+          displayImagePreviews();
           
-          reader2.readAsDataURL(file);
+          uploadProgress.classList.add('hidden');
+          uploadPreview.classList.remove('hidden');
+          
         } catch (error) {
           console.error('Upload error:', error);
           uploadProgress.classList.add('hidden');
           uploadPlaceholder.classList.remove('hidden');
-          alert('Upload failed. Please try again or use a different image.');
+          alert('Upload failed. Please try again.');
         }
       }
 
+      function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function displayImagePreviews() {
+        imagePreviewGrid.innerHTML = '';
+        uploadedImageUrls.forEach((url, index) => {
+          const previewDiv = document.createElement('div');
+          previewDiv.className = 'relative group';
+          previewDiv.innerHTML = '<img src="' + url + '" class="w-full h-32 object-cover rounded-lg border-2 border-gray-200" alt="Menu page ' + (index + 1) + '">' +
+            '<div class="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-1 rounded-full font-bold">Page ' + (index + 1) + '</div>' +
+            '<button onclick="removeImage(' + index + ')" class="absolute top-1 right-1 bg-red-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition">' +
+              '<i class="fas fa-times"></i>' +
+            '</button>';
+          imagePreviewGrid.appendChild(previewDiv);
+        });
+        imageCount.textContent = uploadedImageUrls.length;
+      }
+
+      window.removeImage = function(index) {
+        uploadedImageUrls.splice(index, 1);
+        if (uploadedImageUrls.length === 0) {
+          clearImageUpload();
+        } else {
+          menuImageUrlsInput.value = JSON.stringify(uploadedImageUrls);
+          displayImagePreviews();
+        }
+      };
+
       window.clearImageUpload = function() {
         fileInput.value = '';
-        menuImageUrlInput.value = '';
+        menuImageUrlsInput.value = '';
+        uploadedImageUrls = [];
         uploadPreview.classList.add('hidden');
         uploadPlaceholder.classList.remove('hidden');
       };
@@ -36802,14 +36875,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         const menuName = document.getElementById('menuName').value;
         const menuType = document.getElementById('menuType').value;
-        const menuImageUrl = document.getElementById('menuImageUrl').value;
+        const menuImageUrlsStr = document.getElementById('menuImageUrls').value;
         const baseLanguage = document.getElementById('baseLanguage').value;
 
-        // Validate image URL
-        if (!menuImageUrl || menuImageUrl.trim() === '') {
-          alert('⚠️ Please upload a menu image first!');
+        // Validate image URLs
+        if (!menuImageUrlsStr || menuImageUrlsStr.trim() === '') {
+          alert('⚠️ Please upload at least one menu image first!');
           return;
         }
+
+        const menuImageUrls = JSON.parse(menuImageUrlsStr);
 
         try {
           const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
@@ -36818,7 +36893,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             body: JSON.stringify({
               menu_name: menuName,
               menu_type: menuType,
-              original_image_url: menuImageUrl,
+              image_urls: menuImageUrls,
               base_language: baseLanguage
             })
           });
@@ -36826,8 +36901,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const data = await response.json();
 
           if (data.success) {
-            alert('✅ Menu uploaded successfully! Click "Extract Text" to process with OCR.');
+            const imageCount = menuImageUrls.length;
+            alert('✅ Menu uploaded successfully with ' + imageCount + ' image(s)!\\n\\nClick "Extract Text" to process with OCR.');
             document.getElementById('uploadMenuForm').reset();
+            clearImageUpload();
             loadMenus();
           } else {
             alert('Error: ' + (data.error || 'Upload failed'));
