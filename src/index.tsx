@@ -6805,69 +6805,124 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
       flag: flagMap[lang.language_code] || '🌐'
     }))
     
-    // If language is not English and translation doesn't exist, create on-demand translation
+    // If language is not English, translate structured menu items on-demand
     if (language !== 'en' && menusWithContent.length > 0) {
-      for (const menu of menusWithContent) {
-        // Check if translation exists
-        const existingTranslation = await DB.prepare(`
-          SELECT translated_text FROM restaurant_menu_translations
-          WHERE menu_id = ? AND language_code = ?
-        `).bind(menu.menu_id, language).first()
-        
-        if (!existingTranslation && menu.extracted_text) {
-          // Get language info
-          const langInfo = await DB.prepare(`
-            SELECT language_name_en, language_name_native
-            FROM supported_languages
-            WHERE language_code = ?
-          `).bind(language).first()
-          
-          if (langInfo) {
-            try {
-              // Auto-translate on-demand
-              const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  model: 'gpt-4o-mini',
-                  messages: [{
-                    role: 'system',
-                    content: `You are a professional restaurant menu translator. Translate the menu to ${langInfo.language_name_en} (${langInfo.language_name_native}). Maintain:
-- Section headers and structure
-- Accurate food terminology
-- Cultural appropriateness
-- Price formatting
-- Professional tone
-
-Provide ONLY the translated text, preserving the exact format and structure.`
-                  }, {
-                    role: 'user',
-                    content: menu.extracted_text
-                  }],
-                  max_tokens: 4000,
-                  temperature: 0.3
+      // Get language info once
+      const langInfo = await DB.prepare(`
+        SELECT language_name_en, language_name_native
+        FROM supported_languages
+        WHERE language_code = ?
+      `).bind(language).first()
+      
+      if (langInfo) {
+        for (const menu of menusWithContent) {
+          // Translate categories and items on-demand
+          for (const category of menu.categories) {
+            // Check if category translation exists
+            const catTrans = await DB.prepare(`
+              SELECT * FROM menu_category_translations
+              WHERE category_id = ? AND language_code = ?
+            `).bind(category.category_id, language).first()
+            
+            if (!catTrans && category.category_name) {
+              // Translate category name and description
+              try {
+                const catText = category.category_name + (category.category_description ? '\n' + category.category_description : '')
+                const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{
+                      role: 'system',
+                      content: `Translate this menu category to ${langInfo.language_name_en} (${langInfo.language_name_native}). Keep it concise and professional.`
+                    }, {
+                      role: 'user',
+                      content: catText
+                    }],
+                    max_tokens: 200,
+                    temperature: 0.3
+                  })
                 })
-              })
-              
-              if (openaiResponse.ok) {
-                const translationResult = await openaiResponse.json()
-                const translatedText = translationResult.choices[0].message.content
                 
-                // Store translation for future use
-                await DB.prepare(`
-                  INSERT OR REPLACE INTO restaurant_menu_translations (
-                    menu_id, language_code, translated_text, translation_method, translated_at
-                  ) VALUES (?, ?, ?, 'on-demand', CURRENT_TIMESTAMP)
-                `).bind(menu.menu_id, language, translatedText).run()
-                
-                // Update current menu text
-                menu.extracted_text = translatedText
+                if (openaiResponse.ok) {
+                  const result = await openaiResponse.json()
+                  const translated = result.choices[0].message.content
+                  const lines = translated.split('\n')
+                  const catNameTranslated = lines[0]
+                  const catDescTranslated = lines[1] || null
+                  
+                  // Store translation
+                  await DB.prepare(`
+                    INSERT OR REPLACE INTO menu_category_translations (
+                      category_id, language_code, category_name, category_description
+                    ) VALUES (?, ?, ?, ?)
+                  `).bind(category.category_id, language, catNameTranslated, catDescTranslated).run()
+                  
+                  // Update current data
+                  category.category_name = catNameTranslated
+                  category.category_description = catDescTranslated
+                }
+              } catch (error) {
+                console.error(`Category translation failed:`, error)
               }
-            } catch (error) {
-              console.error(`On-demand translation to ${language} failed:`, error)
+            }
+            
+            // Translate items
+            for (const item of category.items) {
+              const itemTrans = await DB.prepare(`
+                SELECT * FROM menu_item_translations
+                WHERE item_id = ? AND language_code = ?
+              `).bind(item.item_id, language).first()
+              
+              if (!itemTrans && item.item_name) {
+                try {
+                  const itemText = item.item_name + (item.description ? '\n' + item.description : '')
+                  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      model: 'gpt-4o-mini',
+                      messages: [{
+                        role: 'system',
+                        content: `Translate this menu item to ${langInfo.language_name_en} (${langInfo.language_name_native}). Keep food terminology accurate.`
+                      }, {
+                        role: 'user',
+                        content: itemText
+                      }],
+                      max_tokens: 300,
+                      temperature: 0.3
+                    })
+                  })
+                  
+                  if (openaiResponse.ok) {
+                    const result = await openaiResponse.json()
+                    const translated = result.choices[0].message.content
+                    const lines = translated.split('\n')
+                    const itemNameTranslated = lines[0]
+                    const itemDescTranslated = lines.slice(1).join('\n').trim() || null
+                    
+                    // Store translation
+                    await DB.prepare(`
+                      INSERT OR REPLACE INTO menu_item_translations (
+                        item_id, language_code, item_name, description
+                      ) VALUES (?, ?, ?, ?)
+                    `).bind(item.item_id, language, itemNameTranslated, itemDescTranslated).run()
+                    
+                    // Update current data
+                    item.item_name = itemNameTranslated
+                    item.description = itemDescTranslated
+                  }
+                } catch (error) {
+                  console.error(`Item translation failed:`, error)
+                }
+              }
             }
           }
         }
