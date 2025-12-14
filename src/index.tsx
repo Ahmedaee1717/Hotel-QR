@@ -12594,26 +12594,29 @@ app.get('/hotel/:property_slug', async (c) => {
                             subtitle.style.setProperty('color', textColor, 'important');
                         }
                         
-                        // Update features and apply color
-                        const features = section.querySelectorAll('.flex.items-center.gap-2 span');
-                        if (features[0]) {
-                            features[0].textContent = s.feature1_text || 'Free for Hotel Guests';
-                            features[0].style.setProperty('color', textColor, 'important');
+                        // Update features and apply color (more specific selector to avoid traffic light)
+                        const featuresContainer = section.querySelector('.flex.flex-wrap.gap-3.text-sm');
+                        if (featuresContainer) {
+                            const features = featuresContainer.querySelectorAll('.flex.items-center.gap-2 span');
+                            if (features[0]) {
+                                features[0].textContent = s.feature1_text || 'Free for Hotel Guests';
+                                features[0].style.setProperty('color', textColor, 'important');
+                            }
+                            if (features[1]) {
+                                features[1].textContent = s.feature2_text || 'Book Up to 7 Days Ahead';
+                                features[1].style.setProperty('color', textColor, 'important');
+                            }
+                            if (features[2]) {
+                                features[2].textContent = s.feature3_text || 'QR Code Check-in';
+                                features[2].style.setProperty('color', textColor, 'important');
+                            }
+                            
+                            // Apply color to feature icons
+                            const featureIcons = featuresContainer.querySelectorAll('.flex.items-center.gap-2 i');
+                            featureIcons.forEach(icon => {
+                                icon.style.setProperty('color', textColor, 'important');
+                            });
                         }
-                        if (features[1]) {
-                            features[1].textContent = s.feature2_text || 'Book Up to 7 Days Ahead';
-                            features[1].style.setProperty('color', textColor, 'important');
-                        }
-                        if (features[2]) {
-                            features[2].textContent = s.feature3_text || 'QR Code Check-in';
-                            features[2].style.setProperty('color', textColor, 'important');
-                        }
-                        
-                        // Apply color to feature icons
-                        const featureIcons = section.querySelectorAll('.flex.items-center.gap-2 i');
-                        featureIcons.forEach(icon => {
-                            icon.style.setProperty('color', textColor, 'important');
-                        });
                         
                         // Update button
                         const button = section.querySelector('button');
