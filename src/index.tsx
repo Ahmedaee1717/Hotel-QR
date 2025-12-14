@@ -15990,6 +15990,31 @@ app.get('/beach-booking/:property_id', async (c) => {
                             <span class="text-gray-600">Premium Location</span>
                         </div>
                     </div>
+                    
+                    <!-- Zone Legend -->
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <h4 class="font-semibold text-sm mb-3 text-gray-700">
+                            <i class="fas fa-map-marker-alt mr-2 text-purple-600"></i>Beach Zones
+                        </h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 rounded" style="background-color: #10b981; opacity: 0.6;"></div>
+                                <span class="text-gray-600">Quiet Zone</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 rounded" style="background-color: #f59e0b; opacity: 0.6;"></div>
+                                <span class="text-gray-600">Family Area</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 rounded" style="background-color: #8b5cf6; opacity: 0.6;"></div>
+                                <span class="text-gray-600">VIP Section</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-4 rounded" style="background-color: #3b82f6; opacity: 0.6;"></div>
+                                <span class="text-gray-600">Beach Front</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -16079,6 +16104,7 @@ app.get('/beach-booking/:property_id', async (c) => {
         let spots = [];
         let bookings = [];
         let settings = {};
+        let zones = [];
         const propertyId = ${property_id};
         
         const canvas = document.getElementById('beachCanvas');
@@ -16166,6 +16192,43 @@ app.get('/beach-booking/:property_id', async (c) => {
                     spots = spotsData.spots;
                 }
                 
+                // Load sample zones (will be replaced with API call later)
+                zones = [
+                    {
+                        id: 1,
+                        name: 'Quiet Zone',
+                        type: 'rectangle',
+                        x: 50,
+                        y: 50,
+                        width: 200,
+                        height: 150,
+                        color: '#10b981',
+                        opacity: 0.25
+                    },
+                    {
+                        id: 2,
+                        name: 'Family Area',
+                        type: 'rectangle',
+                        x: 300,
+                        y: 50,
+                        width: 250,
+                        height: 150,
+                        color: '#f59e0b',
+                        opacity: 0.25
+                    },
+                    {
+                        id: 3,
+                        name: 'VIP Section',
+                        type: 'rectangle',
+                        x: 150,
+                        y: 250,
+                        width: 300,
+                        height: 180,
+                        color: '#8b5cf6',
+                        opacity: 0.25
+                    }
+                ];
+                
                 // Load bookings for selected date
                 await loadBookingsForDate();
                 renderSpots();
@@ -16208,7 +16271,46 @@ app.get('/beach-booking/:property_id', async (c) => {
             );
         }
         
+        function renderZones() {
+            document.querySelectorAll('.zone-overlay').forEach(el => el.remove());
+            
+            zones.forEach(zone => {
+                const zoneEl = document.createElement('div');
+                zoneEl.className = 'zone-overlay';
+                zoneEl.style.position = 'absolute';
+                zoneEl.style.left = zone.x + 'px';
+                zoneEl.style.top = zone.y + 'px';
+                zoneEl.style.width = zone.width + 'px';
+                zoneEl.style.height = zone.height + 'px';
+                zoneEl.style.backgroundColor = zone.color;
+                zoneEl.style.opacity = zone.opacity;
+                zoneEl.style.border = '2px solid ' + zone.color;
+                zoneEl.style.pointerEvents = 'none';
+                zoneEl.style.borderRadius = '12px';
+                zoneEl.style.zIndex = '1';
+                
+                const label = document.createElement('div');
+                label.style.position = 'absolute';
+                label.style.top = '8px';
+                label.style.left = '8px';
+                label.style.backgroundColor = zone.color;
+                label.style.color = 'white';
+                label.style.padding = '6px 12px';
+                label.style.borderRadius = '6px';
+                label.style.fontSize = '14px';
+                label.style.fontWeight = 'bold';
+                label.style.opacity = '1';
+                label.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                label.textContent = zone.name;
+                zoneEl.appendChild(label);
+                
+                canvas.appendChild(zoneEl);
+            });
+        }
+        
         function renderSpots() {
+            renderZones();
+            
             // Remove existing spot elements
             document.querySelectorAll('.spot-icon').forEach(el => el.remove());
             
