@@ -15609,76 +15609,84 @@ app.get('/admin/beach-management/:property_id', (c) => {
         .tab-content.active {
             display: block;
         }
+        /* Mobile-specific enhancements */
+        @media (max-width: 640px) {
+            #qr-reader {
+                max-width: 300px;
+            }
+            #beachMapCanvas {
+                min-height: 250px;
+            }
+        }
+        /* Better touch targets for mobile */
+        button, input, select {
+            -webkit-tap-highlight-color: transparent;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-7xl mx-auto p-4">
         <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl shadow-xl p-6 mb-6 text-white">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold flex items-center">
-                        <i class="fas fa-umbrella-beach mr-3"></i>
-                        Beach Management Portal
-                    </h1>
-                    <p class="mt-2 opacity-90">Check-in guests, view live availability, and manage walk-ins</p>
-                </div>
-                <button onclick="window.location.href='/admin/dashboard'" class="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl backdrop-blur-sm transition">
-                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
-                </button>
-            </div>
+        <div class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl shadow-xl p-4 md:p-6 mb-4 md:mb-6 text-white">
+            <h1 class="text-2xl md:text-3xl font-bold flex items-center">
+                <i class="fas fa-umbrella-beach mr-2 md:mr-3"></i>
+                Beach Management
+            </h1>
+            <p class="mt-1 md:mt-2 text-sm md:text-base opacity-90">Check-in guests & manage walk-ins</p>
         </div>
 
         <!-- Main Navigation Tabs -->
-        <div class="bg-white rounded-xl shadow-lg mb-6">
-            <div class="flex border-b overflow-x-auto">
-                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 px-6 py-4 font-semibold transition">
-                    <i class="fas fa-qrcode mr-2"></i>QR Check-In
+        <div class="bg-white rounded-xl shadow-lg mb-4 md:mb-6">
+            <div class="flex border-b">
+                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 px-3 md:px-6 py-3 md:py-4 text-sm md:text-base font-semibold transition">
+                    <i class="fas fa-qrcode mr-1 md:mr-2"></i>
+                    <span class="hidden sm:inline">QR </span>Check-In
                 </button>
-                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
-                    <i class="fas fa-map-marked-alt mr-2"></i>Live Beach Map & Walk-In Booking
+                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 px-3 md:px-6 py-3 md:py-4 text-sm md:text-base font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-map-marked-alt mr-1 md:mr-2"></i>
+                    <span class="hidden sm:inline">Beach </span>Map<span class="hidden md:inline"> & Booking</span>
                 </button>
             </div>
         </div>
 
         <!-- Check-In Section -->
         <div id="checkinSection" class="tab-content active">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                 <!-- QR Scanner -->
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
-                        <i class="fas fa-camera text-blue-600 mr-3"></i>
-                        Scan Guest QR Code
+                <div class="bg-white rounded-xl shadow-lg p-4 md:p-6">
+                    <h2 class="text-lg md:text-2xl font-bold mb-3 md:mb-4 flex items-center">
+                        <i class="fas fa-camera text-blue-600 mr-2 md:mr-3"></i>
+                        Scan QR Code
                     </h2>
                     <div class="text-center">
-                        <div id="qr-reader" class="mx-auto border-4 border-blue-200 rounded-xl overflow-hidden mb-4"></div>
-                        <button onclick="toggleQRScanner()" id="scannerToggleBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-lg">
+                        <div id="qr-reader" class="mx-auto border-4 border-blue-200 rounded-xl overflow-hidden mb-3 md:mb-4"></div>
+                        <button onclick="toggleQRScanner()" id="scannerToggleBtn" class="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition shadow-lg text-base md:text-lg">
                             <i class="fas fa-camera mr-2"></i>Start Camera
                         </button>
-                        <p class="text-sm text-gray-600 mt-4">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            Position QR code within the frame
+                        <p class="text-xs md:text-sm text-gray-600 mt-3 md:mt-4">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Position QR code within frame
                         </p>
                     </div>
                 </div>
 
                 <!-- Manual Code Entry -->
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
-                        <i class="fas fa-keyboard text-green-600 mr-3"></i>
-                        Enter Booking Code
+                <div class="bg-white rounded-xl shadow-lg p-4 md:p-6">
+                    <h2 class="text-lg md:text-2xl font-bold mb-3 md:mb-4 flex items-center">
+                        <i class="fas fa-keyboard text-green-600 mr-2 md:mr-3"></i>
+                        Enter Code
                     </h2>
                     <div>
-                        <label class="block text-lg font-semibold mb-3">6-Digit Booking Code</label>
+                        <label class="block text-sm md:text-lg font-semibold mb-2 md:mb-3">6-Digit Booking Code</label>
                         <input 
                             type="text" 
                             id="manualCodeInput" 
                             placeholder="B12345" 
                             maxlength="6"
-                            class="w-full px-6 py-4 text-3xl font-bold text-center border-4 border-green-200 rounded-xl focus:border-green-500 focus:outline-none uppercase mb-4"
+                            class="w-full px-4 md:px-6 py-3 md:py-4 text-2xl md:text-3xl font-bold text-center border-4 border-green-200 rounded-xl focus:border-green-500 focus:outline-none uppercase mb-3 md:mb-4"
                             onkeyup="this.value = this.value.toUpperCase(); if(event.key === 'Enter') verifyManualCode()"
                         >
-                        <button onclick="verifyManualCode()" class="w-full px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-lg transition shadow-lg">
+                        <button onclick="verifyManualCode()" class="w-full px-6 py-3 md:py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-base md:text-lg transition shadow-lg">
                             <i class="fas fa-check mr-2"></i>Verify & Check In
                         </button>
                     </div>
@@ -15686,125 +15694,122 @@ app.get('/admin/beach-management/:property_id', (c) => {
             </div>
 
             <!-- Check-In Result -->
-            <div id="checkInResult" class="mt-6 hidden">
+            <div id="checkInResult" class="mt-4 md:mt-6 hidden">
                 <!-- Will be populated dynamically -->
             </div>
 
             <!-- Recent Check-Ins -->
-            <div class="bg-white rounded-xl shadow-lg p-6 mt-6">
-                <h3 class="text-xl font-bold mb-4 flex items-center">
-                    <i class="fas fa-history text-gray-600 mr-3"></i>
-                    Recent Check-Ins Today
+            <div class="bg-white rounded-xl shadow-lg p-4 md:p-6 mt-4 md:mt-6">
+                <h3 class="text-base md:text-xl font-bold mb-3 md:mb-4 flex items-center">
+                    <i class="fas fa-history text-gray-600 mr-2 md:mr-3"></i>
+                    Recent Check-Ins
                 </h3>
-                <div id="recentCheckIns" class="space-y-3">
-                    <p class="text-gray-500 text-center py-8">Loading recent check-ins...</p>
+                <div id="recentCheckIns" class="space-y-2 md:space-y-3">
+                    <p class="text-gray-500 text-center py-6 md:py-8 text-sm">Loading...</p>
                 </div>
             </div>
         </div>
 
         <!-- Live Beach Map Section -->
         <div id="mapSection" class="tab-content">
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-2xl font-bold flex items-center">
-                        <i class="fas fa-map-marked-alt text-blue-600 mr-3"></i>
-                        Live Beach Availability
+            <div class="bg-white rounded-xl shadow-lg p-4 md:p-6">
+                <!-- Header - Mobile Optimized -->
+                <div class="mb-4 md:mb-6">
+                    <h2 class="text-lg md:text-2xl font-bold flex items-center mb-3 md:mb-4">
+                        <i class="fas fa-map-marked-alt text-blue-600 mr-2 md:mr-3"></i>
+                        Beach Availability
                     </h2>
-                    <div class="flex gap-3">
-                        <input type="date" id="mapDate" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        <select id="mapTimeSlot" class="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                            <option value="all">All Time Slots</option>
+                    <div class="flex flex-col sm:flex-row gap-2 md:gap-3">
+                        <input type="date" id="mapDate" class="flex-1 px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                        <select id="mapTimeSlot" class="flex-1 px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                            <option value="all">All Times</option>
                             <option value="half_day_am">Morning</option>
                             <option value="half_day_pm">Afternoon</option>
                             <option value="full_day">Full Day</option>
                         </select>
-                        <button onclick="refreshBeachMap()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">
-                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        <button onclick="refreshBeachMap()" class="px-4 md:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition text-sm md:text-base whitespace-nowrap">
+                            <i class="fas fa-sync-alt mr-1 md:mr-2"></i>Refresh
                         </button>
                     </div>
                 </div>
 
-                <!-- Stats -->
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                    <div class="bg-gray-50 rounded-lg p-4 text-center">
-                        <div class="text-3xl font-bold text-gray-800" id="totalSpots">-</div>
-                        <div class="text-sm text-gray-600 mt-1">Total Spots</div>
+                <!-- Stats - Mobile Optimized -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4 mb-4 md:mb-6">
+                    <div class="bg-gray-50 rounded-lg p-2 md:p-4 text-center">
+                        <div class="text-xl md:text-3xl font-bold text-gray-800" id="totalSpots">-</div>
+                        <div class="text-xs md:text-sm text-gray-600 mt-1">Total</div>
                     </div>
-                    <div class="bg-green-50 rounded-lg p-4 text-center">
-                        <div class="text-3xl font-bold text-green-600" id="availableSpots">-</div>
-                        <div class="text-sm text-gray-600 mt-1">Available</div>
+                    <div class="bg-green-50 rounded-lg p-2 md:p-4 text-center">
+                        <div class="text-xl md:text-3xl font-bold text-green-600" id="availableSpots">-</div>
+                        <div class="text-xs md:text-sm text-gray-600 mt-1">Available</div>
                     </div>
-                    <div class="bg-yellow-50 rounded-lg p-4 text-center">
-                        <div class="text-3xl font-bold text-yellow-600" id="bookedSpots">-</div>
-                        <div class="text-sm text-gray-600 mt-1">Booked</div>
+                    <div class="bg-yellow-50 rounded-lg p-2 md:p-4 text-center">
+                        <div class="text-xl md:text-3xl font-bold text-yellow-600" id="bookedSpots">-</div>
+                        <div class="text-xs md:text-sm text-gray-600 mt-1">Booked</div>
                     </div>
-                    <div class="bg-blue-50 rounded-lg p-4 text-center">
-                        <div class="text-3xl font-bold text-blue-600" id="checkedInSpots">-</div>
-                        <div class="text-sm text-gray-600 mt-1">Checked In</div>
+                    <div class="bg-blue-50 rounded-lg p-2 md:p-4 text-center">
+                        <div class="text-xl md:text-3xl font-bold text-blue-600" id="checkedInSpots">-</div>
+                        <div class="text-xs md:text-sm text-gray-600 mt-1">Checked In</div>
                     </div>
-                    <div class="bg-purple-50 rounded-lg p-4 text-center">
-                        <div class="text-3xl font-bold text-purple-600" id="occupancyRate">-</div>
-                        <div class="text-sm text-gray-600 mt-1">Occupancy</div>
+                    <div class="bg-purple-50 rounded-lg p-2 md:p-4 text-center col-span-2 sm:col-span-1">
+                        <div class="text-xl md:text-3xl font-bold text-purple-600" id="occupancyRate">-</div>
+                        <div class="text-xs md:text-sm text-gray-600 mt-1">Occupancy</div>
                     </div>
                 </div>
 
-                <!-- Instructions -->
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-4 mb-6">
-                    <div class="flex items-start gap-3">
-                        <i class="fas fa-info-circle text-green-600 text-xl mt-1"></i>
+                <!-- Instructions - Mobile Optimized -->
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-3 md:p-4 mb-4 md:mb-6">
+                    <div class="flex items-start gap-2 md:gap-3">
+                        <i class="fas fa-info-circle text-green-600 text-lg md:text-xl mt-0.5"></i>
                         <div>
-                            <h4 class="font-bold text-green-900 mb-1">Walk-In Booking Instructions</h4>
-                            <p class="text-sm text-green-800">
-                                <strong>Click any green (available) spot</strong> on the map below to book a walk-in guest. A booking form will appear where you can enter guest details and complete the reservation instantly.
+                            <h4 class="font-bold text-green-900 text-sm md:text-base mb-1">Walk-In Booking</h4>
+                            <p class="text-xs md:text-sm text-green-800">
+                                <strong>Tap any green spot</strong> on the map to book a walk-in guest. Enter guest details and complete the booking instantly.
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Legend -->
-                <div class="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-                    <div class="flex items-center">
-                        <div class="w-6 h-6 bg-green-500 rounded mr-2"></div>
-                        <span class="text-sm font-semibold">Available - Click to Book</span>
+                <!-- Legend - Mobile Optimized -->
+                <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 md:gap-4 mb-4 md:mb-6 p-3 md:p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-center sm:justify-start">
+                        <div class="w-5 h-5 md:w-6 md:h-6 bg-green-500 rounded mr-1.5 md:mr-2 flex-shrink-0"></div>
+                        <span class="text-xs md:text-sm font-semibold">Available</span>
                     </div>
-                    <div class="flex items-center">
-                        <div class="w-6 h-6 bg-yellow-500 rounded mr-2"></div>
-                        <span class="text-sm">Booked</span>
+                    <div class="flex items-center justify-center sm:justify-start">
+                        <div class="w-5 h-5 md:w-6 md:h-6 bg-yellow-500 rounded mr-1.5 md:mr-2 flex-shrink-0"></div>
+                        <span class="text-xs md:text-sm">Booked</span>
                     </div>
-                    <div class="flex items-center">
-                        <div class="w-6 h-6 bg-blue-500 rounded mr-2"></div>
-                        <span class="text-sm">Checked In</span>
+                    <div class="flex items-center justify-center sm:justify-start">
+                        <div class="w-5 h-5 md:w-6 md:h-6 bg-blue-500 rounded mr-1.5 md:mr-2 flex-shrink-0"></div>
+                        <span class="text-xs md:text-sm">Checked In</span>
                     </div>
-                    <div class="flex items-center">
-                        <div class="w-6 h-6 bg-red-500 rounded mr-2"></div>
-                        <span class="text-sm">Blocked</span>
-                    </div>
-                    <div class="flex items-center">
-                        <div class="w-6 h-6 border-4 border-purple-500 rounded mr-2"></div>
-                        <span class="text-sm">Premium</span>
+                    <div class="flex items-center justify-center sm:justify-start">
+                        <div class="w-5 h-5 md:w-6 md:h-6 bg-red-500 rounded mr-1.5 md:mr-2 flex-shrink-0"></div>
+                        <span class="text-xs md:text-sm">Blocked</span>
                     </div>
                 </div>
 
-                <!-- Beach Map Canvas -->
-                <div class="border-4 border-gray-200 rounded-xl overflow-hidden">
-                    <canvas id="beachMapCanvas" width="1200" height="600" class="w-full cursor-pointer"></canvas>
+                <!-- Beach Map Canvas - Mobile Optimized -->
+                <div class="border-2 md:border-4 border-gray-200 rounded-lg md:rounded-xl overflow-hidden touch-manipulation">
+                    <canvas id="beachMapCanvas" width="1200" height="600" class="w-full cursor-pointer" style="touch-action: manipulation;"></canvas>
                 </div>
             </div>
         </div>
 
     </div>
 
-    <!-- Walk-In Booking Modal -->
-    <div id="walkinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 rounded-t-2xl">
+    <!-- Walk-In Booking Modal - Mobile Optimized -->
+    <div id="walkinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-2 md:p-4">
+        <div class="bg-white rounded-xl md:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 md:p-6 rounded-t-xl md:rounded-t-2xl">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h3 class="text-2xl font-bold flex items-center">
-                            <i class="fas fa-user-plus mr-3"></i>
+                        <h3 class="text-lg md:text-2xl font-bold flex items-center">
+                            <i class="fas fa-user-plus mr-2 md:mr-3"></i>
                             Book Walk-In Guest
                         </h3>
-                        <p class="text-sm mt-1 opacity-90" id="modalSpotInfo">Spot will be shown here</p>
+                        <p class="text-xs md:text-sm mt-1 opacity-90" id="modalSpotInfo">Spot will be shown here</p>
                     </div>
                     <button onclick="closeWalkinModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition">
                         <i class="fas fa-times text-2xl"></i>
@@ -15812,44 +15817,44 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 </div>
             </div>
 
-            <form id="walkinForm" class="p-6 space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form id="walkinForm" class="p-4 md:p-6 space-y-3 md:space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Guest Name *</label>
-                        <input type="text" id="walkinGuestName" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Guest Name *</label>
+                        <input type="text" id="walkinGuestName" required class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Room Number</label>
-                        <input type="text" id="walkinRoomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Room Number</label>
+                        <input type="text" id="walkinRoomNumber" class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Phone Number</label>
-                        <input type="tel" id="walkinPhone" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Phone Number</label>
+                        <input type="tel" id="walkinPhone" class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Email</label>
-                        <input type="email" id="walkinEmail" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Email</label>
+                        <input type="email" id="walkinEmail" class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Time Slot *</label>
-                        <select id="walkinTimeSlot" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Time Slot *</label>
+                        <select id="walkinTimeSlot" required class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                             <option value="half_day_am">Morning (8AM - 1PM)</option>
                             <option value="half_day_pm">Afternoon (1PM - 6PM)</option>
                             <option value="full_day">Full Day (8AM - 6PM)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Number of Guests *</label>
-                        <input type="number" id="walkinNumGuests" required min="1" max="10" value="2" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                        <label class="block text-xs md:text-sm font-semibold mb-1.5 md:mb-2">Number of Guests *</label>
+                        <input type="number" id="walkinNumGuests" required min="1" max="10" value="2" class="w-full px-3 md:px-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
                     </div>
                 </div>
 
-                <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeWalkinModal()" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition">
+                <div class="flex gap-2 md:gap-3 pt-3 md:pt-4">
+                    <button type="button" onclick="closeWalkinModal()" class="flex-1 px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition">
                         Cancel
                     </button>
-                    <button type="submit" class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition shadow-lg">
-                        <i class="fas fa-check mr-2"></i>Complete Booking
+                    <button type="submit" class="flex-1 px-4 md:px-6 py-2.5 md:py-3 text-sm md:text-base bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition shadow-lg">
+                        <i class="fas fa-check mr-1 md:mr-2"></i><span class="hidden sm:inline">Complete </span>Book
                     </button>
                 </div>
             </form>
