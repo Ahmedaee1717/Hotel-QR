@@ -29949,22 +29949,27 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         },
         
         quickActions: {
+          beach: [
+            { icon: '⚙️', text: 'Configure Settings', desc: '2 min', completed: false, taskKey: 'beachSettingsConfigured', action: () => { document.querySelector('[data-tab="beach"]')?.click(); setTimeout(() => document.getElementById('beachBookingEnabled')?.focus(), 300); } },
+            { icon: '🗺️', text: 'Design Beach Map', desc: '5 min', completed: false, taskKey: 'beachMapDesigned', action: () => { document.querySelector('.beach-map-design-btn')?.click() || alert('Navigate to Beach Booking Management tab first'); } },
+            { icon: '🎨', text: 'Create Zones', desc: '3 min', completed: false, taskKey: 'zonesCreated', action: () => { alert('Open Beach Map Designer, click "Draw Zone", draw on canvas, name it, and save!'); } }
+          ],
           qrcode: [
-            { icon: '🎨', text: 'Design QR Code', desc: '2 min', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
-            { icon: '📥', text: 'Download QR', desc: '1 min', action: () => document.getElementById('downloadCard')?.click() }
+            { icon: '🎨', text: 'Design QR Code', desc: '2 min', completed: false, taskKey: 'qrCodeCreated', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
+            { icon: '📥', text: 'Download QR', desc: '1 min', completed: false, taskKey: 'qrCodeDownloaded', action: () => document.getElementById('downloadCard')?.click() }
+          ],
+          analytics: [
+            { icon: '📊', text: 'View Beach Analytics', desc: '2 min', completed: false, taskKey: 'viewedAnalytics', action: () => window.location.href = '/admin/beach-analytics' },
+            { icon: '📈', text: 'Check Live Occupancy', desc: '1 min', completed: false, taskKey: 'checkedOccupancy', action: () => window.location.href = '/admin/beach-analytics' }
           ],
           settings: [
-            { icon: '📤', text: 'Upload Logo', desc: '1 min', action: () => document.getElementById('logoUpload')?.click() },
-            { icon: '🎨', text: 'Set Colors', desc: '2 min', action: () => document.querySelector('[data-tab="settings"]')?.click() }
-          ],
-          offerings: [
-            { icon: '➕', text: 'Add Restaurant', desc: '3 min', action: () => document.getElementById('addOfferingBtn')?.click() },
-            { icon: '🍽️', text: 'View Offerings', desc: '1 min', action: () => window.location.reload() }
+            { icon: '📤', text: 'Upload Logo', desc: '1 min', completed: false, taskKey: 'logoUploaded', action: () => document.getElementById('logoUpload')?.click() },
+            { icon: '🎨', text: 'Set Brand Colors', desc: '2 min', completed: false, taskKey: 'colorsSet', action: () => document.querySelector('[data-tab="settings"]')?.click() }
           ],
           default: [
-            { icon: '🎨', text: 'Create QR Code', desc: '2 min', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
-            { icon: '➕', text: 'Add Content', desc: '3 min', action: () => document.querySelector('[data-tab="offerings"]')?.click() },
-            { icon: '⚙️', text: 'Settings', desc: '5 min', action: () => document.querySelector('[data-tab="settings"]')?.click() }
+            { icon: '🏖️', text: 'Setup Beach Booking', desc: '5 min', completed: false, taskKey: 'beachSetup', action: () => document.querySelector('[data-tab="beach"]')?.click() },
+            { icon: '🎨', text: 'Create QR Code', desc: '2 min', completed: false, taskKey: 'qrCodeCreated', action: () => document.querySelector('[data-tab="qrcode"]')?.click() },
+            { icon: '📊', text: 'View Analytics', desc: '2 min', completed: false, taskKey: 'viewedAnalytics', action: () => document.querySelector('[data-tab="analytics"]')?.click() }
           ]
         }
       };
@@ -29978,15 +29983,21 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // Calculate setup progress
       function calculateProgress() {
         const tasks = [
-          { key: 'hasLogo', check: () => document.querySelector('#logoPreview img')?.src },
-          { key: 'hasColors', check: () => localStorage.getItem('brandColors') },
-          { key: 'hasQRCode', check: () => document.getElementById('qrCodePreview')?.innerHTML },
-          { key: 'hasOfferings', check: () => document.querySelectorAll('.offering-item').length > 0 }
+          { key: 'beachSettingsConfigured', check: () => localStorage.getItem('beachSettingsConfigured') },
+          { key: 'beachMapDesigned', check: () => localStorage.getItem('beachMapDesigned') },
+          { key: 'zonesCreated', check: () => localStorage.getItem('zonesCreated') },
+          { key: 'qrCodeCreated', check: () => localStorage.getItem('qrCodeCreated') }
         ];
         
         const completed = tasks.filter(task => task.check()).length;
         return Math.round((completed / tasks.length) * 100);
       }
+      
+      // Mark task as complete
+      window.markTaskComplete = function(taskKey) {
+        localStorage.setItem(taskKey, 'true');
+        updateAssistantContent();
+      };
       
       // Create assistant UI
       function createAssistant() {
@@ -30003,7 +30014,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           </div>
           
           <!-- AI Assistant Panel -->
-          <div id="aiAssistantPanel" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 hidden transform transition-all duration-300 border-2 border-indigo-100" style="max-height: 600px;">
+          <div id="aiAssistantPanel" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 hidden transform transition-all duration-300 border-2 border-indigo-100" style="max-height: 650px;">
             <!-- Header -->
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -30015,9 +30026,14 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                   <p class="text-xs text-blue-100">Here to help you succeed! 🚀</p>
                 </div>
               </div>
-              <button onclick="toggleAssistant()" class="hover:bg-white/20 rounded-full p-2 transition">
-                <i class="fas fa-times"></i>
-              </button>
+              <div class="flex gap-2">
+                <button onclick="toggleChatMode()" id="chatModeBtn" class="hover:bg-white/20 rounded-full p-2 transition" title="Toggle Chat">
+                  <i class="fas fa-comments"></i>
+                </button>
+                <button onclick="toggleAssistant()" class="hover:bg-white/20 rounded-full p-2 transition">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
             </div>
             
             <!-- Progress Bar -->
@@ -30031,8 +30047,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               </div>
             </div>
             
-            <!-- Content -->
-            <div class="overflow-y-auto" style="max-height: 420px;">
+            <!-- Tasks & Chat Content -->
+            <div id="assistantTasksMode" class="overflow-y-auto" style="max-height: 470px;">
               <!-- Quick Actions -->
               <div class="p-4 border-b">
                 <h4 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
@@ -30054,18 +30070,39 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                   <!-- Dynamic tips -->
                 </div>
               </div>
+            </div>
+            
+            <!-- Chat Mode -->
+            <div id="assistantChatMode" class="hidden flex flex-col" style="height: 470px;">
+              <!-- Chat Messages -->
+              <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div class="flex gap-2">
+                  <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-robot text-blue-600"></i>
+                  </div>
+                  <div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">
+                    <p class="text-sm text-gray-800">Hi! I'm your GuestConnect Assistant. Ask me anything about managing your hotel dashboard, configuring beach bookings, analytics, or any feature! 🤖</p>
+                  </div>
+                </div>
+              </div>
               
-              <!-- Resources -->
-              <div class="p-4 bg-gray-50 border-t">
-                <h4 class="text-sm font-bold text-gray-700 mb-3">📚 Resources</h4>
-                <div class="space-y-2">
-                  <button onclick="showTutorialModal()" class="w-full text-left px-3 py-2 bg-white rounded-lg hover:bg-blue-50 transition flex items-center gap-2 text-sm">
-                    <i class="fas fa-play-circle text-blue-600"></i>
-                    <span>Video Tutorials</span>
+              <!-- Chat Input -->
+              <div class="p-4 border-t bg-gray-50">
+                <div class="flex gap-2">
+                  <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" onkeypress="if(event.key==='Enter') sendChatMessage()">
+                  <button onclick="sendChatMessage()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transition">
+                    <i class="fas fa-paper-plane"></i>
                   </button>
-                  <button onclick="showDocumentation()" class="w-full text-left px-3 py-2 bg-white rounded-lg hover:bg-blue-50 transition flex items-center gap-2 text-sm">
-                    <i class="fas fa-book text-indigo-600"></i>
-                    <span>Documentation</span>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <button onclick="sendQuickQuestion('How do I change beach settings?')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
+                    🏖️ Beach settings
+                  </button>
+                  <button onclick="sendQuickQuestion('Show me analytics')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
+                    📊 Analytics
+                  </button>
+                  <button onclick="sendQuickQuestion('How to customize QR code?')" class="text-xs px-2 py-1 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition">
+                    🎨 QR codes
                   </button>
                 </div>
               </div>
@@ -30163,16 +30200,26 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         // Update quick actions
         const actionsContainer = document.getElementById('quickActionsContainer');
         if (actionsContainer) {
-          actionsContainer.innerHTML = actions.map((action, idx) => \`
-            <button onclick="quickAction(\${idx}, '\${currentTab}')" class="w-full flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg hover:from-blue-100 hover:to-indigo-100 transition border border-blue-200">
-              <span class="text-2xl">\${action.icon}</span>
-              <div class="flex-1 text-left">
-                <div class="font-semibold text-sm">\${action.text}</div>
-                <div class="text-xs text-gray-600">\${action.desc}</div>
-              </div>
-              <i class="fas fa-arrow-right text-blue-600"></i>
-            </button>
-          \`).join('');
+          actionsContainer.innerHTML = actions.map((action, idx) => {
+            const isCompleted = action.taskKey && localStorage.getItem(action.taskKey);
+            const completedClass = isCompleted ? 'bg-green-50 border-green-200' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200';
+            const completedIcon = isCompleted ? '<i class="fas fa-check-circle text-green-600"></i>' : '<i class="fas fa-arrow-right text-blue-600"></i>';
+            const completedBadge = isCompleted ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full ml-2">✓ Done</span>' : '';
+            
+            return \`
+              <button onclick="quickAction(\${idx}, '\${currentTab}')" class="w-full flex items-center gap-3 p-3 \${completedClass} rounded-lg hover:shadow-md transition border">
+                <span class="text-2xl">\${action.icon}</span>
+                <div class="flex-1 text-left">
+                  <div class="font-semibold text-sm flex items-center">
+                    \${action.text}
+                    \${completedBadge}
+                  </div>
+                  <div class="text-xs text-gray-600">\${action.desc}</div>
+                </div>
+                \${completedIcon}
+              </button>
+            \`;
+          }).join('');
         }
         
         // Update progress
@@ -30198,6 +30245,17 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         const actions = assistantConfig.quickActions[tab] || assistantConfig.quickActions.default;
         if (actions[idx] && actions[idx].action) {
           actions[idx].action();
+          
+          // Mark task as complete after action
+          if (actions[idx].taskKey) {
+            setTimeout(() => {
+              const confirmed = confirm('✅ Did you complete this task?\n\nClick OK to mark it as complete and update your progress.');
+              if (confirmed) {
+                localStorage.setItem(actions[idx].taskKey, 'true');
+                updateAssistantContent();
+              }
+            }, 2000);
+          }
         }
       };
       
@@ -30220,6 +30278,188 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       window.showDocumentation = function() {
         alert('📖 Documentation portal coming soon!');
+      };
+      
+      // Toggle between tasks and chat mode
+      window.toggleChatMode = function() {
+        const tasksMode = document.getElementById('assistantTasksMode');
+        const chatMode = document.getElementById('assistantChatMode');
+        const chatBtn = document.getElementById('chatModeBtn');
+        
+        if (chatMode.classList.contains('hidden')) {
+          tasksMode.classList.add('hidden');
+          chatMode.classList.remove('hidden');
+          chatBtn.innerHTML = '<i class="fas fa-list"></i>';
+          chatBtn.title = 'Show Tasks';
+        } else {
+          chatMode.classList.add('hidden');
+          tasksMode.classList.remove('hidden');
+          chatBtn.innerHTML = '<i class="fas fa-comments"></i>';
+          chatBtn.title = 'Toggle Chat';
+        }
+      };
+      
+      // System knowledge base for AI assistant
+      const systemKnowledge = {
+        beachBooking: {
+          settings: 'Go to Admin Dashboard → Beach Booking Management tab. Here you can configure opening hours, advance booking days, enable/disable booking, set it as free for guests, and customize the beach card appearance.',
+          mapDesigner: 'Click "Design Beach Map" button in Beach Booking Management. Upload a beach photo, draw zones by clicking "Draw Zone", place spots (umbrellas, cabanas, loungers) by selecting from the toolbar, then click "Save Beach Layout".',
+          zones: 'Zones are colored overlays on the beach map. In Beach Map Designer, click "Draw Zone", draw on the canvas, name it, and save. Guests will see these zones with a legend.',
+          spots: 'Add spots by selecting umbrella/cabana/lounger/daybed icons in Beach Map Designer. Click the canvas to place them. Edit details like spot number, capacity, price, and premium status in the right panel.',
+          qrCode: 'Beach bookings automatically generate QR codes with 6-digit booking codes. Staff can scan these at /staff/beach-check-in.',
+          analytics: 'Visit /admin/beach-analytics for comprehensive analytics including live occupancy by zone, peak hours heatmaps, revenue by zone, no-show tracking, and AI recommendations.',
+          importantInfo: 'Go to Beach Booking Management → scroll to "Important Information" section (blue gradient card). Edit the text (one line = one bullet point) and click Save. This appears on guest confirmation pages.'
+        },
+        qrCodes: {
+          create: 'Navigate to QR Codes tab → click "Create New QR Code" → enter destination URL → customize design with logo, colors, and frame → download as PNG or SVG.',
+          customize: 'In QR Code designer, upload your logo, select foreground/background colors, choose frame style, and adjust corner style for a branded QR code.',
+          download: 'After designing, click the download button to get your QR code as PNG (print quality) or SVG (vector format for scaling).'
+        },
+        analytics: {
+          view: 'Click Analytics tab in the sidebar. You will see guest engagement metrics, QR code scans, popular services, and trends over time.',
+          export: 'In Analytics tab, click "Export Data" button to download CSV reports of your metrics.',
+          beach: 'For beach-specific analytics, visit Beach Booking Management → click "Open Dashboard" in the Analytics card, or go directly to /admin/beach-analytics.'
+        },
+        settings: {
+          logo: 'Go to Settings tab → Hotel Information section → click "Upload Logo" → select your image file. Your logo appears throughout the platform.',
+          colors: 'In Settings → Branding section, use color pickers to set primary and secondary brand colors that apply to guest-facing pages.',
+          profile: 'Complete your hotel profile in Settings → Hotel Information. Add name, address, phone, email, and website for a professional appearance.'
+        },
+        restaurants: {
+          add: 'Go to Offerings tab → click "Add New Offering" → select "Restaurant" → fill in name, description, upload photos, add menu, set operating hours.',
+          floorPlan: 'In restaurant edit page, click "Floor Plan Designer" → upload restaurant layout image → place table markers → save. Guests can select preferred tables.'
+        },
+        staff: {
+          checkIn: 'Staff can check in guests at /staff/beach-check-in. Scan the QR code or manually enter the 6-digit booking code. System validates and marks guest as checked in.',
+          management: 'View all bookings in Beach Booking Management → Today\\'s Bookings section. See guest details, spot assignments, and check-in status.'
+        }
+      };
+      
+      // AI Chat Response Generator
+      function generateChatResponse(userMessage) {
+        const msg = userMessage.toLowerCase();
+        
+        // Beach-related queries
+        if (msg.includes('beach') && (msg.includes('setting') || msg.includes('config'))) {
+          return { text: systemKnowledge.beachBooking.settings, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        if (msg.includes('zone') || msg.includes('overlay')) {
+          return { text: systemKnowledge.beachBooking.zones, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        if (msg.includes('map') && msg.includes('design')) {
+          return { text: systemKnowledge.beachBooking.mapDesigner, action: null };
+        }
+        if (msg.includes('spot') && msg.includes('add')) {
+          return { text: systemKnowledge.beachBooking.spots, action: null };
+        }
+        if (msg.includes('important') && msg.includes('info')) {
+          return { text: systemKnowledge.beachBooking.importantInfo, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        
+        // Analytics queries
+        if (msg.includes('analytic') || msg.includes('report')) {
+          if (msg.includes('beach')) {
+            return { text: systemKnowledge.analytics.beach, action: () => window.location.href = '/admin/beach-analytics' };
+          }
+          return { text: systemKnowledge.analytics.view, action: () => document.querySelector('[data-tab="analytics"]')?.click() };
+        }
+        
+        // QR Code queries
+        if (msg.includes('qr') && (msg.includes('create') || msg.includes('make') || msg.includes('design'))) {
+          return { text: systemKnowledge.qrCodes.create, action: () => document.querySelector('[data-tab="qrcode"]')?.click() };
+        }
+        if (msg.includes('qr') && msg.includes('custom')) {
+          return { text: systemKnowledge.qrCodes.customize, action: () => document.querySelector('[data-tab="qrcode"]')?.click() };
+        }
+        
+        // Settings queries
+        if (msg.includes('logo') && msg.includes('upload')) {
+          return { text: systemKnowledge.settings.logo, action: () => document.querySelector('[data-tab="settings"]')?.click() };
+        }
+        if (msg.includes('color') || msg.includes('brand')) {
+          return { text: systemKnowledge.settings.colors, action: () => document.querySelector('[data-tab="settings"]')?.click() };
+        }
+        
+        // Restaurant queries
+        if (msg.includes('restaurant') && msg.includes('add')) {
+          return { text: systemKnowledge.restaurants.add, action: () => document.querySelector('[data-tab="offerings"]')?.click() };
+        }
+        if (msg.includes('floor') || msg.includes('table')) {
+          return { text: systemKnowledge.restaurants.floorPlan, action: null };
+        }
+        
+        // Staff queries
+        if (msg.includes('check') && msg.includes('in')) {
+          return { text: systemKnowledge.staff.checkIn, action: () => window.open('/staff/beach-check-in', '_blank') };
+        }
+        
+        // General help
+        if (msg.includes('help') || msg.includes('how')) {
+          return { text: 'I can help you with:\n\n🏖️ Beach booking settings and configuration\n📊 Analytics and reports\n🎨 QR code design\n⚙️ Settings and branding\n🍽️ Restaurant management\n👥 Staff check-in\n\nWhat would you like to know more about?', action: null };
+        }
+        
+        // Default response
+        return { text: 'I\\'m here to help! Try asking me about:\n• "How do I change beach settings?"\n• "Show me analytics"\n• "How to create a QR code?"\n• "How to add zones?"\n• "How to check in guests?"\n\nOr tell me what you\\'re trying to accomplish!', action: null };
+      }
+      
+      // Send chat message
+      window.sendChatMessage = function() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        if (!message) return;
+        
+        // Add user message
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML += \`
+          <div class="flex gap-2 justify-end">
+            <div class="bg-indigo-600 text-white rounded-lg p-3 max-w-[80%]">
+              <p class="text-sm">\${message}</p>
+            </div>
+            <div class="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-user text-indigo-600"></i>
+            </div>
+          </div>
+        \`;
+        
+        input.value = '';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Generate AI response
+        setTimeout(() => {
+          const response = generateChatResponse(message);
+          const actionButton = response.action ? 
+            \`<button onclick="executeChatAction()" class="mt-2 text-xs px-3 py-1 bg-white text-blue-600 rounded-full hover:bg-blue-50 transition font-semibold">Take me there →</button>\` : '';
+          
+          chatMessages.innerHTML += \`
+            <div class="flex gap-2">
+              <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-robot text-blue-600"></i>
+              </div>
+              <div class="bg-blue-50 rounded-lg p-3 max-w-[80%]">
+                <p class="text-sm text-gray-800 whitespace-pre-line">\${response.text}</p>
+                \${actionButton}
+              </div>
+            </div>
+          \`;
+          
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          
+          // Store action for button click
+          window.currentChatAction = response.action;
+        }, 500);
+      };
+      
+      // Execute chat action
+      window.executeChatAction = function() {
+        if (window.currentChatAction) {
+          window.currentChatAction();
+        }
+      };
+      
+      // Quick question buttons
+      window.sendQuickQuestion = function(question) {
+        document.getElementById('chatInput').value = question;
+        sendChatMessage();
       };
       
       // Update assistant when tab changes
