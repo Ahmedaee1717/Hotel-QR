@@ -14993,10 +14993,10 @@ app.get('/admin/beach-map-designer', (c) => {
         </div>
         
         <!-- Canvas Area -->
-        <div class="flex-1 p-6 overflow-hidden">
+        <div class="flex-1 p-6 overflow-auto">
             <div class="bg-white rounded-lg shadow-lg h-full p-4">
-                <div class="relative w-full h-full">
-                    <div id="beachCanvas" class="w-full h-full relative bg-gradient-to-b from-blue-100 to-yellow-100">
+                <div class="relative w-full h-full overflow-auto">
+                    <div id="beachCanvas" class="relative bg-gradient-to-b from-blue-100 to-yellow-100" style="min-width: 800px; min-height: 600px; width: max-content; height: max-content;">
                         <!-- Spots will be placed here -->
                     </div>
                 </div>
@@ -16098,8 +16098,8 @@ app.get('/beach-booking/:property_id', async (c) => {
                         <i class="fas fa-map-marked-alt mr-3 text-blue-600"></i>
                         Select Your Spot
                     </h2>
-                    <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-hidden" style="height: 500px">
-                        <div id="beachCanvas" class="w-full h-full relative">
+                    <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-auto" style="height: 500px; max-height: 70vh;">
+                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content;">
                             <!-- Spots will be rendered here -->
                         </div>
                     </div>
