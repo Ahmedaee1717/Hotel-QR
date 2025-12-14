@@ -15632,14 +15632,11 @@ app.get('/admin/beach-management/:property_id', (c) => {
         <!-- Main Navigation Tabs -->
         <div class="bg-white rounded-xl shadow-lg mb-6">
             <div class="flex border-b overflow-x-auto">
-                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 min-w-[200px] px-6 py-4 font-semibold transition">
+                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 px-6 py-4 font-semibold transition">
                     <i class="fas fa-qrcode mr-2"></i>QR Check-In
                 </button>
-                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 min-w-[200px] px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
-                    <i class="fas fa-map-marked-alt mr-2"></i>Live Beach Map
-                </button>
-                <button onclick="switchMainTab('walkin')" id="walkinTabBtn" class="tab-btn flex-1 min-w-[200px] px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
-                    <i class="fas fa-user-plus mr-2"></i>Walk-In Booking
+                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 px-6 py-4 font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-map-marked-alt mr-2"></i>Live Beach Map & Walk-In Booking
                 </button>
             </div>
         </div>
@@ -15751,11 +15748,24 @@ app.get('/admin/beach-management/:property_id', (c) => {
                     </div>
                 </div>
 
+                <!-- Instructions -->
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-green-600 text-xl mt-1"></i>
+                        <div>
+                            <h4 class="font-bold text-green-900 mb-1">Walk-In Booking Instructions</h4>
+                            <p class="text-sm text-green-800">
+                                <strong>Click any green (available) spot</strong> on the map below to book a walk-in guest. A booking form will appear where you can enter guest details and complete the reservation instantly.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Legend -->
                 <div class="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
                     <div class="flex items-center">
                         <div class="w-6 h-6 bg-green-500 rounded mr-2"></div>
-                        <span class="text-sm">Available</span>
+                        <span class="text-sm font-semibold">Available - Click to Book</span>
                     </div>
                     <div class="flex items-center">
                         <div class="w-6 h-6 bg-yellow-500 rounded mr-2"></div>
@@ -15782,73 +15792,71 @@ app.get('/admin/beach-management/:property_id', (c) => {
             </div>
         </div>
 
-        <!-- Walk-In Booking Section -->
-        <div id="walkinSection" class="tab-content">
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold mb-6 flex items-center">
-                    <i class="fas fa-user-plus text-green-600 mr-3"></i>
-                    Book Walk-In Guest
-                </h2>
+    </div>
 
-                <form id="walkinForm" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Guest Name *</label>
-                            <input type="text" id="walkinGuestName" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Room Number</label>
-                            <input type="text" id="walkinRoomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Phone Number</label>
-                            <input type="tel" id="walkinPhone" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Email</label>
-                            <input type="email" id="walkinEmail" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Date *</label>
-                            <input type="date" id="walkinDate" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Time Slot *</label>
-                            <select id="walkinTimeSlot" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                                <option value="">Select time slot</option>
-                                <option value="half_day_am">Morning (8AM - 1PM)</option>
-                                <option value="half_day_pm">Afternoon (1PM - 6PM)</option>
-                                <option value="full_day">Full Day (8AM - 6PM)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Number of Guests *</label>
-                            <input type="number" id="walkinNumGuests" required min="1" max="10" value="2" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                        </div>
+    <!-- Walk-In Booking Modal -->
+    <div id="walkinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-bold flex items-center">
+                            <i class="fas fa-user-plus mr-3"></i>
+                            Book Walk-In Guest
+                        </h3>
+                        <p class="text-sm mt-1 opacity-90" id="modalSpotInfo">Spot will be shown here</p>
                     </div>
-
-                    <!-- Available Spots -->
-                    <div id="availableSpotsSection" class="hidden">
-                        <label class="block text-sm font-semibold mb-2">Select Available Spot *</label>
-                        <div id="availableSpotsList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                            <!-- Will be populated dynamically -->
-                        </div>
-                    </div>
-
-                    <div class="flex gap-4">
-                        <button type="button" onclick="checkAvailability()" class="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-lg transition shadow-lg">
-                            <i class="fas fa-search mr-2"></i>Check Availability
-                        </button>
-                        <button type="submit" id="walkinSubmitBtn" class="flex-1 px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-lg transition shadow-lg hidden">
-                            <i class="fas fa-check mr-2"></i>Complete Booking
-                        </button>
-                    </div>
-                </form>
-
-                <!-- Booking Result -->
-                <div id="walkinResult" class="mt-6 hidden">
-                    <!-- Will be populated dynamically -->
+                    <button onclick="closeWalkinModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
                 </div>
+            </div>
+
+            <form id="walkinForm" class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Guest Name *</label>
+                        <input type="text" id="walkinGuestName" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Room Number</label>
+                        <input type="text" id="walkinRoomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Phone Number</label>
+                        <input type="tel" id="walkinPhone" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Email</label>
+                        <input type="email" id="walkinEmail" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Time Slot *</label>
+                        <select id="walkinTimeSlot" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                            <option value="half_day_am">Morning (8AM - 1PM)</option>
+                            <option value="half_day_pm">Afternoon (1PM - 6PM)</option>
+                            <option value="full_day">Full Day (8AM - 6PM)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Number of Guests *</label>
+                        <input type="number" id="walkinNumGuests" required min="1" max="10" value="2" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeWalkinModal()" class="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition shadow-lg">
+                        <i class="fas fa-check mr-2"></i>Complete Booking
+                    </button>
+                </div>
+            </form>
+
+            <!-- Booking Result -->
+            <div id="walkinResult" class="hidden px-6 pb-6">
+                <!-- Will be populated dynamically -->
             </div>
         </div>
     </div>
@@ -15887,9 +15895,6 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 document.getElementById('mapSection').classList.add('active');
                 document.getElementById('mapTabBtn').classList.add('active');
                 refreshBeachMap();
-            } else if (tab === 'walkin') {
-                document.getElementById('walkinSection').classList.add('active');
-                document.getElementById('walkinTabBtn').classList.add('active');
             }
             
             // Update active tab styling
@@ -16147,7 +16152,44 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 ctx.textBaseline = 'middle';
                 ctx.fillText(spot.spot_number, x, y);
             });
+            
+            // Store spots globally for click detection
+            window.beachSpots = spots;
         }
+        
+        // Handle canvas clicks for walk-in booking
+        document.getElementById('beachMapCanvas').addEventListener('click', function(event) {
+            const canvas = this;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clickX = (event.clientX - rect.left) * scaleX;
+            const clickY = (event.clientY - rect.top) * scaleY;
+            
+            // Check if click is on an available spot
+            if (window.beachSpots) {
+                for (const spot of window.beachSpots) {
+                    const x = spot.position_x > 1 ? spot.position_x : spot.position_x * canvas.width;
+                    const y = spot.position_y > 1 ? spot.position_y : spot.position_y * canvas.height;
+                    const size = 40;
+                    
+                    // Check if click is within spot bounds
+                    if (clickX >= x - size/2 && clickX <= x + size/2 &&
+                        clickY >= y - size/2 && clickY <= y + size/2) {
+                        
+                        // Only allow booking available spots
+                        if (!spot.booking_status && !spot.is_blocked) {
+                            openWalkinModal(spot);
+                        } else if (spot.booking_status) {
+                            alert('This spot is already ' + (spot.booking_status === 'checked_in' ? 'checked in' : 'booked') + '\\n\\nGuest: ' + (spot.guest_name || 'Unknown'));
+                        } else if (spot.is_blocked) {
+                            alert('This spot is blocked for maintenance');
+                        }
+                        break;
+                    }
+                }
+            }
+        });
 
         function updateStats(spots) {
             const total = spots.length;
@@ -16215,14 +16257,47 @@ app.get('/admin/beach-management/:property_id', (c) => {
             event.target.closest('.spot-btn').classList.add('border-blue-500', 'bg-blue-50');
         }
 
+        // Modal Functions
+        function openWalkinModal(spot) {
+            selectedSpotId = spot.spot_id;
+            const modal = document.getElementById('walkinModal');
+            const spotInfo = document.getElementById('modalSpotInfo');
+            const date = document.getElementById('mapDate').value;
+            const timeSlot = document.getElementById('mapTimeSlot').value;
+            
+            // Update modal info
+            spotInfo.textContent = \`Booking Spot \${spot.spot_number} (\${spot.spot_type}) - \${new Date(date).toLocaleDateString()}\`;
+            
+            // Pre-select time slot if filtered
+            if (timeSlot && timeSlot !== 'all') {
+                document.getElementById('walkinTimeSlot').value = timeSlot;
+            }
+            
+            // Show modal
+            modal.classList.remove('hidden');
+            
+            // Focus on first input
+            setTimeout(() => document.getElementById('walkinGuestName').focus(), 100);
+        }
+        
+        function closeWalkinModal() {
+            const modal = document.getElementById('walkinModal');
+            modal.classList.add('hidden');
+            document.getElementById('walkinForm').reset();
+            document.getElementById('walkinResult').classList.add('hidden');
+            selectedSpotId = null;
+        }
+        
         // Walk-In Form Submission
         document.getElementById('walkinForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             if (!selectedSpotId) {
-                alert('Please select a spot');
+                alert('No spot selected');
                 return;
             }
+            
+            const date = document.getElementById('mapDate').value;
             
             const formData = {
                 property_id: PROPERTY_ID,
@@ -16231,7 +16306,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 guest_room_number: document.getElementById('walkinRoomNumber').value,
                 guest_phone: document.getElementById('walkinPhone').value,
                 guest_email: document.getElementById('walkinEmail').value,
-                booking_date: document.getElementById('walkinDate').value,
+                booking_date: date,
                 slot_type: document.getElementById('walkinTimeSlot').value,
                 num_guests: parseInt(document.getElementById('walkinNumGuests').value)
             };
@@ -16247,10 +16322,10 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 
                 if (data.success) {
                     showWalkinSuccess(data.booking);
-                    document.getElementById('walkinForm').reset();
-                    document.getElementById('availableSpotsSection').classList.add('hidden');
-                    document.getElementById('walkinSubmitBtn').classList.add('hidden');
-                    selectedSpotId = null;
+                    // Refresh map to show new booking
+                    setTimeout(() => {
+                        refreshBeachMap();
+                    }, 2000);
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
