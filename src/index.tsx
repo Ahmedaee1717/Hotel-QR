@@ -8393,6 +8393,12 @@ Answer the admin's question about the GuestConnect platform:`
         fallbackResponse = 'Staff check-in process:\n\n1. Staff go to /staff/beach-check-in\n2. Two methods to check in guests:\n   - Scan the guest QR code from their confirmation\n   - OR manually enter the 6-digit booking code\n3. System validates the booking\n4. Shows guest details (name, room, spot, time)\n5. Click "Check In" to mark guest as arrived\n6. Guest status updates in real-time in the system'
       } else if (msg.includes('important') && msg.includes('info')) {
         fallbackResponse = 'To edit important information:\n\n1. Go to Beach Booking Management tab\n2. Scroll down to the "Important Information" section (blue gradient card)\n3. Edit the text in the textarea\n4. Each line becomes a bullet point on the guest confirmation page\n5. Click "Save Important Information"\n\nThis text appears on every guest confirmation page, so use it for check-in instructions, policies, or helpful tips!'
+      } else if (msg.includes('live') && msg.includes('map')) {
+        fallbackResponse = 'The Live Beach Map shows real-time spot availability:\n\n1. Go to Beach Booking Management tab\n2. View Live Beach Map at the top (green gradient card)\n3. Color codes:\n   - GREEN = Available\n   - YELLOW = Booked\n   - BLUE = Checked In\n   - RED = Blocked/Maintenance\n   - PURPLE BORDER = Premium Spot\n4. Use date selector for today/tomorrow\n5. Filter by time slot (Morning, Afternoon, Full Day)\n6. Click Refresh to update in real-time\n7. View stats: total spots, available, booked, checked-in, occupancy %\n\nPerfect for managing walk-in guests!'
+      } else if ((msg.includes('walk') && msg.includes('in')) || msg.includes('walkin')) {
+        fallbackResponse = 'To book walk-in guests:\n\n1. Go to Beach Booking Management tab\n2. Check Live Beach Map for available spots (green)\n3. Click "Book for Walk-In Guest" button\n4. Enter guest details:\n   - Guest name (required)\n   - Room number (optional)\n   - Phone number (optional)\n5. System shows list of available spots\n6. Enter spot number from the list\n7. Booking is created instantly\n8. Option to print QR code for guest\n\nThe map updates automatically after booking!'
+      } else if (msg.includes('availab') || (msg.includes('check') && msg.includes('spot'))) {
+        fallbackResponse = 'To check spot availability:\n\n1. Go to Beach Booking Management → Live Beach Map\n2. Select date (today or tomorrow)\n3. Filter by time slot if needed\n4. Available spots show in GREEN\n5. View stats panel below map:\n   - Total spots count\n   - Available spots (green)\n   - Booked spots (yellow)\n   - Checked-in guests (blue)\n   - Current occupancy percentage\n\nClick Refresh to get the latest real-time data!'
       } else {
         fallbackResponse = 'I am having trouble connecting to my AI system right now, but I can still help!\n\nI can guide you with:\n\n- Adding restaurants and offerings\n- Configuring beach booking settings\n- Creating and managing beach zones\n- Viewing analytics and reports\n- Generating QR codes\n- Staff check-in procedures\n- Beach map designer\n- Important information editing\n\nPlease ask your question again, and I will do my best to help!'
       }
@@ -30954,6 +30960,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       const systemKnowledge = {
         beachBooking: {
           settings: 'Go to Admin Dashboard → Beach Booking Management tab. Here you can configure opening hours, advance booking days, enable/disable booking, set it as free for guests, and customize the beach card appearance.',
+          liveMap: 'The Live Beach Map is at the top of Beach Booking Management. It shows real-time spot availability with color-coded status: Green (Available), Yellow (Booked), Blue (Checked In), Red (Blocked), Purple Border (Premium). Use date and slot filters to check availability, click Refresh to update, and use Book for Walk-In Guest button to create instant bookings for guests who arrive at the beach.',
+          walkIn: 'To book walk-in guests: Go to Beach Booking Management → ensure Live Beach Map shows available spots (green) → click Book for Walk-In Guest → enter guest name and optional room/phone → select from available spots list → booking is created instantly with QR code option.',
           mapDesigner: 'Click Design Beach Map button in Beach Booking Management. Upload a beach photo, draw zones by clicking Draw Zone, place spots (umbrellas, cabanas, loungers) by selecting from the toolbar, then click Save Beach Layout.',
           zones: 'Zones are colored overlays on the beach map. In Beach Map Designer, click Draw Zone, draw on the canvas, name it, and save. Guests will see these zones with a legend.',
           spots: 'Add spots by selecting umbrella/cabana/lounger/daybed icons in Beach Map Designer. Click the canvas to place them. Edit details like spot number, capacity, price, and premium status in the right panel.',
@@ -30993,6 +31001,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         // Beach-related queries
         if (msg.includes('beach') && (msg.includes('setting') || msg.includes('config'))) {
           return { text: systemKnowledge.beachBooking.settings, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        if (msg.includes('live') && msg.includes('map')) {
+          return { text: systemKnowledge.beachBooking.liveMap, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        if (msg.includes('walk') && msg.includes('in')) {
+          return { text: systemKnowledge.beachBooking.walkIn, action: () => document.querySelector('[data-tab="beach"]')?.click() };
+        }
+        if (msg.includes('availab') || (msg.includes('spot') && msg.includes('check'))) {
+          return { text: systemKnowledge.beachBooking.liveMap, action: () => document.querySelector('[data-tab="beach"]')?.click() };
         }
         if (msg.includes('zone') || msg.includes('overlay')) {
           return { text: systemKnowledge.beachBooking.zones, action: () => document.querySelector('[data-tab="beach"]')?.click() };
