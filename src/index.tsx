@@ -36090,9 +36090,13 @@ app.get('/waitlist/:waitlist_id', (c) => {
         </div>
     </div>
 
-    <!-- Notification Sound -->
-    <audio id="notificationSound" preload="auto">
-        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUrDl6rhnHwU1ld/ryHUmBSN1xe/glEIKElyx6O2nVRUKRZzd8sFuIgUtgc/y2Ik2CBlpu+/jm04MC1Kw5eq4Zx8FNJTe68h1JQUjdcXv4JVCChJcr+jtqFQVCkSc3fLBbiIFLoHP8tiJNggZabvv4ptODAtSsOXquGcfBTOU3uvIdSUFI3XF7+CVQgoSXK/o7ahUFQpEnN3ywW4iBCyAzvLYiTYIG2m58OOcTgwLUrDl6rhnHwU0lN/ryHUlBSN1xe/glUIKElyw6O2oVBUKRZzd8sFuIgUsgs/y2Ik2CBlpu+/jm04MC1Kw5eq4aB8FNJT" type="audio/wav">
+    <!-- Multiple notification sounds for reliability -->
+    <audio id="notificationSound1" preload="auto" style="display:none;">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        <source src="https://freesound.org/data/previews/320/320655_5260872-lq.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="notificationSound2" preload="auto" style="display:none;">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -36246,8 +36250,74 @@ app.get('/waitlist/:waitlist_id', (c) => {
         }
 
         function playNotificationSound() {
-            const audio = document.getElementById('notificationSound');
-            audio.play().catch(e => console.log('Could not play sound:', e));
+            console.log('🔊 PLAYING NOTIFICATION SOUND');
+            
+            // Try multiple methods to ensure sound plays
+            
+            // Method 1: Play HTML5 audio elements (multiple times)
+            const audio1 = document.getElementById('notificationSound1');
+            const audio2 = document.getElementById('notificationSound2');
+            
+            if (audio1) {
+                audio1.volume = 1.0;
+                audio1.play().then(() => {
+                    console.log('✓ Audio 1 playing');
+                    // Play again after 0.5 seconds
+                    setTimeout(() => audio1.play().catch(e => {}), 500);
+                    // And again after 1 second
+                    setTimeout(() => audio1.play().catch(e => {}), 1000);
+                }).catch(e => console.log('Audio 1 error:', e));
+            }
+            
+            if (audio2) {
+                audio2.volume = 1.0;
+                setTimeout(() => {
+                    audio2.play().then(() => {
+                        console.log('✓ Audio 2 playing');
+                    }).catch(e => console.log('Audio 2 error:', e));
+                }, 250);
+            }
+            
+            // Method 2: Web Audio API for synthesized beeps (works even when muted)
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Play 3 beeps with increasing urgency
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        // High-pitched urgent beep (1000 Hz)
+                        oscillator.frequency.value = 1000;
+                        oscillator.type = 'sine';
+                        
+                        // Envelope: quick attack, sustain, quick release
+                        const now = audioContext.currentTime;
+                        gainNode.gain.setValueAtTime(0, now);
+                        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01);
+                        gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2);
+                        gainNode.gain.linearRampToValueAtTime(0, now + 0.25);
+                        
+                        oscillator.start(now);
+                        oscillator.stop(now + 0.25);
+                        
+                        console.log(\`✓ Beep \${i + 1} played\`);
+                    }, i * 400); // 400ms between beeps
+                }
+            } catch (e) {
+                console.log('Web Audio API error:', e);
+            }
+            
+            // Method 3: Vibration API (for mobile devices)
+            if ('vibrate' in navigator) {
+                // Long vibration pattern
+                navigator.vibrate([200, 100, 200, 100, 200, 100, 400]);
+                console.log('✓ Vibration triggered');
+            }
         }
 
         function showBrowserNotification(title, body) {
@@ -36295,6 +36365,49 @@ app.get('/waitlist/:waitlist_id', (c) => {
                         smsSection.style.display = 'block';
                     }
                 }
+
+                // Enable audio on first user interaction (required by browsers)
+                let audioUnlocked = false;
+                const unlockAudio = () => {
+                    if (audioUnlocked) return;
+                    
+                    console.log('Unlocking audio...');
+                    const audio1 = document.getElementById('notificationSound1');
+                    const audio2 = document.getElementById('notificationSound2');
+                    
+                    // Play and immediately pause to unlock
+                    if (audio1) {
+                        audio1.play().then(() => {
+                            audio1.pause();
+                            audio1.currentTime = 0;
+                            console.log('✓ Audio 1 unlocked');
+                        }).catch(e => {});
+                    }
+                    if (audio2) {
+                        audio2.play().then(() => {
+                            audio2.pause();
+                            audio2.currentTime = 0;
+                            console.log('✓ Audio 2 unlocked');
+                        }).catch(e => {});
+                    }
+                    
+                    // Try to create Web Audio context
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        ctx.resume();
+                        console.log('✓ Web Audio context unlocked');
+                    } catch (e) {}
+                    
+                    audioUnlocked = true;
+                    // Remove listeners after first interaction
+                    document.removeEventListener('touchstart', unlockAudio);
+                    document.removeEventListener('click', unlockAudio);
+                };
+                
+                // Listen for any user interaction
+                document.addEventListener('touchstart', unlockAudio, { once: true });
+                document.addEventListener('click', unlockAudio, { once: true });
+                console.log('Audio unlock listeners added');
 
                 // Load status immediately
                 console.log('Loading waitlist status...');
