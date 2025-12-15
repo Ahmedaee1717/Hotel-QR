@@ -3503,7 +3503,7 @@ app.get('/api/admin/property-settings', async (c) => {
       show_service: property.show_service ?? 1,
       show_activities: property.show_activities ?? 1,
       show_hotel_map: property.show_hotel_map ?? 0,
-      homepage_section_order: property.homepage_section_order || JSON.stringify(['restaurants', 'events', 'spa', 'service', 'activities'])
+      homepage_section_order: property.homepage_section_order || JSON.stringify(['restaurants', 'room-service', 'events', 'spa', 'service', 'activities'])
     }
     
     return c.json(settingsWithDefaults)
@@ -14293,7 +14293,7 @@ app.get('/hotel/:property_slug', async (c) => {
             // Get section order from property settings
             const sectionOrder = propertyData.homepage_section_order ? 
               JSON.parse(propertyData.homepage_section_order) : 
-              ['restaurants', 'events', 'spa', 'service', 'activities'];
+              ['restaurants', 'room-service', 'events', 'spa', 'service', 'activities'];
             
             // Get container
             const container = document.querySelector('.max-w-6xl.mx-auto.px-4.py-6');
@@ -14675,6 +14675,11 @@ app.get('/hotel/:property_slug', async (c) => {
         }
         
         async function renderCustomSection(sectionKey) {
+            // Special handling for room-service
+            if (sectionKey === 'room-service') {
+                return await renderRoomServiceCard();
+            }
+            
             // Filter offerings by custom_section_key
             const sectionOfferings = allOfferings.filter(o => 
               o.offering_type === 'custom' && o.custom_section_key === sectionKey
@@ -14729,6 +14734,76 @@ app.get('/hotel/:property_slug', async (c) => {
             }));
             
             grid.innerHTML = cardsHtml.join('');
+        }
+        
+        async function renderRoomServiceCard() {
+            // Find room service offering
+            const roomService = allOfferings.find(o => o.offering_type === 'room_service');
+            const grid = document.getElementById('custom-grid-room-service');
+            
+            if (!grid) {
+                console.error('custom-grid-room-service element not found');
+                return;
+            }
+            
+            if (!roomService) {
+                grid.innerHTML = '<p class="text-gray-500">Room service is currently unavailable</p>';
+                return;
+            }
+            
+            // Get custom section data for room service (for card customization)
+            const roomServiceSection = customSections.find(s => s.section_key === 'room-service');
+            
+            // Use custom card settings if available, otherwise use defaults
+            const cardTitle = roomServiceSection?.card_title || 'Room Service';
+            const cardSubtitle = roomServiceSection?.card_subtitle || 'Order from your room';
+            const cardDescription = roomServiceSection?.card_description || 'Browse our menu and call to order delicious meals delivered to your room';
+            const cardIcon = roomServiceSection?.icon_class || 'fas fa-concierge-bell';
+            const cardColor = roomServiceSection?.color_class || '#6366f1'; // Default indigo
+            
+            // Calculate lighter shade for gradient
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : { r: 99, g: 102, b: 241 }; // Default indigo
+            };
+            
+            const rgb = hexToRgb(cardColor);
+            const lighterColor = '#' + 
+                Math.min(255, rgb.r + 40).toString(16).padStart(2, '0') +
+                Math.min(255, rgb.g + 40).toString(16).padStart(2, '0') +
+                Math.min(255, rgb.b + 40).toString(16).padStart(2, '0');
+            
+            // Create room service card
+            grid.innerHTML = \`
+                <div class="offering-card bg-gradient-to-br rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1" 
+                     onclick="window.location.href='/room-service/\${propertyData.property_id}'"
+                     style="background: linear-gradient(135deg, \${cardColor} 0%, \${lighterColor} 100%);">
+                    <div class="p-8 text-white">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <i class="\${cardIcon} text-4xl"></i>
+                            </div>
+                            <span class="bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold">
+                                <i class="fas fa-clock mr-1"></i>\${roomService.full_description_en || '24/7'}
+                            </span>
+                        </div>
+                        <h3 class="font-bold text-2xl mb-2">\${cardTitle}</h3>
+                        <p class="text-white/90 font-medium mb-3">\${cardSubtitle}</p>
+                        <p class="text-sm text-white/80 mb-6 leading-relaxed">\${cardDescription}</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium flex items-center gap-2">
+                                <i class="fas fa-book-open"></i>
+                                View Menu
+                            </span>
+                            <i class="fas fa-arrow-right text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            \`;
         }
 
         async function renderHotelMap() {
@@ -34212,6 +34287,17 @@ app.get('/admin/dashboard', (c) => {
             '<i class="' + cs.icon_class + ' mr-1"></i>' + cs.section_name_en :
             '✨ ' + cs.section_name_en;
         });
+        
+        // Add room-service if it's not in the order yet (for existing databases)
+        if (!order.includes('room-service')) {
+          // Insert after restaurants
+          const restaurantsIndex = order.indexOf('restaurants');
+          if (restaurantsIndex >= 0) {
+            order.splice(restaurantsIndex + 1, 0, 'room-service');
+          } else {
+            order.unshift('room-service'); // Add at beginning if restaurants not found
+          }
+        }
         
         // Add beach-booking if it's not in the order yet (for existing databases)
         if (!order.includes('beach-booking')) {
