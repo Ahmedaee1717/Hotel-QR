@@ -10380,7 +10380,8 @@ app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
 // ========== BEACH BOOKING API ENDPOINTS ==========
 
 // API: Get or Create Beach Settings
-app.get('/api/admin/beach/settings/:property_id', requirePermission('beach_view'), async (c) => {
+// Public endpoint - guests need to see if beach booking is enabled and get card customization
+app.get('/api/admin/beach/settings/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
   const language = c.req.query('language') || 'en'
