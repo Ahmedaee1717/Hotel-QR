@@ -17946,116 +17946,827 @@ app.get('/superadmin/dashboard', (c) => {
     <title>GuestConnect Platform Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#016e8f',
+                        secondary: '#f6f6ec',
+                        accent: '#014a61'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-      .tab-active { border-bottom: 3px solid #9333EA; color: #9333EA; }
-      .hidden { display: none !important; }
-      .tab-content { display: block; }
-      .tab-btn { cursor: pointer; transition: all 0.3s; }
-      .tab-btn:hover { background-color: rgba(147, 51, 234, 0.1); }
-      .stat-card { transition: transform 0.2s; }
-      .stat-card:hover { transform: translateY(-4px); }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f6f6ec;
+            overflow-x: hidden;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            background: linear-gradient(180deg, #016e8f 0%, #014a61 100%);
+            color: white;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 20px rgba(1, 110, 143, 0.15);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 28px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .sidebar-logo {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+        
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 0;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        
+        .nav-section {
+            margin-bottom: 20px;
+        }
+        
+        .nav-section-title {
+            padding: 12px 24px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .nav-item {
+            padding: 14px 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: white;
+            border-left-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: white;
+            border-left-color: #f6f6ec;
+            font-weight: 600;
+        }
+        
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #f6f6ec;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .sidebar-footer {
+            padding: 20px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .user-details {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .user-role {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .logout-btn {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            background: #f6f6ec;
+        }
+        
+        .top-bar {
+            background: white;
+            padding: 20px 32px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .page-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .top-bar-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .search-box {
+            position: relative;
+        }
+        
+        .search-box input {
+            padding: 10px 16px 10px 40px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            width: 280px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #016e8f;
+            box-shadow: 0 0 0 3px rgba(1, 110, 143, 0.1);
+        }
+        
+        .search-box i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        
+        .content-area {
+            padding: 32px;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            border: 1px solid #f0f0f0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #016e8f, #014a61);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(1, 110, 143, 0.12);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #016e8f, #014a61);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 22px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1a1a1a;
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+        }
+        
+        .stat-change {
+            font-size: 13px;
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .stat-change.positive {
+            color: #10b981;
+        }
+        
+        .stat-change.negative {
+            color: #ef4444;
+        }
+        
+        /* Content Cards */
+        .content-card {
+            background: white;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 1px solid #f0f0f0;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f6f6ec;
+        }
+        
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-title i {
+            color: #016e8f;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #016e8f, #014a61);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(1, 110, 143, 0.3);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #016e8f;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 2px solid #016e8f;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-secondary:hover {
+            background: #016e8f;
+            color: white;
+        }
+        
+        /* Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .data-table thead th {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .data-table tbody td {
+            padding: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fed7aa;
+            color: #92400e;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Hide/Show Tab Content */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Loading State */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(1, 110, 143, 0.2);
+            border-top-color: #016e8f;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-50">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-purple-700 to-blue-700 text-white py-4 px-4 shadow-lg">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold flex items-center">
-                    <i class="fas fa-crown mr-3"></i>GuestConnect Platform Admin
-                </h1>
-                <p class="text-purple-100 text-sm">Manage all hotels and platform settings</p>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <i class="fas fa-layer-group"></i>
+                <span>GuestConnect</span>
             </div>
-            <button onclick="logout()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg">
-                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+            <div class="sidebar-subtitle">Platform Control</div>
+        </div>
+        
+        <div class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Overview</div>
+                <div class="nav-item active" data-tab="dashboard">
+                    <i class="nav-icon fas fa-th-large"></i>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" data-tab="analytics">
+                    <i class="nav-icon fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </div>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Core Management</div>
+                <div class="nav-item" data-tab="hotels">
+                    <i class="nav-icon fas fa-hotel"></i>
+                    <span>Hotels</span>
+                </div>
+                <div class="nav-item" data-tab="vendors">
+                    <i class="nav-icon fas fa-store"></i>
+                    <span>Vendors</span>
+                </div>
+                <div class="nav-item" data-tab="users">
+                    <i class="nav-icon fas fa-users"></i>
+                    <span>Users</span>
+                </div>
+                <div class="nav-item" data-tab="bookings">
+                    <i class="nav-icon fas fa-calendar-check"></i>
+                    <span>All Bookings</span>
+                </div>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Support & Communication</div>
+                <div class="nav-item" data-tab="support">
+                    <i class="nav-icon fas fa-ticket-alt"></i>
+                    <span>Support Tickets</span>
+                </div>
+                <div class="nav-item" data-tab="chat">
+                    <i class="nav-icon fas fa-comments"></i>
+                    <span>Live Chat</span>
+                </div>
+                <div class="nav-item" data-tab="notifications">
+                    <i class="nav-icon fas fa-bell"></i>
+                    <span>Notifications</span>
+                </div>
+            </div>
+            
+            <div class="nav-section">
+                <div class="nav-section-title">Platform Configuration</div>
+                <div class="nav-item" data-tab="settings">
+                    <i class="nav-icon fas fa-cog"></i>
+                    <span>Platform Settings</span>
+                </div>
+                <div class="nav-item" data-tab="integrations">
+                    <i class="nav-icon fas fa-plug"></i>
+                    <span>Integrations</span>
+                </div>
+                <div class="nav-item" data-tab="billing">
+                    <i class="nav-icon fas fa-credit-card"></i>
+                    <span>Billing & Plans</span>
+                </div>
+                <div class="nav-item" data-tab="logs">
+                    <i class="nav-icon fas fa-file-alt"></i>
+                    <span>System Logs</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name">Platform Admin</div>
+                    <div class="user-role">Super Administrator</div>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                Logout
             </button>
         </div>
     </div>
-
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- Platform Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Total Hotels</p>
-                        <p class="text-3xl font-bold text-purple-600" id="totalHotels">0</p>
-                    </div>
-                    <div class="bg-purple-100 p-4 rounded-full">
-                        <i class="fas fa-hotel text-purple-600 text-2xl"></i>
-                    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div>
+                <div class="page-title">
+                    <i class="fas fa-th-large"></i>
+                    <span id="pageTitle">Dashboard</span>
                 </div>
+                <div class="page-subtitle" id="pageSubtitle">Platform overview and statistics</div>
             </div>
-
-            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Total Vendors</p>
-                        <p class="text-3xl font-bold text-blue-600" id="totalVendors">0</p>
-                    </div>
-                    <div class="bg-blue-100 p-4 rounded-full">
-                        <i class="fas fa-store text-blue-600 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Total Bookings</p>
-                        <p class="text-3xl font-bold text-green-600" id="totalBookings">0</p>
-                    </div>
-                    <div class="bg-green-100 p-4 rounded-full">
-                        <i class="fas fa-calendar-check text-green-600 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="stat-card bg-white rounded-xl shadow-lg p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Platform Revenue</p>
-                        <p class="text-3xl font-bold text-indigo-600" id="totalRevenue">$0</p>
-                    </div>
-                    <div class="bg-indigo-100 p-4 rounded-full">
-                        <i class="fas fa-dollar-sign text-indigo-600 text-2xl"></i>
-                    </div>
+            <div class="top-bar-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search hotels, users, bookings..." id="globalSearch">
                 </div>
             </div>
         </div>
-
-        <!-- Tabs -->
-        <div class="bg-white rounded-lg shadow mb-6">
-            <div class="flex overflow-x-auto">
-                <button data-tab="hotels" class="tab-btn px-6 py-4 font-semibold tab-active">
-                    <i class="fas fa-hotel mr-2"></i>Hotels
-                </button>
-                <button data-tab="vendors" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-store mr-2"></i>Vendors
-                </button>
-                <button data-tab="bookings" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-calendar-alt mr-2"></i>All Bookings
-                </button>
-                <button data-tab="users" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-users mr-2"></i>Users
-                </button>
-                <button data-tab="support" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-ticket-alt mr-2"></i>Support
-                </button>
-                <button data-tab="chat" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-comments mr-2"></i>Live Chat
-                </button>
-                <button data-tab="analytics" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-chart-line mr-2"></i>Analytics
-                </button>
-                <button data-tab="settings" class="tab-btn px-6 py-4 font-semibold">
-                    <i class="fas fa-cog mr-2"></i>Platform Settings
-                </button>
+        
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Dashboard Tab -->
+            <div id="dashboardTab" class="tab-content active">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="totalHotels">0</div>
+                                <div class="stat-label">Total Hotels</div>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-hotel"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Active Properties</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="totalVendors">0</div>
+                                <div class="stat-label">Total Vendors</div>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-store"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Partner Network</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="totalBookings">0</div>
+                                <div class="stat-label">Total Bookings</div>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-calendar-check"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>All Time</span>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div>
+                                <div class="stat-value" id="totalRevenue">$0</div>
+                                <div class="stat-label">Platform Revenue</div>
+                            </div>
+                            <div class="stat-icon">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                        </div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Total Earnings</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-chart-line"></i>
+                            Platform Activity
+                        </div>
+                        <button class="btn-secondary" onclick="loadStats()">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="text-center p-6 bg-gray-50 rounded-lg">
+                            <div class="text-3xl font-bold text-primary mb-2">100%</div>
+                            <div class="text-sm text-gray-600 font-semibold">System Uptime</div>
+                        </div>
+                        <div class="text-center p-6 bg-gray-50 rounded-lg">
+                            <div class="text-3xl font-bold text-primary mb-2">24/7</div>
+                            <div class="text-sm text-gray-600 font-semibold">Support Available</div>
+                        </div>
+                        <div class="text-center p-6 bg-gray-50 rounded-lg">
+                            <div class="text-3xl font-bold text-primary mb-2">Live</div>
+                            <div class="text-sm text-gray-600 font-semibold">Platform Status</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+            
+            <!-- Hotels Tab -->
+            <div id="hotelsTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-hotel"></i>
+                            Hotel Properties
+                        </div>
+                        <button class="btn-primary" onclick="createHotel()">
+                            <i class="fas fa-plus"></i>
+                            Add New Hotel
+                        </button>
+                    </div>
+                    <div id="hotelsListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading hotels...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vendors Tab -->
+            <div id="vendorsTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-store"></i>
+                            Vendor Network
+                        </div>
+                        <button class="btn-primary">
+                            <i class="fas fa-user-plus"></i>
+                            Add Vendor
+                        </button>
+                    </div>
+                    <div id="vendorsListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading vendors...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Bookings Tab -->
+            <div id="bookingsTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-calendar-check"></i>
+                            All Platform Bookings
+                        </div>
+                        <div class="flex gap-2">
+                            <select class="px-4 py-2 border-2 border-gray-200 rounded-lg">
+                                <option>All Bookings</option>
+                                <option>Today</option>
+                                <option>This Week</option>
+                                <option>This Month</option>
+                            </select>
+                            <button class="btn-secondary">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    <div id="bookingsListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading bookings...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         <!-- Users Management Tab -->
-        <div id="usersTab" class="tab-content hidden">
+        <div id="usersTab" class="tab-content">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold"><i class="fas fa-users mr-2 text-purple-600"></i>Platform Users</h2>
@@ -18303,28 +19014,83 @@ app.get('/superadmin/dashboard', (c) => {
             window.location.href = '/superadmin/login';
         }
 
-        let currentTab = 'hotels';
+        let currentTab = 'dashboard';
 
-        function showTab(tab, clickedButton) {
-            currentTab = tab;
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-active'));
-            document.getElementById(tab + 'Tab').classList.remove('hidden');
-            if (clickedButton) {
-                clickedButton.classList.add('tab-active');
-            }
-
-            if (tab === 'hotels') loadHotels();
-            if (tab === 'vendors') loadVendors();
-            if (tab === 'bookings') loadBookings();
-        }
-
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
+        // Sidebar Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
                 const tab = this.getAttribute('data-tab');
-                showTab(tab, this);
+                switchTab(tab);
             });
         });
+
+        function switchTab(tab) {
+            // Update sidebar active state
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(\`.nav-item[data-tab="\${tab}"]\`).classList.add('active');
+            
+            // Update page title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'analytics': 'Analytics',
+                'hotels': 'Hotels',
+                'vendors': 'Vendors',
+                'users': 'Users',
+                'bookings': 'All Bookings',
+                'support': 'Support Tickets',
+                'chat': 'Live Chat',
+                'notifications': 'Notifications',
+                'settings': 'Platform Settings',
+                'integrations': 'Integrations',
+                'billing': 'Billing & Plans',
+                'logs': 'System Logs'
+            };
+            
+            const subtitles = {
+                'dashboard': 'Platform overview and statistics',
+                'analytics': 'Performance metrics and insights',
+                'hotels': 'Manage hotel properties',
+                'vendors': 'Vendor network management',
+                'users': 'User accounts and permissions',
+                'bookings': 'Platform-wide booking history',
+                'support': 'Customer support requests',
+                'chat': 'Real-time messaging',
+                'notifications': 'System notifications',
+                'settings': 'Global configuration',
+                'integrations': 'Third-party services',
+                'billing': 'Subscription management',
+                'logs': 'Activity and error logs'
+            };
+            
+            document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
+            document.getElementById('pageSubtitle').textContent = subtitles[tab] || '';
+            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Show selected tab
+            const targetTab = document.getElementById(tab + 'Tab');
+            if (targetTab) {
+                targetTab.classList.add('active');
+                currentTab = tab;
+                
+                // Load data for specific tabs
+                if (tab === 'dashboard') loadStats();
+                if (tab === 'hotels') loadHotels();
+                if (tab === 'vendors') loadVendors();
+                if (tab === 'bookings') loadBookings();
+                if (tab === 'users') loadUsers();
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('superadmin_user');
+            window.location.href = '/superadmin/login';
+        }
 
         async function loadStats() {
             try {
@@ -18340,37 +19106,115 @@ app.get('/superadmin/dashboard', (c) => {
         }
 
         async function loadHotels() {
+            const container = document.getElementById('hotelsListContainer');
             try {
                 const response = await fetch('/api/superadmin/hotels');
                 const hotels = await response.json();
-                const list = document.getElementById('hotelsList');
                 
                 if (!hotels || hotels.length === 0) {
-                    list.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No hotels yet</td></tr>';
+                    container.innerHTML = \`
+                        <div class="text-center py-12">
+                            <i class="fas fa-hotel text-4xl text-gray-300 mb-3"></i>
+                            <p class="text-gray-600">No hotels registered yet</p>
+                        </div>
+                    \`;
                     return;
                 }
                 
-                list.innerHTML = hotels.map(h => '<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3 font-medium">' + h.property_name + '</td><td class="px-4 py-3"><code class="bg-gray-100 px-2 py-1 rounded text-sm">' + h.slug + '</code></td><td class="px-4 py-3">' + (h.contact_email || 'N/A') + '</td><td class="px-4 py-3">' + (h.location || 'N/A') + '</td><td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs ' + (h.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800') + '">' + h.status + '</span></td><td class="px-4 py-3 text-sm text-gray-500">' + new Date(h.created_at).toLocaleDateString() + '</td><td class="px-4 py-3"><a href="/admin/dashboard?property_id=' + h.property_id + '" target="_blank" class="text-purple-600 hover:underline text-sm"><i class="fas fa-external-link-alt mr-1"></i>View Admin</a></td></tr>').join('');
+                container.innerHTML = \`
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Hotel Name</th>
+                                <th>Slug</th>
+                                <th>Contact Email</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            \${hotels.map(h => \`
+                                <tr>
+                                    <td><strong>\${h.property_name}</strong></td>
+                                    <td><code class="text-xs bg-gray-100 px-2 py-1 rounded">\${h.slug}</code></td>
+                                    <td>\${h.contact_email || 'N/A'}</td>
+                                    <td>\${h.location || 'N/A'}</td>
+                                    <td><span class="badge \${h.status === 'active' ? 'badge-success' : 'badge-warning'}">\${h.status}</span></td>
+                                    <td>\${new Date(h.created_at).toLocaleDateString()}</td>
+                                    <td>
+                                        <a href="/admin/dashboard?property_id=\${h.property_id}" target="_blank" class="btn-secondary px-3 py-1 text-xs">
+                                            <i class="fas fa-external-link-alt mr-1"></i>View
+                                        </a>
+                                    </td>
+                                </tr>
+                            \`).join('')}
+                        </tbody>
+                    </table>
+                \`;
             } catch (error) {
                 console.error('Load hotels error:', error);
+                container.innerHTML = \`
+                    <div class="text-center py-12 text-red-600">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+                        <p>Error loading hotels</p>
+                    </div>
+                \`;
             }
         }
 
         async function loadVendors() {
+            const container = document.getElementById('vendorsListContainer');
             try {
                 const response = await fetch('/api/superadmin/vendors');
                 const vendors = await response.json();
-                const list = document.getElementById('vendorsList');
                 
                 if (!vendors || vendors.length === 0) {
-                    list.innerHTML = '<p class="text-gray-500 text-center py-8">No vendors yet</p>';
+                    container.innerHTML = \`
+                        <div class="text-center py-12">
+                            <i class="fas fa-store text-4xl text-gray-300 mb-3"></i>
+                            <p class="text-gray-600">No vendors registered yet</p>
+                        </div>
+                    \`;
                     return;
                 }
                 
-                list.innerHTML = vendors.map(v => '<div class="border rounded-lg p-4"><div class="flex justify-between items-start"><div><h3 class="font-bold">' + v.business_name + '</h3><p class="text-sm text-gray-600">' + v.email + ' • ' + v.phone + '</p><p class="text-xs text-gray-500 mt-1">Connected to: ' + (v.property_count || 0) + ' hotel(s)</p></div><span class="px-3 py-1 rounded-full text-sm ' + (v.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800') + '">' + v.status + '</span></div></div>').join('');
+                container.innerHTML = \`
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        \${vendors.map(v => \`
+                            <div class="border-2 border-gray-200 rounded-xl p-5 hover:border-primary hover:shadow-lg transition-all">
+                                <div class="flex justify-between items-start mb-3">
+                                    <h3 class="font-bold text-lg">\${v.business_name}</h3>
+                                    <span class="badge \${v.status === 'active' ? 'badge-success' : 'badge-warning'}">\${v.status}</span>
+                                </div>
+                                <div class="text-sm text-gray-600 space-y-1">
+                                    <div><i class="fas fa-envelope mr-2"></i>\${v.email}</div>
+                                    <div><i class="fas fa-phone mr-2"></i>\${v.phone}</div>
+                                    <div><i class="fas fa-hotel mr-2"></i>Connected to \${v.property_count || 0} hotel(s)</div>
+                                </div>
+                                <div class="mt-4 flex gap-2">
+                                    <button class="btn-secondary flex-1 text-sm py-2">
+                                        <i class="fas fa-edit mr-1"></i>Edit
+                                    </button>
+                                </div>
+                            </div>
+                        \`).join('')}
+                    </div>
+                \`;
             } catch (error) {
                 console.error('Load vendors error:', error);
+                container.innerHTML = \`
+                    <div class="text-center py-12 text-red-600">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+                        <p>Error loading vendors</p>
+                    </div>
+                \`;
             }
+        }
+        
+        function createHotel() {
+            alert('Create Hotel feature coming soon!');
         }
 
         async function loadBookings() {
