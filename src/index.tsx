@@ -14331,12 +14331,15 @@ app.get('/hotel/:property_slug', async (c) => {
             };
             
             // Create and add custom section elements dynamically
+            console.log('🔍 Custom sections:', customSections);
             customSections.forEach(section => {
+              console.log('🔍 Processing section:', section.section_key, 'visible:', section.is_visible);
               if (section.is_visible === 1) {
                 let customSectionEl = document.getElementById(\`custom-section-\${section.section_key}\`);
                 
                 // Create if doesn't exist
                 if (!customSectionEl) {
+                  console.log('✨ Creating custom section element:', section.section_key);
                   customSectionEl = document.createElement('section');
                   customSectionEl.id = \`custom-section-\${section.section_key}\`;
                   customSectionEl.className = 'mb-12';
@@ -14355,6 +14358,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 
                 sectionElements[section.section_key] = customSectionEl;
+                console.log('✅ Added section to sectionElements:', section.section_key);
               }
             });
             
@@ -14368,7 +14372,10 @@ app.get('/hotel/:property_slug', async (c) => {
             // Re-append in specified order
             sectionOrder.forEach(section => {
               if (sectionElements[section]) {
+                console.log('📌 Appending section to DOM:', section);
                 container.appendChild(sectionElements[section]);
+              } else {
+                console.warn('⚠️ Section element not found for:', section);
               }
             });
             
@@ -14758,12 +14765,18 @@ app.get('/hotel/:property_slug', async (c) => {
         }
         
         async function renderRoomServiceCard() {
+            console.log('🎯 renderRoomServiceCard called');
+            
             // Find room service offering
             const roomService = allOfferings.find(o => o.offering_type === 'room_service');
+            console.log('🔍 Room service offering:', roomService ? 'FOUND' : 'NOT FOUND');
+            
             const grid = document.getElementById('custom-grid-room-service');
+            console.log('🔍 Grid element:', grid ? 'FOUND' : 'NOT FOUND');
             
             if (!grid) {
-                console.error('custom-grid-room-service element not found');
+                console.error('❌ custom-grid-room-service element not found');
+                console.log('🔍 Checking if parent section exists:', document.getElementById('custom-section-room-service'));
                 return;
             }
             
