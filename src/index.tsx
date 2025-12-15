@@ -9745,7 +9745,8 @@ app.post('/api/chatbot/chat', async (c) => {
     
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
-    if (apiKey && context.length > 0) {
+    // Call AI if we have API key AND (context OR relevant links)
+    if (apiKey && (context.length > 0 || topLinks.length > 0)) {
       try {
         console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
         console.log('📚 Context length:', context.length)
@@ -9810,7 +9811,7 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
     }
     
     // Smart fallback if API didn't work or no API key
-    if (!aiResponse && context.length > 0) {
+    if (!aiResponse && (context.length > 0 || topLinks.length > 0)) {
       // Fallback: Intelligent text summarization without AI API
       const messageLower = message.toLowerCase()
       
