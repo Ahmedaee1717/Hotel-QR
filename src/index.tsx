@@ -3369,6 +3369,27 @@ app.post('/api/admin/login', async (c) => {
     const restaurantAccess = await getUserResourceAccess(DB, user.user_id, 'restaurant')
     const beachAccess = await getUserResourceAccess(DB, user.user_id, 'beach')
     
+    // Smart redirect: Direct users to their primary workspace
+    let redirectTo = '/admin/dashboard'; // Default for full admins
+    
+    // If user has limited permissions, redirect to their specific workspace
+    // permissions is already an array of strings (permission keys)
+    const hasFullAccess = permissions.includes('frontdesk_view') || 
+                         permissions.includes('analytics_view') || 
+                         permissions.includes('users_manage') ||
+                         permissions.length > 10; // Full admins have 40+ permissions
+    
+    if (!hasFullAccess) {
+      // Redirect to their primary workspace based on permissions
+      if (permissions.some(p => p && p.startsWith('beach_'))) {
+        redirectTo = '/admin/beach-management/' + (user.property_id || 1);
+      } else if (permissions.some(p => p && p.startsWith('restaurant_'))) {
+        redirectTo = '/admin/restaurant-management'; // You can create this later
+      } else if (permissions.includes('frontdesk_view')) {
+        redirectTo = '/admin/dashboard?tab=frontdesk';
+      }
+    }
+    
     return c.json({
       success: true,
       user: {
@@ -3385,6 +3406,7 @@ app.post('/api/admin/login', async (c) => {
         restaurants: restaurantAccess,
         beaches: beachAccess
       },
+      redirectTo,
       token: `admin-${user.user_id}-${Date.now()}`
     })
   } catch (error) {
@@ -22407,7 +22429,8 @@ app.get('/admin/login', (c) => {
                 // Store permissions for frontend access control
                 localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
                 localStorage.setItem('admin_resource_access', JSON.stringify(data.resource_access || {}));
-                window.location.href = '/admin/dashboard';
+                // Smart redirect: Use server-suggested redirect or default to dashboard
+                window.location.href = data.redirectTo || '/admin/dashboard';
               } else {
                 alert('Login failed: ' + (data.error || 'Invalid credentials'));
               }
