@@ -36930,9 +36930,13 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         // Initialize
         async function init() {
             await loadRestaurantInfo();
-            await loadFloorPlan();
-            await loadPendingCheckIns();
-            await loadActiveSessions();
+            
+            // IMPORTANT: Load data in correct order to prevent race conditions
+            // 1. Load reservations and sessions first (sets currentReservations and currentSessions)
+            // 2. Then load floor plan (uses that data to calculate table status colors)
+            await loadPendingCheckIns();  // Must load first - sets currentReservations
+            await loadActiveSessions();   // Must load second - sets currentSessions
+            await loadFloorPlan();        // Load last - uses currentReservations and currentSessions
             
             // Update time every second
             updateTime();
@@ -37234,11 +37238,11 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         }
 
         async function refreshAll() {
-            await Promise.all([
-                loadFloorPlan(),
-                loadPendingCheckIns(),
-                loadActiveSessions()
-            ]);
+            // Load data first (reservations and sessions) before rendering floor plan
+            // This ensures table status colors are calculated correctly
+            await loadPendingCheckIns();  // Loads currentReservations
+            await loadActiveSessions();    // Loads currentSessions
+            await loadFloorPlan();         // Uses currentReservations and currentSessions for colors
         }
 
         // Table Modal
