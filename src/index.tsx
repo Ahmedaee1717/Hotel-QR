@@ -2641,6 +2641,261 @@ app.get('/api/admin/callback-requests', async (c) => {
 })
 
 // ============================================
+// FRONT DESK / CONCIERGE API ROUTES
+// ============================================
+
+// Get front desk stats
+app.get('/api/admin/frontdesk/stats', async (c) => {
+  const { DB } = c.env
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const property_id = 1 // TODO: Get from session
+  
+  try {
+    // Today's feedback count
+    const feedbackCount = await DB.prepare(`
+      SELECT COUNT(*) as count FROM feedback_submissions
+      WHERE property_id = ? AND DATE(submitted_at) = ?
+    `).bind(property_id, date).first()
+    
+    // Active chats (conversations with activity in last 24 hours)
+    const activeChats = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chatbot_conversations
+      WHERE property_id = ? AND last_activity >= datetime('now', '-24 hours')
+    `).bind(property_id).first()
+    
+    // Urgent issues (from both feedback and chat_feedback)
+    const urgentFeedback = await DB.prepare(`
+      SELECT COUNT(*) as count FROM feedback_submissions
+      WHERE property_id = ? AND is_urgent = 1 AND is_read = 0
+    `).bind(property_id).first()
+    
+    const urgentChat = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chat_feedback
+      WHERE property_id = ? AND (is_urgent = 1 OR is_complaint = 1) AND is_resolved = 0
+    `).bind(property_id).first()
+    
+    // Unread messages (feedback + chat feedback)
+    const unreadFeedback = await DB.prepare(`
+      SELECT COUNT(*) as count FROM feedback_submissions
+      WHERE property_id = ? AND is_read = 0
+    `).bind(property_id).first()
+    
+    const unreadChat = await DB.prepare(`
+      SELECT COUNT(*) as count FROM chat_feedback
+      WHERE property_id = ? AND is_resolved = 0
+    `).bind(property_id).first()
+    
+    return c.json({
+      success: true,
+      stats: {
+        today_feedback: feedbackCount?.count || 0,
+        active_chats: activeChats?.count || 0,
+        urgent_issues: (urgentFeedback?.count || 0) + (urgentChat?.count || 0),
+        unread_messages: (unreadFeedback?.count || 0) + (unreadChat?.count || 0)
+      }
+    })
+  } catch (error) {
+    console.error('Front desk stats error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get communications feed
+app.get('/api/admin/frontdesk/feed', async (c) => {
+  const { DB } = c.env
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const view = c.req.query('view') || 'all'
+  const property_id = 1 // TODO: Get from session
+  
+  try {
+    const communications = []
+    
+    // Get feedback submissions
+    if (view === 'all' || view === 'feedback' || view === 'urgent') {
+      let feedbackQuery = `
+        SELECT 
+          f.submission_id as id,
+          'feedback' as type,
+          f.guest_name,
+          f.room_number,
+          f.guest_email,
+          f.submitted_at as created_at,
+          f.sentiment_label,
+          f.sentiment_score,
+          f.is_urgent,
+          f.is_read,
+          ff.form_name as preview
+        FROM feedback_submissions f
+        LEFT JOIN feedback_forms ff ON f.form_id = ff.form_id
+        WHERE f.property_id = ? AND DATE(f.submitted_at) >= ?
+      `
+      
+      if (view === 'urgent') {
+        feedbackQuery += ' AND f.is_urgent = 1'
+      }
+      
+      feedbackQuery += ' ORDER BY f.submitted_at DESC LIMIT 50'
+      
+      const feedback = await DB.prepare(feedbackQuery).bind(property_id, date).all()
+      communications.push(...(feedback.results || []))
+    }
+    
+    // Get chatbot conversations with issues
+    if (view === 'all' || view === 'chatbot' || view === 'urgent') {
+      let chatQuery = `
+        SELECT 
+          cf.feedback_id as id,
+          'chatbot' as type,
+          cf.guest_name,
+          cf.room_number,
+          cf.detected_at as created_at,
+          cf.sentiment_label,
+          cf.sentiment_score,
+          cf.is_urgent,
+          cf.is_resolved as is_read,
+          cf.guest_message as preview
+        FROM chat_feedback cf
+        WHERE cf.property_id = ? AND DATE(cf.detected_at) >= ?
+      `
+      
+      if (view === 'urgent') {
+        chatQuery += ' AND (cf.is_urgent = 1 OR cf.is_complaint = 1)'
+      }
+      
+      chatQuery += ' ORDER BY cf.detected_at DESC LIMIT 50'
+      
+      const chatFeedback = await DB.prepare(chatQuery).bind(property_id, date).all()
+      communications.push(...(chatFeedback.results || []))
+    }
+    
+    // Sort by created_at descending
+    communications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    
+    return c.json({
+      success: true,
+      communications
+    })
+  } catch (error) {
+    console.error('Front desk feed error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get communication details
+app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
+  const { DB } = c.env
+  const type = c.req.param('type')
+  const id = c.req.param('id')
+  
+  try {
+    if (type === 'feedback') {
+      const submission = await DB.prepare(`
+        SELECT f.*, ff.form_name
+        FROM feedback_submissions f
+        LEFT JOIN feedback_forms ff ON f.form_id = ff.form_id
+        WHERE f.submission_id = ?
+      `).bind(id).first()
+      
+      const answers = await DB.prepare(`
+        SELECT fa.*, fq.question_text
+        FROM feedback_answers fa
+        LEFT JOIN feedback_questions fq ON fa.question_id = fq.question_id
+        WHERE fa.submission_id = ?
+        ORDER BY fq.display_order
+      `).bind(id).all()
+      
+      return c.json({
+        success: true,
+        communication: {
+          ...submission,
+          answers: answers.results
+        }
+      })
+    } else if (type === 'chatbot') {
+      const chatFeedback = await DB.prepare(`
+        SELECT * FROM chat_feedback WHERE feedback_id = ?
+      `).bind(id).first()
+      
+      if (chatFeedback && chatFeedback.conversation_id) {
+        const messages = await DB.prepare(`
+          SELECT * FROM chatbot_messages
+          WHERE conversation_id = ?
+          ORDER BY created_at ASC
+        `).bind(chatFeedback.conversation_id).all()
+        
+        return c.json({
+          success: true,
+          communication: {
+            ...chatFeedback,
+            messages: messages.results,
+            has_complaint: chatFeedback.is_complaint === 1
+          }
+        })
+      }
+      
+      return c.json({
+        success: true,
+        communication: chatFeedback
+      })
+    }
+    
+    return c.json({ error: 'Invalid type' }, 400)
+  } catch (error) {
+    console.error('Front desk details error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Mark as read
+app.post('/api/admin/frontdesk/mark-read/:type/:id', async (c) => {
+  const { DB } = c.env
+  const type = c.req.param('type')
+  const id = c.req.param('id')
+  
+  try {
+    if (type === 'feedback') {
+      await DB.prepare(`
+        UPDATE feedback_submissions SET is_read = 1 WHERE submission_id = ?
+      `).bind(id).run()
+    } else if (type === 'chatbot') {
+      await DB.prepare(`
+        UPDATE chat_feedback SET is_resolved = 1, resolved_at = CURRENT_TIMESTAMP WHERE feedback_id = ?
+      `).bind(id).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Mark read error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Save admin notes
+app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
+  const { DB } = c.env
+  const type = c.req.param('type')
+  const id = c.req.param('id')
+  const { admin_notes } = await c.req.json()
+  
+  try {
+    if (type === 'feedback') {
+      await DB.prepare(`
+        UPDATE feedback_submissions SET admin_notes = ? WHERE submission_id = ?
+      `).bind(admin_notes, id).run()
+    } else if (type === 'chatbot') {
+      await DB.prepare(`
+        UPDATE chat_feedback SET admin_notes = ? WHERE feedback_id = ?
+      `).bind(admin_notes, id).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Save notes error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// ============================================
 // ADMIN API ROUTES
 // ============================================
 
@@ -26539,6 +26794,9 @@ app.get('/admin/dashboard', (c) => {
                 <!-- Core Section -->
                 <div class="px-3 mb-6">
                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Core</h3>
+                    <button data-tab="frontdesk" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-concierge-bell w-5"></i><span>Front Desk</span>
+                    </button>
                     <button data-tab="qrcode" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3 tab-active">
                         <i class="fas fa-qrcode w-5"></i><span>QR Code</span>
                     </button>
@@ -26616,6 +26874,113 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Main Content Area -->
         <div class="flex-1 ml-64 px-4 py-8">
+
+        <!-- FRONT DESK / CONCIERGE TAB -->
+        <div id="frontdeskTab" class="tab-content" style="display: none;">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-concierge-bell mr-3 text-blue-600"></i>Front Desk & Concierge Center
+                </h2>
+                <p class="text-gray-600">Real-time guest communication monitoring - Feedback, Chatbot conversations, and urgent issues</p>
+            </div>
+
+            <!-- Live Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm font-medium">Today's Feedback</p>
+                            <p class="text-3xl font-bold mt-1" id="statTodayFeedback">0</p>
+                        </div>
+                        <i class="fas fa-comment-dots text-4xl opacity-30"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm font-medium">Active Chats</p>
+                            <p class="text-3xl font-bold mt-1" id="statActiveChats">0</p>
+                        </div>
+                        <i class="fas fa-comments text-4xl opacity-30"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-100 text-sm font-medium">Urgent Issues</p>
+                            <p class="text-3xl font-bold mt-1" id="statUrgentIssues">0</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-4xl opacity-30"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm font-medium">Unread Messages</p>
+                            <p class="text-3xl font-bold mt-1" id="statUnreadMessages">0</p>
+                        </div>
+                        <i class="fas fa-envelope text-4xl opacity-30"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter and Controls -->
+            <div class="bg-white rounded-lg shadow-lg p-4 mb-6">
+                <div class="flex flex-wrap gap-3 items-center">
+                    <button onclick="setFrontDeskView('all')" id="viewAllBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
+                        <i class="fas fa-th-large mr-2"></i>All Communications
+                    </button>
+                    <button onclick="setFrontDeskView('feedback')" id="viewFeedbackBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-comment-dots mr-2"></i>Feedback Forms
+                    </button>
+                    <button onclick="setFrontDeskView('chatbot')" id="viewChatbotBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-robot mr-2"></i>AI Chatbot
+                    </button>
+                    <button onclick="setFrontDeskView('urgent')" id="viewUrgentBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-exclamation-circle mr-2"></i>Urgent Only
+                    </button>
+                    
+                    <div class="ml-auto flex gap-2">
+                        <input type="date" id="frontDeskDateFilter" class="px-3 py-2 border rounded-lg" onchange="loadFrontDeskData()">
+                        <button onclick="loadFrontDeskData()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Communications Feed -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Left Column: Recent Communications -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-stream mr-2 text-blue-600"></i>Recent Communications
+                        <span class="text-sm font-normal text-gray-500 ml-2">(Last 24 hours)</span>
+                    </h3>
+                    <div id="communicationsFeed" class="space-y-3 max-h-[600px] overflow-y-auto">
+                        <div class="text-center text-gray-400 py-8">
+                            <i class="fas fa-inbox text-4xl mb-3"></i>
+                            <p>Loading communications...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Detailed View -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-eye mr-2 text-green-600"></i>Details
+                    </h3>
+                    <div id="communicationDetails" class="text-center text-gray-400 py-12">
+                        <i class="fas fa-mouse-pointer text-5xl mb-4"></i>
+                        <p>Click on any communication to view details</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END FRONT DESK TAB -->
 
         <!-- Master QR Code Tab -->
         <div id="qrcodeTab" class="tab-content">
@@ -30840,6 +31205,7 @@ app.get('/admin/dashboard', (c) => {
           clickedButton.classList.add('tab-active');
         }
         
+        if (tab === 'frontdesk') loadFrontDeskData();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
           requestAnimationFrame(() => {
@@ -30870,6 +31236,301 @@ app.get('/admin/dashboard', (c) => {
           showTab(tab, this);
         });
       });
+      
+      // ========================================
+      // FRONT DESK / CONCIERGE FUNCTIONS
+      // ========================================
+      let currentFrontDeskView = 'all';
+      let frontDeskAutoRefresh = null;
+      
+      window.setFrontDeskView = function(view) {
+        currentFrontDeskView = view;
+        
+        // Update button styles
+        ['All', 'Feedback', 'Chatbot', 'Urgent'].forEach(v => {
+          const btn = document.getElementById('view' + v + 'Btn');
+          if (btn) {
+            if (v.toLowerCase() === view || (v === 'All' && view === 'all')) {
+              btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+            } else {
+              btn.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+            }
+          }
+        });
+        
+        loadFrontDeskData();
+      };
+      
+      async function loadFrontDeskData() {
+        try {
+          const dateFilter = document.getElementById('frontDeskDateFilter').value || new Date().toISOString().split('T')[0];
+          
+          // Load stats
+          const statsResponse = await fetch(\`/api/admin/frontdesk/stats?date=\${dateFilter}\`);
+          const statsData = await statsResponse.json();
+          
+          if (statsData.success) {
+            document.getElementById('statTodayFeedback').textContent = statsData.stats.today_feedback || 0;
+            document.getElementById('statActiveChats').textContent = statsData.stats.active_chats || 0;
+            document.getElementById('statUrgentIssues').textContent = statsData.stats.urgent_issues || 0;
+            document.getElementById('statUnreadMessages').textContent = statsData.stats.unread_messages || 0;
+          }
+          
+          // Load communications feed
+          const feedResponse = await fetch(\`/api/admin/frontdesk/feed?date=\${dateFilter}&view=\${currentFrontDeskView}\`);
+          const feedData = await feedResponse.json();
+          
+          if (feedData.success) {
+            renderCommunicationsFeed(feedData.communications);
+          }
+        } catch (error) {
+          console.error('Front desk load error:', error);
+          document.getElementById('communicationsFeed').innerHTML = \`
+            <div class="text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error loading communications</p>
+            </div>
+          \`;
+        }
+      }
+      
+      function renderCommunicationsFeed(communications) {
+        const feed = document.getElementById('communicationsFeed');
+        
+        if (!communications || communications.length === 0) {
+          feed.innerHTML = \`
+            <div class="text-center text-gray-400 py-8">
+              <i class="fas fa-inbox text-4xl mb-3"></i>
+              <p>No communications found</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        feed.innerHTML = communications.map(comm => {
+          const isUrgent = comm.is_urgent === 1;
+          const isUnread = comm.is_read === 0;
+          const typeIcon = comm.type === 'feedback' ? 'fa-comment-dots' : 
+                          comm.type === 'chatbot' ? 'fa-robot' : 'fa-exclamation-circle';
+          const typeColor = comm.type === 'feedback' ? 'blue' : 
+                           comm.type === 'chatbot' ? 'green' : 'red';
+          
+          return \`
+            <div onclick="viewCommunicationDetails(\${comm.id}, '\${comm.type}')" 
+                 class="border-l-4 border-\${typeColor}-500 bg-white p-4 rounded-lg hover:shadow-md cursor-pointer transition-all \${isUnread ? 'bg-blue-50' : ''}">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <i class="fas \${typeIcon} text-\${typeColor}-600"></i>
+                  <span class="font-semibold text-sm">\${comm.type.toUpperCase()}</span>
+                  \${isUrgent ? '<span class="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded">URGENT</span>' : ''}
+                  \${isUnread ? '<span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded">NEW</span>' : ''}
+                </div>
+                <span class="text-xs text-gray-500">\${formatTimeAgo(comm.created_at)}</span>
+              </div>
+              
+              <div class="text-sm mb-2">
+                <span class="font-medium">Guest:</span> \${comm.guest_name || 'Anonymous'}
+                \${comm.room_number ? \` • Room \${comm.room_number}\` : ''}
+              </div>
+              
+              <p class="text-sm text-gray-700 line-clamp-2">\${comm.preview || 'No preview available'}</p>
+              
+              \${comm.sentiment_label ? \`
+                <div class="mt-2 flex items-center gap-2">
+                  <span class="text-xs px-2 py-1 rounded \${getSentimentClass(comm.sentiment_label)}">
+                    \${comm.sentiment_label.toUpperCase()}
+                  </span>
+                </div>
+              \` : ''}
+            </div>
+          \`;
+        }).join('');
+      }
+      
+      window.viewCommunicationDetails = async function(id, type) {
+        const detailsDiv = document.getElementById('communicationDetails');
+        detailsDiv.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
+        
+        try {
+          const response = await fetch(\`/api/admin/frontdesk/details/\${type}/\${id}\`);
+          const data = await response.json();
+          
+          if (data.success) {
+            renderCommunicationDetails(data.communication, type);
+            
+            // Mark as read
+            if (data.communication.is_read === 0) {
+              await fetch(\`/api/admin/frontdesk/mark-read/\${type}/\${id}\`, { method: 'POST' });
+              loadFrontDeskData(); // Refresh to update unread count
+            }
+          }
+        } catch (error) {
+          console.error('Load details error:', error);
+          detailsDiv.innerHTML = '<div class="text-center text-red-500 py-8"><i class="fas fa-exclamation-triangle text-3xl mb-3"></i><p>Error loading details</p></div>';
+        }
+      };
+      
+      function renderCommunicationDetails(comm, type) {
+        const detailsDiv = document.getElementById('communicationDetails');
+        
+        if (type === 'feedback') {
+          detailsDiv.innerHTML = \`
+            <div class="space-y-4">
+              <div class="flex items-start justify-between pb-4 border-b">
+                <div>
+                  <h4 class="text-lg font-bold text-gray-800">Feedback Submission</h4>
+                  <p class="text-sm text-gray-500">\${new Date(comm.submitted_at).toLocaleString()}</p>
+                </div>
+                \${comm.is_urgent ? '<span class="px-3 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-lg">URGENT</span>' : ''}
+              </div>
+              
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div><span class="font-semibold">Guest:</span> \${comm.guest_name || 'Anonymous'}</div>
+                  <div><span class="font-semibold">Room:</span> \${comm.room_number || 'N/A'}</div>
+                  <div><span class="font-semibold">Email:</span> \${comm.guest_email || 'N/A'}</div>
+                  <div><span class="font-semibold">Phone:</span> \${comm.guest_phone || 'N/A'}</div>
+                </div>
+              </div>
+              
+              \${comm.sentiment_label ? \`
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-semibold">Sentiment:</span>
+                  <span class="px-3 py-1 rounded text-sm \${getSentimentClass(comm.sentiment_label)}">
+                    \${comm.sentiment_label.toUpperCase()}
+                  </span>
+                  \${comm.sentiment_score ? \`<span class="text-sm text-gray-500">(\${(comm.sentiment_score * 100).toFixed(0)}%)</span>\` : ''}
+                </div>
+              \` : ''}
+              
+              <div>
+                <h5 class="font-semibold mb-2">Responses:</h5>
+                <div class="space-y-3">
+                  \${comm.answers && comm.answers.length > 0 ? comm.answers.map(answer => \`
+                    <div class="bg-white border rounded-lg p-3">
+                      <p class="font-medium text-sm text-gray-700 mb-1">\${answer.question_text}</p>
+                      <p class="text-gray-900">\${answer.answer_text || answer.answer_numeric || 'No answer'}</p>
+                    </div>
+                  \`).join('') : '<p class="text-gray-500 text-sm">No answers recorded</p>'}
+                </div>
+              </div>
+              
+              <div>
+                <label class="block font-semibold mb-2">Admin Notes:</label>
+                <textarea id="adminNotes" class="w-full p-3 border rounded-lg" rows="3" placeholder="Add internal notes...">\${comm.admin_notes || ''}</textarea>
+                <button onclick="saveAdminNotes('\${type}', \${comm.submission_id})" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <i class="fas fa-save mr-2"></i>Save Notes
+                </button>
+              </div>
+            </div>
+          \`;
+        } else if (type === 'chatbot') {
+          detailsDiv.innerHTML = \`
+            <div class="space-y-4">
+              <div class="flex items-start justify-between pb-4 border-b">
+                <div>
+                  <h4 class="text-lg font-bold text-gray-800">AI Chatbot Conversation</h4>
+                  <p class="text-sm text-gray-500">Session: \${comm.session_id}</p>
+                  <p class="text-sm text-gray-500">\${new Date(comm.started_at).toLocaleString()}</p>
+                </div>
+                \${comm.has_complaint ? '<span class="px-3 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-lg">COMPLAINT</span>' : ''}
+              </div>
+              
+              <div class="space-y-3 max-h-96 overflow-y-auto">
+                \${comm.messages && comm.messages.length > 0 ? comm.messages.map(msg => \`
+                  <div class="flex \${msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="\${msg.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'} rounded-lg p-3 max-w-[80%]">
+                      <div class="flex items-center gap-2 mb-1">
+                        <i class="fas \${msg.role === 'user' ? 'fa-user' : 'fa-robot'} text-xs"></i>
+                        <span class="text-xs font-semibold">\${msg.role === 'user' ? 'Guest' : 'AI Assistant'}</span>
+                        <span class="text-xs text-gray-500">\${new Date(msg.created_at).toLocaleTimeString()}</span>
+                      </div>
+                      <p class="text-sm">\${msg.content}</p>
+                    </div>
+                  </div>
+                \`).join('') : '<p class="text-gray-500 text-sm">No messages</p>'}
+              </div>
+              
+              \${comm.complaint_summary ? \`
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h5 class="font-semibold text-red-800 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Complaint Detected</h5>
+                  <p class="text-sm mb-2"><span class="font-semibold">Category:</span> \${comm.complaint_category}</p>
+                  <p class="text-sm mb-2"><span class="font-semibold">Issue:</span> \${comm.issue_description}</p>
+                  <p class="text-sm mb-2"><span class="font-semibold">Summary:</span> \${comm.complaint_summary}</p>
+                  \${comm.suggested_resolution ? \`<p class="text-sm"><span class="font-semibold">Suggested Resolution:</span> \${comm.suggested_resolution}</p>\` : ''}
+                </div>
+              \` : ''}
+              
+              <div>
+                <label class="block font-semibold mb-2">Admin Notes:</label>
+                <textarea id="adminNotes" class="w-full p-3 border rounded-lg" rows="3" placeholder="Add internal notes...">\${comm.admin_notes || ''}</textarea>
+                <button onclick="saveAdminNotes('\${type}', \${comm.feedback_id || comm.conversation_id})" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <i class="fas fa-save mr-2"></i>Save Notes
+                </button>
+              </div>
+            </div>
+          \`;
+        }
+      }
+      
+      window.saveAdminNotes = async function(type, id) {
+        const notes = document.getElementById('adminNotes').value;
+        
+        try {
+          const response = await fetch(\`/api/admin/frontdesk/notes/\${type}/\${id}\`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_notes: notes })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            alert('Notes saved successfully!');
+          }
+        } catch (error) {
+          console.error('Save notes error:', error);
+          alert('Failed to save notes');
+        }
+      };
+      
+      function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+        
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+        if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+        return Math.floor(seconds / 86400) + 'd ago';
+      }
+      
+      function getSentimentClass(sentiment) {
+        switch (sentiment?.toLowerCase()) {
+          case 'positive': return 'bg-green-100 text-green-800';
+          case 'negative': return 'bg-red-100 text-red-800';
+          case 'neutral': return 'bg-gray-100 text-gray-800';
+          default: return 'bg-gray-100 text-gray-600';
+        }
+      }
+      
+      // Auto-refresh every 30 seconds when on front desk tab
+      setInterval(() => {
+        if (currentTab === 'frontdesk') {
+          loadFrontDeskData();
+        }
+      }, 30000);
+      
+      // Set today's date as default
+      document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('frontDeskDateFilter');
+        if (dateInput) {
+          dateInput.value = new Date().toISOString().split('T')[0];
+        }
+      });
+      
+      // ========================================
+      // END FRONT DESK FUNCTIONS
+      // ========================================
       
       // QR Code functions
       async function loadQRCode() {
