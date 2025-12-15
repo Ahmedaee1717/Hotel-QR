@@ -36987,57 +36987,39 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             }
             canvas.innerHTML = '';
             
-            console.log('Rendering floor plan with', floorElements.length, 'elements');
+            // Filter to only show tables (not decorative elements)
+            const tables = floorElements.filter(el => el.element_type === 'table');
+            console.log('Rendering floor plan with', tables.length, 'tables');
             
-            // Render all elements
-            floorElements.forEach(element => {
+            // Render only tables for staff dashboard
+            tables.forEach(element => {
                 const el = document.createElement('div');
                 
-                if (element.element_type === 'table') {
-                    // Render table element
-                    el.className = 'table-element table-' + (element.shape || 'rectangle');
-                    el.id = 'table-' + element.element_id;
-                    el.style.left = element.x + 'px';
-                    el.style.top = element.y + 'px';
-                    el.style.width = element.width + 'px';
-                    el.style.height = element.height + 'px';
-                    
-                    // Determine status
-                    const status = getTableStatus(element.table_number);
-                    el.classList.add('table-' + status);
-                    
-                    // Content
-                    el.innerHTML = '<div class="text-center">' +
-                        '<div class="text-lg font-bold">' + element.table_number + '</div>' +
-                        '<div class="text-xs">' + element.capacity + ' seats</div>' +
-                        '</div>';
-                    
-                    // Click handler
-                    el.onclick = () => openTableModal(element);
-                } else {
-                    // Render decorative element (bar, entrance, etc.)
-                    el.className = 'floor-element floor-' + element.element_type;
-                    el.style.left = element.x + 'px';
-                    el.style.top = element.y + 'px';
-                    el.style.width = element.width + 'px';
-                    el.style.height = element.height + 'px';
-                    el.style.backgroundColor = element.color || '#94A3B8';
-                    el.style.opacity = '0.3';
-                    el.style.border = '1px dashed #64748B';
-                    el.style.borderRadius = '8px';
-                    el.style.display = 'flex';
-                    el.style.alignItems = 'center';
-                    el.style.justifyContent = 'center';
-                    el.style.fontSize = '12px';
-                    el.style.color = '#475569';
-                    el.style.cursor = 'default';
-                    el.innerHTML = element.element_label || element.element_type;
-                }
+                // Render table element
+                el.className = 'table-element table-' + (element.shape || 'rectangle');
+                el.id = 'table-' + element.element_id;
+                el.style.left = element.x + 'px';
+                el.style.top = element.y + 'px';
+                el.style.width = element.width + 'px';
+                el.style.height = element.height + 'px';
+                
+                // Determine status
+                const status = getTableStatus(element.table_number);
+                el.classList.add('table-' + status);
+                
+                // Content
+                el.innerHTML = '<div class="text-center">' +
+                    '<div class="text-lg font-bold">' + element.table_number + '</div>' +
+                    '<div class="text-xs">' + element.capacity + ' seats</div>' +
+                    '</div>';
+                
+                // Click handler
+                el.onclick = () => openTableModal(element);
                 
                 canvas.appendChild(el);
             });
             
-            console.log('Floor plan rendered');
+            console.log('Floor plan rendered -', tables.length, 'tables displayed');
         }
 
         function getTableStatus(tableNumber) {
