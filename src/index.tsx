@@ -36029,16 +36029,49 @@ app.get('/waitlist/:waitlist_id', (c) => {
         <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
             <h3 class="font-bold text-lg mb-4 flex items-center">
                 <i class="fas fa-bell mr-2 text-amber-600"></i>
-                Notifications
+                Get Notified
             </h3>
-            <div class="space-y-3">
+            
+            <!-- Browser Notifications (if supported) -->
+            <div id="browserNotifSection" class="space-y-3 mb-4" style="display: none;">
                 <button onclick="enableNotifications()" id="enableNotifBtn" class="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition">
-                    <i class="fas fa-bell mr-2"></i>Enable Browser Notifications
+                    <i class="fas fa-bell mr-2"></i>Enable Browser Alerts
                 </button>
                 <div id="notificationStatus" class="text-sm text-center text-gray-600"></div>
-                <div class="text-xs text-gray-500 text-center">
-                    We'll notify you when your table is ready!
+            </div>
+            
+            <!-- SMS Notifications (Mobile fallback) -->
+            <div id="smsNotifSection" class="space-y-3">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-mobile-alt text-2xl text-green-600"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-green-800 mb-2">SMS Notifications Active</h4>
+                            <p class="text-sm text-green-700 mb-2">
+                                We'll send you a text message when your table is ready!
+                            </p>
+                            <div class="flex items-center gap-2 text-sm text-green-600">
+                                <i class="fas fa-check-circle"></i>
+                                <span id="phoneDisplay">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
+                    <div class="flex gap-2">
+                        <i class="fas fa-volume-up text-amber-600 mt-0.5"></i>
+                        <div class="text-sm text-amber-800">
+                            <strong>Keep sound ON</strong> - This page will play an alert sound when notified
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-xs text-gray-500 text-center mt-3">
+                Don't worry, you'll be notified when ready!
             </div>
         </div>
 
@@ -36088,8 +36121,15 @@ app.get('/waitlist/:waitlist_id', (c) => {
                 
                 // Update UI
                 document.getElementById('queuePosition').textContent = position === 0 ? '-' : '#' + position;
-                document.getElementById('guestName').textContent = entry.guest_name;
-                document.getElementById('partySize').textContent = entry.number_of_guests + ' guests';
+                document.getElementById('guestName').textContent = entry.guest_name || '-';
+                document.getElementById('partySize').textContent = (entry.number_of_guests || '0') + ' guests';
+                
+                // Show phone number in SMS notification section
+                if (entry.phone_number) {
+                    document.getElementById('phoneDisplay').textContent = entry.phone_number;
+                } else {
+                    document.getElementById('phoneDisplay').textContent = 'No phone number provided';
+                }
                 
                 // Calculate wait time
                 const addedTime = new Date(entry.added_at);
@@ -36208,11 +36248,21 @@ app.get('/waitlist/:waitlist_id', (c) => {
             }
         }
 
-        // Check notification permission on load
-        if (Notification.permission === 'granted') {
-            document.getElementById('notificationStatus').textContent = '✓ Notifications are enabled';
-            document.getElementById('enableNotifBtn').disabled = true;
-            document.getElementById('enableNotifBtn').classList.add('opacity-50');
+        // Check if browser supports notifications
+        if ('Notification' in window && Notification.permission !== 'denied') {
+            // Show browser notification option for desktop browsers
+            document.getElementById('browserNotifSection').style.display = 'block';
+            document.getElementById('smsNotifSection').style.display = 'none';
+            
+            if (Notification.permission === 'granted') {
+                document.getElementById('notificationStatus').textContent = '✓ Browser alerts enabled';
+                document.getElementById('enableNotifBtn').disabled = true;
+                document.getElementById('enableNotifBtn').classList.add('opacity-50');
+            }
+        } else {
+            // Mobile browsers or notifications not supported - show SMS info
+            document.getElementById('browserNotifSection').style.display = 'none';
+            document.getElementById('smsNotifSection').style.display = 'block';
         }
 
         // Load status immediately
