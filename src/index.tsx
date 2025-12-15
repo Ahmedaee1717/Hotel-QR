@@ -18504,6 +18504,28 @@ app.get('/superadmin/dashboard', (c) => {
                 margin-left: 0;
             }
         }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -19314,7 +19336,14 @@ app.get('/superadmin/dashboard', (c) => {
         }
         
         function createHotel() {
-            alert('Create Hotel feature coming soon!');
+            const modal = document.getElementById('createHotelModal');
+            modal.style.display = 'flex';
+        }
+        
+        function closeCreateHotelModal() {
+            const modal = document.getElementById('createHotelModal');
+            modal.style.display = 'none';
+            document.getElementById('createHotelForm').reset();
         }
 
         async function loadBookings() {
@@ -19814,6 +19843,61 @@ app.get('/superadmin/dashboard', (c) => {
         document.getElementById('userStatusFilter').addEventListener('change', loadUsers);
         document.getElementById('ticketStatusFilter').addEventListener('change', loadTickets);
         document.getElementById('ticketPriorityFilter').addEventListener('change', loadTickets);
+        
+        // Hotel creation form handler
+        document.getElementById('createHotelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const hotelData = {
+                property_name: document.getElementById('hotelName').value,
+                slug: document.getElementById('hotelSlug').value,
+                contact_email: document.getElementById('hotelEmail').value,
+                contact_phone: document.getElementById('hotelPhone').value || '',
+                location: document.getElementById('hotelAddress').value || ''
+            };
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+            
+            try {
+                const response = await fetch('/api/superadmin/hotels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(hotelData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeCreateHotelModal();
+                    
+                    // Show success notification with registration code
+                    const notification = document.createElement('div');
+                    notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); z-index: 10000; max-width: 400px; animation: slideIn 0.3s ease-out;';
+                    notification.innerHTML = '<div style="display: flex; align-items: start; gap: 12px;"><i class="fas fa-check-circle" style="font-size: 24px; margin-top: 2px;"></i><div><div style="font-weight: 700; font-size: 16px; margin-bottom: 8px;">Hotel Created Successfully!</div><div style="font-size: 14px; opacity: 0.95; margin-bottom: 8px;"><strong>' + hotelData.property_name + '</strong> has been added to the platform.</div><div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; margin-top: 8px;"><div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">Registration Code:</div><div style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px;">' + result.registration_code + '</div></div><div style="font-size: 12px; opacity: 0.85; margin-top: 8px;">Share this code with the hotel admin to complete setup.</div></div></div>';
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.style.animation = 'slideOut 0.3s ease-in';
+                        setTimeout(() => notification.remove(), 300);
+                    }, 8000);
+                    
+                    // Reload hotels and stats
+                    loadHotels();
+                    loadStats();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to create hotel'));
+                }
+            } catch (error) {
+                console.error('Create hotel error:', error);
+                alert('Failed to create hotel. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        });
 
         async function deleteHotel(propertyId, hotelName) {
             if (!confirm('Are you sure you want to delete "' + hotelName + '"?' + String.fromCharCode(10) + String.fromCharCode(10) + 'This will:' + String.fromCharCode(10) + '• Set the hotel status to "deleted"' + String.fromCharCode(10) + '• Prevent future access to the hotel dashboard' + String.fromCharCode(10) + '• Preserve all historical data' + String.fromCharCode(10) + String.fromCharCode(10) + 'This action cannot be easily undone.')) {
