@@ -3625,24 +3625,62 @@ app.post('/api/admin/custom-sections', async (c) => {
   const data = await c.req.json()
   
   try {
-    const result = await DB.prepare(`
-      INSERT INTO custom_sections (
-        property_id, section_key, section_name_en, icon_class, color_class, display_order, is_visible
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      data.property_id,
-      data.section_key,
-      data.section_name_en,
-      data.icon_class || 'fas fa-star',
-      data.color_class || 'blue',
-      data.display_order || 0,
-      data.is_visible !== undefined ? data.is_visible : 1
-    ).run()
+    // Check if section already exists (for upsert behavior)
+    const existing = await DB.prepare(`
+      SELECT section_id FROM custom_sections 
+      WHERE property_id = ? AND section_key = ?
+    `).bind(data.property_id, data.section_key).first()
     
-    return c.json({ success: true, section_id: result.meta.last_row_id })
+    if (existing) {
+      // Update existing section
+      await DB.prepare(`
+        UPDATE custom_sections
+        SET section_name_en = ?,
+            subtitle_en = ?,
+            description_en = ?,
+            icon_class = ?,
+            color_class = ?,
+            is_visible = ?,
+            link_url = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE section_id = ?
+      `).bind(
+        data.section_name_en,
+        data.subtitle_en || null,
+        data.description_en || null,
+        data.icon_class || 'fas fa-star',
+        data.color_class || 'blue',
+        data.is_visible !== undefined ? data.is_visible : 1,
+        data.link_url || null,
+        existing.section_id
+      ).run()
+      
+      return c.json({ success: true, section_id: existing.section_id })
+    } else {
+      // Insert new section
+      const result = await DB.prepare(`
+        INSERT INTO custom_sections (
+          property_id, section_key, section_name_en, subtitle_en, description_en, 
+          icon_class, color_class, display_order, is_visible, link_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        data.property_id,
+        data.section_key,
+        data.section_name_en,
+        data.subtitle_en || null,
+        data.description_en || null,
+        data.icon_class || 'fas fa-star',
+        data.color_class || 'blue',
+        data.display_order || 0,
+        data.is_visible !== undefined ? data.is_visible : 1,
+        data.link_url || null
+      ).run()
+      
+      return c.json({ success: true, section_id: result.meta.last_row_id })
+    }
   } catch (error) {
-    console.error('Create custom section error:', error)
-    return c.json({ error: 'Failed to create custom section' }, 500)
+    console.error('Create/update custom section error:', error)
+    return c.json({ error: 'Failed to create/update custom section: ' + error.message }, 500)
   }
 })
 
@@ -29526,22 +29564,90 @@ app.get('/admin/dashboard', (c) => {
                         <textarea id="roomServiceDescription" rows="3" placeholder="Enjoy delicious meals and beverages delivered to your room at any time." class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none"></textarea>
                     </div>
                     
+                    <!-- Homepage Card Customization -->
+                    <div class="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-6 mb-6 border-2 border-purple-200">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-th-large mr-2 text-purple-600"></i>
+                            Homepage Card Settings
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">Customize how room service appears on the guest homepage</p>
+                        
+                        <div class="grid md:grid-cols-2 gap-6 mb-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-heading mr-2 text-purple-600"></i>Card Title
+                                </label>
+                                <input type="text" id="roomServiceCardTitle" placeholder="Room Service" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-tag mr-2 text-purple-600"></i>Card Subtitle
+                                </label>
+                                <input type="text" id="roomServiceCardSubtitle" placeholder="Order from your room" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-paragraph mr-2 text-purple-600"></i>Card Description
+                            </label>
+                            <textarea id="roomServiceCardDescription" rows="2" placeholder="Browse our menu and call to order delicious meals delivered to your room" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none resize-none"></textarea>
+                        </div>
+                        
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-icons mr-2 text-purple-600"></i>Icon
+                                </label>
+                                <input type="text" id="roomServiceCardIcon" placeholder="fas fa-concierge-bell" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
+                                <p class="text-xs text-gray-500 mt-1">FontAwesome class (e.g., fas fa-concierge-bell)</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-palette mr-2 text-purple-600"></i>Card Color
+                                </label>
+                                <select id="roomServiceCardColor" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
+                                    <option value="indigo">Indigo (Default)</option>
+                                    <option value="blue">Blue</option>
+                                    <option value="purple">Purple</option>
+                                    <option value="pink">Pink</option>
+                                    <option value="red">Red</option>
+                                    <option value="orange">Orange</option>
+                                    <option value="green">Green</option>
+                                    <option value="teal">Teal</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-toggle-on mr-2 text-purple-600"></i>Show on Homepage
+                                </label>
+                                <label class="flex items-center space-x-3 cursor-pointer bg-white px-4 py-3 rounded-lg border-2 border-gray-200 hover:border-purple-400 transition mt-2">
+                                    <input type="checkbox" id="roomServiceCardVisible" class="w-5 h-5 rounded text-purple-600" checked>
+                                    <span class="font-medium text-gray-700">Visible</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="flex gap-3">
                         <button onclick="saveRoomServiceInfo()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-lg">
-                            <i class="fas fa-save mr-2"></i>Save Information
+                            <i class="fas fa-save mr-2"></i>Save All Settings
                         </button>
                         <button onclick="openRoomServiceMenuManagement()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold shadow-lg">
                             <i class="fas fa-book-open mr-2"></i>Manage Menu & OCR
                         </button>
                         <button onclick="window.open('/room-service/1', '_blank')" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold shadow-lg">
-                            <i class="fas fa-eye mr-2"></i>Preview Guest Page
+                            <i class="fas fa-eye mr-2"></i>Preview Menu Page
+                        </button>
+                        <button onclick="window.open('/paradise-resort', '_blank')" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold shadow-lg">
+                            <i class="fas fa-home mr-2"></i>Preview Homepage Card
                         </button>
                     </div>
                     
                     <div class="mt-6 bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded">
                         <p class="text-sm text-indigo-900">
                             <i class="fas fa-info-circle mr-2"></i>
-                            <strong>Guest Access:</strong> Guests can scan QR codes in their rooms to view the menu. Place QR cards on nightstands, desks, or in-room directories.
+                            <strong>Guest Access:</strong> The room service card will appear on the homepage. Guests can click it to view the menu, or scan QR codes in their rooms.
                         </p>
                     </div>
                 </div>
@@ -32593,7 +32699,7 @@ app.get('/admin/dashboard', (c) => {
           // Load section order
           const sectionOrder = settings.homepage_section_order ? 
             JSON.parse(settings.homepage_section_order) : 
-            ['restaurants', 'events', 'spa', 'service', 'activities', 'beach-booking'];
+            ['restaurants', 'room-service', 'events', 'spa', 'service', 'activities', 'beach-booking'];
           await renderSectionOrder(sectionOrder);
           
         } catch (error) {
@@ -34072,6 +34178,7 @@ app.get('/admin/dashboard', (c) => {
         
         const sectionNames = {
           'restaurants': '🍽️ Restaurants',
+          'room-service': '🔔 Room Service',
           'events': '🎉 Events',
           'spa': '💆 Spa & Wellness',
           'service': '🛎️ Hotel Services',
@@ -36646,6 +36753,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             document.getElementById('roomServiceTitle').value = roomService.title_en || 'Room Service';
             document.getElementById('roomServiceDescription').value = roomService.short_description_en || '';
             document.getElementById('roomServiceHours').value = roomService.full_description_en || '24 Hours';
+            
+            // Load card customization from custom_sections
+            await loadRoomServiceCardSettings();
           } else {
             enabledCheckbox.checked = false;
             statusDiv.classList.add('hidden');
@@ -36653,6 +36763,25 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           }
         } catch (error) {
           console.error('Load room service error:', error);
+        }
+      }
+      
+      async function loadRoomServiceCardSettings() {
+        try {
+          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const data = await response.json();
+          const roomServiceSection = data.sections?.find(s => s.section_key === 'room-service');
+          
+          if (roomServiceSection) {
+            document.getElementById('roomServiceCardTitle').value = roomServiceSection.section_name_en || 'Room Service';
+            document.getElementById('roomServiceCardSubtitle').value = roomServiceSection.subtitle_en || 'Order from your room';
+            document.getElementById('roomServiceCardDescription').value = roomServiceSection.description_en || 'Browse our menu and call to order';
+            document.getElementById('roomServiceCardIcon').value = roomServiceSection.icon_class || 'fas fa-concierge-bell';
+            document.getElementById('roomServiceCardColor').value = roomServiceSection.color_class || 'indigo';
+            document.getElementById('roomServiceCardVisible').checked = roomServiceSection.is_visible === 1;
+          }
+        } catch (error) {
+          console.error('Load card settings error:', error);
         }
       }
       
@@ -36749,6 +36878,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
         
         try {
+          // Save room service offering info
           const response = await fetch('/api/admin/offerings/' + roomServiceOffering.offering_id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -36761,11 +36891,42 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
           const data = await response.json();
 
-          if (data.success) {
-            alert('✅ Room Service information saved successfully!');
+          if (!data.success) {
+            alert('Error: ' + (data.error || 'Failed to save information'));
+            return;
+          }
+          
+          // Save homepage card settings
+          const cardTitle = document.getElementById('roomServiceCardTitle').value.trim() || 'Room Service';
+          const cardSubtitle = document.getElementById('roomServiceCardSubtitle').value.trim() || 'Order from your room';
+          const cardDescription = document.getElementById('roomServiceCardDescription').value.trim() || 'Browse our menu and call to order';
+          const cardIcon = document.getElementById('roomServiceCardIcon').value.trim() || 'fas fa-concierge-bell';
+          const cardColor = document.getElementById('roomServiceCardColor').value || 'indigo';
+          const cardVisible = document.getElementById('roomServiceCardVisible').checked ? 1 : 0;
+          
+          const cardResponse = await fetch('/api/admin/custom-sections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              property_id: 1,
+              section_key: 'room-service',
+              section_name_en: cardTitle,
+              subtitle_en: cardSubtitle,
+              description_en: cardDescription,
+              icon_class: cardIcon,
+              color_class: cardColor,
+              is_visible: cardVisible,
+              link_url: '/room-service/1'
+            })
+          });
+          
+          const cardData = await cardResponse.json();
+          
+          if (cardData.success) {
+            alert('✅ Room Service information and card settings saved successfully!');
             await loadRoomService();
           } else {
-            alert('Error: ' + (data.error || 'Failed to save information'));
+            alert('⚠️ Room Service info saved, but card settings failed: ' + (cardData.error || 'Unknown error'));
           }
         } catch (error) {
           console.error('Save room service info error:', error);
