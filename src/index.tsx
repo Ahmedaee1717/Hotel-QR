@@ -2281,7 +2281,19 @@ app.post('/api/superadmin/hotels', async (c) => {
       data.location || data.address || null
     ).run()
     
-    // Create admin user for the hotel
+    // Create admin user account in users table (for login)
+    const userResult = await DB.prepare(`
+      INSERT INTO users (email, password_hash, first_name, last_name, role, role_id, property_id, status)
+      VALUES (?, ?, ?, ?, 'admin', 2, ?, 'active')
+    `).bind(
+      data.contact_email,
+      'admin123', // Default password - user should change after first login
+      data.property_name || data.name,
+      'Admin',
+      property.meta.last_row_id
+    ).run()
+    
+    // Create guest record (for guest-related operations)
     const adminResult = await DB.prepare(`
       INSERT INTO guests (property_id, email, first_name, last_name, phone, preferred_language)
       VALUES (?, ?, ?, ?, ?, 'en')
@@ -19876,7 +19888,7 @@ app.get('/superadmin/dashboard', (c) => {
                     // Show success notification with registration code
                     const notification = document.createElement('div');
                     notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); z-index: 10000; max-width: 400px; animation: slideIn 0.3s ease-out;';
-                    notification.innerHTML = '<div style="display: flex; align-items: start; gap: 12px;"><i class="fas fa-check-circle" style="font-size: 24px; margin-top: 2px;"></i><div><div style="font-weight: 700; font-size: 16px; margin-bottom: 8px;">Hotel Created Successfully!</div><div style="font-size: 14px; opacity: 0.95; margin-bottom: 8px;"><strong>' + hotelData.property_name + '</strong> has been added to the platform.</div><div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; margin-top: 8px;"><div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">Registration Code:</div><div style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px;">' + result.registration_code + '</div></div><div style="font-size: 12px; opacity: 0.85; margin-top: 8px;">Share this code with the hotel admin to complete setup.</div></div></div>';
+                    notification.innerHTML = '<div style="display: flex; align-items: start; gap: 12px;"><i class="fas fa-check-circle" style="font-size: 24px; margin-top: 2px;"></i><div><div style="font-weight: 700; font-size: 16px; margin-bottom: 8px;">Hotel Created Successfully!</div><div style="font-size: 14px; opacity: 0.95; margin-bottom: 8px;"><strong>' + hotelData.property_name + '</strong> has been added to the platform.</div><div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; margin-top: 8px;"><div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">Registration Code:</div><div style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px;">' + result.registration_code + '</div></div><div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 13px;"><div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-key mr-2"></i>Admin Login Credentials:</div><div style="opacity: 0.9;">Email: <strong>' + hotelData.contact_email + '</strong></div><div style="opacity: 0.9;">Password: <strong>admin123</strong></div><div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-style: italic;">⚠️ Admin should change password after first login</div></div><div style="font-size: 12px; opacity: 0.85; margin-top: 8px;">Login URL: <strong>/admin/login</strong></div></div></div>';
                     document.body.appendChild(notification);
                     
                     setTimeout(() => {
