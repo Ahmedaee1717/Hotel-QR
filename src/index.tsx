@@ -2252,6 +2252,7 @@ app.get('/api/superadmin/hotels', async (c) => {
       SELECT property_id, name as property_name, slug, contact_email, contact_phone, 
              address as location, status, created_at
       FROM properties
+      WHERE status != 'deleted'
       ORDER BY created_at DESC
     `).all()
     
@@ -2273,18 +2274,24 @@ app.post('/api/superadmin/hotels', async (c) => {
       INSERT INTO properties (name, slug, contact_email, contact_phone, address, status)
       VALUES (?, ?, ?, ?, ?, 'active')
     `).bind(
-      data.name,
+      data.property_name || data.name,
       data.slug,
       data.contact_email,
       data.contact_phone || null,
-      data.address || null
+      data.location || data.address || null
     ).run()
     
     // Create admin user for the hotel
     const adminResult = await DB.prepare(`
-      INSERT INTO guests (email, name, phone, language_preference)
-      VALUES (?, ?, ?, 'en')
-    `).bind(data.contact_email, data.name + ' Admin', data.contact_phone || '').run()
+      INSERT INTO guests (property_id, email, first_name, last_name, phone, preferred_language)
+      VALUES (?, ?, ?, ?, ?, 'en')
+    `).bind(
+      property.meta.last_row_id,
+      data.contact_email,
+      data.property_name || data.name,
+      'Admin',
+      data.contact_phone || ''
+    ).run()
     
     // Generate registration code for the hotel
     const code = Math.random().toString(36).substring(2, 10).toUpperCase()
@@ -2306,6 +2313,31 @@ app.post('/api/superadmin/hotels', async (c) => {
   } catch (error) {
     console.error('Create hotel error:', error)
     return c.json({ error: 'Failed to create hotel' }, 500)
+  }
+})
+
+// Delete hotel (SuperAdmin only)
+app.delete('/api/superadmin/hotels/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Note: This is a soft delete - sets status to 'deleted'
+    // To prevent data integrity issues, we don't actually delete the record
+    await DB.prepare(`
+      UPDATE properties 
+      SET status = 'deleted', 
+          updated_at = CURRENT_TIMESTAMP
+      WHERE property_id = ?
+    `).bind(property_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Hotel deleted successfully'
+    })
+  } catch (error) {
+    console.error('Delete hotel error:', error)
+    return c.json({ error: 'Failed to delete hotel' }, 500)
   }
 })
 
@@ -19000,10 +19032,73 @@ app.get('/superadmin/dashboard', (c) => {
                         <label class="block text-sm font-medium mb-2">Commission Rate (%)</label>
                         <input type="number" value="10" class="w-full px-4 py-2 border rounded-lg">
                     </div>
-                    <button class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                    <button class="btn-primary">
                         <i class="fas fa-save mr-2"></i>Save Settings
                     </button>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Create Hotel Modal -->
+        <div id="createHotelModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 20px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="background: linear-gradient(135deg, #016e8f, #014a61); padding: 24px; border-radius: 20px 20px 0 0; color: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2 style="font-size: 24px; font-weight: 700; margin: 0;">
+                                <i class="fas fa-hotel mr-3"></i>Create New Hotel
+                            </h2>
+                            <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 14px;">Add a new property to the platform</p>
+                        </div>
+                        <button onclick="closeCreateHotelModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 20px; transition: all 0.2s;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <form id="createHotelForm" style="padding: 28px;">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Hotel Name *</label>
+                        <input type="text" id="hotelName" required placeholder="e.g., Paradise Resort & Spa" 
+                               style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s;">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">URL Slug *</label>
+                        <input type="text" id="hotelSlug" required placeholder="e.g., paradise-resort" 
+                               style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s;">
+                        <p style="font-size: 12px; color: #666; margin-top: 4px;">Used in URL: /hotel/your-slug</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Contact Email *</label>
+                        <input type="email" id="hotelEmail" required placeholder="admin@hotel.com" 
+                               style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s;">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Contact Phone</label>
+                        <input type="tel" id="hotelPhone" placeholder="+1 (555) 123-4567" 
+                               style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s;">
+                    </div>
+                    
+                    <div style="margin-bottom: 24px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Address</label>
+                        <textarea id="hotelAddress" rows="3" placeholder="Full address of the hotel" 
+                                  style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s; resize: vertical;"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" onclick="closeCreateHotelModal()" 
+                                style="flex: 1; padding: 14px; background: #f0f0f0; color: #333; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                style="flex: 1; padding: 14px; background: linear-gradient(135deg, #016e8f, #014a61); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(1, 110, 143, 0.3);">
+                            <i class="fas fa-plus mr-2"></i>Create Hotel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -19144,9 +19239,14 @@ app.get('/superadmin/dashboard', (c) => {
                                     <td><span class="badge \${h.status === 'active' ? 'badge-success' : 'badge-warning'}">\${h.status}</span></td>
                                     <td>\${new Date(h.created_at).toLocaleDateString()}</td>
                                     <td>
-                                        <a href="/admin/dashboard?property_id=\${h.property_id}" target="_blank" class="btn-secondary px-3 py-1 text-xs">
-                                            <i class="fas fa-external-link-alt mr-1"></i>View
-                                        </a>
+                                        <div class="flex gap-2">
+                                            <a href="/admin/dashboard?property_id=\${h.property_id}" target="_blank" class="btn-secondary px-3 py-1 text-xs">
+                                                <i class="fas fa-external-link-alt mr-1"></i>View
+                                            </a>
+                                            <button onclick="deleteHotel(\${h.property_id}, '\${h.property_name}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-xs rounded transition-colors">
+                                                <i class="fas fa-trash mr-1"></i>Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             \`).join('')}
@@ -19714,6 +19814,31 @@ app.get('/superadmin/dashboard', (c) => {
         document.getElementById('userStatusFilter').addEventListener('change', loadUsers);
         document.getElementById('ticketStatusFilter').addEventListener('change', loadTickets);
         document.getElementById('ticketPriorityFilter').addEventListener('change', loadTickets);
+
+        async function deleteHotel(propertyId, hotelName) {
+            if (!confirm('Are you sure you want to delete "' + hotelName + '"?' + String.fromCharCode(10) + String.fromCharCode(10) + 'This will:' + String.fromCharCode(10) + '• Set the hotel status to "deleted"' + String.fromCharCode(10) + '• Prevent future access to the hotel dashboard' + String.fromCharCode(10) + '• Preserve all historical data' + String.fromCharCode(10) + String.fromCharCode(10) + 'This action cannot be easily undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/superadmin/hotels/' + propertyId, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Hotel "' + hotelName + '" deleted successfully');
+                    loadHotels();
+                    loadStats();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to delete hotel'));
+                }
+            } catch (error) {
+                console.error('Delete hotel error:', error);
+                alert('Failed to delete hotel. Please try again.');
+            }
+        }
 
         function logout() {
             localStorage.removeItem('superadmin_user');
