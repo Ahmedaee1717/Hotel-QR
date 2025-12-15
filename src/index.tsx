@@ -2211,13 +2211,31 @@ app.get('/api/superadmin/stats', async (c) => {
   try {
     const hotels = await DB.prepare('SELECT COUNT(*) as count FROM properties').first()
     const vendors = await DB.prepare('SELECT COUNT(*) as count FROM vendors').first()
-    const bookings = await DB.prepare('SELECT COUNT(*) as count, SUM(total_amount) as revenue FROM bookings').first()
+    
+    // Get activity bookings stats
+    let activityBookings = null
+    try {
+      activityBookings = await DB.prepare('SELECT COUNT(*) as count, SUM(total_price) as revenue FROM bookings').first()
+    } catch (e) {
+      console.log('Activity bookings table not found or empty')
+    }
+    
+    // Get beach bookings stats
+    let beachBookings = null
+    try {
+      beachBookings = await DB.prepare('SELECT COUNT(*) as count, SUM(total_price) as revenue FROM beach_bookings').first()
+    } catch (e) {
+      console.log('Beach bookings table not found or empty')
+    }
+    
+    const totalBookings = (activityBookings?.count || 0) + (beachBookings?.count || 0)
+    const totalRevenue = (activityBookings?.revenue || 0) + (beachBookings?.revenue || 0)
     
     return c.json({
-      total_hotels: hotels.count,
-      total_vendors: vendors.count,
-      total_bookings: bookings.count,
-      total_revenue: bookings.revenue || 0
+      total_hotels: hotels?.count || 0,
+      total_vendors: vendors?.count || 0,
+      total_bookings: totalBookings,
+      total_revenue: totalRevenue
     })
   } catch (error) {
     console.error('Stats error:', error)
@@ -17843,6 +17861,11 @@ app.get('/vendor/login', (c) => {
 // ============================================
 // GUESTCONNECT PLATFORM SUPER ADMIN
 // ============================================
+
+// Super Admin - Redirect to dashboard
+app.get('/superadmin', (c) => {
+  return c.redirect('/superadmin/dashboard')
+})
 
 // Super Admin Login
 app.get('/superadmin/login', (c) => {
