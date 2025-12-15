@@ -35206,57 +35206,72 @@ app.get('/admin/dashboard', (c) => {
           
           if (data.success && data.settings) {
             const s = data.settings;
-            document.getElementById('beachBookingEnabled').checked = s.beach_booking_enabled === 1;
-            document.getElementById('freeForGuests').checked = s.free_for_hotel_guests === 1;
-            document.getElementById('openingTime').value = s.opening_time || '08:00';
-            document.getElementById('closingTime').value = s.closing_time || '18:00';
-            document.getElementById('advanceBookingDays').value = s.advance_booking_days || 7;
-            document.getElementById('maxDurationHours').value = s.max_booking_duration_hours || 12;
+            
+            // Helper to safely set element values
+            const safeSet = (id, value, prop = 'value') => {
+              const el = document.getElementById(id);
+              if (el) el[prop] = value;
+            };
+            const safeCheck = (id, checked) => {
+              const el = document.getElementById(id);
+              if (el) el.checked = checked;
+            };
+            
+            safeCheck('beachBookingEnabled', s.beach_booking_enabled === 1);
+            safeCheck('freeForGuests', s.free_for_hotel_guests === 1);
+            safeSet('openingTime', s.opening_time || '08:00');
+            safeSet('closingTime', s.closing_time || '18:00');
+            safeSet('advanceBookingDays', s.advance_booking_days || 7);
+            safeSet('maxDurationHours', s.max_booking_duration_hours || 12);
             
             // Load card customization fields
-            document.getElementById('beachCardTitle').value = s.card_title || 'Beach Booking';
-            document.getElementById('beachCardSubtitle').value = s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
-            document.getElementById('feature1Text').value = s.feature1_text || 'Free for Hotel Guests';
-            document.getElementById('feature2Text').value = s.feature2_text || 'Book Up to 7 Days Ahead';
-            document.getElementById('feature3Text').value = s.feature3_text || 'QR Code Check-in';
-            document.getElementById('umbrellasLabel').value = s.umbrellas_label || 'Umbrellas';
-            document.getElementById('umbrellasDesc').value = s.umbrellas_desc || 'Classic Beach';
-            document.getElementById('cabanasLabel').value = s.cabanas_label || 'Cabanas';
-            document.getElementById('cabanasDesc').value = s.cabanas_desc || 'Private & Cozy';
-            document.getElementById('loungersLabel').value = s.loungers_label || 'Loungers';
-            document.getElementById('loungersDesc').value = s.loungers_desc || 'Relax in Style';
-            document.getElementById('daybedsLabel').value = s.daybeds_label || 'Daybeds';
-            document.getElementById('daybedsDesc').value = s.daybeds_desc || 'Ultimate Comfort';
-            document.getElementById('buttonText').value = s.button_text || 'Book Your Spot Now';
+            safeSet('beachCardTitle', s.card_title || 'Beach Booking');
+            safeSet('beachCardSubtitle', s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.');
+            safeSet('feature1Text', s.feature1_text || 'Free for Hotel Guests');
+            safeSet('feature2Text', s.feature2_text || 'Book Up to 7 Days Ahead');
+            safeSet('feature3Text', s.feature3_text || 'QR Code Check-in');
+            safeSet('umbrellasLabel', s.umbrellas_label || 'Umbrellas');
+            safeSet('umbrellasDesc', s.umbrellas_desc || 'Classic Beach');
+            safeSet('cabanasLabel', s.cabanas_label || 'Cabanas');
+            safeSet('cabanasDesc', s.cabanas_desc || 'Private & Cozy');
+            safeSet('loungersLabel', s.loungers_label || 'Loungers');
+            safeSet('loungersDesc', s.loungers_desc || 'Relax in Style');
+            safeSet('daybedsLabel', s.daybeds_label || 'Daybeds');
+            safeSet('daybedsDesc', s.daybeds_desc || 'Ultimate Comfort');
+            safeSet('buttonText', s.button_text || 'Book Your Spot Now');
             
             // Load color settings
-            document.getElementById('bgColorFrom').value = s.bg_color_from || '#3b82f6';
-            document.getElementById('bgColorFromText').value = s.bg_color_from || '#3b82f6';
-            document.getElementById('bgColorTo').value = s.bg_color_to || '#06b6d4';
-            document.getElementById('bgColorToText').value = s.bg_color_to || '#06b6d4';
-            document.getElementById('textColor').value = s.text_color || '#ffffff';
-            document.getElementById('textColorText').value = s.text_color || '#ffffff';
-            document.getElementById('buttonColorFrom').value = s.button_color_from || '#ffffff';
-            document.getElementById('buttonColorFromText').value = s.button_color_from || '#ffffff';
-            document.getElementById('buttonColorTo').value = s.button_color_to || '#ffffff';
-            document.getElementById('buttonColorToText').value = s.button_color_to || '#ffffff';
-            document.getElementById('buttonTextColor').value = s.button_text_color || '#3b82f6';
-            document.getElementById('buttonTextColorText').value = s.button_text_color || '#3b82f6';
-            document.getElementById('trafficLightTextColor').value = s.traffic_light_text_color || '#ffffff';
-            document.getElementById('trafficLightTextColorText').value = s.traffic_light_text_color || '#ffffff';
-            updateColorPreview();
-            setupColorPickers();
+            safeSet('bgColorFrom', s.bg_color_from || '#3b82f6');
+            safeSet('bgColorFromText', s.bg_color_from || '#3b82f6');
+            safeSet('bgColorTo', s.bg_color_to || '#06b6d4');
+            safeSet('bgColorToText', s.bg_color_to || '#06b6d4');
+            safeSet('textColor', s.text_color || '#ffffff');
+            safeSet('textColorText', s.text_color || '#ffffff');
+            safeSet('buttonColorFrom', s.button_color_from || '#ffffff');
+            safeSet('buttonColorFromText', s.button_color_from || '#ffffff');
+            safeSet('buttonColorTo', s.button_color_to || '#ffffff');
+            safeSet('buttonColorToText', s.button_color_to || '#ffffff');
+            safeSet('buttonTextColor', s.button_text_color || '#3b82f6');
+            safeSet('buttonTextColorText', s.button_text_color || '#3b82f6');
+            safeSet('trafficLightTextColor', s.traffic_light_text_color || '#ffffff');
+            safeSet('trafficLightTextColorText', s.traffic_light_text_color || '#ffffff');
+            
+            if (typeof updateColorPreview === 'function') updateColorPreview();
+            if (typeof setupColorPickers === 'function') setupColorPickers();
             
             // Load important information
             const defaultInfo = 'Please arrive 10 minutes before your time slot\\nBring your QR code (printed or on phone)\\nBeach towels provided by hotel\\nLate arrivals may result in reduced time';
-            document.getElementById('importantInformation').value = s.important_information || defaultInfo;
+            safeSet('importantInformation', s.important_information || defaultInfo);
             
             // Load beach spots
             await loadBeachSpots();
             
             // Set today's date for bookings
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('beachBookingDate').value = today;
+            const beachBookingDateEl = document.getElementById('beachBookingDate');
+            if (beachBookingDateEl) {
+              beachBookingDateEl.value = today;
+            }
             await loadBeachBookings();
             
             // Load time slots
