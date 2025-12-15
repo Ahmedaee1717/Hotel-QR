@@ -18989,22 +18989,6 @@ app.get('/superadmin/dashboard', (c) => {
 
         <!-- Hotels Tab -->
         <div id="hotelsTab" class="tab-content">
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">
-                    <i class="fas fa-plus-circle mr-2 text-purple-600"></i>Add New Hotel
-                </h2>
-                <form id="addHotelForm" class="grid md:grid-cols-3 gap-4">
-                    <input type="text" id="hotelName" placeholder="Hotel Name" required class="px-4 py-2 border rounded-lg">
-                    <input type="email" id="hotelEmail" placeholder="Admin Email" required class="px-4 py-2 border rounded-lg">
-                    <input type="text" id="hotelSlug" placeholder="URL Slug (e.g., paradise-resort)" required class="px-4 py-2 border rounded-lg">
-                    <input type="text" id="hotelPhone" placeholder="Phone" class="px-4 py-2 border rounded-lg">
-                    <input type="text" id="hotelLocation" placeholder="Location/City" class="px-4 py-2 border rounded-lg">
-                    <button type="submit" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
-                        <i class="fas fa-check mr-2"></i>Add Hotel
-                    </button>
-                </form>
-            </div>
-
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">All Hotels</h2>
                 <div class="overflow-x-auto">
@@ -19414,39 +19398,6 @@ app.get('/superadmin/dashboard', (c) => {
                 console.error('Load bookings error:', error);
             }
         }
-
-        document.getElementById('addHotelForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const hotelData = {
-                property_name: document.getElementById('hotelName').value,
-                slug: document.getElementById('hotelSlug').value,
-                contact_email: document.getElementById('hotelEmail').value,
-                contact_phone: document.getElementById('hotelPhone').value,
-                location: document.getElementById('hotelLocation').value
-            };
-
-            try {
-                const response = await fetch('/api/superadmin/hotels', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(hotelData)
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    alert('Hotel added successfully! Admin credentials:' + String.fromCharCode(10) + 'Email: ' + hotelData.contact_email + String.fromCharCode(10) + 'Password: admin123' + String.fromCharCode(10) + String.fromCharCode(10) + 'Please ask the hotel to change their password.');
-                    e.target.reset();
-                    loadHotels();
-                    loadStats();
-                } else {
-                    alert('Error: ' + (result.error || 'Failed to add hotel'));
-                }
-            } catch (error) {
-                console.error('Add hotel error:', error);
-                alert('Failed to add hotel');
-            }
-        });
 
         // ============================================
         // USER MANAGEMENT FUNCTIONS
