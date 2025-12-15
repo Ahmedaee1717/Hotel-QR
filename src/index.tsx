@@ -2209,7 +2209,7 @@ app.get('/api/superadmin/stats', async (c) => {
   const { DB } = c.env
   
   try {
-    const hotels = await DB.prepare('SELECT COUNT(*) as count FROM properties').first()
+    const hotels = await DB.prepare("SELECT COUNT(*) as count FROM properties WHERE status != 'deleted'").first()
     const vendors = await DB.prepare('SELECT COUNT(*) as count FROM vendors').first()
     
     // Get activity bookings stats
