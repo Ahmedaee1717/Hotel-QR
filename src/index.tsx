@@ -6420,6 +6420,73 @@ Provide ONLY the translated text, preserving the exact format and structure.`
   }
 })
 
+// Get all menus for an offering (restaurant or room service)
+app.get('/api/restaurant/menus/by-offering/:offering_id', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  
+  try {
+    const menus = await DB.prepare(`
+      SELECT * FROM restaurant_menus 
+      WHERE offering_id = ?
+      ORDER BY created_at DESC
+    `).bind(offering_id).all()
+    
+    return c.json({ 
+      success: true,
+      menus: menus.results || []
+    })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch menus: ' + error.message }, 500)
+  }
+})
+
+// Get menu items organized by categories
+app.get('/api/restaurant/menus/:menu_id/items', async (c) => {
+  const { DB } = c.env
+  const { menu_id } = c.req.param()
+  const language = c.req.query('language') || 'en'
+  
+  try {
+    // Get all categories for this menu
+    const categories = await DB.prepare(`
+      SELECT DISTINCT mc.*, 
+             COALESCE(mct.category_name, mc.category_name_en) as category_name
+      FROM menu_categories mc
+      LEFT JOIN menu_category_translations mct ON mc.category_id = mct.category_id AND mct.language_code = ?
+      WHERE mc.menu_id = ?
+      ORDER BY mc.display_order, mc.category_id
+    `).bind(language, menu_id).all()
+    
+    // Get all items for each category
+    const categoriesWithItems = await Promise.all(
+      (categories.results || []).map(async (category) => {
+        const items = await DB.prepare(`
+          SELECT mi.*,
+                 COALESCE(mit.item_name, mi.item_name_en) as item_name,
+                 COALESCE(mit.description, mi.description_en) as description
+          FROM menu_items mi
+          LEFT JOIN menu_item_translations mit ON mi.item_id = mit.item_id AND mit.language_code = ?
+          WHERE mi.category_id = ?
+          ORDER BY mi.display_order, mi.item_id
+        `).bind(language, category.category_id).all()
+        
+        return {
+          ...category,
+          items: items.results || []
+        }
+      })
+    )
+    
+    return c.json({ 
+      success: true,
+      categories: categoriesWithItems
+    })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch menu items: ' + error.message }, 500)
+  }
+})
+
 // Get menu translation
 app.get('/api/restaurant/menus/:menu_id/translation/:language', async (c) => {
   const { DB } = c.env
@@ -29413,6 +29480,85 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
         </div>
+
+        <!-- Room Service Section -->
+        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg shadow-lg p-6 mb-6 border-2 border-indigo-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center">
+                        <i class="fas fa-concierge-bell mr-2 text-indigo-600"></i>
+                        Room Service Menu
+                    </h2>
+                    <p class="text-gray-600 mt-2">
+                        Manage your in-room dining menu. Guests can view the menu from their rooms via QR code.
+                    </p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <label class="flex items-center space-x-3 cursor-pointer bg-white px-4 py-3 rounded-lg shadow-md border-2 border-indigo-200 hover:border-indigo-400 transition">
+                        <input type="checkbox" id="roomServiceEnabled" class="w-5 h-5 rounded text-indigo-600" onchange="toggleRoomService()">
+                        <span class="font-semibold text-gray-700">Enable Room Service</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Room Service Status -->
+            <div id="roomServiceStatus" class="hidden">
+                <div class="bg-white rounded-lg p-6 border-2 border-indigo-200">
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-heading mr-2 text-indigo-600"></i>Room Service Title
+                            </label>
+                            <input type="text" id="roomServiceTitle" placeholder="24/7 Room Service" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-clock mr-2 text-indigo-600"></i>Operating Hours
+                            </label>
+                            <input type="text" id="roomServiceHours" placeholder="24 Hours" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-align-left mr-2 text-indigo-600"></i>Description
+                        </label>
+                        <textarea id="roomServiceDescription" rows="3" placeholder="Enjoy delicious meals and beverages delivered to your room at any time." class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="saveRoomServiceInfo()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-lg">
+                            <i class="fas fa-save mr-2"></i>Save Information
+                        </button>
+                        <button onclick="openRoomServiceMenuManagement()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold shadow-lg">
+                            <i class="fas fa-book-open mr-2"></i>Manage Menu & OCR
+                        </button>
+                        <button onclick="window.open('/room-service/1', '_blank')" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold shadow-lg">
+                            <i class="fas fa-eye mr-2"></i>Preview Guest Page
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded">
+                        <p class="text-sm text-indigo-900">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Guest Access:</strong> Guests can scan QR codes in their rooms to view the menu. Place QR cards on nightstands, desks, or in-room directories.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Disabled State -->
+            <div id="roomServiceDisabled" class="bg-white rounded-lg p-6 border-2 border-gray-200 text-center">
+                <i class="fas fa-concierge-bell text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-bold text-gray-700 mb-2">Room Service Not Enabled</h3>
+                <p class="text-gray-600 mb-4">
+                    Enable room service to create and manage your in-room dining menu. Guests will be able to view the menu via QR codes.
+                </p>
+                <p class="text-sm text-gray-500">
+                    <i class="fas fa-arrow-up mr-2"></i>Toggle the switch above to get started
+                </p>
+            </div>
+        </div>
     </div>
 
     <!-- Beach Management Tab -->
@@ -30463,7 +30609,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'chatbot') loadChatbot();
         if (tab === 'beach') loadBeachSettings();
         if (tab === 'feedback') loadFeedbackTab();
-        if (tab === 'restaurants') loadRestaurantsTab();
+        if (tab === 'restaurants') { loadRestaurantsTab(); loadRoomService(); }
       }
       
       // Add event listeners to sidebar buttons
@@ -36474,6 +36620,173 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.openRestaurantManagement = openRestaurantManagement;
       
       // ========== END RESTAURANTS MANAGEMENT ==========
+
+      // ========== ROOM SERVICE MANAGEMENT ==========
+      
+      let roomServiceOffering = null;
+      
+      async function loadRoomService() {
+        try {
+          const response = await fetch('/api/hotel-offerings/1');
+          const data = await response.json();
+          const roomService = data.offerings.find(o => o.offering_type === 'room_service');
+          
+          roomServiceOffering = roomService;
+          
+          const enabledCheckbox = document.getElementById('roomServiceEnabled');
+          const statusDiv = document.getElementById('roomServiceStatus');
+          const disabledDiv = document.getElementById('roomServiceDisabled');
+          
+          if (roomService) {
+            enabledCheckbox.checked = true;
+            statusDiv.classList.remove('hidden');
+            disabledDiv.classList.add('hidden');
+            
+            // Load room service info
+            document.getElementById('roomServiceTitle').value = roomService.title_en || 'Room Service';
+            document.getElementById('roomServiceDescription').value = roomService.short_description_en || '';
+            document.getElementById('roomServiceHours').value = roomService.full_description_en || '24 Hours';
+          } else {
+            enabledCheckbox.checked = false;
+            statusDiv.classList.add('hidden');
+            disabledDiv.classList.remove('hidden');
+          }
+        } catch (error) {
+          console.error('Load room service error:', error);
+        }
+      }
+      
+      async function toggleRoomService() {
+        const isEnabled = document.getElementById('roomServiceEnabled').checked;
+        const statusDiv = document.getElementById('roomServiceStatus');
+        const disabledDiv = document.getElementById('roomServiceDisabled');
+        
+        if (isEnabled && !roomServiceOffering) {
+          // Create room service offering
+          try {
+            const response = await fetch('/api/admin/offerings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                property_id: 1,
+                offering_type: 'room_service',
+                title_en: 'Room Service',
+                short_description_en: 'Enjoy delicious meals and beverages delivered to your room at any time.',
+                full_description_en: '24 Hours',
+                price: 0,
+                location: '',
+                duration_minutes: null,
+                requires_booking: 0,
+                images: JSON.stringify([]),
+                video_url: null,
+                event_date: null,
+                event_start_time: null,
+                event_end_time: null,
+                menu_urls: null
+              })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              roomServiceOffering = { offering_id: data.offering_id };
+              statusDiv.classList.remove('hidden');
+              disabledDiv.classList.add('hidden');
+              await loadRoomService();
+              alert('✅ Room Service enabled successfully!');
+            } else {
+              alert('Error: ' + (data.error || 'Failed to enable room service'));
+              document.getElementById('roomServiceEnabled').checked = false;
+            }
+          } catch (error) {
+            console.error('Enable room service error:', error);
+            alert('Error enabling room service: ' + error.message);
+            document.getElementById('roomServiceEnabled').checked = false;
+          }
+        } else if (!isEnabled && roomServiceOffering) {
+          // Delete room service offering
+          if (confirm('Are you sure you want to disable Room Service? This will remove the menu from guest access.')) {
+            try {
+              const response = await fetch('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+                method: 'DELETE'
+              });
+
+              const data = await response.json();
+
+              if (data.success) {
+                roomServiceOffering = null;
+                statusDiv.classList.add('hidden');
+                disabledDiv.classList.remove('hidden');
+                alert('✅ Room Service disabled successfully!');
+              } else {
+                alert('Error: ' + (data.error || 'Failed to disable room service'));
+                document.getElementById('roomServiceEnabled').checked = true;
+              }
+            } catch (error) {
+              console.error('Disable room service error:', error);
+              alert('Error disabling room service: ' + error.message);
+              document.getElementById('roomServiceEnabled').checked = true;
+            }
+          } else {
+            document.getElementById('roomServiceEnabled').checked = true;
+          }
+        }
+      }
+      
+      async function saveRoomServiceInfo() {
+        if (!roomServiceOffering) {
+          alert('Room Service is not enabled');
+          return;
+        }
+        
+        const title = document.getElementById('roomServiceTitle').value.trim();
+        const description = document.getElementById('roomServiceDescription').value.trim();
+        const hours = document.getElementById('roomServiceHours').value.trim();
+        
+        if (!title) {
+          alert('⚠️ Please enter a title for Room Service');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title_en: title,
+              short_description_en: description || 'Enjoy delicious meals and beverages delivered to your room.',
+              full_description_en: hours || '24 Hours'
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            alert('✅ Room Service information saved successfully!');
+            await loadRoomService();
+          } else {
+            alert('Error: ' + (data.error || 'Failed to save information'));
+          }
+        } catch (error) {
+          console.error('Save room service info error:', error);
+          alert('Error saving information: ' + error.message);
+        }
+      }
+      
+      function openRoomServiceMenuManagement() {
+        if (!roomServiceOffering) {
+          alert('Room Service is not enabled');
+          return;
+        }
+        window.open('/admin/room-service/' + roomServiceOffering.offering_id, '_blank');
+      }
+      
+      // Make functions globally accessible
+      window.toggleRoomService = toggleRoomService;
+      window.saveRoomServiceInfo = saveRoomServiceInfo;
+      window.openRoomServiceMenuManagement = openRoomServiceMenuManagement;
+      
+      // ========== END ROOM SERVICE MANAGEMENT ==========
 
       // ========== AUTO-REFRESH & NOTIFICATION SYSTEM ==========
       
@@ -44264,6 +44577,557 @@ app.get('/feedback/:form_id', async (c) => {
         });
 
         loadForm();
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ============================================
+// ROOM SERVICE - ADMIN MENU MANAGEMENT
+// ============================================
+app.get('/admin/room-service/:offering_id', (c) => {
+  const { offering_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Service Menu Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .tab-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-6 shadow-lg">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <button onclick="window.history.back()" class="p-2 hover:bg-white/20 rounded-lg transition">
+                            <i class="fas fa-arrow-left text-xl"></i>
+                        </button>
+                        <div>
+                            <h1 class="text-3xl font-bold flex items-center">
+                                <i class="fas fa-concierge-bell mr-3"></i>
+                                Room Service Menu Management
+                            </h1>
+                            <p class="text-indigo-100 mt-1">Manage your in-room dining menu, translations, and OCR</p>
+                        </div>
+                    </div>
+                    <button onclick="window.open('/room-service/1', '_blank')" class="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg font-semibold transition backdrop-blur">
+                        <i class="fas fa-eye mr-2"></i>Preview Guest Page
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white shadow-md sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex space-x-1 py-3">
+                    <button id="tabInfo" onclick="switchTab('info')" class="tab-active px-6 py-3 rounded-lg font-semibold transition">
+                        <i class="fas fa-info-circle mr-2"></i>Room Service Info
+                    </button>
+                    <button id="tabMenus" onclick="switchTab('menus')" class="bg-gray-100 text-gray-700 hover:bg-gray-200 px-6 py-3 rounded-lg font-semibold transition">
+                        <i class="fas fa-book-open mr-2"></i>Menu & OCR
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div class="max-w-7xl mx-auto px-4 py-6">
+            
+            <!-- Info Tab -->
+            <div id="infoSection" class="tab-content">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold mb-6">Room Service Information</h2>
+                    
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-heading mr-2 text-indigo-600"></i>Title (English)
+                            </label>
+                            <input type="text" id="rsTitle" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-clock mr-2 text-indigo-600"></i>Operating Hours
+                            </label>
+                            <input type="text" id="rsHours" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-align-left mr-2 text-indigo-600"></i>Description (English)
+                        </label>
+                        <textarea id="rsDescription" rows="4" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none resize-none"></textarea>
+                    </div>
+                    
+                    <button onclick="saveRoomServiceInfo()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-lg transition">
+                        <i class="fas fa-save mr-2"></i>Save Information
+                    </button>
+                </div>
+            </div>
+
+            <!-- Menus Tab -->
+            <div id="menusSection" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold">Menu Management & OCR</h2>
+                        <button onclick="createNewMenu()" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold shadow-lg transition">
+                            <i class="fas fa-plus-circle mr-2"></i>Create New Menu
+                        </button>
+                    </div>
+                    
+                    <div id="menusList" class="space-y-4">
+                        <!-- Menus will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const OFFERING_ID = ${offering_id};
+        let roomServiceData = null;
+        
+        // Tab switching
+        function switchTab(tab) {
+            const tabs = ['info', 'menus'];
+            tabs.forEach(t => {
+                const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+                const section = document.getElementById(t + 'Section');
+                if (btn && section) {
+                    if (t === tab) {
+                        btn.classList.add('tab-active');
+                        btn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                        section.classList.remove('hidden');
+                    } else {
+                        btn.classList.remove('tab-active');
+                        btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                        section.classList.add('hidden');
+                    }
+                }
+            });
+        }
+        
+        // Load room service data
+        async function loadRoomService() {
+            try {
+                const response = await fetch('/api/hotel-offerings/1');
+                const data = await response.json();
+                roomServiceData = data.offerings.find(o => o.offering_id == OFFERING_ID);
+                
+                if (roomServiceData) {
+                    document.getElementById('rsTitle').value = roomServiceData.title_en || '';
+                    document.getElementById('rsHours').value = roomServiceData.full_description_en || '';
+                    document.getElementById('rsDescription').value = roomServiceData.short_description_en || '';
+                }
+                
+                await loadMenus();
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Error loading room service data');
+            }
+        }
+        
+        // Save room service info
+        async function saveRoomServiceInfo() {
+            const title = document.getElementById('rsTitle').value.trim();
+            const hours = document.getElementById('rsHours').value.trim();
+            const description = document.getElementById('rsDescription').value.trim();
+            
+            if (!title) {
+                alert('⚠️ Please enter a title');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/offerings/' + OFFERING_ID, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title_en: title,
+                        full_description_en: hours,
+                        short_description_en: description
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Information saved successfully!');
+                    await loadRoomService();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to save'));
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Error saving information');
+            }
+        }
+        
+        // Load menus
+        async function loadMenus() {
+            try {
+                const response = await fetch('/api/restaurant/menus/by-offering/' + OFFERING_ID);
+                const data = await response.json();
+                
+                const menusList = document.getElementById('menusList');
+                if (!data.menus || data.menus.length === 0) {
+                    menusList.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fas fa-book text-4xl mb-4"></i><p>No menus yet. Click "Create New Menu" to get started.</p></div>';
+                    return;
+                }
+                
+                menusList.innerHTML = data.menus.map(menu => \`
+                    <div class="border-2 border-gray-200 rounded-lg p-6 hover:border-indigo-300 transition">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold">\${menu.menu_name || 'Room Service Menu'}</h3>
+                                <p class="text-sm text-gray-600 mt-1">Base Language: \${menu.base_language || 'en'}</p>
+                                <p class="text-xs text-gray-500 mt-1">Created: \${new Date(menu.created_at).toLocaleDateString()}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="uploadMenuImage(\${menu.menu_id})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                    <i class="fas fa-upload mr-2"></i>Upload Image
+                                </button>
+                                <button onclick="processOCR(\${menu.menu_id})" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                    <i class="fas fa-robot mr-2"></i>OCR Extract
+                                </button>
+                                <button onclick="parseMenu(\${menu.menu_id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                    <i class="fas fa-code-branch mr-2"></i>Parse Structure
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 rounded p-4">
+                            <div class="text-sm text-gray-700">
+                                <strong>OCR Status:</strong> <span class="px-2 py-1 rounded text-xs \${menu.ocr_status === 'completed' ? 'bg-green-100 text-green-700' : menu.ocr_status === 'processing' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}">\${menu.ocr_status || 'Not started'}</span>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-700">
+                                <strong>Menu Images:</strong> \${menu.menu_image_urls ? JSON.parse(menu.menu_image_urls).length : 0} image(s)
+                            </div>
+                        </div>
+                    </div>
+                \`).join('');
+            } catch (error) {
+                console.error('Load menus error:', error);
+            }
+        }
+        
+        // Create new menu
+        async function createNewMenu() {
+            const menuName = prompt('Enter menu name (e.g., "Breakfast Menu", "All Day Dining"):', 'Room Service Menu');
+            if (!menuName) return;
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/menus', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        offering_id: OFFERING_ID,
+                        menu_name: menuName,
+                        base_language: 'en'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Menu created successfully!');
+                    await loadMenus();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to create menu'));
+                }
+            } catch (error) {
+                console.error('Create menu error:', error);
+                alert('Error creating menu');
+            }
+        }
+        
+        // Upload menu image
+        async function uploadMenuImage(menuId) {
+            const imageUrl = prompt('Enter menu image URL (or paste image data URL):', '');
+            if (!imageUrl) return;
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/images', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_urls: [imageUrl] })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Image uploaded successfully!');
+                    await loadMenus();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to upload image'));
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Error uploading image');
+            }
+        }
+        
+        // Process OCR
+        async function processOCR(menuId) {
+            if (!confirm('This will use AI to extract text from the menu images. Continue?')) return;
+            
+            alert('⏳ Processing OCR... This may take 60-120 seconds. Please wait.');
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/process-ocr', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ OCR completed! Text extracted successfully.');
+                    await loadMenus();
+                } else {
+                    alert('Error: ' + (data.error || 'OCR processing failed'));
+                }
+            } catch (error) {
+                console.error('OCR error:', error);
+                alert('Error processing OCR: ' + error.message);
+            }
+        }
+        
+        // Parse menu structure
+        async function parseMenu(menuId) {
+            if (!confirm('This will parse the extracted text into menu items. Continue?')) return;
+            
+            alert('⏳ Parsing menu structure... Please wait.');
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/parse-structure', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(\`✅ Menu parsed successfully! Found \${data.categories_count} categories with \${data.items_count} items.\`);
+                    await loadMenus();
+                } else {
+                    alert('Error: ' + (data.error || 'Parsing failed'));
+                }
+            } catch (error) {
+                console.error('Parse error:', error);
+                alert('Error parsing menu: ' + error.message);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRoomService();
+        });
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ============================================
+// ROOM SERVICE - GUEST VIEW PAGE
+// ============================================
+app.get('/room-service/:property_id', (c) => {
+  const { property_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Service Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .menu-category {
+            scroll-margin-top: 100px;
+        }
+        .menu-item {
+            transition: all 0.3s;
+        }
+        .menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .dietary-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-12 sticky top-0 z-10 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold mb-2 flex items-center justify-center">
+                    <i class="fas fa-concierge-bell mr-3"></i>
+                    <span id="rsTitle">Room Service</span>
+                </h1>
+                <p id="rsHours" class="text-indigo-100 text-lg mb-2">Available 24/7</p>
+                <p id="rsDescription" class="text-indigo-100">Enjoy delicious meals delivered to your room</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        
+        <!-- How to Order -->
+        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 mb-8 border-2 border-indigo-200">
+            <h2 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fas fa-phone-alt mr-2 text-indigo-600"></i>
+                How to Order
+            </h2>
+            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                <div class="flex items-start space-x-3">
+                    <i class="fas fa-phone text-indigo-600 mt-1"></i>
+                    <div>
+                        <strong>Dial Extension</strong>
+                        <p class="text-gray-600">Press "0" on your room phone</p>
+                    </div>
+                </div>
+                <div class="flex items-start space-x-3">
+                    <i class="fas fa-clock text-indigo-600 mt-1"></i>
+                    <div>
+                        <strong>Delivery Time</strong>
+                        <p class="text-gray-600">Typically 30-45 minutes</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu Categories -->
+        <div id="menuCategories" class="space-y-8">
+            <!-- Categories will be loaded here -->
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-indigo-600 mb-4"></i>
+            <p class="text-gray-600">Loading menu...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <i class="fas fa-book text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600">Menu not available at the moment.</p>
+            <p class="text-sm text-gray-500 mt-2">Please call extension "0" for assistance.</p>
+        </div>
+    </div>
+
+    <script>
+        const PROPERTY_ID = ${property_id};
+        
+        // Load room service data and menu
+        async function loadRoomService() {
+            try {
+                // Load room service offering
+                const offeringsResponse = await fetch('/api/hotel-offerings/' + PROPERTY_ID);
+                const offeringsData = await offeringsResponse.json();
+                const roomService = offeringsData.offerings.find(o => o.offering_type === 'room_service');
+                
+                if (!roomService) {
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('emptyState').classList.remove('hidden');
+                    return;
+                }
+                
+                // Update header info
+                document.getElementById('rsTitle').textContent = roomService.title_en || 'Room Service';
+                document.getElementById('rsHours').textContent = roomService.full_description_en || 'Available 24/7';
+                document.getElementById('rsDescription').textContent = roomService.short_description_en || 'Enjoy delicious meals delivered to your room';
+                
+                // Load menu
+                const menusResponse = await fetch('/api/restaurant/menus/by-offering/' + roomService.offering_id);
+                const menusData = await menusResponse.json();
+                
+                if (!menusData.menus || menusData.menus.length === 0) {
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('emptyState').classList.remove('hidden');
+                    return;
+                }
+                
+                // Get first menu's items
+                const menuId = menusData.menus[0].menu_id;
+                const itemsResponse = await fetch('/api/restaurant/menus/' + menuId + '/items');
+                const itemsData = await itemsResponse.json();
+                
+                if (!itemsData.categories || itemsData.categories.length === 0) {
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('emptyState').classList.remove('hidden');
+                    return;
+                }
+                
+                // Display menu
+                displayMenu(itemsData.categories);
+                document.getElementById('loadingState').classList.add('hidden');
+                
+            } catch (error) {
+                console.error('Load error:', error);
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+        
+        // Display menu categories and items
+        function displayMenu(categories) {
+            const container = document.getElementById('menuCategories');
+            
+            container.innerHTML = categories.map(category => \`
+                <div class="menu-category bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4 pb-2 border-b-2 border-indigo-200">
+                        \${category.category_name}
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        \${category.items.map(item => \`
+                            <div class="menu-item bg-gray-50 rounded-lg p-4 border-2 border-gray-100">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-lg font-bold text-gray-900">\${item.item_name}</h3>
+                                    <span class="text-lg font-bold text-indigo-600">\${item.price ? (item.currency || '$') + ' ' + item.price : ''}</span>
+                                </div>
+                                
+                                \${item.description ? \`<p class="text-sm text-gray-600 mb-2">\${item.description}</p>\` : ''}
+                                
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    \${item.is_vegetarian ? '<span class="dietary-badge bg-green-100 text-green-700">🌱 Vegetarian</span>' : ''}
+                                    \${item.is_vegan ? '<span class="dietary-badge bg-green-100 text-green-700">🌿 Vegan</span>' : ''}
+                                    \${item.is_gluten_free ? '<span class="dietary-badge bg-blue-100 text-blue-700">🌾 Gluten-Free</span>' : ''}
+                                    \${item.spice_level && item.spice_level !== 'none' ? '<span class="dietary-badge bg-red-100 text-red-700">🌶️ ' + item.spice_level.charAt(0).toUpperCase() + item.spice_level.slice(1) + '</span>' : ''}
+                                </div>
+                                
+                                \${item.allergens ? \`<p class="text-xs text-gray-500 mt-2"><strong>Allergens:</strong> \${item.allergens}</p>\` : ''}
+                            </div>
+                        \`).join('')}
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRoomService();
+        });
     </script>
 </body>
 </html>
