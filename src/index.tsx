@@ -2859,6 +2859,7 @@ app.get('/api/admin/frontdesk/feed', async (c) => {
     
     // Get chatbot conversations with issues
     if (view === 'all' || view === 'chatbot' || view === 'urgent') {
+      // Get chat feedback (flagged complaints/issues)
       let chatQuery = `
         SELECT 
           cf.feedback_id as id,
@@ -2883,6 +2884,30 @@ app.get('/api/admin/frontdesk/feed', async (c) => {
       
       const chatFeedback = await DB.prepare(chatQuery).bind(property_id, date).all()
       communications.push(...(chatFeedback.results || []))
+      
+      // Also get recent chatbot conversations (not just complaints)
+      if (view === 'all' || view === 'chatbot') {
+        const recentChatsQuery = `
+          SELECT 
+            cc.conversation_id as id,
+            'chatbot' as type,
+            NULL as guest_name,
+            NULL as room_number,
+            cc.last_activity as created_at,
+            NULL as sentiment_label,
+            NULL as sentiment_score,
+            0 as is_urgent,
+            0 as is_read,
+            (SELECT content FROM chatbot_messages WHERE conversation_id = cc.conversation_id AND role = 'user' ORDER BY created_at DESC LIMIT 1) as preview
+          FROM chatbot_conversations cc
+          WHERE cc.property_id = ? AND DATE(cc.last_activity) >= ?
+          AND cc.conversation_id NOT IN (SELECT conversation_id FROM chat_feedback WHERE conversation_id IS NOT NULL)
+          ORDER BY cc.last_activity DESC LIMIT 50
+        `
+        
+        const recentChats = await DB.prepare(recentChatsQuery).bind(property_id, date).all()
+        communications.push(...(recentChats.results || []))
+      }
     }
     
     // Sort by created_at descending
@@ -2929,6 +2954,7 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
         }
       })
     } else if (type === 'chatbot') {
+      // Try to get from chat_feedback first (flagged complaints)
       const chatFeedback = await DB.prepare(`
         SELECT * FROM chat_feedback WHERE feedback_id = ?
       `).bind(id).first()
@@ -2950,9 +2976,31 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
         })
       }
       
+      // If not a flagged complaint, get from chatbot_conversations
+      const conversation = await DB.prepare(`
+        SELECT * FROM chatbot_conversations WHERE conversation_id = ?
+      `).bind(id).first()
+      
+      if (conversation) {
+        const messages = await DB.prepare(`
+          SELECT * FROM chatbot_messages
+          WHERE conversation_id = ?
+          ORDER BY created_at ASC
+        `).bind(id).all()
+        
+        return c.json({
+          success: true,
+          communication: {
+            ...conversation,
+            messages: messages.results,
+            has_complaint: false
+          }
+        })
+      }
+      
       return c.json({
         success: true,
-        communication: chatFeedback
+        communication: chatFeedback || conversation
       })
     }
     
@@ -2975,8 +3023,14 @@ app.post('/api/admin/frontdesk/mark-read/:type/:id', async (c) => {
         UPDATE feedback_submissions SET is_read = 1 WHERE submission_id = ?
       `).bind(id).run()
     } else if (type === 'chatbot') {
+      // Try to mark as resolved in chat_feedback (for flagged complaints)
       await DB.prepare(`
         UPDATE chat_feedback SET is_resolved = 1, resolved_at = CURRENT_TIMESTAMP WHERE feedback_id = ?
+      `).bind(id).run()
+      
+      // Also mark the conversation as read
+      await DB.prepare(`
+        UPDATE chatbot_conversations SET is_read = 1 WHERE conversation_id = ?
       `).bind(id).run()
     }
     
