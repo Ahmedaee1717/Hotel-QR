@@ -33116,7 +33116,7 @@ app.get('/admin/dashboard', (c) => {
         try {
           if (range) currentAnalyticsRange = range;
           
-          const response = await fetch('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
+          const response = await fetchWithAuth('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           
           if (!response.ok) {
             throw new Error('Analytics API returned ' + response.status);
