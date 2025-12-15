@@ -28,6 +28,123 @@ function generateSessionToken(): string {
   return crypto.randomUUID()
 }
 
+// ============================================
+// PERMISSION SYSTEM HELPERS
+// ============================================
+
+// Get user's combined permissions (role permissions + user overrides)
+async function getUserPermissions(DB: D1Database, userId: number): Promise<string[]> {
+  try {
+    const result = await DB.prepare(`
+      SELECT DISTINCT p.permission_key
+      FROM permissions p
+      WHERE p.permission_id IN (
+        -- From role
+        SELECT rp.permission_id
+        FROM users u
+        JOIN roles r ON u.role_id = r.role_id
+        JOIN role_permissions rp ON r.role_id = rp.role_id
+        WHERE u.user_id = ?
+        
+        UNION
+        
+        -- From direct user permissions (overrides)
+        SELECT up.permission_id
+        FROM user_permissions up
+        WHERE up.user_id = ? AND up.is_granted = 1
+      )
+    `).bind(userId, userId).all()
+    
+    return result.results.map((row: any) => row.permission_key)
+  } catch (error) {
+    console.error('Get user permissions error:', error)
+    return []
+  }
+}
+
+// Check if user has a specific permission
+async function checkPermission(DB: D1Database, userId: number, requiredPermission: string): Promise<boolean> {
+  const permissions = await getUserPermissions(DB, userId)
+  return permissions.includes(requiredPermission)
+}
+
+// Get user's resource access (restaurant/beach IDs they can access)
+async function getUserResourceAccess(DB: D1Database, userId: number, resourceType: 'restaurant' | 'beach'): Promise<number[]> {
+  try {
+    const result = await DB.prepare(`
+      SELECT resource_id
+      FROM user_resource_access
+      WHERE user_id = ? AND resource_type = ?
+    `).bind(userId, resourceType).all()
+    
+    return result.results.map((row: any) => row.resource_id)
+  } catch (error) {
+    console.error('Get user resource access error:', error)
+    return []
+  }
+}
+
+// Middleware: Require authentication
+async function requireAuth(c: any, next: () => Promise<void>) {
+  const userId = c.req.header('X-User-ID')
+  
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  c.set('userId', parseInt(userId))
+  await next()
+}
+
+// Middleware: Require specific permission
+function requirePermission(permissionSlug: string) {
+  return async (c: any, next: () => Promise<void>) => {
+    const userId = c.get('userId') || parseInt(c.req.header('X-User-ID') || '0')
+    const { DB } = c.env
+    
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    
+    const hasPermission = await checkPermission(DB, userId, permissionSlug)
+    
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden - Insufficient permissions' }, 403)
+    }
+    
+    await next()
+  }
+}
+
+// Middleware: Require resource access (for restaurant/beach scoping)
+function requireResourceAccess(resourceType: 'restaurant' | 'beach') {
+  return async (c: any, next: () => Promise<void>) => {
+    const userId = c.get('userId') || parseInt(c.req.header('X-User-ID') || '0')
+    const { DB } = c.env
+    const resourceId = parseInt(c.req.param('offering_id') || c.req.param('beach_id') || '0')
+    
+    if (!userId || !resourceId) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    
+    // Check if user has resource-level restrictions
+    const allowedResources = await getUserResourceAccess(DB, userId, resourceType)
+    
+    // If no restrictions defined, allow access to all
+    if (allowedResources.length === 0) {
+      await next()
+      return
+    }
+    
+    // Otherwise, check if user has access to this specific resource
+    if (!allowedResources.includes(resourceId)) {
+      return c.json({ error: 'Forbidden - No access to this resource' }, 403)
+    }
+    
+    await next()
+  }
+}
+
 // Language configuration
 const SUPPORTED_LANGUAGES = {
   'en': { name: 'English', native: 'English', flag: '🇬🇧' },
@@ -3143,6 +3260,36 @@ app.get('/api/admin/permissions', async (c) => {
   }
 })
 
+// Get current user's permissions (for frontend permission checks)
+app.get('/api/admin/my-permissions', async (c) => {
+  const { DB } = c.env
+  const userId = parseInt(c.req.header('X-User-ID') || '0')
+  
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const permissions = await getUserPermissions(DB, userId)
+    
+    // Get resource access
+    const restaurantAccess = await getUserResourceAccess(DB, userId, 'restaurant')
+    const beachAccess = await getUserResourceAccess(DB, userId, 'beach')
+    
+    return c.json({
+      success: true,
+      permissions,
+      resource_access: {
+        restaurants: restaurantAccess,
+        beaches: beachAccess
+      }
+    })
+  } catch (error) {
+    console.error('Get my permissions error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // ============================================
 // ADMIN API ROUTES
 // ============================================
@@ -3154,7 +3301,9 @@ app.post('/api/admin/login', async (c) => {
 
   try {
     const user = await DB.prepare(`
-      SELECT * FROM users WHERE email = ? AND status = 'active'
+      SELECT u.*, r.role_name FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      WHERE u.email = ? AND u.status = 'active'
     `).bind(email).first()
 
     if (!user) {
@@ -3162,6 +3311,13 @@ app.post('/api/admin/login', async (c) => {
     }
 
     // Note: In production, use proper bcrypt password verification
+    
+    // Get user's permissions
+    const permissions = await getUserPermissions(DB, user.user_id)
+    
+    // Get resource access
+    const restaurantAccess = await getUserResourceAccess(DB, user.user_id, 'restaurant')
+    const beachAccess = await getUserResourceAccess(DB, user.user_id, 'beach')
     
     return c.json({
       success: true,
@@ -3171,7 +3327,13 @@ app.post('/api/admin/login', async (c) => {
         first_name: user.first_name,
         last_name: user.last_name,
         role: user.role,
+        role_name: user.role_name,
         property_id: user.property_id
+      },
+      permissions,
+      resource_access: {
+        restaurants: restaurantAccess,
+        beaches: beachAccess
       },
       token: `admin-${user.user_id}-${Date.now()}`
     })
@@ -22182,6 +22344,9 @@ app.get('/admin/login', (c) => {
               if (data.success) {
                 localStorage.setItem('admin_user', JSON.stringify(data.user));
                 localStorage.setItem('admin_token', data.token || data.user.user_id);
+                // Store permissions for frontend access control
+                localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
+                localStorage.setItem('admin_resource_access', JSON.stringify(data.resource_access || {}));
                 window.location.href = '/admin/dashboard';
               } else {
                 alert('Login failed: ' + (data.error || 'Invalid credentials'));
@@ -31651,7 +31816,59 @@ app.get('/admin/dashboard', (c) => {
       // Get property ID from URL or localStorage
       const propertyId = new URLSearchParams(window.location.search).get('property') || localStorage.getItem('property_id') || '1';
 
-      let currentTab = 'rooms';
+      // Load permissions and resource access
+      const userPermissions = JSON.parse(localStorage.getItem('admin_permissions') || '[]');
+      const resourceAccess = JSON.parse(localStorage.getItem('admin_resource_access') || '{"restaurants":[],"beaches":[]}');
+      
+      // Permission checking helper
+      function hasPermission(permissionSlug) {
+        return userPermissions.includes(permissionSlug);
+      }
+      
+      // Map tabs to required permissions
+      const TAB_PERMISSIONS = {
+        'frontdesk': 'frontdesk_view',
+        'qrcode': 'qrcode_view',
+        'analytics': 'analytics_view',
+        'settings': 'settings_view',
+        'feedback': 'feedback_view',
+        'users': 'users_view',
+        'offerings': 'offerings_manage',
+        'customsections': 'sections_manage',
+        'infopages': 'infopages_manage',
+        'activities': 'activities_manage',
+        'restaurants': 'restaurant_view',
+        'vendors': 'vendors_view',
+        'beach': 'beach_view',
+        'callbacks': 'callbacks_view',
+        'chatbot': 'settings_manage', // Use settings permission for chatbot
+        'regcode': 'settings_manage' // Use settings permission for registration code
+      };
+      
+      // Hide tabs based on permissions
+      function enforcePermissions() {
+        document.querySelectorAll('.sidebar-btn').forEach(btn => {
+          const tab = btn.getAttribute('data-tab');
+          const requiredPerm = TAB_PERMISSIONS[tab];
+          
+          if (requiredPerm && !hasPermission(requiredPerm)) {
+            btn.style.display = 'none';
+          }
+        });
+      }
+      
+      // Run permission enforcement on page load
+      enforcePermissions();
+      
+      // Find first accessible tab as default
+      let currentTab = 'qrcode'; // default fallback
+      for (const tab of ['qrcode', 'frontdesk', 'analytics', 'settings', 'feedback', 'offerings', 'restaurants']) {
+        const requiredPerm = TAB_PERMISSIONS[tab];
+        if (!requiredPerm || hasPermission(requiredPerm)) {
+          currentTab = tab;
+          break;
+        }
+      }
       
       function showTab(tab, clickedButton) {
         currentTab = tab;
