@@ -145,6 +145,15 @@ function requireResourceAccess(resourceType: 'restaurant' | 'beach') {
   }
 }
 
+// Middleware: Validate and extract authenticated user's property_id
+function getAuthenticatedPropertyId(c: any): string | null {
+  const property_id = c.req.header('X-Property-ID')
+  if (!property_id) {
+    console.error('Missing X-Property-ID header in authenticated request')
+  }
+  return property_id
+}
+
 // Language configuration
 const SUPPORTED_LANGUAGES = {
   'en': { name: 'English', native: 'English', flag: '🇬🇧' },
@@ -4177,8 +4186,11 @@ app.post('/api/admin/vendors', async (c) => {
 
     const vendor_id = result.meta.last_row_id
 
-    // Link vendor to property (required)
-    const property_id = data.property_id || 1
+    // Link vendor to property (required) - use authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c)
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized - No property ID' }, 401)
+    }
     await DB.prepare(`
       INSERT INTO vendor_properties (vendor_id, property_id, custom_commission_rate, joined_via)
       VALUES (?, ?, ?, 'admin')
@@ -4376,6 +4388,13 @@ app.put('/api/admin/property-settings', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // CRITICAL: Get property_id from authenticated user's header, NOT from request body
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     await DB.prepare(`
       UPDATE properties
@@ -4444,7 +4463,7 @@ app.put('/api/admin/property-settings', async (c) => {
       data.show_service,
       data.show_activities,
       data.show_hotel_map,
-      data.property_id
+      property_id  // Use authenticated user's property_id from header
     ).run()
     
     return c.json({ success: true })
@@ -4482,12 +4501,18 @@ app.post('/api/admin/custom-sections', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     // Check if section already exists (for upsert behavior)
     const existing = await DB.prepare(`
       SELECT section_id FROM custom_sections 
       WHERE property_id = ? AND section_key = ?
-    `).bind(data.property_id, data.section_key).first()
+    `).bind(property_id, data.section_key).first()
     
     if (existing) {
       // Update existing section
@@ -4522,7 +4547,7 @@ app.post('/api/admin/custom-sections', async (c) => {
           icon_class, color_class, display_order, is_visible, link_url
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        data.property_id,
+        property_id,  // Use authenticated property_id
         data.section_key,
         data.section_name_en,
         data.subtitle_en || null,
@@ -4795,6 +4820,12 @@ app.post('/api/admin/info-pages', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     const result = await DB.prepare(`
       INSERT INTO info_pages (
@@ -4803,7 +4834,7 @@ app.post('/api/admin/info-pages', async (c) => {
         display_order, show_in_menu
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
-      data.property_id,
+      property_id,  // Use authenticated property_id
       data.page_key || 'page-' + Date.now(),
       data.title_en,
       data.content_en,
@@ -4966,6 +4997,12 @@ app.post('/api/admin/offerings', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     // Insert the offering first
     const result = await DB.prepare(`
@@ -4975,7 +5012,7 @@ app.post('/api/admin/offerings', async (c) => {
         event_date, event_start_time, event_end_time, status, display_order
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
     `).bind(
-      data.property_id,
+      property_id,  // Use authenticated property_id
       data.offering_type,
       data.title_en,
       data.short_description_en,
@@ -33595,6 +33632,7 @@ app.get('/admin/dashboard', (c) => {
       async function fetchWithAuth(url, options = {}) {
         const headers = {
           'X-User-ID': user.user_id,
+          'X-Property-ID': propertyId,
           'Content-Type': 'application/json',
           ...options.headers
         };
