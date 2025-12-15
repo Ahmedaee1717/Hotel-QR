@@ -7759,7 +7759,7 @@ app.get('/api/offerings/:offering_id/menus', async (c) => {
   
   try {
     const menus = await DB.prepare(`
-      SELECT menu_id, menu_name, menu_url, menu_type, display_order
+      SELECT menu_id, menu_name, original_image_url as menu_url, menu_type, display_order
       FROM restaurant_menus
       WHERE offering_id = ? AND is_active = 1
       ORDER BY display_order ASC, created_at ASC
@@ -16530,13 +16530,24 @@ app.get('/offering-detail', async (c) => {
         }
 
         function updateTotalPrice() {
-            const numGuests = parseInt(document.getElementById('numGuests').value) || 1;
+            const numGuestsEl = document.getElementById('numGuests');
+            const totalPriceEl = document.getElementById('totalPrice');
+            
+            if (!numGuestsEl || !totalPriceEl) {
+                // Elements don't exist (booking section hidden)
+                return;
+            }
+            
+            const numGuests = parseInt(numGuestsEl.value) || 1;
             const pricePerPerson = parseFloat(offeringData.price) || 0;
             const total = numGuests * pricePerPerson;
-            document.getElementById('totalPrice').textContent = (offeringData.currency || 'USD') + ' ' + total.toFixed(2);
+            totalPriceEl.textContent = (offeringData.currency || 'USD') + ' ' + total.toFixed(2);
         }
 
-        document.getElementById('numGuests').addEventListener('input', updateTotalPrice);
+        const numGuestsEl = document.getElementById('numGuests');
+        if (numGuestsEl) {
+            numGuestsEl.addEventListener('input', updateTotalPrice);
+        }
 
         // Language selector
         document.getElementById('languageSelector').addEventListener('change', async (e) => {
