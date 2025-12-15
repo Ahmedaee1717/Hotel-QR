@@ -45304,7 +45304,8 @@ app.get('/admin/room-service/:offering_id', (c) => {
         }
         
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadPropertySettings();
             loadRoomService();
         });
     </script>
@@ -45412,6 +45413,60 @@ app.get('/room-service/:property_id', (c) => {
 
     <script>
         const PROPERTY_ID = ${property_id};
+        let PRIMARY_COLOR = '#6366f1'; // Default indigo
+        
+        // Load property settings for primary color
+        async function loadPropertySettings() {
+            try {
+                const response = await fetch(\`/api/properties?property_id=\${PROPERTY_ID}\`);
+                const data = await response.json();
+                if (data.success && data.properties && data.properties.length > 0) {
+                    const property = data.properties[0];
+                    PRIMARY_COLOR = property.primary_color || '#6366f1';
+                    applyPrimaryColor();
+                }
+            } catch (error) {
+                console.error('Failed to load property settings:', error);
+            }
+        }
+        
+        // Apply primary color to all elements
+        function applyPrimaryColor() {
+            // Calculate lighter shade for gradients
+            const hex = PRIMARY_COLOR;
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const lighterColor = '#' + 
+                Math.min(255, r + 40).toString(16).padStart(2, '0') +
+                Math.min(255, g + 40).toString(16).padStart(2, '0') +
+                Math.min(255, b + 40).toString(16).padStart(2, '0');
+            
+            // Update header gradient
+            const header = document.querySelector('.bg-gradient-to-r');
+            if (header) {
+                header.style.background = \`linear-gradient(to right, \${PRIMARY_COLOR}, \${lighterColor})\`;
+            }
+            
+            // Update all indigo text colors
+            document.querySelectorAll('.text-indigo-600').forEach(el => {
+                el.style.color = PRIMARY_COLOR;
+            });
+            
+            // Update loading spinner
+            const spinner = document.querySelector('.fa-spinner');
+            if (spinner) {
+                spinner.style.color = PRIMARY_COLOR;
+            }
+            
+            // Update "How to Order" box
+            const orderBox = document.querySelector('.from-blue-50');
+            if (orderBox) {
+                const rgbLight = \`rgba(\${r}, \${g}, \${b}, 0.1)\`;
+                orderBox.style.background = \`linear-gradient(to bottom right, \${rgbLight}, rgba(\${Math.min(255, r + 20)}, \${Math.min(255, g + 20)}, \${Math.min(255, b + 20)}, 0.15))\`;
+                orderBox.style.borderColor = \`rgba(\${r}, \${g}, \${b}, 0.3)\`;
+            }
+        }
         
         // Load room service data and menu
         async function loadRoomService() {
@@ -45500,7 +45555,8 @@ app.get('/room-service/:property_id', (c) => {
         }
         
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadPropertySettings();
             loadRoomService();
         });
     </script>
