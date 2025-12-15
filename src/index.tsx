@@ -36098,31 +36098,45 @@ app.get('/waitlist/:waitlist_id', (c) => {
     <script>
         const WAITLIST_ID = ${waitlist_id};
         let previousStatus = null;
-        let notificationPermission = Notification.permission;
+        let notificationPermission = ('Notification' in window) ? Notification.permission : 'unsupported';
 
         async function loadWaitlistStatus() {
             try {
+                console.log('Fetching waitlist status for ID:', WAITLIST_ID);
                 // Get waitlist entry details
                 const response = await fetch('/api/waitlist/' + WAITLIST_ID + '/status');
+                console.log('Response status:', response.status);
                 const data = await response.json();
+                console.log('Response data:', data);
                 
                 if (!data.success) {
+                    console.error('API returned error:', data.error);
                     showError(data.error || 'Failed to load status');
                     return;
                 }
                 
                 const entry = data.entry;
                 const position = data.position;
+                console.log('Entry:', entry, 'Position:', position);
                 
                 // Update restaurant name
                 if (data.restaurant_name) {
-                    document.getElementById('restaurantName').textContent = data.restaurant_name;
+                    const nameEl = document.getElementById('restaurantName');
+                    if (nameEl) {
+                        nameEl.textContent = data.restaurant_name;
+                        console.log('Updated restaurant name');
+                    }
                 }
                 
                 // Update UI
-                document.getElementById('queuePosition').textContent = position === 0 ? '-' : '#' + position;
-                document.getElementById('guestName').textContent = entry.guest_name || '-';
-                document.getElementById('partySize').textContent = (entry.number_of_guests || '0') + ' guests';
+                const queueEl = document.getElementById('queuePosition');
+                const guestEl = document.getElementById('guestName');
+                const partySizeEl = document.getElementById('partySize');
+                
+                if (queueEl) queueEl.textContent = position === 0 ? '-' : '#' + position;
+                if (guestEl) guestEl.textContent = entry.guest_name || '-';
+                if (partySizeEl) partySizeEl.textContent = (entry.number_of_guests || '0') + ' guests';
+                console.log('Updated basic info');
                 
                 // Show phone number in SMS notification section
                 if (entry.phone_number) {
@@ -36248,28 +36262,59 @@ app.get('/waitlist/:waitlist_id', (c) => {
             }
         }
 
-        // Check if browser supports notifications
-        if ('Notification' in window && Notification.permission !== 'denied') {
-            // Show browser notification option for desktop browsers
-            document.getElementById('browserNotifSection').style.display = 'block';
-            document.getElementById('smsNotifSection').style.display = 'none';
+        // Initialize when DOM is ready
+        function init() {
+            console.log('Initializing waitlist page for ID:', WAITLIST_ID);
             
-            if (Notification.permission === 'granted') {
-                document.getElementById('notificationStatus').textContent = '✓ Browser alerts enabled';
-                document.getElementById('enableNotifBtn').disabled = true;
-                document.getElementById('enableNotifBtn').classList.add('opacity-50');
-            }
-        } else {
-            // Mobile browsers or notifications not supported - show SMS info
-            document.getElementById('browserNotifSection').style.display = 'none';
-            document.getElementById('smsNotifSection').style.display = 'block';
-        }
+            try {
+                // Check if browser supports notifications
+                if ('Notification' in window && Notification.permission !== 'denied') {
+                    // Show browser notification option for desktop browsers
+                    const browserSection = document.getElementById('browserNotifSection');
+                    const smsSection = document.getElementById('smsNotifSection');
+                    if (browserSection && smsSection) {
+                        browserSection.style.display = 'block';
+                        smsSection.style.display = 'none';
+                    }
+                    
+                    if (Notification.permission === 'granted') {
+                        const notifStatus = document.getElementById('notificationStatus');
+                        const enableBtn = document.getElementById('enableNotifBtn');
+                        if (notifStatus) notifStatus.textContent = '✓ Browser alerts enabled';
+                        if (enableBtn) {
+                            enableBtn.disabled = true;
+                            enableBtn.classList.add('opacity-50');
+                        }
+                    }
+                } else {
+                    // Mobile browsers or notifications not supported - show SMS info
+                    const browserSection = document.getElementById('browserNotifSection');
+                    const smsSection = document.getElementById('smsNotifSection');
+                    if (browserSection && smsSection) {
+                        browserSection.style.display = 'none';
+                        smsSection.style.display = 'block';
+                    }
+                }
 
-        // Load status immediately
-        loadWaitlistStatus();
+                // Load status immediately
+                console.log('Loading waitlist status...');
+                loadWaitlistStatus();
+                
+                // Auto-refresh every 10 seconds
+                setInterval(loadWaitlistStatus, 10000);
+                console.log('Auto-refresh enabled');
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to initialize page: ' + error.message);
+            }
+        }
         
-        // Auto-refresh every 10 seconds
-        setInterval(loadWaitlistStatus, 10000);
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
