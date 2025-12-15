@@ -21568,12 +21568,12 @@ app.get('/admin/beach-map-designer', (c) => {
                 
                 if (existingData.success && existingData.spots) {
                     for (const spot of existingData.spots) {
-                        await fetch('/api/admin/beach/spots/' + spot.spot_id, { method: 'DELETE' });
+                        await fetchWithAuth('/api/admin/beach/spots/' + spot.spot_id, { method: 'DELETE' });
                     }
                 }
                 
                 // Delete all existing zone overlays
-                await fetch('/api/admin/beach/zone-overlays/' + propertyId, { method: 'DELETE' });
+                await fetchWithAuth('/api/admin/beach/zone-overlays/' + propertyId, { method: 'DELETE' });
                 
                 // Create all new spots
                 for (const spot of spots) {
@@ -23085,7 +23085,7 @@ app.get('/admin/interactive-map-builder', (c) => {
             
             try {
                 // Delete all existing hotspots
-                await fetch('/api/admin/hotel-map/hotspots/clear/' + propertyId, { method: 'POST' });
+                await fetchWithAuth('/api/admin/hotel-map/hotspots/clear/' + propertyId, { method: 'POST' });
                 
                 // Save all hotspots
                 for (const hotspot of hotspots) {
@@ -36249,7 +36249,7 @@ app.get('/admin/dashboard', (c) => {
       async function regenerateQR(roomId) {
         if (!confirm('Regenerate QR code for this room?')) return;
         try {
-          const response = await fetch('/api/admin/rooms/' + roomId + '/regenerate-qr', { method: 'POST' });
+          const response = await fetchWithAuth('/api/admin/rooms/' + roomId + '/regenerate-qr', { method: 'POST' });
           const data = await response.json();
           if (data.success) {
             alert('QR code regenerated!');
@@ -38273,9 +38273,8 @@ app.get('/admin/dashboard', (c) => {
         
         try {
           // Save main settings
-          const response = await fetch('/api/admin/property-settings', {
+          const response = await fetchWithAuth('/api/admin/property-settings', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
           });
           
@@ -38290,9 +38289,8 @@ app.get('/admin/dashboard', (c) => {
             const sectionId = checkbox.getAttribute('data-section-id');
             const isVisible = checkbox.checked ? 1 : 0;
             
-            await fetch('/api/admin/custom-sections/' + sectionId, {
+            await fetchWithAuth('/api/admin/custom-sections/' + sectionId, {
               method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 is_visible: isVisible
               })
@@ -39481,7 +39479,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             document.getElementById('submissionModal').classList.remove('hidden');
             
             // Mark as read
-            await fetch('/api/admin/feedback/submissions/' + submissionId + '/mark-read', { method: 'POST' });
+            await fetchWithAuth('/api/admin/feedback/submissions/' + submissionId + '/mark-read', { method: 'POST' });
           }
         } catch (error) {
           console.error('View submission error:', error);
@@ -39498,7 +39496,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         if (!confirm('Mark this issue as resolved?')) return;
         
         try {
-          await fetch('/api/admin/feedback/insights/' + insightId + '/resolve', { method: 'POST' });
+          await fetchWithAuth('/api/admin/feedback/insights/' + insightId + '/resolve', { method: 'POST' });
           alert('✅ Issue marked as resolved');
           loadFeedbackTab();
         } catch (error) {
