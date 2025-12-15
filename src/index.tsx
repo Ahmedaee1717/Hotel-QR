@@ -37246,6 +37246,16 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             const status = getTableStatus(table.table_number);
             document.getElementById('modalTableNumber').textContent = table.table_number;
             
+            // Update modal header color based on status
+            const modalHeader = document.querySelector('#tableModal .bg-gradient-to-r');
+            if (status === 'free') {
+                modalHeader.className = 'bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-t-lg';
+            } else if (status === 'booked') {
+                modalHeader.className = 'bg-gradient-to-r from-orange-600 to-amber-600 text-white p-4 rounded-t-lg';
+            } else {
+                modalHeader.className = 'bg-gradient-to-r from-red-600 to-rose-600 text-white p-4 rounded-t-lg';
+            }
+            
             let content = '';
             if (status === 'free') {
                 content = \`
