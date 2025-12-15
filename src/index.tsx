@@ -36038,44 +36038,44 @@ app.get('/waitlist/:waitlist_id', (c) => {
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-amber-50 to-orange-100 min-h-screen">
-    <div class="max-w-md mx-auto px-4 py-8">
+<body class="bg-gradient-to-br from-amber-50 to-orange-100 min-h-screen overflow-x-hidden">
+    <div class="max-w-md mx-auto px-4 py-6 sm:py-8">
         <!-- Header -->
-        <div class="text-center mb-8">
-            <div class="inline-block bg-white rounded-full p-4 shadow-lg mb-4">
-                <i class="fas fa-clock text-5xl text-amber-600"></i>
+        <div class="text-center mb-6 sm:mb-8">
+            <div class="inline-block bg-white rounded-full p-3 sm:p-4 shadow-lg mb-3 sm:mb-4">
+                <i class="fas fa-clock text-4xl sm:text-5xl text-amber-600"></i>
             </div>
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">Waitlist Status</h1>
-            <p class="text-gray-600" id="restaurantName">Loading...</p>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Waitlist Status</h1>
+            <p class="text-sm sm:text-base text-gray-600" id="restaurantName">Loading...</p>
         </div>
 
         <!-- Status Card -->
-        <div id="statusCard" class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
-            <div class="text-center mb-6">
-                <div class="text-6xl font-bold text-amber-600 mb-2" id="queuePosition">-</div>
-                <div class="text-gray-600 font-semibold">Your Position in Queue</div>
+        <div id="statusCard" class="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
+            <div class="text-center mb-4 sm:mb-6">
+                <div class="text-5xl sm:text-6xl font-bold text-amber-600 mb-2" id="queuePosition">-</div>
+                <div class="text-sm sm:text-base text-gray-600 font-semibold">Your Position in Queue</div>
             </div>
 
-            <div class="border-t border-gray-200 pt-6 space-y-4">
-                <div class="flex items-center justify-between">
+            <div class="border-t border-gray-200 pt-4 sm:pt-6 space-y-3 sm:space-y-4">
+                <div class="flex items-center justify-between text-sm sm:text-base">
                     <span class="text-gray-600">
                         <i class="fas fa-user mr-2"></i>Guest Name
                     </span>
-                    <span class="font-semibold" id="guestName">-</span>
+                    <span class="font-semibold truncate ml-2" id="guestName">-</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between text-sm sm:text-base">
                     <span class="text-gray-600">
                         <i class="fas fa-users mr-2"></i>Party Size
                     </span>
                     <span class="font-semibold" id="partySize">-</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between text-sm sm:text-base">
                     <span class="text-gray-600">
                         <i class="fas fa-clock mr-2"></i>Wait Time
                     </span>
                     <span class="font-semibold" id="waitTime">-</span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between text-sm sm:text-base">
                     <span class="text-gray-600">
                         <i class="fas fa-hourglass-half mr-2"></i>Est. Remaining
                     </span>
@@ -36090,8 +36090,8 @@ app.get('/waitlist/:waitlist_id', (c) => {
         </div>
 
         <!-- Notification Settings -->
-        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <h3 class="font-bold text-lg mb-4 flex items-center">
+        <div class="bg-white rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6">
+            <h3 class="font-bold text-base sm:text-lg mb-3 sm:mb-4 flex items-center">
                 <i class="fas fa-bell mr-2 text-amber-600"></i>
                 Get Notified
             </h3>
@@ -36106,19 +36106,19 @@ app.get('/waitlist/:waitlist_id', (c) => {
             
             <!-- SMS Notifications (Mobile fallback) -->
             <div id="smsNotifSection" class="space-y-3">
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
-                    <div class="flex items-start gap-3">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
+                    <div class="flex items-start gap-2 sm:gap-3">
                         <div class="flex-shrink-0">
-                            <i class="fas fa-mobile-alt text-2xl text-green-600"></i>
+                            <i class="fas fa-mobile-alt text-xl sm:text-2xl text-green-600"></i>
                         </div>
-                        <div class="flex-1">
-                            <h4 class="font-bold text-green-800 mb-2">SMS Notifications Active</h4>
-                            <p class="text-sm text-green-700 mb-2">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-bold text-sm sm:text-base text-green-800 mb-1 sm:mb-2">SMS Notifications Active</h4>
+                            <p class="text-xs sm:text-sm text-green-700 mb-1 sm:mb-2">
                                 We'll send you a text message when your table is ready!
                             </p>
-                            <div class="flex items-center gap-2 text-sm text-green-600">
-                                <i class="fas fa-check-circle"></i>
-                                <span id="phoneDisplay">Loading...</span>
+                            <div class="flex items-center gap-2 text-xs sm:text-sm text-green-600">
+                                <i class="fas fa-check-circle flex-shrink-0"></i>
+                                <span id="phoneDisplay" class="truncate">Loading...</span>
                             </div>
                         </div>
                     </div>
@@ -36126,8 +36126,8 @@ app.get('/waitlist/:waitlist_id', (c) => {
                 
                 <div class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
                     <div class="flex gap-2">
-                        <i class="fas fa-volume-up text-amber-600 mt-0.5"></i>
-                        <div class="text-sm text-amber-800">
+                        <i class="fas fa-volume-up text-amber-600 mt-0.5 flex-shrink-0"></i>
+                        <div class="text-xs sm:text-sm text-amber-800">
                             <strong>Keep sound ON</strong> - This page will play an alert sound when notified
                         </div>
                     </div>
@@ -36229,11 +36229,11 @@ app.get('/waitlist/:waitlist_id', (c) => {
                 // Status-specific messages
                 const statusMsg = document.getElementById('statusMessage');
                 if (entry.status === 'notified') {
-                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-green-50 border-2 border-green-500 notification-badge';
+                    statusMsg.className = 'mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg text-center bg-green-50 border-2 border-green-500 notification-badge';
                     statusMsg.innerHTML = \`
-                        <div class="text-2xl mb-2">🎉</div>
-                        <div class="font-bold text-green-700 text-lg">Your Table is Ready!</div>
-                        <div class="text-green-600 text-sm mt-1">Please proceed to the host stand</div>
+                        <div class="text-2xl sm:text-3xl mb-2">🎉</div>
+                        <div class="font-bold text-green-700 text-base sm:text-lg">Your Table is Ready!</div>
+                        <div class="text-green-600 text-xs sm:text-sm mt-1">Please proceed to the host stand</div>
                     \`;
                     statusMsg.classList.remove('hidden');
                     
@@ -36243,17 +36243,17 @@ app.get('/waitlist/:waitlist_id', (c) => {
                         showBrowserNotification('Your Table is Ready! 🎉', 'Please proceed to the host stand at the restaurant.');
                     }
                 } else if (entry.status === 'waiting') {
-                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-amber-50 border-2 border-amber-300';
+                    statusMsg.className = 'mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg text-center bg-amber-50 border-2 border-amber-300';
                     statusMsg.innerHTML = \`
-                        <div class="text-amber-700 font-semibold">Please stay nearby</div>
-                        <div class="text-amber-600 text-sm mt-1">We'll notify you when your table is ready</div>
+                        <div class="text-amber-700 font-semibold text-sm sm:text-base">Please stay nearby</div>
+                        <div class="text-amber-600 text-xs sm:text-sm mt-1">We'll notify you when your table is ready</div>
                     \`;
                     statusMsg.classList.remove('hidden');
                 } else if (entry.status === 'seated') {
-                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-blue-50 border-2 border-blue-300';
+                    statusMsg.className = 'mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg text-center bg-blue-50 border-2 border-blue-300';
                     statusMsg.innerHTML = \`
-                        <div class="text-blue-700 font-semibold">You've been seated!</div>
-                        <div class="text-blue-600 text-sm mt-1">Enjoy your meal!</div>
+                        <div class="text-blue-700 font-semibold text-sm sm:text-base">You've been seated!</div>
+                        <div class="text-blue-600 text-xs sm:text-sm mt-1">Enjoy your meal!</div>
                     \`;
                     statusMsg.classList.remove('hidden');
                 } else {
@@ -36401,11 +36401,27 @@ app.get('/waitlist/:waitlist_id', (c) => {
             console.log('Initializing waitlist page for ID:', WAITLIST_ID);
             
             try {
-                // Check if browser supports notifications
-                if ('Notification' in window && Notification.permission !== 'denied') {
-                    // Show browser notification option for desktop browsers
-                    const browserSection = document.getElementById('browserNotifSection');
-                    const smsSection = document.getElementById('smsNotifSection');
+                // Detect device type and notification capability
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                const supportsNotifications = 'Notification' in window;
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                
+                console.log('Device detection:', { isMobile, supportsNotifications, isIOS });
+                
+                const browserSection = document.getElementById('browserNotifSection');
+                const smsSection = document.getElementById('smsNotifSection');
+                
+                // iOS and most mobile browsers don't support Web Notifications properly
+                // Always show SMS notifications for mobile devices
+                if (isMobile || isIOS || !supportsNotifications) {
+                    // Mobile browsers - show SMS info (primary notification method)
+                    if (browserSection && smsSection) {
+                        browserSection.style.display = 'none';
+                        smsSection.style.display = 'block';
+                    }
+                    console.log('Mobile mode: SMS notifications active');
+                } else if (supportsNotifications && Notification.permission !== 'denied') {
+                    // Desktop browsers with notification support
                     if (browserSection && smsSection) {
                         browserSection.style.display = 'block';
                         smsSection.style.display = 'none';
@@ -36420,14 +36436,14 @@ app.get('/waitlist/:waitlist_id', (c) => {
                             enableBtn.classList.add('opacity-50');
                         }
                     }
+                    console.log('Desktop mode: Browser notifications available');
                 } else {
-                    // Mobile browsers or notifications not supported - show SMS info
-                    const browserSection = document.getElementById('browserNotifSection');
-                    const smsSection = document.getElementById('smsNotifSection');
+                    // Fallback to SMS for unsupported browsers
                     if (browserSection && smsSection) {
                         browserSection.style.display = 'none';
                         smsSection.style.display = 'block';
                     }
+                    console.log('Fallback mode: SMS notifications');
                 }
 
                 // Enable audio on first user interaction (required by browsers)
