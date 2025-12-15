@@ -3744,21 +3744,68 @@ app.get('/api/custom-sections/:property_id', async (c) => {
     
     // For each section, get or create translation
     for (const section of sections.results) {
-      // Check if translation exists
+      // Skip translation if already in English
+      if (language === 'en') {
+        section.translated_name = section.section_name_en
+        continue
+      }
+      
+      // Check if translation exists in database
       const translation = await DB.prepare(`
         SELECT section_name FROM custom_section_translations
         WHERE section_id = ? AND language_code = ?
       `).bind(section.section_id, language).first()
       
       if (translation) {
-        // Use existing translation
+        // Use existing translation from database
         section.translated_name = translation.section_name
       } else if (builtInLanguages.includes(language)) {
-        // Use built-in column
+        // Check if built-in column has value
         const columnName = `section_name_${language}`
-        section.translated_name = section[columnName] || section.section_name_en
+        const columnValue = section[columnName]
+        
+        if (columnValue && columnValue.trim() !== '') {
+          // Use built-in column value
+          section.translated_name = columnValue
+        } else {
+          // Column is NULL or empty - do AI translation
+          try {
+            const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{
+                role: 'system',
+                content: `You are a professional translator. Translate the following hotel section name to ${language}. Keep it concise (1-3 words). Return ONLY the translation, nothing else.`
+              }, {
+                role: 'user',
+                content: section.section_name_en
+              }],
+              temperature: 0.3
+            })
+          })
+          
+          const result = await translationResult.json()
+          const translatedName = result.choices[0].message.content.trim()
+          
+          // Store translation for future use
+          await DB.prepare(`
+            INSERT OR REPLACE INTO custom_section_translations (section_id, language_code, section_name)
+            VALUES (?, ?, ?)
+          `).bind(section.section_id, language, translatedName).run()
+          
+            section.translated_name = translatedName
+          } catch (translateError) {
+            console.error('Translation error for section:', translateError)
+            section.translated_name = section.section_name_en // Fallback to English
+          }
+        }
       } else {
-        // Need to translate - do on-demand AI translation
+        // Not a built-in language - do AI translation
         try {
           const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
