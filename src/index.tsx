@@ -11440,6 +11440,44 @@ app.post('/api/beach/bookings/:booking_reference/cancel', async (c) => {
   }
 })
 
+// API: Mark Booking as No-Show
+app.post('/api/admin/beach/bookings/:booking_reference/no-show', async (c) => {
+  const { DB } = c.env
+  const { booking_reference } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'no_show'
+      WHERE booking_reference = ?
+    `).bind(booking_reference).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Mark no-show error:', error)
+    return c.json({ error: 'Failed to mark as no-show' }, 500)
+  }
+})
+
+// API: Checkout from Beach Spot
+app.post('/api/admin/beach/bookings/:booking_reference/checkout', async (c) => {
+  const { DB } = c.env
+  const { booking_reference } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE beach_bookings
+      SET booking_status = 'completed', checked_out_at = CURRENT_TIMESTAMP
+      WHERE booking_reference = ?
+    `).bind(booking_reference).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Checkout error:', error)
+    return c.json({ error: 'Failed to checkout' }, 500)
+  }
+})
+
 // API: Staff - Verify Booking (QR or Code)
 app.post('/api/staff/beach/verify', async (c) => {
   const { DB } = c.env
@@ -18881,13 +18919,17 @@ app.get('/admin/beach-management/:property_id', (c) => {
         <!-- Main Navigation Tabs -->
         <div class="bg-white rounded-xl shadow-lg mb-4 md:mb-6">
             <div class="flex border-b">
-                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 px-3 md:px-6 py-3 md:py-4 text-sm md:text-base font-semibold transition">
-                    <i class="fas fa-qrcode mr-1 md:mr-2"></i>
+                <button onclick="switchMainTab('checkin')" id="checkinTabBtn" class="tab-btn active flex-1 px-3 md:px-4 py-3 md:py-4 text-xs md:text-base font-semibold transition">
+                    <i class="fas fa-qrcode mr-1"></i>
                     <span class="hidden sm:inline">QR </span>Check-In
                 </button>
-                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 px-3 md:px-6 py-3 md:py-4 text-sm md:text-base font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
-                    <i class="fas fa-map-marked-alt mr-1 md:mr-2"></i>
-                    <span class="hidden sm:inline">Beach </span>Map<span class="hidden md:inline"> & Booking</span>
+                <button onclick="switchMainTab('bookings')" id="bookingsTabBtn" class="tab-btn flex-1 px-3 md:px-4 py-3 md:py-4 text-xs md:text-base font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-list mr-1"></i>
+                    <span class="hidden sm:inline">All </span>Bookings
+                </button>
+                <button onclick="switchMainTab('map')" id="mapTabBtn" class="tab-btn flex-1 px-3 md:px-4 py-3 md:py-4 text-xs md:text-base font-semibold transition border-b-4 border-transparent hover:bg-gray-50">
+                    <i class="fas fa-map-marked-alt mr-1"></i>
+                    <span class="hidden sm:inline">Beach </span>Map
                 </button>
             </div>
         </div>
@@ -18949,6 +18991,82 @@ app.get('/admin/beach-management/:property_id', (c) => {
                 </h3>
                 <div id="recentCheckIns" class="space-y-2 md:space-y-3">
                     <p class="text-gray-500 text-center py-6 md:py-8 text-sm">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookings Management Section -->
+        <div id="bookingsSection" class="tab-content">
+            <div class="bg-white rounded-xl shadow-lg p-4 md:p-6 mb-4 md:mb-6">
+                <!-- Search Bar -->
+                <div class="mb-6">
+                    <h2 class="text-xl md:text-2xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-search text-blue-600 mr-3"></i>
+                        Search Bookings
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Room Number</label>
+                            <input 
+                                type="text" 
+                                id="searchRoomNumber" 
+                                placeholder="e.g., 101" 
+                                class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                                onkeyup="if(event.key === 'Enter') searchBookings()"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Guest Last Name</label>
+                            <input 
+                                type="text" 
+                                id="searchLastName" 
+                                placeholder="e.g., Smith" 
+                                class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                                onkeyup="if(event.key === 'Enter') searchBookings()"
+                            >
+                        </div>
+                        <div class="flex items-end">
+                            <button 
+                                onclick="searchBookings()" 
+                                class="w-full px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition shadow-lg">
+                                <i class="fas fa-search mr-2"></i>Search
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button 
+                            onclick="loadAllBookings()" 
+                            class="text-sm text-blue-600 hover:text-blue-700 font-semibold">
+                            <i class="fas fa-sync-alt mr-1"></i>Show All Bookings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Buttons -->
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button onclick="filterBookings('all')" id="filterAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold">
+                        All
+                    </button>
+                    <button onclick="filterBookings('confirmed')" id="filterConfirmed" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300">
+                        Confirmed
+                    </button>
+                    <button onclick="filterBookings('checked_in')" id="filterCheckedIn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300">
+                        Checked In
+                    </button>
+                    <button onclick="filterBookings('no_show')" id="filterNoShow" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300">
+                        No Show
+                    </button>
+                    <button onclick="filterBookings('completed')" id="filterCompleted" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300">
+                        Completed
+                    </button>
+                </div>
+
+                <!-- Bookings List -->
+                <div id="bookingsListContainer">
+                    <div class="text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-3"></i>
+                        <p class="text-gray-600">Loading bookings...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -19139,6 +19257,10 @@ app.get('/admin/beach-management/:property_id', (c) => {
             if (tab === 'checkin') {
                 document.getElementById('checkinSection').classList.add('active');
                 document.getElementById('checkinTabBtn').classList.add('active');
+            } else if (tab === 'bookings') {
+                document.getElementById('bookingsSection').classList.add('active');
+                document.getElementById('bookingsTabBtn').classList.add('active');
+                loadAllBookings();
             } else if (tab === 'map') {
                 document.getElementById('mapSection').classList.add('active');
                 document.getElementById('mapTabBtn').classList.add('active');
@@ -19619,6 +19741,231 @@ app.get('/admin/beach-management/:property_id', (c) => {
             setTimeout(() => {
                 document.getElementById('walkinResult').classList.add('hidden');
             }, 15000);
+        }
+
+        // ==========================================
+        // BOOKINGS MANAGEMENT FUNCTIONS
+        // ==========================================
+        
+        let allBookingsData = [];
+        let currentFilter = 'all';
+
+        async function loadAllBookings() {
+            try {
+                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allBookingsData = data.bookings || [];
+                    filterBookings(currentFilter);
+                } else {
+                    showBookingsError('Failed to load bookings');
+                }
+            } catch (error) {
+                console.error('Load bookings error:', error);
+                showBookingsError('Error loading bookings');
+            }
+        }
+
+        async function searchBookings() {
+            const roomNumber = document.getElementById('searchRoomNumber').value.trim();
+            const lastName = document.getElementById('searchLastName').value.trim().toLowerCase();
+            
+            if (!roomNumber && !lastName) {
+                alert('Please enter a room number or last name to search');
+                return;
+            }
+
+            const container = document.getElementById('bookingsListContainer');
+            container.innerHTML = \`
+                <div class="text-center py-8">
+                    <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-3"></i>
+                    <p class="text-gray-600">Searching...</p>
+                </div>
+            \`;
+
+            try {
+                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    let results = data.bookings || [];
+                    
+                    // Filter by room number
+                    if (roomNumber) {
+                        results = results.filter(b => 
+                            b.guest_room_number && b.guest_room_number.toLowerCase().includes(roomNumber.toLowerCase())
+                        );
+                    }
+                    
+                    // Filter by last name
+                    if (lastName) {
+                        results = results.filter(b => {
+                            const nameParts = b.guest_name.toLowerCase().split(' ');
+                            return nameParts.some(part => part.includes(lastName));
+                        });
+                    }
+                    
+                    allBookingsData = results;
+                    displayBookings(results);
+                } else {
+                    showBookingsError('Search failed');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                showBookingsError('Search error');
+            }
+        }
+
+        function filterBookings(status) {
+            currentFilter = status;
+            
+            // Update filter button styles
+            document.querySelectorAll('[id^="filter"]').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            
+            const activeBtn = document.getElementById(\`filter\${status.charAt(0).toUpperCase() + status.slice(1)}\`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+                activeBtn.classList.add('bg-blue-600', 'text-white');
+            }
+            
+            // Filter bookings
+            let filtered = allBookingsData;
+            if (status !== 'all') {
+                filtered = allBookingsData.filter(b => b.booking_status === status);
+            }
+            
+            displayBookings(filtered);
+        }
+
+        function displayBookings(bookings) {
+            const container = document.getElementById('bookingsListContainer');
+            
+            if (!bookings || bookings.length === 0) {
+                container.innerHTML = \`
+                    <div class="text-center py-8">
+                        <i class="fas fa-inbox text-4xl text-gray-400 mb-3"></i>
+                        <p class="text-gray-600">No bookings found</p>
+                    </div>
+                \`;
+                return;
+            }
+            
+            const html = bookings.map(booking => {
+                const statusColors = {
+                    'confirmed': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                    'checked_in': 'bg-blue-100 text-blue-800 border-blue-300',
+                    'completed': 'bg-green-100 text-green-800 border-green-300',
+                    'no_show': 'bg-red-100 text-red-800 border-red-300',
+                    'cancelled': 'bg-gray-100 text-gray-800 border-gray-300'
+                };
+                
+                const statusClass = statusColors[booking.booking_status] || 'bg-gray-100 text-gray-800';
+                const bookingDate = new Date(booking.booking_date).toLocaleDateString();
+                
+                return \`
+                    <div class="border-2 \${statusClass} rounded-lg p-4 mb-3">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-3 py-1 \${statusClass} rounded-full text-xs font-bold uppercase">
+                                        \${booking.booking_status.replace('_', ' ')}
+                                    </span>
+                                    <span class="text-sm text-gray-600">Code: <strong>\${booking.booking_code}</strong></span>
+                                </div>
+                                <h3 class="font-bold text-lg">\${booking.guest_name}</h3>
+                                <div class="grid grid-cols-2 gap-2 mt-2 text-sm">
+                                    <div><i class="fas fa-door-open mr-1 text-gray-500"></i>Room: <strong>\${booking.guest_room_number || 'N/A'}</strong></div>
+                                    <div><i class="fas fa-umbrella-beach mr-1 text-gray-500"></i>Spot: <strong>\${booking.spot_number}</strong> (\${booking.spot_type})</div>
+                                    <div><i class="fas fa-calendar mr-1 text-gray-500"></i>Date: <strong>\${bookingDate}</strong></div>
+                                    <div><i class="fas fa-clock mr-1 text-gray-500"></i>Slot: <strong>\${booking.slot_type.replace('_', ' ')}</strong></div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-wrap gap-2">
+                                \${booking.booking_status === 'confirmed' ? \`
+                                    <button 
+                                        onclick="markAsNoShow('\${booking.booking_reference}')" 
+                                        class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold">
+                                        <i class="fas fa-ban mr-1"></i>No Show
+                                    </button>
+                                \` : ''}
+                                
+                                \${booking.booking_status === 'checked_in' ? \`
+                                    <button 
+                                        onclick="checkoutBooking('\${booking.booking_reference}')" 
+                                        class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold">
+                                        <i class="fas fa-sign-out-alt mr-1"></i>Checkout
+                                    </button>
+                                \` : ''}
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+            
+            container.innerHTML = html;
+        }
+
+        async function markAsNoShow(bookingReference) {
+            if (!confirm('Mark this booking as No-Show?')) return;
+            
+            try {
+                const response = await fetch(\`/api/admin/beach/bookings/\${bookingReference}/no-show\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-User-ID': '1' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Marked as No-Show');
+                    loadAllBookings();
+                    refreshBeachMap();
+                } else {
+                    alert('❌ Failed to mark as no-show');
+                }
+            } catch (error) {
+                console.error('No-show error:', error);
+                alert('Error marking as no-show');
+            }
+        }
+
+        async function checkoutBooking(bookingReference) {
+            if (!confirm('Checkout this guest from their beach spot?')) return;
+            
+            try {
+                const response = await fetch(\`/api/admin/beach/bookings/\${bookingReference}/checkout\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-User-ID': '1' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Guest checked out successfully');
+                    loadAllBookings();
+                    refreshBeachMap();
+                } else {
+                    alert('❌ Failed to checkout');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                alert('Error during checkout');
+            }
+        }
+
+        function showBookingsError(message) {
+            const container = document.getElementById('bookingsListContainer');
+            container.innerHTML = \`
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3"></i>
+                    <p class="text-red-600">\${message}</p>
+                </div>
+            \`;
         }
     </script>
 </body>
