@@ -5560,6 +5560,57 @@ app.post('/api/admin/restaurant/reservations/:reservation_id/check-in', async (c
 // RESTAURANT WAITLIST APIS
 // ============================================
 
+// Get waitlist status for a guest (public endpoint)
+app.get('/api/waitlist/:waitlist_id/status', async (c) => {
+  const { DB } = c.env
+  const { waitlist_id } = c.req.param()
+  
+  try {
+    // Get waitlist entry
+    const entry = await DB.prepare(`
+      SELECT * FROM restaurant_waitlist WHERE waitlist_id = ?
+    `).bind(waitlist_id).first()
+    
+    if (!entry) {
+      return c.json({ 
+        success: false,
+        error: 'Waitlist entry not found' 
+      }, 404)
+    }
+    
+    // Calculate queue position (only for waiting guests)
+    let position = 0
+    if (entry.status === 'waiting') {
+      const allWaiting = await DB.prepare(`
+        SELECT waitlist_id FROM restaurant_waitlist 
+        WHERE offering_id = ? AND status = 'waiting'
+        ORDER BY priority DESC, added_at ASC
+      `).bind(entry.offering_id).all()
+      
+      position = allWaiting.results.findIndex(w => w.waitlist_id === entry.waitlist_id) + 1
+    }
+    
+    // Get restaurant name
+    const restaurant = await DB.prepare(`
+      SELECT title_en FROM hotel_offerings WHERE offering_id = ?
+    `).bind(entry.offering_id).first()
+    
+    return c.json({ 
+      success: true,
+      entry: entry,
+      position: position,
+      restaurant_name: restaurant ? restaurant.title_en : 'Restaurant'
+    })
+  } catch (error) {
+    console.error('Get waitlist status error:', error)
+    return c.json({ 
+      success: false,
+      error: 'Failed to get waitlist status',
+      details: error.message
+    }, 500)
+  }
+})
+
 // Get waitlist for a restaurant
 app.get('/api/admin/restaurant/:offering_id/waitlist', async (c) => {
   const { DB } = c.env
@@ -35892,6 +35943,289 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
   }
 })
 
+// Guest Waitlist Status Page (for guests to track their position)
+app.get('/waitlist/:waitlist_id', (c) => {
+  const { waitlist_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Waitlist Status</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.5; }
+            100% { transform: scale(0.8); opacity: 1; }
+        }
+        .pulse-ring {
+            animation: pulse-ring 2s ease-in-out infinite;
+        }
+        .notification-badge {
+            animation: pulse-glow 1.5s infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.8); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 to-orange-100 min-h-screen">
+    <div class="max-w-md mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="inline-block bg-white rounded-full p-4 shadow-lg mb-4">
+                <i class="fas fa-clock text-5xl text-amber-600"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Waitlist Status</h1>
+            <p class="text-gray-600" id="restaurantName">Loading...</p>
+        </div>
+
+        <!-- Status Card -->
+        <div id="statusCard" class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <div class="text-center mb-6">
+                <div class="text-6xl font-bold text-amber-600 mb-2" id="queuePosition">-</div>
+                <div class="text-gray-600 font-semibold">Your Position in Queue</div>
+            </div>
+
+            <div class="border-t border-gray-200 pt-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">
+                        <i class="fas fa-user mr-2"></i>Guest Name
+                    </span>
+                    <span class="font-semibold" id="guestName">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">
+                        <i class="fas fa-users mr-2"></i>Party Size
+                    </span>
+                    <span class="font-semibold" id="partySize">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">
+                        <i class="fas fa-clock mr-2"></i>Wait Time
+                    </span>
+                    <span class="font-semibold" id="waitTime">-</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600">
+                        <i class="fas fa-hourglass-half mr-2"></i>Est. Remaining
+                    </span>
+                    <span class="font-semibold text-amber-600" id="estimatedWait">-</span>
+                </div>
+            </div>
+
+            <!-- Status Message -->
+            <div id="statusMessage" class="mt-6 p-4 rounded-lg text-center hidden">
+                <!-- Status will be shown here -->
+            </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h3 class="font-bold text-lg mb-4 flex items-center">
+                <i class="fas fa-bell mr-2 text-amber-600"></i>
+                Notifications
+            </h3>
+            <div class="space-y-3">
+                <button onclick="enableNotifications()" id="enableNotifBtn" class="w-full px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition">
+                    <i class="fas fa-bell mr-2"></i>Enable Browser Notifications
+                </button>
+                <div id="notificationStatus" class="text-sm text-center text-gray-600"></div>
+                <div class="text-xs text-gray-500 text-center">
+                    We'll notify you when your table is ready!
+                </div>
+            </div>
+        </div>
+
+        <!-- Keep this page open notice -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        Keep this page open to receive real-time updates. The page refreshes automatically every 10 seconds.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Sound -->
+    <audio id="notificationSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUrDl6rhnHwU1ld/ryHUmBSN1xe/glEIKElyx6O2nVRUKRZzd8sFuIgUtgc/y2Ik2CBlpu+/jm04MC1Kw5eq4Zx8FNJTe68h1JQUjdcXv4JVCChJcr+jtqFQVCkSc3fLBbiIFLoHP8tiJNggZabvv4ptODAtSsOXquGcfBTOU3uvIdSUFI3XF7+CVQgoSXK/o7ahUFQpEnN3ywW4iBCyAzvLYiTYIG2m58OOcTgwLUrDl6rhnHwU0lN/ryHUlBSN1xe/glUIKElyw6O2oVBUKRZzd8sFuIgUsgs/y2Ik2CBlpu+/jm04MC1Kw5eq4aB8FNJT" type="audio/wav">
+    </audio>
+
+    <script>
+        const WAITLIST_ID = ${waitlist_id};
+        let previousStatus = null;
+        let notificationPermission = Notification.permission;
+
+        async function loadWaitlistStatus() {
+            try {
+                // Get waitlist entry details
+                const response = await fetch('/api/waitlist/' + WAITLIST_ID + '/status');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showError(data.error || 'Failed to load status');
+                    return;
+                }
+                
+                const entry = data.entry;
+                const position = data.position;
+                
+                // Update restaurant name
+                if (data.restaurant_name) {
+                    document.getElementById('restaurantName').textContent = data.restaurant_name;
+                }
+                
+                // Update UI
+                document.getElementById('queuePosition').textContent = position === 0 ? '-' : '#' + position;
+                document.getElementById('guestName').textContent = entry.guest_name;
+                document.getElementById('partySize').textContent = entry.number_of_guests + ' guests';
+                
+                // Calculate wait time
+                const addedTime = new Date(entry.added_at);
+                const waitMinutes = Math.floor((new Date() - addedTime) / 60000);
+                document.getElementById('waitTime').textContent = waitMinutes + ' min';
+                
+                // Estimated remaining
+                if (entry.estimated_wait_minutes && entry.estimated_wait_minutes > waitMinutes) {
+                    const remaining = entry.estimated_wait_minutes - waitMinutes;
+                    document.getElementById('estimatedWait').textContent = remaining + ' min';
+                } else {
+                    document.getElementById('estimatedWait').textContent = 'Soon!';
+                }
+                
+                // Status-specific messages
+                const statusMsg = document.getElementById('statusMessage');
+                if (entry.status === 'notified') {
+                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-green-50 border-2 border-green-500 notification-badge';
+                    statusMsg.innerHTML = \`
+                        <div class="text-2xl mb-2">🎉</div>
+                        <div class="font-bold text-green-700 text-lg">Your Table is Ready!</div>
+                        <div class="text-green-600 text-sm mt-1">Please proceed to the host stand</div>
+                    \`;
+                    statusMsg.classList.remove('hidden');
+                    
+                    // Trigger notification and sound if status changed
+                    if (previousStatus !== 'notified') {
+                        playNotificationSound();
+                        showBrowserNotification('Your Table is Ready! 🎉', 'Please proceed to the host stand at the restaurant.');
+                    }
+                } else if (entry.status === 'waiting') {
+                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-amber-50 border-2 border-amber-300';
+                    statusMsg.innerHTML = \`
+                        <div class="text-amber-700 font-semibold">Please stay nearby</div>
+                        <div class="text-amber-600 text-sm mt-1">We'll notify you when your table is ready</div>
+                    \`;
+                    statusMsg.classList.remove('hidden');
+                } else if (entry.status === 'seated') {
+                    statusMsg.className = 'mt-6 p-4 rounded-lg text-center bg-blue-50 border-2 border-blue-300';
+                    statusMsg.innerHTML = \`
+                        <div class="text-blue-700 font-semibold">You've been seated!</div>
+                        <div class="text-blue-600 text-sm mt-1">Enjoy your meal!</div>
+                    \`;
+                    statusMsg.classList.remove('hidden');
+                } else {
+                    statusMsg.classList.add('hidden');
+                }
+                
+                previousStatus = entry.status;
+                
+            } catch (error) {
+                console.error('Load status error:', error);
+                showError('Failed to load status');
+            }
+        }
+
+        function showError(message) {
+            const card = document.getElementById('statusCard');
+            card.innerHTML = \`
+                <div class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-5xl text-red-500 mb-4"></i>
+                    <p class="text-gray-600">\${message}</p>
+                </div>
+            \`;
+        }
+
+        async function enableNotifications() {
+            if (!('Notification' in window)) {
+                alert('This browser does not support notifications');
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                document.getElementById('notificationStatus').textContent = '✓ Notifications are enabled';
+                document.getElementById('enableNotifBtn').disabled = true;
+                document.getElementById('enableNotifBtn').classList.add('opacity-50');
+                return;
+            }
+
+            if (Notification.permission !== 'denied') {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    document.getElementById('notificationStatus').textContent = '✓ Notifications enabled successfully!';
+                    document.getElementById('enableNotifBtn').disabled = true;
+                    document.getElementById('enableNotifBtn').classList.add('opacity-50');
+                    notificationPermission = 'granted';
+                    
+                    // Test notification
+                    new Notification('Notifications Enabled! 🔔', {
+                        body: 'We\\'ll notify you when your table is ready.',
+                        icon: '/guestconnect-logo.png',
+                        tag: 'waitlist-test'
+                    });
+                } else {
+                    document.getElementById('notificationStatus').textContent = '✗ Permission denied';
+                }
+            } else {
+                alert('Notifications are blocked. Please enable them in your browser settings.');
+            }
+        }
+
+        function playNotificationSound() {
+            const audio = document.getElementById('notificationSound');
+            audio.play().catch(e => console.log('Could not play sound:', e));
+        }
+
+        function showBrowserNotification(title, body) {
+            if (notificationPermission === 'granted') {
+                new Notification(title, {
+                    body: body,
+                    icon: '/guestconnect-logo.png',
+                    tag: 'waitlist-' + WAITLIST_ID,
+                    requireInteraction: true,
+                    vibrate: [200, 100, 200, 100, 200]
+                });
+            }
+        }
+
+        // Check notification permission on load
+        if (Notification.permission === 'granted') {
+            document.getElementById('notificationStatus').textContent = '✓ Notifications are enabled';
+            document.getElementById('enableNotifBtn').disabled = true;
+            document.getElementById('enableNotifBtn').classList.add('opacity-50');
+        }
+
+        // Load status immediately
+        loadWaitlistStatus();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(loadWaitlistStatus, 10000);
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Staff Check-in Dashboard Route
 app.get('/staff/restaurant/:offering_id', (c) => {
   const { offering_id } = c.req.param()
@@ -35905,6 +36239,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
     <title>Staff Check-in Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         /* Table status colors */
         .table-free { background-color: #10B981; border-color: #059669; }
@@ -36274,10 +36609,61 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         </div>
     </div>
 
+    <!-- Modal: QR Code for Guest -->
+    <div id="qrCodeModal" class="modal-overlay items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-qrcode mr-2"></i>Guest Waitlist QR Code
+                    </h3>
+                    <button onclick="closeQRModal()" class="text-white hover:bg-white/20 rounded p-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 text-center">
+                <div class="mb-4">
+                    <h4 class="font-bold text-lg mb-2" id="qrGuestName">Guest Name</h4>
+                    <p class="text-gray-600 text-sm">Show this QR code to the guest</p>
+                </div>
+                
+                <!-- QR Code Container -->
+                <div id="qrcode" class="inline-block p-4 bg-white border-4 border-gray-200 rounded-lg mb-4"></div>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg text-left mb-4">
+                    <p class="text-sm text-blue-700">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        The guest can scan this QR code to:
+                    </p>
+                    <ul class="text-sm text-blue-600 mt-2 ml-6 list-disc">
+                        <li>Track their position in real-time</li>
+                        <li>See estimated wait time</li>
+                        <li>Enable browser notifications</li>
+                        <li>Get notified when table is ready</li>
+                    </ul>
+                </div>
+                
+                <div class="space-y-2">
+                    <button onclick="printQRCode()" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold">
+                        <i class="fas fa-print mr-2"></i>Print QR Code
+                    </button>
+                    <button onclick="copyWaitlistLink()" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+                        <i class="fas fa-copy mr-2"></i>Copy Link
+                    </button>
+                    <button onclick="closeQRModal()" class="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-semibold">
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const OFFERING_ID = ${offering_id};
         let floorElements = [];
         let currentSessions = [];
+        let currentWaitlistLink = '';
         let currentReservations = [];
         let currentWaitlist = [];
         let currentScale = 1;
@@ -36835,9 +37221,14 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('✅ Guest added to waitlist!');
+                    const guestName = data.guest_name;
+                    const waitlistId = result.waitlist_id;
+                    
                     document.getElementById('waitlistForm').reset();
                     loadWaitlist();
+                    
+                    // Show QR code modal
+                    showQRCodeModal(waitlistId, guestName);
                 } else {
                     alert('❌ Error: ' + (result.error || 'Failed to add to waitlist'));
                 }
@@ -36845,6 +37236,90 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                 console.error('Add to waitlist error:', error);
                 alert('❌ Error adding to waitlist');
             }
+        }
+        
+        function showQRCodeModal(waitlistId, guestName) {
+            // Set guest name
+            document.getElementById('qrGuestName').textContent = guestName;
+            
+            // Generate waitlist URL
+            const baseUrl = window.location.origin;
+            const waitlistUrl = baseUrl + '/waitlist/' + waitlistId;
+            currentWaitlistLink = waitlistUrl;
+            
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Generate QR code
+            new QRCode(document.getElementById('qrcode'), {
+                text: waitlistUrl,
+                width: 256,
+                height: 256,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // Show modal
+            document.getElementById('qrCodeModal').classList.add('show');
+        }
+        
+        function closeQRModal() {
+            document.getElementById('qrCodeModal').classList.remove('show');
+            document.getElementById('qrcode').innerHTML = '';
+            currentWaitlistLink = '';
+        }
+        
+        function printQRCode() {
+            const printWindow = window.open('', '_blank');
+            const qrCodeHTML = document.getElementById('qrcode').innerHTML;
+            const guestName = document.getElementById('qrGuestName').textContent;
+            
+            printWindow.document.write(\`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Waitlist QR Code - \${guestName}</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            text-align: center;
+                            padding: 40px;
+                        }
+                        h1 { font-size: 24px; margin-bottom: 10px; }
+                        p { font-size: 16px; color: #666; margin-bottom: 30px; }
+                        .qr-container { display: inline-block; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Restaurant Waitlist</h1>
+                    <h2>\${guestName}</h2>
+                    <p>Scan to track your position</p>
+                    <div class="qr-container">\${qrCodeHTML}</div>
+                    <p style="margin-top: 30px; font-size: 14px;">Keep this page open for real-time updates</p>
+                </body>
+                </html>
+            \`);
+            
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        }
+        
+        function copyWaitlistLink() {
+            navigator.clipboard.writeText(currentWaitlistLink).then(() => {
+                alert('✅ Link copied to clipboard!\\n\\nYou can send this link to the guest via SMS or messaging app.');
+            }).catch(() => {
+                // Fallback for older browsers
+                const input = document.createElement('input');
+                input.value = currentWaitlistLink;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                alert('✅ Link copied to clipboard!');
+            });
         }
 
         async function notifyWaitlistGuest(waitlistId) {
