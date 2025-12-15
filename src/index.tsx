@@ -5101,10 +5101,11 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
   
   try {
+    // Get active guest dining sessions (not time slot sessions)
     const sessions = await DB.prepare(`
-      SELECT * FROM dining_sessions 
-      WHERE offering_id = ? AND session_date = ? AND status != 'cancelled'
-      ORDER BY session_time
+      SELECT * FROM guest_dining_sessions 
+      WHERE offering_id = ? AND session_date = ? AND status = 'active'
+      ORDER BY start_time DESC
     `).bind(offering_id, date).all()
     
     return c.json({ 
@@ -5117,25 +5118,30 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   }
 })
 
-// Create dining session (Admin)
+// Create guest dining session (walk-in check-in)
 app.post('/api/admin/restaurant/session', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
   try {
+    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toTimeString().split(' ')[0].substring(0, 5)
+    
     const result = await DB.prepare(`
-      INSERT INTO dining_sessions (
-        offering_id, session_date, session_time, session_type,
-        duration_minutes, max_capacity, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO guest_dining_sessions (
+        offering_id, guest_name, number_of_guests, table_number,
+        session_date, session_time, status, phone_number, special_requests, source
+      ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
     `).bind(
       data.offering_id,
-      data.session_date,
-      data.session_time,
-      data.session_type,
-      data.duration_minutes || 90,
-      data.max_capacity,
-      'available'
+      data.guest_name || 'Walk-in Guest',
+      data.number_of_guests || 1,
+      data.table_number,
+      today,
+      now,
+      data.phone_number || null,
+      data.special_requests || null,
+      data.source || 'walk-in'
     ).run()
     
     return c.json({ 
@@ -5143,27 +5149,28 @@ app.post('/api/admin/restaurant/session', async (c) => {
       session_id: result.meta.last_row_id
     })
   } catch (error) {
-    console.error('Create session error:', error)
+    console.error('Create guest session error:', error)
     return c.json({ error: 'Failed to create session' }, 500)
   }
 })
 
-// Delete a dining session
+// Check out a guest (end their dining session)
 app.delete('/api/admin/restaurant/session/:session_id', async (c) => {
   const { DB } = c.env
   const { session_id } = c.req.param()
   
   try {
+    // Update guest dining session to completed
     await DB.prepare(`
-      UPDATE dining_sessions 
-      SET status = 'cancelled' 
+      UPDATE guest_dining_sessions 
+      SET status = 'completed', end_time = CURRENT_TIMESTAMP
       WHERE session_id = ?
     `).bind(session_id).run()
     
     return c.json({ success: true })
   } catch (error) {
-    console.error('Delete session error:', error)
-    return c.json({ error: 'Failed to delete session' }, 500)
+    console.error('Check out guest error:', error)
+    return c.json({ error: 'Failed to check out guest' }, 500)
   }
 })
 
@@ -5525,26 +5532,32 @@ app.post('/api/admin/restaurant/reservations/:reservation_id/check-in', async (c
       WHERE reservation_id = ?
     `).bind(reservation_id).run()
     
-    // Optionally create a dining session for this reservation
+    // Create guest dining session for this reservation
     const reservation = await DB.prepare(`
-      SELECT * FROM table_reservations WHERE reservation_id = ?
+      SELECT tr.*, rt.table_number, rt.offering_id, g.first_name, g.last_name, g.phone
+      FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN guests g ON tr.guest_id = g.guest_id
+      WHERE tr.reservation_id = ?
     `).bind(reservation_id).first()
     
-    if (reservation && reservation.table_number) {
-      // Create dining session
+    if (reservation) {
+      const guestName = `${reservation.first_name} ${reservation.last_name}`
+      
+      // Create guest dining session
       await DB.prepare(`
-        INSERT INTO dining_sessions (
+        INSERT INTO guest_dining_sessions (
           offering_id, guest_name, number_of_guests, table_number, 
           session_date, session_time, status, phone_number, special_requests, source
         ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, 'reservation')
       `).bind(
         reservation.offering_id,
-        reservation.guest_name,
-        reservation.number_of_guests,
+        guestName,
+        reservation.num_guests,
         reservation.table_number,
         reservation.reservation_date,
         reservation.reservation_time,
-        reservation.phone_number,
+        reservation.phone,
         reservation.special_requests
       ).run()
     }
@@ -5802,12 +5815,12 @@ app.post('/api/admin/restaurant/waitlist/:waitlist_id/seat', async (c) => {
       WHERE waitlist_id = ?
     `).bind(table_number, waitlist_id).run()
     
-    // Create dining session
+    // Create guest dining session
     const today = new Date().toISOString().split('T')[0]
     const now = new Date().toTimeString().split(' ')[0].substring(0, 5)
     
     await DB.prepare(`
-      INSERT INTO dining_sessions (
+      INSERT INTO guest_dining_sessions (
         offering_id, guest_name, number_of_guests, table_number,
         session_date, session_time, status, phone_number, special_requests, source
       ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, 'waitlist')
