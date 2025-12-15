@@ -2282,14 +2282,19 @@ app.post('/api/superadmin/hotels', async (c) => {
     ).run()
     
     // Create admin user account in users table (for login)
+    const adminEmail = data.admin_email || data.contact_email
+    const adminFirstName = data.admin_first_name || data.property_name || data.name
+    const adminLastName = data.admin_last_name || 'Admin'
+    const adminPassword = data.admin_password || 'admin123'
+    
     const userResult = await DB.prepare(`
       INSERT INTO users (email, password_hash, first_name, last_name, role, role_id, property_id, status)
       VALUES (?, ?, ?, ?, 'admin', 2, ?, 'active')
     `).bind(
-      data.contact_email,
-      'admin123', // Default password - user should change after first login
-      data.property_name || data.name,
-      'Admin',
+      adminEmail,
+      adminPassword,
+      adminFirstName,
+      adminLastName,
       property.meta.last_row_id
     ).run()
     
@@ -2299,9 +2304,9 @@ app.post('/api/superadmin/hotels', async (c) => {
       VALUES (?, ?, ?, ?, ?, 'en')
     `).bind(
       property.meta.last_row_id,
-      data.contact_email,
-      data.property_name || data.name,
-      'Admin',
+      adminEmail,
+      adminFirstName,
+      adminLastName,
       data.contact_phone || ''
     ).run()
     
@@ -19122,6 +19127,41 @@ app.get('/superadmin/dashboard', (c) => {
                                   style="width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; transition: all 0.2s; resize: vertical;"></textarea>
                     </div>
                     
+                    <!-- Admin Credentials Section -->
+                    <div style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 20px; border-radius: 12px; margin-bottom: 24px; border: 2px solid #016e8f;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+                            <i class="fas fa-user-shield" style="color: #016e8f; font-size: 20px;"></i>
+                            <h3 style="margin: 0; font-weight: 700; color: #016e8f; font-size: 16px;">Hotel Admin Login Credentials</h3>
+                        </div>
+                        <p style="font-size: 13px; color: #555; margin-bottom: 16px;">Set up login credentials for the hotel administrator</p>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Admin First Name *</label>
+                            <input type="text" id="adminFirstName" required placeholder="e.g., John" 
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #016e8f; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white;">
+                        </div>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Admin Last Name *</label>
+                            <input type="text" id="adminLastName" required placeholder="e.g., Smith" 
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #016e8f; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white;">
+                        </div>
+                        
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Admin Email *</label>
+                            <input type="email" id="adminEmail" required placeholder="admin@hotel.com" 
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #016e8f; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white;">
+                            <p style="font-size: 12px; color: #666; margin-top: 4px;">This will be the login email for the hotel admin dashboard</p>
+                        </div>
+                        
+                        <div style="margin-bottom: 0;">
+                            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #333;">Admin Password *</label>
+                            <input type="password" id="adminPassword" required placeholder="Minimum 6 characters" minlength="6"
+                                   style="width: 100%; padding: 12px 16px; border: 2px solid #016e8f; border-radius: 10px; font-size: 15px; transition: all 0.2s; background: white;">
+                            <p style="font-size: 12px; color: #666; margin-top: 4px;">Admin can change this password after first login</p>
+                        </div>
+                    </div>
+                    
                     <div style="display: flex; gap: 12px;">
                         <button type="button" onclick="closeCreateHotelModal()" 
                                 style="flex: 1; padding: 14px; background: #f0f0f0; color: #333; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
@@ -19865,7 +19905,11 @@ app.get('/superadmin/dashboard', (c) => {
                 slug: document.getElementById('hotelSlug').value,
                 contact_email: document.getElementById('hotelEmail').value,
                 contact_phone: document.getElementById('hotelPhone').value || '',
-                location: document.getElementById('hotelAddress').value || ''
+                location: document.getElementById('hotelAddress').value || '',
+                admin_first_name: document.getElementById('adminFirstName').value,
+                admin_last_name: document.getElementById('adminLastName').value,
+                admin_email: document.getElementById('adminEmail').value,
+                admin_password: document.getElementById('adminPassword').value
             };
             
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -19888,7 +19932,7 @@ app.get('/superadmin/dashboard', (c) => {
                     // Show success notification with registration code
                     const notification = document.createElement('div');
                     notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); z-index: 10000; max-width: 400px; animation: slideIn 0.3s ease-out;';
-                    notification.innerHTML = '<div style="display: flex; align-items: start; gap: 12px;"><i class="fas fa-check-circle" style="font-size: 24px; margin-top: 2px;"></i><div><div style="font-weight: 700; font-size: 16px; margin-bottom: 8px;">Hotel Created Successfully!</div><div style="font-size: 14px; opacity: 0.95; margin-bottom: 8px;"><strong>' + hotelData.property_name + '</strong> has been added to the platform.</div><div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; margin-top: 8px;"><div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">Registration Code:</div><div style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px;">' + result.registration_code + '</div></div><div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 13px;"><div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-key mr-2"></i>Admin Login Credentials:</div><div style="opacity: 0.9;">Email: <strong>' + hotelData.contact_email + '</strong></div><div style="opacity: 0.9;">Password: <strong>admin123</strong></div><div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-style: italic;">⚠️ Admin should change password after first login</div></div><div style="font-size: 12px; opacity: 0.85; margin-top: 8px;">Login URL: <strong>/admin/login</strong></div></div></div>';
+                    notification.innerHTML = '<div style="display: flex; align-items: start; gap: 12px;"><i class="fas fa-check-circle" style="font-size: 24px; margin-top: 2px;"></i><div><div style="font-weight: 700; font-size: 16px; margin-bottom: 8px;">Hotel Created Successfully!</div><div style="font-size: 14px; opacity: 0.95; margin-bottom: 8px;"><strong>' + hotelData.property_name + '</strong> has been added to the platform.</div><div style="background: rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; margin-top: 8px;"><div style="font-size: 12px; opacity: 0.9; margin-bottom: 4px;">Registration Code:</div><div style="font-family: monospace; font-size: 18px; font-weight: 700; letter-spacing: 2px;">' + result.registration_code + '</div></div><div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; margin-top: 8px; font-size: 13px;"><div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-key mr-2"></i>Admin Login Credentials:</div><div style="opacity: 0.9;">Name: <strong>' + hotelData.admin_first_name + ' ' + hotelData.admin_last_name + '</strong></div><div style="opacity: 0.9;">Email: <strong>' + hotelData.admin_email + '</strong></div><div style="opacity: 0.9;">Password: <strong>' + hotelData.admin_password + '</strong></div><div style="font-size: 11px; opacity: 0.75; margin-top: 6px; font-style: italic;">⚠️ Admin can change password after first login</div></div><div style="font-size: 12px; opacity: 0.85; margin-top: 8px;">Login URL: <strong>/admin/login</strong></div></div></div>';
                     document.body.appendChild(notification);
                     
                     setTimeout(() => {
