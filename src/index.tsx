@@ -4189,7 +4189,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       UPDATE hotel_offerings SET
         title_en = ?, short_description_en = ?, full_description_en = ?,
         price = ?, location = ?, duration_minutes = ?,
-        requires_booking = ?, images = ?, video_url = ?,
+        requires_booking = ?, enable_booking = ?, images = ?, video_url = ?,
         event_date = ?, event_start_time = ?, event_end_time = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE offering_id = ?
@@ -4201,6 +4201,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       data.location,
       data.duration_minutes,
       data.requires_booking ? 1 : 0,
+      data.enable_booking !== undefined ? (data.enable_booking ? 1 : 0) : null,
       data.images,
       data.video_url || null,
       data.event_date,
@@ -38147,6 +38148,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         <input type="text" id="infoTitleEn" class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., Mediterranean Grill">
                     </div>
                     
+                    <!-- Enable Booking Toggle -->
+                    <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label class="block text-sm font-bold mb-1">Enable Table Booking</label>
+                                <p class="text-xs text-gray-600">Allow guests to book tables at this restaurant</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="infoEnableBooking" class="sr-only peer">
+                                <div class="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    
                     <!-- Short Description -->
                     <div>
                         <label class="block text-sm font-bold mb-2">Short Description (English)</label>
@@ -38971,6 +38986,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             
             // Populate info form
             document.getElementById('infoTitleEn').value = restaurant.title_en || '';
+            document.getElementById('infoEnableBooking').checked = restaurant.enable_booking === 1 || restaurant.enable_booking === true;
             document.getElementById('infoShortDescEn').value = restaurant.short_description_en || '';
             document.getElementById('infoFullDescEn').value = restaurant.full_description_en || '';
             
@@ -39050,6 +39066,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         const updateData = {
           title_en: document.getElementById('infoTitleEn').value,
+          enable_booking: document.getElementById('infoEnableBooking').checked ? 1 : 0,
           short_description_en: document.getElementById('infoShortDescEn').value,
           full_description_en: document.getElementById('infoFullDescEn').value,
           images: currentRestaurantData.images
