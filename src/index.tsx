@@ -21260,7 +21260,7 @@ app.get('/admin/beach-map-designer', (c) => {
         // Load existing spots
         async function loadExistingSpots() {
             try {
-                const response = await fetch('/api/admin/beach/spots/1');
+                const response = await fetch('/api/admin/beach/spots/' + propertyId);
                 const data = await response.json();
                 
                 if (data.success && data.spots) {
@@ -21285,7 +21285,7 @@ app.get('/admin/beach-map-designer', (c) => {
         // Load existing zone overlays
         async function loadExistingZones() {
             try {
-                const response = await fetch('/api/admin/beach/zone-overlays/1');
+                const response = await fetch('/api/admin/beach/zone-overlays/' + propertyId);
                 const data = await response.json();
                 
                 if (data.overlays && data.overlays.length > 0) {
@@ -21526,7 +21526,7 @@ app.get('/admin/beach-map-designer', (c) => {
             
             try {
                 // Delete all existing spots
-                const existingSpots = await fetch('/api/admin/beach/spots/1');
+                const existingSpots = await fetch('/api/admin/beach/spots/' + propertyId);
                 const existingData = await existingSpots.json();
                 
                 if (existingData.success && existingData.spots) {
@@ -21536,7 +21536,7 @@ app.get('/admin/beach-map-designer', (c) => {
                 }
                 
                 // Delete all existing zone overlays
-                await fetch('/api/admin/beach/zone-overlays/1', { method: 'DELETE' });
+                await fetch('/api/admin/beach/zone-overlays/' + propertyId, { method: 'DELETE' });
                 
                 // Create all new spots
                 for (const spot of spots) {
@@ -22780,7 +22780,7 @@ app.get('/admin/interactive-map-builder', (c) => {
         // Load categories from database
         async function loadCategories() {
             try {
-                const response = await fetch('/api/admin/hotel-map/categories/1');
+                const response = await fetch('/api/admin/hotel-map/categories/' + propertyId);
                 const data = await response.json();
                 
                 if (data.success && data.categories) {
@@ -22799,7 +22799,7 @@ app.get('/admin/interactive-map-builder', (c) => {
         // Load existing hotspots
         async function loadExistingHotspots() {
             try {
-                const response = await fetch('/api/admin/hotel-map/hotspots/1');
+                const response = await fetch('/api/admin/hotel-map/hotspots/' + propertyId);
                 const data = await response.json();
                 
                 if (data.success && data.hotspots) {
@@ -23048,7 +23048,7 @@ app.get('/admin/interactive-map-builder', (c) => {
             
             try {
                 // Delete all existing hotspots
-                await fetch('/api/admin/hotel-map/hotspots/clear/1', { method: 'POST' });
+                await fetch('/api/admin/hotel-map/hotspots/clear/' + propertyId, { method: 'POST' });
                 
                 // Save all hotspots
                 for (const hotspot of hotspots) {
@@ -34475,7 +34475,7 @@ app.get('/admin/dashboard', (c) => {
       // Load QR card template from database
       async function loadQRCardTemplate() {
         try {
-          const response = await fetch('/api/admin/qr-card/1');
+          const response = await fetch('/api/admin/qr-card/' + propertyId);
           const data = await response.json();
           
           // Update form fields
@@ -34598,7 +34598,7 @@ app.get('/admin/dashboard', (c) => {
       // Save QR card design
       window.saveQRCard = async function() {
         try {
-          const response = await fetch('/api/admin/qr-card/1', {
+          const response = await fetch('/api/admin/qr-card/' + propertyId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35764,7 +35764,7 @@ app.get('/admin/dashboard', (c) => {
             adminPropertySettings = await settingsResponse.json();
           }
           
-          const response = await fetch('/api/hotel-offerings/1');
+          const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           allOfferings = data.offerings || [];
           displayOfferings();
@@ -36419,7 +36419,7 @@ app.get('/admin/dashboard', (c) => {
       async function loadChatbot() {
         try {
           // Load chatbot settings
-          const settingsRes = await fetch('/api/chatbot/settings/1');
+          const settingsRes = await fetch('/api/chatbot/settings/' + propertyId);
           const settingsData = await settingsRes.json();
           
           if (settingsData.success && settingsData.settings) {
@@ -36806,7 +36806,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadBeachSettings() {
         try {
-          const response = await fetchWithAuth('/api/admin/beach/settings/1');
+          const response = await fetchWithAuth('/api/admin/beach/settings/' + propertyId);
           const data = await response.json();
           
           if (data.success && data.settings) {
@@ -37168,7 +37168,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadBeachSpots() {
         try {
-          const response = await fetchWithAuth('/api/admin/beach/spots/1');
+          const response = await fetchWithAuth('/api/admin/beach/spots/' + propertyId);
           const data = await response.json();
           
           const container = document.getElementById('beachSpotsList');
@@ -37455,7 +37455,7 @@ app.get('/admin/dashboard', (c) => {
           const selectedSlot = slotSelector ? slotSelector.value : 'all';
           
           // Fetch spots
-          const spotsResponse = await fetchWithAuth('/api/admin/beach/spots/1');
+          const spotsResponse = await fetchWithAuth('/api/admin/beach/spots/' + propertyId);
           const spotsData = await spotsResponse.json();
           
           // Fetch bookings for the date
@@ -37999,7 +37999,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadNotificationSettings() {
         try {
-          const response = await fetch('/api/admin/notification-settings/1');
+          const response = await fetch('/api/admin/notification-settings/' + propertyId);
           const settings = await response.json();
           
           // Sound settings
@@ -38163,7 +38163,7 @@ app.get('/admin/dashboard', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/notification-settings/1', {
+          const response = await fetch('/api/admin/notification-settings/' + propertyId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingsData)
@@ -38452,7 +38452,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadSeasonalSettings() {
         try {
-          const response = await fetch('/api/seasonal-settings/1');
+          const response = await fetch('/api/seasonal-settings/' + propertyId);
           const data = await response.json();
           if (data.success) {
             seasonalSettings = data.settings;
@@ -38591,7 +38591,7 @@ app.get('/admin/dashboard', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/seasonal-settings/1', {
+          const response = await fetch('/api/admin/seasonal-settings/' + propertyId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -40242,7 +40242,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       async function loadRestaurantsTab() {
         try {
-          const response = await fetch('/api/hotel-offerings/1');
+          const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
           
@@ -40428,7 +40428,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       async function loadRoomService() {
         try {
-          const response = await fetch('/api/hotel-offerings/1');
+          const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const roomService = data.offerings.find(o => o.offering_type === 'room_service');
           
@@ -43901,7 +43901,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         async function loadRestaurantInfo() {
             try {
-                const response = await fetch('/api/hotel-offerings/1');
+                const response = await fetch('/api/hotel-offerings/' + propertyId);
                 const data = await response.json();
                 if (data.success && data.offerings) {
                     const restaurant = data.offerings.find(o => o.offering_id == OFFERING_ID);
@@ -45913,7 +45913,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function loadRestaurant() {
         try {
-          const response = await fetch('/api/hotel-offerings/1');
+          const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
           const restaurant = restaurants.find(o => o.offering_id == offeringId);
@@ -46118,7 +46118,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function loadOccupancyStatus() {
         try {
-          const response = await fetch('/api/hotel-offerings/1');
+          const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurant = data.offerings?.find(o => o.offering_id == offeringId);
           
@@ -48903,7 +48903,7 @@ app.get('/admin/room-service/:offering_id', (c) => {
         // Load room service data
         async function loadRoomService() {
             try {
-                const response = await fetch('/api/hotel-offerings/1');
+                const response = await fetch('/api/hotel-offerings/' + propertyId);
                 const data = await response.json();
                 roomServiceData = data.offerings.find(o => o.offering_id == OFFERING_ID);
                 
