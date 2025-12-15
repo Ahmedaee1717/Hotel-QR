@@ -5512,6 +5512,50 @@ app.post('/api/admin/restaurant/reservation/:reference/cancel', async (c) => {
   }
 })
 
+// Check in reservation by ID (for staff dashboard)
+app.post('/api/admin/restaurant/reservations/:reservation_id/check-in', async (c) => {
+  const { DB } = c.env
+  const { reservation_id } = c.req.param()
+  
+  try {
+    // Update reservation status to checked_in
+    await DB.prepare(`
+      UPDATE table_reservations 
+      SET status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP 
+      WHERE reservation_id = ?
+    `).bind(reservation_id).run()
+    
+    // Optionally create a dining session for this reservation
+    const reservation = await DB.prepare(`
+      SELECT * FROM table_reservations WHERE reservation_id = ?
+    `).bind(reservation_id).first()
+    
+    if (reservation && reservation.table_number) {
+      // Create dining session
+      await DB.prepare(`
+        INSERT INTO dining_sessions (
+          offering_id, guest_name, number_of_guests, table_number, 
+          session_date, session_time, status, phone_number, special_requests, source
+        ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, 'reservation')
+      `).bind(
+        reservation.offering_id,
+        reservation.guest_name,
+        reservation.number_of_guests,
+        reservation.table_number,
+        reservation.reservation_date,
+        reservation.reservation_time,
+        reservation.phone_number,
+        reservation.special_requests
+      ).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Check in reservation error:', error)
+    return c.json({ error: 'Failed to check in reservation' }, 500)
+  }
+})
+
 // ============================================
 // AI TEXTURE EXTRACTION APIS
 // ============================================
@@ -35990,10 +36034,18 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         }
 
         async function loadRestaurantInfo() {
-            const response = await fetch('/api/offerings/' + OFFERING_ID);
-            const data = await response.json();
-            if (data.success && data.offering) {
-                document.getElementById('restaurantName').textContent = data.offering.title;
+            try {
+                const response = await fetch('/api/hotel-offerings/1');
+                const data = await response.json();
+                if (data.success && data.offerings) {
+                    const restaurant = data.offerings.find(o => o.offering_id == OFFERING_ID);
+                    if (restaurant) {
+                        document.getElementById('restaurantName').textContent = restaurant.title_en || restaurant.title;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load restaurant info:', error);
+                document.getElementById('restaurantName').textContent = 'Restaurant #' + OFFERING_ID;
             }
         }
 
@@ -36107,7 +36159,8 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         }
 
         async function loadActiveSessions() {
-            const response = await fetch('/api/admin/restaurant/sessions?offering_id=' + OFFERING_ID);
+            const today = new Date().toISOString().split('T')[0];
+            const response = await fetch('/api/restaurant/' + OFFERING_ID + '/sessions?date=' + today);
             const data = await response.json();
             
             if (data.success) {
@@ -36260,7 +36313,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                 source: 'walk-in'
             };
             
-            const response = await fetch('/api/admin/restaurant/sessions', {
+            const response = await fetch('/api/admin/restaurant/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -36298,8 +36351,8 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function checkOutSession(sessionId) {
             if (!confirm('Check out this guest?')) return;
             
-            const response = await fetch('/api/admin/restaurant/sessions/' + sessionId + '/end', {
-                method: 'POST'
+            const response = await fetch('/api/admin/restaurant/session/' + sessionId, {
+                method: 'DELETE'
             });
             
             const result = await response.json();
