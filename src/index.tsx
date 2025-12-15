@@ -5347,13 +5347,20 @@ app.post('/api/restaurant/reserve', async (c) => {
     // Use guest_count or num_guests
     const guestCount = data.guest_count || data.num_guests || 1
     
+    // Update guest with room number if provided
+    if (data.room_number) {
+      await DB.prepare(`
+        UPDATE guests SET room_number = ? WHERE guest_id = ?
+      `).bind(data.room_number, guestId).run()
+    }
+    
     // Create reservation
     const result = await DB.prepare(`
       INSERT INTO table_reservations (
         session_id, table_id, guest_id, property_id,
         reservation_date, reservation_time, num_guests,
-        special_requests, dietary_requirements, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        special_requests, dietary_requirements, room_number, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.session_id,
       data.table_id,
@@ -5364,6 +5371,7 @@ app.post('/api/restaurant/reserve', async (c) => {
       guestCount,
       data.special_requests || null,
       data.dietary_requirements || null,
+      data.room_number || null,
       'confirmed'
     ).run()
     
@@ -36861,7 +36869,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                 </div>
             </div>
             <div class="p-6">
-                <input type="text" id="searchInput" placeholder="Search by name, phone, or booking ID..." 
+                <input type="text" id="searchInput" placeholder="Search by name, phone, room number, or booking ID..." 
                        oninput="searchReservations(this.value)"
                        class="w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-purple-500 text-lg mb-4">
                 <div id="searchResults" class="space-y-2">
@@ -37212,7 +37220,10 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                                         <i class="fas fa-clock mr-1"></i>\${r.reservation_time}
                                     </div>
                                     \${r.phone_number ? '<div class="text-sm text-gray-600"><i class="fas fa-phone mr-1"></i>' + r.phone_number + '</div>' : ''}
-                                    \${r.table_number ? '<div class="text-sm bg-white px-2 py-1 rounded inline-block mt-1"><i class="fas fa-chair mr-1"></i>Table ' + r.table_number + '</div>' : ''}
+                                    <div class="flex gap-2 mt-1">
+                                        \${r.table_number ? '<div class="text-sm bg-white px-2 py-1 rounded inline-block"><i class="fas fa-chair mr-1"></i>Table ' + r.table_number + '</div>' : ''}
+                                        \${r.room_number ? '<div class="text-sm bg-white px-2 py-1 rounded inline-block"><i class="fas fa-door-open mr-1"></i>Room ' + r.room_number + '</div>' : ''}
+                                    </div>
                                 </div>
                                 <div class="flex flex-col gap-1">
                                     <button onclick="checkInReservation(\${r.reservation_id})" 
@@ -37605,6 +37616,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             const results = currentReservations.filter(r => 
                 r.guest_name.toLowerCase().includes(query.toLowerCase()) ||
                 (r.phone_number && r.phone_number.includes(query)) ||
+                (r.room_number && r.room_number.toLowerCase().includes(query.toLowerCase())) ||
                 r.reservation_id.toString() === query
             );
             
@@ -37624,6 +37636,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                                 <div class="text-sm text-gray-600">
                                     <i class="fas fa-users mr-1"></i>\${r.number_of_guests} guests
                                     \${r.table_number ? '<span class="mx-2">•</span><i class="fas fa-chair mr-1"></i>Table ' + r.table_number : ''}
+                                    \${r.room_number ? '<span class="mx-2">•</span><i class="fas fa-door-open mr-1"></i>Room ' + r.room_number : ''}
                                 </div>
                                 \${r.phone_number ? '<div class="text-sm text-gray-600"><i class="fas fa-phone mr-1"></i>' + r.phone_number + '</div>' : ''}
                             </div>
