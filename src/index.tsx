@@ -14199,7 +14199,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         const button = section.querySelector('button');
                         if (button) {
                             button.style.background = 'linear-gradient(to right, ' + btnFrom + ', ' + btnTo + ')';
-                            button.style.color = btnTextColor;
+                            button.style.setProperty('color', btnTextColor, 'important');
                             const btnText = button.querySelector('.fa-calendar-check').nextSibling;
                             if (btnText) btnText.textContent = ' ' + (s.button_text || 'Book Your Spot Now');
                         }
