@@ -41681,11 +41681,98 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             <div class="grid md:grid-cols-2 gap-6">
                 <!-- Create Session Form -->
                 <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-green-600"></i>Create Time Slot</h2>
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-plus-circle mr-2 text-green-600"></i>Create Time Slots</h2>
+                    
+                    <!-- Quick Meal Templates -->
+                    <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                        <label class="block text-sm font-semibold mb-2">
+                            <i class="fas fa-magic mr-1"></i>Quick Templates
+                        </label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="applyTemplate('breakfast')" class="px-3 py-2 bg-white border-2 border-blue-200 rounded-lg hover:border-blue-500 text-sm font-medium">
+                                🌅 Breakfast<br><span class="text-xs text-gray-500">6:00-10:00</span>
+                            </button>
+                            <button type="button" onclick="applyTemplate('lunch')" class="px-3 py-2 bg-white border-2 border-blue-200 rounded-lg hover:border-blue-500 text-sm font-medium">
+                                🌞 Lunch<br><span class="text-xs text-gray-500">12:00-15:00</span>
+                            </button>
+                            <button type="button" onclick="applyTemplate('dinner')" class="px-3 py-2 bg-white border-2 border-blue-200 rounded-lg hover:border-blue-500 text-sm font-medium">
+                                🌙 Dinner<br><span class="text-xs text-gray-500">18:00-22:00</span>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <form id="createSessionForm" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Session Date</label>
-                            <input type="date" id="sessionDate" required class="w-full px-3 py-2 border rounded-lg">
+                        <!-- Creation Mode Tabs -->
+                        <div class="flex gap-2 mb-4">
+                            <button type="button" onclick="setCreationMode('single')" id="singleModeBtn" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
+                                Single Day
+                            </button>
+                            <button type="button" onclick="setCreationMode('bulk')" id="bulkModeBtn" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                                Multiple Days
+                            </button>
+                        </div>
+                        
+                        <!-- Single Day Mode -->
+                        <div id="singleDayMode">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Session Date</label>
+                                <input type="date" id="sessionDate" required class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        
+                        <!-- Bulk Mode (Hidden by default) -->
+                        <div id="bulkMode" style="display: none;">
+                            <div class="space-y-3">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Start Date</label>
+                                        <input type="date" id="bulkStartDate" class="w-full px-3 py-2 border rounded-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">End Date</label>
+                                        <input type="date" id="bulkEndDate" class="w-full px-3 py-2 border rounded-lg">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-semibold mb-2">Repeat Pattern</label>
+                                    <select id="bulkPattern" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="daily">Every Day</option>
+                                        <option value="weekdays">Weekdays Only (Mon-Fri)</option>
+                                        <option value="weekends">Weekends Only (Sat-Sun)</option>
+                                        <option value="custom">Custom Days...</option>
+                                    </select>
+                                </div>
+                                
+                                <div id="customDaysSelector" style="display: none;" class="flex flex-wrap gap-2">
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="1" class="w-4 h-4"> Mon
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="2" class="w-4 h-4"> Tue
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="3" class="w-4 h-4"> Wed
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="4" class="w-4 h-4"> Thu
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="5" class="w-4 h-4"> Fri
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="6" class="w-4 h-4"> Sat
+                                    </label>
+                                    <label class="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg cursor-pointer hover:bg-gray-200">
+                                        <input type="checkbox" name="customDays" value="0" class="w-4 h-4"> Sun
+                                    </label>
+                                </div>
+                                
+                                <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+                                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                                    <span id="bulkPreview" class="text-gray-700">Select dates to see preview</span>
+                                </div>
+                            </div>
                         </div>
                         
                         <div>
@@ -41717,7 +41804,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         </div>
                         
                         <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
-                            <i class="fas fa-plus mr-2"></i>Create Time Slot
+                            <i class="fas fa-plus mr-2"></i><span id="createButtonText">Create Time Slot</span>
                         </button>
                     </form>
                 </div>
@@ -43319,40 +43406,201 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         }
       }
 
+      // Mode switching functions
+      window.setCreationMode = function(mode) {
+        const singleBtn = document.getElementById('singleModeBtn');
+        const bulkBtn = document.getElementById('bulkModeBtn');
+        const singleMode = document.getElementById('singleDayMode');
+        const bulkMode = document.getElementById('bulkMode');
+        const buttonText = document.getElementById('createButtonText');
+        
+        if (mode === 'single') {
+          singleBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+          bulkBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+          singleMode.style.display = 'block';
+          bulkMode.style.display = 'none';
+          buttonText.textContent = 'Create Time Slot';
+          document.getElementById('sessionDate').required = true;
+        } else {
+          singleBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+          bulkBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+          singleMode.style.display = 'none';
+          bulkMode.style.display = 'block';
+          buttonText.textContent = 'Create Multiple Time Slots';
+          document.getElementById('sessionDate').required = false;
+        }
+      };
+      
+      // Template application
+      window.applyTemplate = function(type) {
+        const templates = {
+          breakfast: { time: '06:00', duration: 240, type: 'breakfast', capacity: 80 },
+          lunch: { time: '12:00', duration: 180, type: 'lunch', capacity: 100 },
+          dinner: { time: '18:00', duration: 240, type: 'dinner', capacity: 120 }
+        };
+        
+        const template = templates[type];
+        if (template) {
+          document.getElementById('sessionTime').value = template.time;
+          document.getElementById('sessionDuration').value = template.duration;
+          document.getElementById('sessionType').value = template.type;
+          document.getElementById('sessionCapacity').value = template.capacity;
+        }
+      };
+      
+      // Show/hide custom days selector
+      document.getElementById('bulkPattern').addEventListener('change', function() {
+        const customDays = document.getElementById('customDaysSelector');
+        customDays.style.display = this.value === 'custom' ? 'flex' : 'none';
+        updateBulkPreview();
+      });
+      
+      // Update preview when dates change
+      ['bulkStartDate', 'bulkEndDate'].forEach(id => {
+        document.getElementById(id).addEventListener('change', updateBulkPreview);
+      });
+      
+      function updateBulkPreview() {
+        const startDate = document.getElementById('bulkStartDate').value;
+        const endDate = document.getElementById('bulkEndDate').value;
+        const pattern = document.getElementById('bulkPattern').value;
+        const preview = document.getElementById('bulkPreview');
+        
+        if (!startDate || !endDate) {
+          preview.textContent = 'Select start and end dates';
+          return;
+        }
+        
+        const dates = generateDateRange(startDate, endDate, pattern);
+        preview.textContent = \`Will create \${dates.length} time slot\${dates.length !== 1 ? 's' : ''}\`;
+      }
+      
+      function generateDateRange(startDateStr, endDateStr, pattern) {
+        const dates = [];
+        const start = new Date(startDateStr + 'T00:00:00');
+        const end = new Date(endDateStr + 'T00:00:00');
+        
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dayOfWeek = d.getDay();
+          let include = false;
+          
+          if (pattern === 'daily') {
+            include = true;
+          } else if (pattern === 'weekdays') {
+            include = dayOfWeek >= 1 && dayOfWeek <= 5;
+          } else if (pattern === 'weekends') {
+            include = dayOfWeek === 0 || dayOfWeek === 6;
+          } else if (pattern === 'custom') {
+            const checkboxes = document.querySelectorAll('input[name="customDays"]:checked');
+            const selectedDays = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            include = selectedDays.includes(dayOfWeek);
+          }
+          
+          if (include) {
+            dates.push(new Date(d).toISOString().split('T')[0]);
+          }
+        }
+        
+        return dates;
+      }
+
       document.getElementById('createSessionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const sessionData = {
+        // Determine if we're in single or bulk mode
+        const isBulkMode = document.getElementById('bulkMode').style.display !== 'none';
+        
+        const baseSessionData = {
           offering_id: offeringId,
-          session_date: document.getElementById('sessionDate').value,
           session_time: document.getElementById('sessionTime').value,
           session_type: document.getElementById('sessionType').value,
           duration_minutes: parseInt(document.getElementById('sessionDuration').value),
           max_capacity: parseInt(document.getElementById('sessionCapacity').value)
         };
         
-        try {
-          const response = await fetch('/api/admin/restaurant/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sessionData)
-          });
+        let datesToCreate = [];
+        
+        if (isBulkMode) {
+          const startDate = document.getElementById('bulkStartDate').value;
+          const endDate = document.getElementById('bulkEndDate').value;
+          const pattern = document.getElementById('bulkPattern').value;
           
-          const data = await response.json();
-          if (data.success) {
-            alert('Time slot created successfully!');
-            // Update filter to show the newly created session's date
-            document.getElementById('filterSessionDate').value = sessionData.session_date;
+          if (!startDate || !endDate) {
+            alert('Please select start and end dates');
+            return;
+          }
+          
+          datesToCreate = generateDateRange(startDate, endDate, pattern);
+          
+          if (datesToCreate.length === 0) {
+            alert('No dates match the selected pattern');
+            return;
+          }
+          
+          if (!confirm(\`Create \${datesToCreate.length} time slots?\`)) {
+            return;
+          }
+        } else {
+          datesToCreate = [document.getElementById('sessionDate').value];
+        }
+        
+        // Create sessions
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+        
+        try {
+          let successCount = 0;
+          let failCount = 0;
+          
+          for (const date of datesToCreate) {
+            try {
+              const sessionData = { ...baseSessionData, session_date: date };
+              
+              const response = await fetch('/api/admin/restaurant/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(sessionData)
+              });
+              
+              const data = await response.json();
+              if (data.success) {
+                successCount++;
+              } else {
+                failCount++;
+                console.error('Failed to create session for', date, ':', data.error);
+              }
+            } catch (error) {
+              failCount++;
+              console.error('Error creating session for', date, ':', error);
+            }
+          }
+          
+          // Show result
+          if (successCount > 0) {
+            alert(\`Successfully created \${successCount} time slot\${successCount !== 1 ? 's' : ''}\` + 
+                  (failCount > 0 ? \` (\${failCount} failed)\` : ''));
             document.getElementById('createSessionForm').reset();
-            // Reset the form date to today for next creation
-            document.getElementById('sessionDate').value = new Date().toISOString().split('T')[0];
+            
+            // Reset dates to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sessionDate').value = today;
+            document.getElementById('bulkStartDate').value = today;
+            
+            // Switch back to single mode
+            setCreationMode('single');
+            
             loadSessions();
           } else {
-            alert('Failed to create time slot: ' + (data.error || 'Unknown error'));
+            alert('Failed to create time slots');
           }
         } catch (error) {
           console.error('Create session error:', error);
-          alert('Error creating time slot');
+          alert('Error creating time slots');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-plus mr-2"></i><span id="createButtonText">' + 
+                               (isBulkMode ? 'Create Multiple Time Slots' : 'Create Time Slot') + '</span>';
         }
       });
 
