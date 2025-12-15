@@ -36923,48 +36923,110 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         }
 
         async function loadFloorPlan() {
-            // Load floor elements
-            const response = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/floor-elements');
-            const data = await response.json();
-            
-            if (data.success) {
-                floorElements = data.elements || [];
-                renderFloorPlan();
-                updateTableStats();
+            try {
+                // Load restaurant tables (actual seating tables)
+                const tablesResponse = await fetch('/api/restaurant/' + OFFERING_ID + '/tables');
+                const tablesData = await tablesResponse.json();
+                
+                // Load decorative floor elements (bar, entrance, etc.)
+                const elementsResponse = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/floor-elements');
+                const elementsData = await elementsResponse.json();
+                
+                if (tablesData.success) {
+                    // Convert tables to floor elements format with correct field names
+                    floorElements = (tablesData.tables || []).map(table => ({
+                        element_id: table.table_id,
+                        element_type: 'table',
+                        table_number: table.table_number,
+                        capacity: table.capacity,
+                        x: table.position_x,
+                        y: table.position_y,
+                        width: table.width,
+                        height: table.height,
+                        shape: table.shape || 'rectangle'
+                    }));
+                    
+                    // Add decorative elements if available
+                    if (elementsData.success && elementsData.elements) {
+                        const decorativeElements = elementsData.elements.map(el => ({
+                            ...el,
+                            x: el.position_x,
+                            y: el.position_y,
+                            element_type: el.element_type // Keep original type (bar, entrance, etc.)
+                        }));
+                        floorElements = [...floorElements, ...decorativeElements];
+                    }
+                    
+                    console.log('Loaded floor plan:', floorElements.length, 'elements');
+                    renderFloorPlan();
+                    updateTableStats();
+                } else {
+                    console.error('Failed to load tables:', tablesData);
+                }
+            } catch (error) {
+                console.error('Load floor plan error:', error);
             }
         }
 
         function renderFloorPlan() {
             const canvas = document.getElementById('floorCanvas');
+            if (!canvas) {
+                console.error('Floor canvas element not found');
+                return;
+            }
             canvas.innerHTML = '';
             
-            // Filter tables only
-            const tables = floorElements.filter(el => el.element_type === 'table');
+            console.log('Rendering floor plan with', floorElements.length, 'elements');
             
-            tables.forEach(table => {
-                const tableEl = document.createElement('div');
-                tableEl.className = 'table-element table-' + (table.shape || 'rectangle');
-                tableEl.id = 'table-' + table.element_id;
-                tableEl.style.left = table.x + 'px';
-                tableEl.style.top = table.y + 'px';
-                tableEl.style.width = table.width + 'px';
-                tableEl.style.height = table.height + 'px';
+            // Render all elements
+            floorElements.forEach(element => {
+                const el = document.createElement('div');
                 
-                // Determine status
-                const status = getTableStatus(table.table_number);
-                tableEl.classList.add('table-' + status);
+                if (element.element_type === 'table') {
+                    // Render table element
+                    el.className = 'table-element table-' + (element.shape || 'rectangle');
+                    el.id = 'table-' + element.element_id;
+                    el.style.left = element.x + 'px';
+                    el.style.top = element.y + 'px';
+                    el.style.width = element.width + 'px';
+                    el.style.height = element.height + 'px';
+                    
+                    // Determine status
+                    const status = getTableStatus(element.table_number);
+                    el.classList.add('table-' + status);
+                    
+                    // Content
+                    el.innerHTML = '<div class="text-center">' +
+                        '<div class="text-lg font-bold">' + element.table_number + '</div>' +
+                        '<div class="text-xs">' + element.capacity + ' seats</div>' +
+                        '</div>';
+                    
+                    // Click handler
+                    el.onclick = () => openTableModal(element);
+                } else {
+                    // Render decorative element (bar, entrance, etc.)
+                    el.className = 'floor-element floor-' + element.element_type;
+                    el.style.left = element.x + 'px';
+                    el.style.top = element.y + 'px';
+                    el.style.width = element.width + 'px';
+                    el.style.height = element.height + 'px';
+                    el.style.backgroundColor = element.color || '#94A3B8';
+                    el.style.opacity = '0.3';
+                    el.style.border = '1px dashed #64748B';
+                    el.style.borderRadius = '8px';
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.justifyContent = 'center';
+                    el.style.fontSize = '12px';
+                    el.style.color = '#475569';
+                    el.style.cursor = 'default';
+                    el.innerHTML = element.element_label || element.element_type;
+                }
                 
-                // Content
-                tableEl.innerHTML = '<div class="text-center">' +
-                    '<div class="text-lg font-bold">' + table.table_number + '</div>' +
-                    '<div class="text-xs">' + table.capacity + ' seats</div>' +
-                    '</div>';
-                
-                // Click handler
-                tableEl.onclick = () => openTableModal(table);
-                
-                canvas.appendChild(tableEl);
+                canvas.appendChild(el);
             });
+            
+            console.log('Floor plan rendered');
         }
 
         function getTableStatus(tableNumber) {
