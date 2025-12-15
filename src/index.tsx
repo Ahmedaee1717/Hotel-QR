@@ -23390,6 +23390,2610 @@ app.get('/admin/test', async (c) => {
   `)
 })
 
+// GM Features Showcase (Hidden page for presentations)
+app.get('/gm-features-showcase', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuestConnect - Complete Features Overview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .feature-card { transition: all 0.3s; }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .category-section { scroll-margin-top: 100px; }
+        .demo-video { aspect-ratio: 16/9; background: #1a1a1a; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white py-8 sticky top-0 z-50 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">🏨 GuestConnect Platform</h1>
+                    <p class="text-blue-100 text-lg">Complete Features Overview for General Managers</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-blue-200">Powered by</div>
+                    <div class="text-2xl font-bold">Cloudflare Edge</div>
+                </div>
+            </div>
+            <!-- Quick Navigation -->
+            <div class="flex flex-wrap gap-2 mt-4">
+                <a href="#restaurant" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">🍽️ Restaurant</a>
+                <a href="#beach" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">🏖️ Beach</a>
+                <a href="#hotel-map" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">🗺️ Hotel Map</a>
+                <a href="#analytics" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">📊 Analytics</a>
+                <a href="#ai" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">🤖 AI Features</a>
+                <a href="#multilingual" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">🌍 Multilingual</a>
+                <a href="#technical" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition">⚙️ Technical</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- Platform Overview -->
+        <div class="bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-4 flex items-center gap-3">
+                <i class="fas fa-star text-yellow-500"></i>
+                What is GuestConnect?
+            </h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="text-center p-6 bg-blue-50 rounded-lg">
+                    <div class="text-4xl mb-3">📱</div>
+                    <h3 class="font-bold text-lg mb-2">All-in-One Platform</h3>
+                    <p class="text-gray-600">Restaurant bookings, beach reservations, hotel maps, and guest services in one unified system</p>
+                </div>
+                <div class="text-center p-6 bg-green-50 rounded-lg">
+                    <div class="text-4xl mb-3">⚡</div>
+                    <h3 class="font-bold text-lg mb-2">Real-Time Updates</h3>
+                    <p class="text-gray-600">Instant synchronization across all devices, staff dashboards update in real-time</p>
+                </div>
+                <div class="text-center p-6 bg-purple-50 rounded-lg">
+                    <div class="text-4xl mb-3">🌍</div>
+                    <h3 class="font-bold text-lg mb-2">Global Scale</h3>
+                    <p class="text-gray-600">Runs on Cloudflare's edge network with 300+ locations worldwide for instant access</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restaurant Management -->
+        <div id="restaurant" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-orange-600">
+                <i class="fas fa-utensils"></i>
+                Restaurant Management System
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Feature 1 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🍽️</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Table Booking System</h3>
+                            <p class="text-gray-600 mb-3">Guests can browse restaurants, view availability, and book tables by time slot</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Real-time availability</li>
+                                <li>✓ Time slot management (breakfast, lunch, dinner)</li>
+                                <li>✓ Room number integration</li>
+                                <li>✓ Special requests capture</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📋</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Digital Waitlist</h3>
+                            <p class="text-gray-600 mb-3">Mobile-optimized waitlist system with real-time position tracking</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ QR code check-in</li>
+                                <li>✓ Live queue position updates</li>
+                                <li>✓ SMS & browser notifications</li>
+                                <li>✓ Estimated wait time</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🗺️</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Interactive Floor Plan Designer</h3>
+                            <p class="text-gray-600 mb-3">Visual table layout editor with drag-and-drop functionality</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Drag-and-drop table positioning</li>
+                                <li>✓ Multiple shapes (rectangle, circle, square)</li>
+                                <li>✓ Real-time table status colors</li>
+                                <li>✓ Add walls, bar, entrance markers</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">👨‍💼</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Staff Check-In Dashboard</h3>
+                            <p class="text-gray-600 mb-3">Dedicated interface for hostesses and staff to manage seating</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Pending reservations view</li>
+                                <li>✓ Walk-in check-in</li>
+                                <li>✓ Waitlist management</li>
+                                <li>✓ Room number search</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📱</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Live Occupancy Status</h3>
+                            <p class="text-gray-600 mb-3">Traffic light system showing real-time restaurant capacity</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Quiet / Moderate / Busy / Very Busy / Full</li>
+                                <li>✓ Visible to guests before booking</li>
+                                <li>✓ One-click status updates by manager</li>
+                                <li>✓ Timestamp tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📄</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">AI-Powered Menu OCR</h3>
+                            <p class="text-gray-600 mb-3">Upload menu images and extract text automatically using GPT-4 Vision</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Photo/PDF menu upload</li>
+                                <li>✓ AI text extraction</li>
+                                <li>✓ Auto-categorization (appetizers, mains, desserts)</li>
+                                <li>✓ Price extraction</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Beach Management -->
+        <div id="beach" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-cyan-600">
+                <i class="fas fa-umbrella-beach"></i>
+                Beach & Pool Management
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🏖️</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Beach Spot Booking</h3>
+                            <p class="text-gray-600 mb-3">Interactive beach map with spot selection and booking</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Visual beach/pool map</li>
+                                <li>✓ Click-to-book umbrellas, cabanas, loungers</li>
+                                <li>✓ Zone overlays (VIP, Family, Quiet zones)</li>
+                                <li>✓ Real-time availability</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🎨</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Beach Map Designer</h3>
+                            <p class="text-gray-600 mb-3">Custom beach/pool layout editor with zone management</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Upload beach/pool image</li>
+                                <li>✓ Place umbrellas, cabanas visually</li>
+                                <li>✓ Draw VIP/Family/Quiet zones</li>
+                                <li>✓ Set pricing per spot type</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">⏰</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Time Slot Management</h3>
+                            <p class="text-gray-600 mb-3">Full-day, half-day, or hourly beach reservations</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Flexible booking duration</li>
+                                <li>✓ Advance booking limits</li>
+                                <li>✓ Same-day booking control</li>
+                                <li>✓ Free for hotel guests option</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🎨</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Customizable Beach Card UI</h3>
+                            <p class="text-gray-600 mb-3">Brand the guest-facing beach booking page</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Custom title & subtitle</li>
+                                <li>✓ Branded colors (gradient backgrounds)</li>
+                                <li>✓ Feature highlights customization</li>
+                                <li>✓ Button text & colors</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hotel Maps -->
+        <div id="hotel-map" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-indigo-600">
+                <i class="fas fa-map-marked-alt"></i>
+                Interactive Hotel Maps
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📍</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Clickable Property Map</h3>
+                            <p class="text-gray-600 mb-3">Upload property map and add interactive hotspots</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Upload hotel/resort map image</li>
+                                <li>✓ Place clickable hotspots on buildings, pools, restaurants</li>
+                                <li>✓ Link hotspots to booking pages</li>
+                                <li>✓ Show/hide by category filter</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🏛️</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Category-Based Navigation</h3>
+                            <p class="text-gray-600 mb-3">Organize locations by type with color-coded legend</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Accommodations, Pools, Restaurants, Spa, Fitness</li>
+                                <li>✓ Water Sports, Diving, Kids Club, Reception</li>
+                                <li>✓ Custom icons and emojis</li>
+                                <li>✓ Filter by category</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics & Reporting -->
+        <div id="analytics" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-green-600">
+                <i class="fas fa-chart-line"></i>
+                Analytics & Business Intelligence
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📊</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Real-Time Dashboard</h3>
+                            <p class="text-gray-600 mb-3">Live metrics and KPIs for all services</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Total bookings by service</li>
+                                <li>✓ Active reservations count</li>
+                                <li>✓ Revenue tracking</li>
+                                <li>✓ Popular time slots analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📈</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Booking Trends</h3>
+                            <p class="text-gray-600 mb-3">Historical data and trend analysis</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Daily/weekly/monthly trends</li>
+                                <li>✓ Peak hours identification</li>
+                                <li>✓ No-show rate tracking</li>
+                                <li>✓ Cancellation patterns</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">👥</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Guest Behavior Analytics</h3>
+                            <p class="text-gray-600 mb-3">Understand guest preferences and patterns</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Most popular restaurants</li>
+                                <li>✓ Average party sizes</li>
+                                <li>✓ Booking lead time</li>
+                                <li>✓ Special requests analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📄</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Export & Reporting</h3>
+                            <p class="text-gray-600 mb-3">Generate reports for management</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ CSV export functionality</li>
+                                <li>✓ Date range filtering</li>
+                                <li>✓ Service-specific reports</li>
+                                <li>✓ Guest contact lists</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Features -->
+        <div id="ai" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-purple-600">
+                <i class="fas fa-robot"></i>
+                AI-Powered Features
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🤖</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">GPT-4 Vision Menu OCR</h3>
+                            <p class="text-gray-600 mb-3">Extract text from menu images automatically</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Upload menu photos (JPEG/PNG)</li>
+                                <li>✓ AI extracts all text (60-90 seconds)</li>
+                                <li>✓ Handles multiple pages</li>
+                                <li>✓ 95%+ accuracy rate</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📋</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Intelligent Menu Parsing</h3>
+                            <p class="text-gray-600 mb-3">Automatically structure menu into categories and items</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Auto-detect categories (appetizers, mains, desserts)</li>
+                                <li>✓ Extract item names, descriptions, prices</li>
+                                <li>✓ Identify dietary info (vegetarian/vegan/gluten-free)</li>
+                                <li>✓ Detect allergens and spice levels</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🌍</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">AI Translation</h3>
+                            <p class="text-gray-600 mb-3">Automatic translation to 9 languages</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ English, Spanish, French, German</li>
+                                <li>✓ Italian, Portuguese, Russian</li>
+                                <li>✓ Arabic, Chinese</li>
+                                <li>✓ Context-aware translations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🎯</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Smart Recommendations</h3>
+                            <p class="text-gray-600 mb-3">AI suggests optimal time slots and table assignments</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Table size optimization</li>
+                                <li>✓ Time slot suggestions based on party size</li>
+                                <li>✓ Waitlist priority calculation</li>
+                                <li>✓ Pattern-based forecasting</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multilingual Support -->
+        <div id="multilingual" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-pink-600">
+                <i class="fas fa-globe"></i>
+                Multilingual & Localization
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🌐</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">9 Language Support</h3>
+                            <p class="text-gray-600 mb-3">Full platform available in multiple languages</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ English & Arabic (full RTL support)</li>
+                                <li>✓ Spanish, French, German, Italian</li>
+                                <li>✓ Portuguese, Russian, Chinese</li>
+                                <li>✓ Auto-detect browser language</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🔄</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Dynamic Content Translation</h3>
+                            <p class="text-gray-600 mb-3">Menus, descriptions, and UI adapt to guest language</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Menu translations</li>
+                                <li>✓ Restaurant descriptions</li>
+                                <li>✓ Beach/activity descriptions</li>
+                                <li>✓ Booking confirmations</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🌙</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">RTL (Right-to-Left) Support</h3>
+                            <p class="text-gray-600 mb-3">Perfect Arabic language support</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Full RTL layout flip</li>
+                                <li>✓ Arabic typography</li>
+                                <li>✓ Mirrored UI elements</li>
+                                <li>✓ Cultural date formats</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">💱</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Currency & Localization</h3>
+                            <p class="text-gray-600 mb-3">Multi-currency support with proper formatting</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Multiple currency support</li>
+                                <li>✓ Locale-specific number formatting</li>
+                                <li>✓ Date/time localization</li>
+                                <li>✓ Timezone handling</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Features -->
+        <div id="technical" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-gray-700">
+                <i class="fas fa-cogs"></i>
+                Technical Excellence
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">⚡</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Cloudflare Edge Network</h3>
+                            <p class="text-gray-600 mb-3">Runs on 300+ data centers worldwide</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ < 50ms response time globally</li>
+                                <li>✓ 99.99% uptime SLA</li>
+                                <li>✓ Auto-scaling (1 to 10,000+ users)</li>
+                                <li>✓ Zero cold starts</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">💾</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Cloudflare D1 Database</h3>
+                            <p class="text-gray-600 mb-3">Globally distributed SQLite database</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Automatic replication</li>
+                                <li>✓ ACID compliance</li>
+                                <li>✓ 5GB free storage</li>
+                                <li>✓ Instant read performance</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🔒</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Enterprise Security</h3>
+                            <p class="text-gray-600 mb-3">Bank-level security built-in</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Automatic HTTPS/SSL</li>
+                                <li>✓ DDoS protection</li>
+                                <li>✓ Rate limiting</li>
+                                <li>✓ Data encryption at rest & transit</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">📱</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Mobile-First Design</h3>
+                            <p class="text-gray-600 mb-3">Perfect experience on all devices</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Responsive on all screen sizes</li>
+                                <li>✓ Touch-optimized interface</li>
+                                <li>✓ PWA capabilities (installable)</li>
+                                <li>✓ Offline support</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">💰</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Cost-Effective</h3>
+                            <p class="text-gray-600 mb-3">Free tier covers most hotels</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ 100,000 requests/day FREE</li>
+                                <li>✓ Unlimited bandwidth</li>
+                                <li>✓ 5GB database FREE</li>
+                                <li>✓ $5/month for 10M requests</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card border-2 border-gray-200 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="text-3xl">🔄</div>
+                        <div>
+                            <h3 class="font-bold text-xl mb-2">Real-Time Sync</h3>
+                            <p class="text-gray-600 mb-3">All dashboards update automatically</p>
+                            <ul class="text-sm text-gray-700 space-y-1">
+                                <li>✓ Live dashboard updates</li>
+                                <li>✓ Instant availability changes</li>
+                                <li>✓ Multi-device sync</li>
+                                <li>✓ No page refresh needed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Access URLs -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3">
+                <i class="fas fa-link"></i>
+                System Access Points
+            </h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white/10 backdrop-blur rounded-lg p-6">
+                    <h3 class="font-bold text-xl mb-3">👨‍💼 Admin Panel</h3>
+                    <p class="text-sm mb-3 text-blue-100">Full system management</p>
+                    <a href="/admin/login" class="inline-block px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50">
+                        Admin Login →
+                    </a>
+                </div>
+                <div class="bg-white/10 backdrop-blur rounded-lg p-6">
+                    <h3 class="font-bold text-xl mb-3">👨‍🍳 Staff Dashboard</h3>
+                    <p class="text-sm mb-3 text-blue-100">Restaurant check-in</p>
+                    <a href="/staff/restaurant/1" class="inline-block px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50">
+                        Staff Portal →
+                    </a>
+                </div>
+                <div class="bg-white/10 backdrop-blur rounded-lg p-6">
+                    <h3 class="font-bold text-xl mb-3">👥 Guest Portal</h3>
+                    <p class="text-sm mb-3 text-blue-100">Guest booking system</p>
+                    <a href="/paradise-resort" class="inline-block px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50">
+                        Guest View →
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Stats -->
+        <div class="text-center text-gray-600 py-8">
+            <div class="grid md:grid-cols-4 gap-6 mb-6">
+                <div>
+                    <div class="text-4xl font-bold text-blue-600 mb-2">25+</div>
+                    <div class="text-sm">Core Features</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-green-600 mb-2">9</div>
+                    <div class="text-sm">Languages</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-purple-600 mb-2">300+</div>
+                    <div class="text-sm">Edge Locations</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold text-orange-600 mb-2">99.99%</div>
+                    <div class="text-sm">Uptime</div>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500">GuestConnect Platform - Built for Modern Hotels & Resorts</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Smooth scroll for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+  `)
+})
+
+// ============================================
+// GM FEATURES SHOWCASE PAGE (Hidden - Not Linked)
+// ============================================
+app.get('/gm/features', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuestConnect Platform Features - For General Managers</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .feature-card {
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-left-color: #3B82F6;
+        }
+        .category-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .demo-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .tech-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">
+                        <i class="fas fa-rocket mr-3"></i>GuestConnect Platform
+                    </h1>
+                    <p class="text-xl text-blue-100">Complete Feature Guide for General Managers</p>
+                    <p class="text-sm text-blue-200 mt-2">Enterprise-grade hospitality management platform</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-3xl font-bold">87</div>
+                    <div class="text-sm text-blue-100">Database Tables</div>
+                    <div class="text-3xl font-bold mt-2">200+</div>
+                    <div class="text-sm text-blue-100">Features</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white rounded-lg shadow-lg p-4 border-l-4 border-blue-500">
+                <div class="flex items-center">
+                    <i class="fas fa-utensils text-3xl text-blue-500 mr-3"></i>
+                    <div>
+                        <div class="text-2xl font-bold">Restaurant</div>
+                        <div class="text-sm text-gray-600">Management System</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-4 border-l-4 border-green-500">
+                <div class="flex items-center">
+                    <i class="fas fa-umbrella-beach text-3xl text-green-500 mr-3"></i>
+                    <div>
+                        <div class="text-2xl font-bold">Beach</div>
+                        <div class="text-sm text-gray-600">Booking System</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-4 border-l-4 border-orange-500">
+                <div class="flex items-center">
+                    <i class="fas fa-swimming-pool text-3xl text-orange-500 mr-3"></i>
+                    <div>
+                        <div class="text-2xl font-bold">Activities</div>
+                        <div class="text-sm text-gray-600">Booking System</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-4 border-l-4 border-purple-500">
+                <div class="flex items-center">
+                    <i class="fas fa-robot text-3xl text-purple-500 mr-3"></i>
+                    <div>
+                        <div class="text-2xl font-bold">AI Chatbot</div>
+                        <div class="text-sm text-gray-600">Guest Support</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button onclick="showCategory('all')" class="category-btn px-4 py-2 rounded-lg font-medium bg-blue-600 text-white">
+                    <i class="fas fa-th-large mr-2"></i>All Features
+                </button>
+                <button onclick="showCategory('restaurant')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-utensils mr-2"></i>Restaurant
+                </button>
+                <button onclick="showCategory('beach')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-umbrella-beach mr-2"></i>Beach
+                </button>
+                <button onclick="showCategory('activities')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-swimming-pool mr-2"></i>Activities
+                </button>
+                <button onclick="showCategory('chatbot')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-robot mr-2"></i>AI Chatbot
+                </button>
+                <button onclick="showCategory('analytics')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-chart-bar mr-2"></i>Analytics
+                </button>
+                <button onclick="showCategory('ai')" class="category-btn px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700">
+                    <i class="fas fa-brain mr-2"></i>AI Features
+                </button>
+            </div>
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="🔍 Search features..." 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onkeyup="filterFeatures()">
+            </div>
+        </div>
+
+        <!-- Features Container -->
+        <div id="featuresContainer">
+
+        <!-- ============================================ -->
+        <!-- RESTAURANT MANAGEMENT SYSTEM -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="restaurant">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-utensils mr-3"></i>Restaurant Management System
+                </h2>
+                <p class="text-blue-100">Complete F&B management with table booking, waitlist, floor plans, and AI menu processing</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>Time Slot Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Create and manage dining sessions with customizable time slots, capacity limits, and booking windows.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Sessions</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Capacity</span>
+                            <span class="tech-badge bg-purple-100 text-purple-700">Schedule</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Breakfast, Lunch, Dinner slots</li>
+                            <li>✓ Custom time ranges & duration</li>
+                            <li>✓ Max guests per session</li>
+                            <li>✓ Advance booking window (days)</li>
+                            <li>✓ Status: Available/Full/Closed</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> dining_sessions
+                        </div>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-chair text-blue-500 mr-2"></i>Table Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Visual floor plan designer with drag-and-drop table positioning, capacity control, and real-time status tracking.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Floor Plan</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Live Status</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Visual table designer (HTML5 Canvas)</li>
+                            <li>✓ Table numbers & capacity</li>
+                            <li>✓ Position (x, y coordinates)</li>
+                            <li>✓ Status: available/occupied/reserved</li>
+                            <li>✓ Auto-layout grid system</li>
+                            <li>✓ Table type: round/square/rectangle</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> restaurant_tables
+                        </div>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-book-open text-blue-500 mr-2"></i>Table Reservations
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Guest table booking system with SMS/email confirmations, QR code check-in, and automatic status updates.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Bookings</span>
+                            <span class="tech-badge bg-green-100 text-green-700">QR Check-in</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Guest name, room number, phone</li>
+                            <li>✓ Party size & special requests</li>
+                            <li>✓ Booking reference (HB-YYMMDD-XXXX)</li>
+                            <li>✓ Session assignment & table allocation</li>
+                            <li>✓ Status: pending/confirmed/seated/completed/cancelled</li>
+                            <li>✓ SMS/Email notifications</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> table_reservations
+                        </div>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-list-ol text-blue-500 mr-2"></i>Waitlist Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Real-time queue management with SMS notifications, estimated wait times, and automatic position updates.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Queue</span>
+                            <span class="tech-badge bg-red-100 text-red-700">Real-time</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Join queue via QR/Guest page</li>
+                            <li>✓ Queue position tracking</li>
+                            <li>✓ Estimated wait time (15/30/45+ min)</li>
+                            <li>✓ SMS alerts when table ready</li>
+                            <li>✓ Status: waiting/notified/seated/cancelled</li>
+                            <li>✓ Auto-remove after timeout</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> restaurant_waitlist
+                        </div>
+                    </div>
+
+                    <!-- Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-user-check text-blue-500 mr-2"></i>Walk-in Check-in System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Staff dashboard for walk-in guest check-ins, table assignment, and session management.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Walk-ins</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Staff</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Quick guest registration</li>
+                            <li>✓ Table assignment interface</li>
+                            <li>✓ Session-based tracking</li>
+                            <li>✓ Guest count & duration</li>
+                            <li>✓ Check-out & table release</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> guest_dining_sessions
+                        </div>
+                    </div>
+
+                    <!-- Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-book-reader text-blue-500 mr-2"></i>Digital Menu System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Multi-language digital menus with category organization, item descriptions, pricing, and dietary tags.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Menus</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Multi-lang</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Menu structure (categories, items)</li>
+                            <li>✓ Item details: name, description, price</li>
+                            <li>✓ Dietary tags: vegetarian, vegan, gluten-free</li>
+                            <li>✓ Spice levels & allergen info</li>
+                            <li>✓ Multi-language support (9 languages)</li>
+                            <li>✓ Image URLs for items</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> restaurant_menus, menu_items, menu_categories
+                        </div>
+                    </div>
+
+                    <!-- Feature 7 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-file-image text-blue-500 mr-2"></i>AI Menu OCR Processing
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Upload menu images (JPEG/PNG) and use AI to automatically extract text, parse structure, and translate to 9 languages.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">AI OCR</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Auto-translate</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">OpenAI</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Upload menu images (JPEG/PNG/Base64)</li>
+                            <li>✓ GPT-4o-mini Vision extracts text</li>
+                            <li>✓ Auto-parse categories & items</li>
+                            <li>✓ Extract prices, descriptions, dietary info</li>
+                            <li>✓ Auto-translate to 9 languages</li>
+                            <li>✓ Processing time: 60-120 seconds</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>API:</strong> POST /api/admin/restaurant/menus/:id/process-ocr
+                        </div>
+                    </div>
+
+                    <!-- Feature 8 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-tachometer-alt text-blue-500 mr-2"></i>Live Occupancy Status
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Real-time restaurant occupancy indicator with color-coded status (Quiet, Moderate, Busy, Very Busy).
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Real-time</span>
+                            <span class="tech-badge bg-orange-100 text-orange-700">Traffic Light</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ 4 occupancy levels with icons</li>
+                            <li>✓ Quiet (Green): Plenty of space</li>
+                            <li>✓ Moderate (Yellow): Filling up</li>
+                            <li>✓ Busy (Orange): Limited tables</li>
+                            <li>✓ Very Busy (Red): Almost full</li>
+                            <li>✓ Manual GM control or auto-calculate</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Field:</strong> hotel_offerings.occupancy_status
+                        </div>
+                    </div>
+
+                    <!-- Feature 9 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-paint-brush text-blue-500 mr-2"></i>Floor Plan Designer
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Advanced visual editor with decorative elements, walls, AI-generated textures, and custom layouts.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Visual Editor</span>
+                            <span class="tech-badge bg-purple-100 text-purple-700">AI Textures</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Drag & drop table placement</li>
+                            <li>✓ Add decorative elements (plants, bars, etc)</li>
+                            <li>✓ Draw walls & partitions</li>
+                            <li>✓ AI-generated floor textures</li>
+                            <li>✓ Custom colors & styles</li>
+                            <li>✓ Save & load layouts</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> floor_plan_elements, restaurant_walls, restaurant_textures
+                        </div>
+                    </div>
+
+                    <!-- Feature 10 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-desktop text-blue-500 mr-2"></i>Staff Dashboard
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Real-time staff interface for managing active guests, pending check-ins, table status, and waitlist.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Real-time</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Staff</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Pending reservations list</li>
+                            <li>✓ Active guest tracking</li>
+                            <li>✓ Table status overview</li>
+                            <li>✓ Waitlist management</li>
+                            <li>✓ Quick check-in/check-out</li>
+                            <li>✓ Real-time updates (auto-refresh)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Route:</strong> /staff/restaurant/:offering_id
+                        </div>
+                    </div>
+
+                    <!-- Feature 11 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-cog text-blue-500 mr-2"></i>Restaurant Admin Panel
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Comprehensive management interface for restaurant info, tables, menus, sessions, reservations, and settings.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Admin</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Full Control</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Restaurant info editor (name, description, images)</li>
+                            <li>✓ Tables & Floor Plan tab</li>
+                            <li>✓ Time Slots & Sessions management</li>
+                            <li>✓ Reservations list & control</li>
+                            <li>✓ Menu design & OCR processing</li>
+                            <li>✓ Enable/Disable booking toggle</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Route:</strong> /admin/restaurant/:offering_id
+                        </div>
+                    </div>
+
+                    <!-- Feature 12 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-toggle-on text-blue-500 mr-2"></i>Enable Booking Toggle
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Quick switch to enable/disable table booking functionality for each restaurant independently.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Control</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Per-restaurant booking control</li>
+                            <li>✓ Enable/disable with one click</li>
+                            <li>✓ Persists in database</li>
+                            <li>✓ Shows on guest booking page</li>
+                            <li>✓ Visual toggle in admin panel</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Field:</strong> hotel_offerings.enable_booking
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- BEACH BOOKING SYSTEM -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="beach">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-umbrella-beach mr-3"></i>Beach Booking System
+                </h2>
+                <p class="text-blue-100">Interactive beach zone management with visual booking, occupancy tracking, and customizable settings</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Beach Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-map-marked-alt text-blue-500 mr-2"></i>Interactive Beach Map
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Visual beach layout with clickable zones, real-time availability, and zone-based booking system.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Interactive</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Visual</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Upload custom beach map image</li>
+                            <li>✓ Define clickable zones (coordinates)</li>
+                            <li>✓ Zone types: umbrellas, cabanas, loungers, daybeds</li>
+                            <li>✓ Real-time availability display</li>
+                            <li>✓ Color-coded status (available/booked)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> beach_zones, beach_settings
+                        </div>
+                    </div>
+
+                    <!-- Beach Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-calendar-check text-blue-500 mr-2"></i>Beach Spot Reservations
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Guest beach booking with spot selection, time slots, pricing, and confirmation system.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Bookings</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Payment</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Select beach zone & spot number</li>
+                            <li>✓ Date & time range selection</li>
+                            <li>✓ Pricing: free for hotel guests, paid for externals</li>
+                            <li>✓ Advance booking window (up to 7 days)</li>
+                            <li>✓ Same-day booking support</li>
+                            <li>✓ Email/SMS confirmations</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> beach_bookings
+                        </div>
+                    </div>
+
+                    <!-- Beach Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-layer-group text-blue-500 mr-2"></i>Zone Overlay Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Define and manage beach zone overlays on map images for precise spot identification.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Visual Editor</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Zone coordinates (x, y, width, height)</li>
+                            <li>✓ Zone labels & spot numbers</li>
+                            <li>✓ Capacity per zone</li>
+                            <li>✓ Zone status & availability</li>
+                            <li>✓ Visual overlay on map</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> beach_zone_overlays
+                        </div>
+                    </div>
+
+                    <!-- Beach Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-cog text-blue-500 mr-2"></i>Beach Settings Control
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Comprehensive settings for beach operations, hours, pricing, booking rules, and UI customization.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Settings</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Customizable</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Operating hours (open/close time)</li>
+                            <li>✓ Advance booking days limit</li>
+                            <li>✓ Max booking duration per guest</li>
+                            <li>✓ Free for hotel guests / paid for externals</li>
+                            <li>✓ Email confirmation settings</li>
+                            <li>✓ UI text & title customization</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> beach_settings
+                        </div>
+                    </div>
+
+                    <!-- Beach Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-traffic-light text-blue-500 mr-2"></i>Beach Occupancy Status
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Real-time beach occupancy indicator with color-coded status and automatic availability calculation.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Real-time</span>
+                            <span class="tech-badge bg-orange-100 text-orange-700">Auto-calc</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Available (Green): Plenty of spots</li>
+                            <li>✓ Filling Up (Yellow): 50-75% booked</li>
+                            <li>✓ Almost Full (Orange): 75-90% booked</li>
+                            <li>✓ Fully Booked (Red): 90%+ booked</li>
+                            <li>✓ Auto-calculate from booking data</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Beach traffic light system
+                        </div>
+                    </div>
+
+                    <!-- Beach Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-language text-blue-500 mr-2"></i>Multi-language Beach UI
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Customize beach booking page text in multiple languages with AI translation support.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Multi-lang</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Customizable</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Custom feature titles & subtitles</li>
+                            <li>✓ Key features text (3 items)</li>
+                            <li>✓ Spot type names & descriptions</li>
+                            <li>✓ 33 language support</li>
+                            <li>✓ AI-powered translation</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> beach_settings_translations
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- ACTIVITIES BOOKING SYSTEM -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="activities">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-swimming-pool mr-3"></i>Activities Booking System
+                </h2>
+                <p class="text-blue-100">Complete activity management with bookings, vendors, schedules, waivers, and payment processing</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Activity Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-swimmer text-blue-500 mr-2"></i>Activity Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Create and manage hotel activities with descriptions, pricing, capacity, duration, and requirements.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Activities</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Catalog</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Activity name, description, images</li>
+                            <li>✓ Pricing & currency</li>
+                            <li>✓ Duration & capacity (min/max guests)</li>
+                            <li>✓ Category-based organization</li>
+                            <li>✓ Requirements (age, skill level, equipment)</li>
+                            <li>✓ Vendor assignment</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> activities
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-tags text-blue-500 mr-2"></i>Activity Categories
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Organize activities into categories with custom icons, colors, and multilingual names.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Categories</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Water Sports</li>
+                            <li>✓ Diving & Snorkeling</li>
+                            <li>✓ Spa & Wellness</li>
+                            <li>✓ Safari & Tours</li>
+                            <li>✓ Kids Club</li>
+                            <li>✓ Custom categories with icons & colors</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> categories
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>Activity Scheduling
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Flexible scheduling with time slots, recurring sessions, blackout dates, and capacity management.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Schedule</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Slots</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Recurring weekly schedules</li>
+                            <li>✓ Custom time slots</li>
+                            <li>✓ Capacity per session</li>
+                            <li>✓ Blackout dates</li>
+                            <li>✓ Special event overrides</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> availability_schedule
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-clipboard-check text-blue-500 mr-2"></i>Activity Bookings
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Guest booking system with date/time selection, payment processing, and confirmation workflow.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Bookings</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Payments</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Browse available activities</li>
+                            <li>✓ Select date, time, guests</li>
+                            <li>✓ Payment processing</li>
+                            <li>✓ Booking reference generation</li>
+                            <li>✓ Email/SMS confirmations</li>
+                            <li>✓ Status tracking: pending/confirmed/completed/cancelled</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> bookings
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-handshake text-blue-500 mr-2"></i>Vendor Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Manage external activity providers with contact info, property assignments, and activity catalogs.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Vendors</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Vendor profiles (name, contact, address)</li>
+                            <li>✓ Property assignments</li>
+                            <li>✓ Activity catalog per vendor</li>
+                            <li>✓ Commission tracking</li>
+                            <li>✓ Status: active/inactive</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> vendors, vendor_properties
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-file-signature text-blue-500 mr-2"></i>Digital Waivers
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Require and collect digital liability waivers for activities with signature capture and legal compliance.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Legal</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Digital Sign</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Waiver text & terms</li>
+                            <li>✓ Digital signature capture</li>
+                            <li>✓ Mandatory acceptance before booking</li>
+                            <li>✓ Store signed waivers</li>
+                            <li>✓ Legal compliance tracking</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> waivers
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 7 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-images text-blue-500 mr-2"></i>Activity Gallery
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Multiple images per activity with captions, order management, and responsive display.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Gallery</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Upload multiple images per activity</li>
+                            <li>✓ Image order management</li>
+                            <li>✓ Captions & descriptions</li>
+                            <li>✓ Set primary image</li>
+                            <li>✓ Responsive image gallery</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> activity_images
+                        </div>
+                    </div>
+
+                    <!-- Activity Feature 8 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-history text-blue-500 mr-2"></i>Activity Logs
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Track all activity changes with detailed audit logs for compliance and troubleshooting.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-gray-100 text-gray-700">Audit</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Log all activity changes</li>
+                            <li>✓ Track user actions</li>
+                            <li>✓ Timestamp all modifications</li>
+                            <li>✓ Change history</li>
+                            <li>✓ Audit trail for compliance</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> activity_logs
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- AI CHATBOT SYSTEM -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="chatbot">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-robot mr-3"></i>AI Chatbot System
+                </h2>
+                <p class="text-blue-100">Intelligent guest support with RAG-powered responses, multi-language support, and conversation management</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Chatbot Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-comments text-blue-500 mr-2"></i>Live Chat Interface
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Real-time chat widget with AI-powered responses, typing indicators, and message history.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Real-time</span>
+                            <span class="tech-badge bg-green-100 text-green-700">AI</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Floating chat widget</li>
+                            <li>✓ Message history persistence</li>
+                            <li>✓ Typing indicators</li>
+                            <li>✓ Quick reply suggestions</li>
+                            <li>✓ File/image attachments (planned)</li>
+                            <li>✓ Read receipts</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> chat_rooms, chat_messages
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-brain text-blue-500 mr-2"></i>RAG-Powered Responses
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            AI retrieval-augmented generation using hotel knowledge base for accurate, contextual responses.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">RAG</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">OpenAI</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Vector similarity search</li>
+                            <li>✓ Context-aware responses</li>
+                            <li>✓ Hotel info knowledge base</li>
+                            <li>✓ Activity recommendations</li>
+                            <li>✓ Restaurant information</li>
+                            <li>✓ Policy & FAQ answers</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> chatbot_documents, chatbot_chunks
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-database text-blue-500 mr-2"></i>Knowledge Base Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Upload and manage hotel documents with automatic chunking, embedding, and semantic search.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Documents</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Embeddings</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Upload PDFs, docs, text files</li>
+                            <li>✓ Auto-chunk large documents</li>
+                            <li>✓ Generate embeddings (OpenAI)</li>
+                            <li>✓ Semantic similarity search</li>
+                            <li>✓ Document versioning</li>
+                            <li>✓ Update knowledge base</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> chatbot_documents, chatbot_chunks
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-language text-blue-500 mr-2"></i>Multi-language Support
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Automatic language detection and AI translation for 33 languages with context preservation.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">33 Languages</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Auto-detect</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Auto-detect guest language</li>
+                            <li>✓ Translate responses to guest language</li>
+                            <li>✓ Preserve context across languages</li>
+                            <li>✓ 33 language support (EN, AR, DE, RU, etc)</li>
+                            <li>✓ AI-powered translation</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Built-in translation
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-chart-line text-blue-500 mr-2"></i>Conversation Analytics
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Track chatbot usage, response times, satisfaction scores, and conversation metrics.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Analytics</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Metrics</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Total conversations count</li>
+                            <li>✓ Messages per conversation</li>
+                            <li>✓ Response time tracking</li>
+                            <li>✓ Satisfaction ratings</li>
+                            <li>✓ Common topics analysis</li>
+                            <li>✓ Usage statistics</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> chatbot_conversations, chatbot_usage_stats
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-thumbs-up text-blue-500 mr-2"></i>Feedback System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Collect feedback on chatbot responses with ratings, comments, and improvement suggestions.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Feedback</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Rate responses (helpful/not helpful)</li>
+                            <li>✓ Optional feedback comments</li>
+                            <li>✓ Track improvement over time</li>
+                            <li>✓ Identify common issues</li>
+                            <li>✓ Flag for human review</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> chat_feedback
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 7 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-shield-alt text-blue-500 mr-2"></i>Rate Limiting & Security
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Protect against abuse with rate limiting, token usage tracking, and cost management.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Security</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Rate limit per IP/user</li>
+                            <li>✓ Message throttling</li>
+                            <li>✓ Token usage tracking</li>
+                            <li>✓ Cost management</li>
+                            <li>✓ Abuse detection</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> chatbot_rate_limits
+                        </div>
+                    </div>
+
+                    <!-- Chatbot Feature 8 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-plug text-blue-500 mr-2"></i>Action Integration
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Connect chatbot to platform actions: check availability, make bookings, retrieve info.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Actions</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Check restaurant availability</li>
+                            <li>✓ Check beach spot availability</li>
+                            <li>✓ Retrieve activity schedules</li>
+                            <li>✓ Book restaurant tables (future)</li>
+                            <li>✓ Book beach spots (future)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Function calling integration
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- ANALYTICS & INSIGHTS -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="analytics">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-chart-bar mr-3"></i>Analytics & Insights
+                </h2>
+                <p class="text-blue-100">Comprehensive tracking and reporting for bookings, guests, revenue, and operational metrics</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Analytics Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-eye text-blue-500 mr-2"></i>Page View Tracking
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Track guest page views with session tracking, referrer info, and device detection.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Tracking</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Page view counts</li>
+                            <li>✓ Session tracking</li>
+                            <li>✓ Referrer source</li>
+                            <li>✓ Device & browser info</li>
+                            <li>✓ Time on page</li>
+                            <li>✓ Bounce rate</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> page_views
+                        </div>
+                    </div>
+
+                    <!-- Analytics Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-qrcode text-blue-500 mr-2"></i>QR Code Analytics
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Track QR code scans with location, device, time, and conversion metrics.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">QR Tracking</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Scan count per QR card</li>
+                            <li>✓ Location tracking (room, table, spot)</li>
+                            <li>✓ Device info</li>
+                            <li>✓ Timestamp tracking</li>
+                            <li>✓ Conversion tracking (scan → booking)</li>
+                            <li>✓ QR design variants testing</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> qr_scans, qr_card_designs
+                        </div>
+                    </div>
+
+                    <!-- Analytics Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-chart-line text-blue-500 mr-2"></i>Event Analytics
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Custom event tracking for guest interactions, button clicks, and conversion funnels.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Events</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Custom event definitions</li>
+                            <li>✓ Button click tracking</li>
+                            <li>✓ Form submission tracking</li>
+                            <li>✓ Conversion funnel analysis</li>
+                            <li>✓ Event properties (JSON)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> analytics_events
+                        </div>
+                    </div>
+
+                    <!-- Analytics Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-dollar-sign text-blue-500 mr-2"></i>Revenue Tracking
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Track payments, revenue streams, and financial metrics across all booking types.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Revenue</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Payment tracking (card, cash, room charge)</li>
+                            <li>✓ Revenue by category</li>
+                            <li>✓ Revenue by time period</li>
+                            <li>✓ Commission tracking</li>
+                            <li>✓ Payment status</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> payments
+                        </div>
+                    </div>
+
+                    <!-- Analytics Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-star text-blue-500 mr-2"></i>Feedback Analytics
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Collect and analyze guest feedback with ratings, comments, and sentiment analysis.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Feedback</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Rating scales (1-5, NPS)</li>
+                            <li>✓ Comment collection</li>
+                            <li>✓ Category-based feedback</li>
+                            <li>✓ Sentiment analysis (planned)</li>
+                            <li>✓ Trend tracking</li>
+                            <li>✓ Action item generation</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> feedback_forms, feedback_submissions, feedback_insights
+                        </div>
+                    </div>
+
+                    <!-- Analytics Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-bell text-blue-500 mr-2"></i>Real-time Notifications
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Configurable notification system for new bookings, feedback, waitlist, and urgent events.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Real-time</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">Alerts</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Sound notifications (customizable)</li>
+                            <li>✓ Persistent beep for urgent items</li>
+                            <li>✓ Browser popup alerts</li>
+                            <li>✓ SMS/Email forwarding</li>
+                            <li>✓ Per-property configuration</li>
+                            <li>✓ Event-based triggers</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> notification_settings
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- AI-POWERED FEATURES -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="ai">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-brain mr-3"></i>AI-Powered Features
+                </h2>
+                <p class="text-blue-100">Cutting-edge AI capabilities for automation, content generation, and intelligent assistance</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- AI Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-language text-blue-500 mr-2"></i>AI Translation Engine
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            High-quality translation for hospitality content using OpenAI GPT-4, supporting 33 languages.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">OpenAI</span>
+                            <span class="tech-badge bg-blue-100 text-blue-700">33 Languages</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Tourism-specific translations</li>
+                            <li>✓ Context-aware translations</li>
+                            <li>✓ Batch processing</li>
+                            <li>✓ Quality preservation</li>
+                            <li>✓ Multi-language output</li>
+                            <li>✓ Usage tracking</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Built into all multilingual features
+                        </div>
+                    </div>
+
+                    <!-- AI Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-file-alt text-blue-500 mr-2"></i>AI Proofreading
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Automatic grammar, spelling, and style checking for all guest-facing content.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Proofreading</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Grammar & spelling correction</li>
+                            <li>✓ Style improvement suggestions</li>
+                            <li>✓ Tone consistency check</li>
+                            <li>✓ Hospitality writing standards</li>
+                            <li>✓ Multi-language support</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> ai_proofreading_logs, ai_proofreading_usage
+                        </div>
+                    </div>
+
+                    <!-- AI Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-palette text-blue-500 mr-2"></i>AI Texture Generation
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Generate custom floor textures, patterns, and backgrounds for floor plan designer.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Image Gen</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Text-to-texture generation</li>
+                            <li>✓ Style presets (wood, marble, carpet, etc)</li>
+                            <li>✓ Seamless tile generation</li>
+                            <li>✓ Custom color palettes</li>
+                            <li>✓ Save texture library</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> restaurant_textures
+                        </div>
+                    </div>
+
+                    <!-- AI Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-lightbulb text-blue-500 mr-2"></i>AI Content Suggestions
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Intelligent content recommendations for activity descriptions, menu items, and marketing copy.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Suggestions</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Activity description generation</li>
+                            <li>✓ Menu item descriptions</li>
+                            <li>✓ Marketing copy suggestions</li>
+                            <li>✓ SEO-optimized content</li>
+                            <li>✓ Multiple variations</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Content assistant (planned)
+                        </div>
+                    </div>
+
+                    <!-- AI Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-robot text-blue-500 mr-2"></i>Smart Recommendations
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Personalized activity and dining recommendations based on guest preferences and behavior.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">ML</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Guest preference analysis</li>
+                            <li>✓ Activity recommendations</li>
+                            <li>✓ Restaurant recommendations</li>
+                            <li>✓ Timing suggestions (best time to visit)</li>
+                            <li>✓ Package bundling suggestions</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Recommendation engine (planned)
+                        </div>
+                    </div>
+
+                    <!-- AI Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-search text-blue-500 mr-2"></i>Semantic Search
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Natural language search across activities, menus, and hotel information using embeddings.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Embeddings</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Vector-based search</li>
+                            <li>✓ Contextual understanding</li>
+                            <li>✓ Multi-language queries</li>
+                            <li>✓ Fuzzy matching</li>
+                            <li>✓ Related results</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Search enhancement (planned)
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- GUEST EXPERIENCE FEATURES -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="all">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-user-friends mr-3"></i>Guest Experience Features
+                </h2>
+                <p class="text-blue-100">Features designed to enhance the guest journey from check-in to check-out</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Guest Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-qrcode text-blue-500 mr-2"></i>QR Code System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Generate QR codes for rooms, tables, beach spots with customizable designs and tracking.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">QR Codes</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ QR code generation for any location</li>
+                            <li>✓ Custom QR card designs</li>
+                            <li>✓ Logo embedding</li>
+                            <li>✓ Color customization</li>
+                            <li>✓ Scan tracking</li>
+                            <li>✓ Print-ready formats</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> qr_card_designs
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-map text-blue-500 mr-2"></i>Interactive Hotel Map
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Visual hotel property map with clickable hotspots for facilities, restaurants, and points of interest.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Interactive</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Upload property map image</li>
+                            <li>✓ Define clickable hotspots</li>
+                            <li>✓ Category-based filtering</li>
+                            <li>✓ Icons & descriptions</li>
+                            <li>✓ Directions & navigation</li>
+                            <li>✓ Multi-language labels</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> hotel_map_hotspots, hotel_map_categories
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-book text-blue-500 mr-2"></i>Info Pages & Content
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Custom content pages for policies, FAQs, services, and hotel information.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Content</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Rich text editor</li>
+                            <li>✓ HTML content support</li>
+                            <li>✓ Media embedding</li>
+                            <li>✓ Multi-language versions</li>
+                            <li>✓ SEO optimization</li>
+                            <li>✓ Version control</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> info_pages
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-mobile-alt text-blue-500 mr-2"></i>Mobile-First Design
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Responsive design optimized for mobile devices with touch-friendly interfaces.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-green-100 text-green-700">Responsive</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Mobile-optimized layouts</li>
+                            <li>✓ Touch gestures support</li>
+                            <li>✓ Fast loading times</li>
+                            <li>✓ Offline functionality (planned)</li>
+                            <li>✓ Progressive Web App (PWA) ready</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tech:</strong> TailwindCSS responsive design
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-bell text-blue-500 mr-2"></i>Guest Notifications
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Multi-channel notifications for booking confirmations, reminders, and updates.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Notifications</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Email notifications</li>
+                            <li>✓ SMS notifications</li>
+                            <li>✓ Browser push notifications</li>
+                            <li>✓ In-app notifications</li>
+                            <li>✓ Multi-language</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Notification system
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-headset text-blue-500 mr-2"></i>Support Ticket System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Built-in ticket system for guest support requests with status tracking and messaging.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Support</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Create support tickets</li>
+                            <li>✓ Category-based routing</li>
+                            <li>✓ Priority levels</li>
+                            <li>✓ Status tracking</li>
+                            <li>✓ Message threads</li>
+                            <li>✓ File attachments</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> support_tickets, ticket_messages
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 7 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-phone-alt text-blue-500 mr-2"></i>Callback Requests
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Quick callback request system for guests needing immediate assistance.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Urgent</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ One-click callback request</li>
+                            <li>✓ Room number & name</li>
+                            <li>✓ Reason for callback</li>
+                            <li>✓ Priority queue</li>
+                            <li>✓ Staff notification</li>
+                            <li>✓ Status tracking</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> callback_requests
+                        </div>
+                    </div>
+
+                    <!-- Guest Feature 8 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-edit text-blue-500 mr-2"></i>Custom Sections
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Create custom content sections for promotional banners, announcements, and special offers.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Flexible</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Custom HTML sections</li>
+                            <li>✓ Position control</li>
+                            <li>✓ Show/hide toggle</li>
+                            <li>✓ Multi-language support</li>
+                            <li>✓ Scheduling (show only on dates)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> custom_sections, custom_section_translations
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TECHNICAL & INFRASTRUCTURE -->
+        <!-- ============================================ -->
+        <div class="mb-8 feature-section" data-category="all">
+            <div class="category-header text-white rounded-t-lg p-6">
+                <h2 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-cogs mr-3"></i>Technical & Infrastructure
+                </h2>
+                <p class="text-blue-100">Robust backend architecture, security, and platform management capabilities</p>
+            </div>
+            <div class="bg-white rounded-b-lg shadow-lg p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    <!-- Tech Feature 1 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-database text-blue-500 mr-2"></i>Cloudflare D1 Database
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Globally distributed SQLite database with automatic replication and low-latency access.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">D1</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Global</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ 87 database tables</li>
+                            <li>✓ Automatic global replication</li>
+                            <li>✓ SQLite compatibility</li>
+                            <li>✓ ACID transactions</li>
+                            <li>✓ Schema migrations</li>
+                            <li>✓ Free 5GB storage</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Size:</strong> 1.1 MB (production)
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 2 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-globe text-blue-500 mr-2"></i>Cloudflare Pages Hosting
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Blazing-fast edge deployment on 300+ global CDN locations with automatic HTTPS.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-orange-100 text-orange-700">Edge</span>
+                            <span class="tech-badge bg-green-100 text-green-700">CDN</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ 300+ global edge locations</li>
+                            <li>✓ Sub-100ms response times</li>
+                            <li>✓ Automatic HTTPS/SSL</li>
+                            <li>✓ DDoS protection</li>
+                            <li>✓ Unlimited bandwidth (free)</li>
+                            <li>✓ 100k requests/day (free)</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Platform:</strong> Cloudflare Pages
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 3 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-bolt text-blue-500 mr-2"></i>Hono Framework
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Lightweight, ultra-fast web framework optimized for Cloudflare Workers edge runtime.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Hono</span>
+                            <span class="tech-badge bg-green-100 text-green-700">Fast</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Sub-millisecond routing</li>
+                            <li>✓ Minimal bundle size</li>
+                            <li>✓ TypeScript support</li>
+                            <li>✓ Built-in middleware</li>
+                            <li>✓ Edge-optimized</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Framework:</strong> Hono v4
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 4 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-users-cog text-blue-500 mr-2"></i>User Management System
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Multi-role user system with property-level access control and permissions.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">RBAC</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Roles: property_admin, staff, vendor</li>
+                            <li>✓ Permission system</li>
+                            <li>✓ Property-level access</li>
+                            <li>✓ Password hashing (bcrypt)</li>
+                            <li>✓ Session management</li>
+                            <li>✓ Account status control</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Tables:</strong> users, platform_users
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 5 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-hotel text-blue-500 mr-2"></i>Multi-Property Support
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Manage multiple properties from one platform with isolated data and settings.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-purple-100 text-purple-700">Multi-tenant</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Property-based data isolation</li>
+                            <li>✓ Custom domain per property</li>
+                            <li>✓ Independent settings</li>
+                            <li>✓ Separate analytics</li>
+                            <li>✓ Role-based property access</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> properties
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 6 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-language text-blue-500 mr-2"></i>Internationalization (i18n)
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Full multi-language support with 33 languages, RTL support, and AI translation.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">33 Languages</span>
+                            <span class="tech-badge bg-green-100 text-green-700">RTL</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ 33 language support</li>
+                            <li>✓ RTL layout for Arabic/Hebrew</li>
+                            <li>✓ Auto-translation via AI</li>
+                            <li>✓ Language switcher</li>
+                            <li>✓ Translation tables for all content</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> supported_languages
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 7 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-code-branch text-blue-500 mr-2"></i>Database Migrations
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Version-controlled database schema with automatic migration system and rollback support.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-gray-100 text-gray-700">Migrations</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ 47 migrations applied</li>
+                            <li>✓ Version tracking</li>
+                            <li>✓ Automatic schema updates</li>
+                            <li>✓ Rollback support</li>
+                            <li>✓ Local & production sync</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> d1_migrations
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 8 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-shield-alt text-blue-500 mr-2"></i>Security Features
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Enterprise-grade security with HTTPS, DDoS protection, input validation, and SQL injection prevention.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-red-100 text-red-700">Security</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Automatic HTTPS/SSL</li>
+                            <li>✓ DDoS protection (Cloudflare)</li>
+                            <li>✓ SQL injection prevention</li>
+                            <li>✓ XSS protection</li>
+                            <li>✓ CORS configuration</li>
+                            <li>✓ Rate limiting</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Feature:</strong> Built-in security
+                        </div>
+                    </div>
+
+                    <!-- Tech Feature 9 -->
+                    <div class="feature-card bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">
+                            <i class="fas fa-sync text-blue-500 mr-2"></i>Session Management
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Flexible session templates for dining, activities, and events with recurring patterns.
+                        </p>
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            <span class="tech-badge bg-blue-100 text-blue-700">Sessions</span>
+                        </div>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            <li>✓ Session templates</li>
+                            <li>✓ Recurring schedules</li>
+                            <li>✓ Capacity management</li>
+                            <li>✓ Time slot configuration</li>
+                            <li>✓ Status control</li>
+                        </ul>
+                        <div class="mt-3 text-xs text-gray-500">
+                            <strong>Table:</strong> session_templates
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Footer Statistics -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg p-8 mt-8">
+            <div class="text-center">
+                <h2 class="text-3xl font-bold mb-4">Platform Statistics</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+                    <div>
+                        <div class="text-4xl font-bold">87</div>
+                        <div class="text-blue-100">Database Tables</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold">200+</div>
+                        <div class="text-blue-100">Features</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold">33</div>
+                        <div class="text-blue-100">Languages</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold">100%</div>
+                        <div class="text-blue-100">Uptime</div>
+                    </div>
+                </div>
+                <div class="mt-8 text-blue-100">
+                    <p class="mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>Deployed on Cloudflare Pages Edge Network
+                    </p>
+                    <p class="mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>Powered by Hono Framework & Cloudflare D1
+                    </p>
+                    <p>
+                        <i class="fas fa-check-circle mr-2"></i>AI-Enhanced with OpenAI GPT-4
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Category filtering
+        function showCategory(category) {
+            const sections = document.querySelectorAll('.feature-section');
+            const buttons = document.querySelectorAll('.category-btn');
+            
+            // Update button states
+            buttons.forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+            event.target.classList.remove('bg-gray-200', 'text-gray-700');
+            event.target.classList.add('bg-blue-600', 'text-white');
+            
+            // Show/hide sections
+            sections.forEach(section => {
+                if (category === 'all' || section.dataset.category === category) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        // Search filtering
+        function filterFeatures() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const featureCards = document.querySelectorAll('.feature-card');
+            
+            featureCards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.style.display = 'block';
+                    card.parentElement.parentElement.parentElement.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            
+            // Hide sections with no visible cards
+            const sections = document.querySelectorAll('.feature-section');
+            sections.forEach(section => {
+                const visibleCards = section.querySelectorAll('.feature-card[style="display: block;"]');
+                if (visibleCards.length === 0 && searchTerm !== '') {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        // Auto-scroll to hash
+        if (window.location.hash) {
+            const element = document.querySelector(window.location.hash);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Print functionality
+        function printFeatures() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Admin Dashboard page
 app.get('/admin/dashboard', (c) => {
   return c.html(`
