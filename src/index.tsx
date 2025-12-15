@@ -3078,15 +3078,15 @@ app.post('/api/admin/users', requirePermission('users_create'), async (c) => {
     // Create user (in production, hash password!)
     const result = await DB.prepare(`
       INSERT INTO users (
-        email, password, first_name, last_name, phone,
-        role_id, property_id, status, created_at
+        email, password_hash, first_name, last_name,
+        role, role_id, property_id, status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       userData.email,
       userData.password, // TODO: Hash this!
       userData.first_name,
       userData.last_name,
-      userData.phone || null,
+      'staff', // Default role value for role column
       userData.role_id || null,
       userData.property_id,
       userData.status
@@ -3107,7 +3107,8 @@ app.post('/api/admin/users', requirePermission('users_create'), async (c) => {
     return c.json({ success: true, user_id: userId })
   } catch (error) {
     console.error('Create user error:', error)
-    return c.json({ error: 'Internal server error' }, 500)
+    console.error('Error details:', error.message, error.stack)
+    return c.json({ error: 'Internal server error', details: error.message }, 500)
   }
 })
 
@@ -3121,14 +3122,13 @@ app.put('/api/admin/users/:id', requirePermission('users_edit'), async (c) => {
     // Update user basic info
     await DB.prepare(`
       UPDATE users 
-      SET first_name = ?, last_name = ?, email = ?, phone = ?,
+      SET first_name = ?, last_name = ?, email = ?,
           role_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = ?
     `).bind(
       userData.first_name,
       userData.last_name,
       userData.email,
-      userData.phone || null,
       userData.role_id || null,
       userData.status,
       userId
