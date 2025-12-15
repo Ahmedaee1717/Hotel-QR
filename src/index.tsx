@@ -35363,7 +35363,7 @@ app.get('/admin/dashboard', (c) => {
 
       window.saveTimeSlots = async function() {
         try {
-          const response = await fetch('/api/admin/beach/settings', {
+          const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35394,7 +35394,7 @@ app.get('/admin/dashboard', (c) => {
           const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
           const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
           
-          const response = await fetch('/api/admin/beach/settings', {
+          const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35454,7 +35454,7 @@ app.get('/admin/dashboard', (c) => {
           const advanceBookingDays = parseInt(document.getElementById('advanceBookingDays')?.value || '7');
           const maxDurationHours = parseInt(document.getElementById('maxDurationHours')?.value || '12');
           
-          const response = await fetch('/api/admin/beach/settings', {
+          const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35511,7 +35511,7 @@ app.get('/admin/dashboard', (c) => {
           const daybedsDesc = document.getElementById('daybedsDesc')?.value || 'Ultimate Comfort';
           const buttonText = document.getElementById('buttonText')?.value || 'Book Your Spot Now';
           
-          const response = await fetch('/api/admin/beach/settings', {
+          const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35674,7 +35674,7 @@ app.get('/admin/dashboard', (c) => {
         if (!spotType) return;
         
         try {
-          const response = await fetch('/api/admin/beach/spots', {
+          const response = await fetchWithAuth('/api/admin/beach/spots', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -35707,7 +35707,7 @@ app.get('/admin/dashboard', (c) => {
         if (!confirm('Delete this beach spot?')) return;
         
         try {
-          const response = await fetch('/api/admin/beach/spots/' + spotId, {
+          const response = await fetchWithAuth('/api/admin/beach/spots/' + spotId, {
             method: 'DELETE'
           });
           
@@ -35728,7 +35728,7 @@ app.get('/admin/dashboard', (c) => {
       window.loadBeachBookings = async function() {
         try {
           const date = document.getElementById('beachBookingDate').value;
-          const response = await fetch('/api/admin/beach/bookings?property_id=1&date=' + date);
+          const response = await fetchWithAuth('/api/admin/beach/bookings?property_id=1&date=' + date);
           const data = await response.json();
           
           const container = document.getElementById('beachBookingsList');
