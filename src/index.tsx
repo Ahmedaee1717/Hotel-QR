@@ -5119,29 +5119,53 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
 })
 
 // Create guest dining session (walk-in check-in)
+// Create dining time slot (breakfast/lunch/dinner schedule)
 app.post('/api/admin/restaurant/session', async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
   try {
-    const today = new Date().toISOString().split('T')[0]
-    const now = new Date().toTimeString().split(' ')[0].substring(0, 5)
+    // If this is a walk-in check-in (has guest_name), redirect to guest session endpoint
+    if (data.guest_name || data.source === 'walk-in') {
+      const today = new Date().toISOString().split('T')[0]
+      const now = new Date().toTimeString().split(' ')[0].substring(0, 5)
+      
+      const result = await DB.prepare(`
+        INSERT INTO guest_dining_sessions (
+          offering_id, guest_name, number_of_guests, table_number,
+          session_date, session_time, status, phone_number, special_requests, source
+        ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+      `).bind(
+        data.offering_id,
+        data.guest_name || 'Walk-in Guest',
+        data.number_of_guests || 1,
+        data.table_number,
+        today,
+        now,
+        data.phone_number || null,
+        data.special_requests || null,
+        data.source || 'walk-in'
+      ).run()
+      
+      return c.json({ 
+        success: true,
+        session_id: result.meta.last_row_id
+      })
+    }
     
+    // Otherwise, create a time slot session
     const result = await DB.prepare(`
-      INSERT INTO guest_dining_sessions (
-        offering_id, guest_name, number_of_guests, table_number,
-        session_date, session_time, status, phone_number, special_requests, source
-      ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+      INSERT INTO dining_sessions (
+        offering_id, session_date, session_time, session_type,
+        duration_minutes, max_capacity, current_bookings, status
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'available')
     `).bind(
       data.offering_id,
-      data.guest_name || 'Walk-in Guest',
-      data.number_of_guests || 1,
-      data.table_number,
-      today,
-      now,
-      data.phone_number || null,
-      data.special_requests || null,
-      data.source || 'walk-in'
+      data.session_date,
+      data.session_time,
+      data.session_type,
+      data.duration_minutes || 90,
+      data.max_capacity || 80
     ).run()
     
     return c.json({ 
@@ -5149,7 +5173,7 @@ app.post('/api/admin/restaurant/session', async (c) => {
       session_id: result.meta.last_row_id
     })
   } catch (error) {
-    console.error('Create guest session error:', error)
+    console.error('Create session error:', error)
     return c.json({ error: 'Failed to create session' }, 500)
   }
 })
