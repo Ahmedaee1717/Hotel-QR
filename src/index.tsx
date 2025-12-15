@@ -16443,14 +16443,6 @@ app.get('/offering-detail', async (c) => {
             document.getElementById('offeringDescription').textContent = description;
             document.getElementById('priceDisplay').textContent = (offeringData.currency || 'USD') + ' ' + (offeringData.price || '0');
 
-            // Show/hide booking section based on requires_booking
-            const bookingSection = document.getElementById('bookingSection');
-            if (offeringData.requires_booking === 0) {
-                bookingSection.classList.add('hidden');
-            } else {
-                bookingSection.classList.remove('hidden');
-            }
-
             // Show event details if it's an event
             if (offeringData.offering_type === 'event' && offeringData.event_date) {
                 document.getElementById('eventDetails').classList.remove('hidden');
@@ -16463,9 +16455,10 @@ app.get('/offering-detail', async (c) => {
 
             // Show restaurant-specific fields and load menus
             if (offeringData.offering_type === 'restaurant') {
-                // Hide the generic booking form and show View Menu + Book Table buttons
+                // ALWAYS show booking section for restaurants with View Menu + Book Table buttons
                 const bookingSection = document.getElementById('bookingSection');
                 if (bookingSection) {
+                    bookingSection.classList.remove('hidden'); // Make sure it's visible
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
                         '<div class="flex gap-3">' +
@@ -16478,6 +16471,14 @@ app.get('/offering-detail', async (c) => {
                         '</div>';
                 }
                 loadRestaurantMenus();
+            } else {
+                // For non-restaurant offerings, show/hide booking section based on requires_booking
+                const bookingSection = document.getElementById('bookingSection');
+                if (offeringData.requires_booking === 0) {
+                    bookingSection.classList.add('hidden');
+                } else {
+                    bookingSection.classList.remove('hidden');
+                }
             }
 
             updateTotalPrice();
@@ -16496,10 +16497,10 @@ app.get('/offering-detail', async (c) => {
                     data.menus.forEach((menu, index) => {
                         const menuCard = document.createElement('div');
                         menuCard.className = 'bg-white border-2 border-orange-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer';
-                        menuCard.onclick = () => window.open(menu.menu_url, '_blank');
+                        menuCard.onclick = () => window.open(menu.original_image_url, '_blank');
                         
                         const img = document.createElement('img');
-                        img.src = menu.menu_url;
+                        img.src = menu.original_image_url;
                         img.alt = menu.menu_name;
                         img.className = 'w-full h-48 object-cover';
                         
