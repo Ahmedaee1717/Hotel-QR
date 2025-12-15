@@ -6236,11 +6236,17 @@ Please provide a complete, accurate transcription that preserves the menu's layo
     })
     
     if (!openaiResponse.ok) {
-      throw new Error('OCR processing failed')
+      const errorData = await openaiResponse.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('OpenAI error:', errorData)
+      throw new Error(`OCR processing failed: ${JSON.stringify(errorData)}`)
     }
     
     const ocrResult = await openaiResponse.json()
-    const extractedText = ocrResult.choices[0].message.content
+    const extractedText = ocrResult.choices[0]?.message?.content || ''
+    
+    if (!extractedText) {
+      throw new Error('No text extracted from image')
+    }
     
     // Update menu with extracted text
     await DB.prepare(`
