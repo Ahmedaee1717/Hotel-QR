@@ -34406,8 +34406,31 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style id="dynamicStyles"></style>
+    <style>
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .loading-spinner {
+        animation: spin 1s linear infinite;
+      }
+    </style>
 </head>
 <body class="antialiased">
+    <!-- Translation Loading Overlay -->
+    <div id="translationOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
+        <div class="loading-spinner w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">Translating Menu...</h3>
+        <p class="text-gray-600" id="translationMessage">Please wait while we translate your menu</p>
+        <div class="mt-4 flex items-center justify-center gap-2">
+          <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+          <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+          <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+        </div>
+      </div>
+    </div>
+    
     <div id="menuContainer" class="min-h-screen"></div>
     
     <script>
@@ -34426,9 +34449,12 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
           designSettings = data.design;
           applyDesignSettings();
           renderMenu();
+          // Hide loading overlay
+          document.getElementById('translationOverlay').classList.add('hidden');
         }
       } catch (error) {
         console.error('Failed to load menu:', error);
+        document.getElementById('translationOverlay').classList.add('hidden');
         document.getElementById('menuContainer').innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="text-center"><i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i><p class="text-xl text-gray-700">Failed to load menu</p></div></div>';
       }
     }
@@ -34650,6 +34676,18 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
     }
     
     window.changeLanguage = function(lang) {
+      // Get language name from the select option
+      const select = document.getElementById('languageSelector');
+      const selectedOption = select.options[select.selectedIndex];
+      const languageName = selectedOption.text;
+      
+      // Show loading overlay with language name
+      const overlay = document.getElementById('translationOverlay');
+      const message = document.getElementById('translationMessage');
+      message.textContent = 'Translating to ' + languageName + '...';
+      overlay.classList.remove('hidden');
+      
+      // Change language and reload
       currentLanguage = lang;
       loadMenuData();
     };
