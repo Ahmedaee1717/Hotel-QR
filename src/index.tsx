@@ -5557,6 +5557,210 @@ app.post('/api/admin/restaurant/reservations/:reservation_id/check-in', async (c
 })
 
 // ============================================
+// RESTAURANT WAITLIST APIS
+// ============================================
+
+// Get waitlist for a restaurant
+app.get('/api/admin/restaurant/:offering_id/waitlist', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const status = c.req.query('status') || 'waiting'
+  
+  try {
+    const query = status === 'all' 
+      ? `SELECT * FROM restaurant_waitlist WHERE offering_id = ? ORDER BY priority DESC, added_at ASC`
+      : `SELECT * FROM restaurant_waitlist WHERE offering_id = ? AND status = ? ORDER BY priority DESC, added_at ASC`
+    
+    const waitlist = status === 'all'
+      ? await DB.prepare(query).bind(offering_id).all()
+      : await DB.prepare(query).bind(offering_id, status).all()
+    
+    return c.json({ 
+      success: true,
+      waitlist: waitlist.results || []
+    })
+  } catch (error) {
+    console.error('Get waitlist error:', error)
+    return c.json({ error: 'Failed to get waitlist' }, 500)
+  }
+})
+
+// Add guest to waitlist
+app.post('/api/admin/restaurant/waitlist', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO restaurant_waitlist (
+        offering_id, guest_name, phone_number, number_of_guests,
+        party_size_preference, special_requests, priority, 
+        estimated_wait_minutes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.offering_id,
+      data.guest_name,
+      data.phone_number || null,
+      data.number_of_guests,
+      data.party_size_preference || null,
+      data.special_requests || null,
+      data.priority || 0,
+      data.estimated_wait_minutes || null,
+      data.created_by || 'staff'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      waitlist_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Add to waitlist error:', error)
+    return c.json({ error: 'Failed to add to waitlist' }, 500)
+  }
+})
+
+// Update waitlist entry
+app.put('/api/admin/restaurant/waitlist/:waitlist_id', async (c) => {
+  const { DB } = c.env
+  const { waitlist_id } = c.req.param()
+  const data = await c.req.json()
+  
+  try {
+    const updates = []
+    const values = []
+    
+    if (data.guest_name !== undefined) {
+      updates.push('guest_name = ?')
+      values.push(data.guest_name)
+    }
+    if (data.phone_number !== undefined) {
+      updates.push('phone_number = ?')
+      values.push(data.phone_number)
+    }
+    if (data.number_of_guests !== undefined) {
+      updates.push('number_of_guests = ?')
+      values.push(data.number_of_guests)
+    }
+    if (data.priority !== undefined) {
+      updates.push('priority = ?')
+      values.push(data.priority)
+    }
+    if (data.estimated_wait_minutes !== undefined) {
+      updates.push('estimated_wait_minutes = ?')
+      values.push(data.estimated_wait_minutes)
+    }
+    if (data.notes !== undefined) {
+      updates.push('notes = ?')
+      values.push(data.notes)
+    }
+    
+    values.push(waitlist_id)
+    
+    await DB.prepare(`
+      UPDATE restaurant_waitlist 
+      SET ${updates.join(', ')}
+      WHERE waitlist_id = ?
+    `).bind(...values).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update waitlist error:', error)
+    return c.json({ error: 'Failed to update waitlist entry' }, 500)
+  }
+})
+
+// Notify guest (mark as notified)
+app.post('/api/admin/restaurant/waitlist/:waitlist_id/notify', async (c) => {
+  const { DB } = c.env
+  const { waitlist_id } = c.req.param()
+  
+  try {
+    await DB.prepare(`
+      UPDATE restaurant_waitlist 
+      SET notified_at = CURRENT_TIMESTAMP, status = 'notified'
+      WHERE waitlist_id = ?
+    `).bind(waitlist_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Notify waitlist error:', error)
+    return c.json({ error: 'Failed to notify guest' }, 500)
+  }
+})
+
+// Seat guest from waitlist
+app.post('/api/admin/restaurant/waitlist/:waitlist_id/seat', async (c) => {
+  const { DB } = c.env
+  const { waitlist_id } = c.req.param()
+  const { table_number } = await c.req.json()
+  
+  try {
+    // Get waitlist entry
+    const entry = await DB.prepare(`
+      SELECT * FROM restaurant_waitlist WHERE waitlist_id = ?
+    `).bind(waitlist_id).first()
+    
+    if (!entry) {
+      return c.json({ error: 'Waitlist entry not found' }, 404)
+    }
+    
+    // Update waitlist status
+    await DB.prepare(`
+      UPDATE restaurant_waitlist 
+      SET status = 'seated', seated_at = CURRENT_TIMESTAMP, table_number = ?
+      WHERE waitlist_id = ?
+    `).bind(table_number, waitlist_id).run()
+    
+    // Create dining session
+    const today = new Date().toISOString().split('T')[0]
+    const now = new Date().toTimeString().split(' ')[0].substring(0, 5)
+    
+    await DB.prepare(`
+      INSERT INTO dining_sessions (
+        offering_id, guest_name, number_of_guests, table_number,
+        session_date, session_time, status, phone_number, special_requests, source
+      ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, 'waitlist')
+    `).bind(
+      entry.offering_id,
+      entry.guest_name,
+      entry.number_of_guests,
+      table_number,
+      today,
+      now,
+      entry.phone_number,
+      entry.special_requests
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Seat from waitlist error:', error)
+    return c.json({ error: 'Failed to seat guest' }, 500)
+  }
+})
+
+// Cancel/remove from waitlist
+app.delete('/api/admin/restaurant/waitlist/:waitlist_id', async (c) => {
+  const { DB } = c.env
+  const { waitlist_id } = c.req.param()
+  const { reason } = await c.req.json().catch(() => ({}))
+  
+  try {
+    const status = reason === 'no_show' ? 'no_show' : 'cancelled'
+    
+    await DB.prepare(`
+      UPDATE restaurant_waitlist 
+      SET status = ?, cancelled_at = CURRENT_TIMESTAMP, notes = COALESCE(notes || ' | ', '') || ?
+      WHERE waitlist_id = ?
+    `).bind(status, reason || 'Cancelled by staff', waitlist_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Cancel waitlist error:', error)
+    return c.json({ error: 'Failed to cancel waitlist entry' }, 500)
+  }
+})
+
+// ============================================
 // AI TEXTURE EXTRACTION APIS
 // ============================================
 
@@ -35996,11 +36200,86 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         </div>
     </div>
 
+    <!-- Modal: Waitlist Management -->
+    <div id="waitlistModal" class="modal-overlay items-center justify-center">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-auto">
+            <div class="bg-gradient-to-r from-yellow-600 to-orange-600 text-white p-4 rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold">
+                        <i class="fas fa-clock mr-2"></i>Restaurant Waitlist
+                    </h3>
+                    <button onclick="closeWaitlistModal()" class="text-white hover:bg-white/20 rounded p-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <!-- Add to Waitlist Form -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h4 class="font-bold text-lg mb-3">
+                        <i class="fas fa-plus-circle mr-2"></i>Add Guest to Waitlist
+                    </h4>
+                    <form id="waitlistForm" onsubmit="addToWaitlist(event)" class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Guest Name *</label>
+                            <input type="text" id="waitlistGuestName" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Phone Number</label>
+                            <input type="tel" id="waitlistPhone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Party Size *</label>
+                            <input type="number" id="waitlistPartySize" required min="1" value="2" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Est. Wait (minutes)</label>
+                            <input type="number" id="waitlistEstWait" min="0" value="15" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Priority</label>
+                            <select id="waitlistPriority" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                                <option value="0">Normal</option>
+                                <option value="1">Priority</option>
+                                <option value="2">VIP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Notes</label>
+                            <input type="text" id="waitlistNotes" placeholder="Special requests..." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-500">
+                        </div>
+                        <div class="col-span-2">
+                            <button type="submit" class="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold">
+                                <i class="fas fa-plus mr-2"></i>Add to Waitlist
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Current Waitlist -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-lg">
+                            <i class="fas fa-list mr-2"></i>Current Waitlist (<span id="waitlistCount">0</span>)
+                        </h4>
+                        <button onclick="loadWaitlist()" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm">
+                            <i class="fas fa-sync-alt mr-1"></i>Refresh
+                        </button>
+                    </div>
+                    <div id="waitlistEntries" class="space-y-2 max-h-96 overflow-auto">
+                        <!-- Waitlist entries will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const OFFERING_ID = ${offering_id};
         let floorElements = [];
         let currentSessions = [];
         let currentReservations = [];
+        let currentWaitlist = [];
         let currentScale = 1;
 
         // Initialize
@@ -36459,8 +36738,193 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             \`).join('');
         }
 
+        async function loadWaitlist() {
+            try {
+                const response = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=waiting');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentWaitlist = data.waitlist || [];
+                    document.getElementById('waitlistCount').textContent = currentWaitlist.length;
+                    
+                    const container = document.getElementById('waitlistEntries');
+                    if (currentWaitlist.length === 0) {
+                        container.innerHTML = '<p class="text-gray-500 text-center py-8">No guests on waitlist</p>';
+                    } else {
+                        container.innerHTML = currentWaitlist.map((entry, index) => {
+                            const waitTime = entry.added_at ? Math.floor((new Date() - new Date(entry.added_at)) / 60000) : 0;
+                            const priorityBadge = entry.priority === 2 ? '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-bold">VIP</span>' :
+                                                 entry.priority === 1 ? '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-bold">PRIORITY</span>' : '';
+                            
+                            return \`
+                                <div class="border-2 \${entry.priority > 0 ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-white'} rounded-lg p-4">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="text-2xl font-bold text-gray-400">#\${index + 1}</span>
+                                                <div>
+                                                    <div class="font-bold text-lg">\${entry.guest_name}</div>
+                                                    <div class="text-sm text-gray-600">
+                                                        <i class="fas fa-users mr-1"></i>\${entry.number_of_guests} guests
+                                                        \${entry.phone_number ? '<span class="mx-2">•</span><i class="fas fa-phone mr-1"></i>' + entry.phone_number : ''}
+                                                    </div>
+                                                </div>
+                                                \${priorityBadge}
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                <i class="fas fa-clock mr-1"></i>Waiting: \${waitTime} min
+                                                \${entry.estimated_wait_minutes ? '<span class="mx-2">•</span>Est: ' + entry.estimated_wait_minutes + ' min' : ''}
+                                            </div>
+                                            \${entry.special_requests ? '<div class="text-sm text-gray-600 mt-1"><i class="fas fa-info-circle mr-1"></i>' + entry.special_requests + '</div>' : ''}
+                                        </div>
+                                        <div class="flex flex-col gap-2">
+                                            <button onclick="notifyWaitlistGuest(\${entry.waitlist_id})" 
+                                                    class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-sm font-semibold whitespace-nowrap">
+                                                <i class="fas fa-bell mr-1"></i>Notify
+                                            </button>
+                                            <button onclick="seatWaitlistGuest(\${entry.waitlist_id})" 
+                                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold whitespace-nowrap">
+                                                <i class="fas fa-chair mr-1"></i>Seat Now
+                                            </button>
+                                            <button onclick="cancelWaitlistEntry(\${entry.waitlist_id}, 'cancelled')" 
+                                                    class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm font-semibold whitespace-nowrap">
+                                                <i class="fas fa-times mr-1"></i>Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            \`;
+                        }).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Load waitlist error:', error);
+            }
+        }
+
         function showWaitlist() {
-            alert('Waitlist feature coming soon!');
+            document.getElementById('waitlistModal').classList.add('show');
+            loadWaitlist();
+        }
+
+        function closeWaitlistModal() {
+            document.getElementById('waitlistModal').classList.remove('show');
+            document.getElementById('waitlistForm').reset();
+        }
+
+        async function addToWaitlist(event) {
+            event.preventDefault();
+            
+            const data = {
+                offering_id: OFFERING_ID,
+                guest_name: document.getElementById('waitlistGuestName').value,
+                phone_number: document.getElementById('waitlistPhone').value || null,
+                number_of_guests: parseInt(document.getElementById('waitlistPartySize').value),
+                estimated_wait_minutes: parseInt(document.getElementById('waitlistEstWait').value) || null,
+                priority: parseInt(document.getElementById('waitlistPriority').value),
+                special_requests: document.getElementById('waitlistNotes').value || null,
+                created_by: 'staff'
+            };
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/waitlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Guest added to waitlist!');
+                    document.getElementById('waitlistForm').reset();
+                    loadWaitlist();
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Failed to add to waitlist'));
+                }
+            } catch (error) {
+                console.error('Add to waitlist error:', error);
+                alert('❌ Error adding to waitlist');
+            }
+        }
+
+        async function notifyWaitlistGuest(waitlistId) {
+            if (!confirm('Mark this guest as notified?')) return;
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId + '/notify', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Guest notified!');
+                    loadWaitlist();
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Failed to notify'));
+                }
+            } catch (error) {
+                console.error('Notify error:', error);
+                alert('❌ Error notifying guest');
+            }
+        }
+
+        async function seatWaitlistGuest(waitlistId) {
+            // Show available tables
+            const tables = floorElements.filter(el => el.element_type === 'table');
+            const freeTables = tables.filter(t => getTableStatus(t.table_number) === 'free');
+            
+            if (freeTables.length === 0) {
+                alert('❌ No free tables available');
+                return;
+            }
+            
+            const tableOptions = freeTables.map(t => t.table_number + ' (' + t.capacity + ' seats)').join('\\n');
+            const tableNumber = prompt('Select table number:\\n\\n' + tableOptions);
+            
+            if (!tableNumber) return;
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId + '/seat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_number: tableNumber })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Guest seated at table ' + tableNumber + '!');
+                    closeWaitlistModal();
+                    refreshAll();
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Failed to seat guest'));
+                }
+            } catch (error) {
+                console.error('Seat error:', error);
+                alert('❌ Error seating guest');
+            }
+        }
+
+        async function cancelWaitlistEntry(waitlistId, reason) {
+            if (!confirm('Remove this guest from waitlist?')) return;
+            
+            try {
+                const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Guest removed from waitlist');
+                    loadWaitlist();
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Failed to remove'));
+                }
+            } catch (error) {
+                console.error('Cancel error:', error);
+                alert('❌ Error removing guest');
+            }
         }
 
         // Zoom controls
