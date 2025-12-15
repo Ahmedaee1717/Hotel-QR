@@ -2896,6 +2896,254 @@ app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
 })
 
 // ============================================
+// USER MANAGEMENT API ROUTES
+// ============================================
+
+// Get all users
+app.get('/api/admin/users', async (c) => {
+  const { DB } = c.env
+  const property_id = 1 // TODO: Get from session
+  
+  try {
+    const users = await DB.prepare(`
+      SELECT 
+        u.*,
+        r.role_name,
+        r.role_description
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      WHERE u.property_id = ?
+      ORDER BY u.created_at DESC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, users: users.results })
+  } catch (error) {
+    console.error('Get users error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get single user
+app.get('/api/admin/users/:id', async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  
+  try {
+    const user = await DB.prepare(`
+      SELECT u.*, r.role_name
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.role_id
+      WHERE u.user_id = ?
+    `).bind(userId).first()
+    
+    return c.json({ success: true, user })
+  } catch (error) {
+    console.error('Get user error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Create new user
+app.post('/api/admin/users', async (c) => {
+  const { DB } = c.env
+  const userData = await c.req.json()
+  
+  try {
+    // Check if email already exists
+    const existing = await DB.prepare(`
+      SELECT user_id FROM users WHERE email = ?
+    `).bind(userData.email).first()
+    
+    if (existing) {
+      return c.json({ error: 'Email already exists' }, 400)
+    }
+    
+    // Create user (in production, hash password!)
+    const result = await DB.prepare(`
+      INSERT INTO users (
+        email, password, first_name, last_name, phone,
+        role_id, property_id, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      userData.email,
+      userData.password, // TODO: Hash this!
+      userData.first_name,
+      userData.last_name,
+      userData.phone || null,
+      userData.role_id || null,
+      userData.property_id,
+      userData.status
+    ).run()
+    
+    const userId = result.meta.last_row_id
+    
+    // Assign custom permissions if provided
+    if (userData.permissions && userData.permissions.length > 0) {
+      for (const permissionId of userData.permissions) {
+        await DB.prepare(`
+          INSERT INTO user_permissions (user_id, permission_id, is_granted)
+          VALUES (?, ?, 1)
+        `).bind(userId, permissionId).run()
+      }
+    }
+    
+    return c.json({ success: true, user_id: userId })
+  } catch (error) {
+    console.error('Create user error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Update user
+app.put('/api/admin/users/:id', async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  const userData = await c.req.json()
+  
+  try {
+    // Update user basic info
+    await DB.prepare(`
+      UPDATE users 
+      SET first_name = ?, last_name = ?, email = ?, phone = ?,
+          role_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+    `).bind(
+      userData.first_name,
+      userData.last_name,
+      userData.email,
+      userData.phone || null,
+      userData.role_id || null,
+      userData.status,
+      userId
+    ).run()
+    
+    // Update custom permissions
+    if (userData.permissions) {
+      // Delete existing custom permissions
+      await DB.prepare(`
+        DELETE FROM user_permissions WHERE user_id = ?
+      `).bind(userId).run()
+      
+      // Insert new permissions
+      for (const permissionId of userData.permissions) {
+        await DB.prepare(`
+          INSERT INTO user_permissions (user_id, permission_id, is_granted)
+          VALUES (?, ?, 1)
+        `).bind(userId, permissionId).run()
+      }
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update user error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Delete user
+app.delete('/api/admin/users/:id', async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  
+  try {
+    // Prevent deleting user ID 1 (super admin)
+    if (parseInt(userId) === 1) {
+      return c.json({ error: 'Cannot delete super admin' }, 400)
+    }
+    
+    await DB.prepare(`
+      DELETE FROM users WHERE user_id = ?
+    `).bind(userId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete user error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get user's permissions
+app.get('/api/admin/users/:id/permissions', async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  
+  try {
+    const permissions = await DB.prepare(`
+      SELECT up.*, p.permission_key, p.permission_name
+      FROM user_permissions up
+      JOIN permissions p ON up.permission_id = p.permission_id
+      WHERE up.user_id = ?
+    `).bind(userId).all()
+    
+    return c.json({ success: true, permissions: permissions.results })
+  } catch (error) {
+    console.error('Get user permissions error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get all roles
+app.get('/api/admin/roles', async (c) => {
+  const { DB } = c.env
+  const property_id = 1 // TODO: Get from session
+  
+  try {
+    const roles = await DB.prepare(`
+      SELECT 
+        r.*,
+        (SELECT COUNT(*) FROM role_permissions WHERE role_id = r.role_id) as permission_count
+      FROM roles r
+      WHERE r.property_id = ?
+      ORDER BY r.is_system_role DESC, r.role_name ASC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, roles: roles.results })
+  } catch (error) {
+    console.error('Get roles error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get role's permissions
+app.get('/api/admin/roles/:id/permissions', async (c) => {
+  const { DB } = c.env
+  const roleId = c.req.param('id')
+  
+  try {
+    // Get all permissions with role assignment status
+    const permissions = await DB.prepare(`
+      SELECT 
+        p.*,
+        CASE WHEN rp.role_id IS NOT NULL THEN 1 ELSE 0 END as has_permission
+      FROM permissions p
+      LEFT JOIN role_permissions rp ON p.permission_id = rp.permission_id AND rp.role_id = ?
+      ORDER BY p.permission_category, p.permission_name
+    `).bind(roleId).all()
+    
+    return c.json({ success: true, permissions: permissions.results })
+  } catch (error) {
+    console.error('Get role permissions error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get all permissions
+app.get('/api/admin/permissions', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const permissions = await DB.prepare(`
+      SELECT * FROM permissions ORDER BY permission_category, permission_name
+    `).all()
+    
+    return c.json({ success: true, permissions: permissions.results })
+  } catch (error) {
+    console.error('Get permissions error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// ============================================
 // ADMIN API ROUTES
 // ============================================
 
@@ -26809,6 +27057,9 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="feedback" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-comments w-5"></i><span>Feedback</span>
                     </button>
+                    <button data-tab="users" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-users-cog w-5"></i><span>User Management</span>
+                    </button>
                 </div>
                 
                 <!-- Content Section -->
@@ -26981,6 +27232,44 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
         <!-- END FRONT DESK TAB -->
+
+        <!-- USER MANAGEMENT TAB -->
+        <div id="usersTab" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-users-cog mr-3 text-purple-600"></i>User & Role Management
+                </h2>
+                <p class="text-gray-600">Create users, assign roles, and configure granular permissions</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3 mb-6">
+                <button onclick="openCreateUserModal()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
+                    <i class="fas fa-user-plus mr-2"></i>Create New User
+                </button>
+                <button onclick="openRolesManagementModal()" class="px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">
+                    <i class="fas fa-user-tag mr-2"></i>Manage Roles
+                </button>
+                <button onclick="openPermissionsReferenceModal()" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                    <i class="fas fa-shield-alt mr-2"></i>Permissions Reference
+                </button>
+            </div>
+
+            <!-- Users List -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Users</h3>
+                    <input type="text" id="userSearchInput" placeholder="Search users..." class="px-4 py-2 border rounded-lg w-64" oninput="filterUsers()">
+                </div>
+                <div id="usersList" class="overflow-x-auto">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p>Loading users...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END USER MANAGEMENT TAB -->
 
         <!-- Master QR Code Tab -->
         <div id="qrcodeTab" class="tab-content">
@@ -31164,6 +31453,174 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- CREATE USER MODAL -->
+    <div id="createUserModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-user-plus mr-2"></i><span id="userModalTitle">Create New User</span></h3>
+                <button onclick="closeCreateUserModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <form id="createUserForm">
+                    <input type="hidden" id="editUserId">
+                    
+                    <!-- Basic Info -->
+                    <div class="mb-6">
+                        <h4 class="font-bold text-lg mb-3"><i class="fas fa-user mr-2"></i>Basic Information</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">First Name *</label>
+                                <input type="text" id="userFirstName" required class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Last Name *</label>
+                                <input type="text" id="userLastName" required class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Email *</label>
+                                <input type="email" id="userEmail" required class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Phone</label>
+                                <input type="tel" id="userPhone" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password (only for new users) -->
+                    <div id="passwordSection" class="mb-6">
+                        <h4 class="font-bold text-lg mb-3"><i class="fas fa-lock mr-2"></i>Password</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Password *</label>
+                                <input type="password" id="userPassword" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Confirm Password *</label>
+                                <input type="password" id="userPasswordConfirm" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Role Selection -->
+                    <div class="mb-6">
+                        <h4 class="font-bold text-lg mb-3"><i class="fas fa-user-tag mr-2"></i>Role Assignment</h4>
+                        <select id="userRole" class="w-full px-3 py-2 border rounded-lg" onchange="loadRolePermissions()">
+                            <option value="">Select a role...</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Role determines default permissions. You can customize per-user permissions below.</p>
+                    </div>
+
+                    <!-- Permission Customization -->
+                    <div class="mb-6">
+                        <h4 class="font-bold text-lg mb-3"><i class="fas fa-shield-alt mr-2"></i>Custom Permissions</h4>
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                            <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                            <span class="text-sm text-gray-700">These permissions will override the role defaults for this specific user.</span>
+                        </div>
+                        <div id="userPermissionsGrid" class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto">
+                            <div class="text-center text-gray-400 py-4">
+                                <p class="text-sm">Select a role first to see available permissions</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resource Scoping -->
+                    <div class="mb-6">
+                        <h4 class="font-bold text-lg mb-3"><i class="fas fa-filter mr-2"></i>Resource Access Limits</h4>
+                        <p class="text-sm text-gray-600 mb-3">Restrict this user to specific resources (optional)</p>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">
+                                    <input type="checkbox" id="limitRestaurants" class="mr-2" onchange="toggleResourceLimit('restaurants')">
+                                    Limit to Specific Restaurants
+                                </label>
+                                <div id="restaurantSelector" class="hidden ml-6 space-y-2">
+                                    <!-- Loaded dynamically -->
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">
+                                    <input type="checkbox" id="limitBeach" class="mr-2" onchange="toggleResourceLimit('beach')">
+                                    Limit to Specific Beach Zones
+                                </label>
+                                <div id="beachSelector" class="hidden ml-6 space-y-2">
+                                    <!-- Loaded dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="mb-6">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" id="userStatus" checked class="w-4 h-4">
+                            <span class="font-semibold">Active (user can log in)</span>
+                        </label>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3">
+                        <button type="submit" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Save User
+                        </button>
+                        <button type="button" onclick="closeCreateUserModal()" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROLES MANAGEMENT MODAL -->
+    <div id="rolesManagementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-user-tag mr-2"></i>Roles Management</h3>
+                <button onclick="closeRolesManagementModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div class="mb-4">
+                    <button onclick="openCreateRoleModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-plus mr-2"></i>Create New Role
+                    </button>
+                </div>
+                <div id="rolesList" class="space-y-3">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p>Loading roles...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PERMISSIONS REFERENCE MODAL -->
+    <div id="permissionsReferenceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-shield-alt mr-2"></i>Permissions Reference Guide</h3>
+                <button onclick="closePermissionsReferenceModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div id="permissionsReferenceContent">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p>Loading permissions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Analytics Dashboard Modal -->
     <div id="analyticsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
@@ -31206,6 +31663,7 @@ app.get('/admin/dashboard', (c) => {
         }
         
         if (tab === 'frontdesk') loadFrontDeskData();
+        if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
           requestAnimationFrame(() => {
@@ -31530,6 +31988,444 @@ app.get('/admin/dashboard', (c) => {
       
       // ========================================
       // END FRONT DESK FUNCTIONS
+      // ========================================
+      
+      // ========================================
+      // USER MANAGEMENT FUNCTIONS
+      // ========================================
+      let allUsers = [];
+      let allRoles = [];
+      let allPermissions = [];
+      
+      async function loadUsersManagement() {
+        try {
+          // Load users
+          const usersResponse = await fetch('/api/admin/users');
+          const usersData = await usersResponse.json();
+          
+          if (usersData.success) {
+            allUsers = usersData.users;
+            renderUsersTable(allUsers);
+          }
+          
+          // Load roles for dropdown
+          const rolesResponse = await fetch('/api/admin/roles');
+          const rolesData = await rolesResponse.json();
+          
+          if (rolesData.success) {
+            allRoles = rolesData.roles;
+          }
+        } catch (error) {
+          console.error('Load users error:', error);
+          document.getElementById('usersList').innerHTML = \`
+            <div class="text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error loading users</p>
+            </div>
+          \`;
+        }
+      }
+      
+      function renderUsersTable(users) {
+        const table = document.getElementById('usersList');
+        
+        if (!users || users.length === 0) {
+          table.innerHTML = \`
+            <div class="text-center text-gray-400 py-8">
+              <i class="fas fa-users text-4xl mb-3"></i>
+              <p>No users found. Create your first user!</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        table.innerHTML = \`
+          <table class="min-w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              \${users.map(user => \`
+                <tr class="hover:bg-gray-50">
+                  <td class="px-6 py-4">
+                    <div class="flex items-center">
+                      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold">
+                        \${(user.first_name?.[0] || 'U').toUpperCase()}\${(user.last_name?.[0] || '').toUpperCase()}
+                      </div>
+                      <div class="ml-3">
+                        <div class="text-sm font-medium text-gray-900">\${user.first_name} \${user.last_name}</div>
+                        <div class="text-xs text-gray-500">ID: \${user.user_id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full \${getRoleBadgeClass(user.role_name)}">
+                      \${user.role_name || 'No Role'}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-gray-500">\${user.email}</td>
+                  <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full \${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                      \${user.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-gray-500">\${new Date(user.created_at).toLocaleDateString()}</td>
+                  <td class="px-6 py-4 text-right text-sm font-medium">
+                    <button onclick="editUser(\${user.user_id})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="viewUserPermissions(\${user.user_id})" class="text-blue-600 hover:text-blue-900 mr-3">
+                      <i class="fas fa-shield-alt"></i>
+                    </button>
+                    \${user.user_id !== 1 ? \`
+                      <button onclick="deleteUser(\${user.user_id})" class="text-red-600 hover:text-red-900">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    \` : ''}
+                  </td>
+                </tr>
+              \`).join('')}
+            </tbody>
+          </table>
+        \`;
+      }
+      
+      function getRoleBadgeClass(roleName) {
+        const classes = {
+          'Super Admin': 'bg-red-100 text-red-800',
+          'Hotel Manager': 'bg-purple-100 text-purple-800',
+          'Front Desk Staff': 'bg-blue-100 text-blue-800',
+          'Beach Manager': 'bg-cyan-100 text-cyan-800',
+          'Restaurant Manager': 'bg-orange-100 text-orange-800'
+        };
+        return classes[roleName] || 'bg-gray-100 text-gray-800';
+      }
+      
+      function filterUsers() {
+        const search = document.getElementById('userSearchInput').value.toLowerCase();
+        const filtered = allUsers.filter(user => 
+          user.first_name?.toLowerCase().includes(search) ||
+          user.last_name?.toLowerCase().includes(search) ||
+          user.email?.toLowerCase().includes(search) ||
+          user.role_name?.toLowerCase().includes(search)
+        );
+        renderUsersTable(filtered);
+      }
+      
+      window.openCreateUserModal = async function() {
+        document.getElementById('createUserModal').classList.remove('hidden');
+        document.getElementById('userModalTitle').textContent = 'Create New User';
+        document.getElementById('createUserForm').reset();
+        document.getElementById('editUserId').value = '';
+        document.getElementById('passwordSection').style.display = 'block';
+        
+        // Load roles dropdown
+        const roleSelect = document.getElementById('userRole');
+        roleSelect.innerHTML = '<option value="">Select a role...</option>' +
+          allRoles.map(role => \`<option value="\${role.role_id}">\${role.role_name}</option>\`).join('');
+      };
+      
+      window.closeCreateUserModal = function() {
+        document.getElementById('createUserModal').classList.add('hidden');
+      };
+      
+      window.editUser = async function(userId) {
+        try {
+          const response = await fetch(\`/api/admin/users/\${userId}\`);
+          const data = await response.json();
+          
+          if (data.success) {
+            const user = data.user;
+            document.getElementById('editUserId').value = user.user_id;
+            document.getElementById('userFirstName').value = user.first_name;
+            document.getElementById('userLastName').value = user.last_name;
+            document.getElementById('userEmail').value = user.email;
+            document.getElementById('userPhone').value = user.phone || '';
+            document.getElementById('userRole').value = user.role_id || '';
+            document.getElementById('userStatus').checked = user.status === 'active';
+            document.getElementById('passwordSection').style.display = 'none';
+            document.getElementById('userModalTitle').textContent = 'Edit User';
+            document.getElementById('createUserModal').classList.remove('hidden');
+            
+            await loadRolePermissions();
+            await loadUserPermissions(userId);
+          }
+        } catch (error) {
+          console.error('Edit user error:', error);
+          alert('Failed to load user details');
+        }
+      };
+      
+      window.deleteUser = async function(userId) {
+        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/users/\${userId}\`, { method: 'DELETE' });
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('User deleted successfully');
+            loadUsersManagement();
+          } else {
+            alert('Failed to delete user: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete user error:', error);
+          alert('Error deleting user');
+        }
+      };
+      
+      window.loadRolePermissions = async function() {
+        const roleId = document.getElementById('userRole').value;
+        const grid = document.getElementById('userPermissionsGrid');
+        
+        if (!roleId) {
+          grid.innerHTML = '<div class="text-center text-gray-400 py-4 col-span-2"><p class="text-sm">Select a role first</p></div>';
+          return;
+        }
+        
+        try {
+          const response = await fetch(\`/api/admin/roles/\${roleId}/permissions\`);
+          const data = await response.json();
+          
+          if (data.success) {
+            const permissions = data.permissions;
+            allPermissions = permissions;
+            
+            // Group by category
+            const grouped = {};
+            permissions.forEach(perm => {
+              if (!grouped[perm.permission_category]) {
+                grouped[perm.permission_category] = [];
+              }
+              grouped[perm.permission_category].push(perm);
+            });
+            
+            grid.innerHTML = Object.entries(grouped).map(([category, perms]) => \`
+              <div class="col-span-2 bg-gray-50 p-3 rounded-lg">
+                <h5 class="font-semibold text-sm uppercase text-gray-700 mb-2">\${category}</h5>
+                <div class="space-y-1">
+                  \${perms.map(perm => \`
+                    <label class="flex items-center gap-2 text-sm">
+                      <input type="checkbox" 
+                             name="permission" 
+                             value="\${perm.permission_id}" 
+                             \${perm.has_permission ? 'checked' : ''}
+                             class="w-4 h-4">
+                      <span>\${perm.permission_name}</span>
+                      <span class="text-xs text-gray-500">(\${perm.permission_key})</span>
+                    </label>
+                  \`).join('')}
+                </div>
+              </div>
+            \`).join('');
+          }
+        } catch (error) {
+          console.error('Load role permissions error:', error);
+        }
+      };
+      
+      window.loadUserPermissions = async function(userId) {
+        try {
+          const response = await fetch(\`/api/admin/users/\${userId}/permissions\`);
+          const data = await response.json();
+          
+          if (data.success) {
+            // Update checkboxes based on user's custom permissions
+            data.permissions.forEach(perm => {
+              const checkbox = document.querySelector(\`input[name="permission"][value="\${perm.permission_id}"]\`);
+              if (checkbox) {
+                checkbox.checked = perm.is_granted === 1;
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Load user permissions error:', error);
+        }
+      };
+      
+      document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const userId = document.getElementById('editUserId').value;
+        const isEdit = !!userId;
+        
+        // Validate passwords for new users
+        if (!isEdit) {
+          const password = document.getElementById('userPassword').value;
+          const confirm = document.getElementById('userPasswordConfirm').value;
+          
+          if (password !== confirm) {
+            alert('Passwords do not match!');
+            return;
+          }
+          
+          if (password.length < 6) {
+            alert('Password must be at least 6 characters');
+            return;
+          }
+        }
+        
+        // Collect data
+        const userData = {
+          first_name: document.getElementById('userFirstName').value,
+          last_name: document.getElementById('userLastName').value,
+          email: document.getElementById('userEmail').value,
+          phone: document.getElementById('userPhone').value,
+          role_id: document.getElementById('userRole').value || null,
+          status: document.getElementById('userStatus').checked ? 'active' : 'inactive',
+          property_id: 1 // TODO: Get from session
+        };
+        
+        if (!isEdit) {
+          userData.password = document.getElementById('userPassword').value;
+        }
+        
+        // Collect custom permissions
+        const permissions = [];
+        document.querySelectorAll('input[name="permission"]:checked').forEach(cb => {
+          permissions.push(parseInt(cb.value));
+        });
+        userData.permissions = permissions;
+        
+        try {
+          const url = isEdit ? \`/api/admin/users/\${userId}\` : '/api/admin/users';
+          const method = isEdit ? 'PUT' : 'POST';
+          
+          const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert(isEdit ? 'User updated successfully!' : 'User created successfully!');
+            closeCreateUserModal();
+            loadUsersManagement();
+          } else {
+            alert('Failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Save user error:', error);
+          alert('Error saving user');
+        }
+      });
+      
+      window.openRolesManagementModal = async function() {
+        document.getElementById('rolesManagementModal').classList.remove('hidden');
+        await loadRolesList();
+      };
+      
+      window.closeRolesManagementModal = function() {
+        document.getElementById('rolesManagementModal').classList.add('hidden');
+      };
+      
+      async function loadRolesList() {
+        try {
+          const response = await fetch('/api/admin/roles');
+          const data = await response.json();
+          
+          if (data.success) {
+            const rolesList = document.getElementById('rolesList');
+            rolesList.innerHTML = data.roles.map(role => \`
+              <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h5 class="font-bold text-lg">\${role.role_name}</h5>
+                    <p class="text-sm text-gray-600">\${role.role_description}</p>
+                    <div class="mt-2">
+                      <span class="text-xs px-2 py-1 rounded \${role.is_system_role ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                        \${role.is_system_role ? 'System Role' : 'Custom Role'}
+                      </span>
+                      <span class="text-xs text-gray-500 ml-2">\${role.permission_count || 0} permissions</span>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="viewRolePermissions(\${role.role_id})" class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                      <i class="fas fa-eye mr-1"></i>View
+                    </button>
+                    \${!role.is_system_role ? \`
+                      <button onclick="deleteRole(\${role.role_id})" class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                        <i class="fas fa-trash mr-1"></i>Delete
+                      </button>
+                    \` : ''}
+                  </div>
+                </div>
+              </div>
+            \`).join('');
+          }
+        } catch (error) {
+          console.error('Load roles error:', error);
+        }
+      }
+      
+      window.openPermissionsReferenceModal = async function() {
+        document.getElementById('permissionsReferenceModal').classList.remove('hidden');
+        await loadPermissionsReference();
+      };
+      
+      window.closePermissionsReferenceModal = function() {
+        document.getElementById('permissionsReferenceModal').classList.add('hidden');
+      };
+      
+      async function loadPermissionsReference() {
+        try {
+          const response = await fetch('/api/admin/permissions');
+          const data = await response.json();
+          
+          if (data.success) {
+            const grouped = {};
+            data.permissions.forEach(perm => {
+              if (!grouped[perm.permission_category]) {
+                grouped[perm.permission_category] = [];
+              }
+              grouped[perm.permission_category].push(perm);
+            });
+            
+            const content = document.getElementById('permissionsReferenceContent');
+            content.innerHTML = Object.entries(grouped).map(([category, perms]) => \`
+              <div class="mb-6">
+                <h4 class="text-xl font-bold mb-3 capitalize">\${category} Permissions</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  \${perms.map(perm => \`
+                    <div class="border rounded-lg p-3">
+                      <div class="font-semibold">\${perm.permission_name}</div>
+                      <div class="text-xs text-gray-500 mt-1">\${perm.permission_key}</div>
+                      <p class="text-sm text-gray-600 mt-2">\${perm.description}</p>
+                    </div>
+                  \`).join('')}
+                </div>
+              </div>
+            \`).join('');
+          }
+        } catch (error) {
+          console.error('Load permissions error:', error);
+        }
+      }
+      
+      window.toggleResourceLimit = function(type) {
+        const checkbox = document.getElementById(\`limit\${type.charAt(0).toUpperCase() + type.slice(1)}\`);
+        const selector = document.getElementById(\`\${type}Selector\`);
+        
+        if (checkbox.checked) {
+          selector.classList.remove('hidden');
+          // TODO: Load resources dynamically
+        } else {
+          selector.classList.add('hidden');
+        }
+      };
+      
+      // ========================================
+      // END USER MANAGEMENT FUNCTIONS
       // ========================================
       
       // QR Code functions
