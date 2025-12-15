@@ -31825,6 +31825,73 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
+    <!-- CREATE CUSTOM ROLE MODAL -->
+    <div id="createRoleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-2xl font-bold"><i class="fas fa-user-shield mr-2"></i>Create Custom Role</h3>
+                <button onclick="closeCreateRoleModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <form id="createRoleForm" class="space-y-6">
+                    <!-- Role Basic Info -->
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-3 text-indigo-900"><i class="fas fa-info-circle mr-2"></i>Role Information</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Role Name *</label>
+                                <input type="text" id="roleNameInput" required class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., Pool Manager">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1">Role Type</label>
+                                <select id="roleTypeInput" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="custom">Custom Role</option>
+                                    <option value="system" disabled>System Role (Protected)</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-semibold mb-1">Description</label>
+                                <textarea id="roleDescriptionInput" class="w-full px-4 py-2 border rounded-lg" rows="2" placeholder="Brief description of this role's responsibilities"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Permission Selection -->
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-3 text-blue-900"><i class="fas fa-shield-alt mr-2"></i>Assign Permissions</h4>
+                        <div class="mb-4 flex items-center gap-4">
+                            <button type="button" onclick="selectAllPermissions()" class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                                <i class="fas fa-check-double mr-1"></i>Select All
+                            </button>
+                            <button type="button" onclick="deselectAllPermissions()" class="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                                <i class="fas fa-times mr-1"></i>Deselect All
+                            </button>
+                            <span id="selectedPermissionsCount" class="text-sm text-gray-600">0 permissions selected</span>
+                        </div>
+                        <div id="permissionsCheckboxGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div class="text-center text-gray-400 py-8">
+                                <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                                <p>Loading permissions...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" onclick="closeCreateRoleModal()" class="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">
+                            <i class="fas fa-save mr-2"></i>Create Role
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- PERMISSIONS REFERENCE MODAL -->
     <div id="permissionsReferenceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
