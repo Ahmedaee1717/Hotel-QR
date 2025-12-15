@@ -35649,7 +35649,18 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
           // Load availability for selected session
           const availabilityResponse = await fetch('/api/restaurant/session/' + selectedSessionId + '/availability');
           const availabilityData = await availabilityResponse.json();
-          reservedTables = availabilityData.reserved_tables || [];
+          
+          // Extract table IDs that are NOT available (already reserved)
+          // API returns tables with is_available flag
+          if (availabilityData.success && availabilityData.tables) {
+            reservedTables = availabilityData.tables
+              .filter(t => !t.is_available)
+              .map(t => t.table_id);
+          } else {
+            reservedTables = [];
+          }
+          
+          console.log('Reserved table IDs:', reservedTables);
           
           // Filter tables by capacity
           const suitableTables = availableTables.filter(t => t.capacity >= selectedGuests);
