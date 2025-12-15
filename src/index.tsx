@@ -16470,7 +16470,11 @@ app.get('/offering-detail', async (c) => {
                         '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>' +
                         '</div>';
                 }
-                loadRestaurantMenus();
+                // Hide the menu cards section - we have View Menu button instead
+                const menuSection = document.getElementById('restaurantMenus');
+                if (menuSection) {
+                    menuSection.classList.add('hidden');
+                }
             } else {
                 // For non-restaurant offerings, show/hide booking section based on requires_booking
                 const bookingSection = document.getElementById('bookingSection');
