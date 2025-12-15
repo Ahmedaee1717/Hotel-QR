@@ -29599,23 +29599,43 @@ app.get('/admin/dashboard', (c) => {
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
                                     <i class="fas fa-icons mr-2 text-purple-600"></i>Icon
                                 </label>
-                                <input type="text" id="roomServiceCardIcon" placeholder="fas fa-concierge-bell" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
-                                <p class="text-xs text-gray-500 mt-1">FontAwesome class (e.g., fas fa-concierge-bell)</p>
+                                <select id="roomServiceCardIcon" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
+                                    <option value="fas fa-concierge-bell">🔔 Concierge Bell</option>
+                                    <option value="fas fa-utensils">🍴 Utensils</option>
+                                    <option value="fas fa-coffee">☕ Coffee</option>
+                                    <option value="fas fa-pizza-slice">🍕 Pizza</option>
+                                    <option value="fas fa-hamburger">🍔 Hamburger</option>
+                                    <option value="fas fa-wine-glass">🍷 Wine Glass</option>
+                                    <option value="fas fa-cocktail">🍹 Cocktail</option>
+                                    <option value="fas fa-mug-hot">☕ Hot Mug</option>
+                                    <option value="fas fa-drumstick-bite">🍗 Drumstick</option>
+                                    <option value="fas fa-birthday-cake">🎂 Cake</option>
+                                    <option value="fas fa-ice-cream">🍦 Ice Cream</option>
+                                    <option value="fas fa-apple-alt">🍎 Apple</option>
+                                    <option value="fas fa-carrot">🥕 Carrot</option>
+                                    <option value="fas fa-cheese">🧀 Cheese</option>
+                                    <option value="fas fa-bread-slice">🍞 Bread</option>
+                                    <option value="fas fa-phone">📞 Phone</option>
+                                    <option value="fas fa-bell">🔔 Bell</option>
+                                    <option value="fas fa-clock">🕐 Clock</option>
+                                    <option value="fas fa-home">🏠 Home</option>
+                                    <option value="fas fa-star">⭐ Star</option>
+                                </select>
+                                <div class="mt-2 flex items-center justify-center p-3 bg-white rounded-lg border-2 border-gray-200">
+                                    <i id="roomServiceCardIconPreview" class="fas fa-concierge-bell text-4xl text-purple-600"></i>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
                                     <i class="fas fa-palette mr-2 text-purple-600"></i>Card Color
                                 </label>
-                                <select id="roomServiceCardColor" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none">
-                                    <option value="indigo">Indigo (Default)</option>
-                                    <option value="blue">Blue</option>
-                                    <option value="purple">Purple</option>
-                                    <option value="pink">Pink</option>
-                                    <option value="red">Red</option>
-                                    <option value="orange">Orange</option>
-                                    <option value="green">Green</option>
-                                    <option value="teal">Teal</option>
-                                </select>
+                                <div class="flex gap-2">
+                                    <input type="color" id="roomServiceCardColor" value="#6366f1" class="w-20 h-12 border-2 border-gray-200 rounded-lg cursor-pointer">
+                                    <input type="text" id="roomServiceCardColorText" value="#6366f1" placeholder="#6366f1" class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none font-mono">
+                                </div>
+                                <div id="roomServiceCardColorPreview" class="mt-2 p-4 rounded-lg text-white font-semibold text-center" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                                    Preview Color
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -36777,11 +36797,75 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             document.getElementById('roomServiceCardSubtitle').value = roomServiceSection.subtitle_en || 'Order from your room';
             document.getElementById('roomServiceCardDescription').value = roomServiceSection.description_en || 'Browse our menu and call to order';
             document.getElementById('roomServiceCardIcon').value = roomServiceSection.icon_class || 'fas fa-concierge-bell';
-            document.getElementById('roomServiceCardColor').value = roomServiceSection.color_class || 'indigo';
+            
+            // Handle color - check if it's a hex color or old color name
+            const cardColor = roomServiceSection.color_class || '#6366f1';
+            if (cardColor.startsWith('#')) {
+              document.getElementById('roomServiceCardColor').value = cardColor;
+              document.getElementById('roomServiceCardColorText').value = cardColor;
+            } else {
+              // Convert old color names to hex
+              const colorMap = {
+                'indigo': '#6366f1',
+                'blue': '#3b82f6',
+                'purple': '#8b5cf6',
+                'pink': '#ec4899',
+                'red': '#ef4444',
+                'orange': '#f97316',
+                'green': '#10b981',
+                'teal': '#14b8a6'
+              };
+              const hexColor = colorMap[cardColor] || '#6366f1';
+              document.getElementById('roomServiceCardColor').value = hexColor;
+              document.getElementById('roomServiceCardColorText').value = hexColor;
+            }
+            
             document.getElementById('roomServiceCardVisible').checked = roomServiceSection.is_visible === 1;
           }
+          
+          // Initialize icon and color previews
+          updateRoomServiceIconPreview();
+          updateRoomServiceColorPreview();
+          
+          // Add event listeners for real-time preview
+          document.getElementById('roomServiceCardIcon').addEventListener('change', updateRoomServiceIconPreview);
+          document.getElementById('roomServiceCardColor').addEventListener('input', function(e) {
+            document.getElementById('roomServiceCardColorText').value = e.target.value;
+            updateRoomServiceColorPreview();
+          });
+          document.getElementById('roomServiceCardColorText').addEventListener('input', function(e) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+              document.getElementById('roomServiceCardColor').value = e.target.value;
+              updateRoomServiceColorPreview();
+            }
+          });
         } catch (error) {
           console.error('Load card settings error:', error);
+        }
+      }
+      
+      function updateRoomServiceIconPreview() {
+        const iconSelect = document.getElementById('roomServiceCardIcon');
+        const iconPreview = document.getElementById('roomServiceCardIconPreview');
+        if (iconSelect && iconPreview) {
+          iconPreview.className = iconSelect.value + ' text-4xl text-purple-600';
+        }
+      }
+      
+      function updateRoomServiceColorPreview() {
+        const colorPicker = document.getElementById('roomServiceCardColor');
+        const colorPreview = document.getElementById('roomServiceCardColorPreview');
+        if (colorPicker && colorPreview) {
+          const color = colorPicker.value;
+          // Create a lighter version for gradient
+          const r = parseInt(color.slice(1, 3), 16);
+          const g = parseInt(color.slice(3, 5), 16);
+          const b = parseInt(color.slice(5, 7), 16);
+          const lighterColor = '#' + 
+            Math.min(255, r + 40).toString(16).padStart(2, '0') +
+            Math.min(255, g + 40).toString(16).padStart(2, '0') +
+            Math.min(255, b + 40).toString(16).padStart(2, '0');
+          colorPreview.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + lighterColor + ' 100%)';
         }
       }
       
@@ -36901,7 +36985,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const cardSubtitle = document.getElementById('roomServiceCardSubtitle').value.trim() || 'Order from your room';
           const cardDescription = document.getElementById('roomServiceCardDescription').value.trim() || 'Browse our menu and call to order';
           const cardIcon = document.getElementById('roomServiceCardIcon').value.trim() || 'fas fa-concierge-bell';
-          const cardColor = document.getElementById('roomServiceCardColor').value || 'indigo';
+          const cardColor = document.getElementById('roomServiceCardColor').value || '#6366f1';
           const cardVisible = document.getElementById('roomServiceCardVisible').checked ? 1 : 0;
           
           const cardResponse = await fetch('/api/admin/custom-sections', {
