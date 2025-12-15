@@ -26876,7 +26876,7 @@ app.get('/admin/dashboard', (c) => {
         <div class="flex-1 ml-64 px-4 py-8">
 
         <!-- FRONT DESK / CONCIERGE TAB -->
-        <div id="frontdeskTab" class="tab-content" style="display: none;">
+        <div id="frontdeskTab" class="tab-content hidden">
             <div class="mb-6">
                 <h2 class="text-3xl font-bold text-gray-800 mb-2">
                     <i class="fas fa-concierge-bell mr-3 text-blue-600"></i>Front Desk & Concierge Center
