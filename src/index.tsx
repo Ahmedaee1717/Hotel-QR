@@ -32495,7 +32495,7 @@ app.get('/admin/dashboard', (c) => {
       
       window.editUser = async function(userId) {
         try {
-          const response = await fetch(\`/api/admin/users/\${userId}\`);
+          const response = await fetchWithAuth(\`/api/admin/users/\${userId}\`);
           const data = await response.json();
           
           if (data.success) {
@@ -32524,7 +32524,7 @@ app.get('/admin/dashboard', (c) => {
         if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
         
         try {
-          const response = await fetch(\`/api/admin/users/\${userId}\`, { method: 'DELETE' });
+          const response = await fetchWithAuth(\`/api/admin/users/\${userId}\`, { method: 'DELETE' });
           const data = await response.json();
           
           if (data.success) {
@@ -32549,7 +32549,7 @@ app.get('/admin/dashboard', (c) => {
         }
         
         try {
-          const response = await fetch(\`/api/admin/roles/\${roleId}/permissions\`);
+          const response = await fetchWithAuth(\`/api/admin/roles/\${roleId}/permissions\`);
           const data = await response.json();
           
           if (data.success) {
@@ -32591,7 +32591,7 @@ app.get('/admin/dashboard', (c) => {
       
       window.loadUserPermissions = async function(userId) {
         try {
-          const response = await fetch(\`/api/admin/users/\${userId}/permissions\`);
+          const response = await fetchWithAuth(\`/api/admin/users/\${userId}/permissions\`);
           const data = await response.json();
           
           if (data.success) {
@@ -32656,9 +32656,8 @@ app.get('/admin/dashboard', (c) => {
           const url = isEdit ? \`/api/admin/users/\${userId}\` : '/api/admin/users';
           const method = isEdit ? 'PUT' : 'POST';
           
-          const response = await fetch(url, {
+          const response = await fetchWithAuth(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
           });
           
@@ -32773,7 +32772,12 @@ app.get('/admin/dashboard', (c) => {
         const checkbox = document.getElementById(\`limit\${type.charAt(0).toUpperCase() + type.slice(1)}\`);
         const selector = document.getElementById(\`\${type}Selector\`);
         
-        if (checkbox.checked) {
+        if (!selector) {
+          console.warn(\`Selector element not found for type: \${type}\`);
+          return;
+        }
+        
+        if (checkbox && checkbox.checked) {
           selector.classList.remove('hidden');
           // TODO: Load resources dynamically
         } else {
