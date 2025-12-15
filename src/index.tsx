@@ -26585,11 +26585,11 @@ app.get('/admin/dashboard', (c) => {
                             <div class="space-y-3">
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Main Title</label>
-                                    <input type="text" id="cardTitle" class="w-full p-2 border rounded" placeholder="Scan for Hotel Services" />
+                                    <input type="text" id="qrCardTitle" class="w-full p-2 border rounded" placeholder="Scan for Hotel Services" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Subtitle</label>
-                                    <input type="text" id="cardSubtitle" class="w-full p-2 border rounded" placeholder="Access all amenities and services" />
+                                    <input type="text" id="qrCardSubtitle" class="w-full p-2 border rounded" placeholder="Access all amenities and services" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-semibold mb-1">Bottom Message (optional)</label>
@@ -29958,7 +29958,7 @@ app.get('/admin/dashboard', (c) => {
                         <label class="block font-medium mb-2">
                             <i class="fas fa-heading mr-2 text-purple-600"></i>Card Title
                         </label>
-                        <input type="text" id="cardTitle" placeholder="Beach Booking" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <input type="text" id="beachCardTitle" placeholder="Beach Booking" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
                         <p class="text-xs text-gray-500 mt-1">Main heading for the beach booking section</p>
                     </div>
                     
@@ -29966,7 +29966,7 @@ app.get('/admin/dashboard', (c) => {
                         <label class="block font-medium mb-2">
                             <i class="fas fa-text-height mr-2 text-purple-600"></i>Card Subtitle
                         </label>
-                        <input type="text" id="cardSubtitle" placeholder="Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
+                        <input type="text" id="beachCardSubtitle" placeholder="Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations." class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500">
                         <p class="text-xs text-gray-500 mt-1">Description text below the title</p>
                     </div>
                     
@@ -30906,8 +30906,8 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           // Update form fields
-          document.getElementById('cardTitle').value = data.card_title || qrCardConfig.title;
-          document.getElementById('cardSubtitle').value = data.card_subtitle || qrCardConfig.subtitle;
+          document.getElementById('qrCardTitle').value = data.card_title || qrCardConfig.title;
+          document.getElementById('qrCardSubtitle').value = data.card_subtitle || qrCardConfig.subtitle;
           document.getElementById('cardMessage').value = data.custom_message || '';
           document.getElementById('bgColor').value = data.background_color || qrCardConfig.bgColor;
           document.getElementById('qrTextColor').value = data.text_color || qrCardConfig.textColor;
@@ -31057,8 +31057,8 @@ app.get('/admin/dashboard', (c) => {
       window.resetQRCard = function() {
         if (!confirm('Reset to default design? Any unsaved changes will be lost.')) return;
         
-        document.getElementById('cardTitle').value = 'Scan for Hotel Services';
-        document.getElementById('cardSubtitle').value = 'Access all amenities and services';
+        document.getElementById('qrCardTitle').value = 'Scan for Hotel Services';
+        document.getElementById('qrCardSubtitle').value = 'Access all amenities and services';
         document.getElementById('cardMessage').value = '';
         document.getElementById('bgColor').value = '#ffffff';
         document.getElementById('qrTextColor').value = '#000000';
@@ -31106,12 +31106,12 @@ app.get('/admin/dashboard', (c) => {
       };
 
       // Event listeners for real-time updates
-      document.getElementById('cardTitle').addEventListener('input', (e) => {
+      document.getElementById('qrCardTitle').addEventListener('input', (e) => {
         qrCardConfig.title = e.target.value;
         updateQRCardPreview();
       });
       
-      document.getElementById('cardSubtitle').addEventListener('input', (e) => {
+      document.getElementById('qrCardSubtitle').addEventListener('input', (e) => {
         qrCardConfig.subtitle = e.target.value;
         updateQRCardPreview();
       });
@@ -33246,8 +33246,8 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('maxDurationHours').value = s.max_booking_duration_hours || 12;
             
             // Load card customization fields
-            document.getElementById('cardTitle').value = s.card_title || 'Beach Booking';
-            document.getElementById('cardSubtitle').value = s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
+            document.getElementById('beachCardTitle').value = s.card_title || 'Beach Booking';
+            document.getElementById('beachCardSubtitle').value = s.card_subtitle || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
             document.getElementById('feature1Text').value = s.feature1_text || 'Free for Hotel Guests';
             document.getElementById('feature2Text').value = s.feature2_text || 'Book Up to 7 Days Ahead';
             document.getElementById('feature3Text').value = s.feature3_text || 'QR Code Check-in';
@@ -33424,8 +33424,8 @@ app.get('/admin/dashboard', (c) => {
               advance_booking_days: advanceBookingDays,
               max_booking_duration_hours: maxDurationHours,
               // Card customization
-              card_title: document.getElementById('cardTitle').value,
-              card_subtitle: document.getElementById('cardSubtitle').value,
+              card_title: document.getElementById('beachCardTitle').value,
+              card_subtitle: document.getElementById('beachCardSubtitle').value,
               feature1_text: document.getElementById('feature1Text').value,
               feature2_text: document.getElementById('feature2Text').value,
               feature3_text: document.getElementById('feature3Text').value,
@@ -33513,8 +33513,8 @@ app.get('/admin/dashboard', (c) => {
           const trafficLightTextColor = document.getElementById('trafficLightTextColor')?.value || '#ffffff';
           
           // Get current text values to preserve them
-          const cardTitle = document.getElementById('cardTitle')?.value || 'Beach Booking';
-          const cardSubtitle = document.getElementById('cardSubtitle')?.value || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
+          const cardTitle = document.getElementById('beachCardTitle')?.value || 'Beach Booking';
+          const cardSubtitle = document.getElementById('beachCardSubtitle')?.value || 'Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.';
           const feature1Text = document.getElementById('feature1Text')?.value || 'Free for Hotel Guests';
           const feature2Text = document.getElementById('feature2Text')?.value || 'Book Up to 7 Days Ahead';
           const feature3Text = document.getElementById('feature3Text')?.value || 'QR Code Check-in';
@@ -37055,7 +37055,17 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             body: JSON.stringify({
               title_en: title,
               short_description_en: description || 'Enjoy delicious meals and beverages delivered to your room.',
-              full_description_en: hours || '24 Hours'
+              full_description_en: hours || '24 Hours',
+              price: roomServiceOffering.price || 0,
+              location: roomServiceOffering.location || '',
+              duration_minutes: roomServiceOffering.duration_minutes || null,
+              requires_booking: roomServiceOffering.requires_booking || 0,
+              enable_booking: roomServiceOffering.enable_booking || null,
+              images: roomServiceOffering.images || '[]',
+              video_url: roomServiceOffering.video_url || null,
+              event_date: roomServiceOffering.event_date || null,
+              event_start_time: roomServiceOffering.event_start_time || null,
+              event_end_time: roomServiceOffering.event_end_time || null
             })
           });
 
