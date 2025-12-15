@@ -9643,6 +9643,96 @@ app.post('/api/chatbot/chat', async (c) => {
       }
     }
     
+    // 🏖️ BOOKING INTENT DETECTION - Beach & Restaurant Reservations
+    const bookingKeywords = {
+      beach: ['beach', 'umbrella', 'cabana', 'lounger', 'daybed', 'spot', 'sunbed'],
+      restaurant: ['restaurant', 'table', 'dinner', 'lunch', 'breakfast', 'dine', 'eat', 'reserve'],
+      booking: ['book', 'reserve', 'reservation', 'make a booking', 'i want to', 'can i']
+    };
+    
+    const messageLowerBooking = message.toLowerCase();
+    const hasBeachKeyword = bookingKeywords.beach.some(kw => messageLowerBooking.includes(kw));
+    const hasRestaurantKeyword = bookingKeywords.restaurant.some(kw => messageLowerBooking.includes(kw));
+    const hasBookingIntent = bookingKeywords.booking.some(kw => messageLowerBooking.includes(kw));
+    
+    // Detect if user wants to make a reservation
+    if (hasBookingIntent && (hasBeachKeyword || hasRestaurantKeyword)) {
+      let bookingType = hasBeachKeyword ? 'beach' : 'restaurant';
+      
+      // Create a friendly booking invitation with direct link
+      let bookingResponse = '';
+      
+      if (bookingType === 'beach') {
+        const beachSettings = await DB.prepare(`
+          SELECT beach_booking_enabled FROM beach_settings WHERE property_id = ?
+        `).bind(property_id).first();
+        
+        if (beachSettings?.beach_booking_enabled === 1) {
+          bookingResponse = `🏖️ **I'd be delighted to help you reserve a beach spot!**\n\n`;
+          bookingResponse += `We offer:\n`;
+          bookingResponse += `🔵 **Umbrellas** - Classic beach experience\n`;
+          bookingResponse += `🟢 **Cabanas** - Private & cozy\n`;
+          bookingResponse += `🟡 **Loungers** - Relax in style\n`;
+          bookingResponse += `🟣 **Daybeds** - Ultimate comfort\n\n`;
+          bookingResponse += `**[Click here to select your spot and complete your beach reservation](/hotel/paradise-resort#beach-booking)**\n\n`;
+          bookingResponse += `You'll be able to:\n`;
+          bookingResponse += `✅ Choose your preferred date and time slot\n`;
+          bookingResponse += `✅ See available spots on our interactive beach map\n`;
+          bookingResponse += `✅ Select your ideal spot type\n`;
+          bookingResponse += `✅ Receive instant confirmation with QR code\n\n`;
+          bookingResponse += `The booking takes just 2 minutes! 🌊`;
+        } else {
+          bookingResponse = `I apologize, but beach bookings are currently not available. Please contact our front desk for assistance.`;
+        }
+      } else if (bookingType === 'restaurant') {
+        // Get active restaurants
+        const restaurants = await DB.prepare(`
+          SELECT offering_id, title_en, short_description_en
+          FROM hotel_offerings
+          WHERE property_id = ? AND offering_type = 'restaurant' AND status = 'active'
+          ORDER BY offering_id
+          LIMIT 5
+        `).bind(property_id).all();
+        
+        if (restaurants.results && restaurants.results.length > 0) {
+          bookingResponse = `🍽️ **I'd be happy to help you make a restaurant reservation!**\n\n`;
+          bookingResponse += `We have ${restaurants.results.length} dining options available:\n\n`;
+          
+          restaurants.results.forEach((restaurant: any, index: number) => {
+            const emoji = index === 0 ? '☀️' : index === 1 ? '🏖️' : index === 2 ? '🌿' : '🍴';
+            bookingResponse += `${emoji} **[${restaurant.title_en}](/hotel/paradise-resort/restaurant/${restaurant.offering_id}/book)**\n`;
+            if (restaurant.short_description_en) {
+              bookingResponse += `   ${restaurant.short_description_en}\n`;
+            }
+            bookingResponse += `\n`;
+          });
+          
+          bookingResponse += `**Simply click on any restaurant above to:**\n`;
+          bookingResponse += `✅ View the full menu\n`;
+          bookingResponse += `✅ Select your preferred date and time\n`;
+          bookingResponse += `✅ Choose party size\n`;
+          bookingResponse += `✅ Get instant confirmation\n\n`;
+          bookingResponse += `Looking forward to serving you! 🎉`;
+        } else {
+          bookingResponse = `I apologize, but I couldn't find available restaurants at the moment. Please contact our concierge for assistance.`;
+        }
+      }
+      
+      await DB.prepare(`
+        INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
+        VALUES (?, 'assistant', ?, '[]')
+      `).bind(convId, bookingResponse).run();
+      
+      return c.json({ 
+        success: true,
+        response: bookingResponse,
+        conversation_id: convId,
+        chunks_used: 0,
+        booking_intent: true,
+        booking_type: bookingType
+      });
+    }
+    
     // RAG: Find relevant chunks
     const allChunks = await DB.prepare(`
       SELECT chunk_id, chunk_text, document_id
