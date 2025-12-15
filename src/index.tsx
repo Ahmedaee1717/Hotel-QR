@@ -7719,11 +7719,32 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
     
     return c.json({ 
       success: true,
-      offerings: offerings.results.map(o => ({
-        ...o,
-        images: o.images ? JSON.parse(o.images) : [],
-        includes: o.includes ? JSON.parse(o.includes) : []
-      }))
+      offerings: offerings.results.map(o => {
+        let images = [];
+        let includes = [];
+        
+        // Safely parse images
+        try {
+          images = o.images ? JSON.parse(o.images) : [];
+        } catch (e) {
+          console.error('Failed to parse images for offering', o.offering_id, o.images, e);
+          images = [];
+        }
+        
+        // Safely parse includes
+        try {
+          includes = (o.includes && o.includes !== 'null') ? JSON.parse(o.includes) : [];
+        } catch (e) {
+          console.error('Failed to parse includes for offering', o.offering_id, o.includes, e);
+          includes = [];
+        }
+        
+        return {
+          ...o,
+          images,
+          includes
+        };
+      })
     })
   } catch (error) {
     console.error('Get hotel offerings error:', error)
@@ -14755,9 +14776,9 @@ app.get('/hotel/:property_slug', async (c) => {
             const roomServiceSection = customSections.find(s => s.section_key === 'room-service');
             
             // Use custom card settings if available, otherwise use defaults
-            const cardTitle = roomServiceSection?.card_title || 'Room Service';
-            const cardSubtitle = roomServiceSection?.card_subtitle || 'Order from your room';
-            const cardDescription = roomServiceSection?.card_description || 'Browse our menu and call to order delicious meals delivered to your room';
+            const cardTitle = roomServiceSection?.section_name_en || 'Room Service';
+            const cardSubtitle = roomServiceSection?.subtitle_en || 'Order from your room';
+            const cardDescription = roomServiceSection?.description_en || 'Browse our menu and call to order delicious meals delivered to your room';
             const cardIcon = roomServiceSection?.icon_class || 'fas fa-concierge-bell';
             const cardColor = roomServiceSection?.color_class || '#6366f1'; // Default indigo
             
