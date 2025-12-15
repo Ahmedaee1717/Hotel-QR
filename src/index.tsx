@@ -35201,7 +35201,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadBeachSettings() {
         try {
-          const response = await fetch('/api/admin/beach/settings/1');
+          const response = await fetchWithAuth('/api/admin/beach/settings/1');
           const data = await response.json();
           
           if (data.success && data.settings) {
@@ -35548,7 +35548,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadBeachSpots() {
         try {
-          const response = await fetch('/api/admin/beach/spots/1');
+          const response = await fetchWithAuth('/api/admin/beach/spots/1');
           const data = await response.json();
           
           const container = document.getElementById('beachSpotsList');
@@ -35835,11 +35835,11 @@ app.get('/admin/dashboard', (c) => {
           const selectedSlot = slotSelector ? slotSelector.value : 'all';
           
           // Fetch spots
-          const spotsResponse = await fetch('/api/admin/beach/spots/1');
+          const spotsResponse = await fetchWithAuth('/api/admin/beach/spots/1');
           const spotsData = await spotsResponse.json();
           
           // Fetch bookings for the date
-          const bookingsResponse = await fetch('/api/admin/beach/bookings?property_id=1&date=' + dateStr);
+          const bookingsResponse = await fetchWithAuth('/api/admin/beach/bookings?property_id=1&date=' + dateStr);
           const bookingsData = await bookingsResponse.json();
           
           window.liveBeachMapData.spots = spotsData.spots || [];
