@@ -25929,7 +25929,7 @@ app.get('/admin/test', async (c) => {
     </div>
     <script>
         async function loadRooms() {
-            const response = await fetch('/api/admin/rooms?property_id=1');
+            const response = await fetch('/api/admin/rooms?property_id=${propertyId}');
             const rooms = await response.json();
             const list = document.getElementById('roomsList');
             list.innerHTML = rooms.map(r => \`
@@ -33538,8 +33538,14 @@ app.get('/admin/dashboard', (c) => {
       const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
       if (!user.user_id) { window.location.href = '/admin/login'; }
 
-      // Get property ID from URL or localStorage
-      const propertyId = new URLSearchParams(window.location.search).get('property') || localStorage.getItem('property_id') || '1';
+      // CRITICAL: Get property ID from logged-in user (MULTI-TENANCY)
+      // Priority: 1. URL param, 2. User's property_id, 3. localStorage backup
+      const propertyId = new URLSearchParams(window.location.search).get('property') || user.property_id || localStorage.getItem('property_id') || '1';
+      
+      // Store property_id for future use
+      if (user.property_id) {
+        localStorage.setItem('property_id', user.property_id.toString());
+      }
 
       // Load permissions and resource access
       const userPermissions = JSON.parse(localStorage.getItem('admin_permissions') || '[]');
@@ -34839,7 +34845,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadRegCode() {
         try {
-          const response = await fetch('/api/admin/registration-code?property_id=1');
+          const response = await fetch('/api/admin/registration-code?property_id=${propertyId}');
           const data = await response.json();
           document.getElementById('regCode').textContent = data.registration_code;
           const expiry = new Date(data.expires_at);
@@ -34869,7 +34875,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadCallbacks() {
         try {
-          const response = await fetch('/api/admin/callback-requests?property_id=1');
+          const response = await fetch('/api/admin/callback-requests?property_id=${propertyId}');
           const data = await response.json();
           const list = document.getElementById('callbacksList');
           
@@ -34901,7 +34907,7 @@ app.get('/admin/dashboard', (c) => {
       async function loadRooms() {
         try {
           console.log('🔄 Loading rooms...');
-          const response = await fetch('/api/admin/rooms?property_id=1');
+          const response = await fetch('/api/admin/rooms?property_id=${propertyId}');
           console.log('📡 Response status:', response.status);
           const rooms = await response.json();
           console.log('📦 Rooms received:', rooms.length, rooms);
@@ -34926,7 +34932,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadVendors() {
         try {
-          const response = await fetch('/api/admin/vendors?property_id=1');
+          const response = await fetch('/api/admin/vendors?property_id=${propertyId}');
           const vendors = await response.json();
           const list = document.getElementById('vendorsList');
           
@@ -35123,7 +35129,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadInfoPages() {
         try {
-          const response = await fetch('/api/admin/info-pages?property_id=1');
+          const response = await fetch('/api/admin/info-pages?property_id=${propertyId}');
           const pages = await response.json();
           
           const container = document.getElementById('infoPagesContainer');
@@ -35606,7 +35612,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadActivities() {
         try {
-          const response = await fetch('/api/admin/activities?property_id=1');
+          const response = await fetch('/api/admin/activities?property_id=${propertyId}');
           const activities = await response.json();
           const list = document.getElementById('activitiesList');
           
@@ -35661,7 +35667,7 @@ app.get('/admin/dashboard', (c) => {
       // Custom Sections Management
       async function loadCustomSections() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const response = await fetch('/api/admin/custom-sections?property_id=${propertyId}');
           const data = await response.json();
           const list = document.getElementById('customSectionsList');
           
@@ -35754,7 +35760,7 @@ app.get('/admin/dashboard', (c) => {
         try {
           // Load property settings if not already loaded
           if (!adminPropertySettings) {
-            const settingsResponse = await fetch('/api/admin/property-settings?property_id=1');
+            const settingsResponse = await fetch('/api/admin/property-settings?property_id=${propertyId}');
             adminPropertySettings = await settingsResponse.json();
           }
           
@@ -35775,7 +35781,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadCustomSectionsDropdown() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const response = await fetch('/api/admin/custom-sections?property_id=${propertyId}');
           const data = await response.json();
           const dropdown = document.getElementById('offeringType');
           
@@ -36239,7 +36245,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadSettings() {
         try {
-          const response = await fetch('/api/admin/property-settings?property_id=1');
+          const response = await fetch('/api/admin/property-settings?property_id=${propertyId}');
           const settings = await response.json();
           adminPropertySettings = settings; // Store for later use
           
@@ -36445,7 +36451,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadChatbotDocuments() {
         try {
-          const response = await fetch('/api/admin/chatbot/documents?property_id=1');
+          const response = await fetch('/api/admin/chatbot/documents?property_id=${propertyId}');
           const data = await response.json();
           
           const container = document.getElementById('documentsList');
@@ -36573,7 +36579,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadAnalyticsStats() {
         try {
-          const response = await fetch('/api/admin/chatbot/analytics/stats?property_id=1');
+          const response = await fetch('/api/admin/chatbot/analytics/stats?property_id=${propertyId}');
           const data = await response.json();
           
           if (data.success) {
@@ -36589,7 +36595,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadTopQuestions() {
         try {
-          const response = await fetch('/api/admin/chatbot/analytics/top-questions?property_id=1&limit=10');
+          const response = await fetch('/api/admin/chatbot/analytics/top-questions?property_id=${propertyId}&limit=10');
           const data = await response.json();
           
           const container = document.getElementById('topQuestionsList');
@@ -36618,7 +36624,7 @@ app.get('/admin/dashboard', (c) => {
           const date = document.getElementById('filterDate').value;
           const search = document.getElementById('searchQuery').value;
           
-          let url = '/api/admin/chatbot/analytics/chat-history?property_id=1';
+          let url = '/api/admin/chatbot/analytics/chat-history?property_id=${propertyId}';
           if (date) url += '&date=' + date;
           if (search) url += '&search=' + encodeURIComponent(search);
           
@@ -36743,7 +36749,7 @@ app.get('/admin/dashboard', (c) => {
       window.editChatbotDocument = async function(documentId) {
         try {
           // Fetch document details
-          const response = await fetch('/api/admin/chatbot/documents?property_id=1');
+          const response = await fetch('/api/admin/chatbot/documents?property_id=${propertyId}');
           const data = await response.json();
           
           const doc = data.documents.find(d => d.document_id === documentId);
@@ -37327,7 +37333,7 @@ app.get('/admin/dashboard', (c) => {
       window.loadBeachBookings = async function() {
         try {
           const date = document.getElementById('beachBookingDate').value;
-          const response = await fetchWithAuth('/api/admin/beach/bookings?property_id=1&date=' + date);
+          const response = await fetchWithAuth('/api/admin/beach/bookings?property_id=${propertyId}&date=' + date);
           const data = await response.json();
           
           const container = document.getElementById('beachBookingsList');
@@ -37453,7 +37459,7 @@ app.get('/admin/dashboard', (c) => {
           const spotsData = await spotsResponse.json();
           
           // Fetch bookings for the date
-          const bookingsResponse = await fetchWithAuth('/api/admin/beach/bookings?property_id=1&date=' + dateStr);
+          const bookingsResponse = await fetchWithAuth('/api/admin/beach/bookings?property_id=${propertyId}&date=' + dateStr);
           const bookingsData = await bookingsResponse.json();
           
           window.liveBeachMapData.spots = spotsData.spots || [];
@@ -37797,7 +37803,7 @@ app.get('/admin/dashboard', (c) => {
         // Load custom sections
         let customSections = [];
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const response = await fetch('/api/admin/custom-sections?property_id=${propertyId}');
           const data = await response.json();
           customSections = data.sections || [];
         } catch (error) {
@@ -37846,7 +37852,7 @@ app.get('/admin/dashboard', (c) => {
         // Load custom sections first
         let customSections = [];
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const response = await fetch('/api/admin/custom-sections?property_id=${propertyId}');
           const data = await response.json();
           customSections = data.sections || [];
         } catch (error) {
@@ -40456,7 +40462,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       async function loadRoomServiceCardSettings() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=1');
+          const response = await fetch('/api/admin/custom-sections?property_id=${propertyId}');
           const data = await response.json();
           const roomServiceSection = data.sections?.find(s => s.section_key === 'room-service');
           
@@ -40787,7 +40793,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.loadBeachBookings = async function(detectChanges = false) {
         try {
           const date = document.getElementById('beachBookingDate')?.value;
-          const response = await fetch('/api/admin/beach/bookings?property_id=1&date=' + date);
+          const response = await fetch('/api/admin/beach/bookings?property_id=${propertyId}&date=' + date);
           const data = await response.json();
           
           if (detectChanges && data.success && data.bookings) {
@@ -40829,7 +40835,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       const originalLoadCallbacks = loadCallbacks;
       const enhancedLoadCallbacks = async function(detectChanges = false) {
         try {
-          const response = await fetch('/api/admin/callback-requests?property_id=1');
+          const response = await fetch('/api/admin/callback-requests?property_id=${propertyId}');
           const data = await response.json();
           
           if (detectChanges && data.requests) {
