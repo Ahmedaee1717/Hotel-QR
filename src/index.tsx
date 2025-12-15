@@ -31986,6 +31986,20 @@ app.get('/admin/dashboard', (c) => {
       // Run permission enforcement on page load
       enforcePermissions();
       
+      // Helper function for authenticated API requests
+      async function fetchWithAuth(url, options = {}) {
+        const headers = {
+          'X-User-ID': user.user_id,
+          'Content-Type': 'application/json',
+          ...options.headers
+        };
+        
+        return fetch(url, {
+          ...options,
+          headers
+        });
+      }
+      
       // Find first accessible tab as default
       let currentTab = 'qrcode'; // default fallback
       for (const tab of ['qrcode', 'frontdesk', 'analytics', 'settings', 'feedback', 'offerings', 'restaurants']) {
@@ -32343,7 +32357,7 @@ app.get('/admin/dashboard', (c) => {
       async function loadUsersManagement() {
         try {
           // Load users
-          const usersResponse = await fetch('/api/admin/users');
+          const usersResponse = await fetchWithAuth('/api/admin/users');
           const usersData = await usersResponse.json();
           
           if (usersData.success) {
@@ -32352,7 +32366,7 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Load roles for dropdown
-          const rolesResponse = await fetch('/api/admin/roles');
+          const rolesResponse = await fetchWithAuth('/api/admin/roles');
           const rolesData = await rolesResponse.json();
           
           if (rolesData.success) {
