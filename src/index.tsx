@@ -5765,10 +5765,10 @@ app.post('/api/admin/restaurant/waitlist/:waitlist_id/no-show', async (c) => {
   const { waitlist_id } = c.req.param()
   
   try {
-    // Update waitlist status to no_show
+    // Update waitlist status to no_show (no updated_at column in this table)
     await DB.prepare(`
       UPDATE restaurant_waitlist 
-      SET status = 'no_show', updated_at = CURRENT_TIMESTAMP
+      SET status = 'no_show', cancelled_at = CURRENT_TIMESTAMP
       WHERE waitlist_id = ?
     `).bind(waitlist_id).run()
     
