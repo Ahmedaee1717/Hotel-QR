@@ -36624,7 +36624,7 @@ app.get('/admin/dashboard', (c) => {
           const date = document.getElementById('filterDate').value;
           const search = document.getElementById('searchQuery').value;
           
-          let url = '/api/admin/chatbot/analytics/chat-history?property_id=${propertyId}';
+          let url = '/api/admin/chatbot/analytics/chat-history?property_id=' + propertyId;
           if (date) url += '&date=' + date;
           if (search) url += '&search=' + encodeURIComponent(search);
           
