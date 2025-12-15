@@ -3722,10 +3722,11 @@ app.delete('/api/admin/custom-sections/:section_id', async (c) => {
   }
 })
 
-// Get custom sections for hotel homepage (public)
+// Get custom sections for hotel homepage (public) with on-demand translation
 app.get('/api/custom-sections/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
+  const language = c.req.query('language') || 'en'
   
   try {
     const sections = await DB.prepare(`
@@ -3733,6 +3734,67 @@ app.get('/api/custom-sections/:property_id', async (c) => {
       WHERE property_id = ? AND is_visible = 1
       ORDER BY display_order ASC, section_id ASC
     `).bind(property_id).all()
+    
+    if (!sections.results || sections.results.length === 0) {
+      return c.json({ success: true, sections: [] })
+    }
+    
+    // If language is English or one of the built-in columns, use existing data
+    const builtInLanguages = ['en', 'ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
+    
+    // For each section, get or create translation
+    for (const section of sections.results) {
+      // Check if translation exists
+      const translation = await DB.prepare(`
+        SELECT section_name FROM custom_section_translations
+        WHERE section_id = ? AND language_code = ?
+      `).bind(section.section_id, language).first()
+      
+      if (translation) {
+        // Use existing translation
+        section.translated_name = translation.section_name
+      } else if (builtInLanguages.includes(language)) {
+        // Use built-in column
+        const columnName = `section_name_${language}`
+        section.translated_name = section[columnName] || section.section_name_en
+      } else {
+        // Need to translate - do on-demand AI translation
+        try {
+          const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{
+                role: 'system',
+                content: `You are a professional translator. Translate the following hotel section name to ${language}. Keep it concise (1-3 words). Return ONLY the translation, nothing else.`
+              }, {
+                role: 'user',
+                content: section.section_name_en
+              }],
+              temperature: 0.3
+            })
+          })
+          
+          const result = await translationResult.json()
+          const translatedName = result.choices[0].message.content.trim()
+          
+          // Store translation for future use
+          await DB.prepare(`
+            INSERT OR REPLACE INTO custom_section_translations (section_id, language_code, section_name)
+            VALUES (?, ?, ?)
+          `).bind(section.section_id, language, translatedName).run()
+          
+          section.translated_name = translatedName
+        } catch (translateError) {
+          console.error('Translation error for section:', translateError)
+          section.translated_name = section.section_name_en // Fallback to English
+        }
+      }
+    }
     
     return c.json({ success: true, sections: sections.results })
   } catch (error) {
@@ -13403,7 +13465,8 @@ app.get('/hotel/:property_slug', async (c) => {
           // Add custom section pills only if visible
           customSections.forEach(section => {
             if (section.is_visible === 1) {
-              const sectionName = section[\`section_name_\${lang}\`] || section.section_name_en;
+              // Use translated_name from API (supports all 30+ languages)
+              const sectionName = section.translated_name || section.section_name_en;
               const icon = section.icon_class || 'fas fa-star';
               pillsHTML += \`
                 <button onclick="filterOfferings('\${section.section_key}')" class="category-pill bg-gray-200 text-gray-700" data-category="\${section.section_key}">
@@ -13521,8 +13584,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 const activitiesData = await activitiesResponse.json();
                 allActivities = activitiesData.activities || [];
                 
-                // Load custom sections
-                const customSectionsResponse = await fetch(\`/api/admin/custom-sections?property_id=\${propertyData.property_id}\`);
+                // Load custom sections with language support
+                const customSectionsResponse = await fetch(\`/api/custom-sections/\${propertyData.property_id}?language=\${currentLanguage}\`);
                 const customSectionsData = await customSectionsResponse.json();
                 customSections = customSectionsData.sections || [];
                 
@@ -13597,8 +13660,8 @@ app.get('/hotel/:property_slug', async (c) => {
                   customSectionEl.id = \`custom-section-\${section.section_key}\`;
                   customSectionEl.className = 'mb-12';
                   
-                  const lang = currentLanguage;
-                  const sectionName = section['section_name_' + lang] || section.section_name_en;
+                  // Use translated_name from API (supports all 30+ languages)
+                  const sectionName = section.translated_name || section.section_name_en;
                   const icon = section.icon_class || 'fas fa-star';
                   
                   customSectionEl.innerHTML = '<h2 class="text-2xl font-bold mb-4 flex items-center">' +
