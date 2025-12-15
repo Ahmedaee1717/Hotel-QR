@@ -5101,7 +5101,31 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
   
   try {
-    // Get active guest dining sessions (not time slot sessions)
+    // Get time slot sessions (breakfast/lunch/dinner schedule)
+    const sessions = await DB.prepare(`
+      SELECT * FROM dining_sessions 
+      WHERE offering_id = ? AND session_date = ? AND status != 'cancelled'
+      ORDER BY session_time ASC
+    `).bind(offering_id, date).all()
+    
+    return c.json({ 
+      success: true,
+      sessions: sessions.results
+    })
+  } catch (error) {
+    console.error('Get sessions error:', error)
+    return c.json({ error: 'Failed to get sessions' }, 500)
+  }
+})
+
+// Get active guest dining sessions (for staff dashboard)
+app.get('/api/restaurant/:offering_id/active-guests', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    // Get active guest dining sessions
     const sessions = await DB.prepare(`
       SELECT * FROM guest_dining_sessions 
       WHERE offering_id = ? AND session_date = ? AND status = 'active'
@@ -5113,8 +5137,8 @@ app.get('/api/restaurant/:offering_id/sessions', async (c) => {
       sessions: sessions.results
     })
   } catch (error) {
-    console.error('Get sessions error:', error)
-    return c.json({ error: 'Failed to get sessions' }, 500)
+    console.error('Get active guests error:', error)
+    return c.json({ error: 'Failed to get active guests' }, 500)
   }
 })
 
@@ -37252,7 +37276,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         async function loadActiveSessions() {
             const today = new Date().toISOString().split('T')[0];
-            const response = await fetch('/api/restaurant/' + OFFERING_ID + '/sessions?date=' + today);
+            const response = await fetch('/api/restaurant/' + OFFERING_ID + '/active-guests?date=' + today);
             const data = await response.json();
             
             if (data.success) {
