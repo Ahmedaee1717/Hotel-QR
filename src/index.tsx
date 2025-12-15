@@ -3017,7 +3017,7 @@ app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
 // ============================================
 
 // Get all users
-app.get('/api/admin/users', async (c) => {
+app.get('/api/admin/users', requirePermission('users_view'), async (c) => {
   const { DB } = c.env
   const property_id = 1 // TODO: Get from session
   
@@ -3041,7 +3041,7 @@ app.get('/api/admin/users', async (c) => {
 })
 
 // Get single user
-app.get('/api/admin/users/:id', async (c) => {
+app.get('/api/admin/users/:id', requirePermission('users_view'), async (c) => {
   const { DB } = c.env
   const userId = c.req.param('id')
   
@@ -3061,7 +3061,7 @@ app.get('/api/admin/users/:id', async (c) => {
 })
 
 // Create new user
-app.post('/api/admin/users', async (c) => {
+app.post('/api/admin/users', requirePermission('users_create'), async (c) => {
   const { DB } = c.env
   const userData = await c.req.json()
   
@@ -3112,7 +3112,7 @@ app.post('/api/admin/users', async (c) => {
 })
 
 // Update user
-app.put('/api/admin/users/:id', async (c) => {
+app.put('/api/admin/users/:id', requirePermission('users_edit'), async (c) => {
   const { DB } = c.env
   const userId = c.req.param('id')
   const userData = await c.req.json()
@@ -3158,7 +3158,7 @@ app.put('/api/admin/users/:id', async (c) => {
 })
 
 // Delete user
-app.delete('/api/admin/users/:id', async (c) => {
+app.delete('/api/admin/users/:id', requirePermission('users_delete'), async (c) => {
   const { DB } = c.env
   const userId = c.req.param('id')
   
@@ -3286,6 +3286,56 @@ app.get('/api/admin/my-permissions', async (c) => {
     })
   } catch (error) {
     console.error('Get my permissions error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Set user resource access (Admin only)
+app.post('/api/admin/users/:id/resource-access', requirePermission('users_permissions'), async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  const { resource_type, resource_ids } = await c.req.json()
+  
+  try {
+    // Delete existing resource access for this type
+    await DB.prepare(`
+      DELETE FROM user_resource_access 
+      WHERE user_id = ? AND resource_type = ?
+    `).bind(userId, resource_type).run()
+    
+    // Insert new resource access
+    for (const resourceId of resource_ids) {
+      await DB.prepare(`
+        INSERT INTO user_resource_access (user_id, resource_type, resource_id)
+        VALUES (?, ?, ?)
+      `).bind(userId, resource_type, resourceId).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Set resource access error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get user resource access
+app.get('/api/admin/users/:id/resource-access', requirePermission('users_view'), async (c) => {
+  const { DB } = c.env
+  const userId = c.req.param('id')
+  
+  try {
+    const restaurantAccess = await getUserResourceAccess(DB, parseInt(userId), 'restaurant')
+    const beachAccess = await getUserResourceAccess(DB, parseInt(userId), 'beach')
+    
+    return c.json({
+      success: true,
+      resource_access: {
+        restaurants: restaurantAccess,
+        beaches: beachAccess
+      }
+    })
+  } catch (error) {
+    console.error('Get resource access error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -3440,7 +3490,7 @@ app.post('/api/track-page-view', async (c) => {
 })
 
 // Get analytics data
-app.get('/api/admin/analytics', async (c) => {
+app.get('/api/admin/analytics', requirePermission('analytics_view'), async (c) => {
   const { DB } = c.env
   const property_id = c.req.query('property_id') || '1'
   const dateRange = c.req.query('range') || 'today' // today, yesterday, 7days, 30days, custom
@@ -5546,7 +5596,7 @@ app.get('/api/restaurant/:offering_id/tables', async (c) => {
 })
 
 // Create table (Admin)
-app.post('/api/admin/restaurant/table', async (c) => {
+app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
@@ -5581,7 +5631,7 @@ app.post('/api/admin/restaurant/table', async (c) => {
 })
 
 // Update table (Admin)
-app.put('/api/admin/restaurant/table/:table_id', async (c) => {
+app.put('/api/admin/restaurant/table/:table_id', requirePermission('restaurant_tables'), async (c) => {
   const { DB } = c.env
   const { table_id } = c.req.param()
   const data = await c.req.json()
@@ -5616,7 +5666,7 @@ app.put('/api/admin/restaurant/table/:table_id', async (c) => {
 })
 
 // Delete table (Admin)
-app.delete('/api/admin/restaurant/table/:table_id', async (c) => {
+app.delete('/api/admin/restaurant/table/:table_id', requirePermission('restaurant_tables'), async (c) => {
   const { DB } = c.env
   const { table_id } = c.req.param()
   
@@ -5848,7 +5898,7 @@ app.get('/api/restaurant/:offering_id/active-guests', async (c) => {
 
 // Create guest dining session (walk-in check-in)
 // Create dining time slot (breakfast/lunch/dinner schedule)
-app.post('/api/admin/restaurant/session', async (c) => {
+app.post('/api/admin/restaurant/session', requirePermission('restaurant_sessions'), async (c) => {
   const { DB } = c.env
   const data = await c.req.json()
   
@@ -5907,7 +5957,7 @@ app.post('/api/admin/restaurant/session', async (c) => {
 })
 
 // Check out a guest (end their dining session)
-app.delete('/api/admin/restaurant/session/:session_id', async (c) => {
+app.delete('/api/admin/restaurant/session/:session_id', requirePermission('restaurant_checkin'), async (c) => {
   const { DB } = c.env
   const { session_id } = c.req.param()
   
@@ -6150,7 +6200,7 @@ app.post('/api/offering-booking', async (c) => {
 })
 
 // Get reservations (Admin)
-app.get('/api/admin/restaurant/reservations', async (c) => {
+app.get('/api/admin/restaurant/reservations', requirePermission('restaurant_reservations_view'), async (c) => {
   const { DB } = c.env
   const offering_id = c.req.query('offering_id')
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
@@ -6158,6 +6208,15 @@ app.get('/api/admin/restaurant/reservations', async (c) => {
   const guest = c.req.query('guest')
   
   try {
+    // Check resource access
+    const userId = parseInt(c.req.header('X-User-ID') || '0')
+    if (userId && offering_id) {
+      const allowedRestaurants = await getUserResourceAccess(DB, userId, 'restaurant')
+      if (allowedRestaurants.length > 0 && !allowedRestaurants.includes(parseInt(offering_id))) {
+        return c.json({ error: 'Access denied to this restaurant' }, 403)
+      }
+    }
+    
     let query = `
       SELECT 
         tr.*,
@@ -6214,7 +6273,7 @@ app.get('/api/admin/restaurant/reservations', async (c) => {
 })
 
 // Confirm reservation
-app.post('/api/admin/restaurant/reservation/:reference/confirm', async (c) => {
+app.post('/api/admin/restaurant/reservation/:reference/confirm', requirePermission('restaurant_reservations_manage'), async (c) => {
   const { DB } = c.env
   const { reference } = c.req.param()
   
@@ -6236,7 +6295,7 @@ app.post('/api/admin/restaurant/reservation/:reference/confirm', async (c) => {
 })
 
 // Check in reservation
-app.post('/api/admin/restaurant/reservation/:reference/checkin', async (c) => {
+app.post('/api/admin/restaurant/reservation/:reference/checkin', requirePermission('restaurant_checkin'), async (c) => {
   const { DB } = c.env
   const { reference } = c.req.param()
   
@@ -10321,7 +10380,7 @@ app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
 // ========== BEACH BOOKING API ENDPOINTS ==========
 
 // API: Get or Create Beach Settings
-app.get('/api/admin/beach/settings/:property_id', async (c) => {
+app.get('/api/admin/beach/settings/:property_id', requirePermission('beach_view'), async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
   const language = c.req.query('language') || 'en'
@@ -10442,7 +10501,7 @@ app.get('/api/admin/beach/settings/:property_id', async (c) => {
 })
 
 // API: Save Beach Settings
-app.post('/api/admin/beach/settings', async (c) => {
+app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async (c) => {
   const { DB } = c.env
   
   try {
@@ -10763,7 +10822,7 @@ app.get('/api/admin/beach/spots', async (c) => {
 })
 
 // API: Create Beach Spot
-app.post('/api/admin/beach/spots', async (c) => {
+app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), async (c) => {
   const { DB } = c.env
   
   try {
@@ -10827,7 +10886,7 @@ app.post('/api/admin/beach/spots', async (c) => {
 })
 
 // API: Delete Beach Spot
-app.delete('/api/admin/beach/spots/:spot_id', async (c) => {
+app.delete('/api/admin/beach/spots/:spot_id', requirePermission('beach_zones_manage'), async (c) => {
   const { DB } = c.env
   const { spot_id } = c.req.param()
   
@@ -11425,7 +11484,7 @@ Answer the admin's question about the GuestConnect platform:`
 })
 
 // API: Staff - Check In Guest
-app.post('/api/staff/beach/check-in', async (c) => {
+app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async (c) => {
   const { DB } = c.env
   
   try {
@@ -11472,7 +11531,7 @@ app.post('/api/staff/beach/check-in', async (c) => {
 // ==================== ANALYTICS API ENDPOINTS ====================
 
 // API: Analytics - Live Occupancy (Real-time)
-app.get('/api/analytics/beach/live-occupancy/:property_id', async (c) => {
+app.get('/api/analytics/beach/live-occupancy/:property_id', requirePermission('beach_analytics'), async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
   const today = new Date().toISOString().split('T')[0]
