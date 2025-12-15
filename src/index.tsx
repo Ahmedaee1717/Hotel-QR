@@ -9118,6 +9118,7 @@ app.get('/api/admin/chatbot/analytics/chat-history', async (c) => {
 app.get('/api/admin/beach/settings/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
+  const language = c.req.query('language') || 'en'
   
   try {
     let settings = await DB.prepare(`
@@ -9133,6 +9134,98 @@ app.get('/api/admin/beach/settings/:property_id', async (c) => {
       settings = await DB.prepare(`
         SELECT * FROM beach_settings WHERE property_id = ?
       `).bind(property_id).first()
+    }
+    
+    // If language is not English, get or create translations
+    if (language !== 'en' && settings) {
+      const translation = await DB.prepare(`
+        SELECT * FROM beach_settings_translations
+        WHERE setting_id = ? AND language_code = ?
+      `).bind(settings.setting_id, language).first()
+      
+      if (translation) {
+        // Use existing translations
+        Object.assign(settings, translation)
+      } else {
+        // Need to translate - do on-demand AI translation
+        const fieldsToTranslate = [
+          'card_title', 'card_subtitle', 'feature1_text', 'feature2_text', 'feature3_text',
+          'button_text', 'umbrellas_label', 'umbrellas_desc', 'cabanas_label', 'cabanas_desc',
+          'loungers_label', 'loungers_desc', 'daybeds_label', 'daybeds_desc'
+        ]
+        
+        const translations = {}
+        
+        try {
+          // Prepare batch translation request
+          const textsToTranslate = fieldsToTranslate.map(field => settings[field]).filter(Boolean)
+          
+          if (textsToTranslate.length > 0) {
+            const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{
+                  role: 'system',
+                  content: `You are a professional translator. Translate the following beach booking texts to ${language}. Keep them concise. Return translations in the same order, one per line, ONLY the translations.`
+                }, {
+                  role: 'user',
+                  content: textsToTranslate.join('\n')
+                }],
+                temperature: 0.3
+              })
+            })
+            
+            const result = await translationResult.json()
+            const translatedTexts = result.choices[0].message.content.trim().split('\n')
+            
+            // Map translations back to fields
+            let textIndex = 0
+            for (const field of fieldsToTranslate) {
+              if (settings[field]) {
+                translations[field] = translatedTexts[textIndex] || settings[field]
+                textIndex++
+              }
+            }
+            
+            // Store translations
+            await DB.prepare(`
+              INSERT INTO beach_settings_translations (
+                setting_id, language_code, card_title, card_subtitle, 
+                feature1_text, feature2_text, feature3_text, button_text,
+                umbrellas_label, umbrellas_desc, cabanas_label, cabanas_desc,
+                loungers_label, loungers_desc, daybeds_label, daybeds_desc
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              settings.setting_id, language,
+              translations.card_title || settings.card_title,
+              translations.card_subtitle || settings.card_subtitle,
+              translations.feature1_text || settings.feature1_text,
+              translations.feature2_text || settings.feature2_text,
+              translations.feature3_text || settings.feature3_text,
+              translations.button_text || settings.button_text,
+              translations.umbrellas_label || settings.umbrellas_label,
+              translations.umbrellas_desc || settings.umbrellas_desc,
+              translations.cabanas_label || settings.cabanas_label,
+              translations.cabanas_desc || settings.cabanas_desc,
+              translations.loungers_label || settings.loungers_label,
+              translations.loungers_desc || settings.loungers_desc,
+              translations.daybeds_label || settings.daybeds_label,
+              translations.daybeds_desc || settings.daybeds_desc
+            ).run()
+            
+            // Apply translations to settings object
+            Object.assign(settings, translations)
+          }
+        } catch (translateError) {
+          console.error('Beach translation error:', translateError)
+          // Continue with English texts
+        }
+      }
     }
     
     return c.json({ success: true, settings })
@@ -14248,7 +14341,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             try {
-                const response = await fetch('/api/admin/beach/settings/' + propertyData.property_id);
+                const response = await fetch('/api/admin/beach/settings/' + propertyData.property_id + '?language=' + currentLanguage);
                 const data = await response.json();
                 
                 console.log('Beach settings response:', data);
