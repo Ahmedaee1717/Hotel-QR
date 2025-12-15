@@ -10072,21 +10072,23 @@ app.get('/api/analytics/beach/live-occupancy/:property_id', async (c) => {
   try {
     // Get total spots by zone and type
     const spots = await DB.prepare(`
-      SELECT zone_name, spot_type, COUNT(*) as total_spots
-      FROM beach_spots
-      WHERE property_id = ? AND is_active = 1
-      GROUP BY zone_name, spot_type
+      SELECT bz.zone_name, bs.spot_type, COUNT(*) as total_spots
+      FROM beach_spots bs
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
+      WHERE bs.property_id = ? AND bs.is_active = 1
+      GROUP BY bz.zone_name, bs.spot_type
     `).bind(property_id).all()
     
     // Get occupied spots for today
     const occupied = await DB.prepare(`
-      SELECT bs.zone_name, bs.spot_type, COUNT(*) as occupied_spots
+      SELECT bz.zone_name, bs.spot_type, COUNT(*) as occupied_spots
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ? 
         AND bb.booking_date = ?
         AND bb.booking_status IN ('confirmed', 'checked_in')
-      GROUP BY bs.zone_name, bs.spot_type
+      GROUP BY bz.zone_name, bs.spot_type
     `).bind(property_id, today).all()
     
     // Calculate occupancy rates
@@ -10132,7 +10134,7 @@ app.get('/api/analytics/beach/revenue/:property_id', async (c) => {
   try {
     const revenue = await DB.prepare(`
       SELECT 
-        bs.zone_name,
+        bz.zone_name,
         bs.spot_type,
         COUNT(*) as total_bookings,
         SUM(bb.total_price) as total_revenue,
@@ -10140,10 +10142,11 @@ app.get('/api/analytics/beach/revenue/:property_id', async (c) => {
         SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ?
         AND bb.booking_date BETWEEN ? AND ?
         AND bb.booking_status != 'cancelled'
-      GROUP BY bs.zone_name, bs.spot_type
+      GROUP BY bz.zone_name, bs.spot_type
       ORDER BY total_revenue DESC
     `).bind(property_id, start_date, end_date).all()
     
@@ -10174,14 +10177,15 @@ app.get('/api/analytics/beach/peak-hours/:property_id', async (c) => {
       SELECT 
         strftime('%w', booking_date) as day_of_week,
         slot_type,
-        bs.zone_name,
+        bz.zone_name,
         COUNT(*) as booking_count
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ?
         AND bb.booking_date >= ?
         AND bb.booking_status != 'cancelled'
-      GROUP BY day_of_week, slot_type, bs.zone_name
+      GROUP BY day_of_week, slot_type, bz.zone_name
       ORDER BY day_of_week, slot_type
     `).bind(property_id, startDateStr).all()
     
@@ -10209,9 +10213,10 @@ app.get('/api/analytics/beach/no-shows/:property_id', async (c) => {
         bb.*,
         bs.spot_number,
         bs.spot_type,
-        bs.zone_name
+        bz.zone_name
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ?
         AND bb.booking_date BETWEEN ? AND ?
         AND bb.booking_status = 'confirmed'
@@ -10223,17 +10228,18 @@ app.get('/api/analytics/beach/no-shows/:property_id', async (c) => {
     // Get no-show statistics by zone
     const noShowStats = await DB.prepare(`
       SELECT 
-        bs.zone_name,
+        bz.zone_name,
         COUNT(*) as no_show_count,
         SUM(bb.total_price) as lost_revenue
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ?
         AND bb.booking_date BETWEEN ? AND ?
         AND bb.booking_status = 'confirmed'
         AND bb.checked_in_at IS NULL
         AND bb.booking_date < date('now')
-      GROUP BY bs.zone_name
+      GROUP BY bz.zone_name
     `).bind(property_id, start_date, end_date).all()
     
     return c.json({ 
@@ -10285,16 +10291,17 @@ app.get('/api/analytics/beach/dashboard/:property_id', async (c) => {
     // Zone performance
     const zonePerformance = await DB.prepare(`
       SELECT 
-        bs.zone_name,
+        bz.zone_name,
         COUNT(*) as bookings,
         SUM(bb.total_price) as revenue,
         AVG(bb.total_price) as avg_revenue,
         SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as utilization
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      JOIN beach_zones bz ON bs.zone_id = bz.zone_id
       WHERE bb.property_id = ?
         AND bb.booking_date >= ?
-      GROUP BY bs.zone_name
+      GROUP BY bz.zone_name
       ORDER BY revenue DESC
     `).bind(property_id, weekStart.toISOString().split('T')[0]).all()
     
