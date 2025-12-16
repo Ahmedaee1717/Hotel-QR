@@ -10314,9 +10314,15 @@ app.get('/api/chatbot/settings/:property_id', async (c) => {
 app.post('/api/admin/chatbot/settings', async (c) => {
   const { DB } = c.env
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     const body = await c.req.json()
-    const { property_id, chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color } = body
+    const { chatbot_enabled, chatbot_greeting_en, chatbot_name, chatbot_avatar_url, chatbot_primary_color } = body
     
     // Handle undefined/null values - D1 doesn't accept undefined
     const enabled = chatbot_enabled ? 1 : 0
@@ -10342,9 +10348,13 @@ app.post('/api/admin/chatbot/settings', async (c) => {
 app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
   const { DB } = c.env
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
-    const body = await c.req.json()
-    const { property_id } = body
     
     let totalDocuments = 0
     let totalChunks = 0
@@ -36548,11 +36558,10 @@ app.get('/admin/dashboard', (c) => {
       
       window.saveChatbotSettings = async function() {
         try {
-          const response = await fetch('/api/admin/chatbot/settings', {
+          const response = await fetchWithAuth('/api/admin/chatbot/settings', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
+              property_id: propertyId,  // Use authenticated property_id
               chatbot_enabled: document.getElementById('chatbotEnabled').checked,
               chatbot_name: document.getElementById('chatbotName').value,
               chatbot_greeting_en: document.getElementById('chatbotGreeting').value,
@@ -36582,10 +36591,9 @@ app.get('/admin/dashboard', (c) => {
           syncBtn.disabled = true;
           syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Syncing... Please wait';
           
-          const response = await fetch('/api/admin/chatbot/sync-knowledge', {
+          const response = await fetchWithAuth('/api/admin/chatbot/sync-knowledge', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ property_id: 1 })
+            body: JSON.stringify({ property_id: propertyId })  // Use authenticated property_id
           });
           
           const data = await response.json();
