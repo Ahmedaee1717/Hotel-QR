@@ -29901,7 +29901,7 @@ app.get('/admin/dashboard', (c) => {
         <!-- Sidebar Navigation -->
         <aside id="sidebar" class="w-64 bg-white shadow-xl fixed left-0 top-16 bottom-0 overflow-y-auto transition-all duration-300 z-40">
             <!-- GuestConnect Logo at Top -->
-            <div class="px-6 py-5 border-b border-gray-200" style="background-color: #b0d1b5;">
+            <div class="px-6 py-5 border-b border-gray-200" style="background-color: #ffffff;">
                 <div class="flex flex-col items-center">
                     <img src="/guestconnect-logo.png" alt="GuestConnect" class="w-32 h-auto mb-2" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                     <div style="display:none;" class="flex-col items-center">
