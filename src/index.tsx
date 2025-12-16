@@ -453,7 +453,7 @@ app.get('/', (c) => {
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center">
-                    <img src="/guestconnect-logo.png" alt="GuestConnect Logo" class="h-14 w-auto">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect Logo" class="h-12 w-auto">
                 </div>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
