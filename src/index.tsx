@@ -890,7 +890,7 @@ app.get('/', (c) => {
                             </svg>
                         </div>
                         <div class="flex-1">
-                            <h3 class="text-2xl font-bold text-white">GuestConnect AI</h3>
+                            <h3 class="text-2xl font-bold text-white">Hotel Assistant</h3>
                             <div class="flex items-center gap-2 text-accent text-sm">
                                 <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
                                 <span>Online • Always ready to help</span>
@@ -1012,7 +1012,7 @@ app.get('/', (c) => {
                             </div>
                             <div class="flex-1">
                                 <h3 class="text-2xl font-bold text-gray-900 mb-3">Automated Bookings & Upsells</h3>
-                                <p class="text-gray-600 leading-relaxed text-lg">More than just Q&A—the AI proactively suggests spa treatments, restaurant reservations, and activities, driving $2,000+ in additional monthly revenue per property.</p>
+                                <p class="text-gray-600 leading-relaxed text-lg">More than just Q&A—the AI proactively suggests spa treatments, restaurant reservations, and activities, driving significant additional revenue for your property.</p>
                             </div>
                         </div>
                     </div>
