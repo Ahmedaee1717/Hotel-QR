@@ -44098,12 +44098,25 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
     <script>
         const OFFERING_ID = ${offering_id};
+        const propertyId = localStorage.getItem('property_id') || '1';
+        const userId = localStorage.getItem('user_id');
         let floorElements = [];
         let currentSessions = [];
         let currentWaitlistLink = '';
         let currentReservations = [];
         let currentWaitlist = [];
         let currentScale = 1;
+        
+        // Authenticated fetch with property_id and user_id headers
+        async function fetchWithAuth(url, options = {}) {
+            const headers = {
+                ...options.headers,
+                'Content-Type': 'application/json',
+                'X-User-ID': userId,
+                'X-Property-ID': propertyId
+            };
+            return fetch(url, { ...options, headers });
+        }
 
         // Initialize
         async function init() {
@@ -44141,7 +44154,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         async function loadRestaurantInfo() {
             try {
-                const response = await fetch('/api/hotel-offerings/' + propertyId);
+                const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
                 const data = await response.json();
                 if (data.success && data.offerings) {
                     const restaurant = data.offerings.find(o => o.offering_id == OFFERING_ID);
@@ -44158,11 +44171,11 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function loadFloorPlan() {
             try {
                 // Load restaurant tables (actual seating tables)
-                const tablesResponse = await fetch('/api/restaurant/' + OFFERING_ID + '/tables');
+                const tablesResponse = await fetchWithAuth('/api/restaurant/' + OFFERING_ID + '/tables');
                 const tablesData = await tablesResponse.json();
                 
                 // Load decorative floor elements (bar, entrance, etc.)
-                const elementsResponse = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/floor-elements');
+                const elementsResponse = await fetchWithAuth('/api/admin/restaurant/' + OFFERING_ID + '/floor-elements');
                 const elementsData = await elementsResponse.json();
                 
                 if (tablesData.success) {
@@ -44273,11 +44286,11 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             const today = new Date().toISOString().split('T')[0];
             
             // Load reservations
-            const reservationsResponse = await fetch('/api/admin/restaurant/reservations?offering_id=' + OFFERING_ID + '&start_date=' + today + '&end_date=' + today);
+            const reservationsResponse = await fetchWithAuth('/api/admin/restaurant/reservations?offering_id=' + OFFERING_ID + '&start_date=' + today + '&end_date=' + today);
             const reservationsData = await reservationsResponse.json();
             
             // Load waitlist (waiting and notified statuses)
-            const waitlistResponse = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=all');
+            const waitlistResponse = await fetchWithAuth('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=all');
             const waitlistData = await waitlistResponse.json();
             
             if (reservationsData.success) {
@@ -44380,7 +44393,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         async function loadActiveSessions() {
             const today = new Date().toISOString().split('T')[0];
-            const response = await fetch('/api/restaurant/' + OFFERING_ID + '/active-guests?date=' + today);
+            const response = await fetchWithAuth('/api/restaurant/' + OFFERING_ID + '/active-guests?date=' + today);
             const data = await response.json();
             
             if (data.success) {
@@ -44543,9 +44556,8 @@ app.get('/staff/restaurant/:offering_id', (c) => {
                 source: 'walk-in'
             };
             
-            const response = await fetch('/api/admin/restaurant/session', {
+            const response = await fetchWithAuth('/api/admin/restaurant/session', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             
@@ -44563,7 +44575,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function checkInReservation(reservationId) {
             if (!confirm('Check in this guest?')) return;
             
-            const response = await fetch('/api/admin/restaurant/reservations/' + reservationId + '/check-in', {
+            const response = await fetchWithAuth('/api/admin/restaurant/reservations/' + reservationId + '/check-in', {
                 method: 'POST'
             });
             
@@ -44581,7 +44593,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function checkOutSession(sessionId) {
             if (!confirm('Check out this guest?')) return;
             
-            const response = await fetch('/api/admin/restaurant/session/' + sessionId, {
+            const response = await fetchWithAuth('/api/admin/restaurant/session/' + sessionId, {
                 method: 'DELETE'
             });
             
@@ -44599,7 +44611,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function markReservationNoShow(reservationId) {
             if (!confirm('Mark this reservation as NO SHOW? This cannot be undone.')) return;
             
-            const response = await fetch('/api/admin/restaurant/reservations/' + reservationId + '/no-show', {
+            const response = await fetchWithAuth('/api/admin/restaurant/reservations/' + reservationId + '/no-show', {
                 method: 'POST'
             });
             
@@ -44616,7 +44628,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
         async function markWaitlistNoShow(waitlistId) {
             if (!confirm('Mark this waitlist guest as NO SHOW? They will be removed from the waitlist.')) return;
             
-            const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId + '/no-show', {
+            const response = await fetchWithAuth('/api/admin/restaurant/waitlist/' + waitlistId + '/no-show', {
                 method: 'POST'
             });
             
@@ -44631,7 +44643,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         // Notify waitlist guest (from pending section)
         async function notifyWaitlistGuest(waitlistId) {
-            const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId + '/notify', {
+            const response = await fetchWithAuth('/api/admin/restaurant/waitlist/' + waitlistId + '/notify', {
                 method: 'POST'
             });
             
@@ -44646,7 +44658,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         // Seat waitlist guest (show table selection modal)
         async function seatWaitlistGuest(waitlistId) {
-            const waitlistGuest = (await fetch('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=all').then(r => r.json())).waitlist.find(w => w.waitlist_id === waitlistId);
+            const waitlistGuest = (await fetchWithAuth('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=all').then(r => r.json())).waitlist.find(w => w.waitlist_id === waitlistId);
             
             if (!waitlistGuest) {
                 alert('❌ Waitlist guest not found');
@@ -44673,9 +44685,8 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             }
             
             // Seat the guest (creates dining session)
-            const response = await fetch('/api/admin/restaurant/waitlist/' + waitlistId + '/seat', {
+            const response = await fetchWithAuth('/api/admin/restaurant/waitlist/' + waitlistId + '/seat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ table_number: tableNumber })
             });
             
@@ -44786,7 +44797,7 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
         async function loadWaitlist() {
             try {
-                const response = await fetch('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=waiting');
+                const response = await fetchWithAuth('/api/admin/restaurant/' + OFFERING_ID + '/waitlist?status=waiting');
                 const data = await response.json();
                 
                 if (data.success) {
@@ -44873,9 +44884,8 @@ app.get('/staff/restaurant/:offering_id', (c) => {
             };
             
             try {
-                const response = await fetch('/api/admin/restaurant/waitlist', {
+                const response = await fetchWithAuth('/api/admin/restaurant/waitlist', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 
