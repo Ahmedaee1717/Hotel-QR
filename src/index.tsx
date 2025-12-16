@@ -34491,9 +34491,10 @@ app.get('/admin/dashboard', (c) => {
       // QR Code functions
       async function loadQRCode() {
         try {
-          const response = await fetch('/api/properties');
+          // CRITICAL: Fetch ONLY authenticated user's property, not all properties
+          const response = await fetch(\`/api/properties?property_id=\${propertyId}\`);
           const data = await response.json();
-          const property = data.properties[0];
+          const property = data.properties[0];  // Now gets authenticated user's property only
           
           if (property) {
             const hotelURL = window.location.origin + '/hotel/' + property.slug;
