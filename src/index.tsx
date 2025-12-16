@@ -15128,13 +15128,13 @@ app.get('/hotel/:property_slug', async (c) => {
                     <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 shadow-xl">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="flex-1">
-                                <div class="flex items-center justify-between mb-3">
-                                    <h2 class="text-3xl font-bold flex items-center">
+                                <div class="flex items-center justify-between mb-3 gap-4">
+                                    <h2 class="text-3xl font-bold flex items-center flex-shrink-0">
                                         <i class="fas fa-umbrella-beach mr-3"></i>
                                         Beach Booking
                                     </h2>
                                     <!-- Live Occupancy Traffic Light -->
-                                    <div id="beach-traffic-light" class="flex flex-col items-end gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2">
+                                    <div id="beach-traffic-light" class="flex flex-col items-end gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 ml-auto">
                                         <div class="flex items-center gap-2">
                                             <div id="traffic-light-indicator" class="w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
                                             <span id="traffic-light-text" class="text-sm font-semibold">Loading...</span>
