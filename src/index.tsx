@@ -5164,6 +5164,25 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
   const data = await c.req.json()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Validate offering belongs to property
+    const offering = await DB.prepare(`
+      SELECT property_id FROM hotel_offerings WHERE offering_id = ?
+    `).bind(offering_id).first()
+    
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    
+    if (offering.property_id != property_id) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    
     await DB.prepare(`
       UPDATE hotel_offerings SET
         title_en = ?, short_description_en = ?, full_description_en = ?,
@@ -5171,22 +5190,23 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
         requires_booking = ?, enable_booking = ?, images = ?, video_url = ?,
         event_date = ?, event_start_time = ?, event_end_time = ?,
         updated_at = CURRENT_TIMESTAMP
-      WHERE offering_id = ?
+      WHERE offering_id = ? AND property_id = ?
     `).bind(
-      data.title_en,
-      data.short_description_en,
-      data.full_description_en,
+      data.title_en || '',
+      data.short_description_en || '',
+      data.full_description_en || '',
       data.price || 0,
-      data.location,
-      data.duration_minutes,
+      data.location || '',
+      data.duration_minutes || null,
       data.requires_booking ? 1 : 0,
       data.enable_booking !== undefined ? (data.enable_booking ? 1 : 0) : null,
-      data.images,
+      data.images || JSON.stringify([]),
       data.video_url || null,
-      data.event_date,
-      data.event_start_time,
-      data.event_end_time,
-      offering_id
+      data.event_date || null,
+      data.event_start_time || null,
+      data.event_end_time || null,
+      offering_id,
+      property_id
     ).run()
     
     // Update restaurant menus if provided
@@ -46236,12 +46256,17 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       document.getElementById('restaurantInfoForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
+        if (!currentRestaurantData) {
+          alert('⚠️ Restaurant data not loaded yet. Please wait and try again.');
+          return;
+        }
+        
         const updateData = {
           title_en: document.getElementById('infoTitleEn').value,
           enable_booking: document.getElementById('infoEnableBooking').checked ? 1 : 0,
           short_description_en: document.getElementById('infoShortDescEn').value,
           full_description_en: document.getElementById('infoFullDescEn').value,
-          images: currentRestaurantData.images
+          images: currentRestaurantData.images || JSON.stringify([])
         };
         
         try {
@@ -46256,7 +46281,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             alert('✅ Restaurant info updated successfully!');
             await loadRestaurant();
           } else {
-            alert('❌ Failed to update restaurant info');
+            alert('❌ Failed to update restaurant info: ' + (data.error || 'Unknown error'));
           }
         } catch (error) {
           console.error('Update restaurant info error:', error);
