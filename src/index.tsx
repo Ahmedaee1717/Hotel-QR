@@ -494,7 +494,7 @@ app.get('/', (c) => {
             <div class="grid lg:grid-cols-2 gap-16 items-center">
                 <div class="text-white">
                     <div class="inline-block mb-4 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
-                        <i class="fas fa-sparkles mr-2"></i>Trusted by 500+ Hotels Worldwide
+                        <i class="fas fa-rocket mr-2"></i>Modern Guest Experience Platform
                     </div>
                     <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
                         One QR Code.<br/>
@@ -1077,69 +1077,6 @@ app.get('/', (c) => {
                 animation: fade-in 0.5s ease-out forwards;
             }
         </style>
-    </section>
-
-    <!-- Testimonials -->
-    <section class="py-24 px-6 bg-gradient-to-br from-primary to-[#014a5e] text-white">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold mb-6">Loved by Hotel Managers Worldwide</h2>
-                <p class="text-xl text-white/80">See what our customers have to say</p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"GuestConnect reduced our front desk calls by 65%. Guests love having everything at their fingertips. Our ancillary revenue increased by $45K in the first quarter."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">SM</div>
-                        <div>
-                            <div class="font-semibold">Sarah Martinez</div>
-                            <div class="text-white/60 text-sm">GM, Paradise Beach Resort (280 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"Setup took 2 hours. Within a week, 80% of our guests were using it. The beach booking system alone paid for the subscription 3x over. Incredible ROI."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">JK</div>
-                        <div>
-                            <div class="font-semibold">James Kim</div>
-                            <div class="text-white/60 text-sm">Operations Director, Coastal Grand Hotel (420 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"The AI chatbot is a game-changer. It handles 90% of guest inquiries automatically. Our guest satisfaction score went from 4.2 to 4.8 stars in 2 months."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">LB</div>
-                        <div>
-                            <div class="font-semibold">Lisa Bennett</div>
-                            <div class="text-white/60 text-sm">GM, Mountain View Resort (150 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </section>
 
     <!-- Final CTA -->
