@@ -13827,6 +13827,11 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
     const body = await c.req.json()
     const { booking_reference, staff_name } = body
     
+    // Validate required fields
+    if (!booking_reference || !staff_name) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
     // Check if booking exists AND belongs to staff's property (multi-tenancy validation)
     const existing = await DB.prepare(`
       SELECT booking_status, property_id FROM beach_bookings WHERE booking_reference = ?
@@ -25502,9 +25507,8 @@ app.get('/staff/beach-check-in', (c) => {
 
         async function verifyBooking(data, method) {
             try {
-                const response = await fetch('/api/staff/beach/verify', {
+                const response = await fetchWithAuth('/api/staff/beach/verify', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data, method })
                 });
 
@@ -25582,7 +25586,10 @@ app.get('/staff/beach-check-in', (c) => {
 
         async function checkInGuest(bookingReference) {
             const staffName = prompt('Enter your name:');
-            if (!staffName) return;
+            if (!staffName || staffName.trim().length === 0) {
+                alert('⚠️ Staff name is required');
+                return;
+            }
             
             try {
                 const response = await fetchWithAuth('/api/staff/beach/check-in', {
