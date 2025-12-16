@@ -18732,17 +18732,29 @@ app.get('/superadmin/login', (c) => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            // Super admin credentials (hardcoded for now - you should change this!)
-            if (email === 'superadmin@guestconnect.com' && password === 'GuestConnect2024!') {
-                localStorage.setItem('superadmin_user', JSON.stringify({
-                    user_id: 1,
-                    email: email,
-                    role: 'superadmin',
-                    name: 'Platform Administrator'
-                }));
-                window.location.href = '/superadmin/dashboard';
-            } else {
-                alert('Invalid credentials');
+            try {
+                const response = await fetch('/api/superadmin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('superadmin_user', JSON.stringify({
+                        user_id: data.admin.admin_id,
+                        email: data.admin.email,
+                        role: data.admin.role,
+                        name: data.admin.full_name
+                    }));
+                    window.location.href = '/superadmin/dashboard';
+                } else {
+                    alert(data.error || 'Invalid credentials');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed. Please try again.');
             }
         });
     </script>
@@ -24746,93 +24758,6 @@ Late arrivals may result in reduced time\`;
 })
 
 // Super Admin Login Page
-app.get('/superadmin/login', (c) => {
-  return c.html(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Platform Super Admin - Login</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    </head>
-    <body class="bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
-                    <i class="fas fa-crown text-white text-3xl"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-800 mb-2">Platform Super Admin</h1>
-                <p class="text-gray-600">GuestConnect Platform Management</p>
-            </div>
-
-            <form id="loginForm" class="space-y-6">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-envelope mr-2 text-purple-600"></i>Email Address
-                    </label>
-                    <input type="email" id="email" required
-                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors"
-                           placeholder="superadmin@guestconnect.com">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-lock mr-2 text-purple-600"></i>Password
-                    </label>
-                    <input type="password" id="password" required
-                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors"
-                           placeholder="••••••••">
-                </div>
-
-                <button type="submit"
-                        class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg">
-                    <i class="fas fa-sign-in-alt mr-2"></i>Login to Platform
-                </button>
-            </form>
-
-            <div class="mt-6 pt-6 border-t border-gray-200 text-center">
-                <p class="text-sm text-gray-600">
-                    <i class="fas fa-shield-alt text-purple-600 mr-2"></i>
-                    Secure Platform Administration
-                </p>
-            </div>
-        </div>
-
-        <script>
-            document.getElementById('loginForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                
-                try {
-                    const response = await fetch('/api/superadmin/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email, password })
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        localStorage.setItem('superadmin', JSON.stringify(data.admin));
-                        window.location.href = '/superadmin/dashboard';
-                    } else {
-                        alert(data.error || 'Login failed');
-                    }
-                } catch (error) {
-                    console.error('Login error:', error);
-                    alert('Login failed. Please try again.');
-                }
-            });
-        </script>
-    </body>
-    </html>
-  `)
-})
-
 app.get('/admin/login', (c) => {
   return c.html(`
     <!DOCTYPE html>
