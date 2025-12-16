@@ -19942,7 +19942,7 @@ app.get('/superadmin/dashboard', (c) => {
 
     <script>
         const user = JSON.parse(localStorage.getItem('superadmin_user') || '{}');
-        if (!user.user_id || user.role !== 'superadmin') {
+        if (!user.user_id || (user.role !== 'superadmin' && user.role !== 'super_admin')) {
             window.location.href = '/superadmin/login';
         }
 
