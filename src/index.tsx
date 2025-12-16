@@ -1054,7 +1054,7 @@ app.get('/', (c) => {
             const avgRevenuePerRoom = 75; // $75 additional revenue per occupied room
             const additionalRevenue = occupiedRooms * avgRevenuePerRoom;
             const timeSaved = Math.floor(occupiedRooms * 0.5); // 0.5 hours saved per occupied room
-            const subscription Cost = rooms <= 50 ? 49 : (rooms <= 150 ? 149 : 499);
+            const subscriptionCost = rooms <= 50 ? 49 : (rooms <= 150 ? 149 : 499);
             const roi = Math.floor(((additionalRevenue - subscriptionCost) / subscriptionCost) * 100);
             
             document.getElementById('additionalRevenue').textContent = '$' + additionalRevenue.toLocaleString();
