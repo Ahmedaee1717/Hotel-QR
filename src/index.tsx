@@ -44101,8 +44101,34 @@ app.get('/staff/restaurant/:offering_id', (c) => {
 
     <script>
         const OFFERING_ID = ${offering_id};
-        const propertyId = localStorage.getItem('property_id') || '1';
-        const userId = localStorage.getItem('user_id');
+        
+        // CRITICAL: Get user_id and property_id from localStorage
+        // If missing, try to extract from admin_user object as fallback
+        let userId = localStorage.getItem('user_id');
+        let propertyId = localStorage.getItem('property_id');
+        
+        // Fallback: Extract from admin_user if direct values don't exist
+        if (!userId || !propertyId) {
+            try {
+                const adminUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
+                userId = userId || (adminUser.user_id ? adminUser.user_id.toString() : null);
+                propertyId = propertyId || (adminUser.property_id ? adminUser.property_id.toString() : null);
+            } catch (e) {
+                console.error('Failed to parse admin_user from localStorage:', e);
+            }
+        }
+        
+        // Final fallback for propertyId only (userId MUST exist)
+        propertyId = propertyId || '1';
+        
+        // Debug logging
+        console.log('Staff Dashboard Auth:', { userId, propertyId, OFFERING_ID });
+        
+        if (!userId) {
+            console.error('CRITICAL: user_id is missing! Please logout and login again.');
+            alert('Session error: Please logout and login again to access the staff dashboard.');
+        }
+        
         let floorElements = [];
         let currentSessions = [];
         let currentWaitlistLink = '';
