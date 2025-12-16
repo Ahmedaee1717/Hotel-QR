@@ -622,6 +622,52 @@ app.get('/', (c) => {
         </div>
     </section>
 
+    <!-- Mobile Showcase Section -->
+    <section class="py-24 px-6 bg-gradient-to-br from-gray-50 to-white">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+                    See GuestConnect in <span class="gradient-text">Action</span>
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Experience how guests interact with your hotel through our beautiful mobile app
+                </p>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Mobile Mockup -->
+                <div class="flex justify-center">
+                    <div class="relative">
+                        <!-- iPhone Mockup -->
+                        <div class="relative w-[280px] h-[570px] bg-gray-900 rounded-[45px] p-3 shadow-2xl">
+                            <!-- Notch -->
+                            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-gray-900 rounded-b-3xl z-10"></div>
+                            <!-- Screen -->
+                            <div class="relative w-full h-full bg-white rounded-[35px] overflow-hidden">
+                                <div id="mobileScreenCarousel" class="w-full h-full"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Screenshots Info -->
+                <div>
+                    <div id="showcaseDetails" class="space-y-6">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                    <div class="flex gap-4 mt-8">
+                        <button id="prevScreenshot" class="w-12 h-12 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition">
+                            <i class="fas fa-chevron-left text-gray-700"></i>
+                        </button>
+                        <button id="nextScreenshot" class="w-12 h-12 bg-primary hover:bg-[#014a61] text-white rounded-full flex items-center justify-center transition">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features Section -->
     <section id="features" class="py-24 px-6 bg-white">
         <div class="max-w-7xl mx-auto">
@@ -1016,8 +1062,69 @@ app.get('/', (c) => {
             document.getElementById('roiPercentage').textContent = roi + '%';
         }
         
+        // Mobile Showcase Carousel
+        let showcaseScreenshots = [];
+        let currentScreenshotIndex = 0;
+        
+        async function loadShowcase() {
+            try {
+                const response = await fetch('/api/showcase/active');
+                showcaseScreenshots = await response.json();
+                
+                if (showcaseScreenshots.length > 0) {
+                    displayScreenshot(0);
+                } else {
+                    document.getElementById('mobileScreenCarousel').innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100"><p class="text-gray-500">No screenshots available</p></div>';
+                }
+            } catch (error) {
+                console.error('Load showcase error:', error);
+            }
+        }
+        
+        function displayScreenshot(index) {
+            if (!showcaseScreenshots || showcaseScreenshots.length === 0) return;
+            
+            currentScreenshotIndex = index;
+            const screenshot = showcaseScreenshots[index];
+            
+            // Update mobile screen
+            document.getElementById('mobileScreenCarousel').innerHTML = 
+                '<img src="' + screenshot.image_url + '" alt="' + screenshot.title + '" class="w-full h-full object-cover">';
+            
+            // Update details
+            document.getElementById('showcaseDetails').innerHTML = 
+                '<div>' +
+                    '<div class="flex items-center gap-3 mb-4">' +
+                        '<span class="text-sm font-bold text-primary bg-blue-50 px-3 py-1 rounded-full">' + (index + 1) + ' of ' + showcaseScreenshots.length + '</span>' +
+                    '</div>' +
+                    '<h3 class="text-3xl font-bold text-gray-900 mb-4">' + screenshot.title + '</h3>' +
+                    '<p class="text-lg text-gray-600 leading-relaxed">' + (screenshot.description || '') + '</p>' +
+                '</div>';
+        }
+        
+        document.getElementById('prevScreenshot')?.addEventListener('click', () => {
+            const newIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : showcaseScreenshots.length - 1;
+            displayScreenshot(newIndex);
+        });
+        
+        document.getElementById('nextScreenshot')?.addEventListener('click', () => {
+            const newIndex = currentScreenshotIndex < showcaseScreenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
+            displayScreenshot(newIndex);
+        });
+        
+        // Auto-rotate every 5 seconds
+        setInterval(() => {
+            if (showcaseScreenshots.length > 0) {
+                const newIndex = currentScreenshotIndex < showcaseScreenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
+                displayScreenshot(newIndex);
+            }
+        }, 5000);
+        
         // Initialize ROI calculator on page load
-        window.addEventListener('DOMContentLoaded', calculateROI);
+        window.addEventListener('DOMContentLoaded', () => {
+            calculateROI();
+            loadShowcase();
+        });
     </script>
 </body>
 </html>
@@ -3540,6 +3647,134 @@ app.get('/api/superadmin/blog/stats', async (c) => {
   } catch (error) {
     console.error('Get blog stats error:', error)
     return c.json({ error: 'Failed to fetch stats' }, 500)
+  }
+})
+
+// ============================================
+// SUPER ADMIN - MOBILE SHOWCASE API
+// ============================================
+
+// Get all showcase screenshots
+app.get('/api/superadmin/showcase', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { results } = await DB.prepare(`
+      SELECT * FROM mobile_showcase ORDER BY display_order ASC, showcase_id ASC
+    `).all()
+    
+    return c.json(results)
+  } catch (error) {
+    console.error('Get showcase error:', error)
+    return c.json({ error: 'Failed to fetch screenshots' }, 500)
+  }
+})
+
+// Get single screenshot
+app.get('/api/superadmin/showcase/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    const { results } = await DB.prepare(`
+      SELECT * FROM mobile_showcase WHERE showcase_id = ?
+    `).bind(id).all()
+    
+    if (results.length === 0) {
+      return c.json({ error: 'Screenshot not found' }, 404)
+    }
+    
+    return c.json(results[0])
+  } catch (error) {
+    console.error('Get screenshot error:', error)
+    return c.json({ error: 'Failed to fetch screenshot' }, 500)
+  }
+})
+
+// Create screenshot
+app.post('/api/superadmin/showcase', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO mobile_showcase (title, description, image_url, display_order, is_active)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      data.title,
+      data.description || null,
+      data.image_url,
+      data.display_order || 0,
+      data.is_active ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true, showcase_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create screenshot error:', error)
+    return c.json({ error: 'Failed to create screenshot' }, 500)
+  }
+})
+
+// Update screenshot
+app.put('/api/superadmin/showcase/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE mobile_showcase SET
+        title = ?, description = ?, image_url = ?,
+        display_order = ?, is_active = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE showcase_id = ?
+    `).bind(
+      data.title,
+      data.description || null,
+      data.image_url,
+      data.display_order || 0,
+      data.is_active ? 1 : 0,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update screenshot error:', error)
+    return c.json({ error: 'Failed to update screenshot' }, 500)
+  }
+})
+
+// Delete screenshot
+app.delete('/api/superadmin/showcase/:id', async (c) => {
+  const { DB } = c.env
+  const id = c.req.param('id')
+  
+  try {
+    await DB.prepare(`DELETE FROM mobile_showcase WHERE showcase_id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete screenshot error:', error)
+    return c.json({ error: 'Failed to delete screenshot' }, 500)
+  }
+})
+
+// Public API - Get active screenshots for homepage
+app.get('/api/showcase/active', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { results } = await DB.prepare(`
+      SELECT showcase_id, title, description, image_url, display_order
+      FROM mobile_showcase 
+      WHERE is_active = 1
+      ORDER BY display_order ASC
+      LIMIT 10
+    `).all()
+    
+    return c.json(results)
+  } catch (error) {
+    console.error('Get active showcase error:', error)
+    return c.json([])
   }
 })
 
@@ -20218,6 +20453,10 @@ app.get('/superadmin/dashboard', (c) => {
                     <i class="nav-icon fas fa-search"></i>
                     <span>SEO Dashboard</span>
                 </div>
+                <div class="nav-item" data-tab="mobile-showcase">
+                    <i class="nav-icon fas fa-mobile-alt"></i>
+                    <span>Mobile Showcase</span>
+                </div>
             </div>
             
             <div class="nav-section">
@@ -21094,6 +21333,84 @@ app.get('/superadmin/dashboard', (c) => {
                                 <button type="submit" id="saveArticleBtn"
                                         style="flex: 1; padding: 14px; background: linear-gradient(135deg, #016e8f, #014a61); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(1, 110, 143, 0.3);">
                                     <i class="fas fa-save mr-2"></i>Save Article
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Showcase Tab -->
+            <div id="mobile-showcaseTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-mobile-alt"></i>
+                            Mobile Showcase Screenshots
+                        </div>
+                        <button class="btn-primary" onclick="openShowcaseEditor()">
+                            <i class="fas fa-plus"></i>
+                            Add Screenshot
+                        </button>
+                    </div>
+                    <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                        <p class="text-sm text-gray-700"><strong>What is this?</strong> These screenshots appear on the homepage in an interactive mobile mockup. Upload your actual app screenshots (375x812px recommended for iPhone size).</p>
+                    </div>
+                    <div id="showcaseListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading screenshots...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Showcase Editor Modal -->
+            <div id="showcaseEditorModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; overflow-y: auto;">
+                <div style="min-height: 100vh; padding: 40px 20px; display: flex; align-items: center; justify-content: center;">
+                    <div style="background: white; border-radius: 20px; max-width: 600px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.3);">
+                        <div style="padding: 30px; border-bottom: 2px solid #f3f4f6;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h2 style="font-size: 24px; font-weight: 700; color: #016e8f;">
+                                    <i class="fas fa-mobile-alt mr-2"></i>
+                                    <span id="showcaseModalTitle">Add Screenshot</span>
+                                </h2>
+                                <button onclick="closeShowcaseEditor()" style="background: none; border: none; font-size: 28px; color: #9ca3af; cursor: pointer;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <form id="showcaseForm" style="padding: 30px;">
+                            <input type="hidden" id="showcaseId">
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 8px;">Title *</label>
+                                <input type="text" id="showcaseTitle" required style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px;">
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 8px;">Description</label>
+                                <textarea id="showcaseDescription" rows="3" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px;"></textarea>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 8px;">Screenshot URL *</label>
+                                <input type="url" id="showcaseImageUrl" required style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px;" placeholder="https://example.com/screenshot.png">
+                                <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">Recommended: 375x812px (iPhone mockup size)</div>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-weight: 600; margin-bottom: 8px;">Display Order</label>
+                                <input type="number" id="showcaseOrder" value="0" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px;">
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="showcaseActive" checked style="width: 18px; height: 18px;">
+                                    <span style="font-weight: 600;">Active (show on homepage)</span>
+                                </label>
+                            </div>
+                            <div style="display: flex; gap: 12px; padding-top: 20px; border-top: 2px solid #f3f4f6;">
+                                <button type="button" onclick="closeShowcaseEditor()" style="flex: 1; padding: 14px; background: white; color: #6b7280; border: 2px solid #e5e7eb; border-radius: 10px; font-weight: 600; cursor: pointer;">
+                                    Cancel
+                                </button>
+                                <button type="submit" style="flex: 1; padding: 14px; background: linear-gradient(135deg, #016e8f, #014a61); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer;">
+                                    <i class="fas fa-save mr-2"></i>Save
                                 </button>
                             </div>
                         </form>
@@ -22009,6 +22326,144 @@ app.get('/superadmin/dashboard', (c) => {
         }
         
         // ============================================
+        // MOBILE SHOWCASE FUNCTIONS
+        // ============================================
+        let allShowcases = [];
+        let editingShowcaseId = null;
+        
+        async function loadShowcaseScreenshots() {
+            const container = document.getElementById('showcaseListContainer');
+            try {
+                const response = await fetch('/api/superadmin/showcase');
+                allShowcases = await response.json();
+                
+                if (!allShowcases || allShowcases.length === 0) {
+                    container.innerHTML = '<div class="text-center py-12"><i class="fas fa-mobile-alt text-4xl text-gray-300 mb-3"></i><p class="text-gray-600">No screenshots yet. Add your first one!</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">' +
+                    allShowcases.map(s => '<div class="bg-white rounded-xl overflow-hidden shadow-lg border-2 ' + (s.is_active ? 'border-green-200' : 'border-gray-200') + '">' +
+                        '<div class="relative">' +
+                            '<img src="' + s.image_url + '" alt="' + s.title + '" class="w-full h-64 object-cover">' +
+                            '<div class="absolute top-2 right-2 flex gap-2">' +
+                                '<span class="bg-white px-2 py-1 rounded-full text-xs font-bold">#' + s.display_order + '</span>' +
+                                (s.is_active ? '<span class="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">Active</span>' : '<span class="bg-gray-400 text-white px-2 py-1 rounded-full text-xs font-bold">Inactive</span>') +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="p-4">' +
+                            '<h3 class="font-bold text-gray-800 mb-2">' + s.title + '</h3>' +
+                            '<p class="text-sm text-gray-600 mb-4">' + (s.description || '') + '</p>' +
+                            '<div class="flex gap-2">' +
+                                '<button onclick="editShowcase(' + s.showcase_id + ')" class="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-blue-600"><i class="fas fa-edit mr-1"></i>Edit</button>' +
+                                '<button onclick="deleteShowcase(' + s.showcase_id + ')" class="bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-red-600"><i class="fas fa-trash"></i></button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>').join('') +
+                '</div>';
+            } catch (error) {
+                console.error('Load showcase error:', error);
+                container.innerHTML = '<div class="text-center py-12 text-red-600">Failed to load screenshots</div>';
+            }
+        }
+        
+        function openShowcaseEditor(showcaseId = null) {
+            editingShowcaseId = showcaseId;
+            const modal = document.getElementById('showcaseEditorModal');
+            const form = document.getElementById('showcaseForm');
+            
+            if (showcaseId) {
+                document.getElementById('showcaseModalTitle').textContent = 'Edit Screenshot';
+                fetch('/api/superadmin/showcase/' + showcaseId)
+                    .then(r => r.json())
+                    .then(s => {
+                        document.getElementById('showcaseId').value = s.showcase_id;
+                        document.getElementById('showcaseTitle').value = s.title;
+                        document.getElementById('showcaseDescription').value = s.description || '';
+                        document.getElementById('showcaseImageUrl').value = s.image_url;
+                        document.getElementById('showcaseOrder').value = s.display_order;
+                        document.getElementById('showcaseActive').checked = s.is_active === 1;
+                    });
+            } else {
+                document.getElementById('showcaseModalTitle').textContent = 'Add Screenshot';
+                form.reset();
+                document.getElementById('showcaseId').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeShowcaseEditor() {
+            document.getElementById('showcaseEditorModal').style.display = 'none';
+            editingShowcaseId = null;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('showcaseForm');
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const showcaseId = document.getElementById('showcaseId').value;
+                    const isEdit = !!showcaseId;
+                    
+                    const data = {
+                        title: document.getElementById('showcaseTitle').value,
+                        description: document.getElementById('showcaseDescription').value,
+                        image_url: document.getElementById('showcaseImageUrl').value,
+                        display_order: parseInt(document.getElementById('showcaseOrder').value) || 0,
+                        is_active: document.getElementById('showcaseActive').checked ? 1 : 0
+                    };
+                    
+                    try {
+                        const response = await fetch(
+                            isEdit ? '/api/superadmin/showcase/' + showcaseId : '/api/superadmin/showcase',
+                            {
+                                method: isEdit ? 'PUT' : 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            }
+                        );
+                        
+                        if (response.ok) {
+                            closeShowcaseEditor();
+                            loadShowcaseScreenshots();
+                            alert(isEdit ? 'Screenshot updated!' : 'Screenshot added!');
+                        } else {
+                            alert('Failed to save screenshot');
+                        }
+                    } catch (error) {
+                        console.error('Save showcase error:', error);
+                        alert('Failed to save screenshot');
+                    }
+                });
+            }
+        });
+        
+        async function editShowcase(showcaseId) {
+            openShowcaseEditor(showcaseId);
+        }
+        
+        async function deleteShowcase(showcaseId) {
+            if (!confirm('Delete this screenshot?')) return;
+            
+            try {
+                const response = await fetch('/api/superadmin/showcase/' + showcaseId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadShowcaseScreenshots();
+                    alert('Screenshot deleted');
+                } else {
+                    alert('Failed to delete screenshot');
+                }
+            } catch (error) {
+                console.error('Delete showcase error:', error);
+                alert('Failed to delete screenshot');
+            }
+        }
+        
+        // ============================================
         // TAB SWITCHING
         // ============================================
         document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -22033,6 +22488,7 @@ app.get('/superadmin/dashboard', (c) => {
                 else if (tab === 'blog') loadArticles();
                 else if (tab === 'blog-categories') loadCategories();
                 else if (tab === 'blog-seo') loadBlogStats();
+                else if (tab === 'mobile-showcase') loadShowcaseScreenshots();
             });
         });
         
