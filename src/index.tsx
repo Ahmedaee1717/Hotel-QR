@@ -458,7 +458,7 @@ app.get('/', (c) => {
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
                     <a href="#pricing" class="text-sm font-medium text-gray-700 hover:text-primary transition">Pricing</a>
-                    <a href="#roi" class="text-sm font-medium text-gray-700 hover:text-primary transition">ROI Calculator</a>
+                    <a href="#ai-chatbot" class="text-sm font-medium text-gray-700 hover:text-primary transition">AI Chatbot</a>
                     <a href="/blog" class="text-sm font-medium text-gray-700 hover:text-primary transition">Blog</a>
                     <a href="/admin/login" class="text-sm font-medium text-gray-700 hover:text-primary transition">Login</a>
                     <a href="/superadmin/login" class="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-[#014a5e] transition text-sm font-semibold shadow-md hover:shadow-lg">
@@ -476,7 +476,7 @@ app.get('/', (c) => {
             <div class="px-6 py-4 space-y-3">
                 <a href="#features" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Features</a>
                 <a href="#pricing" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Pricing</a>
-                <a href="#roi" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">ROI Calculator</a>
+                <a href="#ai-chatbot" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">AI Chatbot</a>
                 <a href="/blog" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Blog</a>
                 <a href="/admin/login" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Login</a>
                 <a href="/superadmin/login" class="block bg-primary text-white px-6 py-3 rounded-lg text-center font-semibold">Start Free Trial</a>
@@ -850,47 +850,233 @@ app.get('/', (c) => {
         </div>
     </section>
 
-    <!-- ROI Calculator -->
-    <section id="roi" class="py-24 px-6 bg-white">
-        <div class="max-w-5xl mx-auto">
+    <!-- GuestConnect AI Showcase -->
+    <section id="ai-chatbot" class="py-24 px-6 bg-gradient-to-br from-primary via-[#014a5e] to-[#012936] relative overflow-hidden">
+        <!-- Animated background particles -->
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-10 w-64 h-64 bg-accent rounded-full blur-3xl animate-pulse"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+            <div class="absolute top-1/2 left-1/2 w-80 h-80 bg-accent rounded-full blur-3xl animate-pulse" style="animation-delay: 2s;"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto relative z-10">
+            <!-- Header -->
             <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Calculate Your <span class="gradient-text">ROI</span>
+                <div class="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm px-6 py-3 rounded-full border border-accent/30 mb-6">
+                    <svg class="w-6 h-6 text-accent animate-spin" style="animation-duration: 3s;" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-white font-semibold">POWERED BY ADVANCED AI</span>
+                </div>
+                <h2 class="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+                    Meet <span class="text-accent">GuestConnect AI</span><br>Your 24/7 Guest Assistant
                 </h2>
-                <p class="text-xl text-gray-600">See how much revenue GuestConnect can generate for your hotel</p>
+                <p class="text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
+                    An intelligent chatbot that understands your guests, answers questions instantly, and creates unforgettable experiences—all without human intervention.
+                </p>
             </div>
-            <div class="bg-secondary border-4 border-accent rounded-2xl p-10 shadow-xl">
-                <div class="space-y-8">
-                    <div>
-                        <label class="block text-lg font-semibold text-gray-900 mb-3">Number of Rooms</label>
-                        <input type="range" min="20" max="500" value="100" class="roi-slider w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer" id="roomSlider" oninput="calculateROI()">
-                        <div class="text-3xl font-bold text-primary mt-3" id="roomCount">100</div>
+
+            <!-- Main Interactive Demo Card -->
+            <div class="grid lg:grid-cols-2 gap-12 mb-16">
+                <!-- Chat Demo -->
+                <div class="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl border-4 border-accent/30 overflow-hidden transform hover:scale-105 transition-all duration-300">
+                    <!-- Chat Header -->
+                    <div class="bg-gradient-to-r from-primary to-[#014a5e] px-8 py-6 flex items-center gap-4">
+                        <div class="w-14 h-14 bg-accent rounded-full flex items-center justify-center shadow-lg">
+                            <svg class="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
+                                <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-2xl font-bold text-white">GuestConnect AI</h3>
+                            <div class="flex items-center gap-2 text-accent text-sm">
+                                <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+                                <span>Online • Always ready to help</span>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-lg font-semibold text-gray-900 mb-3">Average Occupancy Rate</label>
-                        <input type="range" min="40" max="100" value="70" class="roi-slider w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer" id="occupancySlider" oninput="calculateROI()">
-                        <div class="text-3xl font-bold text-primary mt-3" id="occupancyRate">70%</div>
+
+                    <!-- Chat Messages -->
+                    <div class="p-8 space-y-6 bg-gradient-to-b from-gray-50 to-white min-h-[500px] flex flex-col">
+                        <!-- Guest Message -->
+                        <div class="flex gap-3 animate-fade-in">
+                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
+                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-4 max-w-xs shadow-sm">
+                                <p class="text-gray-800">Hi! What time does the spa open tomorrow?</p>
+                                <span class="text-xs text-gray-400 mt-2 block">10:23 AM</span>
+                            </div>
+                        </div>
+
+                        <!-- AI Response -->
+                        <div class="flex gap-3 justify-end animate-fade-in" style="animation-delay: 0.5s;">
+                            <div class="bg-gradient-to-r from-primary to-[#014a5e] text-white rounded-2xl rounded-tr-none px-6 py-4 max-w-xs shadow-lg">
+                                <p class="leading-relaxed">Good morning! 🌅 Our Tranquility Spa opens at 8:00 AM and closes at 9:00 PM. Would you like me to book a treatment for you?</p>
+                                <span class="text-xs text-accent mt-2 block">10:23 AM</span>
+                            </div>
+                            <div class="w-10 h-10 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Guest Message -->
+                        <div class="flex gap-3 animate-fade-in" style="animation-delay: 1s;">
+                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
+                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-4 max-w-xs shadow-sm">
+                                <p class="text-gray-800">Yes please! Do you have any availability for a couples massage around 2 PM?</p>
+                                <span class="text-xs text-gray-400 mt-2 block">10:24 AM</span>
+                            </div>
+                        </div>
+
+                        <!-- AI Response -->
+                        <div class="flex gap-3 justify-end animate-fade-in" style="animation-delay: 1.5s;">
+                            <div class="bg-gradient-to-r from-primary to-[#014a5e] text-white rounded-2xl rounded-tr-none px-6 py-4 max-w-xs shadow-lg">
+                                <p class="leading-relaxed">Perfect! 💆‍♀️ I found availability for a 90-minute Couples Paradise Massage at 2:00 PM tomorrow. The session includes aromatherapy and costs $280. Shall I confirm this booking for you?</p>
+                                <span class="text-xs text-accent mt-2 block">10:24 AM</span>
+                            </div>
+                            <div class="w-10 h-10 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Typing Indicator -->
+                        <div class="flex gap-3 mt-auto animate-fade-in" style="animation-delay: 2s;">
+                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
+                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-3 shadow-sm">
+                                <div class="flex gap-2">
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="border-t-2 border-gray-100 px-8 py-6 bg-white">
+                        <div class="flex gap-4">
+                            <input type="text" placeholder="Ask anything... (This is a demo)" class="flex-1 px-6 py-4 rounded-xl border-2 border-gray-200 focus:border-primary focus:outline-none text-gray-400 cursor-not-allowed" disabled>
+                            <button class="bg-gradient-to-r from-primary to-[#014a5e] text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition cursor-not-allowed opacity-60" disabled>
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div class="mt-12 pt-10 border-t-4 border-accent">
-                    <h3 class="text-2xl font-bold text-gray-900 mb-8 text-center">Monthly Results</h3>
-                    <div class="grid md:grid-cols-3 gap-6">
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">Additional Revenue</div>
-                            <div class="text-4xl font-bold text-primary" id="additionalRevenue">$0</div>
+
+                <!-- AI Features & Benefits -->
+                <div class="space-y-6">
+                    <!-- Feature Card 1 -->
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
+                        <div class="flex items-start gap-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Instant Responses, 24/7</h3>
+                                <p class="text-gray-600 leading-relaxed text-lg">No more waiting. GuestConnect AI answers guest questions in under 3 seconds—whether it's 3 AM or checkout rush hour. Always available, always accurate.</p>
+                            </div>
                         </div>
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">Time Saved</div>
-                            <div class="text-4xl font-bold text-primary" id="timeSaved">0 hrs</div>
+                    </div>
+
+                    <!-- Feature Card 2 -->
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
+                        <div class="flex items-start gap-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Intelligent & Context-Aware</h3>
+                                <p class="text-gray-600 leading-relaxed text-lg">Powered by advanced AI, our chatbot understands context, remembers conversations, and provides personalized recommendations based on guest preferences and history.</p>
+                            </div>
                         </div>
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">ROI</div>
-                            <div class="text-4xl font-bold text-green-600" id="roiPercentage">0%</div>
+                    </div>
+
+                    <!-- Feature Card 3 -->
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
+                        <div class="flex items-start gap-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Automated Bookings & Upsells</h3>
+                                <p class="text-gray-600 leading-relaxed text-lg">More than just Q&A—the AI proactively suggests spa treatments, restaurant reservations, and activities, driving $2,000+ in additional monthly revenue per property.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature Card 4 -->
+                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
+                        <div class="flex items-start gap-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Multilingual Support</h3>
+                                <p class="text-gray-600 leading-relaxed text-lg">Communicate seamlessly with international guests in 50+ languages. Break down language barriers and provide exceptional service to every visitor.</p>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Stats Section -->
+            <div class="grid md:grid-cols-4 gap-6 mb-16">
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
+                    <div class="text-5xl font-bold text-accent mb-3">90%</div>
+                    <p class="text-white/80 text-lg">Of inquiries handled automatically</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
+                    <div class="text-5xl font-bold text-accent mb-3">&lt;3s</div>
+                    <p class="text-white/80 text-lg">Average response time</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
+                    <div class="text-5xl font-bold text-accent mb-3">24/7</div>
+                    <p class="text-white/80 text-lg">Always online, never sleeps</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
+                    <div class="text-5xl font-bold text-accent mb-3">50+</div>
+                    <p class="text-white/80 text-lg">Languages supported</p>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="text-center">
+                <a href="/superadmin/login" class="inline-flex items-center gap-4 bg-accent text-primary px-12 py-6 rounded-2xl font-bold text-2xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition">
+                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
+                        <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/>
+                    </svg>
+                    <span>Experience GuestConnect AI Today</span>
+                </a>
+                <p class="text-white/70 mt-6 text-lg">Start your 14-day free trial • No credit card required</p>
             </div>
         </div>
+
+        <!-- Add custom animations -->
+        <style>
+            @keyframes fade-in {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fade-in {
+                animation: fade-in 0.5s ease-out forwards;
+            }
+        </style>
     </section>
 
     <!-- Testimonials -->
@@ -1017,7 +1203,7 @@ app.get('/', (c) => {
                     <ul class="space-y-4 text-white/70">
                         <li><a href="#features" class="hover:text-primary transition">Features</a></li>
                         <li><a href="#pricing" class="hover:text-primary transition">Pricing</a></li>
-                        <li><a href="#roi" class="hover:text-primary transition">ROI Calculator</a></li>
+                        <li><a href="#ai-chatbot" class="hover:text-primary transition">AI Chatbot</a></li>
                         <li><a href="#demo" class="hover:text-primary transition">Demo</a></li>
                     </ul>
                 </div>
@@ -1040,26 +1226,6 @@ app.get('/', (c) => {
         function toggleMobileMenu() {
             const menu = document.getElementById('mobileMenu');
             menu.classList.toggle('hidden');
-        }
-        
-        function calculateROI() {
-            const rooms = parseInt(document.getElementById('roomSlider').value);
-            const occupancy = parseInt(document.getElementById('occupancySlider').value);
-            
-            document.getElementById('roomCount').textContent = rooms;
-            document.getElementById('occupancyRate').textContent = occupancy + '%';
-            
-            // Calculate metrics
-            const occupiedRooms = Math.floor(rooms * (occupancy / 100));
-            const avgRevenuePerRoom = 75; // $75 additional revenue per occupied room
-            const additionalRevenue = occupiedRooms * avgRevenuePerRoom;
-            const timeSaved = Math.floor(occupiedRooms * 0.5); // 0.5 hours saved per occupied room
-            const subscriptionCost = rooms <= 50 ? 49 : (rooms <= 150 ? 149 : 499);
-            const roi = Math.floor(((additionalRevenue - subscriptionCost) / subscriptionCost) * 100);
-            
-            document.getElementById('additionalRevenue').textContent = '$' + additionalRevenue.toLocaleString();
-            document.getElementById('timeSaved').textContent = timeSaved + ' hrs';
-            document.getElementById('roiPercentage').textContent = roi + '%';
         }
         
         // Mobile Showcase Carousel
@@ -1120,9 +1286,8 @@ app.get('/', (c) => {
             }
         }, 5000);
         
-        // Initialize ROI calculator on page load
+        // Initialize showcase on page load
         window.addEventListener('DOMContentLoaded', () => {
-            calculateROI();
             loadShowcase();
         });
     </script>
