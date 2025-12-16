@@ -24251,6 +24251,9 @@ app.get('/admin/login', (c) => {
                 // Store permissions for frontend access control
                 localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
                 localStorage.setItem('admin_resource_access', JSON.stringify(data.resource_access || {}));
+                // CRITICAL: Store user_id and property_id for fetchWithAuth() in staff dashboards
+                localStorage.setItem('user_id', data.user.user_id.toString());
+                localStorage.setItem('property_id', data.user.property_id.toString());
                 // Smart redirect: Use server-suggested redirect or default to dashboard
                 window.location.href = data.redirectTo || '/admin/dashboard';
               } else {
