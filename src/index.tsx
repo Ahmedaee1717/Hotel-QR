@@ -35243,7 +35243,7 @@ app.get('/admin/dashboard', (c) => {
         const code = document.getElementById('regCode').textContent;
         if (code && code !== 'Loading...' && code !== 'None' && code !== 'Error loading') {
           navigator.clipboard.writeText(code).then(() => {
-            alert('✅ Code copied to clipboard!');
+            alert('SUCCESS: Code copied to clipboard!');
           }).catch(err => {
             console.error('Copy failed:', err);
             alert('Failed to copy code');
@@ -35254,7 +35254,7 @@ app.get('/admin/dashboard', (c) => {
       }
 
       async function regenerateRegCode() {
-        if (!confirm('⚠️ Regenerate registration code? This will disconnect ALL vendors using the old code. They will need the new code to reconnect.')) return;
+        if (!confirm('WARNING: Regenerate registration code? This will disconnect ALL vendors using the old code. They will need the new code to reconnect.')) return;
         try {
           const response = await fetchWithAuth('/api/admin/regenerate-registration-code', {
             method: 'POST',
@@ -35262,10 +35262,10 @@ app.get('/admin/dashboard', (c) => {
           });
           const data = await response.json();
           if (data.success) {
-            alert('✅ New registration code generated!\n\nNew Code: ' + data.registration_code + '\n\nShare this with your vendors.');
+            alert('SUCCESS: New registration code generated!' + String.fromCharCode(10) + String.fromCharCode(10) + 'New Code: ' + data.registration_code + String.fromCharCode(10) + String.fromCharCode(10) + 'Share this with your vendors.');
             loadRegCode();
           } else {
-            alert('❌ Error: ' + (data.error || 'Failed to generate code'));
+            alert('ERROR: ' + (data.error || 'Failed to generate code'));
           }
         } catch (error) {
           console.error('Regenerate code error:', error);
