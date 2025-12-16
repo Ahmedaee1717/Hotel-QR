@@ -459,6 +459,7 @@ app.get('/', (c) => {
                     <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
                     <a href="#pricing" class="text-sm font-medium text-gray-700 hover:text-primary transition">Pricing</a>
                     <a href="#roi" class="text-sm font-medium text-gray-700 hover:text-primary transition">ROI Calculator</a>
+                    <a href="/blog" class="text-sm font-medium text-gray-700 hover:text-primary transition">Blog</a>
                     <a href="/admin/login" class="text-sm font-medium text-gray-700 hover:text-primary transition">Login</a>
                     <a href="/superadmin/login" class="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-[#014a5e] transition text-sm font-semibold shadow-md hover:shadow-lg">
                         Start Free Trial
@@ -476,6 +477,7 @@ app.get('/', (c) => {
                 <a href="#features" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Features</a>
                 <a href="#pricing" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Pricing</a>
                 <a href="#roi" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">ROI Calculator</a>
+                <a href="/blog" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Blog</a>
                 <a href="/admin/login" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Login</a>
                 <a href="/superadmin/login" class="block bg-primary text-white px-6 py-3 rounded-lg text-center font-semibold">Start Free Trial</a>
             </div>
