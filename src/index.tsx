@@ -527,42 +527,76 @@ app.get('/', (c) => {
                     </div>
                 </div>
                 <div class="float-animation">
-                    <div class="bg-white rounded-2xl shadow-2xl p-8 border-4 border-accent">
-                        <div class="text-center mb-6">
-                            <div class="inline-block p-4 bg-secondary rounded-xl mb-4">
-                                <img src="/guestconnect-logo.png" alt="QR Code" class="w-48 h-48 mx-auto">
+                    <div class="bg-gradient-to-br from-white to-secondary/30 rounded-3xl shadow-2xl p-10 border-2 border-accent/20 backdrop-blur-sm relative overflow-hidden group hover:shadow-3xl transition-all duration-500">
+                        <!-- Decorative corner elements -->
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        <div class="absolute bottom-0 left-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                        
+                        <div class="text-center mb-8 relative z-10">
+                            <!-- Circular QR Code with animated ring -->
+                            <div class="relative inline-block mb-6">
+                                <!-- Animated outer ring -->
+                                <div class="absolute inset-0 -m-4 rounded-full border-4 border-accent/30 animate-spin-slow"></div>
+                                <div class="absolute inset-0 -m-6 rounded-full border-2 border-primary/20 animate-pulse"></div>
+                                
+                                <!-- Circular QR Code container -->
+                                <div class="relative w-56 h-56 rounded-full bg-gradient-to-br from-white to-secondary shadow-xl flex items-center justify-center border-4 border-accent group-hover:scale-105 transition-transform duration-500">
+                                    <img src="/guestconnect-logo.png" alt="QR Code" class="w-44 h-44 rounded-full p-2">
+                                </div>
+                                
+                                <!-- Decorative dots -->
+                                <div class="absolute -top-2 -right-2 w-6 h-6 bg-accent rounded-full animate-bounce shadow-lg"></div>
+                                <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-primary rounded-full animate-bounce shadow-lg" style="animation-delay: 0.3s;"></div>
                             </div>
-                            <h3 class="text-2xl font-bold text-gray-900 mb-2">Scan to Explore</h3>
-                            <p class="text-gray-600">Room 305 - Paradise Resort</p>
+                            
+                            <h3 class="text-3xl font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">Scan to Explore</h3>
+                            <p class="text-lg text-gray-600 font-medium">Room 305 - Paradise Resort</p>
+                            <div class="mt-4 inline-flex items-center gap-2 text-sm text-gray-500">
+                                <i class="fas fa-qrcode text-primary"></i>
+                                <span>Point your camera at the QR code</span>
+                            </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-3 pt-6 border-t border-gray-200">
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-utensils text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Restaurants</p>
+                        
+                        <!-- Service cards grid with enhanced effects -->
+                        <div class="grid grid-cols-3 gap-4 pt-8 border-t-2 border-accent/20 relative z-10">
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-utensils text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Restaurants</p>
                             </div>
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-umbrella-beach text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Beach</p>
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-umbrella-beach text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Beach</p>
                             </div>
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-spa text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Spa</p>
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-spa text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Spa</p>
                             </div>
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-concierge-bell text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Room Service</p>
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-concierge-bell text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Room Service</p>
                             </div>
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-calendar-star text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Activities</p>
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-hiking text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Activities</p>
                             </div>
-                            <div class="text-center p-3 bg-secondary rounded-lg hover:bg-accent transition">
-                                <i class="fas fa-info-circle text-2xl text-primary mb-2"></i>
-                                <p class="text-xs font-semibold text-gray-700">Info</p>
+                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
+                                <i class="fas fa-info-circle text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
+                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Info</p>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Add custom animations -->
+                <style>
+                    @keyframes spin-slow {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                    .animate-spin-slow {
+                        animation: spin-slow 20s linear infinite;
+                    }
+                </style>
             </div>
         </div>
     </section>
