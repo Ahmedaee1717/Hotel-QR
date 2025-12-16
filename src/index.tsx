@@ -35529,7 +35529,7 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadInfoPages() {
         try {
-          const response = await fetch('/api/admin/info-pages?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/info-pages?property_id=' + propertyId);
           const pages = await response.json();
           
           const container = document.getElementById('infoPagesContainer');
@@ -35603,7 +35603,7 @@ app.get('/admin/dashboard', (c) => {
 
       window.editInfoPage = async function(pageId) {
         try {
-          const response = await fetch('/api/admin/info-pages/' + pageId);
+          const response = await fetchWithAuth('/api/admin/info-pages/' + pageId);
           const page = await response.json();
           
           currentInfoPageId = pageId;
@@ -35635,7 +35635,6 @@ app.get('/admin/dashboard', (c) => {
         }
         
         const data = {
-          property_id: 1,
           page_key: document.getElementById('infoPageKey').value || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
           title_en: title,
           content_en: content,
@@ -35651,9 +35650,8 @@ app.get('/admin/dashboard', (c) => {
           const url = pageId ? '/api/admin/info-pages/' + pageId : '/api/admin/info-pages';
           const method = pageId ? 'PUT' : 'POST';
           
-          const response = await fetch(url, {
+          const response = await fetchWithAuth(url, {
             method: method,
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
           
@@ -35678,7 +35676,7 @@ app.get('/admin/dashboard', (c) => {
         }
         
         try {
-          const response = await fetch('/api/admin/info-pages/' + pageId, {
+          const response = await fetchWithAuth('/api/admin/info-pages/' + pageId, {
             method: 'DELETE'
           });
           
