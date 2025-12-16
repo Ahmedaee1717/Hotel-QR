@@ -451,9 +451,9 @@ app.get('/', (c) => {
     <!-- Navigation -->
     <nav class="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-200 z-50 shadow-sm">
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
+            <div class="flex justify-between items-center h-24">
                 <div class="flex items-center">
-                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect Logo" class="h-16 w-auto">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect Logo" class="h-20 w-auto">
                 </div>
                 <div class="hidden md:flex items-center space-x-8">
                     <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
@@ -1449,7 +1449,7 @@ app.get('/blog', async (c) => {
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center gap-3">
-                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-14">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-20">
                 </a>
                 <div class="flex gap-6">
                     <a href="/" class="text-gray-700 hover:text-[#016e8f] font-semibold">Home</a>
@@ -1704,7 +1704,7 @@ app.get('/blog/:slug', async (c) => {
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center gap-3">
-                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-14">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-20">
                 </a>
                 <div class="flex gap-6">
                     <a href="/" class="text-gray-700 hover:text-[#016e8f] font-semibold">Home</a>
