@@ -23494,10 +23494,24 @@ app.get('/admin/beach-management', (c) => {
         // Verify and Check In
         async function verifyAndCheckIn(code) {
             try {
+                // Get staff name from localStorage or prompt
+                let staffName = localStorage.getItem('staff_name');
+                if (!staffName) {
+                    staffName = prompt('Enter your name for check-in:');
+                    if (!staffName || staffName.trim().length === 0) {
+                        showCheckInError('Staff name is required');
+                        return;
+                    }
+                    localStorage.setItem('staff_name', staffName.trim());
+                }
+                
                 const response = await fetchWithAuth('/api/staff/beach/check-in', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ booking_reference: code })
+                    body: JSON.stringify({ 
+                        booking_reference: code,
+                        staff_name: staffName
+                    })
                 });
                 
                 const data = await response.json();
