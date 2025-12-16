@@ -106,6 +106,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **All Offerings Operations** - Fixed 401 errors on add/edit/delete offerings and room service management (8+ endpoints)
 - ✅ **Room Service Card Settings** - Fixed unauthorized error when saving room service homepage card (7 custom-sections endpoints)
 
+### New Features
+- ✅ **Vendor Registration Code System** - Hotels can generate codes for vendors to connect to their property (never expires)
+
 ### Key Achievements
 - 🔒 **100+ backend endpoints secured** with property_id validation
 - 🔐 **60+ frontend functions updated** to use fetchWithAuth()
