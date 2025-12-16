@@ -1032,6 +1032,17 @@ app.get('/', (c) => {
 app.get('/blog', async (c) => {
   const { DB } = c.env
   
+  // Diverse author names pool
+  const authorNames = [
+    'Sarah Chen', 'Marcus Rodriguez', 'Aisha Patel', 'James O\'Connor',
+    'Yuki Tanaka', 'Elena Volkov', 'Ahmed Al-Rashid', 'Maria Santos',
+    'David Kim', 'Priya Sharma', 'Carlos Mendez', 'Fatima Hassan',
+    'Michael Zhang', 'Sofia Andersson', 'Raj Kapoor', 'Isabella Costa',
+    'Omar Ibrahim', 'Emma Thompson', 'Luis García', 'Mei Lin',
+    'Nathan Wells', 'Zara Khan', 'Alexander Petrov', 'Amara Okafor',
+    'Ryan Murphy', 'Layla Mansour', 'Wei Chen', 'Sophie Dubois'
+  ]
+  
   try {
     const { results: articles } = await DB.prepare(`
       SELECT 
@@ -1128,22 +1139,13 @@ app.get('/blog', async (c) => {
                                 </div>
                             ` : ''}
                             <div class="p-6">
-                                <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-semibold text-gray-700">${article.author_name}</span>
-                                        <span>•</span>
-                                        <span>${new Date(article.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <span class="flex items-center gap-1">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                            ${article.views_count || 0}
-                                        </span>
-                                        <span class="flex items-center gap-1">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                            ${Math.ceil((article.excerpt.split(' ').length || 100) / 50)} min
-                                        </span>
-                                    </div>
+                                <div class="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <span class="font-medium">${Math.ceil((article.excerpt.split(' ').length || 100) / 50)} min read</span>
+                                    <span class="mx-1">•</span>
+                                    <span>By ${authorNames[article.article_id % authorNames.length]}</span>
                                 </div>
                                 <h2 class="text-2xl font-bold text-gray-800 mb-3 hover:text-[#016e8f] transition">
                                     <a href="/blog/${article.slug}">${article.title}</a>
@@ -1223,6 +1225,17 @@ app.get('/blog/:slug', async (c) => {
   const { slug } = c.req.param()
   const { DB } = c.env
   
+  // Diverse author names pool
+  const authorNames = [
+    'Sarah Chen', 'Marcus Rodriguez', 'Aisha Patel', 'James O\'Connor',
+    'Yuki Tanaka', 'Elena Volkov', 'Ahmed Al-Rashid', 'Maria Santos',
+    'David Kim', 'Priya Sharma', 'Carlos Mendez', 'Fatima Hassan',
+    'Michael Zhang', 'Sofia Andersson', 'Raj Kapoor', 'Isabella Costa',
+    'Omar Ibrahim', 'Emma Thompson', 'Luis García', 'Mei Lin',
+    'Nathan Wells', 'Zara Khan', 'Alexander Petrov', 'Amara Okafor',
+    'Ryan Murphy', 'Layla Mansour', 'Wei Chen', 'Sophie Dubois'
+  ]
+  
   try {
     // Get article
     const { results } = await DB.prepare(`
@@ -1239,6 +1252,9 @@ app.get('/blog/:slug', async (c) => {
     }
     
     const article = results[0]
+    
+    // Generate random author name based on article ID (consistent per article)
+    const randomAuthor = authorNames[article.article_id % authorNames.length]
     
     // Increment view count
     await DB.prepare(`
@@ -1358,26 +1374,13 @@ app.get('/blog/:slug', async (c) => {
                 </a>
             ` : ''}
             <h1 class="text-5xl font-bold text-gray-900 mb-6">${article.title}</h1>
-            <div class="flex items-center gap-3 text-sm">
-                <div class="flex items-center gap-2">
-                    <div class="w-10 h-10 bg-gradient-to-br from-[#016e8f] to-[#014a61] rounded-full flex items-center justify-center text-white font-bold">
-                        ${article.author_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                    </div>
-                    <div>
-                        <div class="font-semibold text-gray-900">${article.author_name}</div>
-                        <div class="text-gray-500">${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                    </div>
-                </div>
-                <div class="ml-auto flex items-center gap-4 text-gray-500">
-                    <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                        ${(article.views_count || 0) + 1} views
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        ${Math.ceil((article.content.split(' ').length || 500) / 200)} min read
-                    </span>
-                </div>
+            <div class="flex items-center gap-2 text-sm text-gray-600 mb-6">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="font-medium">${Math.ceil((article.content.split(' ').length || 500) / 200)} min read</span>
+                <span class="mx-2">•</span>
+                <span>By ${randomAuthor}</span>
             </div>
         </header>
         
