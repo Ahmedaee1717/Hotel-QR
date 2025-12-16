@@ -40914,7 +40914,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               icon_class: cardIcon,
               color_class: cardColor,
               is_visible: cardVisible,
-              link_url: `/room-service/${roomServiceOffering.offering_id}`
+              link_url: '/room-service/' + roomServiceOffering.offering_id
             })
           });
           
