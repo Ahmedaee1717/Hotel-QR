@@ -3162,7 +3162,11 @@ app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
 // Get all users
 app.get('/api/admin/users', requirePermission('users_view'), async (c) => {
   const { DB } = c.env
-  const property_id = 1 // TODO: Get from session
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     const users = await DB.prepare(`
@@ -3187,14 +3191,19 @@ app.get('/api/admin/users', requirePermission('users_view'), async (c) => {
 app.get('/api/admin/users/:id', requirePermission('users_view'), async (c) => {
   const { DB } = c.env
   const userId = c.req.param('id')
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     const user = await DB.prepare(`
       SELECT u.*, r.role_name
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.role_id
-      WHERE u.user_id = ?
-    `).bind(userId).first()
+      WHERE u.user_id = ? AND u.property_id = ?
+    `).bind(userId, property_id).first()
     
     return c.json({ success: true, user })
   } catch (error) {
@@ -3207,6 +3216,12 @@ app.get('/api/admin/users/:id', requirePermission('users_view'), async (c) => {
 app.post('/api/admin/users', requirePermission('users_create'), async (c) => {
   const { DB } = c.env
   const userData = await c.req.json()
+  
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
   
   try {
     // Check if email already exists
@@ -3231,7 +3246,7 @@ app.post('/api/admin/users', requirePermission('users_create'), async (c) => {
       userData.last_name,
       'staff', // Default role value for role column
       userData.role_id || null,
-      userData.property_id,
+      property_id,  // Use authenticated property_id
       userData.status
     ).run()
     
@@ -3261,20 +3276,27 @@ app.put('/api/admin/users/:id', requirePermission('users_edit'), async (c) => {
   const userId = c.req.param('id')
   const userData = await c.req.json()
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
-    // Update user basic info
+    // Update user basic info - ONLY if user belongs to this property
     await DB.prepare(`
       UPDATE users 
       SET first_name = ?, last_name = ?, email = ?,
           role_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ?
+      WHERE user_id = ? AND property_id = ?
     `).bind(
       userData.first_name,
       userData.last_name,
       userData.email,
       userData.role_id || null,
       userData.status,
-      userId
+      userId,
+      property_id  // Ensure can only update own hotel's users
     ).run()
     
     // Update custom permissions
@@ -3305,15 +3327,22 @@ app.delete('/api/admin/users/:id', requirePermission('users_delete'), async (c) 
   const { DB } = c.env
   const userId = c.req.param('id')
   
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
+  
   try {
     // Prevent deleting user ID 1 (super admin)
     if (parseInt(userId) === 1) {
       return c.json({ error: 'Cannot delete super admin' }, 400)
     }
     
+    // ONLY delete if user belongs to this property
     await DB.prepare(`
-      DELETE FROM users WHERE user_id = ?
-    `).bind(userId).run()
+      DELETE FROM users WHERE user_id = ? AND property_id = ?
+    `).bind(userId, property_id).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -3345,7 +3374,11 @@ app.get('/api/admin/users/:id/permissions', async (c) => {
 // Get all roles
 app.get('/api/admin/roles', async (c) => {
   const { DB } = c.env
-  const property_id = 1 // TODO: Get from session
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     const roles = await DB.prepare(`
@@ -34022,8 +34055,8 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadUsersManagement() {
         try {
-          // Load users
-          const usersResponse = await fetchWithAuth('/api/admin/users');
+          // Load users - include property_id from authenticated user
+          const usersResponse = await fetchWithAuth(\`/api/admin/users?property_id=\${propertyId}\`);
           const usersData = await usersResponse.json();
           
           if (usersData.success) {
@@ -34031,8 +34064,8 @@ app.get('/admin/dashboard', (c) => {
             renderUsersTable(allUsers);
           }
           
-          // Load roles for dropdown
-          const rolesResponse = await fetchWithAuth('/api/admin/roles');
+          // Load roles for dropdown - include property_id
+          const rolesResponse = await fetchWithAuth(\`/api/admin/roles?property_id=\${propertyId}\`);
           const rolesData = await rolesResponse.json();
           
           if (rolesData.success) {
