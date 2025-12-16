@@ -23489,10 +23489,10 @@ app.get('/admin/beach-management', (c) => {
         // Verify and Check In
         async function verifyAndCheckIn(code) {
             try {
-                const response = await fetch('/api/staff/beach/check-in', {
+                const response = await fetchWithAuth('/api/staff/beach/check-in', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: code })
+                    body: JSON.stringify({ booking_reference: code })
                 });
                 
                 const data = await response.json();
@@ -25418,6 +25418,25 @@ app.get('/staff/beach-check-in', (c) => {
         let html5QrCode = null;
         let recentCheckIns = [];
 
+        // Authentication helper - gets user/property from localStorage
+        async function fetchWithAuth(url, options = {}) {
+            const user_id = localStorage.getItem('user_id');
+            const property_id = localStorage.getItem('property_id');
+            
+            const headers = {
+                ...options.headers,
+                'Content-Type': 'application/json'
+            };
+            
+            if (user_id) headers['X-User-ID'] = user_id;
+            if (property_id) headers['X-Property-ID'] = property_id;
+            
+            return fetch(url, {
+                ...options,
+                headers
+            });
+        }
+
         function switchTab(tab) {
             // Update tabs
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -25566,9 +25585,8 @@ app.get('/staff/beach-check-in', (c) => {
             if (!staffName) return;
             
             try {
-                const response = await fetch('/api/staff/beach/check-in', {
+                const response = await fetchWithAuth('/api/staff/beach/check-in', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         booking_reference: bookingReference,
                         staff_name: staffName
