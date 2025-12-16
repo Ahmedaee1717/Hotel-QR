@@ -567,25 +567,133 @@ app.get('/', (c) => {
         </div>
     </section>
 
-    <!-- Stats Bar -->
-    <section class="py-12 px-6 bg-secondary border-y border-accent/30">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                <div class="stat-card">
-                    <div class="text-4xl md:text-5xl font-bold text-primary mb-2">500+</div>
-                    <div class="text-gray-600 font-medium">Hotels Using GuestConnect</div>
+    <!-- Platform Benefits Section -->
+    <section class="py-20 px-6 bg-gradient-to-br from-gray-50 via-white to-secondary relative overflow-hidden">
+        <!-- Decorative elements -->
+        <div class="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 left-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
+        
+        <div class="max-w-7xl mx-auto relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+                    Why Hotel Managers Choose <span class="gradient-text">GuestConnect</span>
+                </h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Real benefits that transform your hotel operations from day one
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Benefit Card 1 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        2 Hours
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Setup Time</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">From installation to first guest using the system. No technical expertise needed.</p>
                 </div>
-                <div class="stat-card">
-                    <div class="text-4xl md:text-5xl font-bold text-primary mb-2">2M+</div>
-                    <div class="text-gray-600 font-medium">Guest Interactions/Month</div>
+
+                <!-- Benefit Card 2 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        Zero
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">App Download Required</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Guests scan QR code and access everything instantly. No app store friction.</p>
                 </div>
-                <div class="stat-card">
-                    <div class="text-4xl md:text-5xl font-bold text-primary mb-2">35%</div>
-                    <div class="text-gray-600 font-medium">Avg Revenue Increase</div>
+
+                <!-- Benefit Card 3 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        &lt;3 Sec
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">AI Response Time</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Lightning-fast AI chatbot answers guest questions instantly, 24/7.</p>
                 </div>
-                <div class="stat-card">
-                    <div class="text-4xl md:text-5xl font-bold text-primary mb-2">4.9★</div>
-                    <div class="text-gray-600 font-medium">Guest Satisfaction Score</div>
+
+                <!-- Benefit Card 4 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        50+
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Languages Supported</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Communicate with international guests in their native language automatically.</p>
+                </div>
+
+                <!-- Benefit Card 5 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        All-in-One
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Unified Platform</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Replace multiple systems with one QR code. Room service, spa, restaurant, activities.</p>
+                </div>
+
+                <!-- Benefit Card 6 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        24/7
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Guest Support</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">AI-powered assistance never sleeps. Handle guest requests at any time of day.</p>
+                </div>
+
+                <!-- Benefit Card 7 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        Real-Time
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Analytics Dashboard</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Track bookings, revenue, and guest satisfaction with live insights.</p>
+                </div>
+
+                <!-- Benefit Card 8 -->
+                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
+                        Secure
+                    </div>
+                    <div class="text-gray-600 font-semibold mb-2">Cloud-Based System</div>
+                    <p class="text-sm text-gray-500 leading-relaxed">Enterprise-grade security with automatic backups and data encryption.</p>
                 </div>
             </div>
         </div>
@@ -1400,7 +1508,7 @@ app.get('/blog', async (c) => {
                 <!-- CTA Box -->
                 <div class="bg-gradient-to-br from-[#016e8f] to-[#014a61] text-white rounded-2xl p-6 shadow-lg">
                     <h3 class="text-xl font-bold mb-3">Ready to Transform Your Hotel?</h3>
-                    <p class="text-blue-100 mb-4 text-sm">Join 500+ hotels using GuestConnect to enhance guest experience and boost revenue.</p>
+                    <p class="text-blue-100 mb-4 text-sm">Start your 14-day free trial today. No credit card required. Set up in just 2 hours.</p>
                     <a href="/superadmin/login" class="block w-full bg-white text-[#016e8f] text-center py-3 rounded-lg font-bold hover:bg-gray-100 transition">
                         Start Free Trial
                     </a>
