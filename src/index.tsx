@@ -18698,10 +18698,9 @@ app.get('/superadmin/login', (c) => {
 <body class="bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 min-h-screen flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full mb-4">
-                <i class="fas fa-crown text-white text-3xl"></i>
+            <div class="mb-4">
+                <img src="/guestconnect-logo.png" alt="GuestConnect Logo" class="mx-auto h-24 w-auto">
             </div>
-            <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">GuestConnect</h1>
             <p class="text-gray-600 mt-2">Platform Super Admin</p>
         </div>
 
@@ -19329,8 +19328,7 @@ app.get('/superadmin/dashboard', (c) => {
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">
-                <i class="fas fa-layer-group"></i>
-                <span>GuestConnect</span>
+                <img src="/guestconnect-logo-small.png" alt="GuestConnect Logo" style="height: 40px; width: auto;">
             </div>
             <div class="sidebar-subtitle">Platform Control</div>
         </div>
@@ -29855,6 +29853,7 @@ app.get('/admin/dashboard', (c) => {
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <!-- Logo and Brand -->
             <div class="flex items-center gap-4">
+                <img src="/guestconnect-logo.png" alt="GuestConnect Logo" class="h-12 w-auto">
                 <h1 class="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
             </div>
             
