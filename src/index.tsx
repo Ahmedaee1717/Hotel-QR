@@ -36124,11 +36124,8 @@ app.get('/admin/dashboard', (c) => {
         console.log('Attempting to delete offering:', offeringId);
         
         try {
-          const response = await fetch('/api/admin/offerings/' + offeringId, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json'
-            }
+          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
+            method: 'DELETE'
           });
           
           console.log('Delete response status:', response.status);
@@ -36167,11 +36164,9 @@ app.get('/admin/dashboard', (c) => {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Translating...';
         
         try {
-          const response = await fetch('/api/admin/offerings/translate-all', {
+          const response = await fetchWithAuth('/api/admin/offerings/translate-all', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               openai_api_key: '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'
             })
           });
@@ -36290,9 +36285,8 @@ app.get('/admin/dashboard', (c) => {
           }
           
           try {
-            const response = await fetch('/api/admin/offerings/' + offeringId, {
+            const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
               method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 offering_type: offeringType,
                 title_en: document.getElementById('offeringTitle').value,
@@ -36413,9 +36407,8 @@ app.get('/admin/dashboard', (c) => {
             menu_urls: menuUrls.length > 0 ? menuUrls : null
           };
           
-          const response = await fetch('/api/admin/offerings', {
+          const response = await fetchWithAuth('/api/admin/offerings', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
           
@@ -40794,11 +40787,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         if (isEnabled && !roomServiceOffering) {
           // Create room service offering
           try {
-            const response = await fetch('/api/admin/offerings', {
+            const response = await fetchWithAuth('/api/admin/offerings', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                property_id: 1,
                 offering_type: 'room_service',
                 title_en: 'Room Service',
                 short_description_en: 'Enjoy delicious meals and beverages delivered to your room at any time.',
@@ -40837,7 +40828,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           // Delete room service offering
           if (confirm('Are you sure you want to disable Room Service? This will remove the menu from guest access.')) {
             try {
-              const response = await fetch('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+              const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.offering_id, {
                 method: 'DELETE'
               });
 
@@ -40880,9 +40871,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         try {
           // Save room service offering info
-          const response = await fetch('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+          const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.offering_id, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               title_en: title,
               short_description_en: description || 'Enjoy delicious meals and beverages delivered to your room.',
@@ -49176,7 +49166,20 @@ app.get('/admin/room-service/:offering_id', (c) => {
 
     <script>
         const OFFERING_ID = ${offering_id};
+        const propertyId = localStorage.getItem('property_id') || '1';
+        const userId = localStorage.getItem('user_id');
         let roomServiceData = null;
+        
+        // Authenticated fetch with headers
+        async function fetchWithAuth(url, options = {}) {
+            const headers = {
+                ...options.headers,
+                'Content-Type': 'application/json',
+                'X-User-ID': userId,
+                'X-Property-ID': propertyId
+            };
+            return fetch(url, { ...options, headers });
+        }
         
         // Tab switching
         function switchTab(tab) {
@@ -49230,9 +49233,8 @@ app.get('/admin/room-service/:offering_id', (c) => {
             }
             
             try {
-                const response = await fetch('/api/admin/offerings/' + OFFERING_ID, {
+                const response = await fetchWithAuth('/api/admin/offerings/' + OFFERING_ID, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         title_en: title,
                         full_description_en: hours,
