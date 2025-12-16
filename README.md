@@ -103,6 +103,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Restaurant Time Slots** - Fixed null reference errors during time slot creation
 - ✅ **Staff Restaurant Dashboard** - Fixed missing check-ins and today's bookings (propertyId undefined + missing fetchWithAuth)
 - ✅ **Admin Login** - Now stores user_id and property_id in localStorage for staff dashboards to use
+- ✅ **All Offerings Operations** - Fixed 401 errors on add/edit/delete offerings and room service management (8+ endpoints)
 
 ### Key Achievements
 - 🔒 **100+ backend endpoints secured** with property_id validation
