@@ -26379,6 +26379,11 @@ app.get('/beach-booking/:property_id', async (c) => {
         let zones = [];
         const propertyId = ${property_id};
         
+        // Helper function for API calls
+        async function fetchWithAuth(url, options = {}) {
+            return fetch(url, options);
+        }
+        
         const canvas = document.getElementById('beachCanvas');
         
         // Set today as minimum date
