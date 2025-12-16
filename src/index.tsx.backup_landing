@@ -621,402 +621,263 @@ app.get('/', (c) => {
     </section>
 
     <!-- Features Section -->
-    <section id="features" class="py-24 px-6 bg-white">
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Custom branding (colors, fonts, logo)</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Add offerings with photos & videos</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Connect activity vendors</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>8-language AI translation</li>
+                    </ul>
+                </div>
+
+                <!-- Step 2 -->
+                <div>
+                    <div class="text-6xl font-light text-gray-200 mb-6">02</div>
+                    <h3 class="text-2xl font-medium text-gray-900 mb-4">Generate QR codes</h3>
+                    <p class="text-gray-600 leading-relaxed mb-6">
+                        Create a unique QR code for each room. Print and place them. Guests scan with their phone camera—no app needed.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Unique code per room</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Track which rooms scan</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>No app download required</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Works on any phone</li>
+                    </ul>
+                </div>
+
+                <!-- Step 3 -->
+                <div>
+                    <div class="text-6xl font-light text-gray-200 mb-6">03</div>
+                    <h3 class="text-2xl font-medium text-gray-900 mb-4">Guests browse & book</h3>
+                    <p class="text-gray-600 leading-relaxed mb-6">
+                        They see everything instantly. Book activities, check event times, browse restaurants—all in their language.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Instant activity booking</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Real-time availability</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Auto-translated content</li>
+                        <li class="flex items-center gap-2"><span class="w-1 h-1 bg-gray-400 rounded-full"></span>Callback requests</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-24 px-6">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-20">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Everything Your Hotel Needs in <span class="gradient-text">One Platform</span>
-                </h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                    From room service to beach bookings, spa reservations to restaurant management—GuestConnect handles it all.
-                </p>
+            <div class="max-w-2xl mb-20">
+                <h2 class="text-4xl md:text-5xl font-light text-gray-900 mb-6">Complete control over<br/>your guest experience</h2>
+                <p class="text-lg text-gray-600 leading-relaxed">Everything you need to create a premium digital experience for your guests.</p>
             </div>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature Cards -->
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-qrcode text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Smart QR System</h3>
-                    <p class="text-gray-600 leading-relaxed">Unique QR per room. Track scans, measure engagement, identify top-performing services.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-concierge-bell text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Room Service Orders</h3>
-                    <p class="text-gray-600 leading-relaxed">Digital menu cards, real-time orders, kitchen dashboard, staff notifications.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-utensils text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Restaurant Management</h3>
-                    <p class="text-gray-600 leading-relaxed">Table reservations, live capacity tracking, multiple restaurants, staff dashboard.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-umbrella-beach text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Beach Booking System</h3>
-                    <p class="text-gray-600 leading-relaxed">Zone-based sunbed reservations, live occupancy maps, premium areas, automated check-ins.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-spa text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Spa & Wellness</h3>
-                    <p class="text-gray-600 leading-relaxed">Treatment bookings, package deals, therapist schedules, automated confirmations.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-hiking text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Activity Marketplace</h3>
-                    <p class="text-gray-600 leading-relaxed">Connect local vendors, commission management, automated payments, vendor dashboards.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-robot text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">AI Chatbot (24/7)</h3>
-                    <p class="text-gray-600 leading-relaxed">Powered by GPT-4. Answers guest questions instantly in 8 languages. Reduces front desk calls by 60%.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-chart-line text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Real-Time Analytics</h3>
-                    <p class="text-gray-600 leading-relaxed">Revenue tracking, booking rates, guest engagement metrics, staff performance dashboards.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-language text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Multi-Language Support</h3>
-                    <p class="text-gray-600 leading-relaxed">Auto-translation in 8 languages: English, Arabic, German, French, Italian, Russian, Polish, Czech.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-info-circle text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Info Pages & FAQs</h3>
-                    <p class="text-gray-600 leading-relaxed">Hotel policies, WiFi passwords, check-out times, local tips—all organized beautifully.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-users-cog text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Staff Dashboards</h3>
-                    <p class="text-gray-600 leading-relaxed">Front desk, restaurant, spa, vendors—everyone has their own portal with role-based access.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-palette text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Full Brand Control</h3>
-                    <p class="text-gray-600 leading-relaxed">Your colors, logo, fonts, style. Every screen matches your brand identity perfectly.</p>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Pricing Section -->
-    <section id="pricing" class="py-24 px-6 bg-gradient-to-br from-primary/5 to-accent/10">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Simple, Transparent <span class="gradient-text">Pricing</span>
-                </h2>
-                <p class="text-xl text-gray-600 max-w-2xl mx-auto">Choose the plan that fits your hotel. Upgrade or downgrade anytime.</p>
-            </div>
-            <div class="grid md:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                <!-- Free Trial -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-accent transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Free Trial</h3>
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$0</div>
-                        <div class="text-gray-600">14 days</div>
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
+                <!-- Feature 1 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-palette text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Full Brand Customization</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Your colors, fonts, logo, and layout. Choose from modern, elegant, or minimal styles. Every pixel matches your brand.
+                        </p>
                     </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Up to 20 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">All core features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Basic analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Email support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition">Start Trial</a>
                 </div>
-                <!-- Basic -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-accent hover:border-primary transition transform hover:scale-105">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Basic</h3>
-                        <div class="text-5xl font-bold text-primary mb-2">$49</div>
-                        <div class="text-gray-600">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Up to 50 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">QR codes & Room Service</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Restaurant bookings</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Basic analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Priority support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-primary text-white py-3 rounded-lg font-semibold hover:bg-[#014a5e] transition shadow-lg">Get Started</a>
-                </div>
-                <!-- Pro -->
-                <div class="bg-primary text-white rounded-2xl p-8 border-4 border-accent transform scale-105 shadow-2xl relative">
-                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-accent text-primary px-4 py-1 rounded-full text-sm font-bold">MOST POPULAR</div>
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold mb-2">Pro</h3>
-                        <div class="text-5xl font-bold mb-2">$149</div>
-                        <div class="text-white/80">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Up to 150 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>All Basic features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Beach & Spa booking</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Activity marketplace</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>AI Chatbot (24/7)</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Advanced analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>24/7 Priority support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-white text-primary py-3 rounded-lg font-semibold hover:bg-accent hover:text-white transition shadow-xl">Get Started</a>
-                </div>
-                <!-- Enterprise -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-primary transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$499</div>
-                        <div class="text-gray-600">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Unlimited rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">All Pro features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Custom integrations</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">White-label options</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Dedicated account manager</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Custom training</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition">Contact Sales</a>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- ROI Calculator -->
-    <section id="roi" class="py-24 px-6 bg-white">
-        <div class="max-w-5xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Calculate Your <span class="gradient-text">ROI</span>
-                </h2>
-                <p class="text-xl text-gray-600">See how much revenue GuestConnect can generate for your hotel</p>
-            </div>
-            <div class="bg-secondary border-4 border-accent rounded-2xl p-10 shadow-xl">
-                <div class="space-y-8">
-                    <div>
-                        <label class="block text-lg font-semibold text-gray-900 mb-3">Number of Rooms</label>
-                        <input type="range" min="20" max="500" value="100" class="roi-slider w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer" id="roomSlider" oninput="calculateROI()">
-                        <div class="text-3xl font-bold text-primary mt-3" id="roomCount">100</div>
-                    </div>
-                    <div>
-                        <label class="block text-lg font-semibold text-gray-900 mb-3">Average Occupancy Rate</label>
-                        <input type="range" min="40" max="100" value="70" class="roi-slider w-full h-2 bg-primary/20 rounded-lg appearance-none cursor-pointer" id="occupancySlider" oninput="calculateROI()">
-                        <div class="text-3xl font-bold text-primary mt-3" id="occupancyRate">70%</div>
+                <!-- Feature 2 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-language text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">8-Language AI Translation</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            English, Arabic, German, French, Italian, Russian, Polish, Czech, Ukrainian. Powered by GPT-4 for 100% accurate tourism translations.
+                        </p>
                     </div>
                 </div>
-                <div class="mt-12 pt-10 border-t-4 border-accent">
-                    <h3 class="text-2xl font-bold text-gray-900 mb-8 text-center">Monthly Results</h3>
-                    <div class="grid md:grid-cols-3 gap-6">
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">Additional Revenue</div>
-                            <div class="text-4xl font-bold text-primary" id="additionalRevenue">$0</div>
+
+                <!-- Feature 3 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-utensils text-white"></i>
                         </div>
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">Time Saved</div>
-                            <div class="text-4xl font-bold text-primary" id="timeSaved">0 hrs</div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Restaurants & Dining</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Add all your restaurants with menus, photos, videos, opening hours, locations. Guests see everything at a glance.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-calendar-alt text-white"></i>
                         </div>
-                        <div class="text-center p-6 bg-white rounded-xl border-2 border-primary/20">
-                            <div class="text-sm text-gray-600 mb-2">ROI</div>
-                            <div class="text-4xl font-bold text-green-600" id="roiPercentage">0%</div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Events & Entertainment</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Showcase your events, live music, themed nights. Include dates, times, photos, videos. Keep guests informed and engaged.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 5 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-hiking text-white"></i>
                         </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Activity Booking System</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Full booking system for excursions and activities. Connect local vendors. Real-time availability. Automated confirmations. Commission tracking.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 6 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-spa text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Spa & Wellness</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Display spa treatments, massage services, wellness programs. Add pricing, duration, photos, booking options.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 7 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-map-marked-alt text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Interactive Hotel Map</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Upload your hotel map or grounds layout. Floating button for easy access. Guests find their way around effortlessly.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 8 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-video text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Photos & Videos</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Add videos to activities and offerings. Upload multiple photos. Show guests exactly what to expect.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 9 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-chart-line text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Analytics Dashboard</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Track bookings, QR scans, popular activities, revenue. See which rooms engage most. Make data-driven decisions.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 10 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-plug text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Vendor Integration</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Activity vendors get their own dashboard. They manage listings, pricing, availability. You control commissions and approvals.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 11 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-qrcode text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">QR Code Management</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Generate unique QR codes for each room. Download as PDFs. Track which codes are scanned. Regenerate anytime.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Feature 12 -->
+                <div class="feature-card">
+                    <div class="mb-6">
+                        <div class="w-12 h-12 bg-gray-900 rounded-lg flex items-center justify-center mb-4">
+                            <i class="fas fa-plus-circle text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-medium text-gray-900 mb-3">Custom Sections</h3>
+                        <p class="text-gray-600 leading-relaxed text-sm">
+                            Create any section you need—kids club, beach services, golf, diving center. Fully customizable categories with custom icons.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Testimonials -->
-    <section class="py-24 px-6 bg-gradient-to-br from-primary to-[#014a5e] text-white">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold mb-6">Loved by Hotel Managers Worldwide</h2>
-                <p class="text-xl text-white/80">See what our customers have to say</p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"GuestConnect reduced our front desk calls by 65%. Guests love having everything at their fingertips. Our ancillary revenue increased by $45K in the first quarter."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">SM</div>
-                        <div>
-                            <div class="font-semibold">Sarah Martinez</div>
-                            <div class="text-white/60 text-sm">GM, Paradise Beach Resort (280 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"Setup took 2 hours. Within a week, 80% of our guests were using it. The beach booking system alone paid for the subscription 3x over. Incredible ROI."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">JK</div>
-                        <div>
-                            <div class="font-semibold">James Kim</div>
-                            <div class="text-white/60 text-sm">Operations Director, Coastal Grand Hotel (420 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div class="flex gap-1 mb-4">
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                        <i class="fas fa-star text-yellow-400"></i>
-                    </div>
-                    <p class="text-lg mb-6 leading-relaxed">"The AI chatbot is a game-changer. It handles 90% of guest inquiries automatically. Our guest satisfaction score went from 4.2 to 4.8 stars in 2 months."</p>
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-accent rounded-full flex items-center justify-center font-bold text-primary text-xl">LB</div>
-                        <div>
-                            <div class="font-semibold">Lisa Bennett</div>
-                            <div class="text-white/60 text-sm">GM, Mountain View Resort (150 rooms)</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Final CTA -->
-    <section class="py-24 px-6 bg-secondary">
+    <!-- CTA Section -->
+    <section class="py-24 px-6 bg-gray-900 text-white">
         <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Ready to Transform Your Hotel?
-            </h2>
-            <p class="text-2xl text-gray-600 mb-12">Start your 14-day free trial. No credit card required.</p>
-            <div class="flex flex-col sm:flex-row gap-6 justify-center mb-8">
-                <a href="/superadmin/login" class="bg-primary text-white px-12 py-5 rounded-xl hover:bg-[#014a5e] transition font-bold text-xl shadow-2xl hover:shadow-3xl transform hover:scale-105">
-                    <i class="fas fa-rocket mr-3"></i>Start Free Trial
+            <h2 class="text-4xl md:text-5xl font-light mb-6">Ready to get started?</h2>
+            <p class="text-xl text-gray-300 mb-12 font-light">Create your hotel's digital guest experience today.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="/admin/dashboard" class="bg-white text-gray-900 px-8 py-4 rounded-md hover:bg-gray-100 transition font-medium">
+                    Start Building Now
                 </a>
-                <a href="#demo" class="bg-white text-primary border-4 border-primary px-12 py-5 rounded-xl hover:bg-primary hover:text-white transition font-bold text-xl">
-                    <i class="fas fa-play-circle mr-3"></i>Watch Demo
+                <a href="/vendor/login" class="bg-transparent border border-white text-white px-8 py-4 rounded-md hover:bg-white/10 transition font-medium">
+                    Vendor Login
                 </a>
-            </div>
-            <div class="flex items-center justify-center gap-8 text-gray-600">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">14-day free trial</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">No credit card</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">Cancel anytime</span>
-                </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-16 px-6">
+    <footer class="bg-white border-t border-gray-100 py-12 px-6">
         <div class="max-w-7xl mx-auto">
             <div class="grid md:grid-cols-4 gap-12 mb-12">
                 <div class="md:col-span-2">
-                    <img src="/guestconnect-logo.png" alt="GuestConnect Logo" class="h-16 w-auto mb-6 brightness-0 invert">
-                    <p class="text-white/70 leading-relaxed max-w-md mb-6">
-                        The complete guest experience platform for modern hotels. Transform your operations with one QR code per room.
+                    <img src="https://www.genspark.ai/api/files/s/Az5K2rEF" alt="GuestConnect - Your Resort, Connected" class="h-12 w-auto mb-4">
+                    <p class="text-sm text-gray-600 leading-relaxed max-w-md">
+                        Digital guest experience platform for hotels and resorts. QR-powered in-room access to everything your property offers.
                     </p>
-                    <div class="flex gap-4">
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-twitter"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-linkedin-in"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                    </div>
                 </div>
                 <div>
-                    <h4 class="font-bold text-white mb-6 text-lg">Product</h4>
-                    <ul class="space-y-4 text-white/70">
-                        <li><a href="#features" class="hover:text-primary transition">Features</a></li>
-                        <li><a href="#pricing" class="hover:text-primary transition">Pricing</a></li>
-                        <li><a href="#roi" class="hover:text-primary transition">ROI Calculator</a></li>
-                        <li><a href="#demo" class="hover:text-primary transition">Demo</a></li>
+                    <h4 class="font-medium text-gray-900 mb-4 text-sm">Platform</h4>
+                    <ul class="space-y-3 text-sm text-gray-600">
+                        <li><a href="#features" class="hover:text-gray-900 transition">Features</a></li>
+                        <li><a href="#how-it-works" class="hover:text-gray-900 transition">How It Works</a></li>
+                        <li><a href="/admin/dashboard" class="hover:text-gray-900 transition">Demo</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold text-white mb-6 text-lg">Access</h4>
-                    <ul class="space-y-4 text-white/70">
-                        <li><a href="/admin/login" class="hover:text-primary transition">Hotel Admin</a></li>
-                        <li><a href="/vendor/login" class="hover:text-primary transition">Vendor Portal</a></li>
-                        <li><a href="/superadmin/login" class="hover:text-primary transition">Platform Admin</a></li>
+                    <h4 class="font-medium text-gray-900 mb-4 text-sm">Access</h4>
+                    <ul class="space-y-3 text-sm text-gray-600">
+                        <li><a href="/admin/dashboard" class="hover:text-gray-900 transition">Hotel Admin</a></li>
+                        <li><a href="/vendor/login" class="hover:text-gray-900 transition">Activity Vendor</a></li>
+                        <li><a href="/superadmin" class="hover:text-gray-900 transition">Super Admin</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="pt-8 border-t border-white/10 text-center text-white/50 text-sm">
-                <p>&copy; 2025 GuestConnect. All rights reserved. Transforming hospitality, one QR code at a time.</p>
+            <div class="border-t border-gray-100 pt-8 text-center">
+                <p class="text-sm text-gray-500">&copy; 2024 GuestConnect. Digital guest experience platform.</p>
             </div>
         </div>
     </footer>
-
-    <script>
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobileMenu');
-            menu.classList.toggle('hidden');
-        }
-        
-        function calculateROI() {
-            const rooms = parseInt(document.getElementById('roomSlider').value);
-            const occupancy = parseInt(document.getElementById('occupancySlider').value);
-            
-            document.getElementById('roomCount').textContent = rooms;
-            document.getElementById('occupancyRate').textContent = occupancy + '%';
-            
-            // Calculate metrics
-            const occupiedRooms = Math.floor(rooms * (occupancy / 100));
-            const avgRevenuePerRoom = 75; // $75 additional revenue per occupied room
-            const additionalRevenue = occupiedRooms * avgRevenuePerRoom;
-            const timeSaved = Math.floor(occupiedRooms * 0.5); // 0.5 hours saved per occupied room
-            const subscription Cost = rooms <= 50 ? 49 : (rooms <= 150 ? 149 : 499);
-            const roi = Math.floor(((additionalRevenue - subscriptionCost) / subscriptionCost) * 100);
-            
-            document.getElementById('additionalRevenue').textContent = '$' + additionalRevenue.toLocaleString();
-            document.getElementById('timeSaved').textContent = timeSaved + ' hrs';
-            document.getElementById('roiPercentage').textContent = roi + '%';
-        }
-        
-        // Initialize ROI calculator on page load
-        window.addEventListener('DOMContentLoaded', calculateROI);
-    </script>
 </body>
 </html>
   `)
