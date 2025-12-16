@@ -20068,19 +20068,19 @@ app.get('/superadmin/dashboard', (c) => {
                         </thead>
                         <tbody>
                             \${hotels.map(h => \`
-                                <tr>
+                                <tr onclick="openSubscriptionModal(\${h.property_id}, '\${h.property_name.replace(/'/g, "\\'")}')" class="cursor-pointer hover:bg-blue-50 transition-colors">
                                     <td><strong>\${h.property_name}</strong></td>
                                     <td><code class="text-xs bg-gray-100 px-2 py-1 rounded">\${h.slug}</code></td>
                                     <td>\${h.contact_email || 'N/A'}</td>
                                     <td>\${h.location || 'N/A'}</td>
                                     <td><span class="badge \${h.status === 'active' ? 'badge-success' : 'badge-warning'}">\${h.status}</span></td>
                                     <td>\${new Date(h.created_at).toLocaleDateString()}</td>
-                                    <td>
+                                    <td onclick="event.stopPropagation()">
                                         <div class="flex gap-2">
                                             <a href="/admin/dashboard?property_id=\${h.property_id}" target="_blank" class="btn-secondary px-3 py-1 text-xs">
                                                 <i class="fas fa-external-link-alt mr-1"></i>View
                                             </a>
-                                            <button onclick="deleteHotel(\${h.property_id}, '\${h.property_name}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-xs rounded transition-colors">
+                                            <button onclick="deleteHotel(\${h.property_id}, '\${h.property_name.replace(/'/g, "\\'")}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-xs rounded transition-colors">
                                                 <i class="fas fa-trash mr-1"></i>Delete
                                             </button>
                                         </div>
@@ -20717,7 +20717,157 @@ app.get('/superadmin/dashboard', (c) => {
 
         loadStats();
         loadHotels();
+
+        // Subscription Management Modal Functions
+        let currentPropertyId = null;
+        let currentPropertyName = '';
+        let allPlans = [];
+        let allFeatures = [];
+        let selectedPlanId = null;
+
+        async function openSubscriptionModal(propertyId, propertyName) {
+            currentPropertyId = propertyId;
+            currentPropertyName = propertyName;
+            
+            // Load plans and features if not loaded
+            if (allPlans.length === 0) {
+                const plansRes = await fetch('/api/superadmin/plans');
+                const plansData = await plansRes.json();
+                allPlans = plansData.plans;
+            }
+            
+            if (allFeatures.length === 0) {
+                const featuresRes = await fetch('/api/superadmin/features');
+                const featuresData = await featuresRes.json();
+                allFeatures = featuresData.features;
+            }
+            
+            // Load property subscription details
+            const res = await fetch(\`/api/superadmin/property/\${propertyId}/subscription\`);
+            const data = await res.json();
+            
+            selectedPlanId = data.subscription?.plan_id;
+            
+            // Update modal content
+            document.getElementById('modalPropertyName').textContent = propertyName;
+            document.getElementById('modalCurrentPlan').textContent = data.subscription ? \`Current: \${data.subscription.plan_name} ($\${data.subscription.price_monthly}/mo)\` : 'No active subscription';
+            
+            // Display plan options
+            document.getElementById('planOptions').innerHTML = allPlans.map(plan => \`
+                <div onclick="selectPlan(\${plan.plan_id})" class="border-2 \${selectedPlanId == plan.plan_id ? 'border-blue-600 bg-blue-50' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-blue-400 transition">
+                    <h4 class="font-bold text-gray-800">\${plan.plan_name}</h4>
+                    <p class="text-2xl font-bold text-blue-600 my-2">$\${plan.price_monthly}/mo</p>
+                    <p class="text-xs text-gray-600">\${plan.max_rooms} rooms, \${plan.max_staff_users} staff, \${plan.max_vendors} vendors</p>
+                </div>
+            \`).join('');
+            
+            // Display features
+            document.getElementById('featuresList').innerHTML = data.features.map(f => \`
+                <div class="flex items-center gap-2 text-sm py-1">
+                    <input type="checkbox" \${f.is_enabled ? 'checked' : ''} onchange="toggleFeature(\${f.feature_id}, this.checked)" class="w-4 h-4">
+                    <i class="fas fa-\${f.is_enabled ? 'check-circle text-green-600' : 'times-circle text-gray-400'}"></i>
+                    <span class="\${f.is_enabled ? 'text-gray-800' : 'text-gray-400'}">\${f.feature_name}</span>
+                    <span class="text-xs text-gray-500">(\${f.category})</span>
+                </div>
+            \`).join('');
+            
+            document.getElementById('subscriptionModal').classList.remove('hidden');
+        }
+
+        function selectPlan(planId) {
+            selectedPlanId = planId;
+            openSubscriptionModal(currentPropertyId, currentPropertyName);
+        }
+
+        async function toggleFeature(featureId, isEnabled) {
+            try {
+                await fetch(\`/api/superadmin/property/\${currentPropertyId}/feature/\${featureId}/toggle\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        is_enabled: isEnabled, 
+                        override_reason: 'Manual override by super admin',
+                        admin_id: user.user_id 
+                    })
+                });
+            } catch (error) {
+                console.error('Toggle feature error:', error);
+                alert('Failed to toggle feature');
+            }
+        }
+
+        async function saveSubscription() {
+            if (!selectedPlanId) {
+                alert('Please select a plan');
+                return;
+            }
+            
+            try {
+                await fetch(\`/api/superadmin/property/\${currentPropertyId}/subscription\`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_id: selectedPlanId,
+                        admin_id: user.user_id,
+                        notes: 'Plan updated by super admin'
+                    })
+                });
+                
+                alert('SUCCESS: Subscription updated!');
+                closeSubscriptionModal();
+                loadHotels();
+            } catch (error) {
+                console.error('Save subscription error:', error);
+                alert('ERROR: Failed to save subscription');
+            }
+        }
+
+        function closeSubscriptionModal() {
+            document.getElementById('subscriptionModal').classList.add('hidden');
+            currentPropertyId = null;
+        }
     </script>
+
+    <!-- Subscription Management Modal -->
+    <div id="subscriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-xl font-bold"><i class="fas fa-cog mr-2"></i>Manage Subscription</h3>
+                <button onclick="closeSubscriptionModal()" class="text-white hover:text-gray-200 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <h4 id="modalPropertyName" class="text-2xl font-bold text-gray-800 mb-2"></h4>
+                    <p id="modalCurrentPlan" class="text-gray-600"></p>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Select Subscription Plan:</label>
+                    <div id="planOptions" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- Plans will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Features Available:</label>
+                    <div id="featuresList" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-4">
+                        <!-- Features will be listed here -->
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="saveSubscription()" class="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                    <button onclick="closeSubscriptionModal()" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
   `)
