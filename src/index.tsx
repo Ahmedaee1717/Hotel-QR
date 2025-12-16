@@ -3558,7 +3558,7 @@ app.post('/api/admin/login', async (c) => {
     if (!hasFullAccess) {
       // Redirect to their primary workspace based on permissions
       if (permissions.some(p => p && p.startsWith('beach_'))) {
-        redirectTo = '/admin/beach-management/' + (user.property_id || 1);
+        redirectTo = '/admin/beach-management';
       } else if (permissions.some(p => p && p.startsWith('restaurant_'))) {
         redirectTo = '/admin/restaurant-management'; // You can create this later
       } else if (permissions.includes('frontdesk_view')) {
@@ -11611,11 +11611,17 @@ app.post('/api/admin/beach/bookings/:booking_reference/no-show', async (c) => {
   const { booking_reference } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
     await DB.prepare(`
       UPDATE beach_bookings
       SET booking_status = 'no_show'
-      WHERE booking_reference = ?
-    `).bind(booking_reference).run()
+      WHERE booking_reference = ? AND property_id = ?
+    `).bind(booking_reference, property_id).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -11630,11 +11636,17 @@ app.post('/api/admin/beach/bookings/:booking_reference/checkout', async (c) => {
   const { booking_reference } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
     await DB.prepare(`
       UPDATE beach_bookings
       SET booking_status = 'completed', checked_out_at = CURRENT_TIMESTAMP
-      WHERE booking_reference = ?
-    `).bind(booking_reference).run()
+      WHERE booking_reference = ? AND property_id = ?
+    `).bind(booking_reference, property_id).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -11648,19 +11660,25 @@ app.post('/api/staff/beach/verify', async (c) => {
   const { DB } = c.env
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    
     const body = await c.req.json()
     const { data, method } = body
     
     let booking = null
     
     if (method === 'manual') {
-      // Manual code entry - search by booking_code
+      // Manual code entry - search by booking_code AND property_id
       booking = await DB.prepare(`
         SELECT bb.*, bs.spot_number, bs.spot_type
         FROM beach_bookings bb
         JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-        WHERE bb.booking_code = ? AND bb.booking_status != 'cancelled'
-      `).bind(data).first()
+        WHERE bb.booking_code = ? AND bb.property_id = ? AND bb.booking_status != 'cancelled'
+      `).bind(data, property_id).first()
     } else if (method === 'qr') {
       // QR code scan - parse JSON data
       try {
@@ -11669,16 +11687,16 @@ app.post('/api/staff/beach/verify', async (c) => {
           SELECT bb.*, bs.spot_number, bs.spot_type
           FROM beach_bookings bb
           JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-          WHERE bb.booking_reference = ? OR bb.booking_code = ?
-        `).bind(qrData.booking_reference || data, qrData.booking_code || data).first()
+          WHERE (bb.booking_reference = ? OR bb.booking_code = ?) AND bb.property_id = ?
+        `).bind(qrData.booking_reference || data, qrData.booking_code || data, property_id).first()
       } catch {
         // If not JSON, try as booking reference
         booking = await DB.prepare(`
           SELECT bb.*, bs.spot_number, bs.spot_type
           FROM beach_bookings bb
           JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-          WHERE bb.booking_reference = ? OR bb.booking_code = ?
-        `).bind(data, data).first()
+          WHERE (bb.booking_reference = ? OR bb.booking_code = ?) AND bb.property_id = ?
+        `).bind(data, data, property_id).first()
       }
     }
     
@@ -11859,15 +11877,26 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
   const { DB } = c.env
   
   try {
+    // SECURITY: Get authenticated property_id from header
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ success: false, error: 'Unauthorized: property_id not found' }, 401);
+    }
+    
     const body = await c.req.json()
     const { booking_reference, staff_name } = body
     
-    // Check if already checked in
+    // Check if booking exists AND belongs to staff's property (multi-tenancy validation)
     const existing = await DB.prepare(`
-      SELECT booking_status FROM beach_bookings WHERE booking_reference = ?
+      SELECT booking_status, property_id FROM beach_bookings WHERE booking_reference = ?
     `).bind(booking_reference).first()
     
     if (!existing) {
+      return c.json({ success: false, error: 'Booking not found' }, 404)
+    }
+    
+    // CRITICAL: Validate booking belongs to staff's property
+    if (existing.property_id != property_id) {
       return c.json({ success: false, error: 'Booking not found' }, 404)
     }
     
@@ -11881,8 +11910,8 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
       SET booking_status = 'checked_in',
           checked_in_at = CURRENT_TIMESTAMP,
           checked_in_by = ?
-      WHERE booking_reference = ?
-    `).bind(staff_name, booking_reference).run()
+      WHERE booking_reference = ? AND property_id = ?
+    `).bind(staff_name, booking_reference, property_id).run()
     
     // Get updated booking
     const booking = await DB.prepare(`
@@ -20047,8 +20076,9 @@ app.get('/superadmin/dashboard', (c) => {
 // ============================================
 
 // Beach Management - Staff interface for check-in, map, and walk-in bookings
-app.get('/admin/beach-management/:property_id', (c) => {
-  const { property_id } = c.req.param()
+app.get('/admin/beach-management', (c) => {
+  // Property ID will be retrieved from localStorage in frontend
+  // This prevents URL manipulation to access other properties' data
   
   return c.html(`
 <!DOCTYPE html>
@@ -20409,7 +20439,20 @@ app.get('/admin/beach-management/:property_id', (c) => {
     </div>
 
     <script>
-        const PROPERTY_ID = '${property_id}';
+        // Get authenticated property ID from localStorage
+        const PROPERTY_ID = localStorage.getItem('property_id') || '1';
+        const USER_ID = localStorage.getItem('user_id') || '1';
+        
+        // Authenticated fetch helper
+        async function fetchWithAuth(url, options = {}) {
+            const headers = {
+                ...options.headers,
+                'X-User-ID': USER_ID,
+                'X-Property-ID': PROPERTY_ID
+            };
+            return fetch(url, { ...options, headers });
+        }
+        
         let html5QrCode = null;
         let scannerActive = false;
         let selectedSpotId = null;
@@ -20608,7 +20651,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
         async function loadRecentCheckIns() {
             try {
                 const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}&date=\${today}&status=checked_in\`);
+                const response = await fetchWithAuth(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}&date=\${today}&status=checked_in\`);
                 const data = await response.json();
                 
                 if (data.bookings && data.bookings.length > 0) {
@@ -20643,7 +20686,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
             const timeSlot = document.getElementById('mapTimeSlot').value;
             
             try {
-                const response = await fetch(\`/api/admin/beach/spots?property_id=\${PROPERTY_ID}&date=\${date}&time_slot=\${timeSlot}\`);
+                const response = await fetchWithAuth(\`/api/admin/beach/spots?property_id=\${PROPERTY_ID}&date=\${date}&time_slot=\${timeSlot}\`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -20767,7 +20810,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
             }
             
             try {
-                const response = await fetch(\`/api/beach/availability/\${PROPERTY_ID}/\${date}?time_slot=\${timeSlot}\`);
+                const response = await fetchWithAuth(\`/api/beach/availability/\${PROPERTY_ID}/\${date}?time_slot=\${timeSlot}\`);
                 const data = await response.json();
                 
                 if (data.availableSpots && data.availableSpots.length > 0) {
@@ -20863,7 +20906,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
             };
             
             try {
-                const response = await fetch('/api/beach/bookings', {
+                const response = await fetchWithAuth('/api/beach/bookings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
@@ -20933,7 +20976,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
 
         async function loadAllBookings() {
             try {
-                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
+                const response = await fetchWithAuth(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -20966,7 +21009,7 @@ app.get('/admin/beach-management/:property_id', (c) => {
             \`;
 
             try {
-                const response = await fetch(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
+                const response = await fetchWithAuth(\`/api/admin/beach/bookings?property_id=\${PROPERTY_ID}\`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -23728,7 +23771,7 @@ app.get('/beach-booking/:property_id', async (c) => {
             };
             
             try {
-                const response = await fetch('/api/beach/bookings', {
+                const response = await fetchWithAuth('/api/beach/bookings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(bookingData)
@@ -32409,7 +32452,7 @@ app.get('/admin/dashboard', (c) => {
                     <i class="fas fa-umbrella-beach mr-2 text-blue-600"></i>
                     Beach Booking Management
                 </h2>
-                <button onclick="window.open('/admin/beach-management/1', '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
+                <button onclick="window.open('/admin/beach-management', '_blank')" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
                     <i class="fas fa-external-link-alt"></i>
                     Open Beach Management Portal
                     <span class="text-xs bg-white/20 px-2 py-1 rounded">STAFF</span>
