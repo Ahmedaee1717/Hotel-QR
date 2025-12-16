@@ -29697,7 +29697,7 @@ app.get('/superadmin/dashboard', (c) => {
             }
 
             container.innerHTML = properties.map(p => \`
-                <div class="border-b border-gray-200 py-4 hover:bg-gray-50 transition">
+                <div onclick="editProperty(\${p.property_id})" class="border-b border-gray-200 py-4 hover:bg-purple-50 transition cursor-pointer">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
@@ -29721,9 +29721,9 @@ app.get('/superadmin/dashboard', (c) => {
                                 <div><i class="fas fa-dollar-sign mr-1 text-green-600"></i> $\${p.price_monthly || 0}/mo</div>
                             </div>
                         </div>
-                        <button onclick="editProperty(\${p.property_id})" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 ml-4">
-                            <i class="fas fa-cog mr-2"></i>Manage
-                        </button>
+                        <div class="flex items-center gap-2 ml-4">
+                            <i class="fas fa-chevron-right text-purple-600"></i>
+                        </div>
                     </div>
                 </div>
             \`).join('');
