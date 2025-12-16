@@ -6526,8 +6526,26 @@ app.post('/api/admin/restaurant/reservation/:reference/checkin', requirePermissi
   const { reference } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
     // Extract reservation_id from reference (RES000001 -> 1)
     const reservationId = reference.replace('RES', '').replace(/^0+/, '')
+    
+    // Validate reservation belongs to property
+    const reservation = await DB.prepare(`
+      SELECT tr.* FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE tr.reservation_id = ? AND ho.property_id = ?
+    `).bind(reservationId, property_id).first()
+    
+    if (!reservation) {
+      return c.json({ error: 'Reservation not found' }, 404)
+    }
     
     await DB.prepare(`
       UPDATE table_reservations 
@@ -6548,8 +6566,26 @@ app.post('/api/admin/restaurant/reservation/:reference/cancel', async (c) => {
   const { reference } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
     // Extract reservation_id from reference (RES000001 -> 1)
     const reservationId = reference.replace('RES', '').replace(/^0+/, '')
+    
+    // Validate reservation belongs to property
+    const reservation = await DB.prepare(`
+      SELECT tr.* FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE tr.reservation_id = ? AND ho.property_id = ?
+    `).bind(reservationId, property_id).first()
+    
+    if (!reservation) {
+      return c.json({ error: 'Reservation not found' }, 404)
+    }
     
     await DB.prepare(`
       UPDATE table_reservations 
@@ -6570,6 +6606,24 @@ app.post('/api/admin/restaurant/reservations/:reservation_id/check-in', async (c
   const { reservation_id } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Validate reservation belongs to property
+    const checkReservation = await DB.prepare(`
+      SELECT tr.* FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE tr.reservation_id = ? AND ho.property_id = ?
+    `).bind(reservation_id, property_id).first()
+    
+    if (!checkReservation) {
+      return c.json({ error: 'Reservation not found' }, 404)
+    }
+    
     // Update reservation status to checked_in
     await DB.prepare(`
       UPDATE table_reservations 
@@ -6620,6 +6674,24 @@ app.post('/api/admin/restaurant/reservations/:reservation_id/no-show', async (c)
   const { reservation_id } = c.req.param()
   
   try {
+    // SECURITY: Get authenticated property_id
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Validate reservation belongs to property
+    const reservation = await DB.prepare(`
+      SELECT tr.* FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE tr.reservation_id = ? AND ho.property_id = ?
+    `).bind(reservation_id, property_id).first()
+    
+    if (!reservation) {
+      return c.json({ error: 'Reservation not found' }, 404)
+    }
+    
     // Update reservation status to no_show
     await DB.prepare(`
       UPDATE table_reservations 
@@ -40517,11 +40589,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           document.getElementById('submitNewRestaurant').disabled = true;
           
           try {
-            const response = await fetch('/api/admin/offerings', {
+            const response = await fetchWithAuth('/api/admin/offerings', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                property_id: 1,
                 offering_type: 'restaurant',
                 title_en: name,
                 short_description_en: description || 'Our restaurant offers a delightful dining experience.',
