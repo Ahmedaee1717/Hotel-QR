@@ -722,7 +722,7 @@ app.get('/', (c) => {
                     <p class="text-gray-600">Thousands spent monthly on menus, brochures, and info cards that are outdated the moment they're printed.</p>
                 </div>
                 <div class="p-8 bg-red-50 border-2 border-red-200 rounded-xl">
-                    <div class="text-red-500 text-4xl mb-4"><i class="fas fa-chart-line-down"></i></div>
+                    <div class="text-red-500 text-4xl mb-4"><i class="fas fa-money-bill-wave"></i></div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">Missed Revenue</h3>
                     <p class="text-gray-600">Guests don't know about your spa, activities, or premium services. You're leaving money on the table.</p>
                 </div>
