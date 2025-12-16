@@ -20461,8 +20461,8 @@ app.get('/admin/beach-management', (c) => {
         document.addEventListener('DOMContentLoaded', function() {
             // Set today's date
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('mapDate').value = today;
-            document.getElementById('walkinDate').value = today;
+            const mapDateEl = document.getElementById('mapDate');
+            if (mapDateEl) mapDateEl.value = today;
             
             loadRecentCheckIns();
         });
@@ -20801,7 +20801,7 @@ app.get('/admin/beach-management', (c) => {
 
         // Walk-In Booking Functions
         async function checkAvailability() {
-            const date = document.getElementById('walkinDate').value;
+            const date = document.getElementById('mapDate').value; // Use map date for walk-in bookings
             const timeSlot = document.getElementById('walkinTimeSlot').value;
             
             if (!date || !timeSlot) {
