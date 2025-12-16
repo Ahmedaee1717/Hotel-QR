@@ -10833,9 +10833,14 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
   const { DB } = c.env
   
   try {
+    // SECURITY: Get property_id from authenticated header, NOT from request body
+    const property_id = getAuthenticatedPropertyId(c);
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized: property_id not found' }, 401);
+    }
+    
     const body = await c.req.json()
     const {
-      property_id,
       beach_booking_enabled,
       beach_map_image_url,
       opening_time,
@@ -37079,7 +37084,6 @@ app.get('/admin/dashboard', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               time_slots: JSON.stringify(window.beachTimeSlots)
             })
           });
@@ -37110,7 +37114,6 @@ app.get('/admin/dashboard', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               // Preserve basic settings
               beach_booking_enabled: beachBookingEnabled,
               free_for_hotel_guests: freeForGuests,
@@ -37170,7 +37173,6 @@ app.get('/admin/dashboard', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               // Preserve basic settings
               beach_booking_enabled: beachBookingEnabled,
               free_for_hotel_guests: freeForGuests,
@@ -37227,7 +37229,6 @@ app.get('/admin/dashboard', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               beach_booking_enabled: document.getElementById('beachBookingEnabled').checked ? 1 : 0,
               free_for_hotel_guests: document.getElementById('freeForGuests').checked ? 1 : 0,
               opening_time: document.getElementById('openingTime').value,
