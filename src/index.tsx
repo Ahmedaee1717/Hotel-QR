@@ -154,6 +154,74 @@ function getAuthenticatedPropertyId(c: any): string | null {
   return property_id
 }
 
+// Middleware: Check if property has access to a feature (subscription-based)
+async function hasFeatureAccess(DB: any, property_id: string, feature_key: string): Promise<boolean> {
+  try {
+    // Get property's active subscription
+    const subscription = await DB.prepare(`
+      SELECT ps.*, sp.plan_id
+      FROM property_subscriptions ps
+      JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      WHERE ps.property_id = ? AND ps.status = 'active'
+      ORDER BY ps.created_at DESC
+      LIMIT 1
+    `).bind(property_id).first()
+    
+    if (!subscription) {
+      return false // No active subscription
+    }
+    
+    // Check for feature override first
+    const override = await DB.prepare(`
+      SELECT is_enabled 
+      FROM property_feature_overrides pfo
+      JOIN feature_flags ff ON pfo.feature_id = ff.feature_id
+      WHERE pfo.property_id = ? AND ff.feature_key = ?
+        AND (pfo.expires_at IS NULL OR pfo.expires_at > datetime('now'))
+    `).bind(property_id, feature_key).first()
+    
+    if (override) {
+      return override.is_enabled === 1
+    }
+    
+    // Check if feature is included in plan
+    const planFeature = await DB.prepare(`
+      SELECT pf.is_included
+      FROM plan_features pf
+      JOIN feature_flags ff ON pf.feature_id = ff.feature_id
+      WHERE pf.plan_id = ? AND ff.feature_key = ? AND pf.is_included = 1
+    `).bind(subscription.plan_id, feature_key).first()
+    
+    return !!planFeature
+  } catch (error) {
+    console.error('Feature access check error:', error)
+    return false
+  }
+}
+
+// Middleware: Require feature access
+function requireFeature(feature_key: string) {
+  return async (c: any, next: any) => {
+    const { DB } = c.env
+    const property_id = getAuthenticatedPropertyId(c)
+    
+    if (!property_id) {
+      return c.json({ error: 'Unauthorized - No property ID' }, 401)
+    }
+    
+    const hasAccess = await hasFeatureAccess(DB, property_id, feature_key)
+    
+    if (!hasAccess) {
+      return c.json({ 
+        error: 'Feature not available', 
+        message: `Your subscription plan does not include ${feature_key}. Please upgrade to access this feature.`
+      }, 403)
+    }
+    
+    await next()
+  }
+}
+
 // Language configuration
 const SUPPORTED_LANGUAGES = {
   'en': { name: 'English', native: 'English', flag: '🇬🇧' },
@@ -2809,6 +2877,351 @@ app.post('/api/chat/rooms/:room_id/messages', async (c) => {
 })
 
 // ============================================
+// PLATFORM SUPER ADMIN - SUBSCRIPTION MANAGEMENT
+// ============================================
+
+// Super Admin Login
+app.post('/api/superadmin/login', async (c) => {
+  const { DB } = c.env
+  const { email, password } = await c.req.json()
+  
+  try {
+    const admin = await DB.prepare(`
+      SELECT * FROM platform_admins 
+      WHERE email = ? AND is_active = 1
+    `).bind(email).first()
+    
+    if (!admin || admin.password_hash !== password) {
+      return c.json({ error: 'Invalid credentials' }, 401)
+    }
+    
+    // Update last login
+    await DB.prepare(`
+      UPDATE platform_admins SET last_login = datetime('now') WHERE admin_id = ?
+    `).bind(admin.admin_id).run()
+    
+    return c.json({
+      success: true,
+      admin: {
+        admin_id: admin.admin_id,
+        email: admin.email,
+        full_name: admin.full_name,
+        role: admin.role
+      }
+    })
+  } catch (error) {
+    console.error('Super admin login error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get all properties with subscription status
+app.get('/api/superadmin/properties', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const properties = await DB.prepare(`
+      SELECT 
+        p.property_id,
+        p.name,
+        p.slug,
+        p.email,
+        p.phone,
+        p.status,
+        p.created_at,
+        sp.plan_key,
+        sp.plan_name,
+        sp.price_monthly,
+        ps.status as subscription_status,
+        ps.current_period_end,
+        (SELECT COUNT(*) FROM rooms WHERE property_id = p.property_id) as room_count,
+        (SELECT COUNT(*) FROM users WHERE property_id = p.property_id) as user_count,
+        (SELECT COUNT(*) FROM vendor_properties WHERE property_id = p.property_id) as vendor_count
+      FROM properties p
+      LEFT JOIN property_subscriptions ps ON p.property_id = ps.property_id
+      LEFT JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      ORDER BY p.created_at DESC
+    `).all()
+    
+    return c.json({ properties: properties.results })
+  } catch (error) {
+    console.error('Get properties error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get all subscription plans
+app.get('/api/superadmin/plans', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const plans = await DB.prepare(`
+      SELECT * FROM subscription_plans 
+      WHERE is_active = 1
+      ORDER BY display_order
+    `).all()
+    
+    return c.json({ plans: plans.results })
+  } catch (error) {
+    console.error('Get plans error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get all feature flags
+app.get('/api/superadmin/features', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const features = await DB.prepare(`
+      SELECT * FROM feature_flags 
+      WHERE is_active = 1
+      ORDER BY category, feature_name
+    `).all()
+    
+    return c.json({ features: features.results })
+  } catch (error) {
+    console.error('Get features error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get property's subscription details
+app.get('/api/superadmin/property/:property_id/subscription', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Get subscription info
+    const subscription = await DB.prepare(`
+      SELECT 
+        ps.*,
+        sp.plan_key,
+        sp.plan_name,
+        sp.price_monthly,
+        sp.price_yearly,
+        sp.max_rooms,
+        sp.max_staff_users,
+        sp.max_vendors
+      FROM property_subscriptions ps
+      JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      WHERE ps.property_id = ?
+      ORDER BY ps.created_at DESC
+      LIMIT 1
+    `).bind(property_id).first()
+    
+    // Get enabled features
+    const enabledFeatures = await DB.prepare(`
+      SELECT 
+        ff.feature_id,
+        ff.feature_key,
+        ff.feature_name,
+        ff.category,
+        CASE 
+          WHEN pfo.override_id IS NOT NULL THEN pfo.is_enabled
+          ELSE pf.is_included
+        END as is_enabled,
+        pfo.override_reason
+      FROM feature_flags ff
+      LEFT JOIN plan_features pf ON ff.feature_id = pf.feature_id 
+        AND pf.plan_id = ?
+      LEFT JOIN property_feature_overrides pfo ON ff.feature_id = pfo.feature_id 
+        AND pfo.property_id = ?
+      WHERE ff.is_active = 1
+      ORDER BY ff.category, ff.feature_name
+    `).bind(subscription?.plan_id || 1, property_id).all()
+    
+    return c.json({
+      subscription,
+      features: enabledFeatures.results
+    })
+  } catch (error) {
+    console.error('Get property subscription error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Update property's subscription plan
+app.put('/api/superadmin/property/:property_id/subscription', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const { plan_id, admin_id, notes } = await c.req.json()
+  
+  try {
+    // Get current subscription
+    const current = await DB.prepare(`
+      SELECT * FROM property_subscriptions WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    if (current) {
+      // Update existing subscription
+      await DB.prepare(`
+        UPDATE property_subscriptions
+        SET plan_id = ?, 
+            updated_at = datetime('now'),
+            current_period_start = datetime('now'),
+            current_period_end = datetime('now', '+30 days')
+        WHERE property_id = ?
+      `).bind(plan_id, property_id).run()
+      
+      // Record history
+      await DB.prepare(`
+        INSERT INTO subscription_history 
+        (property_id, plan_id, previous_plan_id, action, performed_by, notes)
+        VALUES (?, ?, ?, 'upgraded', ?, ?)
+      `).bind(property_id, plan_id, current.plan_id, admin_id, notes || 'Plan changed by super admin').run()
+    } else {
+      // Create new subscription
+      await DB.prepare(`
+        INSERT INTO property_subscriptions
+        (property_id, plan_id, status, current_period_end)
+        VALUES (?, ?, 'active', datetime('now', '+30 days'))
+      `).bind(property_id, plan_id).run()
+      
+      // Record history
+      await DB.prepare(`
+        INSERT INTO subscription_history 
+        (property_id, plan_id, action, performed_by, notes)
+        VALUES (?, ?, 'created', ?, ?)
+      `).bind(property_id, plan_id, admin_id, notes || 'Subscription created by super admin').run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update subscription error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Toggle feature for property (override)
+app.post('/api/superadmin/property/:property_id/feature/:feature_id/toggle', async (c) => {
+  const { DB } = c.env
+  const { property_id, feature_id } = c.req.param()
+  const { is_enabled, override_reason, admin_id } = await c.req.json()
+  
+  try {
+    // Check if override exists
+    const existing = await DB.prepare(`
+      SELECT * FROM property_feature_overrides
+      WHERE property_id = ? AND feature_id = ?
+    `).bind(property_id, feature_id).first()
+    
+    if (existing) {
+      // Update existing override
+      await DB.prepare(`
+        UPDATE property_feature_overrides
+        SET is_enabled = ?, override_reason = ?, created_by = ?
+        WHERE property_id = ? AND feature_id = ?
+      `).bind(is_enabled ? 1 : 0, override_reason, admin_id, property_id, feature_id).run()
+    } else {
+      // Create new override
+      await DB.prepare(`
+        INSERT INTO property_feature_overrides
+        (property_id, feature_id, is_enabled, override_reason, created_by)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(property_id, feature_id, is_enabled ? 1 : 0, override_reason, admin_id).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Toggle feature error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get platform-wide analytics
+app.get('/api/superadmin/analytics', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // Total properties
+    const totalProperties = await DB.prepare(`
+      SELECT COUNT(*) as count FROM properties WHERE status = 'active'
+    `).first()
+    
+    // Total subscriptions by plan
+    const subscriptionsByPlan = await DB.prepare(`
+      SELECT 
+        sp.plan_name,
+        sp.plan_key,
+        COUNT(*) as count,
+        SUM(sp.price_monthly) as mrr
+      FROM property_subscriptions ps
+      JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      WHERE ps.status = 'active'
+      GROUP BY sp.plan_id
+      ORDER BY sp.display_order
+    `).all()
+    
+    // Total MRR
+    const totalMRR = await DB.prepare(`
+      SELECT SUM(sp.price_monthly) as mrr
+      FROM property_subscriptions ps
+      JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      WHERE ps.status = 'active'
+    `).first()
+    
+    // Properties by status
+    const propertiesByStatus = await DB.prepare(`
+      SELECT status, COUNT(*) as count 
+      FROM properties 
+      GROUP BY status
+    `).all()
+    
+    return c.json({
+      total_properties: totalProperties.count,
+      total_mrr: totalMRR.mrr || 0,
+      subscriptions_by_plan: subscriptionsByPlan.results,
+      properties_by_status: propertiesByStatus.results
+    })
+  } catch (error) {
+    console.error('Platform analytics error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Suspend/activate property
+app.post('/api/superadmin/property/:property_id/:action', async (c) => {
+  const { DB } = c.env
+  const { property_id, action } = c.req.param()
+  const { admin_id, reason } = await c.req.json()
+  
+  if (!['suspend', 'activate'].includes(action)) {
+    return c.json({ error: 'Invalid action' }, 400)
+  }
+  
+  try {
+    const newStatus = action === 'suspend' ? 'suspended' : 'active'
+    
+    // Update property status
+    await DB.prepare(`
+      UPDATE properties SET status = ? WHERE property_id = ?
+    `).bind(newStatus, property_id).run()
+    
+    // Update subscription status
+    await DB.prepare(`
+      UPDATE property_subscriptions 
+      SET status = ?
+      WHERE property_id = ?
+    `).bind(newStatus, property_id).run()
+    
+    // Record in history
+    await DB.prepare(`
+      INSERT INTO subscription_history
+      (property_id, plan_id, action, performed_by, notes)
+      SELECT property_id, plan_id, ?, ?, ?
+      FROM property_subscriptions
+      WHERE property_id = ?
+    `).bind(action === 'suspend' ? 'suspended' : 'reactivated', admin_id, reason, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Property status update error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// ============================================
 // HOTEL ADMIN API ENDPOINTS
 // ============================================
 
@@ -3642,6 +4055,87 @@ app.get('/api/admin/dashboard', async (c) => {
     })
   } catch (error) {
     console.error('Admin dashboard error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get property's subscription and enabled features (for hotel admins)
+app.get('/api/admin/subscription', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
+  
+  try {
+    // Get subscription info
+    const subscription = await DB.prepare(`
+      SELECT 
+        ps.*,
+        sp.plan_key,
+        sp.plan_name,
+        sp.description,
+        sp.price_monthly,
+        sp.max_rooms,
+        sp.max_staff_users,
+        sp.max_vendors
+      FROM property_subscriptions ps
+      JOIN subscription_plans sp ON ps.plan_id = sp.plan_id
+      WHERE ps.property_id = ?
+      ORDER BY ps.created_at DESC
+      LIMIT 1
+    `).bind(property_id).first()
+    
+    if (!subscription) {
+      return c.json({ 
+        error: 'No subscription found',
+        message: 'Please contact support to set up your subscription'
+      }, 404)
+    }
+    
+    // Get all features with access status
+    const features = await DB.prepare(`
+      SELECT 
+        ff.feature_key,
+        ff.feature_name,
+        ff.description,
+        ff.category,
+        CASE 
+          WHEN pfo.override_id IS NOT NULL THEN pfo.is_enabled
+          ELSE COALESCE(pf.is_included, 0)
+        END as is_enabled,
+        pfo.override_reason
+      FROM feature_flags ff
+      LEFT JOIN plan_features pf ON ff.feature_id = pf.feature_id 
+        AND pf.plan_id = ?
+      LEFT JOIN property_feature_overrides pfo ON ff.feature_id = pfo.feature_id 
+        AND pfo.property_id = ?
+        AND (pfo.expires_at IS NULL OR pfo.expires_at > datetime('now'))
+      WHERE ff.is_active = 1
+      ORDER BY ff.category, ff.feature_name
+    `).bind(subscription.plan_id, property_id).all()
+    
+    // Current usage stats
+    const usage = await DB.prepare(`
+      SELECT 
+        (SELECT COUNT(*) FROM rooms WHERE property_id = ?) as current_rooms,
+        (SELECT COUNT(*) FROM users WHERE property_id = ?) as current_staff_users,
+        (SELECT COUNT(*) FROM vendor_properties WHERE property_id = ?) as current_vendors
+    `).bind(property_id, property_id, property_id).first()
+    
+    return c.json({
+      subscription,
+      features: features.results,
+      usage,
+      limits: {
+        max_rooms: subscription.max_rooms,
+        max_staff_users: subscription.max_staff_users,
+        max_vendors: subscription.max_vendors
+      }
+    })
+  } catch (error) {
+    console.error('Get subscription error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
