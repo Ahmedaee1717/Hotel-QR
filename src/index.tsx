@@ -47209,21 +47209,22 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const singleMode = document.getElementById('singleDayMode');
         const bulkMode = document.getElementById('bulkMode');
         const buttonText = document.getElementById('createButtonText');
+        const sessionDate = document.getElementById('sessionDate');
         
         if (mode === 'single') {
-          singleBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
-          bulkBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
-          singleMode.style.display = 'block';
-          bulkMode.style.display = 'none';
-          buttonText.textContent = 'Create Time Slot';
-          document.getElementById('sessionDate').required = true;
+          if (singleBtn) singleBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+          if (bulkBtn) bulkBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+          if (singleMode) singleMode.style.display = 'block';
+          if (bulkMode) bulkMode.style.display = 'none';
+          if (buttonText) buttonText.textContent = 'Create Time Slot';
+          if (sessionDate) sessionDate.required = true;
         } else {
-          singleBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
-          bulkBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
-          singleMode.style.display = 'none';
-          bulkMode.style.display = 'block';
-          buttonText.textContent = 'Create Multiple Time Slots';
-          document.getElementById('sessionDate').required = false;
+          if (singleBtn) singleBtn.className = 'flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+          if (bulkBtn) bulkBtn.className = 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+          if (singleMode) singleMode.style.display = 'none';
+          if (bulkMode) bulkMode.style.display = 'block';
+          if (buttonText) buttonText.textContent = 'Create Multiple Time Slots';
+          if (sessionDate) sessionDate.required = false;
         }
       };
       
