@@ -29599,13 +29599,13 @@ app.get('/admin/dashboard', (c) => {
         color: #4B5563;
       }
       .sidebar-btn:hover {
-        background-color: #F3F4F6;
+        background-color: #aecfb4;
         color: #1F2937;
       }
       .sidebar-btn.tab-active {
-        background-color: #3B82F6;
+        background-color: #016e8f;
         color: white;
-        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        box-shadow: 0 2px 4px rgba(1, 110, 143, 0.3);
       }
       .sidebar-btn.tab-active i {
         color: white;
@@ -29820,9 +29820,36 @@ app.get('/admin/dashboard', (c) => {
         background: #888;
         border-radius: 4px;
       }
+      
+      /* Brand Color Overrides - #016e8f (Primary), #f6f2e9 (Secondary), #aecfb4 (Accent) */
+      .bg-blue-600, .bg-blue-500, .bg-purple-600, .bg-indigo-600, .bg-blue-700 {
+        background-color: #016e8f !important;
+      }
+      .hover\\:bg-blue-600:hover, .hover\\:bg-blue-700:hover, .hover\\:bg-purple-700:hover, .hover\\:bg-indigo-700:hover {
+        background-color: #015266 !important;
+      }
+      .text-blue-600, .text-purple-600, .text-indigo-600, .text-blue-700, .text-blue-500 {
+        color: #016e8f !important;
+      }
+      .hover\\:text-blue-600:hover, .hover\\:text-purple-600:hover, .hover\\:text-indigo-600:hover {
+        color: #016e8f !important;
+      }
+      .hover\\:bg-blue-50:hover, .hover\\:bg-purple-50:hover, .hover\\:bg-indigo-50:hover {
+        background-color: #aecfb4 !important;
+      }
+      .bg-blue-50, .bg-purple-50, .bg-indigo-50 {
+        background-color: #f6f2e9 !important;
+      }
+      .border-blue-500, .border-purple-500, .border-indigo-500, .border-blue-600 {
+        border-color: #016e8f !important;
+      }
+      .text-blue-100, .text-purple-100 {
+        color: #aecfb4 !important;
+      }
+      
     </style>
 </head>
-<body class="bg-gray-50 transition-colors duration-300">
+<body style="background-color: #f6f2e9;" class="transition-colors duration-300">
     <!-- Professional Header with Logo -->
     <div class="bg-white border-b border-gray-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -29833,13 +29860,13 @@ app.get('/admin/dashboard', (c) => {
             
             <!-- Action Buttons -->
             <div class="flex items-center gap-2">
-                <button onclick="openSupportModal()" class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Get Support">
+                <button onclick="openSupportModal()" class="p-2 text-gray-600 hover:text-white" style="hover:background-color: #016e8f;" class="rounded-lg transition-colors" title="Get Support">
                   <i class="fas fa-life-ring text-lg"></i>
                 </button>
                 <button onclick="openLiveChat()" class="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Live Chat">
                   <i class="fas fa-comments text-lg"></i>
                 </button>
-                <button onclick="toggleDarkMode()" class="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Toggle Dark Mode">
+                <button onclick="toggleDarkMode()" class="p-2 text-gray-600 hover:text-white" style="hover:background-color: #aecfb4;" class="rounded-lg transition-colors" title="Toggle Dark Mode">
                   <i id="darkModeIcon" class="fas fa-moon text-lg"></i>
                 </button>
                 <div class="hidden md:block w-px h-8 bg-gray-300 mx-2"></div>
