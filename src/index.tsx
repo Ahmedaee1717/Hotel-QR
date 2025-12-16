@@ -24747,6 +24747,94 @@ Late arrivals may result in reduced time\`;
   `)
 })
 
+// Super Admin Login Page
+app.get('/superadmin/login', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Platform Super Admin - Login</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
+                    <i class="fas fa-crown text-white text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Platform Super Admin</h1>
+                <p class="text-gray-600">GuestConnect Platform Management</p>
+            </div>
+
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-envelope mr-2 text-purple-600"></i>Email Address
+                    </label>
+                    <input type="email" id="email" required
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors"
+                           placeholder="superadmin@guestconnect.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-lock mr-2 text-purple-600"></i>Password
+                    </label>
+                    <input type="password" id="password" required
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none transition-colors"
+                           placeholder="••••••••">
+                </div>
+
+                <button type="submit"
+                        class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login to Platform
+                </button>
+            </form>
+
+            <div class="mt-6 pt-6 border-t border-gray-200 text-center">
+                <p class="text-sm text-gray-600">
+                    <i class="fas fa-shield-alt text-purple-600 mr-2"></i>
+                    Secure Platform Administration
+                </p>
+            </div>
+        </div>
+
+        <script>
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    const response = await fetch('/api/superadmin/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        localStorage.setItem('superadmin', JSON.stringify(data.admin));
+                        window.location.href = '/superadmin/dashboard';
+                    } else {
+                        alert(data.error || 'Login failed');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    alert('Login failed. Please try again.');
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `)
+})
+
 app.get('/admin/login', (c) => {
   return c.html(`
     <!DOCTYPE html>
@@ -29412,6 +29500,341 @@ app.get('/gm/features', (c) => {
         function printFeatures() {
             window.print();
         }
+    </script>
+</body>
+</html>
+  `)
+})
+
+// Super Admin Dashboard page
+app.get('/superadmin/dashboard', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Super Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <!-- Top Navigation -->
+    <nav class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 shadow-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-crown text-2xl"></i>
+                <div>
+                    <h1 class="text-xl font-bold">Platform Super Admin</h1>
+                    <p class="text-xs text-purple-200">GuestConnect Management</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="adminName" class="text-sm"></span>
+                <button onclick="logout()" class="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="p-6">
+        <!-- Analytics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Total Properties</p>
+                        <p id="totalProperties" class="text-3xl font-bold text-purple-600">0</p>
+                    </div>
+                    <i class="fas fa-hotel text-4xl text-purple-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Monthly MRR</p>
+                        <p id="totalMRR" class="text-3xl font-bold text-green-600">$0</p>
+                    </div>
+                    <i class="fas fa-dollar-sign text-4xl text-green-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Active Subscriptions</p>
+                        <p id="activeSubscriptions" class="text-3xl font-bold text-blue-600">0</p>
+                    </div>
+                    <i class="fas fa-check-circle text-4xl text-blue-200"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">Trial Properties</p>
+                        <p id="trialProperties" class="text-3xl font-bold text-orange-600">0</p>
+                    </div>
+                    <i class="fas fa-clock text-4xl text-orange-200"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties List -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-building mr-2 text-purple-600"></i>All Properties
+                </h2>
+                <button onclick="refreshData()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                    <i class="fas fa-sync mr-2"></i>Refresh
+                </button>
+            </div>
+            <div id="propertiesList" class="p-6">
+                <div class="text-center py-8 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                    <p>Loading properties...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Subscription Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="text-xl font-bold"><i class="fas fa-edit mr-2"></i>Manage Subscription</h3>
+                <button onclick="closeEditModal()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <h4 id="modalPropertyName" class="text-2xl font-bold text-gray-800 mb-2"></h4>
+                    <p id="modalCurrentPlan" class="text-gray-600"></p>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Select Subscription Plan:</label>
+                    <div id="planOptions" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Plan options will be inserted here -->
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Features Available:</label>
+                    <div id="featuresList" class="space-y-2 max-h-60 overflow-y-auto">
+                        <!-- Features will be listed here -->
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="saveSubscription()" class="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                    <button onclick="closeEditModal()" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const admin = JSON.parse(localStorage.getItem('superadmin') || '{}');
+        if (!admin.admin_id) {
+            window.location.href = '/superadmin/login';
+        }
+
+        document.getElementById('adminName').textContent = admin.full_name;
+
+        let allPlans = [];
+        let allFeatures = [];
+        let currentProperty = null;
+        let selectedPlan = null;
+
+        async function loadDashboard() {
+            try {
+                // Load analytics
+                const analyticsRes = await fetch('/api/superadmin/analytics');
+                const analytics = await analyticsRes.json();
+                
+                document.getElementById('totalProperties').textContent = analytics.total_properties || 0;
+                document.getElementById('totalMRR').textContent = '$' + (analytics.total_mrr || 0).toFixed(0);
+                
+                const activeCount = analytics.subscriptions_by_plan?.reduce((sum, p) => sum + p.count, 0) || 0;
+                document.getElementById('activeSubscriptions').textContent = activeCount;
+                
+                const trialCount = analytics.subscriptions_by_plan?.find(p => p.plan_key === 'free')?.count || 0;
+                document.getElementById('trialProperties').textContent = trialCount;
+
+                // Load properties
+                const propertiesRes = await fetch('/api/superadmin/properties');
+                const { properties } = await propertiesRes.json();
+                
+                displayProperties(properties);
+
+                // Load plans and features for modal
+                const plansRes = await fetch('/api/superadmin/plans');
+                const plansData = await plansRes.json();
+                allPlans = plansData.plans;
+
+                const featuresRes = await fetch('/api/superadmin/features');
+                const featuresData = await featuresRes.json();
+                allFeatures = featuresData.features;
+            } catch (error) {
+                console.error('Load dashboard error:', error);
+                alert('Failed to load dashboard');
+            }
+        }
+
+        function displayProperties(properties) {
+            const container = document.getElementById('propertiesList');
+            
+            if (properties.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-4xl mb-2"></i><p>No properties found</p></div>';
+                return;
+            }
+
+            container.innerHTML = properties.map(p => \`
+                <div class="border-b border-gray-200 py-4 hover:bg-gray-50 transition">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h3 class="text-lg font-bold text-gray-800">\${p.name}</h3>
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full \${
+                                    p.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
+                                    p.subscription_status === 'trial' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }">\${p.subscription_status || 'No Subscription'}</span>
+                                <span class="px-3 py-1 text-xs font-semibold rounded-full \${
+                                    p.plan_key === 'enterprise' ? 'bg-purple-100 text-purple-800' :
+                                    p.plan_key === 'pro' ? 'bg-blue-100 text-blue-800' :
+                                    p.plan_key === 'basic' ? 'bg-green-100 text-green-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }">\${p.plan_name || 'No Plan'}</span>
+                            </div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                                <div><i class="fas fa-door-open mr-1 text-purple-600"></i> \${p.room_count} rooms</div>
+                                <div><i class="fas fa-users mr-1 text-blue-600"></i> \${p.user_count} staff</div>
+                                <div><i class="fas fa-store mr-1 text-green-600"></i> \${p.vendor_count} vendors</div>
+                                <div><i class="fas fa-dollar-sign mr-1 text-green-600"></i> $\${p.price_monthly || 0}/mo</div>
+                            </div>
+                        </div>
+                        <button onclick="editProperty(\${p.property_id})" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 ml-4">
+                            <i class="fas fa-cog mr-2"></i>Manage
+                        </button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        async function editProperty(propertyId) {
+            try {
+                const res = await fetch(\`/api/superadmin/property/\${propertyId}/subscription\`);
+                const data = await res.json();
+                
+                currentProperty = { property_id: propertyId, subscription: data.subscription, features: data.features };
+                
+                // Get property name
+                const propertiesRes = await fetch('/api/superadmin/properties');
+                const { properties } = await propertiesRes.json();
+                const property = properties.find(p => p.property_id == propertyId);
+                
+                document.getElementById('modalPropertyName').textContent = property.name;
+                document.getElementById('modalCurrentPlan').textContent = \`Current Plan: \${data.subscription?.plan_name || 'None'}\`;
+                
+                selectedPlan = data.subscription?.plan_id;
+                
+                // Display plan options
+                document.getElementById('planOptions').innerHTML = allPlans.map(plan => \`
+                    <div onclick="selectPlan(\${plan.plan_id})" class="border-2 \${selectedPlan == plan.plan_id ? 'border-purple-600 bg-purple-50' : 'border-gray-300'} rounded-lg p-4 cursor-pointer hover:border-purple-400 transition">
+                        <h4 class="font-bold text-gray-800">\${plan.plan_name}</h4>
+                        <p class="text-2xl font-bold text-purple-600 my-2">$\${plan.price_monthly}/mo</p>
+                        <p class="text-xs text-gray-600">\${plan.max_rooms} rooms, \${plan.max_staff_users} staff</p>
+                    </div>
+                \`).join('');
+                
+                // Display features
+                document.getElementById('featuresList').innerHTML = data.features.map(f => \`
+                    <div class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" \${f.is_enabled ? 'checked' : ''} onchange="toggleFeature(\${f.feature_id}, this.checked)">
+                        <i class="fas fa-\${f.is_enabled ? 'check-circle text-green-600' : 'times-circle text-gray-400'}"></i>
+                        <span class="\${f.is_enabled ? 'text-gray-800' : 'text-gray-400'}">\${f.feature_name}</span>
+                    </div>
+                \`).join('');
+                
+                document.getElementById('editModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Edit property error:', error);
+                alert('Failed to load property details');
+            }
+        }
+
+        function selectPlan(planId) {
+            selectedPlan = planId;
+            // Refresh plan UI
+            editProperty(currentProperty.property_id);
+        }
+
+        async function toggleFeature(featureId, isEnabled) {
+            try {
+                await fetch(\`/api/superadmin/property/\${currentProperty.property_id}/feature/\${featureId}/toggle\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        is_enabled: isEnabled, 
+                        override_reason: 'Manual override by super admin',
+                        admin_id: admin.admin_id 
+                    })
+                });
+            } catch (error) {
+                console.error('Toggle feature error:', error);
+            }
+        }
+
+        async function saveSubscription() {
+            if (!selectedPlan) {
+                alert('Please select a plan');
+                return;
+            }
+            
+            try {
+                await fetch(\`/api/superadmin/property/\${currentProperty.property_id}/subscription\`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        plan_id: selectedPlan,
+                        admin_id: admin.admin_id,
+                        notes: 'Plan updated by super admin'
+                    })
+                });
+                
+                alert('Subscription updated successfully!');
+                closeEditModal();
+                loadDashboard();
+            } catch (error) {
+                console.error('Save subscription error:', error);
+                alert('Failed to save subscription');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            currentProperty = null;
+        }
+
+        function refreshData() {
+            loadDashboard();
+        }
+
+        function logout() {
+            localStorage.removeItem('superadmin');
+            window.location.href = '/superadmin/login';
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
     </script>
 </body>
 </html>
