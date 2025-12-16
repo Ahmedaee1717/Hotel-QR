@@ -1023,6 +1023,436 @@ app.get('/', (c) => {
 })
 
 // ============================================
+// PUBLIC BLOG ROUTES
+// ============================================
+
+// Blog listing page
+app.get('/blog', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { results: articles } = await DB.prepare(`
+      SELECT 
+        a.article_id, a.title, a.slug, a.excerpt, a.featured_image,
+        a.author_name, a.published_at, a.views_count,
+        c.name as category_name, c.slug as category_slug
+      FROM blog_articles a
+      LEFT JOIN blog_categories c ON a.category_id = c.category_id
+      WHERE a.status = 'published'
+      ORDER BY a.published_at DESC
+      LIMIT 50
+    `).all()
+    
+    const { results: categories } = await DB.prepare(`
+      SELECT c.*, COUNT(a.article_id) as article_count
+      FROM blog_categories c
+      LEFT JOIN blog_articles a ON c.category_id = a.category_id AND a.status = 'published'
+      GROUP BY c.category_id
+      HAVING article_count > 0
+      ORDER BY c.name
+    `).all()
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - GuestConnect | Hotel Technology Insights</title>
+    <meta name="description" content="Latest insights, trends, and best practices in hotel technology, guest experience, and digital transformation for the hospitality industry.">
+    <meta name="keywords" content="hotel technology, guest experience, hospitality tech, hotel management, digital transformation">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Blog - GuestConnect">
+    <meta property="og:description" content="Latest insights in hotel technology and guest experience">
+    <meta property="og:type" content="website">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .article-card {
+            transition: all 0.3s ease;
+        }
+        .article-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(1, 110, 143, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center gap-3">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-12">
+                </a>
+                <div class="flex gap-6">
+                    <a href="/" class="text-gray-700 hover:text-[#016e8f] font-semibold">Home</a>
+                    <a href="/blog" class="text-[#016e8f] font-bold">Blog</a>
+                    <a href="/superadmin/login" class="bg-[#016e8f] text-white px-6 py-2 rounded-lg hover:bg-[#014a5e] transition">Login</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-br from-[#016e8f] to-[#014a61] text-white py-20">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <h1 class="text-5xl font-bold mb-4">GuestConnect Blog</h1>
+            <p class="text-xl text-blue-100">Insights, trends, and best practices for modern hospitality</p>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-6 py-12">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Main Content -->
+            <div class="lg:col-span-3">
+                <!-- Articles Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    ${articles.map(article => `
+                        <article class="article-card bg-white rounded-2xl overflow-hidden shadow-lg">
+                            ${article.featured_image ? `
+                                <div class="relative h-48 overflow-hidden">
+                                    <img src="${article.featured_image}" alt="${article.title}" class="w-full h-full object-cover">
+                                    <div class="absolute top-4 right-4">
+                                        ${article.category_name ? `
+                                            <span class="bg-[#016e8f] text-white px-3 py-1 rounded-full text-xs font-semibold">
+                                                ${article.category_name}
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                            <div class="p-6">
+                                <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                                    <span><i class="fas fa-user mr-1"></i>${article.author_name}</span>
+                                    <span><i class="fas fa-calendar mr-1"></i>${new Date(article.published_at).toLocaleDateString()}</span>
+                                    <span><i class="fas fa-eye mr-1"></i>${article.views_count || 0}</span>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-800 mb-3 hover:text-[#016e8f] transition">
+                                    <a href="/blog/${article.slug}">${article.title}</a>
+                                </h2>
+                                <p class="text-gray-600 mb-4 line-clamp-3">${article.excerpt}</p>
+                                <a href="/blog/${article.slug}" class="inline-flex items-center gap-2 text-[#016e8f] font-semibold hover:gap-3 transition-all">
+                                    Read More <i class="fas fa-arrow-right"></i>
+                                </a>
+                            </div>
+                        </article>
+                    `).join('')}
+                </div>
+                
+                ${articles.length === 0 ? `
+                    <div class="text-center py-20">
+                        <i class="fas fa-blog text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-2xl font-bold text-gray-700 mb-2">No articles yet</h3>
+                        <p class="text-gray-500">Check back soon for exciting content!</p>
+                    </div>
+                ` : ''}
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="lg:col-span-1">
+                <!-- Categories -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg mb-8">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-folder text-[#016e8f]"></i>
+                        Categories
+                    </h3>
+                    <ul class="space-y-2">
+                        ${categories.map(cat => `
+                            <li>
+                                <a href="/blog?category=${cat.slug}" class="flex justify-between items-center py-2 px-3 rounded-lg hover:bg-gray-50 transition">
+                                    <span class="text-gray-700">${cat.name}</span>
+                                    <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">${cat.article_count}</span>
+                                </a>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                
+                <!-- CTA Box -->
+                <div class="bg-gradient-to-br from-[#016e8f] to-[#014a61] text-white rounded-2xl p-6 shadow-lg">
+                    <h3 class="text-xl font-bold mb-3">Ready to Transform Your Hotel?</h3>
+                    <p class="text-blue-100 mb-4 text-sm">Join 500+ hotels using GuestConnect to enhance guest experience and boost revenue.</p>
+                    <a href="/superadmin/login" class="block w-full bg-white text-[#016e8f] text-center py-3 rounded-lg font-bold hover:bg-gray-100 transition">
+                        Start Free Trial
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12 mt-20">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <p class="text-gray-400">© 2025 GuestConnect. All rights reserved.</p>
+            <div class="mt-4 flex justify-center gap-6">
+                <a href="/" class="text-gray-400 hover:text-white transition">Home</a>
+                <a href="/blog" class="text-gray-400 hover:text-white transition">Blog</a>
+                <a href="/superadmin/login" class="text-gray-400 hover:text-white transition">Login</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Blog listing error:', error)
+    return c.html('<h1>Error loading blog</h1>', 500)
+  }
+})
+
+// Individual article page
+app.get('/blog/:slug', async (c) => {
+  const { slug } = c.req.param()
+  const { DB } = c.env
+  
+  try {
+    // Get article
+    const { results } = await DB.prepare(`
+      SELECT 
+        a.*,
+        c.name as category_name, c.slug as category_slug
+      FROM blog_articles a
+      LEFT JOIN blog_categories c ON a.category_id = c.category_id
+      WHERE a.slug = ? AND a.status = 'published'
+    `).bind(slug).all()
+    
+    if (results.length === 0) {
+      return c.html('<h1>Article not found</h1>', 404)
+    }
+    
+    const article = results[0]
+    
+    // Increment view count
+    await DB.prepare(`
+      UPDATE blog_articles SET views_count = views_count + 1 WHERE article_id = ?
+    `).bind(article.article_id).run()
+    
+    // Get related articles
+    const { results: relatedArticles } = await DB.prepare(`
+      SELECT article_id, title, slug, excerpt, published_at
+      FROM blog_articles
+      WHERE category_id = ? AND article_id != ? AND status = 'published'
+      ORDER BY published_at DESC
+      LIMIT 3
+    `).bind(article.category_id, article.article_id).all()
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>${article.meta_title || article.title} | GuestConnect Blog</title>
+    <meta name="description" content="${article.meta_description}">
+    ${article.meta_keywords ? `<meta name="keywords" content="${article.meta_keywords}">` : ''}
+    <meta name="author" content="${article.author_name}">
+    <meta name="publish_date" property="og:publish_date" content="${article.published_at}">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://yoursite.com/blog/${article.slug}">
+    <meta property="og:title" content="${article.og_title || article.meta_title || article.title}">
+    <meta property="og:description" content="${article.og_description || article.meta_description}">
+    ${article.og_image || article.featured_image ? `<meta property="og:image" content="${article.og_image || article.featured_image}">` : ''}
+    <meta property="article:published_time" content="${article.published_at}">
+    <meta property="article:author" content="${article.author_name}">
+    ${article.category_name ? `<meta property="article:section" content="${article.category_name}">` : ''}
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://yoursite.com/blog/${article.slug}">
+    <meta name="twitter:title" content="${article.twitter_title || article.meta_title || article.title}">
+    <meta name="twitter:description" content="${article.twitter_description || article.meta_description}">
+    ${article.twitter_image || article.featured_image ? `<meta name="twitter:image" content="${article.twitter_image || article.featured_image}">` : ''}
+    
+    <!-- AI/Chatbot Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "${article.title}",
+      "description": "${article.ai_summary || article.excerpt}",
+      "author": {
+        "@type": "Person",
+        "name": "${article.author_name}"
+      },
+      "datePublished": "${article.published_at}",
+      "dateModified": "${article.updated_at}",
+      ${article.featured_image ? `"image": "${article.featured_image}",` : ''}
+      "publisher": {
+        "@type": "Organization",
+        "name": "GuestConnect",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://yoursite.com/guestconnect-logo.png"
+        }
+      },
+      ${article.category_name ? `"articleSection": "${article.category_name}",` : ''}
+      ${article.target_audience ? `"audience": {
+        "@type": "Audience",
+        "audienceType": "${article.target_audience}"
+      },` : ''}
+      "keywords": "${article.meta_keywords || ''}",
+      "abstract": "${article.ai_summary || article.excerpt}"
+    }
+    </script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .article-content h2 { font-size: 2rem; font-weight: bold; margin-top: 2rem; margin-bottom: 1rem; color: #016e8f; }
+        .article-content h3 { font-size: 1.5rem; font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.75rem; color: #374151; }
+        .article-content p { margin-bottom: 1rem; line-height: 1.75; }
+        .article-content ul, .article-content ol { margin-left: 2rem; margin-bottom: 1rem; }
+        .article-content li { margin-bottom: 0.5rem; line-height: 1.75; }
+        .article-content strong { font-weight: 700; color: #1f2937; }
+        .article-content em { font-style: italic; }
+        .article-content a { color: #016e8f; text-decoration: underline; }
+        .article-content img { max-width: 100%; height: auto; border-radius: 12px; margin: 2rem 0; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex justify-between items-center">
+                <a href="/" class="flex items-center gap-3">
+                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect" class="h-12">
+                </a>
+                <div class="flex gap-6">
+                    <a href="/" class="text-gray-700 hover:text-[#016e8f] font-semibold">Home</a>
+                    <a href="/blog" class="text-[#016e8f] font-bold">Blog</a>
+                    <a href="/superadmin/login" class="bg-[#016e8f] text-white px-6 py-2 rounded-lg hover:bg-[#014a5e] transition">Login</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Article Content -->
+    <article class="max-w-4xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <header class="mb-10">
+            ${article.category_name ? `
+                <a href="/blog?category=${article.category_slug}" class="inline-block bg-[#016e8f] text-white px-4 py-1 rounded-full text-sm font-semibold mb-4 hover:bg-[#014a61] transition">
+                    ${article.category_name}
+                </a>
+            ` : ''}
+            <h1 class="text-5xl font-bold text-gray-900 mb-6">${article.title}</h1>
+            <div class="flex items-center gap-6 text-gray-600">
+                <span><i class="fas fa-user mr-2"></i>${article.author_name}</span>
+                <span><i class="fas fa-calendar mr-2"></i>${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                <span><i class="fas fa-eye mr-2"></i>${(article.views_count || 0) + 1} views</span>
+            </div>
+        </header>
+        
+        <!-- Featured Image -->
+        ${article.featured_image ? `
+            <div class="mb-10">
+                <img src="${article.featured_image}" alt="${article.title}" class="w-full h-auto rounded-2xl shadow-xl">
+            </div>
+        ` : ''}
+        
+        <!-- Excerpt -->
+        <div class="bg-blue-50 border-l-4 border-[#016e8f] p-6 mb-10 rounded-r-lg">
+            <p class="text-lg text-gray-700 italic">${article.excerpt}</p>
+        </div>
+        
+        <!-- Key Points (if provided) -->
+        ${article.key_points ? `
+            <div class="bg-white p-6 rounded-xl shadow-lg mb-10">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-lightbulb text-yellow-500"></i>
+                    Key Takeaways
+                </h3>
+                <div class="prose max-w-none">
+                    ${article.key_points.split('\n').filter(p => p.trim()).map(point => `
+                        <p class="flex items-start gap-3 mb-2">
+                            <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                            <span>${point.replace(/^[•\-]\s*/, '')}</span>
+                        </p>
+                    `).join('')}
+                </div>
+            </div>
+        ` : ''}
+        
+        <!-- Article Content -->
+        <div class="article-content prose max-w-none text-gray-700 text-lg">
+            ${article.content}
+        </div>
+        
+        <!-- Target Audience (if specified) -->
+        ${article.target_audience ? `
+            <div class="mt-10 p-6 bg-gray-100 rounded-xl">
+                <p class="text-sm text-gray-600"><strong>Target Audience:</strong> ${article.target_audience}</p>
+            </div>
+        ` : ''}
+        
+        <!-- Share Buttons -->
+        <div class="mt-12 pt-8 border-t-2 border-gray-200">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Share this article:</h3>
+            <div class="flex gap-4">
+                <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=https://yoursite.com/blog/${article.slug}" target="_blank" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition">
+                    <i class="fab fa-twitter mr-2"></i>Twitter
+                </a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://yoursite.com/blog/${article.slug}" target="_blank" class="bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-800 transition">
+                    <i class="fab fa-linkedin mr-2"></i>LinkedIn
+                </a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u=https://yoursite.com/blog/${article.slug}" target="_blank" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fab fa-facebook mr-2"></i>Facebook
+                </a>
+            </div>
+        </div>
+    </article>
+    
+    <!-- Related Articles -->
+    ${relatedArticles.length > 0 ? `
+        <section class="bg-white py-16">
+            <div class="max-w-7xl mx-auto px-6">
+                <h2 class="text-3xl font-bold text-gray-900 mb-8">Related Articles</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    ${relatedArticles.map(related => `
+                        <article class="bg-gray-50 rounded-xl p-6 hover:shadow-lg transition">
+                            <h3 class="text-xl font-bold text-gray-800 mb-3 hover:text-[#016e8f] transition">
+                                <a href="/blog/${related.slug}">${related.title}</a>
+                            </h3>
+                            <p class="text-gray-600 mb-4 line-clamp-3">${related.excerpt}</p>
+                            <a href="/blog/${related.slug}" class="text-[#016e8f] font-semibold hover:underline">
+                                Read More →
+                            </a>
+                        </article>
+                    `).join('')}
+                </div>
+            </div>
+        </section>
+    ` : ''}
+    
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <p class="text-gray-400">© 2025 GuestConnect. All rights reserved.</p>
+            <div class="mt-4 flex justify-center gap-6">
+                <a href="/" class="text-gray-400 hover:text-white transition">Home</a>
+                <a href="/blog" class="text-gray-400 hover:text-white transition">Blog</a>
+                <a href="/superadmin/login" class="text-gray-400 hover:text-white transition">Login</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Article page error:', error)
+    return c.html('<h1>Error loading article</h1>', 500)
+  }
+})
+
+// ============================================
 // GUEST API ROUTES
 // ============================================
 
@@ -2873,6 +3303,210 @@ app.post('/api/tickets/:ticket_id/messages', async (c) => {
   } catch (error) {
     console.error('Add ticket message error:', error)
     return c.json({ error: 'Failed to add message' }, 500)
+  }
+})
+
+// ============================================
+// SUPER ADMIN - BLOG API
+// ============================================
+
+// Get all blog articles
+app.get('/api/superadmin/blog/articles', async (c) => {
+  const { DB } = c.env
+  const status = c.req.query('status') || 'all'
+  
+  try {
+    let query = `
+      SELECT 
+        a.*,
+        c.name as category_name,
+        c.slug as category_slug
+      FROM blog_articles a
+      LEFT JOIN blog_categories c ON a.category_id = c.category_id
+    `
+    
+    if (status !== 'all') {
+      query += ` WHERE a.status = '${status}'`
+    }
+    
+    query += ` ORDER BY a.created_at DESC`
+    
+    const { results } = await DB.prepare(query).all()
+    return c.json(results)
+  } catch (error) {
+    console.error('Get articles error:', error)
+    return c.json({ error: 'Failed to fetch articles' }, 500)
+  }
+})
+
+// Get single article
+app.get('/api/superadmin/blog/articles/:article_id', async (c) => {
+  const { DB } = c.env
+  const article_id = c.req.param('article_id')
+  
+  try {
+    const { results } = await DB.prepare(`
+      SELECT a.*, c.name as category_name
+      FROM blog_articles a
+      LEFT JOIN blog_categories c ON a.category_id = c.category_id
+      WHERE a.article_id = ?
+    `).bind(article_id).all()
+    
+    if (results.length === 0) {
+      return c.json({ error: 'Article not found' }, 404)
+    }
+    
+    return c.json(results[0])
+  } catch (error) {
+    console.error('Get article error:', error)
+    return c.json({ error: 'Failed to fetch article' }, 500)
+  }
+})
+
+// Create article
+app.post('/api/superadmin/blog/articles', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO blog_articles (
+        title, slug, excerpt, content, featured_image,
+        author_id, author_name, category_id,
+        meta_title, meta_description, meta_keywords,
+        ai_summary, key_points, target_audience,
+        status, published_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      data.title,
+      data.slug,
+      data.excerpt,
+      data.content,
+      data.featured_image || null,
+      data.author_id || 1,
+      data.author_name || 'Super Admin',
+      data.category_id || null,
+      data.meta_title || data.title,
+      data.meta_description,
+      data.meta_keywords || null,
+      data.ai_summary,
+      data.key_points || null,
+      data.target_audience || null,
+      data.status || 'draft',
+      data.status === 'published' ? new Date().toISOString() : null
+    ).run()
+    
+    return c.json({ success: true, article_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create article error:', error)
+    return c.json({ error: 'Failed to create article' }, 500)
+  }
+})
+
+// Update article
+app.put('/api/superadmin/blog/articles/:article_id', async (c) => {
+  const { DB } = c.env
+  const article_id = c.req.param('article_id')
+  const data = await c.req.json()
+  
+  try {
+    // Check if article was just published
+    const { results } = await DB.prepare(`
+      SELECT status FROM blog_articles WHERE article_id = ?
+    `).bind(article_id).all()
+    
+    const wasPublished = results[0]?.status === 'published'
+    const nowPublished = data.status === 'published'
+    const justPublished = !wasPublished && nowPublished
+    
+    await DB.prepare(`
+      UPDATE blog_articles SET
+        title = ?, slug = ?, excerpt = ?, content = ?, featured_image = ?,
+        category_id = ?,
+        meta_title = ?, meta_description = ?, meta_keywords = ?,
+        ai_summary = ?, key_points = ?, target_audience = ?,
+        status = ?, published_at = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE article_id = ?
+    `).bind(
+      data.title,
+      data.slug,
+      data.excerpt,
+      data.content,
+      data.featured_image || null,
+      data.category_id || null,
+      data.meta_title || data.title,
+      data.meta_description,
+      data.meta_keywords || null,
+      data.ai_summary,
+      data.key_points || null,
+      data.target_audience || null,
+      data.status,
+      justPublished ? new Date().toISOString() : results[0]?.published_at,
+      article_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update article error:', error)
+    return c.json({ error: 'Failed to update article' }, 500)
+  }
+})
+
+// Delete article
+app.delete('/api/superadmin/blog/articles/:article_id', async (c) => {
+  const { DB } = c.env
+  const article_id = c.req.param('article_id')
+  
+  try {
+    await DB.prepare(`DELETE FROM blog_articles WHERE article_id = ?`).bind(article_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete article error:', error)
+    return c.json({ error: 'Failed to delete article' }, 500)
+  }
+})
+
+// Get all categories
+app.get('/api/superadmin/blog/categories', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { results } = await DB.prepare(`
+      SELECT c.*, COUNT(a.article_id) as article_count
+      FROM blog_categories c
+      LEFT JOIN blog_articles a ON c.category_id = a.category_id
+      GROUP BY c.category_id
+      ORDER BY c.name
+    `).all()
+    
+    return c.json(results)
+  } catch (error) {
+    console.error('Get categories error:', error)
+    return c.json({ error: 'Failed to fetch categories' }, 500)
+  }
+})
+
+// Get blog stats
+app.get('/api/superadmin/blog/stats', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { results: articles } = await DB.prepare(`
+      SELECT COUNT(*) as count FROM blog_articles WHERE status = 'published'
+    `).all()
+    
+    const { results: views } = await DB.prepare(`
+      SELECT SUM(views_count) as total FROM blog_articles
+    `).all()
+    
+    return c.json({
+      total_articles: articles[0]?.count || 0,
+      total_views: views[0]?.total || 0
+    })
+  } catch (error) {
+    console.error('Get blog stats error:', error)
+    return c.json({ error: 'Failed to fetch stats' }, 500)
   }
 })
 
@@ -19538,6 +20172,22 @@ app.get('/superadmin/dashboard', (c) => {
             </div>
             
             <div class="nav-section">
+                <div class="nav-section-title">Blog & Marketing</div>
+                <div class="nav-item" data-tab="blog">
+                    <i class="nav-icon fas fa-blog"></i>
+                    <span>Blog Articles</span>
+                </div>
+                <div class="nav-item" data-tab="blog-categories">
+                    <i class="nav-icon fas fa-folder"></i>
+                    <span>Categories</span>
+                </div>
+                <div class="nav-item" data-tab="blog-seo">
+                    <i class="nav-icon fas fa-search"></i>
+                    <span>SEO Dashboard</span>
+                </div>
+            </div>
+            
+            <div class="nav-section">
                 <div class="nav-section-title">Platform Configuration</div>
                 <div class="nav-item" data-tab="settings">
                     <i class="nav-icon fas fa-cog"></i>
@@ -20092,6 +20742,331 @@ app.get('/superadmin/dashboard', (c) => {
             </div>
         </div>
     </div>
+
+            <!-- Blog Articles Tab -->
+            <div id="blogTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-blog"></i>
+                            Blog Articles
+                        </div>
+                        <button class="btn-primary" onclick="openArticleEditor()">
+                            <i class="fas fa-plus"></i>
+                            Create New Article
+                        </button>
+                    </div>
+                    <div id="articlesListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading articles...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Blog Categories Tab -->
+            <div id="blog-categoriesTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-folder"></i>
+                            Blog Categories
+                        </div>
+                        <button class="btn-primary" onclick="createCategory()">
+                            <i class="fas fa-plus"></i>
+                            Add Category
+                        </button>
+                    </div>
+                    <div id="categoriesListContainer">
+                        <div class="text-center py-12">
+                            <div class="loading-spinner mx-auto mb-4"></div>
+                            <p class="text-gray-600">Loading categories...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Blog SEO Dashboard Tab -->
+            <div id="blog-seoTab" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fas fa-search"></i>
+                            SEO Dashboard
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-3xl font-bold text-blue-700" id="totalArticles">0</div>
+                                    <div class="text-sm text-blue-600 font-semibold mt-1">Published Articles</div>
+                                </div>
+                                <div class="text-4xl text-blue-400">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-3xl font-bold text-green-700" id="totalViews">0</div>
+                                    <div class="text-sm text-green-600 font-semibold mt-1">Total Views</div>
+                                </div>
+                                <div class="text-4xl text-green-400">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-3xl font-bold text-purple-700" id="avgSeoScore">85%</div>
+                                    <div class="text-sm text-purple-600 font-semibold mt-1">Avg. SEO Score</div>
+                                </div>
+                                <div class="text-4xl text-purple-400">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl border-2 border-gray-100">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                            SEO Best Practices
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                                <div>
+                                    <div class="font-semibold text-gray-800">Title Optimization</div>
+                                    <div class="text-sm text-gray-600">Keep titles between 50-60 characters for optimal display</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                                <div>
+                                    <div class="font-semibold text-gray-800">Meta Description</div>
+                                    <div class="text-sm text-gray-600">Write compelling 150-160 character descriptions</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                                <div>
+                                    <div class="font-semibold text-gray-800">AI Optimization</div>
+                                    <div class="text-sm text-gray-600">Include clear summaries and key points for AI chatbots</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i class="fas fa-check-circle text-green-500 mt-1"></i>
+                                <div>
+                                    <div class="font-semibold text-gray-800">Target Keywords</div>
+                                    <div class="text-sm text-gray-600">Focus on 3-5 relevant keywords per article</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Article Editor Modal -->
+            <div id="articleEditorModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; overflow-y: auto;">
+                <div style="min-height: 100vh; padding: 40px 20px; display: flex; align-items: flex-start; justify-content: center;">
+                    <div style="background: white; border-radius: 20px; max-width: 1200px; width: 100%; box-shadow: 0 25px 50px rgba(0,0,0,0.3);">
+                        <div style="padding: 30px; border-bottom: 2px solid #f3f4f6;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h2 style="font-size: 28px; font-weight: 700; color: #016e8f;">
+                                    <i class="fas fa-edit mr-2"></i>
+                                    <span id="editorModalTitle">Create New Article</span>
+                                </h2>
+                                <button onclick="closeArticleEditor()" style="background: none; border: none; font-size: 28px; color: #9ca3af; cursor: pointer; padding: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: all 0.2s;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <form id="articleForm" style="padding: 30px;">
+                            <input type="hidden" id="articleId" name="article_id">
+                            
+                            <!-- Basic Info -->
+                            <div style="margin-bottom: 30px;">
+                                <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                    Article Title *
+                                </label>
+                                <input type="text" id="articleTitle" name="title" required
+                                       style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 16px; transition: all 0.2s;"
+                                       placeholder="Enter compelling article title">
+                                <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                    <span id="titleCharCount">0</span>/60 characters (SEO optimal: 50-60)
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                    URL Slug *
+                                </label>
+                                <input type="text" id="articleSlug" name="slug" required
+                                       style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: monospace; background: #f9fafb;"
+                                       placeholder="url-friendly-slug">
+                                <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                    Will be: <strong>https://yoursite.com/blog/<span id="slugPreview">url-friendly-slug</span></strong>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6" style="margin-bottom: 30px;">
+                                <div>
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Category *
+                                    </label>
+                                    <select id="articleCategory" name="category_id" required
+                                            style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;">
+                                        <option value="">Select category...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Status
+                                    </label>
+                                    <select id="articleStatus" name="status"
+                                            style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;">
+                                        <option value="draft">Draft</option>
+                                        <option value="published">Published</option>
+                                        <option value="archived">Archived</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                    Excerpt / Short Summary *
+                                </label>
+                                <textarea id="articleExcerpt" name="excerpt" rows="3" required
+                                          style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; resize: vertical;"
+                                          placeholder="Brief summary for article listings (2-3 sentences)"></textarea>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                    Article Content (HTML) *
+                                </label>
+                                <textarea id="articleContent" name="content" rows="15" required
+                                          style="width: 100%; padding: 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; font-family: monospace; resize: vertical; background: #f9fafb;"
+                                          placeholder="<h2>Introduction</h2><p>Your article content here...</p>"></textarea>
+                                <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                    Use HTML tags: &lt;h2&gt;, &lt;h3&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt;, &lt;em&gt;, etc.
+                                </div>
+                            </div>
+                            
+                            <!-- SEO Section -->
+                            <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+                                <h3 style="font-size: 18px; font-weight: 700; color: #0369a1; margin-bottom: 16px;">
+                                    <i class="fas fa-search mr-2"></i>SEO Optimization
+                                </h3>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        SEO Title (Meta Title)
+                                    </label>
+                                    <input type="text" id="metaTitle" name="meta_title"
+                                           style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;"
+                                           placeholder="Custom SEO title (leave empty to use article title)">
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        <span id="metaTitleCount">0</span>/60 characters
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Meta Description *
+                                    </label>
+                                    <textarea id="metaDescription" name="meta_description" rows="3" required
+                                              style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; resize: vertical;"
+                                              placeholder="Compelling description for search results"></textarea>
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        <span id="metaDescCount">0</span>/160 characters (SEO optimal: 150-160)
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Target Keywords
+                                    </label>
+                                    <input type="text" id="metaKeywords" name="meta_keywords"
+                                           style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;"
+                                           placeholder="hotel technology, guest experience, QR codes">
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        Separate with commas. Focus on 3-5 keywords.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- AI Optimization Section -->
+                            <div style="background: #faf5ff; border: 2px solid #e9d5ff; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+                                <h3 style="font-size: 18px; font-weight: 700; color: #7c3aed; margin-bottom: 16px;">
+                                    <i class="fas fa-robot mr-2"></i>AI Chatbot Optimization
+                                </h3>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        AI Summary *
+                                    </label>
+                                    <textarea id="aiSummary" name="ai_summary" rows="4" required
+                                              style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; resize: vertical;"
+                                              placeholder="Clear, concise summary for AI understanding (3-5 sentences). Focus on key facts and insights."></textarea>
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        This helps AI chatbots like GPT understand and cite your content accurately.
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-bottom: 20px;">
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Key Takeaways / Bullet Points
+                                    </label>
+                                    <textarea id="keyPoints" name="key_points" rows="5"
+                                              style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px; resize: vertical; font-family: monospace;"
+                                              placeholder="• First key point&#10;• Second key point&#10;• Third key point"></textarea>
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        One point per line. Use • or - for bullets.
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                        Target Audience
+                                    </label>
+                                    <input type="text" id="targetAudience" name="target_audience"
+                                           style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;"
+                                           placeholder="Hotel General Managers, Resort Owners, Hospitality Professionals">
+                                    <div style="margin-top: 6px; font-size: 12px; color: #6b7280;">
+                                        Who is this article for? Helps AI recommend to right audience.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <label style="display: block; font-weight: 600; color: #374151; margin-bottom: 8px; font-size: 14px;">
+                                    Featured Image URL
+                                </label>
+                                <input type="url" id="featuredImage" name="featured_image"
+                                       style="width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 14px;"
+                                       placeholder="https://example.com/image.jpg">
+                            </div>
+                            
+                            <!-- Form Actions -->
+                            <div style="display: flex; gap: 12px; padding-top: 20px; border-top: 2px solid #f3f4f6;">
+                                <button type="button" onclick="closeArticleEditor()"
+                                        style="flex: 1; padding: 14px; background: white; color: #6b7280; border: 2px solid #e5e7eb; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                                    Cancel
+                                </button>
+                                <button type="submit" id="saveArticleBtn"
+                                        style="flex: 1; padding: 14px; background: linear-gradient(135deg, #016e8f, #014a61); color: white; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(1, 110, 143, 0.3);">
+                                    <i class="fas fa-save mr-2"></i>Save Article
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
     <script>
         const user = JSON.parse(localStorage.getItem('superadmin_user') || '{}');
@@ -20749,6 +21724,258 @@ app.get('/superadmin/dashboard', (c) => {
         });
         
         // ============================================
+        // BLOG MANAGEMENT FUNCTIONS
+        // ============================================
+        let allArticles = [];
+        let allCategories = [];
+        let editingArticleId = null;
+        
+        async function loadArticles() {
+            const container = document.getElementById('articlesListContainer');
+            try {
+                const response = await fetch('/api/superadmin/blog/articles');
+                allArticles = await response.json();
+                
+                if (!allArticles || allArticles.length === 0) {
+                    container.innerHTML = '<div class="text-center py-12"><i class="fas fa-blog text-4xl text-gray-300 mb-3"></i><p class="text-gray-600">No articles yet. Create your first one!</p></div>';
+                    return;
+                }
+                
+                const statusColors = {
+                    draft: 'bg-gray-100 text-gray-700',
+                    published: 'bg-green-100 text-green-700',
+                    archived: 'bg-red-100 text-red-700'
+                };
+                
+                container.innerHTML = '<table class="data-table"><thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Views</th><th>Published</th><th>Actions</th></tr></thead><tbody>' +
+                    allArticles.map(a => '<tr>' +
+                        '<td class="px-6 py-4"><div class="font-medium">' + a.title + '</div><div class="text-xs text-gray-500">/blog/' + a.slug + '</div></td>' +
+                        '<td class="px-6 py-4">' + (a.category_name || '-') + '</td>' +
+                        '<td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full ' + statusColors[a.status] + '">' + a.status.toUpperCase() + '</span></td>' +
+                        '<td class="px-6 py-4">' + (a.views_count || 0) + '</td>' +
+                        '<td class="px-6 py-4 text-sm">' + (a.published_at ? new Date(a.published_at).toLocaleDateString() : '-') + '</td>' +
+                        '<td class="px-6 py-4"><div class="flex gap-2">' +
+                            '<button onclick="editArticle(' + a.article_id + ')" class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>' +
+                            '<button onclick="deleteArticle(' + a.article_id + ')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>' +
+                            '<a href="/blog/' + a.slug + '" target="_blank" class="text-green-600 hover:text-green-800"><i class="fas fa-external-link-alt"></i></a>' +
+                        '</div></td>' +
+                    '</tr>').join('') +
+                '</tbody></table>';
+            } catch (error) {
+                console.error('Load articles error:', error);
+                container.innerHTML = '<div class="text-center py-12 text-red-600">Failed to load articles</div>';
+            }
+        }
+        
+        async function loadCategories() {
+            const container = document.getElementById('categoriesListContainer');
+            try {
+                const response = await fetch('/api/superadmin/blog/categories');
+                allCategories = await response.json();
+                
+                // Also populate category dropdown in editor
+                const select = document.getElementById('articleCategory');
+                if (select) {
+                    select.innerHTML = '<option value="">Select category...</option>' +
+                        allCategories.map(c => '<option value="' + c.category_id + '">' + c.name + '</option>').join('');
+                }
+                
+                container.innerHTML = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">' +
+                    allCategories.map(c => '<div class="bg-white p-6 rounded-xl border-2 border-gray-100 hover:border-primary transition">' +
+                        '<div class="flex justify-between items-start mb-3">' +
+                            '<h3 class="text-lg font-bold text-gray-800">' + c.name + '</h3>' +
+                            '<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-semibold">' + (c.article_count || 0) + ' articles</span>' +
+                        '</div>' +
+                        '<p class="text-sm text-gray-600 mb-2">' + (c.description || '') + '</p>' +
+                        '<div class="text-xs text-gray-400">/blog/category/' + c.slug + '</div>' +
+                    '</div>').join('') +
+                '</div>';
+            } catch (error) {
+                console.error('Load categories error:', error);
+            }
+        }
+        
+        async function loadBlogStats() {
+            try {
+                const response = await fetch('/api/superadmin/blog/stats');
+                const stats = await response.json();
+                document.getElementById('totalArticles').textContent = stats.total_articles || 0;
+                document.getElementById('totalViews').textContent = stats.total_views || 0;
+            } catch (error) {
+                console.error('Load blog stats error:', error);
+            }
+        }
+        
+        function openArticleEditor(articleId = null) {
+            editingArticleId = articleId;
+            const modal = document.getElementById('articleEditorModal');
+            const form = document.getElementById('articleForm');
+            
+            // Load categories if not loaded
+            if (allCategories.length === 0) {
+                fetch('/api/superadmin/blog/categories').then(r => r.json()).then(cats => {
+                    allCategories = cats;
+                    const select = document.getElementById('articleCategory');
+                    select.innerHTML = '<option value="">Select category...</option>' +
+                        cats.map(c => '<option value="' + c.category_id + '">' + c.name + '</option>').join('');
+                });
+            }
+            
+            if (articleId) {
+                // Edit existing article
+                document.getElementById('editorModalTitle').textContent = 'Edit Article';
+                fetch('/api/superadmin/blog/articles/' + articleId)
+                    .then(r => r.json())
+                    .then(article => {
+                        document.getElementById('articleId').value = article.article_id;
+                        document.getElementById('articleTitle').value = article.title;
+                        document.getElementById('articleSlug').value = article.slug;
+                        document.getElementById('articleCategory').value = article.category_id || '';
+                        document.getElementById('articleStatus').value = article.status;
+                        document.getElementById('articleExcerpt').value = article.excerpt;
+                        document.getElementById('articleContent').value = article.content;
+                        document.getElementById('metaTitle').value = article.meta_title || '';
+                        document.getElementById('metaDescription').value = article.meta_description;
+                        document.getElementById('metaKeywords').value = article.meta_keywords || '';
+                        document.getElementById('aiSummary').value = article.ai_summary;
+                        document.getElementById('keyPoints').value = article.key_points || '';
+                        document.getElementById('targetAudience').value = article.target_audience || '';
+                        document.getElementById('featuredImage').value = article.featured_image || '';
+                        updateCharCounts();
+                    });
+            } else {
+                // New article
+                document.getElementById('editorModalTitle').textContent = 'Create New Article';
+                form.reset();
+                document.getElementById('articleId').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeArticleEditor() {
+            document.getElementById('articleEditorModal').style.display = 'none';
+            editingArticleId = null;
+        }
+        
+        function updateCharCounts() {
+            const titleInput = document.getElementById('articleTitle');
+            const metaTitleInput = document.getElementById('metaTitle');
+            const metaDescInput = document.getElementById('metaDescription');
+            const slugInput = document.getElementById('articleSlug');
+            
+            if (titleInput) document.getElementById('titleCharCount').textContent = titleInput.value.length;
+            if (metaTitleInput) document.getElementById('metaTitleCount').textContent = metaTitleInput.value.length;
+            if (metaDescInput) document.getElementById('metaDescCount').textContent = metaDescInput.value.length;
+            if (slugInput) document.getElementById('slugPreview').textContent = slugInput.value || 'url-friendly-slug';
+        }
+        
+        // Auto-update slug from title
+        document.addEventListener('DOMContentLoaded', () => {
+            const titleInput = document.getElementById('articleTitle');
+            const slugInput = document.getElementById('articleSlug');
+            if (titleInput && slugInput) {
+                titleInput.addEventListener('input', (e) => {
+                    if (!editingArticleId) { // Only auto-generate for new articles
+                        const slug = e.target.value.toLowerCase()
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-|-$/g, '');
+                        slugInput.value = slug;
+                    }
+                    updateCharCounts();
+                });
+            }
+            
+            // Character count updates
+            ['articleTitle', 'metaTitle', 'metaDescription', 'articleSlug'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateCharCounts);
+            });
+        });
+        
+        // Article form submission
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('articleForm');
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const articleId = document.getElementById('articleId').value;
+                    const isEdit = !!articleId;
+                    
+                    const data = {
+                        title: document.getElementById('articleTitle').value,
+                        slug: document.getElementById('articleSlug').value,
+                        category_id: parseInt(document.getElementById('articleCategory').value) || null,
+                        status: document.getElementById('articleStatus').value,
+                        excerpt: document.getElementById('articleExcerpt').value,
+                        content: document.getElementById('articleContent').value,
+                        meta_title: document.getElementById('metaTitle').value || document.getElementById('articleTitle').value,
+                        meta_description: document.getElementById('metaDescription').value,
+                        meta_keywords: document.getElementById('metaKeywords').value,
+                        ai_summary: document.getElementById('aiSummary').value,
+                        key_points: document.getElementById('keyPoints').value,
+                        target_audience: document.getElementById('targetAudience').value,
+                        featured_image: document.getElementById('featuredImage').value,
+                        author_id: 1,
+                        author_name: 'Super Admin'
+                    };
+                    
+                    try {
+                        const response = await fetch(
+                            isEdit ? '/api/superadmin/blog/articles/' + articleId : '/api/superadmin/blog/articles',
+                            {
+                                method: isEdit ? 'PUT' : 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            }
+                        );
+                        
+                        if (response.ok) {
+                            closeArticleEditor();
+                            loadArticles();
+                            alert(isEdit ? 'Article updated successfully!' : 'Article created successfully!');
+                        } else {
+                            alert('Failed to save article');
+                        }
+                    } catch (error) {
+                        console.error('Save article error:', error);
+                        alert('Failed to save article');
+                    }
+                });
+            }
+        });
+        
+        async function editArticle(articleId) {
+            openArticleEditor(articleId);
+        }
+        
+        async function deleteArticle(articleId) {
+            if (!confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/superadmin/blog/articles/' + articleId, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadArticles();
+                    alert('Article deleted successfully');
+                } else {
+                    alert('Failed to delete article');
+                }
+            } catch (error) {
+                console.error('Delete article error:', error);
+                alert('Failed to delete article');
+            }
+        }
+        
+        function createCategory() {
+            alert('Category management coming soon! For now, use default categories or add via database.');
+        }
+        
+        // ============================================
         // TAB SWITCHING
         // ============================================
         document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -20770,6 +21997,9 @@ app.get('/superadmin/dashboard', (c) => {
                 else if (tab === 'hotels') loadHotels();
                 else if (tab === 'vendors') loadVendors();
                 else if (tab === 'bookings') loadBookings();
+                else if (tab === 'blog') loadArticles();
+                else if (tab === 'blog-categories') loadCategories();
+                else if (tab === 'blog-seo') loadBlogStats();
             });
         });
         
