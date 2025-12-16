@@ -2841,7 +2841,11 @@ app.get('/api/admin/callback-requests', async (c) => {
 app.get('/api/admin/frontdesk/stats', async (c) => {
   const { DB } = c.env
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
-  const property_id = 1 // TODO: Get from session
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     // Today's feedback count
@@ -2898,7 +2902,11 @@ app.get('/api/admin/frontdesk/feed', async (c) => {
   const { DB } = c.env
   const date = c.req.query('date') || new Date().toISOString().split('T')[0]
   const view = c.req.query('view') || 'all'
-  const property_id = 1 // TODO: Get from session
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     const communications = []
@@ -3004,6 +3012,11 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
   const { DB } = c.env
   const type = c.req.param('type')
   const id = c.req.param('id')
+  const property_id = c.req.query('property_id')
+  
+  if (!property_id) {
+    return c.json({ error: 'Missing property_id' }, 400)
+  }
   
   try {
     if (type === 'feedback') {
@@ -3011,8 +3024,8 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
         SELECT f.*, ff.form_name
         FROM feedback_submissions f
         LEFT JOIN feedback_forms ff ON f.form_id = ff.form_id
-        WHERE f.submission_id = ?
-      `).bind(id).first()
+        WHERE f.submission_id = ? AND f.property_id = ?
+      `).bind(id, property_id).first()
       
       const answers = await DB.prepare(`
         SELECT fa.*, fq.question_text
@@ -3032,8 +3045,8 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
     } else if (type === 'chatbot') {
       // Try to get from chat_feedback first (flagged complaints)
       const chatFeedback = await DB.prepare(`
-        SELECT * FROM chat_feedback WHERE feedback_id = ?
-      `).bind(id).first()
+        SELECT * FROM chat_feedback WHERE feedback_id = ? AND property_id = ?
+      `).bind(id, property_id).first()
       
       if (chatFeedback && chatFeedback.conversation_id) {
         const messages = await DB.prepare(`
@@ -3054,8 +3067,8 @@ app.get('/api/admin/frontdesk/details/:type/:id', async (c) => {
       
       // If not a flagged complaint, get from chatbot_conversations
       const conversation = await DB.prepare(`
-        SELECT * FROM chatbot_conversations WHERE conversation_id = ?
-      `).bind(id).first()
+        SELECT * FROM chatbot_conversations WHERE conversation_id = ? AND property_id = ?
+      `).bind(id, property_id).first()
       
       if (conversation) {
         const messages = await DB.prepare(`
@@ -33724,7 +33737,7 @@ app.get('/admin/dashboard', (c) => {
           const dateFilter = document.getElementById('frontDeskDateFilter').value || new Date().toISOString().split('T')[0];
           
           // Load stats
-          const statsResponse = await fetch(\`/api/admin/frontdesk/stats?date=\${dateFilter}\`);
+          const statsResponse = await fetch(\`/api/admin/frontdesk/stats?date=\${dateFilter}&property_id=\${propertyId}\`);
           const statsData = await statsResponse.json();
           
           if (statsData.success) {
@@ -33735,7 +33748,7 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Load communications feed
-          const feedResponse = await fetch(\`/api/admin/frontdesk/feed?date=\${dateFilter}&view=\${currentFrontDeskView}\`);
+          const feedResponse = await fetch(\`/api/admin/frontdesk/feed?date=\${dateFilter}&view=\${currentFrontDeskView}&property_id=\${propertyId}\`);
           const feedData = await feedResponse.json();
           
           if (feedData.success) {
@@ -33810,7 +33823,7 @@ app.get('/admin/dashboard', (c) => {
         detailsDiv.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
         
         try {
-          const response = await fetch(\`/api/admin/frontdesk/details/\${type}/\${id}\`);
+          const response = await fetch(\`/api/admin/frontdesk/details/\${type}/\${id}?property_id=\${propertyId}\`);
           const data = await response.json();
           
           if (data.success) {
