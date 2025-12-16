@@ -1128,10 +1128,22 @@ app.get('/blog', async (c) => {
                                 </div>
                             ` : ''}
                             <div class="p-6">
-                                <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                                    <span><i class="fas fa-user mr-1"></i>${article.author_name}</span>
-                                    <span><i class="fas fa-calendar mr-1"></i>${new Date(article.published_at).toLocaleDateString()}</span>
-                                    <span><i class="fas fa-eye mr-1"></i>${article.views_count || 0}</span>
+                                <div class="flex items-center justify-between text-xs text-gray-500 mb-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-semibold text-gray-700">${article.author_name}</span>
+                                        <span>•</span>
+                                        <span>${new Date(article.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                            ${article.views_count || 0}
+                                        </span>
+                                        <span class="flex items-center gap-1">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            ${Math.ceil((article.excerpt.split(' ').length || 100) / 50)} min
+                                        </span>
+                                    </div>
                                 </div>
                                 <h2 class="text-2xl font-bold text-gray-800 mb-3 hover:text-[#016e8f] transition">
                                     <a href="/blog/${article.slug}">${article.title}</a>
@@ -1346,10 +1358,26 @@ app.get('/blog/:slug', async (c) => {
                 </a>
             ` : ''}
             <h1 class="text-5xl font-bold text-gray-900 mb-6">${article.title}</h1>
-            <div class="flex items-center gap-6 text-gray-600">
-                <span><i class="fas fa-user mr-2"></i>${article.author_name}</span>
-                <span><i class="fas fa-calendar mr-2"></i>${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                <span><i class="fas fa-eye mr-2"></i>${(article.views_count || 0) + 1} views</span>
+            <div class="flex items-center gap-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-10 h-10 bg-gradient-to-br from-[#016e8f] to-[#014a61] rounded-full flex items-center justify-center text-white font-bold">
+                        ${article.author_name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-900">${article.author_name}</div>
+                        <div class="text-gray-500">${new Date(article.published_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    </div>
+                </div>
+                <div class="ml-auto flex items-center gap-4 text-gray-500">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        ${(article.views_count || 0) + 1} views
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        ${Math.ceil((article.content.split(' ').length || 500) / 200)} min read
+                    </span>
+                </div>
             </div>
         </header>
         
