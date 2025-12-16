@@ -1,0 +1,67 @@
+-- ============================================
+-- GUESTCONNECT DATABASE FULL BACKUP
+-- Generated: $(date '+%Y-%m-%d %H:%M:%S')
+-- Database: webapp-production (local)
+-- ============================================
+
+-- This backup includes:
+-- 1. All table schemas (CREATE TABLE statements)
+-- 2. All data (INSERT statements)
+-- 3. Migration history
+-- 4. Complete state of the platform
+
+-- ============================================
+-- TABLES INCLUDED:
+-- ============================================
+-- Core: properties, rooms, offerings, custom_sections
+-- Users: users, admins, vendors, platform_admins
+-- Bookings: bookings, beach_bookings, restaurant_reservations
+-- Content: info_pages, callback_requests, qr_scans
+-- Analytics: analytics_events
+-- Subscriptions: subscription_plans, feature_flags, plan_features, 
+--                property_subscriptions, property_feature_overrides, 
+--                subscription_history
+-- ============================================
+
+-- Exporting table: properties
+-- Table properties: No data or doesn't exist
+-- Exporting table: rooms
+-- Table rooms: No data or doesn't exist
+-- Exporting table: users
+-- Table users: No data or doesn't exist
+-- Exporting table: admins
+-- Table admins: No data or doesn't exist
+-- Exporting table: vendors
+-- Table vendors: No data or doesn't exist
+-- Exporting table: platform_admins
+-- Table platform_admins: No data or doesn't exist
+-- Exporting table: offerings
+-- Table offerings: No data or doesn't exist
+-- Exporting table: custom_sections
+-- Table custom_sections: No data or doesn't exist
+-- Exporting table: bookings
+-- Table bookings: No data or doesn't exist
+-- Exporting table: beach_bookings
+-- Table beach_bookings: No data or doesn't exist
+-- Exporting table: restaurant_reservations
+-- Table restaurant_reservations: No data or doesn't exist
+-- Exporting table: info_pages
+-- Table info_pages: No data or doesn't exist
+-- Exporting table: callback_requests
+-- Table callback_requests: No data or doesn't exist
+-- Exporting table: qr_scans
+-- Table qr_scans: No data or doesn't exist
+-- Exporting table: analytics_events
+-- Table analytics_events: No data or doesn't exist
+-- Exporting table: subscription_plans
+-- Table subscription_plans: No data or doesn't exist
+-- Exporting table: feature_flags
+-- Table feature_flags: No data or doesn't exist
+-- Exporting table: plan_features
+-- Table plan_features: No data or doesn't exist
+-- Exporting table: property_subscriptions
+-- Table property_subscriptions: No data or doesn't exist
+-- Exporting table: property_feature_overrides
+-- Table property_feature_overrides: No data or doesn't exist
+-- Exporting table: subscription_history
+-- Table subscription_history: No data or doesn't exist
