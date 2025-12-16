@@ -35919,7 +35919,7 @@ app.get('/admin/dashboard', (c) => {
       // Custom Sections Management
       async function loadCustomSections() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
           const list = document.getElementById('customSectionsList');
           
@@ -35953,7 +35953,7 @@ app.get('/admin/dashboard', (c) => {
       async function deleteCustomSection(sectionId) {
         if (!confirm('Delete this custom section? All offerings linked to this section will remain but will not be displayed.')) return;
         try {
-          const response = await fetch('/api/admin/custom-sections/' + sectionId, {
+          const response = await fetchWithAuth('/api/admin/custom-sections/' + sectionId, {
             method: 'DELETE'
           });
           if (response.ok) {
@@ -35980,9 +35980,8 @@ app.get('/admin/dashboard', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/custom-sections', {
+          const response = await fetchWithAuth('/api/admin/custom-sections', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
           
@@ -36033,7 +36032,7 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadCustomSectionsDropdown() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
           const dropdown = document.getElementById('offeringType');
           
@@ -38042,7 +38041,7 @@ app.get('/admin/dashboard', (c) => {
         // Load custom sections
         let customSections = [];
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
           customSections = data.sections || [];
         } catch (error) {
@@ -38091,7 +38090,7 @@ app.get('/admin/dashboard', (c) => {
         // Load custom sections first
         let customSections = [];
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
           customSections = data.sections || [];
         } catch (error) {
@@ -40698,7 +40697,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       async function loadRoomServiceCardSettings() {
         try {
-          const response = await fetch('/api/admin/custom-sections?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
           const roomServiceSection = data.sections?.find(s => s.section_key === 'room-service');
           
@@ -40905,11 +40904,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const cardColor = document.getElementById('roomServiceCardColor').value || '#6366f1';
           const cardVisible = document.getElementById('roomServiceCardVisible').checked ? 1 : 0;
           
-          const cardResponse = await fetch('/api/admin/custom-sections', {
+          const cardResponse = await fetchWithAuth('/api/admin/custom-sections', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              property_id: 1,
               section_key: 'room-service',
               section_name_en: cardTitle,
               subtitle_en: cardSubtitle,
@@ -40917,7 +40914,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               icon_class: cardIcon,
               color_class: cardColor,
               is_visible: cardVisible,
-              link_url: '/room-service/1'
+              link_url: `/room-service/${roomServiceOffering.offering_id}`
             })
           });
           
