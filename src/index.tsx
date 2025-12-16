@@ -21333,6 +21333,20 @@ app.get('/admin/beach-map-designer', (c) => {
     </div>
     
     <script>
+        // Get authenticated property ID from localStorage
+        const propertyId = localStorage.getItem('property_id') || '1';
+        const userId = localStorage.getItem('user_id') || '1';
+        
+        // Authenticated fetch helper
+        async function fetchWithAuth(url, options = {}) {
+            const headers = {
+                ...options.headers,
+                'X-User-ID': userId,
+                'X-Property-ID': propertyId
+            };
+            return fetch(url, { ...options, headers });
+        }
+        
         let currentTool = 'select';
         let selectedSpot = null;
         let spots = [];
@@ -21633,11 +21647,11 @@ app.get('/admin/beach-map-designer', (c) => {
                 
                 // Create all new spots
                 for (const spot of spots) {
-                    await fetch('/api/admin/beach/spots', {
+                    await fetchWithAuth('/api/admin/beach/spots', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            property_id: 1,
+                            property_id: parseInt(propertyId),
                             zone_id: 1,
                             spot_number: spot.number,
                             spot_type: spot.type,
@@ -21654,11 +21668,11 @@ app.get('/admin/beach-map-designer', (c) => {
                 // Save all zone overlays
                 for (let i = 0; i < zones.length; i++) {
                     const zone = zones[i];
-                    await fetch('/api/admin/beach/zone-overlays', {
+                    await fetchWithAuth('/api/admin/beach/zone-overlays', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            property_id: 1,
+                            property_id: parseInt(propertyId),
                             zone_name: zone.name,
                             shape_type: 'rectangle',
                             coordinates: JSON.stringify({
