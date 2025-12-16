@@ -644,8 +644,8 @@ app.get('/', (c) => {
                     <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
                         <i class="fas fa-concierge-bell text-white text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Room Service Orders</h3>
-                    <p class="text-gray-600 leading-relaxed">Digital menu cards, real-time orders, kitchen dashboard, staff notifications.</p>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Room Service Menus</h3>
+                    <p class="text-gray-600 leading-relaxed">Beautiful digital menu cards. Guests browse your offerings instantly. No printed menus needed.</p>
                 </div>
                 <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
                     <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
@@ -680,7 +680,7 @@ app.get('/', (c) => {
                         <i class="fas fa-robot text-white text-2xl"></i>
                     </div>
                     <h3 class="text-xl font-bold text-gray-900 mb-3">AI Chatbot (24/7)</h3>
-                    <p class="text-gray-600 leading-relaxed">Powered by GPT-4. Answers guest questions instantly in 8 languages. Reduces front desk calls by 60%.</p>
+                    <p class="text-gray-600 leading-relaxed">Powered by GPT-4. Answers guest questions instantly in 35 languages. Reduces front desk calls by 60%.</p>
                 </div>
                 <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
                     <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
@@ -693,8 +693,8 @@ app.get('/', (c) => {
                     <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
                         <i class="fas fa-language text-white text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Multi-Language Support</h3>
-                    <p class="text-gray-600 leading-relaxed">Auto-translation in 8 languages: English, Arabic, German, French, Italian, Russian, Polish, Czech.</p>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">35-Language Auto-Translation</h3>
+                    <p class="text-gray-600 leading-relaxed">Translate your menus, info pages, and offerings to 35 languages in seconds. Powered by AI. One click, instant translations.</p>
                 </div>
                 <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
                     <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
