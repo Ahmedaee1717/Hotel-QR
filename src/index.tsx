@@ -46113,6 +46113,19 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
     <script>
       const offeringId = '${offering_id}';
+      const propertyId = localStorage.getItem('property_id') || '1';
+      const userId = localStorage.getItem('user_id') || '1';
+      
+      // Authenticated fetch helper
+      async function fetchWithAuth(url, options = {}) {
+        const headers = {
+          ...options.headers,
+          'X-User-ID': userId,
+          'X-Property-ID': propertyId
+        };
+        return fetch(url, { ...options, headers });
+      }
+      
       let tables = [];
       let selectedTable = null;
       let floorElements = [];
@@ -46133,7 +46146,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function loadRestaurant() {
         try {
-          const response = await fetch('/api/hotel-offerings/' + propertyId);
+          const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
           const restaurant = restaurants.find(o => o.offering_id == offeringId);
@@ -46232,7 +46245,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/offerings/' + offeringId, {
+          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData)
@@ -46254,7 +46267,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // Occupancy Status Management
       async function setOccupancyStatus(status) {
         try {
-          const response = await fetch('/api/admin/offerings/' + offeringId + '/occupancy', {
+          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId + '/occupancy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -46338,7 +46351,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function loadOccupancyStatus() {
         try {
-          const response = await fetch('/api/hotel-offerings/' + propertyId);
+          const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurant = data.offerings?.find(o => o.offering_id == offeringId);
           
@@ -46358,7 +46371,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadTables() {
         try {
-          const response = await fetch('/api/restaurant/' + offeringId + '/tables');
+          const response = await fetchWithAuth('/api/restaurant/' + offeringId + '/tables');
           const data = await response.json();
           tables = data.tables || [];
           renderTables();
@@ -46471,7 +46484,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function updateElementPosition(element) {
         try {
-          await fetch('/api/admin/restaurant/floor-element/' + element.element_id, {
+          await fetchWithAuth('/api/admin/restaurant/floor-element/' + element.element_id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(element)
@@ -46483,7 +46496,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function updateTablePosition(table) {
         try {
-          await fetch('/api/admin/restaurant/table/' + table.table_id, {
+          await fetchWithAuth('/api/admin/restaurant/table/' + table.table_id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(table)
@@ -46534,7 +46547,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const features = Array.from(document.querySelectorAll('input[name="features"]:checked')).map(cb => cb.value);
         
         try {
-          const response = await fetch('/api/admin/restaurant/table', {
+          const response = await fetchWithAuth('/api/admin/restaurant/table', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -46569,7 +46582,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm(\`Delete table \${selectedTable.table_number}?\`)) return;
         
         try {
-          const response = await fetch('/api/admin/restaurant/table/' + selectedTable.table_id, {
+          const response = await fetchWithAuth('/api/admin/restaurant/table/' + selectedTable.table_id, {
             method: 'DELETE'
           });
           
@@ -46601,7 +46614,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // ========================================
       async function loadFloorElements() {
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/floor-elements');
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/floor-elements');
           const data = await response.json();
           floorElements = data.elements || [];
           renderFloorElements();
@@ -46706,7 +46719,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Delete this floor element?')) return;
         
         try {
-          const response = await fetch('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
+          const response = await fetchWithAuth('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
             method: 'DELETE'
           });
           
@@ -46751,7 +46764,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/restaurant/floor-element', {
+          const response = await fetchWithAuth('/api/admin/restaurant/floor-element', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(elementData)
@@ -46779,7 +46792,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadWalls() {
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/walls');
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/walls');
           const data = await response.json();
           walls = data.walls || [];
           renderWalls();
@@ -46897,7 +46910,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           };
           
           try {
-            const response = await fetch('/api/admin/restaurant/wall', {
+            const response = await fetchWithAuth('/api/admin/restaurant/wall', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(wallData)
@@ -46973,7 +46986,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // ========================================
       async function loadMenuDesign() {
         try {
-          const response = await fetch('/api/restaurant/' + offeringId + '/menu-design');
+          const response = await fetchWithAuth('/api/restaurant/' + offeringId + '/menu-design');
           const data = await response.json();
           
           if (data.success && data.design) {
@@ -47026,7 +47039,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         };
         
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menu-design', {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/menu-design', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
@@ -47128,7 +47141,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       async function loadSessions() {
         try {
           const dateFilter = document.getElementById('filterSessionDate').value || new Date().toISOString().split('T')[0];
-          const response = await fetch(\`/api/restaurant/\${offeringId}/sessions?date=\${dateFilter}\`);
+          const response = await fetchWithAuth(\`/api/restaurant/\${offeringId}/sessions?date=\${dateFilter}\`);
           const data = await response.json();
           
           const list = document.getElementById('sessionsList');
@@ -47315,7 +47328,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             try {
               const sessionData = { ...baseSessionData, session_date: date };
               
-              const response = await fetch('/api/admin/restaurant/session', {
+              const response = await fetchWithAuth('/api/admin/restaurant/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(sessionData)
@@ -47366,7 +47379,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Delete this time slot? Existing reservations will be affected.')) return;
         
         try {
-          const response = await fetch(\`/api/admin/restaurant/session/\${sessionId}\`, {
+          const response = await fetchWithAuth(\`/api/admin/restaurant/session/\${sessionId}\`, {
             method: 'DELETE'
           });
           
@@ -47396,7 +47409,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           if (statusFilter) url += \`&status=\${statusFilter}\`;
           if (guestFilter) url += \`&guest=\${encodeURIComponent(guestFilter)}\`;
           
-          const response = await fetch(url);
+          const response = await fetchWithAuth(url);
           const data = await response.json();
           
           if (!data.success) {
@@ -47470,7 +47483,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function confirmReservation(reference) {
         try {
-          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/confirm\`, {
+          const response = await fetchWithAuth(\`/api/admin/restaurant/reservation/\${reference}/confirm\`, {
             method: 'POST'
           });
           const data = await response.json();
@@ -47488,7 +47501,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function checkInReservation(reference) {
         try {
-          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/checkin\`, {
+          const response = await fetchWithAuth(\`/api/admin/restaurant/reservation/\${reference}/checkin\`, {
             method: 'POST'
           });
           const data = await response.json();
@@ -47508,7 +47521,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Cancel this reservation?')) return;
         
         try {
-          const response = await fetch(\`/api/admin/restaurant/reservation/\${reference}/cancel\`, {
+          const response = await fetchWithAuth(\`/api/admin/restaurant/reservation/\${reference}/cancel\`, {
             method: 'POST'
           });
           const data = await response.json();
@@ -47531,7 +47544,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function loadTextureSettings() {
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/textures');
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/textures');
           const data = await response.json();
           
           if (data.success && data.texture) {
@@ -47613,7 +47626,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             const base64Image = event.target.result;
             
             // Call AI analysis API
-            const response = await fetch('/api/admin/restaurant/' + offeringId + '/analyze-textures', {
+            const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/analyze-textures', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -47675,7 +47688,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         }
         
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/textures', {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/textures', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -47709,7 +47722,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // Load all languages
       async function loadLanguages() {
         try {
-          const response = await fetch('/api/languages');
+          const response = await fetchWithAuth('/api/languages');
           const data = await response.json();
           if (data.success) {
             supportedLanguages = data.languages;
@@ -47722,7 +47735,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // Load menus
       async function loadMenus() {
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus');
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/menus');
           const data = await response.json();
           
           if (data.success) {
@@ -47935,7 +47948,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const menuImageUrls = JSON.parse(menuImageUrlsStr);
 
         try {
-          const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/menus', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -47968,7 +47981,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Process OCR to extract text from this menu image?')) return;
 
         try {
-          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/process-ocr', {
+          const response = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId + '/process-ocr', {
             method: 'POST'
           });
 
@@ -48063,7 +48076,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i><p class="text-lg font-semibold">Translating menu...</p></div>';
 
         try {
-          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/translate', {
+          const response = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId + '/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -48109,7 +48122,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Delete this menu? This action cannot be undone.')) return;
 
         try {
-          const response = await fetch('/api/admin/restaurant/menus/' + menuId, {
+          const response = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId, {
             method: 'DELETE'
           });
 
@@ -48132,7 +48145,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         if (!confirm('Parse this menu into categories and items using AI?\\n\\nThis will analyze the extracted text and create a structured digital menu.')) return;
 
         try {
-          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/parse-structure', {
+          const response = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId + '/parse-structure', {
             method: 'POST'
           });
 
@@ -48222,7 +48235,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           document.getElementById('submitNewMenu').disabled = true;
           
           try {
-            const response = await fetch('/api/admin/restaurant/' + offeringId + '/menus', {
+            const response = await fetchWithAuth('/api/admin/restaurant/' + offeringId + '/menus', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
