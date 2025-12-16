@@ -4361,28 +4361,84 @@ app.get('/api/admin/registration-code', async (c) => {
 // Regenerate property registration code
 app.post('/api/admin/regenerate-registration-code', async (c) => {
   const { DB } = c.env
-  const { property_id } = await c.req.json()
+  
+  // CRITICAL: Get property_id from authenticated user's header
+  const property_id = getAuthenticatedPropertyId(c)
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - No property ID' }, 401)
+  }
   
   try {
-    // Generate new 8-character code
+    // Generate new 8-character code (never expires)
     const newCode = Math.random().toString(36).substring(2, 10).toUpperCase()
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + 30) // Expires in 30 days
     
     await DB.prepare(`
       UPDATE properties
       SET registration_code = ?,
-          registration_code_expires_at = ?
+          registration_code_expires_at = NULL
       WHERE property_id = ?
-    `).bind(newCode, expiresAt.toISOString(), property_id).run()
+    `).bind(newCode, property_id).run()
     
     return c.json({
       success: true,
-      registration_code: newCode,
-      expires_at: expiresAt.toISOString()
+      registration_code: newCode
     })
   } catch (error) {
     console.error('Regenerate registration code error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Vendor connects to property using registration code
+app.post('/api/vendor/connect-property', async (c) => {
+  const { DB } = c.env
+  const { vendor_id, registration_code } = await c.req.json()
+  
+  if (!vendor_id || !registration_code) {
+    return c.json({ error: 'Vendor ID and registration code are required' }, 400)
+  }
+  
+  try {
+    // Find property by registration code
+    const property = await DB.prepare(`
+      SELECT property_id, name, registration_code
+      FROM properties
+      WHERE registration_code = ?
+    `).bind(registration_code.toUpperCase()).first()
+    
+    if (!property) {
+      return c.json({ error: 'Invalid registration code' }, 404)
+    }
+    
+    // Check if vendor is already connected to this property
+    const existing = await DB.prepare(`
+      SELECT id FROM vendor_properties
+      WHERE vendor_id = ? AND property_id = ?
+    `).bind(vendor_id, property.property_id).first()
+    
+    if (existing) {
+      return c.json({ 
+        success: true, 
+        message: 'Already connected',
+        property_id: property.property_id,
+        property_name: property.name
+      })
+    }
+    
+    // Connect vendor to property
+    await DB.prepare(`
+      INSERT INTO vendor_properties (vendor_id, property_id)
+      VALUES (?, ?)
+    `).bind(vendor_id, property.property_id).run()
+    
+    return c.json({
+      success: true,
+      property_id: property.property_id,
+      property_name: property.name,
+      message: 'Successfully connected to ' + property.name
+    })
+  } catch (error) {
+    console.error('Connect vendor to property error:', error)
     return c.json({ error: 'Internal server error' }, 500)
   }
 })
@@ -24340,6 +24396,23 @@ app.get('/vendor/dashboard', (c) => {
             </div>
         </div>
 
+        <!-- Connect to New Property -->
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-key mr-2 text-purple-600"></i>Connect to New Property</h2>
+            <p class="text-gray-600 text-sm mb-4">Enter the registration code provided by a hotel to connect and start offering activities at their property.</p>
+            
+            <form id="connectPropertyForm" class="flex gap-4">
+                <input type="text" id="registrationCodeInput" placeholder="Enter registration code (e.g., ABC12XYZ)" maxlength="8" 
+                    class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none font-mono text-lg uppercase"
+                    style="text-transform: uppercase">
+                <button type="submit" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-lg transition whitespace-nowrap">
+                    <i class="fas fa-link mr-2"></i>Connect
+                </button>
+            </form>
+            
+            <div id="connectResult" class="mt-4 hidden"></div>
+        </div>
+
         <!-- Connected Hotels/Properties -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-hotel mr-2 text-indigo-600"></i>Connected Hotels & Resorts</h2>
@@ -24662,6 +24735,57 @@ app.get('/vendor/dashboard', (c) => {
           updateExcludesList();
         }
       }
+
+      // Connect to Property using Registration Code
+      document.getElementById('connectPropertyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const codeInput = document.getElementById('registrationCodeInput');
+        const code = codeInput.value.trim().toUpperCase();
+        const resultDiv = document.getElementById('connectResult');
+        
+        if (!code || code.length < 6) {
+          resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+          resultDiv.innerHTML = '<p class="text-red-700"><i class="fas fa-exclamation-circle mr-2"></i>Please enter a valid registration code</p>';
+          resultDiv.classList.remove('hidden');
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/vendor/connect-property', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vendor_id: parseInt(vendorId),
+              registration_code: code
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            resultDiv.className = 'mt-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+            resultDiv.innerHTML = '<p class="text-green-700"><i class="fas fa-check-circle mr-2"></i><strong>' + data.message + '</strong></p><p class="text-sm text-gray-600 mt-2">Property: ' + data.property_name + '</p>';
+            resultDiv.classList.remove('hidden');
+            codeInput.value = '';
+            
+            // Reload properties list
+            setTimeout(() => {
+              loadDashboard();
+              resultDiv.classList.add('hidden');
+            }, 3000);
+          } else {
+            resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+            resultDiv.innerHTML = '<p class="text-red-700"><i class="fas fa-exclamation-circle mr-2"></i>' + (data.error || 'Failed to connect') + '</p>';
+            resultDiv.classList.remove('hidden');
+          }
+        } catch (error) {
+          console.error('Connect property error:', error);
+          resultDiv.className = 'mt-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+          resultDiv.innerHTML = '<p class="text-red-700"><i class="fas fa-exclamation-circle mr-2"></i>Connection error. Please try again.</p>';
+          resultDiv.classList.remove('hidden');
+        }
+      });
 
       // Update display lists
       function updateRequirementsList() {
@@ -29748,29 +29872,38 @@ app.get('/admin/dashboard', (c) => {
         <div id="regcodeTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4"><i class="fas fa-key mr-2 text-purple-600"></i>Vendor Registration Code</h2>
-                <p class="text-gray-600 mb-4">Share this code with vendors so they can self-register to your hotel</p>
+                <p class="text-gray-600 mb-4">Share this code with vendors so they can connect to your property</p>
                 
-                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <div>
-                            <p class="text-sm text-gray-600 mb-2">Current Registration Code</p>
-                            <p class="text-4xl font-bold text-blue-600" id="regCode">Loading...</p>
+                            <p class="text-sm text-gray-600 mb-2">Property Registration Code</p>
+                            <div class="flex items-center gap-4">
+                                <p class="text-5xl font-bold text-blue-600" id="regCode">Loading...</p>
+                                <button onclick="copyRegCode()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition">
+                                    <i class="fas fa-copy mr-2"></i>Copy
+                                </button>
+                            </div>
+                            <p class="text-sm text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>This code never expires</p>
                         </div>
                         <button onclick="regenerateRegCode()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                            <i class="fas fa-sync mr-2"></i>Regenerate Code
+                            <i class="fas fa-sync mr-2"></i>Regenerate
                         </button>
                     </div>
-                    <p class="text-sm text-gray-600">Expires: <span id="regCodeExpiry">Loading...</span></p>
                 </div>
                 
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="font-bold mb-2">How it works:</h3>
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h3 class="font-bold mb-2"><i class="fas fa-info-circle mr-2 text-blue-600"></i>How it works:</h3>
                     <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
                         <li>Share this registration code with your vendors</li>
-                        <li>Vendors visit the registration page at <code class="bg-white px-2 py-1 rounded">/vendor/register</code></li>
-                        <li>They enter the code along with their business details</li>
-                        <li>Once registered, they can immediately add activities to your hotel</li>
+                        <li>Vendors login to their vendor dashboard</li>
+                        <li>They enter your code in the "Connect to Property" section</li>
+                        <li>Once connected, they can add activities to your property</li>
                     </ol>
+                </div>
+                
+                <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800"><i class="fas fa-exclamation-triangle mr-2"></i><strong>Security:</strong> Regenerating the code will disconnect all vendors who used the old code. They'll need the new code to reconnect.</p>
                 </div>
             </div>
         </div>
@@ -35097,31 +35230,46 @@ app.get('/admin/dashboard', (c) => {
 
       async function loadRegCode() {
         try {
-          const response = await fetch('/api/admin/registration-code?property_id=' + propertyId);
+          const response = await fetchWithAuth('/api/admin/registration-code?property_id=' + propertyId);
           const data = await response.json();
-          document.getElementById('regCode').textContent = data.registration_code;
-          const expiry = new Date(data.expires_at);
-          document.getElementById('regCodeExpiry').textContent = expiry.toLocaleDateString();
+          document.getElementById('regCode').textContent = data.registration_code || 'None';
         } catch (error) {
           console.error('Load reg code error:', error);
+          document.getElementById('regCode').textContent = 'Error loading';
+        }
+      }
+
+      function copyRegCode() {
+        const code = document.getElementById('regCode').textContent;
+        if (code && code !== 'Loading...' && code !== 'None' && code !== 'Error loading') {
+          navigator.clipboard.writeText(code).then(() => {
+            alert('✅ Code copied to clipboard!');
+          }).catch(err => {
+            console.error('Copy failed:', err);
+            alert('Failed to copy code');
+          });
+        } else {
+          alert('No code to copy');
         }
       }
 
       async function regenerateRegCode() {
-        if (!confirm('Regenerate registration code? The old code will no longer work.')) return;
+        if (!confirm('⚠️ Regenerate registration code? This will disconnect ALL vendors using the old code. They will need the new code to reconnect.')) return;
         try {
-          const response = await fetch('/api/admin/regenerate-registration-code', {
+          const response = await fetchWithAuth('/api/admin/regenerate-registration-code', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ property_id: 1 })
+            body: JSON.stringify({})
           });
           const data = await response.json();
           if (data.success) {
-            alert('New registration code generated!');
+            alert('✅ New registration code generated!\n\nNew Code: ' + data.registration_code + '\n\nShare this with your vendors.');
             loadRegCode();
+          } else {
+            alert('❌ Error: ' + (data.error || 'Failed to generate code'));
           }
         } catch (error) {
           console.error('Regenerate code error:', error);
+          alert('Error regenerating code');
         }
       }
 
