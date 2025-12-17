@@ -39911,9 +39911,17 @@ app.get('/admin/dashboard', (c) => {
           console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
           if (range) currentAnalyticsRange = range;
           
-          // Show loading state
+          // Get all DOM elements once at the start
+          const totalScansEl = document.getElementById('totalScans');
+          const activeBookingsEl = document.getElementById('activeBookings');
+          const totalActivitiesEl = document.getElementById('totalActivities');
+          const totalVendorsEl = document.getElementById('totalVendors');
+          const scansComparisonEl = document.getElementById('scansComparison');
+          const bookingsComparisonEl = document.getElementById('bookingsComparison');
           const popularActivitiesEl = document.getElementById('popularActivities');
           const popularSectionsEl = document.getElementById('popularSections');
+          
+          // Show loading state
           if (popularActivitiesEl) {
             popularActivitiesEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading activities...</p></div>';
           }
@@ -39931,12 +39939,6 @@ app.get('/admin/dashboard', (c) => {
           
           const data = await response.json();
           console.log('✅ Analytics data received:', data);
-          
-          // Defensive: Check if elements exist before updating
-          const totalScansEl = document.getElementById('totalScans');
-          const activeBookingsEl = document.getElementById('activeBookings');
-          const totalActivitiesEl = document.getElementById('totalActivities');
-          const totalVendorsEl = document.getElementById('totalVendors');
           
           if (!totalScansEl || !activeBookingsEl || !totalActivitiesEl || !totalVendorsEl) {
             console.error('❌ Analytics DOM elements not found:', {
@@ -39988,7 +39990,6 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Popular activities
-          const popularActivitiesEl = document.getElementById('popularActivities');
           if (popularActivitiesEl && data.popularActivities) {
             const activitiesHTML = data.popularActivities.map((a, i) => 
               '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
@@ -40006,7 +40007,6 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Popular sections
-          const popularSectionsEl = document.getElementById('popularSections');
           if (popularSectionsEl && data.popularSections) {
             const sectionsHTML = data.popularSections.map((s, i) =>
               '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
@@ -40023,16 +40023,7 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('❌ Analytics load error:', error);
           
-          // Set default values to stop infinite loading
-          const totalScansEl = document.getElementById('totalScans');
-          const activeBookingsEl = document.getElementById('activeBookings');
-          const totalActivitiesEl = document.getElementById('totalActivities');
-          const totalVendorsEl = document.getElementById('totalVendors');
-          const scansComparisonEl = document.getElementById('scansComparison');
-          const bookingsComparisonEl = document.getElementById('bookingsComparison');
-          const popularActivitiesEl = document.getElementById('popularActivities');
-          const popularSectionsEl = document.getElementById('popularSections');
-          
+          // Set default values to stop infinite loading (elements already declared above)
           if (totalScansEl) totalScansEl.textContent = '0';
           if (activeBookingsEl) activeBookingsEl.textContent = '0';
           if (totalActivitiesEl) totalActivitiesEl.textContent = '0';
