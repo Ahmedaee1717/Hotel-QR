@@ -16129,6 +16129,7 @@ app.get('/hotel/:property_slug', async (c) => {
         <title>Welcome</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
         <style id="dynamic-styles">
           /* Dynamic styles will be injected here */
         </style>
@@ -26872,9 +26873,238 @@ app.get('/staff/beach-check-in', (c) => {
 })
 
 // Staff Pass Verification Scanner with Facial Recognition
-app.get('/staff/verify-pass', async (c) => {
-  const html = await Bun.file('public/staff-pass-scanner.html').text()
-  return c.html(html)
+app.get('/staff/verify-pass', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Pass Verification - Facial Recognition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        #video { border-radius: 12px; transform: scaleX(-1); }
+        #canvas { position: absolute; top: 0; left: 0; border-radius: 12px; }
+        .confidence-meter { height: 24px; background: linear-gradient(to right, #ef4444, #f59e0b, #10b981); border-radius: 12px; transition: all 0.3s; }
+        .scan-indicator { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen p-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold flex items-center gap-3" style="color: #016e8f;">
+                            <i class="fas fa-user-shield"></i>Pass Verification Scanner
+                        </h1>
+                        <p class="text-gray-600 mt-2">QR Code + Facial Recognition</p>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
+                            <i class="fas fa-check-circle text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-bold text-gray-800" id="verified-count">0</div>
+                            <div class="text-sm text-gray-600">Verified Today</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-yellow-500">
+                            <i class="fas fa-exclamation-triangle text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-bold text-gray-800" id="manual-review-count">0</div>
+                            <div class="text-sm text-gray-600">Manual Reviews</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-red-500">
+                            <i class="fas fa-times-circle text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-bold text-gray-800" id="denied-count">0</div>
+                            <div class="text-sm text-gray-600">Access Denied</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2" style="color: #016e8f;">
+                    <i class="fas fa-qrcode"></i>Enter Pass Reference
+                </h2>
+                <div class="flex gap-2">
+                    <input type="text" id="manual-pass-ref" placeholder="PASS-XXX-XXX" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <button onclick="verifyManualPass()" class="px-6 py-2 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">
+                        Verify
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    QR Scanner coming soon - Use manual entry for now
+                </p>
+            </div>
+            
+            <div id="verification-result" class="hidden"></div>
+        </div>
+    </div>
+    
+    <script>
+        let faceApiLoaded = false;
+        let currentPass = null;
+        
+        function fetchWithAuth(url, options = {}) {
+            const user_id = localStorage.getItem('user_id');
+            const property_id = localStorage.getItem('property_id');
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-User-ID': user_id,
+                    'X-Property-ID': property_id,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        async function loadFaceAPI() {
+            try {
+                console.log('Loading face-api.js models...');
+                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                faceApiLoaded = true;
+                console.log('face-api.js models loaded successfully');
+            } catch (error) {
+                console.error('Failed to load face-api.js:', error);
+            }
+        }
+        
+        async function verifyManualPass() {
+            const passRef = document.getElementById('manual-pass-ref').value.trim();
+            if (!passRef) {
+                alert('Please enter a pass reference');
+                return;
+            }
+            await verifyPass(passRef);
+        }
+        
+        async function verifyPass(passReference) {
+            try {
+                const response = await fetchWithAuth('/api/staff/verify-pass', {
+                    method: 'POST',
+                    body: JSON.stringify({ pass_reference: passReference })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showError(data.error || 'Pass verification failed');
+                    return;
+                }
+                
+                currentPass = data;
+                
+                if (data.face_enrolled === false) {
+                    showQROnlySuccess(data.pass_details);
+                } else {
+                    showError('Face verification not yet fully implemented. Coming soon!');
+                }
+            } catch (error) {
+                console.error('Verify pass error:', error);
+                showError('Failed to verify pass');
+            }
+        }
+        
+        function showQROnlySuccess(passDetails) {
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.innerHTML = \`
+                <div class="bg-green-50 border-4 border-green-500 rounded-xl p-8">
+                    <div class="text-center mb-6">
+                        <i class="fas fa-check-circle text-6xl text-green-700"></i>
+                        <h3 class="text-3xl font-bold mt-4 text-green-700">Pass Verified - Access Granted</h3>
+                        <p class="text-gray-600 mt-2">QR verification successful</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-6">
+                        <h4 class="font-bold text-lg mb-4" style="color: #016e8f;">Pass Details:</h4>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div><p class="text-sm text-gray-600">Guest Name</p><p class="font-semibold">\${passDetails.guest_name}</p></div>
+                            <div><p class="text-sm text-gray-600">Room Number</p><p class="font-semibold">\${passDetails.room_number}</p></div>
+                            <div><p class="text-sm text-gray-600">Pass Reference</p><p class="font-semibold">\${passDetails.pass_reference}</p></div>
+                            <div><p class="text-sm text-gray-600">Tier</p><p class="font-semibold"><i class="fas \${passDetails.tier_icon}" style="color: \${passDetails.tier_color};"></i> \${passDetails.tier}</p></div>
+                        </div>
+                    </div>
+                    <button onclick="resetScanner()" class="w-full mt-6 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">
+                        Verify Next Pass
+                    </button>
+                </div>
+            \`;
+            resultDiv.classList.remove('hidden');
+            updateStats('valid');
+        }
+        
+        function showError(message) {
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.innerHTML = \`
+                <div class="bg-red-50 border-4 border-red-500 rounded-xl p-8 text-center">
+                    <i class="fas fa-exclamation-circle text-6xl text-red-700"></i>
+                    <h3 class="text-3xl font-bold mt-4 text-red-700">Verification Failed</h3>
+                    <p class="text-gray-700 mt-2">\${message}</p>
+                    <button onclick="resetScanner()" class="mt-6 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">
+                        Try Again
+                    </button>
+                </div>
+            \`;
+            resultDiv.classList.remove('hidden');
+        }
+        
+        function resetScanner() {
+            document.getElementById('verification-result').classList.add('hidden');
+            document.getElementById('manual-pass-ref').value = '';
+            currentPass = null;
+        }
+        
+        function updateStats(result) {
+            if (result === 'valid') {
+                const count = parseInt(document.getElementById('verified-count').textContent);
+                document.getElementById('verified-count').textContent = count + 1;
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('property_id');
+            localStorage.removeItem('staff_name');
+            window.location.href = '/admin/login';
+        }
+        
+        window.addEventListener('load', async () => {
+            if (!localStorage.getItem('user_id') || !localStorage.getItem('property_id')) {
+                window.location.href = '/admin/login';
+                return;
+            }
+            await loadFaceAPI();
+        });
+    </script>
+</body>
+</html>
+  `)
 })
 
 // Interactive Hotel Map Builder - Admin tool to create clickable map hotspots
@@ -46468,11 +46698,67 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // Display passes
       function displayPasses(passes) {
         const container = document.getElementById('passes-list');
-        container.innerHTML = '<div class="text-center py-8 text-gray-600">' +
-          '<p><strong>' + passes.length + ' passes loaded</strong></p>' +
-          '<p class="text-sm mt-2">Detailed pass cards UI coming in next phase</p>' +
-          '<pre class="text-left bg-gray-50 p-4 mt-4 rounded text-xs overflow-auto">' + JSON.stringify(passes.slice(0, 3), null, 2) + '</pre>' +
-          '</div>';
+        
+        if (passes.length === 0) {
+          container.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fas fa-id-badge text-4xl mb-3"></i><p>No passes found</p></div>';
+          return;
+        }
+        
+        let html = '<div class="grid md:grid-cols-2 gap-6">';
+        
+        passes.forEach(pass => {
+          const statusColor = pass.pass_status === 'active' ? 'bg-green-100 text-green-700' : pass.pass_status === 'expired' ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700';
+          const hasFace = !!pass.face_photo_url || !!pass.face_embedding;
+          const photoUrl = pass.face_photo_url || pass.primary_guest_photo_url || 'https://via.placeholder.com/150?text=No+Photo';
+          const tierColor = pass.tier_color || '#3B82F6';
+          const tierIcon = pass.tier_icon || 'fa-star';
+          const tierName = pass.tier_display_name || 'Standard';
+          
+          html += '<div class="bg-white rounded-xl shadow-lg overflow-hidden border-2" style="border-color: ' + tierColor + ';">';
+          html += '<div class="p-6">';
+          html += '<div class="flex items-start justify-between mb-4">';
+          html += '<div class="flex items-center gap-4">';
+          html += '<div class="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 relative bg-gray-50">';
+          html += '<img src="' + photoUrl + '" alt="' + pass.primary_guest_name + '" class="w-full h-full object-cover">';
+          if (hasFace) {
+            html += '<div class="absolute top-1 right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"><i class="fas fa-check text-white text-xs"></i></div>';
+          }
+          html += '</div>';
+          html += '<div>';
+          html += '<h3 class="font-bold text-lg">' + pass.primary_guest_name + '</h3>';
+          html += '<p class="text-gray-600 text-sm">Room ' + pass.room_number + '</p>';
+          html += '<p class="text-gray-500 text-xs mt-1">' + pass.pass_reference + '</p>';
+          html += '</div></div>';
+          html += '<span class="' + statusColor + ' px-3 py-1 rounded-full text-xs font-semibold uppercase">' + pass.pass_status + '</span>';
+          html += '</div>';
+          
+          html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+          html += '<div><p class="text-xs text-gray-500">Tier Level</p>';
+          html += '<p class="font-semibold flex items-center gap-2">';
+          html += '<i class="fas ' + tierIcon + '" style="color: ' + tierColor + ';"></i>';
+          html += tierName + '</p></div>';
+          html += '<div><p class="text-xs text-gray-500">Guests</p>';
+          html += '<p class="font-semibold">' + pass.num_adults + ' Adults, ' + pass.num_children + ' Kids</p></div>';
+          html += '<div><p class="text-xs text-gray-500">Valid From</p>';
+          html += '<p class="font-semibold text-sm">' + pass.valid_from + '</p></div>';
+          html += '<div><p class="text-xs text-gray-500">Valid Until</p>';
+          html += '<p class="font-semibold text-sm">' + pass.valid_until + '</p></div>';
+          html += '</div>';
+          
+          html += '<div class="flex gap-2">';
+          if (hasFace) {
+            html += '<button onclick="viewPassFace(' + pass.pass_id + ')" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-semibold"><i class="fas fa-camera mr-2"></i>Face Enrolled</button>';
+          } else {
+            html += '<button onclick="enrollPassFace(' + pass.pass_id + ', \'' + pass.pass_reference + '\')" class="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 text-sm font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-2"></i>Enroll Face</button>';
+          }
+          html += '<button onclick="viewPass(\'' + pass.pass_reference + '\')" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-qrcode"></i></button>';
+          html += '<button onclick="editPass(' + pass.pass_id + ')" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"><i class="fas fa-edit"></i></button>';
+          html += '</div>';
+          html += '</div></div>';
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
       }
 
       // Display pagination
@@ -46528,6 +46814,275 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           console.error('Deactivate pass error:', error);
           alert('Failed to deactivate pass');
         }
+      };
+      
+      // Enroll face for pass
+      window.enrollPassFace = function(passId, passReference) {
+        const modal = document.createElement('div');
+        modal.id = 'face-enroll-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">';
+        html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-camera"></i>';
+        html += 'Enroll Guest Face - ' + passReference;
+        html += '</h2>';
+        html += '<button onclick="closeFaceEnrollModal()" class="text-white hover:text-gray-200 text-2xl">';
+        html += '<i class="fas fa-times"></i>';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<div class="mb-6">';
+        html += '<p class="text-gray-600 mb-4">Upload a photo or capture from webcam to enable facial recognition for this pass.</p>';
+        
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 cursor-pointer" onclick="document.getElementById(\'photo-upload-' + passId + '\').click()">';
+        html += '<i class="fas fa-upload text-4xl text-gray-400 mb-3"></i>';
+        html += '<p class="font-semibold">Upload Photo</p>';
+        html += '<p class="text-sm text-gray-500 mt-1">Click to select image</p>';
+        html += '<input type="file" id="photo-upload-' + passId + '" accept="image/*" class="hidden" onchange="handlePhotoUpload(' + passId + ', this)">';
+        html += '</div>';
+        
+        html += '<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 cursor-pointer" onclick="startWebcam(' + passId + ')">';
+        html += '<i class="fas fa-video text-4xl text-gray-400 mb-3"></i>';
+        html += '<p class="font-semibold">Use Webcam</p>';
+        html += '<p class="text-sm text-gray-500 mt-1">Capture live photo</p>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div id="photo-preview-' + passId + '" class="hidden mb-6">';
+        html += '<h3 class="font-semibold mb-3">Photo Preview:</h3>';
+        html += '<div class="relative inline-block">';
+        html += '<img id="preview-img-' + passId + '" class="max-w-full h-64 rounded-lg border-2 border-gray-300">';
+        html += '<div id="face-detection-overlay-' + passId + '" class="absolute top-0 left-0"></div>';
+        html += '</div>';
+        html += '<p id="face-status-' + passId + '" class="text-sm text-gray-600 mt-2"></p>';
+        html += '</div>';
+        
+        html += '<div id="webcam-area-' + passId + '" class="hidden mb-6">';
+        html += '<h3 class="font-semibold mb-3">Position Face in Frame:</h3>';
+        html += '<div class="relative inline-block">';
+        html += '<video id="webcam-' + passId + '" width="640" height="480" autoplay class="rounded-lg border-2 border-gray-300"></video>';
+        html += '<canvas id="webcam-canvas-' + passId + '" class="absolute top-0 left-0"></canvas>';
+        html += '</div>';
+        html += '<div class="mt-4 flex gap-2">';
+        html += '<button onclick="capturePhoto(' + passId + ')" class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold">';
+        html += '<i class="fas fa-camera mr-2"></i>Capture Photo';
+        html += '</button>';
+        html += '<button onclick="stopWebcam(' + passId + ')" class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold">';
+        html += 'Cancel';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '<div id="submit-area-' + passId + '" class="hidden">';
+        html += '<button onclick="submitFaceEnrollment(' + passId + ')" class="w-full px-6 py-3 text-white rounded-lg font-bold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<i class="fas fa-check mr-2"></i>Enroll Face & Save';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+      };
+      
+      window.closeFaceEnrollModal = function() {
+        const modal = document.getElementById('face-enroll-modal');
+        if (modal) {
+          // Stop any webcam streams
+          const videos = modal.querySelectorAll('video');
+          videos.forEach(video => {
+            if (video.srcObject) {
+              video.srcObject.getTracks().forEach(track => track.stop());
+            }
+          });
+          modal.remove();
+        }
+      };
+      
+      let currentPhotoData = null;
+      let currentFaceEmbedding = null;
+      
+      window.handlePhotoUpload = async function(passId, input) {
+        if (!input.files || !input.files[0]) return;
+        
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = async function(e) {
+          currentPhotoData = e.target.result;
+          
+          // Show preview
+          const previewArea = document.getElementById('photo-preview-' + passId);
+          const previewImg = document.getElementById('preview-img-' + passId);
+          const statusEl = document.getElementById('face-status-' + passId);
+          
+          previewImg.src = currentPhotoData;
+          previewArea.classList.remove('hidden');
+          statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Detecting face...';
+          
+          // Detect face using face-api.js
+          await detectFaceInImage(previewImg, passId);
+          
+          document.getElementById('submit-area-' + passId).classList.remove('hidden');
+        };
+        
+        reader.readAsDataURL(file);
+      };
+      
+      window.startWebcam = async function(passId) {
+        const webcamArea = document.getElementById('webcam-area-' + passId);
+        const video = document.getElementById('webcam-' + passId);
+        const canvas = document.getElementById('webcam-canvas-' + passId);
+        
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+          video.srcObject = stream;
+          webcamArea.classList.remove('hidden');
+          
+          // Setup canvas
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          
+          // Start face detection
+          video.addEventListener('loadedmetadata', () => {
+            detectFaceInWebcam(video, canvas);
+          });
+        } catch (error) {
+          alert('Failed to access webcam: ' + error.message);
+        }
+      };
+      
+      window.stopWebcam = function(passId) {
+        const video = document.getElementById('webcam-' + passId);
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        document.getElementById('webcam-area-' + passId).classList.add('hidden');
+      };
+      
+      window.capturePhoto = async function(passId) {
+        const video = document.getElementById('webcam-' + passId);
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        
+        currentPhotoData = canvas.toDataURL('image/jpeg', 0.9);
+        
+        // Stop webcam
+        stopWebcam(passId);
+        
+        // Show preview
+        const previewArea = document.getElementById('photo-preview-' + passId);
+        const previewImg = document.getElementById('preview-img-' + passId);
+        const statusEl = document.getElementById('face-status-' + passId);
+        
+        previewImg.src = currentPhotoData;
+        previewArea.classList.remove('hidden');
+        statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Detecting face...';
+        
+        // Detect face
+        await detectFaceInImage(previewImg, passId);
+        
+        document.getElementById('submit-area-' + passId).classList.remove('hidden');
+      };
+      
+      async function detectFaceInImage(imgElement, passId) {
+        const statusEl = document.getElementById('face-status-' + passId);
+        
+        try {
+          // Load face-api.js models if not loaded
+          if (!window.faceapi) {
+            statusEl.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-500 mr-2"></i>Face detection library loading... (enrollment will continue)';
+            return;
+          }
+          
+          const detection = await faceapi.detectSingleFace(imgElement, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+          
+          if (detection) {
+            currentFaceEmbedding = Array.from(detection.descriptor);
+            statusEl.innerHTML = '<i class="fas fa-check-circle text-green-500 mr-2"></i>Face detected successfully! Ready to enroll.';
+          } else {
+            currentFaceEmbedding = null;
+            statusEl.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>No face detected. Photo will be saved without facial recognition.';
+          }
+        } catch (error) {
+          console.error('Face detection error:', error);
+          statusEl.innerHTML = '<i class="fas fa-info-circle text-blue-500 mr-2"></i>Face detection unavailable. Photo will be saved for manual verification.';
+        }
+      }
+      
+      async function detectFaceInWebcam(video, canvas) {
+        if (!window.faceapi || !video.srcObject) return;
+        
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (detections.length > 0) {
+          const { x, y, width, height } = detections[0].box;
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x, y, width, height);
+        }
+        
+        requestAnimationFrame(() => detectFaceInWebcam(video, canvas));
+      }
+      
+      window.submitFaceEnrollment = async function(passId) {
+        if (!currentPhotoData) {
+          alert('Please upload or capture a photo first');
+          return;
+        }
+        
+        const submitBtn = document.querySelector('#submit-area-' + passId + ' button');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enrolling...';
+        
+        try {
+          const property_id = localStorage.getItem('property_id');
+          const url = '/api/admin/all-inclusive/passes/' + property_id + '/' + passId + '/enroll-face';
+          
+          const response = await fetchWithAuth(url, {
+            method: 'POST',
+            body: JSON.stringify({
+              photo_data: currentPhotoData,
+              face_embedding: currentFaceEmbedding ? JSON.stringify(currentFaceEmbedding) : null
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Face enrolled successfully!');
+            closeFaceEnrollModal();
+            loadPasses(); // Reload passes to show updated status
+          } else {
+            alert('Failed to enroll face: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Enroll Face & Save';
+          }
+        } catch (error) {
+          console.error('Face enrollment error:', error);
+          alert('Failed to enroll face');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Enroll Face & Save';
+        }
+      };
+      
+      // View pass face
+      window.viewPassFace = function(passId) {
+        alert('Viewing face photo for Pass ID: ' + passId + '\\n\\nFull photo viewer coming soon!');
       };
 
       // Load locations
