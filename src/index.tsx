@@ -14387,7 +14387,7 @@ app.get('/api/admin/all-inclusive/passes', async (c) => {
 })
 
 // Admin: Create new digital pass
-app.post('/api/admin/all-inclusive/passes', requirePermission('property_settings'), async (c) => {
+app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const property_id = getAuthenticatedPropertyId(c)
   const user_id = c.req.header('X-User-ID')
@@ -14495,7 +14495,7 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('property_settings
 })
 
 // Admin: Get single pass details
-app.get('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+app.get('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const { pass_id } = c.req.param()
   const property_id = getAuthenticatedPropertyId(c)
@@ -14550,7 +14550,7 @@ app.get('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_
 })
 
 // Admin: Update pass
-app.put('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+app.put('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const { pass_id } = c.req.param()
   const property_id = getAuthenticatedPropertyId(c)
@@ -14625,7 +14625,7 @@ app.put('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_
 })
 
 // Admin: Deactivate pass
-app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermission('property_settings'), async (c) => {
+app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const { pass_id } = c.req.param()
   const property_id = getAuthenticatedPropertyId(c)
@@ -14656,7 +14656,7 @@ app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermissio
 })
 
 // Admin: Delete pass permanently
-app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
   const { pass_id } = c.req.param()
   const property_id = getAuthenticatedPropertyId(c)
