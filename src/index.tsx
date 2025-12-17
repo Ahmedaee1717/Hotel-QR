@@ -13,6 +13,24 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 
 // ============================================
+// GUEST DIGITAL PASS ROUTES (Priority routes - must be first)
+// ============================================
+
+// Guest Digital Pass Display (QR + Face in ONE place)
+app.get('/guest-pass/:pass_reference', async (c) => {
+  // Create the full URL to fetch the static HTML file
+  const url = new URL('/guest-pass.html', c.req.url)
+  const response = await fetch(url.toString())
+  return c.html(await response.text())
+})
+
+// Guest Self-Service Portal  
+app.get('/guest-portal.html', async (c) => {
+  const html = await fetch(new URL('/guest-portal.html', c.req.url))
+  return c.html(await html.text())
+})
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
@@ -27754,12 +27772,6 @@ app.get('/staff/face-scanner', async (c) => {
   return c.html(await html.text())
 })
 
-// Guest Digital Pass Display (QR + Face in ONE place)
-app.get('/guest-pass/:pass_reference', async (c) => {
-  const html = await fetch(new URL('/guest-pass.html', c.req.url))
-  return c.html(await html.text())
-})
-
 // GDPR/BIPA Compliance Documentation Page
 app.get('/biometric-compliance', async (c) => {
   const html = await fetch(new URL('/biometric-compliance.html', c.req.url))
@@ -48840,6 +48852,11 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 app.get('/:property_slug?', async (c) => {
   const { DB } = c.env
   const property_slug = c.req.param('property_slug') || 'paradise-resort'
+  
+  // Skip if this matches a specific route pattern
+  if (property_slug && (property_slug.startsWith('guest-pass') || property_slug === 'guest-portal.html')) {
+    return c.notFound()
+  }
   
   try {
     const property = await DB.prepare(`
