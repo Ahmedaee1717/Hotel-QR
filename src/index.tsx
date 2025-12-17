@@ -481,14 +481,18 @@ app.get('/', (c) => {
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-24">
                 <div class="flex items-center">
-                    <img src="/guestconnect-logo-horizontal.png" alt="GuestConnect Logo" class="h-20 w-auto">
+                    <img src="/guestconnect-logo-small.png" alt="GuestConnect Logo" class="h-16 w-auto">
                 </div>
-                <div class="hidden md:flex items-center space-x-8">
+                <div class="hidden md:flex items-center space-x-6">
                     <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
                     <a href="#pricing" class="text-sm font-medium text-gray-700 hover:text-primary transition">Pricing</a>
                     <a href="#ai-chatbot" class="text-sm font-medium text-gray-700 hover:text-primary transition">AI Chatbot</a>
                     <a href="/blog" class="text-sm font-medium text-gray-700 hover:text-primary transition">Blog</a>
                     <a href="/admin/login" class="text-sm font-medium text-gray-700 hover:text-primary transition">Login</a>
+                    <a href="/face-scan-feature" class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transform hover:scale-105 transition border-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 16px; filter: brightness(0) invert(1);">
+                        <span>OnePass</span>
+                    </a>
                     <a href="/superadmin/login" class="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-[#014a5e] transition text-sm font-semibold shadow-md hover:shadow-lg">
                         Start Free Trial
                     </a>
@@ -507,6 +511,10 @@ app.get('/', (c) => {
                 <a href="#ai-chatbot" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">AI Chatbot</a>
                 <a href="/blog" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Blog</a>
                 <a href="/admin/login" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Login</a>
+                <a href="/face-scan-feature" class="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-lg font-bold border-2 mb-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
+                    <img src="/onepass-logo.png" alt="OnePass" style="height: 18px; filter: brightness(0) invert(1);">
+                    <span>OnePass</span>
+                </a>
                 <a href="/superadmin/login" class="block bg-primary text-white px-6 py-3 rounded-lg text-center font-semibold">Start Free Trial</a>
             </div>
         </div>
