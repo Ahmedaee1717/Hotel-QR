@@ -34358,20 +34358,14 @@ app.get('/admin/dashboard', (c) => {
                     <div class="bg-white border rounded-lg p-4 md:p-6">
                         <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-fire mr-2 text-red-500"></i>Most Popular Activities</h3>
                         <div id="popularActivities" class="space-y-2 md:space-y-3">
-                            <div class="text-center text-gray-400 py-6 md:py-8">
-                                <i class="fas fa-spinner fa-spin text-xl md:text-2xl mb-2"></i>
-                                <p class="text-sm md:text-base">Loading...</p>
-                            </div>
+                            <!-- Will be populated by loadAnalytics() -->
                         </div>
                     </div>
                     
                     <div class="bg-white border rounded-lg p-4 md:p-6">
-                        <h3 class="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
+                        <h3 class="text-base md:text-lg font-bold mb-3 md:text-2xl font-bold mb-3 md:mb-4 text-gray-700"><i class="fas fa-star mr-2 text-yellow-500"></i>Most Viewed Sections</h3>
                         <div id="popularSections" class="space-y-2 md:space-y-3">
-                            <div class="text-center text-gray-400 py-6 md:py-8">
-                                <i class="fas fa-spinner fa-spin text-xl md:text-2xl mb-2"></i>
-                                <p class="text-sm md:text-base">Loading...</p>
-                            </div>
+                            <!-- Will be populated by loadAnalytics() -->
                         </div>
                     </div>
                 </div>
@@ -39914,15 +39908,29 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadAnalytics(range) {
         try {
+          console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
           if (range) currentAnalyticsRange = range;
           
+          // Show loading state
+          const popularActivitiesEl = document.getElementById('popularActivities');
+          const popularSectionsEl = document.getElementById('popularSections');
+          if (popularActivitiesEl) {
+            popularActivitiesEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading activities...</p></div>';
+          }
+          if (popularSectionsEl) {
+            popularSectionsEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading sections...</p></div>';
+          }
+          
+          console.log('📡 Fetching analytics from /api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           const response = await fetchWithAuth('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
           
           if (!response.ok) {
+            console.error('❌ Analytics API error:', response.status, response.statusText);
             throw new Error('Analytics API returned ' + response.status);
           }
           
           const data = await response.json();
+          console.log('✅ Analytics data received:', data);
           
           // Defensive: Check if elements exist before updating
           const totalScansEl = document.getElementById('totalScans');
