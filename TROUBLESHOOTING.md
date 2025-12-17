@@ -25,7 +25,8 @@ We manually created the minimal required schema in production:
 ✅ **Tiers exist**: 4 tiers created (Standard, Premium, VIP, Diamond)  
 ✅ **Admin user exists**: admin@paradiseresort.com (user_id: 1, property_id: 1)  
 ✅ **Guest-pass route working**: HTML page loads correctly  
-✅ **Guest-portal route working**: HTML page accessible
+✅ **Guest-portal route working**: HTML page accessible  
+✅ **Missing columns added**: guest_access_token, verification_preference, qr_code_displayed
 
 ### Current Status
 - **Database Schema**: ✅ Applied
