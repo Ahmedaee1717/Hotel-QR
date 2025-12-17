@@ -15594,9 +15594,9 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
     // Log consent in audit trail (GDPR/BIPA requirement)
     await DB.prepare(`
       INSERT INTO biometric_audit_log (
-        pass_id, property_id, action_type, action_details,
-        performed_by, ip_address, user_agent
-      ) VALUES (?, ?, 'CONSENT_GRANTED', ?, 'system', ?, ?)
+        pass_id, property_id, event_type, event_details,
+        actor_type, actor_id, actor_ip_address
+      ) VALUES (?, ?, 'CONSENT_GRANTED', ?, 'system', 'admin', ?)
     `).bind(
       pass_id,
       property_id,
@@ -15608,8 +15608,7 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
         photo_stored: false,
         consent_method: 'admin_enrollment'
       }),
-      c.req.header('CF-Connecting-IP') || 'unknown',
-      c.req.header('User-Agent') || 'unknown'
+      c.req.header('CF-Connecting-IP') || 'unknown'
     ).run()
 
     return c.json({ 
