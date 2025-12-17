@@ -732,9 +732,21 @@
                     <p class="text-sm text-gray-400 mt-2">Results will appear here</p>
                 </div>
             `;
+            
+            // Clear any face detection overlays
+            if (ctx && canvas) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // Reset state
             lastVerifyTime = 0; // Reset cooldown
-            isScanning = true;
-            updateStatus('Waiting for QR code or face...', 'info');
+            isScanning = true; // Enable scanning
+            
+            // CRITICAL: Restart the scan loop
+            console.log('🔄 Resetting scanner - restarting scan loop');
+            requestAnimationFrame(scanLoop);
+            
+            updateStatus('Ready to scan - Point at QR or Face', 'info');
         }
         
         function switchMode(mode) {
