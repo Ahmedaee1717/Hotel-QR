@@ -34690,7 +34690,7 @@ app.get('/admin/dashboard', (c) => {
                 <!-- OnePass Premium Feature - FIRST & PROMINENT -->
                 <div class="px-3 mb-6 border-b-2 border-teal-200 pb-6">
                     <button data-tab="onepass" class="onepass-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 mb-2">
-                        <img src="/onepass-logo.png" alt="OnePass" style="height: 22px;">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 22px; width: auto; max-width: 24px; object-fit: contain;">
                         <span class="flex-1">OnePass</span>
                         <span style="background: #00d4aa; color: #0f1f33; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 800;">PRO</span>
                     </button>
