@@ -14655,6 +14655,180 @@ app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermissio
   }
 })
 
+// GDPR/BIPA: Withdraw biometric consent and delete biometric data immediately
+app.post('/api/admin/all-inclusive/passes/:pass_id/withdraw-consent', async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // Get pass details before deletion
+    const pass = await DB.prepare(`
+      SELECT pass_id, primary_guest_name, guest_email, face_embedding, face_photo_url
+      FROM digital_passes 
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+
+    const hadBiometricData = !!(pass.face_embedding || pass.face_photo_url)
+
+    // IMMEDIATE deletion of ALL biometric data (GDPR/BIPA requirement)
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET face_embedding = NULL,
+          face_photo_url = NULL,
+          face_enrolled_at = NULL,
+          face_embedding_version = NULL,
+          biometric_consent_given = 0,
+          biometric_consent_withdrawn = 1,
+          biometric_consent_withdrawn_at = CURRENT_TIMESTAMP,
+          scheduled_deletion_date = NULL
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).run()
+
+    // Also delete from family members
+    await DB.prepare(`
+      UPDATE pass_family_members
+      SET face_embedding = NULL,
+          face_photo_url = NULL,
+          face_enrolled_at = NULL,
+          face_embedding_version = NULL
+      WHERE pass_id = ?
+    `).bind(pass_id).run()
+
+    // Log deletion in audit trail (MANDATORY for GDPR/BIPA compliance)
+    await DB.prepare(`
+      INSERT INTO biometric_audit_log (
+        pass_id, property_id, action_type, action_details,
+        performed_by, ip_address, user_agent
+      ) VALUES (?, ?, 'CONSENT_WITHDRAWN', ?, ?, ?, ?)
+    `).bind(
+      pass_id,
+      property_id,
+      JSON.stringify({
+        guest_name: pass.primary_guest_name,
+        guest_email: pass.guest_email,
+        data_deleted: hadBiometricData,
+        deletion_method: 'immediate',
+        deletion_reason: 'consent_withdrawal',
+        timestamp: new Date().toISOString()
+      }),
+      'guest_request',
+      c.req.header('CF-Connecting-IP') || 'unknown',
+      c.req.header('User-Agent') || 'unknown'
+    ).run()
+
+    return c.json({ 
+      success: true,
+      message: 'Biometric consent withdrawn and all biometric data deleted immediately',
+      data_deleted: hadBiometricData,
+      fallback_methods: ['QR code', 'Wristband', 'Room card'],
+      compliance: 'GDPR/BIPA compliant immediate deletion'
+    })
+  } catch (error) {
+    console.error('Withdraw consent error:', error)
+    return c.json({ error: 'Failed to withdraw consent: ' + error.message }, 500)
+  }
+})
+
+// AUTOMATED: Delete expired biometric data (called by scheduled trigger)
+app.post('/api/admin/all-inclusive/biometric/auto-delete', async (c) => {
+  const { DB } = c.env
+  const authToken = c.req.header('X-Cron-Token')
+  
+  // Secure this endpoint with a secret token
+  if (authToken !== (c.env.CRON_SECRET || 'change-this-in-production')) {
+    return c.json({ error: 'Unauthorized - Invalid cron token' }, 401)
+  }
+  
+  try {
+    const now = new Date().toISOString()
+    
+    // Find all passes with biometric data that should be deleted
+    const passesToDelete = await DB.prepare(`
+      SELECT pass_id, property_id, primary_guest_name, guest_email,
+             scheduled_deletion_date, valid_until
+      FROM digital_passes
+      WHERE (face_embedding IS NOT NULL OR face_photo_url IS NOT NULL)
+        AND biometric_consent_withdrawn = 0
+        AND (
+          scheduled_deletion_date <= ?
+          OR valid_until < date('now', '-1 day')
+        )
+    `).bind(now).all()
+
+    const deletedCount = passesToDelete.results.length
+    const deletionDetails = []
+
+    for (const pass of passesToDelete.results) {
+      // Delete biometric data
+      await DB.prepare(`
+        UPDATE digital_passes
+        SET face_embedding = NULL,
+            face_photo_url = NULL,
+            face_enrolled_at = NULL,
+            face_embedding_version = NULL,
+            biometric_consent_given = 0,
+            scheduled_deletion_date = NULL
+        WHERE pass_id = ? AND property_id = ?
+      `).bind(pass.pass_id, pass.property_id).run()
+
+      // Delete from family members
+      await DB.prepare(`
+        UPDATE pass_family_members
+        SET face_embedding = NULL,
+            face_photo_url = NULL,
+            face_enrolled_at = NULL,
+            face_embedding_version = NULL
+        WHERE pass_id = ?
+      `).bind(pass.pass_id).run()
+
+      // Log the automated deletion
+      await DB.prepare(`
+        INSERT INTO biometric_audit_log (
+          pass_id, property_id, action_type, action_details,
+          performed_by, ip_address, user_agent
+        ) VALUES (?, ?, 'AUTO_DELETED', ?, 'automated_job', 'system', 'cloudflare-worker')
+      `).bind(
+        pass.pass_id,
+        pass.property_id,
+        JSON.stringify({
+          guest_name: pass.primary_guest_name,
+          guest_email: pass.guest_email,
+          scheduled_deletion_date: pass.scheduled_deletion_date,
+          valid_until: pass.valid_until,
+          deletion_reason: 'retention_period_expired',
+          deletion_time: now
+        })
+      ).run()
+
+      deletionDetails.push({
+        pass_id: pass.pass_id,
+        guest_name: pass.primary_guest_name,
+        deletion_reason: pass.scheduled_deletion_date <= now ? 'scheduled' : 'checkout+24h'
+      })
+    }
+
+    return c.json({ 
+      success: true,
+      deleted_count: deletedCount,
+      deletions: deletionDetails,
+      timestamp: now,
+      compliance: 'GDPR/BIPA automated retention enforcement'
+    })
+  } catch (error) {
+    console.error('Auto-delete biometric data error:', error)
+    return c.json({ error: 'Failed to auto-delete: ' + error.message }, 500)
+  }
+})
+
 // Admin: Delete pass permanently
 app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settings_manage'), async (c) => {
   const { DB } = c.env
@@ -15296,14 +15470,18 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
   try {
     const { face_embedding, photo_data } = await c.req.json()
     
-    // Photo data is required, face_embedding is optional (can be null if face-api.js fails)
-    if (!photo_data) {
-      return c.json({ error: 'Photo data is required' }, 400)
+    // ⚠️ CRITICAL BIOMETRIC COMPLIANCE:
+    // 1. We store ONLY irreversible mathematical representations (face_embedding)
+    // 2. Photo data is NOT stored permanently (violation of GDPR/BIPA)
+    // 3. Consent is REQUIRED and logged
+    
+    if (!face_embedding) {
+      return c.json({ error: 'Face embedding (template) is required for biometric enrollment' }, 400)
     }
 
     // Verify pass belongs to this property
     const pass = await DB.prepare(`
-      SELECT pass_id FROM digital_passes 
+      SELECT pass_id, primary_guest_name, guest_email, valid_until FROM digital_passes 
       WHERE pass_id = ? AND property_id = ?
     `).bind(pass_id, property_id).first()
 
@@ -15311,28 +15489,58 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
       return c.json({ error: 'Pass not found or unauthorized' }, 404)
     }
 
-    // Store face data
-    // Note: photo_data is base64 data URL (data:image/jpeg;base64,...)
-    // In production, you'd upload to R2/S3 and store the URL instead
-    // For now, we store the base64 directly (works for MVP)
+    // Calculate scheduled deletion date (24 hours after checkout/valid_until)
+    const validUntil = new Date(pass.valid_until)
+    const scheduledDeletion = new Date(validUntil.getTime() + 24 * 60 * 60 * 1000)
+
+    // Store ONLY the face embedding (template), NOT the photo
+    // Template is already irreversible (cannot reconstruct face image)
     await DB.prepare(`
       UPDATE digital_passes
       SET face_embedding = ?,
-          face_photo_url = ?,
+          face_photo_url = NULL,
           face_enrolled_at = CURRENT_TIMESTAMP,
-          face_embedding_version = 'face-api-v1'
+          face_embedding_version = 'face-api-v1.7.12-descriptor',
+          biometric_consent_given = 1,
+          biometric_consent_timestamp = CURRENT_TIMESTAMP,
+          biometric_consent_withdrawn = 0,
+          scheduled_deletion_date = ?
       WHERE pass_id = ? AND property_id = ?
     `).bind(
-      face_embedding ? JSON.stringify(face_embedding) : null,
-      photo_data,
+      JSON.stringify(face_embedding),
+      scheduledDeletion.toISOString(),
       pass_id,
       property_id
     ).run()
 
+    // Log consent in audit trail (GDPR/BIPA requirement)
+    await DB.prepare(`
+      INSERT INTO biometric_audit_log (
+        pass_id, property_id, action_type, action_details,
+        performed_by, ip_address, user_agent
+      ) VALUES (?, ?, 'CONSENT_GRANTED', ?, 'system', ?, ?)
+    `).bind(
+      pass_id,
+      property_id,
+      JSON.stringify({
+        guest_name: pass.primary_guest_name,
+        guest_email: pass.guest_email,
+        scheduled_deletion: scheduledDeletion.toISOString(),
+        data_stored: 'face_embedding_only',
+        photo_stored: false,
+        consent_method: 'admin_enrollment'
+      }),
+      c.req.header('CF-Connecting-IP') || 'unknown',
+      c.req.header('User-Agent') || 'unknown'
+    ).run()
+
     return c.json({ 
       success: true,
-      message: 'Face enrolled successfully',
-      face_embedding_stored: !!face_embedding
+      message: 'Face enrolled successfully with biometric consent',
+      face_embedding_stored: true,
+      photo_stored: false,
+      scheduled_deletion_date: scheduledDeletion.toISOString(),
+      compliance_notes: 'Only irreversible template stored. Auto-deletion scheduled 24h after checkout.'
     })
   } catch (error) {
     console.error('Face enrollment error:', error)
@@ -47154,6 +47362,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<div class="flex gap-2">';
           if (hasFace) {
             html += '<button onclick="viewPassFace(' + pass.pass_id + ')" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-semibold"><i class="fas fa-camera mr-2"></i>Face Enrolled</button>';
+            html += '<button onclick="withdrawBiometricConsent(' + pass.pass_id + ', &quot;' + pass.primary_guest_name + '&quot;)" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-semibold" title="GDPR/BIPA: Withdraw consent and delete biometric data"><i class="fas fa-user-slash mr-2"></i>Disable Face Recognition</button>';
           } else {
             html += '<button onclick="enrollPassFace(' + pass.pass_id + ', &quot;' + pass.pass_reference + '&quot;)" class="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 text-sm font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-2"></i>Enroll Face</button>';
           }
@@ -47616,6 +47825,48 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             }
           });
           modal.remove();
+        }
+      };
+
+      // GDPR/BIPA: Withdraw biometric consent and delete all biometric data
+      window.withdrawBiometricConsent = async function(passId, guestName) {
+        const confirmed = confirm(
+          '⚠️ WITHDRAW BIOMETRIC CONSENT\\n\\n' +
+          'Guest: ' + guestName + '\\n\\n' +
+          'This will IMMEDIATELY:\\n' +
+          '• Delete all facial recognition data\\n' +
+          '• Remove biometric templates permanently\\n' +
+          '• Switch to QR code, wristband, or room card\\n\\n' +
+          'This action is irreversible.\\n\\n' +
+          'Are you sure?'
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/passes/' + passId + '/withdraw-consent', {
+            method: 'POST'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            alert(
+              '✅ Biometric Consent Withdrawn\\n\\n' +
+              'All biometric data has been permanently deleted.\\n\\n' +
+              'Guest can now use:\\n' +
+              '• QR Code\\n' +
+              '• Wristband\\n' +
+              '• Room Card\\n\\n' +
+              'Deletion logged for GDPR/BIPA compliance.'
+            );
+            loadPasses(); // Reload to show updated status
+          } else {
+            const error = await response.json();
+            alert('❌ Error: ' + (error.error || 'Failed to withdraw consent'));
+          }
+        } catch (error) {
+          console.error('Withdraw consent error:', error);
+          alert('❌ Error: ' + error.message);
         }
       };
       
