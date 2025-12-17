@@ -364,22 +364,48 @@
                 </div>
             `;
             
-            // Generate QR Code
-            QRCode.toCanvas(
-                document.getElementById('qrcode').appendChild(document.createElement('canvas')),
-                pass.pass_reference,
-                {
-                    width: 220,
-                    margin: 1,
-                    color: {
-                        dark: '#000000',
-                        light: '#FFFFFF'
+            // Generate QR Code after DOM updates
+            setTimeout(() => {
+                try {
+                    const qrcodeDiv = document.getElementById('qrcode');
+                    if (!qrcodeDiv) {
+                        console.error('QR code container not found!');
+                        return;
                     }
-                },
-                function (error) {
-                    if (error) console.error('QR Code generation error:', error);
+                    
+                    // Clear any existing content
+                    qrcodeDiv.innerHTML = '';
+                    
+                    if (typeof QRCode === 'undefined') {
+                        console.error('QRCode library not loaded!');
+                        qrcodeDiv.innerHTML = '<p class="text-red-500 text-sm">QR Code library loading...</p>';
+                        return;
+                    }
+                    
+                    QRCode.toCanvas(
+                        qrcodeDiv.appendChild(document.createElement('canvas')),
+                        pass.pass_reference,
+                        {
+                            width: 220,
+                            margin: 1,
+                            color: {
+                                dark: '#000000',
+                                light: '#FFFFFF'
+                            }
+                        },
+                        function (error) {
+                            if (error) {
+                                console.error('QR Code generation error:', error);
+                                qrcodeDiv.innerHTML = '<p class="text-red-500 text-sm">Failed to generate QR code</p>';
+                            } else {
+                                console.log('✅ QR Code generated successfully');
+                            }
+                        }
+                    );
+                } catch (error) {
+                    console.error('QR Code generation exception:', error);
                 }
-            );
+            }, 100); // Small delay to ensure DOM is ready
         }
 
         function showError(message) {
