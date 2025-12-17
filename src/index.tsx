@@ -34362,6 +34362,23 @@ app.get('/admin/dashboard', (c) => {
         color: white;
       }
       
+      /* OnePass Premium Button Styling */
+      .onepass-btn {
+        background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%) !important;
+        color: white !important;
+        border: 2px solid #00d4aa !important;
+        box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3) !important;
+        font-weight: 700 !important;
+      }
+      .onepass-btn:hover {
+        background: linear-gradient(135deg, #16304d 0%, #1e3a5f 100%) !important;
+        transform: translateY(-2px);
+      }
+      .onepass-btn img {
+        height: 22px;
+        filter: brightness(0) invert(1);
+      }
+      
       /* Keep compatibility with old tab-btn class for JavaScript */
       .tab-btn {
         cursor: pointer;
@@ -34670,6 +34687,15 @@ app.get('/admin/dashboard', (c) => {
             </div>
             
             <nav class="py-4">
+                <!-- OnePass Premium Feature - FIRST & PROMINENT -->
+                <div class="px-3 mb-6 border-b-2 border-teal-200 pb-6">
+                    <button data-tab="onepass" class="onepass-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 mb-2">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 22px;">
+                        <span class="flex-1">OnePass</span>
+                        <span style="background: #00d4aa; color: #0f1f33; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 800;">PRO</span>
+                    </button>
+                    <p class="text-xs text-gray-500 px-4 mt-2 italic">Digital Pass + Face Recognition</p>
+                </div>
                 <!-- Core Section -->
                 <div class="px-3 mb-6">
                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Core</h3>
@@ -34721,9 +34747,6 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                     <button data-tab="beach" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-umbrella-beach w-5"></i><span>Beach</span>
-                    </button>
-                    <button data-tab="allinclusive" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
-                        <i class="fas fa-id-badge w-5"></i><span>All-Inclusive</span>
                     </button>
                     <button data-tab="callbacks" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-phone w-5"></i><span>Callbacks</span>
@@ -38582,12 +38605,12 @@ app.get('/admin/dashboard', (c) => {
         </div>
     </div>
 
-    <!-- All-Inclusive Digital Pass System Tab -->
-    <div id="allinclusiveTab" class="tab-content hidden">
+    <!-- OnePass - Digital Pass + Face Recognition Tab -->
+    <div id="onepassTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-3xl font-bold mb-6 flex items-center gap-3" style="color: #016e8f;">
                 <i class="fas fa-id-badge"></i>
-                All-Inclusive Digital Pass System
+                OnePass - Digital Pass + Face Recognition
             </h2>
             
             <div class="bg-gradient-to-r from-[#f6f2e9] to-[#aecfb4]/20 border-l-4 p-6 rounded-lg mb-6" style="border-color: #016e8f;">
