@@ -166,6 +166,8 @@
         let scannerMode = 'auto'; // 'auto', 'qr', 'face'
         let isScanning = false;
         let qrCodeReader;
+        let lastVerifyTime = 0;
+        const VERIFY_COOLDOWN = 3000; // 3 seconds between scans
         
         // Stats
         let stats = { verified: 0, qr: 0, face: 0 };
@@ -271,8 +273,12 @@
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
                 
                 if (code && code.data.startsWith('PASS-')) {
+                    const now = Date.now();
+                    if (now - lastVerifyTime < VERIFY_COOLDOWN) return; // Debounce
+                    
+                    lastVerifyTime = now;
                     isScanning = false; // Pause scanning
-                    updateStatus('QR Code detected! Verifying...', 'success');
+                    updateStatus('QR Code detected! Verifying...', 'loading');
                     await verifyPass(code.data, 'qr');
                 }
             } catch (error) {
@@ -290,6 +296,17 @@
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
                 if (detections.length > 0) {
+                    const now = Date.now();
+                    if (now - lastVerifyTime < VERIFY_COOLDOWN) {
+                        // Still in cooldown - just draw the box
+                        const detection = detections[0];
+                        const box = detection.detection.box;
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(box.x, box.y, box.width, box.height);
+                        return;
+                    }
+                    
                     // Draw face box
                     const detection = detections[0];
                     const box = detection.detection.box;
@@ -298,14 +315,11 @@
                     ctx.lineWidth = 3;
                     ctx.strokeRect(box.x, box.y, box.width, box.height);
                     
-                    // Show face detected
-                    updateStatus('Face detected! Tap to verify', 'success');
-                    
-                    // Auto-verify if in face-only mode
-                    if (scannerMode === 'face') {
-                        isScanning = false;
-                        await verifyFace(detection.descriptor);
-                    }
+                    // AUTO-VERIFY face (no tap needed!)
+                    lastVerifyTime = now;
+                    updateStatus('Face detected! Verifying...', 'loading');
+                    isScanning = false; // Pause scanning during verification
+                    await verifyFace(detection.descriptor);
                 }
             } catch (error) {
                 // Silent - face detection errors are normal
@@ -433,6 +447,7 @@
                     <p class="text-sm text-gray-400 mt-2">Results will appear here</p>
                 </div>
             `;
+            lastVerifyTime = 0; // Reset cooldown
             isScanning = true;
             updateStatus('Waiting for QR code or face...', 'info');
         }
