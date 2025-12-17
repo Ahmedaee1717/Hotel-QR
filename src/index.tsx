@@ -46838,7 +46838,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<p class="text-gray-600 mb-4">Upload a photo or capture from webcam to enable facial recognition for this pass.</p>';
         
         html += '<div class="grid md:grid-cols-2 gap-4">';
-        html += '<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 cursor-pointer" onclick="document.getElementById(\'photo-upload-' + passId + '\').click()">';
+        html += '<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 cursor-pointer" onclick="document.getElementById(&quot;photo-upload-' + passId + '&quot;).click()">';
         html += '<i class="fas fa-upload text-4xl text-gray-400 mb-3"></i>';
         html += '<p class="font-semibold">Upload Photo</p>';
         html += '<p class="text-sm text-gray-500 mt-1">Click to select image</p>';
@@ -47082,7 +47082,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       // View pass face
       window.viewPassFace = function(passId) {
-        alert('Viewing face photo for Pass ID: ' + passId + '\\n\\nFull photo viewer coming soon!');
+        alert('Viewing face photo for Pass ID: ' + passId + '. Full photo viewer coming soon!');
       };
 
       // Load locations
