@@ -21,34 +21,12 @@
             overflow-x: hidden;
         }
         
-        /* Animated gradient background */
-        .hero-animated {
-            background: linear-gradient(-45deg, #016e8f, #014a5e, #0295bf, #00d4aa);
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
+        /* Professional solid backgrounds */
+        .hero-section {
+            background: linear-gradient(135deg, #014a5e 0%, #016e8f 100%);
             position: relative;
         }
         
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        
-        /* Floating particles effect */
-        .particle {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            animation: float 20s infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0) translateX(0); }
-            25% { transform: translateY(-100px) translateX(50px); }
-            50% { transform: translateY(-200px) translateX(-50px); }
-            75% { transform: translateY(-100px) translateX(100px); }
-        }
         
         /* 3D card hover effect */
         .card-3d {
@@ -61,43 +39,21 @@
             box-shadow: 0 30px 80px rgba(1, 110, 143, 0.3);
         }
         
-        /* Glowing effect */
-        .glow {
-            box-shadow: 0 0 20px rgba(0, 212, 170, 0.5),
-                        0 0 40px rgba(0, 212, 170, 0.3),
-                        0 0 60px rgba(0, 212, 170, 0.1);
+        
+        /* Professional button shadow */
+        .btn-shadow {
+            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
+            transition: all 0.3s ease;
         }
         
-        /* Pulsing glow animation */
-        @keyframes pulse-glow {
-            0%, 100% {
-                box-shadow: 0 0 20px rgba(0, 212, 170, 0.5),
-                            0 0 40px rgba(0, 212, 170, 0.3);
-            }
-            50% {
-                box-shadow: 0 0 30px rgba(0, 212, 170, 0.7),
-                            0 0 60px rgba(0, 212, 170, 0.5),
-                            0 0 90px rgba(0, 212, 170, 0.3);
-            }
+        .btn-shadow:hover {
+            box-shadow: 0 6px 30px rgba(0, 212, 170, 0.4);
         }
         
-        .pulse-glow {
-            animation: pulse-glow 3s ease-in-out infinite;
-        }
-        
-        /* Gradient text */
+        /* Professional text accent */
         .gradient-text {
-            background: linear-gradient(135deg, #016e8f, #00d4aa, #0295bf);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: shimmer 3s ease-in-out infinite;
-            background-size: 200% 200%;
-        }
-        
-        @keyframes shimmer {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+            color: #016e8f;
+            font-weight: 900;
         }
         
         /* Slide up animation */
@@ -116,45 +72,15 @@
             }
         }
         
-        /* Choice badge animation */
-        .choice-badge {
-            position: relative;
-            overflow: hidden;
+        
+        
+        /* Subtle icon hover */
+        .icon-hover {
+            transition: transform 0.3s ease;
         }
         
-        .choice-badge::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            transition: left 0.5s;
-        }
-        
-        .choice-badge:hover::before {
-            left: 100%;
-        }
-        
-        /* Stat counter animation */
-        .stat-counter {
-            font-size: 4rem;
-            font-weight: 900;
-            background: linear-gradient(135deg, #016e8f, #00d4aa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        /* Icon bounce */
-        .icon-bounce {
-            animation: bounce 2s ease-in-out infinite;
-        }
-        
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
+        .icon-hover:hover {
+            transform: translateY(-5px);
         }
         
         /* Comparison scale effect */
@@ -188,28 +114,18 @@
             width: 100%;
         }
         
-        /* Hero image perspective */
-        .hero-perspective {
-            perspective: 1000px;
-        }
-        
+        /* Subtle card elevation */
         .hero-card {
-            transform: rotateY(-10deg) rotateX(5deg);
-            transition: transform 0.6s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
         
-        .hero-perspective:hover .hero-card {
-            transform: rotateY(0deg) rotateX(0deg);
+        .hero-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
     </style>
 </head>
 <body class="bg-white">
-    <!-- Particles Background -->
-    <div class="particle" style="width: 100px; height: 100px; top: 10%; left: 10%; animation-delay: 0s;"></div>
-    <div class="particle" style="width: 150px; height: 150px; top: 60%; left: 80%; animation-delay: 3s;"></div>
-    <div class="particle" style="width: 80px; height: 80px; top: 30%; left: 60%; animation-delay: 6s;"></div>
-    <div class="particle" style="width: 120px; height: 120px; top: 80%; left: 20%; animation-delay: 9s;"></div>
-
     <!-- Navigation -->
     <nav class="bg-white/95 backdrop-blur-md shadow-lg sticky top-0 z-50 border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -225,7 +141,7 @@
                     <a href="#guest-choice" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">Guest Choice</a>
                     <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">How It Works</a>
                     <a href="#comparison" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">vs Wristbands</a>
-                    <a href="/admin/login" class="px-8 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transform hover:scale-105 transition">
+                    <a href="/admin/login" class="px-8 py-3 bg-teal-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:bg-teal-700 transform hover:scale-105 transition">
                         Get Started
                     </a>
                 </div>
@@ -234,7 +150,7 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="hero-animated text-white py-24 md:py-32 relative">
+    <section class="bg-gradient-to-br from-gray-900 via-teal-900 to-gray-900 text-white py-24 md:py-32 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="slide-up">
@@ -252,10 +168,10 @@
                         No plastic wristbands. No hassle. Just seamless access everywhere.
                     </p>
                     <div class="flex flex-wrap gap-6">
-                        <a href="#guest-choice" class="px-10 py-5 bg-accent text-white rounded-xl font-black text-xl shadow-2xl hover:bg-opacity-90 transition transform hover:scale-110 pulse-glow">
+                        <a href="#guest-choice" class="px-10 py-5 bg-teal-500 text-white rounded-xl font-black text-xl btn-shadow hover:bg-teal-600 transition transform hover:scale-105">
                             <i class="fas fa-hand-pointer mr-3"></i>See Guest Choice
                         </a>
-                        <a href="#comparison" class="px-10 py-5 bg-white/20 backdrop-blur-md text-white rounded-xl font-black text-xl border-2 border-white/50 hover:bg-white/30 transition transform hover:scale-110">
+                        <a href="#comparison" class="px-10 py-5 bg-white text-teal-700 rounded-xl font-black text-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
                             <i class="fas fa-chart-bar mr-3"></i>Why Switch?
                         </a>
                     </div>
@@ -278,20 +194,20 @@
                 </div>
                 
                 <!-- Hero Visual -->
-                <div class="relative hero-perspective">
-                    <div class="hero-card bg-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl border border-white/20 glow">
+                <div class="relative">
+                    <div class="hero-card bg-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl border border-white/20">
                         <div class="space-y-8">
                             <!-- QR + Face Icons -->
                             <div class="flex justify-around items-center">
                                 <div class="text-center">
-                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-bounce">
+                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-hover shadow-lg">
                                         <i class="fas fa-qrcode text-7xl" style="color: var(--primary);"></i>
                                     </div>
                                     <p class="text-xl font-bold">QR Code</p>
                                 </div>
-                                <div class="text-6xl font-black text-white/50">OR</div>
+                                <div class="text-6xl font-black text-white/70">OR</div>
                                 <div class="text-center">
-                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-bounce" style="animation-delay: 0.3s;">
+                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-hover shadow-lg">
                                         <i class="fas fa-user-check text-7xl" style="color: var(--accent);"></i>
                                     </div>
                                     <p class="text-xl font-bold">Face Scan</p>
@@ -321,7 +237,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="text-center mb-20">
                 <div class="inline-block mb-6">
-                    <span class="px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-full text-sm font-bold shadow-lg">
+                    <span class="px-6 py-3 bg-teal-600 text-white rounded-full text-sm font-bold shadow-lg">
                         <i class="fas fa-user-friends mr-2"></i>Guest Freedom
                     </span>
                 </div>
@@ -382,7 +298,7 @@
                         </div>
                     </div>
                     
-                    <div class="mt-8 p-6 bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl text-white text-center">
+                    <div class="mt-8 p-6 bg-blue-600 rounded-2xl text-white text-center shadow-lg">
                         <p class="text-xl font-bold">Perfect for privacy-focused guests</p>
                     </div>
                 </div>
@@ -438,31 +354,37 @@
                         </div>
                     </div>
                     
-                    <div class="mt-8 p-6 bg-gradient-to-r from-green-600 to-teal-800 rounded-2xl text-white text-center">
+                    <div class="mt-8 p-6 bg-green-600 rounded-2xl text-white text-center shadow-lg">
                         <p class="text-xl font-bold">Perfect for touchless, VIP experience</p>
                     </div>
                 </div>
             </div>
             
             <!-- Both Together -->
-            <div class="bg-gradient-to-r from-primary via-accent to-primary rounded-3xl p-12 text-white text-center shadow-2xl">
-                <h3 class="text-4xl font-black mb-6">Best of Both Worlds</h3>
-                <p class="text-2xl mb-8 leading-relaxed max-w-4xl mx-auto">
-                    Guests can even <strong>switch between methods</strong> anytime! Started with QR? Enroll face later. 
-                    Prefer privacy one day? Use QR. Want convenience? Use face. <strong>Total flexibility.</strong>
+            <div class="bg-white border-4 border-teal-500 rounded-3xl p-12 text-center shadow-2xl">
+                <div class="inline-block px-6 py-3 bg-teal-500 text-white rounded-full font-black mb-6 text-xl">
+                    <i class="fas fa-star mr-2"></i>BEST OF BOTH WORLDS
+                </div>
+                <h3 class="text-5xl font-black mb-8 text-gray-900">Ultimate Guest Flexibility</h3>
+                <p class="text-2xl mb-10 leading-relaxed max-w-4xl mx-auto text-gray-700">
+                    Guests can even <strong class="text-teal-600">switch between methods anytime!</strong><br/>
+                    Started with QR? <strong>Enroll face later.</strong><br/>
+                    Prefer privacy one day? <strong>Use QR.</strong><br/>
+                    Want convenience? <strong>Use face.</strong><br/><br/>
+                    <span class="text-3xl font-black text-teal-600">Total flexibility.</span>
                 </p>
-                <div class="grid md:grid-cols-3 gap-8">
-                    <div>
-                        <div class="text-5xl font-black mb-3">100%</div>
-                        <div class="text-lg opacity-90">Guest Satisfaction</div>
+                <div class="grid md:grid-cols-3 gap-10 max-w-5xl mx-auto">
+                    <div class="bg-gradient-to-br from-green-50 to-teal-50 p-8 rounded-2xl">
+                        <div class="text-6xl font-black mb-4 text-teal-600">100%</div>
+                        <div class="text-xl font-bold text-gray-800">Guest Satisfaction</div>
                     </div>
-                    <div>
-                        <div class="text-5xl font-black mb-3">Zero</div>
-                        <div class="text-lg opacity-90">Forced Biometrics</div>
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-8 rounded-2xl">
+                        <div class="text-6xl font-black mb-4 text-blue-600">Zero</div>
+                        <div class="text-xl font-bold text-gray-800">Forced Biometrics</div>
                     </div>
-                    <div>
-                        <div class="text-5xl font-black mb-3">Always</div>
-                        <div class="text-lg opacity-90">Their Choice</div>
+                    <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-8 rounded-2xl">
+                        <div class="text-6xl font-black mb-4 text-purple-600">Always</div>
+                        <div class="text-xl font-bold text-gray-800">Their Choice</div>
                     </div>
                 </div>
             </div>
@@ -584,7 +506,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-20">
                 <div class="inline-block mb-6">
-                    <span class="px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-full text-sm font-bold shadow-lg">
+                    <span class="px-6 py-3 bg-teal-600 text-white rounded-full text-sm font-bold shadow-lg">
                         <i class="fas fa-cogs mr-2"></i>Simple Process
                     </span>
                 </div>
@@ -611,7 +533,7 @@
                         </div>
                     </div>
                     <div class="order-1 md:order-2">
-                        <div class="inline-block px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-full font-black mb-6 text-xl">
+                        <div class="inline-block px-6 py-3 bg-blue-600 text-white rounded-full font-black mb-6 text-xl shadow-lg">
                             STEP 1
                         </div>
                         <h3 class="text-5xl font-black mb-6 text-gray-900">Guest Chooses Their Method</h3>
@@ -647,7 +569,7 @@
                 <!-- Step 2 -->
                 <div class="grid md:grid-cols-2 gap-16 items-center">
                     <div>
-                        <div class="inline-block px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-full font-black mb-6 text-xl">
+                        <div class="inline-block px-6 py-3 bg-green-600 text-white rounded-full font-black mb-6 text-xl shadow-lg">
                             STEP 2
                         </div>
                         <h3 class="text-5xl font-black mb-6 text-gray-900">Instant Access Everywhere</h3>
@@ -695,7 +617,7 @@
                         </div>
                     </div>
                     <div class="order-1 md:order-2">
-                        <div class="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full font-black mb-6 text-xl">
+                        <div class="inline-block px-6 py-3 bg-purple-600 text-white rounded-full font-black mb-6 text-xl shadow-lg">
                             STEP 3
                         </div>
                         <h3 class="text-5xl font-black mb-6 text-gray-900">Automatic Insights & Security</h3>
@@ -958,7 +880,7 @@
     </section>
 
     <!-- Final CTA -->
-    <section class="hero-animated text-white py-24 relative overflow-hidden">
+    <section class="bg-gradient-to-br from-teal-800 via-teal-600 to-blue-900 text-white py-24 relative overflow-hidden">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
             <h2 class="text-6xl md:text-7xl font-black mb-8">
                 Ready to Replace<br/>
@@ -970,10 +892,10 @@
             </p>
             
             <div class="flex flex-wrap justify-center gap-8 mb-16">
-                <a href="/admin/login" class="px-12 py-6 bg-white text-primary rounded-2xl font-black text-2xl shadow-2xl hover:bg-opacity-90 transition transform hover:scale-110 pulse-glow">
+                <a href="/admin/login" class="px-12 py-6 bg-white text-teal-700 rounded-2xl font-black text-2xl shadow-2xl hover:shadow-3xl transition transform hover:scale-105">
                     <i class="fas fa-rocket mr-3"></i>Start Free Trial
                 </a>
-                <a href="#guest-choice" class="px-12 py-6 bg-transparent border-4 border-white text-white rounded-2xl font-black text-2xl hover:bg-white hover:text-primary transition transform hover:scale-110">
+                <a href="#guest-choice" class="px-12 py-6 bg-transparent border-4 border-white text-white rounded-2xl font-black text-2xl hover:bg-white hover:text-teal-700 transition transform hover:scale-105">
                     <i class="fas fa-info-circle mr-3"></i>Learn More
                 </a>
             </div>
