@@ -27185,13 +27185,16 @@ app.get('/staff/beach-check-in', (c) => {
   `)
 })
 
-// Staff: Face-Only Check-In Scanner (multiple route patterns)
+// Staff: Face-Only Check-In Scanner (clean URL without .html)
 app.get('/staff-face-scanner', async (c) => {
-  return c.redirect('/staff-face-scanner.html')
+  // Fetch the static HTML file from the dist folder
+  const html = await fetch(new URL('/staff-face-scanner.html', c.req.url))
+  return c.html(await html.text())
 })
 
 app.get('/staff/face-scanner', async (c) => {
-  return c.redirect('/staff-face-scanner.html')
+  const html = await fetch(new URL('/staff-face-scanner.html', c.req.url))
+  return c.html(await html.text())
 })
 
 // Staff Pass Verification Scanner with Facial Recognition
