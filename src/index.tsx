@@ -40054,6 +40054,11 @@ app.get('/admin/dashboard', (c) => {
       // Initialize: Load QR code tab by default (it's marked as tab-active)
       loadQRCode();
       loadQRCardTemplate();
+      
+      // Load analytics on page load since it's visible on dashboard
+      if (typeof loadAnalytics === 'function') {
+        loadAnalytics('today').catch(err => console.error('Initial analytics load error:', err));
+      }
 
       async function loadRegCode() {
         try {
