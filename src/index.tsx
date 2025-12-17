@@ -14915,6 +14915,337 @@ app.get('/api/guest/digital-pass/:pass_reference', async (c) => {
   }
 })
 
+// ========== FACIAL RECOGNITION API ENDPOINTS ==========
+
+// Admin: Enroll face for a digital pass
+app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  const pass_id = c.req.param('pass_id')
+  
+  // Auth check
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized - Property mismatch' }, 401)
+  }
+
+  try {
+    const { face_embedding, face_photo_url } = await c.req.json()
+    
+    if (!face_embedding) {
+      return c.json({ error: 'Face embedding is required' }, 400)
+    }
+
+    // Verify pass belongs to this property
+    const pass = await DB.prepare(`
+      SELECT pass_id FROM digital_passes 
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).first()
+
+    if (!pass) {
+      return c.json({ error: 'Pass not found or unauthorized' }, 404)
+    }
+
+    // Store face embedding
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET face_embedding = ?,
+          face_photo_url = ?,
+          face_enrolled_at = CURRENT_TIMESTAMP,
+          face_embedding_version = 'face-api-v1'
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(
+      JSON.stringify(face_embedding),
+      face_photo_url,
+      pass_id,
+      property_id
+    ).run()
+
+    return c.json({ 
+      success: true,
+      message: 'Face enrolled successfully'
+    })
+  } catch (error) {
+    console.error('Face enrollment error:', error)
+    return c.json({ error: 'Failed to enroll face' }, 500)
+  }
+})
+
+// Staff: Verify face during pass verification
+app.post('/api/staff/all-inclusive/verify-face', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { pass_reference, live_face_embedding, staff_name, location, match_score } = await c.req.json()
+    
+    if (!pass_reference || !live_face_embedding) {
+      return c.json({ error: 'Pass reference and face embedding required' }, 400)
+    }
+
+    // Get pass with stored face embedding
+    const pass = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+
+    if (pass.pass_status !== 'active') {
+      return c.json({ error: 'Pass is not active' }, 403)
+    }
+
+    // Check if face is enrolled
+    if (!pass.face_embedding) {
+      return c.json({ 
+        success: true,
+        face_enrolled: false,
+        allow_qr_only: true,
+        pass_details: {
+          pass_reference: pass.pass_reference,
+          guest_name: pass.primary_guest_name,
+          room_number: pass.room_number,
+          tier: pass.tier_display_name,
+          tier_color: pass.tier_color,
+          tier_icon: pass.tier_icon
+        }
+      }, 200)
+    }
+
+    // Get face recognition settings
+    const settings = await DB.prepare(`
+      SELECT * FROM face_recognition_settings WHERE property_id = ?
+    `).bind(property_id).first()
+
+    const matchThreshold = settings?.match_threshold || 0.6
+    const manualReviewThreshold = settings?.manual_review_threshold || 0.5
+
+    // Parse stored embedding
+    const storedEmbedding = JSON.parse(pass.face_embedding)
+    
+    // match_score is calculated client-side using face-api.js
+    // It's a similarity score where higher = better match (0.0-1.0)
+    
+    let verification_status = 'skipped'
+    let verification_result = 'pending'
+    
+    if (match_score >= matchThreshold) {
+      verification_status = 'matched'
+      verification_result = 'valid'
+    } else if (match_score >= manualReviewThreshold) {
+      verification_status = 'manual_override'
+      verification_result = 'pending'
+    } else {
+      verification_status = 'no_match'
+      verification_result = 'invalid'
+      
+      // Create fraud alert
+      await DB.prepare(`
+        INSERT INTO face_verification_fraud_alerts (
+          property_id, pass_id, alert_type, severity,
+          attempted_location, attempted_by_staff,
+          match_score, pass_reference, guest_name, room_number, tier_code,
+          alert_status
+        ) VALUES (?, ?, 'face_mismatch', 'high', ?, ?, ?, ?, ?, ?, ?, 'pending')
+      `).bind(
+        property_id,
+        pass.pass_id,
+        location || 'Unknown',
+        staff_name || 'Unknown',
+        match_score,
+        pass.pass_reference,
+        pass.primary_guest_name,
+        pass.room_number,
+        pass.tier_display_name,
+      ).run()
+    }
+
+    // Log verification attempt
+    await DB.prepare(`
+      INSERT INTO pass_verifications (
+        property_id, pass_id, staff_name, verification_location,
+        verification_method, face_match_score, face_verification_status,
+        verification_result
+      ) VALUES (?, ?, ?, ?, 'qr+face', ?, ?, ?)
+    `).bind(
+      property_id,
+      pass.pass_id,
+      staff_name || 'Unknown',
+      location || 'Unknown',
+      match_score,
+      verification_status,
+      verification_result
+    ).run()
+
+    return c.json({
+      success: verification_result === 'valid',
+      match_score,
+      verification_status,
+      verification_result,
+      pass_details: {
+        pass_reference: pass.pass_reference,
+        guest_name: pass.primary_guest_name,
+        room_number: pass.room_number,
+        tier: pass.tier_display_name,
+        tier_color: pass.tier_color,
+        tier_icon: pass.tier_icon
+      },
+      message: 
+        verification_status === 'matched' ? 'Face verified - Access granted' :
+        verification_status === 'manual_override' ? 'Low confidence - Manual review required' :
+        'Face mismatch - Access denied'
+    })
+  } catch (error) {
+    console.error('Face verification error:', error)
+    return c.json({ error: 'Failed to verify face' }, 500)
+  }
+})
+
+// Admin: Get face recognition settings
+app.get('/api/admin/all-inclusive/face-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  try {
+    const settings = await DB.prepare(`
+      SELECT * FROM face_recognition_settings WHERE property_id = ?
+    `).bind(property_id).first()
+
+    if (!settings) {
+      // Return default settings
+      return c.json({
+        property_id: parseInt(property_id),
+        face_recognition_enabled: 0,
+        require_face_for_vip: 0,
+        require_face_for_premium: 0,
+        match_threshold: 0.6,
+        manual_review_threshold: 0.5,
+        auto_delete_after_checkout: 1,
+        retain_embeddings_days: 0,
+        provider: 'face-api-js'
+      })
+    }
+
+    return c.json(settings)
+  } catch (error) {
+    console.error('Get face settings error:', error)
+    return c.json({ error: 'Failed to get settings' }, 500)
+  }
+})
+
+// Admin: Update face recognition settings
+app.put('/api/admin/all-inclusive/face-settings/:property_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  try {
+    const settings = await c.req.json()
+
+    // Check if settings exist
+    const existing = await DB.prepare(`
+      SELECT setting_id FROM face_recognition_settings WHERE property_id = ?
+    `).bind(property_id).first()
+
+    if (existing) {
+      // Update
+      await DB.prepare(`
+        UPDATE face_recognition_settings
+        SET face_recognition_enabled = ?,
+            require_face_for_vip = ?,
+            require_face_for_premium = ?,
+            match_threshold = ?,
+            manual_review_threshold = ?,
+            auto_delete_after_checkout = ?,
+            retain_embeddings_days = ?,
+            provider = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE property_id = ?
+      `).bind(
+        settings.face_recognition_enabled ? 1 : 0,
+        settings.require_face_for_vip ? 1 : 0,
+        settings.require_face_for_premium ? 1 : 0,
+        settings.match_threshold || 0.6,
+        settings.manual_review_threshold || 0.5,
+        settings.auto_delete_after_checkout ? 1 : 0,
+        settings.retain_embeddings_days || 0,
+        settings.provider || 'face-api-js',
+        property_id
+      ).run()
+    } else {
+      // Insert
+      await DB.prepare(`
+        INSERT INTO face_recognition_settings (
+          property_id, face_recognition_enabled, require_face_for_vip,
+          require_face_for_premium, match_threshold, manual_review_threshold,
+          auto_delete_after_checkout, retain_embeddings_days, provider
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        settings.face_recognition_enabled ? 1 : 0,
+        settings.require_face_for_vip ? 1 : 0,
+        settings.require_face_for_premium ? 1 : 0,
+        settings.match_threshold || 0.6,
+        settings.manual_review_threshold || 0.5,
+        settings.auto_delete_after_checkout ? 1 : 0,
+        settings.retain_embeddings_days || 0,
+        settings.provider || 'face-api-js'
+      ).run()
+    }
+
+    return c.json({ success: true, message: 'Settings updated' })
+  } catch (error) {
+    console.error('Update face settings error:', error)
+    return c.json({ error: 'Failed to update settings' }, 500)
+  }
+})
+
+// Admin: Get fraud alerts
+app.get('/api/admin/all-inclusive/fraud-alerts/:property_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  try {
+    const alerts = await DB.prepare(`
+      SELECT * FROM face_verification_fraud_alerts
+      WHERE property_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+
+    return c.json(alerts.results || [])
+  } catch (error) {
+    console.error('Get fraud alerts error:', error)
+    return c.json({ error: 'Failed to get alerts' }, 500)
+  }
+})
+
 // ==================== END ALL-INCLUSIVE DIGITAL PASS API ENDPOINTS ====================
 
 // ========== FEEDBACK SYSTEM API ENDPOINTS ==========
