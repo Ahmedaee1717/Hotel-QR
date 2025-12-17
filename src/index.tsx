@@ -46749,9 +46749,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           if (hasFace) {
             html += '<button onclick="viewPassFace(' + pass.pass_id + ')" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-semibold"><i class="fas fa-camera mr-2"></i>Face Enrolled</button>';
           } else {
-            html += '<button onclick="enrollPassFace(' + pass.pass_id + ', \'' + pass.pass_reference + '\')" class="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 text-sm font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-2"></i>Enroll Face</button>';
+            html += '<button onclick="enrollPassFace(' + pass.pass_id + ', &quot;' + pass.pass_reference + '&quot;)" class="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 text-sm font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-2"></i>Enroll Face</button>';
           }
-          html += '<button onclick="viewPass(\'' + pass.pass_reference + '\')" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-qrcode"></i></button>';
+          html += '<button onclick="viewPass(&quot;' + pass.pass_reference + '&quot;)" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-qrcode"></i></button>';
           html += '<button onclick="editPass(' + pass.pass_id + ')" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"><i class="fas fa-edit"></i></button>';
           html += '</div>';
           html += '</div></div>';
