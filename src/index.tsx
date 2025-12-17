@@ -30177,6 +30177,216 @@ app.get('/gm-features-showcase', (c) => {
             </div>
         </div>
 
+        <!-- All-Inclusive Digital Pass System -->
+        <div id="allinclusive" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-purple-600">
+                <i class="fas fa-id-badge"></i>
+                All-Inclusive Digital Pass System
+            </h2>
+            
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-600 p-6 rounded-lg mb-6">
+                <h3 class="font-bold text-lg mb-2 flex items-center gap-2">
+                    <i class="fas fa-shield-alt text-purple-600"></i>
+                    Eliminate Wristband Fraud - Save $135K-225K Annually
+                </h3>
+                <p class="text-gray-700 mb-3">
+                    Replace physical wristbands with fraud-proof digital passes. Prevent old wristband reuse, sharing, counterfeiting, and tier fraud.
+                </p>
+                <div class="grid md:grid-cols-3 gap-4 text-sm">
+                    <div class="bg-white p-3 rounded-lg">
+                        <strong class="text-purple-600">✓ Rotating QR Codes</strong>
+                        <p class="text-gray-600">Refresh every 60s - impossible to counterfeit</p>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg">
+                        <strong class="text-purple-600">✓ Instant Deactivation</strong>
+                        <p class="text-gray-600">Auto-expire at checkout - no old pass reuse</p>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg">
+                        <strong class="text-purple-600">✓ Tier Verification</strong>
+                        <p class="text-gray-600">Staff verify access rights in 1 second</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Stats Dashboard -->
+            <div class="grid md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
+                    <div class="text-3xl font-bold" id="stats-active-passes">0</div>
+                    <div class="text-blue-100 text-sm">Active Passes</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+                    <div class="text-3xl font-bold" id="stats-verifications-today">0</div>
+                    <div class="text-green-100 text-sm">Verifications Today</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-5 rounded-xl">
+                    <div class="text-3xl font-bold" id="stats-total-tiers">0</div>
+                    <div class="text-purple-100 text-sm">Tier Levels</div>
+                </div>
+                <div class="bg-gradient-to-br from-red-500 to-red-600 text-white p-5 rounded-xl">
+                    <div class="text-3xl font-bold" id="stats-fraud-alerts">0</div>
+                    <div class="text-red-100 text-sm">Fraud Alerts</div>
+                </div>
+            </div>
+
+            <!-- Management Tabs -->
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="flex gap-4">
+                    <button onclick="switchPassTab('tiers')" id="pass-tab-tiers" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-purple-600 text-purple-600">
+                        <i class="fas fa-layer-group mr-2"></i>Tier Management
+                    </button>
+                    <button onclick="switchPassTab('passes')" id="pass-tab-passes" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-id-card mr-2"></i>Digital Passes
+                    </button>
+                    <button onclick="switchPassTab('locations')" id="pass-tab-locations" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-map-marker-alt mr-2"></i>Verification Locations
+                    </button>
+                    <button onclick="switchPassTab('analytics')" id="pass-tab-analytics" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-chart-bar mr-2"></i>Analytics
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tier Management Tab -->
+            <div id="pass-content-tiers" class="pass-tab-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Tier Configuration</h3>
+                    <button onclick="openCreateTierModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                        <i class="fas fa-plus mr-2"></i>Create New Tier
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-4">
+                    <p class="text-sm text-gray-700">
+                        <strong>Tiers</strong> define guest access levels (e.g., Standard, Premium, VIP, Diamond). Each tier can have different privileges: restaurant access, drink quality, spa access, etc.
+                    </p>
+                </div>
+
+                <div id="tiers-list" class="space-y-4">
+                    <!-- Tiers will be loaded here -->
+                    <div class="text-center py-12 text-gray-500">
+                        <i class="fas fa-layer-group text-4xl mb-3"></i>
+                        <p>Loading tiers...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Digital Passes Tab -->
+            <div id="pass-content-passes" class="pass-tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Digital Passes</h3>
+                    <div class="flex gap-3">
+                        <select id="pass-status-filter" onchange="loadPasses()" class="border border-gray-300 rounded-lg px-3 py-2">
+                            <option value="all">All Passes</option>
+                            <option value="active">Active</option>
+                            <option value="expired">Expired</option>
+                            <option value="deactivated">Deactivated</option>
+                        </select>
+                        <button onclick="openCreatePassModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                            <i class="fas fa-plus mr-2"></i>Issue New Pass
+                        </button>
+                    </div>
+                </div>
+
+                <div id="passes-list" class="space-y-4">
+                    <!-- Passes will be loaded here -->
+                    <div class="text-center py-12 text-gray-500">
+                        <i class="fas fa-id-card text-4xl mb-3"></i>
+                        <p>Loading passes...</p>
+                    </div>
+                </div>
+
+                <!-- Pagination -->
+                <div id="passes-pagination" class="mt-6 flex justify-center gap-2">
+                    <!-- Pagination buttons will be here -->
+                </div>
+            </div>
+
+            <!-- Verification Locations Tab -->
+            <div id="pass-content-locations" class="pass-tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold">Verification Locations</h3>
+                    <button onclick="openCreateLocationModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                        <i class="fas fa-plus mr-2"></i>Add Location
+                    </button>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-4">
+                    <p class="text-sm text-gray-700">
+                        <strong>Verification Locations</strong> are checkpoints where staff scan guest passes (e.g., VIP Restaurant Entry, Rooftop Bar, Adults Pool, Premium Spa).
+                    </p>
+                </div>
+
+                <div id="locations-list" class="grid md:grid-cols-2 gap-4">
+                    <!-- Locations will be loaded here -->
+                    <div class="text-center py-12 text-gray-500 col-span-2">
+                        <i class="fas fa-map-marker-alt text-4xl mb-3"></i>
+                        <p>Loading locations...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="pass-content-analytics" class="pass-tab-content hidden">
+                <h3 class="text-xl font-bold mb-4">Pass Analytics</h3>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Verifications by Tier -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-6">
+                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-pie text-purple-600"></i>
+                            Verifications by Tier
+                        </h4>
+                        <div id="chart-tier-verifications" class="h-64">
+                            <canvas id="tier-verifications-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Verifications by Location -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-6">
+                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
+                            <i class="fas fa-chart-bar text-blue-600"></i>
+                            Verifications by Location
+                        </h4>
+                        <div id="chart-location-verifications" class="h-64">
+                            <canvas id="location-verifications-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Recent Fraud Alerts -->
+                    <div class="bg-white border border-gray-200 rounded-xl p-6 md:col-span-2">
+                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                            Recent Fraud Alerts
+                        </h4>
+                        <div id="fraud-alerts-list">
+                            <p class="text-gray-500 text-center py-4">No fraud alerts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-8 grid md:grid-cols-3 gap-4">
+                <a href="/staff/verify-pass" target="_blank" class="block bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all">
+                    <i class="fas fa-qrcode text-3xl mb-3"></i>
+                    <h4 class="font-bold text-lg mb-1">Staff Verification</h4>
+                    <p class="text-blue-100 text-sm">Open QR scanner for staff to verify guests</p>
+                </a>
+
+                <a href="/admin/all-inclusive/reports" class="block bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl hover:from-green-600 hover:to-green-700 transition-all">
+                    <i class="fas fa-file-download text-3xl mb-3"></i>
+                    <h4 class="font-bold text-lg mb-1">Export Reports</h4>
+                    <p class="text-green-100 text-sm">Download pass usage and verification reports</p>
+                </a>
+
+                <a href="/admin/all-inclusive/fraud-prevention" class="block bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-xl hover:from-red-600 hover:to-red-700 transition-all">
+                    <i class="fas fa-shield-alt text-3xl mb-3"></i>
+                    <h4 class="font-bold text-lg mb-1">Fraud Prevention</h4>
+                    <p class="text-red-100 text-sm">View fraud alerts and suspicious activity</p>
+                </a>
+            </div>
+        </div>
+
         <!-- Hotel Maps -->
         <div id="hotel-map" class="category-section bg-white rounded-xl shadow-xl p-8 mb-8">
             <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-indigo-600">
@@ -32914,6 +33124,9 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                     <button data-tab="beach" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-umbrella-beach w-5"></i><span>Beach</span>
+                    </button>
+                    <button data-tab="allinclusive" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-id-badge w-5"></i><span>All-Inclusive</span>
                     </button>
                     <button data-tab="callbacks" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-phone w-5"></i><span>Callbacks</span>
@@ -45701,6 +45914,244 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       };
       
       // ========== END DOCUMENTATION & FAQ FUNCTIONS ==========
+
+      // ========== ALL-INCLUSIVE DIGITAL PASS FUNCTIONS ==========
+
+      // Switch between pass management tabs
+      window.switchPassTab = function(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.pass-tab-btn').forEach(btn => {
+          btn.classList.remove('border-purple-600', 'text-purple-600');
+          btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        document.getElementById('pass-tab-' + tabName).classList.remove('border-transparent', 'text-gray-500');
+        document.getElementById('pass-tab-' + tabName).classList.add('border-purple-600', 'text-purple-600');
+        
+        // Update content
+        document.querySelectorAll('.pass-tab-content').forEach(content => {
+          content.classList.add('hidden');
+        });
+        document.getElementById('pass-content-' + tabName).classList.remove('hidden');
+        
+        // Load data for the tab
+        if (tabName === 'tiers') {
+          loadTiers();
+        } else if (tabName === 'passes') {
+          loadPasses();
+        } else if (tabName === 'locations') {
+          loadLocations();
+        } else if (tabName === 'analytics') {
+          loadPassAnalytics();
+        }
+      };
+
+      // Load all tiers
+      async function loadTiers() {
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${propertyId}\`);
+          const data = await response.json();
+          
+          if (data.success && data.tiers) {
+            displayTiers(data.tiers);
+            document.getElementById('stats-total-tiers').textContent = data.tiers.length;
+          }
+        } catch (error) {
+          console.error('Load tiers error:', error);
+          document.getElementById('tiers-list').innerHTML = '<p class="text-red-600 text-center py-8">Failed to load tiers</p>';
+        }
+      }
+
+      // Display tiers
+      function displayTiers(tiers) {
+        const container = document.getElementById('tiers-list');
+        
+        if (tiers.length === 0) {
+          container.innerHTML = '<div class="text-center py-12">' +
+            '<i class="fas fa-layer-group text-gray-300 text-5xl mb-4"></i>' +
+            '<p class="text-gray-600 mb-4">No tiers created yet</p>' +
+            '<button onclick="openCreateTierModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold">' +
+            '<i class="fas fa-plus mr-2"></i>Create First Tier' +
+            '</button>' +
+            '</div>';
+          return;
+        }
+        
+        container.innerHTML = tiers.map(tier => 
+          '<div class="border-2 border-gray-200 rounded-xl p-6 hover:border-purple-300 transition-all">' +
+            '<div class="flex items-start justify-between">' +
+              '<div class="flex items-center gap-4 flex-1">' +
+                '<div class="w-16 h-16 rounded-full flex items-center justify-center" style="background-color: ' + tier.tier_color + '20; border: 3px solid ' + tier.tier_color + '">' +
+                  '<i class="fas ' + (tier.tier_icon || 'fa-star') + ' text-2xl" style="color: ' + tier.tier_color + '"></i>' +
+                '</div>' +
+                '<div class="flex-1">' +
+                  '<h4 class="text-xl font-bold mb-1">' + tier.tier_display_name + '</h4>' +
+                  '<p class="text-sm text-gray-600 mb-2">Code: <code class="bg-gray-100 px-2 py-1 rounded">' + tier.tier_code + '</code></p>' +
+                  (tier.tier_description ? '<p class="text-sm text-gray-700 mb-2">' + tier.tier_description + '</p>' : '') +
+                  (tier.daily_upgrade_price > 0 ? '<p class="text-sm font-semibold text-green-600">Upgrade: $' + tier.daily_upgrade_price + '/day</p>' : '') +
+                '</div>' +
+              '</div>' +
+              '<div class="flex gap-2">' +
+                '<button onclick="editTier(' + tier.tier_id + ')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">' +
+                  '<i class="fas fa-edit"></i>' +
+                '</button>' +
+                '<button onclick="deleteTier(' + tier.tier_id + ')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">' +
+                  '<i class="fas fa-trash"></i>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        ).join('');
+      }
+
+      // Open create tier modal
+      window.openCreateTierModal = function() {
+        alert('Create Tier Modal - Coming in next phase!\\n\\nFor now, you can create tiers via API:\\nPOST /api/admin/all-inclusive/tiers\\n\\nSample tiers will be auto-created for testing.');
+      };
+
+      // Edit tier
+      window.editTier = function(tierId) {
+        alert('Edit Tier Modal - Coming in next phase!\\n\\nTier ID: ' + tierId);
+      };
+
+      // Delete tier
+      window.deleteTier = async function(tierId) {
+        if (!confirm('Are you sure you want to delete this tier?\\n\\nThis cannot be undone.')) return;
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}\`, {
+            method: 'DELETE'
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Tier deleted successfully');
+            loadTiers();
+          } else {
+            alert('Failed to delete tier: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Delete tier error:', error);
+          alert('Failed to delete tier');
+        }
+      };
+
+      // Load passes
+      async function loadPasses(page = 1) {
+        const status = document.getElementById('pass-status-filter')?.value || 'all';
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/passes?status=\${status}&page=\${page}\`);
+          const data = await response.json();
+          
+          if (data.success && data.passes) {
+            displayPasses(data.passes);
+            displayPassesPagination(data.pagination);
+            
+            // Update stats
+            const activePasses = data.passes.filter(p => p.pass_status === 'active').length;
+            document.getElementById('stats-active-passes').textContent = activePasses;
+          }
+        } catch (error) {
+          console.error('Load passes error:', error);
+          document.getElementById('passes-list').innerHTML = '<p class="text-red-600 text-center py-8">Failed to load passes</p>';
+        }
+      }
+
+      // Display passes
+      function displayPasses(passes) {
+        const container = document.getElementById('passes-list');
+        container.innerHTML = '<div class="text-center py-8 text-gray-600">' +
+          '<p><strong>' + passes.length + ' passes loaded</strong></p>' +
+          '<p class="text-sm mt-2">Detailed pass cards UI coming in next phase</p>' +
+          '<pre class="text-left bg-gray-50 p-4 mt-4 rounded text-xs overflow-auto">' + JSON.stringify(passes.slice(0, 3), null, 2) + '</pre>' +
+          '</div>';
+      }
+
+      // Display pagination
+      function displayPassesPagination(pagination) {
+        const container = document.getElementById('passes-pagination');
+        if (!pagination || pagination.total_pages <= 1) {
+          container.innerHTML = '';
+          return;
+        }
+        
+        let html = '';
+        for (let i = 1; i <= pagination.total_pages; i++) {
+          const active = i === pagination.page ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300';
+          html += '<button onclick="loadPasses(' + i + ')" class="' + active + ' px-4 py-2 rounded-lg font-semibold">' + i + '</button>';
+        }
+        container.innerHTML = html;
+      }
+
+      // Open create pass modal
+      window.openCreatePassModal = function() {
+        alert('Create Pass Modal - Coming in next phase!\\n\\nFor now, you can create passes via API:\\nPOST /api/admin/all-inclusive/passes');
+      };
+
+      // View pass
+      window.viewPass = function(passReference) {
+        window.open(\`/guest-pass/\${passReference}\`, '_blank');
+      };
+
+      // Edit pass
+      window.editPass = function(passId) {
+        alert('Edit Pass Modal - Coming in next phase!\\n\\nPass ID: ' + passId);
+      };
+
+      // Deactivate pass
+      window.deactivatePass = async function(passId) {
+        const reason = prompt('Enter reason for deactivation:');
+        if (!reason) return;
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/passes/\${passId}/deactivate\`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Pass deactivated successfully');
+            loadPasses();
+          } else {
+            alert('Failed to deactivate pass: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Deactivate pass error:', error);
+          alert('Failed to deactivate pass');
+        }
+      };
+
+      // Load locations
+      async function loadLocations() {
+        document.getElementById('locations-list').innerHTML = '<div class="text-center py-12 text-gray-500 col-span-2">' +
+          '<i class="fas fa-map-marker-alt text-4xl mb-3"></i>' +
+          '<p>Verification Locations feature coming in next phase!</p>' +
+          '<p class="text-sm mt-2">You will be able to define checkpoints like VIP Restaurant, Rooftop Bar, Premium Spa</p>' +
+          '</div>';
+      }
+
+      // Open create location modal
+      window.openCreateLocationModal = function() {
+        alert('Create Location Modal - Coming in next phase!');
+      };
+
+      // Load pass analytics
+      async function loadPassAnalytics() {
+        document.getElementById('pass-content-analytics').innerHTML = '<h3 class="text-xl font-bold mb-4">Pass Analytics</h3>' +
+          '<div class="text-center py-12 text-gray-500">' +
+          '<i class="fas fa-chart-bar text-5xl mb-4"></i>' +
+          '<p class="text-lg mb-2">Analytics Dashboard Coming Soon!</p>' +
+          '<p class="text-sm">Track verifications by tier, location, time of day, and more</p>' +
+          '</div>';
+      }
+
+      // Load all-inclusive stats on page load
+      if (document.getElementById('allinclusive')) {
+        loadTiers();
+      }
+
+      // ========== END ALL-INCLUSIVE FUNCTIONS ==========
     </script>
 </body>
 </html>
