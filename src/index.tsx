@@ -14950,11 +14950,11 @@ app.get('/api/admin/all-inclusive/analytics/:property_id', async (c) => {
       WHERE property_id = ? AND face_match_score IS NOT NULL
     `).bind(property_id).first()
     
-    // Manual reviews (verification_status = 'manual_override')
+    // Manual reviews (face_verification_status = 'manual_override')
     const manualReviews = await DB.prepare(`
       SELECT COUNT(*) as count 
       FROM pass_verifications 
-      WHERE property_id = ? AND verification_status = 'manual_override'
+      WHERE property_id = ? AND face_verification_status = 'manual_override'
     `).bind(property_id).first()
     
     // Fraud alerts
@@ -14987,7 +14987,7 @@ app.get('/api/admin/all-inclusive/analytics/:property_id', async (c) => {
       FROM face_verification_fraud_alerts fvfa
       JOIN digital_passes dp ON fvfa.pass_id = dp.pass_id
       WHERE fvfa.property_id = ?
-      ORDER BY fvfa.alert_timestamp DESC
+      ORDER BY fvfa.created_at DESC
       LIMIT 10
     `).bind(property_id).all()
     
