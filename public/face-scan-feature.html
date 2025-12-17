@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Pass System - Replace Wristbands Forever | GuestConnect</title>
-    <meta name="description" content="Revolutionary digital pass technology for all-inclusive resorts. Guest choice: QR Code or Facial Recognition. Eliminate wristbands, reduce fraud, enhance guest experience.">
+    <title>OnePass - Replace Wristbands Forever | GuestConnect</title>
+    <meta name="description" content="OnePass: Revolutionary digital pass + face recognition for all-inclusive resorts. Guest choice: QR Code or Face Scan. Eliminate wristbands, reduce fraud, enhance guest experience.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
+            --onepass-blue: #1e3a5f;
+            --onepass-dark: #16304d;
+            --onepass-teal: #00d4aa;
             --primary: #016e8f;
             --primary-dark: #014a5e;
             --primary-light: #0295bf;
@@ -21,10 +24,14 @@
             overflow-x: hidden;
         }
         
-        /* Professional solid backgrounds */
+        /* OnePass Hero Background */
         .hero-section {
-            background: linear-gradient(135deg, #014a5e 0%, #016e8f 100%);
+            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);
             position: relative;
+        }
+        
+        .onepass-gradient {
+            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);
         }
         
         
@@ -130,18 +137,27 @@
     <nav class="bg-white/95 backdrop-blur-md shadow-lg sticky top-0 z-50 border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
-                <div class="flex items-center">
+                <div class="flex items-center gap-4">
                     <div class="flex-shrink-0">
                         <h1 class="text-3xl font-extrabold" style="color: var(--primary);">
                             <i class="fas fa-shield-alt mr-2"></i>GuestConnect
                         </h1>
                     </div>
+                    <div class="hidden lg:block w-px h-8 bg-gray-300"></div>
+                    <div class="hidden lg:flex items-center gap-2 px-3 py-1 rounded-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 20px; filter: brightness(0) invert(1);">
+                        <span class="text-white font-bold text-sm">OnePass</span>
+                    </div>
                 </div>
-                <div class="hidden md:flex items-center space-x-10">
-                    <a href="#guest-choice" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">Guest Choice</a>
-                    <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">How It Works</a>
-                    <a href="#comparison" class="nav-link text-gray-700 hover:text-primary font-semibold text-lg">vs Wristbands</a>
-                    <a href="/admin/login" class="px-8 py-3 bg-teal-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:bg-teal-700 transform hover:scale-105 transition">
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="#guest-choice" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">Guest Choice</a>
+                    <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">How It Works</a>
+                    <a href="#comparison" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">vs Wristbands</a>
+                    <a href="/face-scan-feature" class="px-6 py-2 text-white rounded-lg font-bold text-base shadow-lg hover:shadow-xl transform hover:scale-105 transition border-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
+                        <img src="/onepass-logo.png" alt="OnePass" class="inline h-4 mr-2" style="filter: brightness(0) invert(1);">
+                        OnePass
+                    </a>
+                    <a href="/admin/login" class="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-base shadow-lg hover:shadow-xl hover:bg-teal-700 transform hover:scale-105 transition">
                         Get Started
                     </a>
                 </div>
@@ -150,44 +166,46 @@
     </nav>
 
     <!-- Hero Section -->
-    <section class="bg-gradient-to-br from-gray-900 via-teal-900 to-gray-900 text-white py-24 md:py-32 relative">
+    <section class="onepass-gradient text-white py-24 md:py-32 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div class="grid md:grid-cols-2 gap-16 items-center">
                 <div class="slide-up">
                     <div class="inline-block mb-6">
-                        <span class="px-6 py-3 bg-white/20 rounded-full text-sm font-bold backdrop-blur-sm border border-white/30">
-                            <i class="fas fa-sparkles mr-2"></i>The Future of Guest Access
-                        </span>
+                        <div class="flex items-center gap-3 px-6 py-3 bg-white/10 rounded-full backdrop-blur-sm border-2" style="border-color: #00d4aa;">
+                            <img src="/onepass-logo.png" alt="OnePass" style="height: 24px; filter: brightness(0) invert(1);">
+                            <span class="font-black text-lg">OnePass</span>
+                            <span class="px-3 py-1 rounded-full text-xs font-black" style="background: #00d4aa; color: #16304d;">PRO</span>
+                        </div>
                     </div>
                     <h1 class="text-6xl md:text-7xl font-black mb-8 leading-tight">
                         Replace Wristbands<br/>
-                        <span class="text-yellow-300">Forever</span>
+                        <span style="color: #00d4aa;">Forever</span>
                     </h1>
                     <p class="text-2xl mb-8 text-gray-100 leading-relaxed font-light">
                         Give your guests the power to choose: <strong>QR Code</strong> or <strong>Face Recognition</strong>.
                         No plastic wristbands. No hassle. Just seamless access everywhere.
                     </p>
                     <div class="flex flex-wrap gap-6">
-                        <a href="#guest-choice" class="px-10 py-5 bg-teal-500 text-white rounded-xl font-black text-xl btn-shadow hover:bg-teal-600 transition transform hover:scale-105">
+                        <a href="#guest-choice" class="px-10 py-5 text-white rounded-xl font-black text-xl shadow-2xl transition transform hover:scale-105 border-2" style="background: #00d4aa; border-color: #00ffd0;">
                             <i class="fas fa-hand-pointer mr-3"></i>See Guest Choice
                         </a>
-                        <a href="#comparison" class="px-10 py-5 bg-white text-teal-700 rounded-xl font-black text-xl shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                        <a href="#comparison" class="px-10 py-5 bg-white rounded-xl font-black text-xl shadow-lg hover:shadow-xl transition transform hover:scale-105" style="color: #1e3a5f;">
                             <i class="fas fa-chart-bar mr-3"></i>Why Switch?
                         </a>
                     </div>
                     
                     <!-- Impressive Stats -->
-                    <div class="grid grid-cols-3 gap-8 mt-16 pt-12 border-t border-white/30">
+                    <div class="grid grid-cols-3 gap-8 mt-16 pt-12 border-t" style="border-color: #00d4aa;">
                         <div class="text-center">
-                            <div class="text-5xl font-black text-yellow-300 mb-2">2</div>
+                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">2</div>
                             <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Guest Options</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-5xl font-black text-yellow-300 mb-2">&lt;1s</div>
+                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">&lt;1s</div>
                             <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Verification</div>
                         </div>
                         <div class="text-center">
-                            <div class="text-5xl font-black text-yellow-300 mb-2">$0</div>
+                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">$0</div>
                             <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Per Guest</div>
                         </div>
                     </div>
@@ -922,15 +940,21 @@
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-16">
+    <footer class="text-white py-16" style="background: linear-gradient(135deg, #0f1f33 0%, #1e3a5f 100%);">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid md:grid-cols-4 gap-12 mb-12">
                 <div>
-                    <h3 class="text-3xl font-black mb-6" style="color: var(--accent);">
-                        <i class="fas fa-shield-alt mr-3"></i>GuestConnect
-                    </h3>
-                    <p class="text-gray-400 text-lg leading-relaxed">
-                        Digital pass technology for all-inclusive resorts. QR or Face – guest's choice.
+                    <div class="flex items-center gap-3 mb-4">
+                        <h3 class="text-3xl font-black" style="color: #00d4aa;">
+                            <i class="fas fa-shield-alt mr-2"></i>GuestConnect
+                        </h3>
+                    </div>
+                    <div class="flex items-center gap-2 mb-4 px-4 py-2 bg-white/10 rounded-lg inline-block">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 18px; filter: brightness(0) invert(1);">
+                        <span class="font-bold">OnePass</span>
+                    </div>
+                    <p class="text-gray-300 text-lg leading-relaxed">
+                        Digital pass + face recognition for all-inclusive resorts. QR or Face – guest's choice.
                     </p>
                 </div>
                 <div>
