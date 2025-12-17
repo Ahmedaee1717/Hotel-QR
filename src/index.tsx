@@ -15834,6 +15834,101 @@ app.post('/api/staff/all-inclusive/verify-face', async (c) => {
   }
 })
 
+// Search for face across all active passes
+app.post('/api/staff/all-inclusive/search-face', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { live_face_embedding } = await c.req.json()
+    
+    if (!live_face_embedding || !Array.isArray(live_face_embedding)) {
+      return c.json({ error: 'Valid face embedding required' }, 400)
+    }
+
+    // Get all active passes with face enrollment
+    const passes = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.property_id = ? 
+        AND p.pass_status = 'active'
+        AND p.face_embedding IS NOT NULL
+        AND p.face_embedding != ''
+    `).bind(property_id).all()
+
+    if (!passes.results || passes.results.length === 0) {
+      return c.json({ 
+        match_found: false, 
+        error: 'No enrolled faces in database' 
+      }, 404)
+    }
+
+    // Find best match using euclidean distance
+    let bestMatch = null
+    let bestScore = 0
+    
+    for (const pass of passes.results) {
+      try {
+        const storedEmbedding = JSON.parse(pass.face_embedding)
+        
+        // Calculate euclidean distance
+        let distance = 0
+        for (let i = 0; i < live_face_embedding.length; i++) {
+          const diff = live_face_embedding[i] - storedEmbedding[i]
+          distance += diff * diff
+        }
+        distance = Math.sqrt(distance)
+        
+        // Convert distance to similarity score (0-1, higher is better)
+        const similarity = 1 / (1 + distance)
+        
+        if (similarity > bestScore) {
+          bestScore = similarity
+          bestMatch = pass
+        }
+      } catch (e) {
+        console.error('Error parsing embedding for pass:', pass.pass_reference, e)
+      }
+    }
+
+    // Match threshold
+    const matchThreshold = 0.6
+    
+    if (bestMatch && bestScore >= matchThreshold) {
+      return c.json({
+        match_found: true,
+        match_score: bestScore,
+        pass_details: {
+          pass_reference: bestMatch.pass_reference,
+          guest_name: bestMatch.primary_guest_name,
+          room_number: bestMatch.room_number,
+          tier: bestMatch.tier_display_name,
+          tier_color: bestMatch.tier_color,
+          tier_icon: bestMatch.tier_icon
+        }
+      })
+    } else {
+      return c.json({ 
+        match_found: false,
+        error: 'No matching face found',
+        best_score: bestScore
+      }, 404)
+    }
+  } catch (error) {
+    console.error('Face search error:', error)
+    return c.json({ error: 'Failed to search faces: ' + error.message }, 500)
+  }
+})
+
 // GUEST SELF-SERVICE API ENDPOINTS
 // These allow guests to manage their own passes and consent without staff intervention
 
