@@ -36785,30 +36785,30 @@ app.get('/admin/dashboard', (c) => {
     <!-- All-Inclusive Digital Pass System Tab -->
     <div id="allinclusiveTab" class="tab-content hidden">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3 text-purple-600">
+            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3" style="color: #016e8f;">
                 <i class="fas fa-id-badge"></i>
                 All-Inclusive Digital Pass System
             </h2>
             
-            <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-600 p-6 rounded-lg mb-6">
-                <h3 class="font-bold text-lg mb-2 flex items-center gap-2">
-                    <i class="fas fa-shield-alt text-purple-600"></i>
+            <div class="bg-gradient-to-r from-[#f6f2e9] to-[#aecfb4]/20 border-l-4 p-6 rounded-lg mb-6" style="border-color: #016e8f;">
+                <h3 class="font-bold text-lg mb-2 flex items-center gap-2" style="color: #016e8f;">
+                    <i class="fas fa-shield-alt"></i>
                     Eliminate Wristband Fraud - Save $135K-225K Annually
                 </h3>
                 <p class="text-gray-700 mb-3">
                     Replace physical wristbands with fraud-proof digital passes. Prevent old wristband reuse, sharing, counterfeiting, and tier fraud.
                 </p>
                 <div class="grid md:grid-cols-3 gap-4 text-sm">
-                    <div class="bg-white p-3 rounded-lg">
-                        <strong class="text-purple-600">✓ Rotating QR Codes</strong>
+                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                        <strong style="color: #016e8f;">✓ Rotating QR Codes</strong>
                         <p class="text-gray-600">Refresh every 60s - impossible to counterfeit</p>
                     </div>
-                    <div class="bg-white p-3 rounded-lg">
-                        <strong class="text-purple-600">✓ Instant Deactivation</strong>
+                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                        <strong style="color: #016e8f;">✓ Instant Deactivation</strong>
                         <p class="text-gray-600">Auto-expire at checkout - no old pass reuse</p>
                     </div>
-                    <div class="bg-white p-3 rounded-lg">
-                        <strong class="text-purple-600">✓ Tier Verification</strong>
+                    <div class="bg-white p-3 rounded-lg border border-gray-200">
+                        <strong style="color: #016e8f;">✓ Tier Verification</strong>
                         <p class="text-gray-600">Staff verify access rights in 1 second</p>
                     </div>
                 </div>
@@ -36816,28 +36816,28 @@ app.get('/admin/dashboard', (c) => {
             
             <!-- Quick Stats Dashboard -->
             <div class="grid md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-xl">
+                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
                     <div class="text-3xl font-bold" id="stats-active-passes">0</div>
-                    <div class="text-blue-100 text-sm">Active Passes</div>
+                    <div class="opacity-90 text-sm">Active Passes</div>
                 </div>
-                <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-xl">
+                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
                     <div class="text-3xl font-bold" id="stats-verifications-today">0</div>
-                    <div class="text-green-100 text-sm">Verifications Today</div>
+                    <div class="opacity-90 text-sm">Verifications Today</div>
                 </div>
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-5 rounded-xl">
+                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
                     <div class="text-3xl font-bold" id="stats-total-tiers">0</div>
-                    <div class="text-purple-100 text-sm">Tier Levels</div>
+                    <div class="opacity-90 text-sm">Tier Levels</div>
                 </div>
-                <div class="bg-gradient-to-br from-red-500 to-red-600 text-white p-5 rounded-xl">
+                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
                     <div class="text-3xl font-bold" id="stats-fraud-alerts">0</div>
-                    <div class="text-red-100 text-sm">Fraud Alerts</div>
+                    <div class="opacity-90 text-sm">Fraud Alerts</div>
                 </div>
             </div>
 
             <!-- Management Tabs -->
             <div class="border-b border-gray-200 mb-6">
                 <nav class="flex gap-4">
-                    <button onclick="switchPassTab('tiers')" id="pass-tab-tiers" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-purple-600 text-purple-600">
+                    <button onclick="switchPassTab('tiers')" id="pass-tab-tiers" class="pass-tab-btn px-4 py-3 font-semibold border-b-4" style="border-color: #016e8f; color: #016e8f;">
                         <i class="fas fa-layer-group mr-2"></i>Tier Management
                     </button>
                     <button onclick="switchPassTab('passes')" id="pass-tab-passes" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
@@ -36856,7 +36856,7 @@ app.get('/admin/dashboard', (c) => {
             <div id="pass-content-tiers" class="pass-tab-content">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold">Tier Configuration</h3>
-                    <button onclick="openCreateTierModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                    <button onclick="openCreateTierModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
                         <i class="fas fa-plus mr-2"></i>Create New Tier
                     </button>
                 </div>
@@ -36887,7 +36887,7 @@ app.get('/admin/dashboard', (c) => {
                             <option value="expired">Expired</option>
                             <option value="deactivated">Deactivated</option>
                         </select>
-                        <button onclick="openCreatePassModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                        <button onclick="openCreatePassModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
                             <i class="fas fa-plus mr-2"></i>Issue New Pass
                         </button>
                     </div>
@@ -36911,7 +36911,7 @@ app.get('/admin/dashboard', (c) => {
             <div id="pass-content-locations" class="pass-tab-content hidden">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-bold">Verification Locations</h3>
-                    <button onclick="openCreateLocationModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold">
+                    <button onclick="openCreateLocationModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
                         <i class="fas fa-plus mr-2"></i>Add Location
                     </button>
                 </div>
@@ -36973,22 +36973,22 @@ app.get('/admin/dashboard', (c) => {
 
             <!-- Quick Actions -->
             <div class="mt-8 grid md:grid-cols-3 gap-4">
-                <a href="/staff/verify-pass" target="_blank" class="block bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all">
+                <a href="/staff/verify-pass" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
                     <i class="fas fa-qrcode text-3xl mb-3"></i>
                     <h4 class="font-bold text-lg mb-1">Staff Verification</h4>
-                    <p class="text-blue-100 text-sm">Open QR scanner for staff to verify guests</p>
+                    <p class="opacity-90 text-sm">Open QR scanner for staff to verify guests</p>
                 </a>
 
-                <a href="/admin/all-inclusive/reports" class="block bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl hover:from-green-600 hover:to-green-700 transition-all">
+                <a href="/admin/all-inclusive/reports" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
                     <i class="fas fa-file-download text-3xl mb-3"></i>
                     <h4 class="font-bold text-lg mb-1">Export Reports</h4>
-                    <p class="text-green-100 text-sm">Download pass usage and verification reports</p>
+                    <p class="opacity-90 text-sm">Download pass usage and verification reports</p>
                 </a>
 
-                <a href="/admin/all-inclusive/fraud-prevention" class="block bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-xl hover:from-red-600 hover:to-red-700 transition-all">
+                <a href="/admin/all-inclusive/fraud-prevention" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
                     <i class="fas fa-shield-alt text-3xl mb-3"></i>
                     <h4 class="font-bold text-lg mb-1">Fraud Prevention</h4>
-                    <p class="text-red-100 text-sm">View fraud alerts and suspicious activity</p>
+                    <p class="opacity-90 text-sm">View fraud alerts and suspicious activity</p>
                 </a>
             </div>
         </div>
@@ -45925,11 +45925,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.switchPassTab = function(tabName) {
         // Update tab buttons
         document.querySelectorAll('.pass-tab-btn').forEach(btn => {
-          btn.classList.remove('border-purple-600', 'text-purple-600');
-          btn.classList.add('border-transparent', 'text-gray-500');
+          btn.style.borderColor = 'transparent';
+          btn.style.color = '#6B7280'; // gray-500
         });
-        document.getElementById('pass-tab-' + tabName).classList.remove('border-transparent', 'text-gray-500');
-        document.getElementById('pass-tab-' + tabName).classList.add('border-purple-600', 'text-purple-600');
+        const activeTab = document.getElementById('pass-tab-' + tabName);
+        activeTab.style.borderColor = '#016e8f';
+        activeTab.style.color = '#016e8f';
         
         // Update content
         document.querySelectorAll('.pass-tab-content').forEach(content => {
