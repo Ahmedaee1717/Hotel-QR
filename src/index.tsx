@@ -14435,14 +14435,17 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
     // Generate QR secret for rotating QR codes
     const qr_secret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     
-    // Insert digital pass
+    // Generate secure guest access token for self-service portal
+    const guest_access_token = Math.random().toString(36).substring(2) + Date.now().toString(36) + Math.random().toString(36).substring(2)
+    
+    // Insert digital pass with guest portal token
     const result = await DB.prepare(`
       INSERT INTO digital_passes (
         property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
         guest_email, guest_phone, room_number, tier_id, pass_status,
         num_adults, num_children, valid_from, valid_until,
-        qr_secret, issued_by_user_id, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+        qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1)
     `).bind(
       property_id,
       pass_reference,
@@ -14458,7 +14461,8 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
       valid_until,
       qr_secret,
       user_id || null,
-      notes || null
+      notes || null,
+      guest_access_token
     ).run()
     
     const pass_id = result.meta.last_row_id
@@ -14482,11 +14486,16 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
       }
     }
     
+    // Generate guest portal URL with secure token
+    const guest_portal_url = `/guest-portal.html?pass=${pass_reference}&token=${guest_access_token}`
+    
     return c.json({
       success: true,
       pass_id,
       pass_reference,
-      pass_url: `/guest-pass/${pass_reference}`
+      pass_url: `/guest-pass/${pass_reference}`,
+      guest_portal_url,
+      guest_access_token
     })
   } catch (error) {
     console.error('Create pass error:', error)
@@ -14735,6 +14744,58 @@ app.post('/api/admin/all-inclusive/passes/:pass_id/withdraw-consent', async (c) 
   } catch (error) {
     console.error('Withdraw consent error:', error)
     return c.json({ error: 'Failed to withdraw consent: ' + error.message }, 500)
+  }
+})
+
+// Generate guest access token for existing pass
+app.post('/api/admin/all-inclusive/passes/:pass_id/generate-token', requirePermission('settings_manage'), async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // Check if pass exists and belongs to this property
+    const pass = await DB.prepare(`
+      SELECT pass_id, pass_reference, guest_access_token
+      FROM digital_passes 
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // If token already exists, return it
+    if (pass.guest_access_token) {
+      return c.json({ 
+        success: true, 
+        guest_access_token: pass.guest_access_token 
+      })
+    }
+    
+    // Generate new secure token
+    const guest_access_token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+    
+    // Update pass with new token
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET guest_access_token = ?
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(guest_access_token, pass_id, property_id).run()
+    
+    return c.json({ 
+      success: true, 
+      guest_access_token 
+    })
+  } catch (error) {
+    console.error('Generate token error:', error)
+    return c.json({ error: 'Failed to generate token' }, 500)
   }
 })
 
@@ -27690,6 +27751,12 @@ app.get('/staff-face-scanner', async (c) => {
 
 app.get('/staff/face-scanner', async (c) => {
   const html = await fetch(new URL('/staff-face-scanner.html', c.req.url))
+  return c.html(await html.text())
+})
+
+// Guest Digital Pass Display (QR + Face in ONE place)
+app.get('/guest-pass/:pass_reference', async (c) => {
+  const html = await fetch(new URL('/guest-pass.html', c.req.url))
   return c.html(await html.text())
 })
 
@@ -47602,15 +47669,20 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<p class="font-semibold text-sm">' + pass.valid_until + '</p></div>';
           html += '</div>';
           
-          html += '<div class="flex gap-2">';
+          // Add verification preference indicator
+          const verificationPref = pass.verification_preference || 'qr';
+          const prefLabel = verificationPref === 'face' ? '👤 Face' : verificationPref === 'both' ? '👤+📱 Both' : '📱 QR Code';
+          html += '<div class="mb-3 text-center"><span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">Verification: ' + prefLabel + '</span></div>';
+          
+          html += '<div class="flex flex-wrap gap-2">';
           if (hasFace) {
-            html += '<button onclick="viewPassFace(' + pass.pass_id + ')" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-semibold"><i class="fas fa-camera mr-2"></i>Face Enrolled</button>';
-            html += '<button onclick="withdrawBiometricConsent(' + pass.pass_id + ', &quot;' + pass.primary_guest_name + '&quot;)" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-semibold" title="GDPR/BIPA: Withdraw consent and delete biometric data"><i class="fas fa-user-slash mr-2"></i>Disable Face Recognition</button>';
+            html += '<button onclick="viewPassFace(' + pass.pass_id + ')" class="flex-1 min-w-[120px] px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-xs font-semibold"><i class="fas fa-camera mr-1"></i>Face Enrolled</button>';
+            html += '<button onclick="withdrawBiometricConsent(' + pass.pass_id + ', &quot;' + pass.primary_guest_name + '&quot;)" class="flex-1 min-w-[120px] px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-xs font-semibold" title="GDPR/BIPA: Withdraw consent and delete biometric data"><i class="fas fa-user-slash mr-1"></i>Disable Face</button>';
           } else {
-            html += '<button onclick="enrollPassFace(' + pass.pass_id + ', &quot;' + pass.pass_reference + '&quot;)" class="flex-1 px-4 py-2 text-white rounded-lg hover:opacity-90 text-sm font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-2"></i>Enroll Face</button>';
+            html += '<button onclick="enrollPassFace(' + pass.pass_id + ', &quot;' + pass.pass_reference + '&quot;)" class="flex-1 min-w-[120px] px-3 py-2 text-white rounded-lg hover:opacity-90 text-xs font-semibold" style="background: linear-gradient(to right, #016e8f, #014a5e);"><i class="fas fa-camera mr-1"></i>Enroll Face</button>';
           }
-          html += '<button onclick="viewPass(&quot;' + pass.pass_reference + '&quot;)" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"><i class="fas fa-qrcode"></i></button>';
-          html += '<button onclick="editPass(' + pass.pass_id + ')" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"><i class="fas fa-edit"></i></button>';
+          html += '<button onclick="showGuestPortalInfo(' + pass.pass_id + ', &quot;' + pass.pass_reference + '&quot;, &quot;' + (pass.guest_access_token || '') + '&quot;)" class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs font-semibold whitespace-nowrap"><i class="fas fa-mobile-alt mr-1"></i>QR & Link</button>';
+          html += '<button onclick="editPass(' + pass.pass_id + ')" class="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-xs"><i class="fas fa-edit"></i></button>';
           html += '</div>';
           html += '</div></div>';
         });
@@ -47733,7 +47805,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       // View pass
       window.viewPass = function(passReference) {
-        window.open(\`/guest-pass/\${passReference}\`, '_blank');
+        window.open('/guest-pass/' + passReference, '_blank');
       };
 
       // Close create pass modal
@@ -47763,9 +47835,56 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const result = await response.json();
           
           if (result.success) {
-            alert('✅ Digital Pass Issued Successfully!\\n\\nPass Reference: ' + result.pass_reference + '\\n\\nYou can now enroll the guest\\'s face for verification.');
-            closeCreatePassModal();
-            loadPasses();
+            // Show success modal with guest portal link
+            const guestPortalFullUrl = window.location.origin + result.guest_portal_url;
+            const successModal = document.createElement('div');
+            successModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            successModal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">' +
+              '<div class="text-center mb-6">' +
+              '<div class="inline-block p-4 bg-green-100 rounded-full mb-4">' +
+              '<i class="fas fa-check-circle text-green-600 text-5xl"></i>' +
+              '</div>' +
+              '<h2 class="text-2xl font-bold text-gray-800">Digital Pass Issued!</h2>' +
+              '<p class="text-gray-600 mt-2">Pass Reference: <span class="font-mono font-bold">' + result.pass_reference + '</span></p>' +
+              '</div>' +
+              '<div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">' +
+              '<h3 class="font-bold text-blue-900 mb-2 flex items-center gap-2">' +
+              '<i class="fas fa-mobile-alt"></i> Guest Self-Service Portal' +
+              '</h3>' +
+              '<p class="text-sm text-blue-800 mb-3">Send this link to the guest via email or SMS:</p>' +
+              '<div class="flex gap-2">' +
+              '<input type="text" id="portal-link" value="' + guestPortalFullUrl + '" readonly class="flex-1 px-3 py-2 border border-blue-300 rounded-lg bg-white font-mono text-sm">' +
+              '<button onclick="copyPortalLink(\\'' + guestPortalFullUrl + '\\')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">' +
+              '<i class="fas fa-copy mr-2"></i>Copy' +
+              '</button>' +
+              '</div>' +
+              '</div>' +
+              '<div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 mb-6">' +
+              '<h3 class="font-bold text-purple-900 mb-2">What the guest can do:</h3>' +
+              '<ul class="space-y-1 text-sm text-purple-800">' +
+              '<li class="flex items-start gap-2">' +
+              '<i class="fas fa-qrcode mt-1"></i>' +
+              '<span>View and use their QR code for instant access</span>' +
+              '</li>' +
+              '<li class="flex items-start gap-2">' +
+              '<i class="fas fa-wallet mt-1"></i>' +
+              '<span>Add pass to Apple Wallet or Google Pay</span>' +
+              '</li>' +
+              '<li class="flex items-start gap-2">' +
+              '<i class="fas fa-sliders-h mt-1"></i>' +
+              '<span>Choose verification method (QR, Face, or Both)</span>' +
+              '</li>' +
+              '<li class="flex items-start gap-2">' +
+              '<i class="fas fa-user-slash mt-1"></i>' +
+              '<span>Withdraw biometric consent anytime (no staff needed)</span>' +
+              '</li>' +
+              '</ul>' +
+              '</div>' +
+              '<button onclick="this.closest(\\'.fixed\\').remove(); closeCreatePassModal(); loadPasses();" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-indigo-700">' +
+              '<i class="fas fa-check mr-2"></i>Done' +
+              '</button>' +
+              '</div>';
+            document.body.appendChild(successModal);
           } else {
             alert('❌ Failed to issue pass: ' + result.error);
           }
@@ -47776,6 +47895,121 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       };
       
       // Edit pass
+      // Copy guest portal link to clipboard
+      window.copyPortalLink = function(url) {
+        navigator.clipboard.writeText(url).then(() => {
+          alert('✅ Guest portal link copied to clipboard!\\n\\nYou can now send it via email or SMS to the guest.');
+        }).catch(err => {
+          console.error('Copy failed:', err);
+          // Fallback: select the text
+          document.getElementById('portal-link').select();
+          alert('Link selected. Press Ctrl+C (Cmd+C on Mac) to copy.');
+        });
+      };
+      
+      // Show guest portal info and QR code
+      window.showGuestPortalInfo = async function(passId, passReference, guestAccessToken) {
+        // If no token exists, generate one
+        if (!guestAccessToken) {
+          try {
+            const response = await fetchWithAuth('/api/admin/all-inclusive/passes/' + passId + '/generate-token', {
+              method: 'POST'
+            });
+            const result = await response.json();
+            if (result.success) {
+              guestAccessToken = result.guest_access_token;
+            } else {
+              alert('❌ Failed to generate access token');
+              return;
+            }
+          } catch (error) {
+            console.error('Token generation error:', error);
+            alert('❌ Failed to generate access token');
+            return;
+          }
+        }
+        
+        const guestPassUrl = window.location.origin + '/guest-pass/' + passReference;
+        const guestPortalUrl = window.location.origin + '/guest-portal.html?pass=' + passReference + '&token=' + guestAccessToken;
+        
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">' +
+          '<div class="flex items-center justify-between mb-6">' +
+          '<h2 class="text-2xl font-bold text-gray-800">' +
+          '<i class="fas fa-qrcode mr-2 text-purple-600"></i>Digital Pass & QR Code' +
+          '</h2>' +
+          '<button onclick="this.closest(\\'.fixed\\').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">' +
+          '<i class="fas fa-times"></i>' +
+          '</button>' +
+          '</div>' +
+          '<div class="bg-gradient-to-br from-purple-50 to-blue-50 border-2 border-purple-200 rounded-xl p-6 mb-4">' +
+          '<h3 class="font-bold text-purple-900 mb-3 text-center text-lg">' +
+          '<i class="fas fa-mobile-screen-button mr-2"></i>Guest Digital Pass' +
+          '</h3>' +
+          '<p class="text-sm text-purple-800 mb-4 text-center">' +
+          'This is the guest\\'s all-in-one digital pass with <strong>QR Code + Face Recognition</strong> in ONE place' +
+          '</p>' +
+          '<div class="flex gap-2 mb-3">' +
+          '<input type="text" id="guest-pass-url" value="' + guestPassUrl + '" readonly class="flex-1 px-3 py-2 border border-purple-300 rounded-lg bg-white font-mono text-sm">' +
+          '<button onclick="navigator.clipboard.writeText(\\'' + guestPassUrl + '\\').then(() => alert(\\'✅ Pass URL copied!\\'))" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold whitespace-nowrap">' +
+          '<i class="fas fa-copy mr-2"></i>Copy' +
+          '</button>' +
+          '</div>' +
+          '<div class="flex gap-2">' +
+          '<button onclick="window.open(\\'/guest-pass/' + passReference + '\\', \\'_blank\\')" class="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold">' +
+          '<i class="fas fa-external-link-alt mr-2"></i>View Pass (QR + Face)' +
+          '</button>' +
+          '</div>' +
+          '</div>' +
+          '<div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 mb-4">' +
+          '<h3 class="font-bold text-blue-900 mb-3">' +
+          '<i class="fas fa-cog mr-2"></i>Guest Self-Service Portal' +
+          '</h3>' +
+          '<p class="text-sm text-blue-800 mb-3">' +
+          'Send this portal link to guests so they can manage their own preferences:' +
+          '</p>' +
+          '<div class="flex gap-2 mb-3">' +
+          '<input type="text" id="guest-portal-url" value="' + guestPortalUrl + '" readonly class="flex-1 px-3 py-2 border border-blue-300 rounded-lg bg-white font-mono text-sm">' +
+          '<button onclick="navigator.clipboard.writeText(\\'' + guestPortalUrl + '\\').then(() => alert(\\'✅ Portal link copied!\\'))" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold whitespace-nowrap">' +
+          '<i class="fas fa-copy mr-2"></i>Copy' +
+          '</button>' +
+          '</div>' +
+          '</div>' +
+          '<div class="bg-green-50 border-2 border-green-200 rounded-xl p-4">' +
+          '<h3 class="font-bold text-green-900 mb-2 flex items-center gap-2">' +
+          '<i class="fas fa-check-circle"></i>What guests can do:' +
+          '</h3>' +
+          '<ul class="space-y-2 text-sm text-green-800">' +
+          '<li class="flex items-start gap-2">' +
+          '<i class="fas fa-qrcode mt-1"></i>' +
+          '<span><strong>View & Use QR Code:</strong> Instant access without staff interaction</span>' +
+          '</li>' +
+          '<li class="flex items-start gap-2">' +
+          '<i class="fas fa-face-smile mt-1"></i>' +
+          '<span><strong>Face Recognition:</strong> Optional touchless verification (GDPR compliant)</span>' +
+          '</li>' +
+          '<li class="flex items-start gap-2">' +
+          '<i class="fas fa-wallet mt-1"></i>' +
+          '<span><strong>Mobile Wallet:</strong> Add to Apple Wallet or Google Pay</span>' +
+          '</li>' +
+          '<li class="flex items-start gap-2">' +
+          '<i class="fas fa-sliders-h mt-1"></i>' +
+          '<span><strong>Choose Method:</strong> QR only, Face only, or Both</span>' +
+          '</li>' +
+          '<li class="flex items-start gap-2">' +
+          '<i class="fas fa-user-shield mt-1"></i>' +
+          '<span><strong>Privacy Control:</strong> Withdraw biometric consent anytime (no staff needed)</span>' +
+          '</li>' +
+          '</ul>' +
+          '</div>' +
+          '<button onclick="this.closest(\\'.fixed\\').remove()" class="w-full mt-6 px-6 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900">' +
+          '<i class="fas fa-check mr-2"></i>Done' +
+          '</button>' +
+          '</div>';
+        document.body.appendChild(modal);
+      };
+      
       window.editPass = async function(passId) {
         // Load pass details
         let passData = null;

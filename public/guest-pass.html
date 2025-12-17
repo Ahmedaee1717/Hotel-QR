@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Pass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .pass-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 420px;
+            margin: 20px auto;
+        }
+        
+        .pass-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .qr-container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 16px 0;
+        }
+        
+        .pass-info {
+            padding: 20px 24px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .info-label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .info-value {
+            color: #111827;
+            font-weight: 600;
+        }
+        
+        .verification-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            margin: 4px;
+        }
+        
+        .badge-qr {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-face {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-no-face {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .action-button {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-weight: 600;
+            margin: 8px 0;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-wallet {
+            background: #000;
+            color: white;
+        }
+        
+        .tier-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .family-member {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-6">
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p class="mt-4 text-white">Loading your digital pass...</p>
+        </div>
+        
+        <div id="pass-container" style="display: none;"></div>
+        
+        <div id="error-container" style="display: none;" class="text-center text-white">
+            <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">Pass Not Found</h2>
+            <p id="error-message"></p>
+        </div>
+    </div>
+
+    <script>
+        // Get pass reference from URL
+        const pathParts = window.location.pathname.split('/');
+        const passReference = pathParts[pathParts.length - 1];
+
+        async function loadPass() {
+            try {
+                const response = await fetch(`/api/guest/digital-pass/${passReference}`);
+                
+                if (!response.ok) {
+                    throw new Error('Pass not found or inactive');
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayPass(data.pass, data.family_members);
+                } else {
+                    showError(data.error || 'Failed to load pass');
+                }
+            } catch (error) {
+                console.error('Load pass error:', error);
+                showError(error.message);
+            }
+        }
+
+        function displayPass(pass, familyMembers) {
+            document.getElementById('loading').style.display = 'none';
+            const container = document.getElementById('pass-container');
+            container.style.display = 'block';
+            
+            // Format dates
+            const validFrom = new Date(pass.valid_from).toLocaleDateString();
+            const validUntil = new Date(pass.valid_until).toLocaleDateString();
+            
+            // Determine verification methods
+            const hasFace = pass.face_enrolled_at !== null;
+            const hasQR = true; // QR is always available
+            
+            let verificationBadges = '';
+            if (hasQR) {
+                verificationBadges += '<span class="verification-badge badge-qr"><i class="fas fa-qrcode mr-1"></i> QR Code Active</span>';
+            }
+            if (hasFace) {
+                verificationBadges += '<span class="verification-badge badge-face"><i class="fas fa-fingerprint mr-1"></i> Face Recognition Active</span>';
+            } else {
+                verificationBadges += '<span class="verification-badge badge-no-face"><i class="fas fa-fingerprint mr-1"></i> Face Not Enrolled</span>';
+            }
+            
+            // Render family members
+            let familyHTML = '';
+            if (familyMembers && familyMembers.length > 0) {
+                familyHTML = `
+                    <div style="padding: 20px 24px; border-top: 1px solid #e5e7eb;">
+                        <h3 class="font-bold text-lg mb-3">
+                            <i class="fas fa-users mr-2"></i>Family Members
+                        </h3>
+                        ${familyMembers.map(member => {
+                            const initials = member.member_name.split(' ').map(n => n[0]).join('').toUpperCase();
+                            const memberHasFace = member.face_enrolled_at !== null;
+                            return `
+                                <div class="family-member">
+                                    <div class="member-avatar">${initials}</div>
+                                    <div class="flex-1">
+                                        <div class="font-semibold">${member.member_name}</div>
+                                        <div class="text-sm text-gray-600">${member.member_type}</div>
+                                    </div>
+                                    ${memberHasFace ? 
+                                        '<span class="text-green-600 text-sm"><i class="fas fa-check-circle"></i> Face Enrolled</span>' : 
+                                        '<span class="text-gray-400 text-sm"><i class="fas fa-times-circle"></i> No Face</span>'
+                                    }
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = `
+                <div class="pass-card">
+                    <!-- Header -->
+                    <div class="pass-header">
+                        <div class="text-sm opacity-90 mb-1">ALL-INCLUSIVE DIGITAL PASS</div>
+                        <h1 class="text-3xl font-bold mb-1">${pass.primary_guest_name}</h1>
+                        <p class="opacity-90">${pass.property_name}</p>
+                        <span class="tier-badge" style="background: ${pass.tier_color}20; color: ${pass.tier_color};">
+                            ${pass.tier_icon} ${pass.tier_display_name}
+                        </span>
+                    </div>
+                    
+                    <!-- QR Code Section -->
+                    <div class="qr-container">
+                        <div class="text-center">
+                            <h2 class="text-xl font-bold mb-2">
+                                <i class="fas fa-qrcode mr-2 text-blue-600"></i>Scan to Verify
+                            </h2>
+                            <p class="text-sm text-gray-600 mb-3">Show this QR code to staff for instant access</p>
+                            <div id="qrcode"></div>
+                            <div class="text-xs text-gray-500 mt-2 font-mono bg-gray-100 py-2 px-3 rounded">
+                                ${pass.pass_reference}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Verification Methods -->
+                    <div style="padding: 20px 24px; border-top: 1px solid #e5e7eb;">
+                        <h3 class="font-bold text-lg mb-3">
+                            <i class="fas fa-shield-alt mr-2"></i>Verification Methods
+                        </h3>
+                        <div class="text-center">
+                            ${verificationBadges}
+                        </div>
+                        ${!hasFace ? `
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                                <p class="text-sm text-blue-800">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    <strong>Tip:</strong> Ask staff to enroll your face for faster, touchless verification!
+                                </p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Pass Information -->
+                    <div class="pass-info border-t">
+                        <h3 class="font-bold text-lg mb-3">
+                            <i class="fas fa-info-circle mr-2"></i>Pass Details
+                        </h3>
+                        <div class="info-row">
+                            <span class="info-label">Room Number</span>
+                            <span class="info-value">${pass.room_number}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Check-in</span>
+                            <span class="info-value">${validFrom}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Check-out</span>
+                            <span class="info-value">${validUntil}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Adults</span>
+                            <span class="info-value">${pass.num_adults}</span>
+                        </div>
+                        <div class="info-row" style="border-bottom: none;">
+                            <span class="info-label">Children</span>
+                            <span class="info-value">${pass.num_children}</span>
+                        </div>
+                    </div>
+                    
+                    ${familyHTML}
+                    
+                    <!-- Action Buttons -->
+                    <div style="padding: 20px 24px; background: #f9fafb;">
+                        <button onclick="addToWallet('apple')" class="action-button btn-wallet">
+                            <i class="fab fa-apple"></i>
+                            Add to Apple Wallet
+                        </button>
+                        <button onclick="addToWallet('google')" class="action-button btn-secondary">
+                            <i class="fab fa-google"></i>
+                            Add to Google Pay
+                        </button>
+                        <button onclick="managePreferences()" class="action-button btn-secondary">
+                            <i class="fas fa-cog"></i>
+                            Manage Preferences
+                        </button>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="text-center py-4 text-sm text-gray-500">
+                        <i class="fas fa-lock mr-1"></i>
+                        Your data is protected with end-to-end encryption
+                    </div>
+                </div>
+            `;
+            
+            // Generate QR Code
+            QRCode.toCanvas(
+                document.getElementById('qrcode').appendChild(document.createElement('canvas')),
+                pass.pass_reference,
+                {
+                    width: 220,
+                    margin: 1,
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                },
+                function (error) {
+                    if (error) console.error('QR Code generation error:', error);
+                }
+            );
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.style.display = 'block';
+            document.getElementById('error-message').textContent = message;
+        }
+
+        function addToWallet(type) {
+            if (type === 'apple') {
+                window.location.href = `/api/guest/pass/${passReference}/wallet/apple`;
+            } else if (type === 'google') {
+                window.location.href = `/api/guest/pass/${passReference}/wallet/google`;
+            }
+        }
+
+        function managePreferences() {
+            window.location.href = `/guest-portal.html?pass=${passReference}`;
+        }
+
+        // Load pass on page load
+        window.addEventListener('DOMContentLoaded', loadPass);
+    </script>
+</body>
+</html>
