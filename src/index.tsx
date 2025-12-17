@@ -40011,7 +40011,27 @@ app.get('/admin/dashboard', (c) => {
           
         } catch (error) {
           console.error('❌ Analytics load error:', error);
-          alert('Analytics Error: ' + error.message + '\\n\\nCheck console for details.');
+          
+          // Set default values to stop infinite loading
+          const totalScansEl = document.getElementById('totalScans');
+          const activeBookingsEl = document.getElementById('activeBookings');
+          const totalActivitiesEl = document.getElementById('totalActivities');
+          const totalVendorsEl = document.getElementById('totalVendors');
+          const scansComparisonEl = document.getElementById('scansComparison');
+          const bookingsComparisonEl = document.getElementById('bookingsComparison');
+          const popularActivitiesEl = document.getElementById('popularActivities');
+          const popularSectionsEl = document.getElementById('popularSections');
+          
+          if (totalScansEl) totalScansEl.textContent = '0';
+          if (activeBookingsEl) activeBookingsEl.textContent = '0';
+          if (totalActivitiesEl) totalActivitiesEl.textContent = '0';
+          if (totalVendorsEl) totalVendorsEl.textContent = '0';
+          if (scansComparisonEl) scansComparisonEl.innerHTML = '<span class="text-blue-100">No data</span>';
+          if (bookingsComparisonEl) bookingsComparisonEl.innerHTML = '<span class="text-green-100">No data</span>';
+          if (popularActivitiesEl) popularActivitiesEl.innerHTML = '<p class="text-center text-gray-400 py-8">No data available</p>';
+          if (popularSectionsEl) popularSectionsEl.innerHTML = '<p class="text-center text-gray-400 py-8">No data available</p>';
+          
+          console.log('✅ Set default values to stop infinite loading');
         }
       }
       
