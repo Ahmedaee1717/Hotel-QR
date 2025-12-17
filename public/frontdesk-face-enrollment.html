@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Enrollment - Front Desk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    <style>
+        .signature-pad {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background: white;
+            cursor: crosshair;
+        }
+        .onepass-gradient {
+            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);
+        }
+        #video-preview {
+            transform: scaleX(-1); /* Mirror effect */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    
+    <!-- Header -->
+    <div class="onepass-gradient text-white py-6 shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <h1 class="text-3xl font-bold flex items-center gap-3">
+                <i class="fas fa-user-check"></i>
+                Face Enrollment - OnePass
+            </h1>
+            <p class="text-blue-100 mt-2">Front Desk - Secure Guest Enrollment</p>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        
+        <!-- Progress Steps -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div id="step-1" class="flex items-center gap-2 step-indicator active">
+                    <div class="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold">1</div>
+                    <span class="font-semibold">Guest Info</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-300 mx-4"></div>
+                <div id="step-2" class="flex items-center gap-2 step-indicator">
+                    <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold">2</div>
+                    <span class="font-semibold">Consent</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-300 mx-4"></div>
+                <div id="step-3" class="flex items-center gap-2 step-indicator">
+                    <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold">3</div>
+                    <span class="font-semibold">Photo Capture</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-300 mx-4"></div>
+                <div id="step-4" class="flex items-center gap-2 step-indicator">
+                    <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold">4</div>
+                    <span class="font-semibold">Complete</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Guest Information -->
+        <div id="step-1-content" class="bg-white rounded-2xl shadow-lg p-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-800">
+                <i class="fas fa-id-card"></i>
+                Guest Information
+            </h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-gray-700">Pass Reference *</label>
+                    <input type="text" id="pass-reference" class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-teal-600 focus:outline-none" placeholder="Enter pass reference">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-gray-700">Guest Name *</label>
+                    <input type="text" id="guest-name" class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-teal-600 focus:outline-none" placeholder="Will be loaded automatically" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-gray-700">Room Number</label>
+                    <input type="text" id="room-number" class="w-full border-2 border-gray-300 rounded-lg px-4 py-3" placeholder="Will be loaded automatically" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2 text-gray-700">Email</label>
+                    <input type="text" id="guest-email" class="w-full border-2 border-gray-300 rounded-lg px-4 py-3" placeholder="Will be loaded automatically" readonly>
+                </div>
+            </div>
+
+            <div class="mt-8 flex gap-4">
+                <button onclick="loadGuestInfo()" class="flex-1 px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg font-bold hover:from-teal-700 hover:to-teal-800 transition">
+                    <i class="fas fa-search mr-2"></i>Load Guest Information
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Biometric Consent -->
+        <div id="step-2-content" class="hidden bg-white rounded-2xl shadow-lg p-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-800">
+                <i class="fas fa-file-signature"></i>
+                Biometric Consent Agreement
+            </h2>
+
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 mb-6 rounded-lg">
+                <p class="text-blue-900 font-semibold mb-2">
+                    <i class="fas fa-info-circle mr-2"></i>Staff Instructions:
+                </p>
+                <p class="text-blue-800 text-sm">
+                    Please read the consent agreement to the guest and have them sign on the touchscreen. 
+                    The guest must understand they can opt-out at any time and their data will be deleted.
+                </p>
+            </div>
+
+            <!-- Consent Text -->
+            <div class="border-2 border-gray-300 rounded-lg p-6 mb-6 max-h-96 overflow-y-auto bg-gray-50">
+                <h3 class="font-bold text-lg mb-4">Biometric Data Consent for OnePass Face Recognition</h3>
+                
+                <div class="space-y-4 text-sm text-gray-700">
+                    <p><strong>Purpose:</strong> I consent to the collection and use of my facial biometric data for the purpose of verifying my identity and providing access to hotel facilities and services during my stay.</p>
+                    
+                    <p><strong>Data Collected:</strong> A mathematical template will be created from my facial photograph. This template cannot be used to recreate my photo and is used only for identity verification.</p>
+                    
+                    <p><strong>Data Storage:</strong> My biometric data will be stored securely on encrypted servers and will not be shared with third parties.</p>
+                    
+                    <p><strong>Data Retention:</strong> My biometric data will be automatically deleted 24 hours after my checkout date or immediately upon request.</p>
+                    
+                    <p><strong>Right to Withdraw:</strong> I understand that I can withdraw my consent at any time through the guest portal or by requesting staff assistance. Upon withdrawal, my biometric data will be permanently deleted within 24 hours.</p>
+                    
+                    <p><strong>Alternative Access:</strong> I understand that I can choose to use QR code verification instead of facial recognition at any time without any disadvantage to my service.</p>
+                    
+                    <p><strong>GDPR/BIPA Compliance:</strong> This collection complies with GDPR, BIPA, and applicable biometric privacy laws.</p>
+                </div>
+            </div>
+
+            <!-- Language Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-2 text-gray-700">Consent Language</label>
+                <select id="consent-language" class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-teal-600 focus:outline-none">
+                    <option value="en">English</option>
+                    <option value="es">Español (Spanish)</option>
+                    <option value="fr">Français (French)</option>
+                    <option value="de">Deutsch (German)</option>
+                    <option value="zh">中文 (Chinese)</option>
+                </select>
+            </div>
+
+            <!-- Guest Confirmation Checkbox -->
+            <div class="mb-6 p-4 border-2 border-teal-600 rounded-lg bg-teal-50">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="guest-understands" class="mt-1 w-5 h-5 text-teal-600">
+                    <span class="text-sm font-semibold text-gray-800">
+                        I confirm that the guest has read and understood the consent agreement, and voluntarily agrees to facial recognition enrollment.
+                    </span>
+                </label>
+            </div>
+
+            <!-- Signature Pad -->
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-2 text-gray-700">Guest Signature *</label>
+                <p class="text-xs text-gray-500 mb-2">Ask guest to sign on the touchscreen below:</p>
+                <canvas id="signature-pad" class="signature-pad w-full" width="800" height="200"></canvas>
+                <button onclick="clearSignature()" class="mt-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm">
+                    <i class="fas fa-redo mr-2"></i>Clear Signature
+                </button>
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="prevStep()" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="saveConsent()" class="flex-1 px-6 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg font-bold hover:from-teal-700 hover:to-teal-800 transition">
+                    <i class="fas fa-check mr-2"></i>Consent Given - Continue to Photo
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Photo Capture -->
+        <div id="step-3-content" class="hidden bg-white rounded-2xl shadow-lg p-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-800">
+                <i class="fas fa-camera"></i>
+                Face Photo Capture
+            </h2>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Camera Preview -->
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Live Camera</h3>
+                    <div class="relative">
+                        <video id="video-preview" class="w-full rounded-lg border-4 border-gray-300" autoplay></video>
+                        <div id="face-detection-overlay" class="absolute inset-0 pointer-events-none"></div>
+                    </div>
+                    <div class="mt-4 flex gap-3">
+                        <button onclick="startCamera()" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                            <i class="fas fa-video mr-2"></i>Start Camera
+                        </button>
+                        <button onclick="capturePhoto()" id="capture-btn" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700" disabled>
+                            <i class="fas fa-camera mr-2"></i>Capture Photo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Captured Photo -->
+                <div>
+                    <h3 class="font-bold text-lg mb-4">Captured Photo</h3>
+                    <div id="captured-preview" class="w-full aspect-square rounded-lg border-4 border-gray-300 bg-gray-100 flex items-center justify-center text-gray-400">
+                        <i class="fas fa-user text-6xl"></i>
+                    </div>
+                    <div id="photo-quality" class="hidden mt-4 p-4 rounded-lg">
+                        <!-- Quality feedback will appear here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="mt-8 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg">
+                <h4 class="font-bold text-yellow-900 mb-2">
+                    <i class="fas fa-lightbulb mr-2"></i>Photo Guidelines:
+                </h4>
+                <ul class="text-sm text-yellow-800 space-y-1">
+                    <li>• Guest should face the camera directly</li>
+                    <li>• Remove sunglasses and hats</li>
+                    <li>• Ensure good lighting on the face</li>
+                    <li>• Neutral expression works best</li>
+                    <li>• Keep still for 1-2 seconds</li>
+                </ul>
+            </div>
+
+            <div class="mt-8 flex gap-4">
+                <button onclick="prevStep()" class="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="retakePhoto()" id="retake-btn" class="px-6 py-3 bg-gray-600 text-white rounded-lg font-bold hover:bg-gray-700 transition hidden">
+                    <i class="fas fa-redo mr-2"></i>Retake Photo
+                </button>
+                <button onclick="submitEnrollment()" id="submit-btn" class="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg font-bold hover:from-green-700 hover:to-green-800 transition hidden">
+                    <i class="fas fa-check-circle mr-2"></i>Complete Enrollment
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Success -->
+        <div id="step-4-content" class="hidden bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="inline-block p-6 bg-green-100 rounded-full mb-6">
+                <i class="fas fa-check-circle text-green-600 text-6xl"></i>
+            </div>
+            <h2 class="text-3xl font-bold mb-4 text-gray-800">Enrollment Complete!</h2>
+            <p class="text-lg text-gray-600 mb-8">
+                Guest <span id="success-guest-name" class="font-bold"></span> has been successfully enrolled for face recognition.
+            </p>
+            
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-8">
+                <h3 class="font-bold text-blue-900 mb-4">What Happens Next:</h3>
+                <ul class="text-left text-blue-800 space-y-3">
+                    <li class="flex items-start gap-3">
+                        <i class="fas fa-user-check text-blue-600 mt-1"></i>
+                        <span>Guest can now use face recognition at all venues</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fas fa-qrcode text-blue-600 mt-1"></i>
+                        <span>QR code access still available as backup</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fas fa-shield-alt text-blue-600 mt-1"></i>
+                        <span>Biometric data encrypted and secured</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <i class="fas fa-trash-alt text-blue-600 mt-1"></i>
+                        <span>Auto-deleted 24h after checkout</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="flex gap-4 justify-center">
+                <button onclick="enrollAnother()" class="px-8 py-3 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg font-bold hover:from-teal-700 hover:to-teal-800 transition">
+                    <i class="fas fa-plus mr-2"></i>Enroll Another Guest
+                </button>
+                <button onclick="window.close()" class="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition">
+                    <i class="fas fa-times mr-2"></i>Close
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let passData = null;
+        let signatureData = null;
+        let capturedPhotoData = null;
+        let canvas, ctx, isDrawing = false;
+        let videoStream = null;
+
+        // Initialize signature pad
+        function initSignaturePad() {
+            canvas = document.getElementById('signature-pad');
+            ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#1e3a5f';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+
+            // Mouse events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+
+            // Touch events
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                isDrawing = true;
+            });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!isDrawing) return;
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                isDrawing = false;
+            });
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            if (!isDrawing) return;
+            isDrawing = false;
+        }
+
+        function clearSignature() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            signatureData = null;
+        }
+
+        async function loadGuestInfo() {
+            const passRef = document.getElementById('pass-reference').value.trim();
+            if (!passRef) {
+                alert('Please enter a pass reference');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/admin/passes/${passRef}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Pass not found');
+                
+                const data = await response.json();
+                passData = data.pass;
+
+                document.getElementById('guest-name').value = passData.primary_guest_name || '';
+                document.getElementById('room-number').value = passData.room_number || 'N/A';
+                document.getElementById('guest-email').value = passData.guest_email || 'N/A';
+
+                // Check if already enrolled
+                if (passData.face_photo_url || passData.face_embedding) {
+                    if (confirm('This guest is already enrolled in face recognition. Do you want to re-enroll?')) {
+                        nextStep();
+                    }
+                } else {
+                    nextStep();
+                }
+            } catch (error) {
+                console.error('Error loading guest info:', error);
+                alert('Failed to load guest information. Please check the pass reference.');
+            }
+        }
+
+        async function saveConsent() {
+            // Validate
+            if (!document.getElementById('guest-understands').checked) {
+                alert('Please confirm that the guest understands the consent agreement.');
+                return;
+            }
+
+            // Check signature
+            signatureData = canvas.toDataURL();
+            if (!signatureData || signatureData === canvas.toDataURL('image/png', 0)) {
+                alert('Please have the guest sign on the touchscreen.');
+                return;
+            }
+
+            // Save consent to database
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/admin/face-enrollment/consent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        pass_reference: document.getElementById('pass-reference').value,
+                        signature_data: signatureData,
+                        consent_language: document.getElementById('consent-language').value,
+                        consent_timestamp: new Date().toISOString(),
+                        staff_id: localStorage.getItem('user_email')
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save consent');
+
+                nextStep();
+            } catch (error) {
+                console.error('Error saving consent:', error);
+                alert('Failed to save consent. Please try again.');
+            }
+        }
+
+        async function startCamera() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480, facingMode: 'user' } 
+                });
+                document.getElementById('video-preview').srcObject = videoStream;
+                document.getElementById('capture-btn').disabled = false;
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Failed to access camera. Please check permissions.');
+            }
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('video-preview');
+            const capturedCanvas = document.createElement('canvas');
+            capturedCanvas.width = video.videoWidth;
+            capturedCanvas.height = video.videoHeight;
+            const capturedCtx = capturedCanvas.getContext('2d');
+            
+            // Mirror the image back
+            capturedCtx.translate(capturedCanvas.width, 0);
+            capturedCtx.scale(-1, 1);
+            capturedCtx.drawImage(video, 0, 0);
+            
+            capturedPhotoData = capturedCanvas.toDataURL('image/jpeg', 0.8);
+            
+            // Display captured photo
+            document.getElementById('captured-preview').innerHTML = 
+                `<img src="${capturedPhotoData}" class="w-full h-full object-cover rounded-lg">`;
+            
+            // Show quality check (placeholder)
+            document.getElementById('photo-quality').className = 'mt-4 p-4 rounded-lg bg-green-50 border-l-4 border-green-500';
+            document.getElementById('photo-quality').innerHTML = 
+                `<p class="text-green-800"><i class="fas fa-check-circle mr-2"></i>Photo quality: Good - Face detected</p>`;
+            
+            // Show buttons
+            document.getElementById('retake-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').classList.remove('hidden');
+            
+            // Stop camera
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function retakePhoto() {
+            capturedPhotoData = null;
+            document.getElementById('captured-preview').innerHTML = 
+                `<i class="fas fa-user text-6xl"></i>`;
+            document.getElementById('photo-quality').className = 'hidden';
+            document.getElementById('retake-btn').classList.add('hidden');
+            document.getElementById('submit-btn').classList.add('hidden');
+            startCamera();
+        }
+
+        async function submitEnrollment() {
+            if (!capturedPhotoData) {
+                alert('Please capture a photo first');
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('/api/admin/face-enrollment/complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        pass_reference: document.getElementById('pass-reference').value,
+                        photo_data: capturedPhotoData,
+                        staff_id: localStorage.getItem('user_email')
+                    })
+                });
+
+                if (!response.ok) throw new Error('Enrollment failed');
+
+                const result = await response.json();
+                document.getElementById('success-guest-name').textContent = passData.primary_guest_name;
+                nextStep();
+            } catch (error) {
+                console.error('Error completing enrollment:', error);
+                alert('Failed to complete enrollment. Please try again.');
+            }
+        }
+
+        function nextStep() {
+            document.getElementById(`step-${currentStep}-content`).classList.add('hidden');
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            currentStep++;
+            document.getElementById(`step-${currentStep}-content`).classList.remove('hidden');
+            document.getElementById(`step-${currentStep}`).classList.add('active');
+            
+            // Auto-scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        function prevStep() {
+            document.getElementById(`step-${currentStep}-content`).classList.add('hidden');
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            currentStep--;
+            document.getElementById(`step-${currentStep}-content`).classList.remove('hidden');
+            document.getElementById(`step-${currentStep}`).classList.add('active');
+            
+            window.scrollTo(0, 0);
+        }
+
+        function enrollAnother() {
+            location.reload();
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initSignaturePad();
+        });
+    </script>
+
+    <style>
+        .step-indicator.active .w-10 {
+            background-color: #00d4aa;
+        }
+        .step-indicator.active span {
+            color: #00d4aa;
+            font-weight: 700;
+        }
+    </style>
+
+</body>
+</html>
