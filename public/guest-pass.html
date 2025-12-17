@@ -6,7 +6,8 @@
     <title>Digital Pass</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- QRCode.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -379,33 +380,30 @@
                     if (typeof QRCode === 'undefined') {
                         console.error('QRCode library not loaded!');
                         qrcodeDiv.innerHTML = '<p class="text-red-500 text-sm">QR Code library loading...</p>';
+                        // Try again after 1 second
+                        setTimeout(() => window.location.reload(), 1000);
                         return;
                     }
                     
-                    QRCode.toCanvas(
-                        qrcodeDiv.appendChild(document.createElement('canvas')),
-                        pass.pass_reference,
-                        {
-                            width: 220,
-                            margin: 1,
-                            color: {
-                                dark: '#000000',
-                                light: '#FFFFFF'
-                            }
-                        },
-                        function (error) {
-                            if (error) {
-                                console.error('QR Code generation error:', error);
-                                qrcodeDiv.innerHTML = '<p class="text-red-500 text-sm">Failed to generate QR code</p>';
-                            } else {
-                                console.log('✅ QR Code generated successfully');
-                            }
-                        }
-                    );
+                    // Generate QR code using QRCode.js
+                    new QRCode(qrcodeDiv, {
+                        text: pass.pass_reference,
+                        width: 220,
+                        height: 220,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    
+                    console.log('✅ QR Code generated successfully for:', pass.pass_reference);
                 } catch (error) {
                     console.error('QR Code generation exception:', error);
+                    const qrcodeDiv = document.getElementById('qrcode');
+                    if (qrcodeDiv) {
+                        qrcodeDiv.innerHTML = '<p class="text-red-500 text-sm">Failed to generate QR code</p>';
+                    }
                 }
-            }, 100); // Small delay to ensure DOM is ready
+            }, 200); // Slightly longer delay to ensure library is loaded
         }
 
         function showError(message) {
