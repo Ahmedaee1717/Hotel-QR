@@ -14971,6 +14971,72 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
   }
 })
 
+// Staff: Basic pass verification (QR only, returns face enrollment status)
+app.post('/api/staff/verify-pass', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { pass_reference } = await c.req.json()
+    
+    if (!pass_reference) {
+      return c.json({ error: 'Pass reference required' }, 400)
+    }
+
+    // Get pass details
+    const pass = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+
+    if (pass.pass_status !== 'active') {
+      return c.json({ error: `Pass is ${pass.pass_status}` }, 403)
+    }
+
+    // Check if today is within valid dates
+    const today = new Date().toISOString().split('T')[0]
+    if (today < pass.valid_from || today > pass.valid_until) {
+      return c.json({ error: 'Pass is not valid for today' }, 403)
+    }
+
+    return c.json({
+      success: true,
+      pass_reference: pass.pass_reference,
+      face_enrolled: !!pass.face_embedding,
+      face_embedding: pass.face_embedding,
+      pass_details: {
+        pass_reference: pass.pass_reference,
+        guest_name: pass.primary_guest_name,
+        room_number: pass.room_number,
+        tier: pass.tier_display_name,
+        tier_color: pass.tier_color,
+        tier_icon: pass.tier_icon,
+        num_adults: pass.num_adults,
+        num_children: pass.num_children,
+        valid_from: pass.valid_from,
+        valid_until: pass.valid_until
+      }
+    })
+  } catch (error) {
+    console.error('Verify pass error:', error)
+    return c.json({ error: 'Failed to verify pass' }, 500)
+  }
+})
+
 // Staff: Verify face during pass verification
 app.post('/api/staff/all-inclusive/verify-face', async (c) => {
   const { DB } = c.env
@@ -26803,6 +26869,12 @@ app.get('/staff/beach-check-in', (c) => {
 </body>
 </html>
   `)
+})
+
+// Staff Pass Verification Scanner with Facial Recognition
+app.get('/staff/verify-pass', async (c) => {
+  const html = await Bun.file('public/staff-pass-scanner.html').text()
+  return c.html(html)
 })
 
 // Interactive Hotel Map Builder - Admin tool to create clickable map hotspots
