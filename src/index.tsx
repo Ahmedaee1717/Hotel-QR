@@ -38848,6 +38848,9 @@ app.get('/admin/dashboard', (c) => {
         });
       });
       
+      // Show the default tab on page load
+      showTab(currentTab);
+      
       // ========================================
       // FRONT DESK / CONCIERGE FUNCTIONS
       // ========================================
@@ -40055,10 +40058,9 @@ app.get('/admin/dashboard', (c) => {
       loadQRCode();
       loadQRCardTemplate();
       
-      // Load analytics on page load since it's visible on dashboard
-      if (typeof loadAnalytics === 'function') {
-        loadAnalytics('today').catch(err => console.error('Initial analytics load error:', err));
-      }
+      // NOTE: Analytics section is visible but not loaded on initial page load
+      // It will only load when user clicks the "Analytics" tab button
+      // This prevents errors when permissions/auth aren't fully configured
 
       async function loadRegCode() {
         try {
