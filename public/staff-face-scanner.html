@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Check-In Scanner - GuestConnect</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
+    <style>
+        #video {
+            border-radius: 12px;
+            transform: scaleX(-1);
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-radius: 12px;
+            transform: scaleX(-1);
+        }
+        
+        .scan-indicator {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        .scanning-overlay {
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 90%; }
+            100% { top: 0%; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+    <div class="min-h-screen p-4">
+        <!-- Header -->
+        <div class="max-w-6xl mx-auto mb-6">
+            <div class="bg-gradient-to-r from-teal-600 to-teal-800 rounded-xl shadow-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white flex items-center gap-3">
+                            <i class="fas fa-user-check"></i>
+                            Face Check-In Scanner
+                        </h1>
+                        <p class="text-teal-100 mt-2">Just scan guest face - No QR code needed!</p>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 bg-white text-teal-600 rounded-lg hover:bg-teal-50 font-semibold">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-green-500 to-green-600">
+                        <i class="fas fa-check-circle text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-bold text-gray-800" id="checked-in-count">0</div>
+                        <div class="text-sm text-gray-600">Checked In Today</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600">
+                        <i class="fas fa-users text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-bold text-gray-800" id="enrolled-count">0</div>
+                        <div class="text-sm text-gray-600">Enrolled Guests</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-500 to-purple-600">
+                        <i class="fas fa-clock text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-3xl font-bold text-gray-800" id="avg-time">0s</div>
+                        <div class="text-sm text-gray-600">Avg Check-In Time</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Camera Section -->
+                <div class="bg-white rounded-xl shadow-2xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-teal-600">
+                        <i class="fas fa-camera"></i>
+                        Live Face Scanner
+                    </h2>
+                    
+                    <div id="camera-container" class="relative mb-4">
+                        <video id="video" width="100%" height="auto" autoplay muted class="rounded-lg"></video>
+                        <canvas id="canvas" class="rounded-lg"></canvas>
+                        
+                        <!-- Scanning overlay -->
+                        <div id="scanning-line" class="absolute left-0 right-0 h-1 bg-teal-500 scanning-overlay hidden" style="top: 0;"></div>
+                    </div>
+                    
+                    <div id="camera-status" class="mb-4 p-4 bg-gray-100 rounded-lg text-center">
+                        <i class="fas fa-camera text-gray-400 text-3xl scan-indicator mb-2"></i>
+                        <p class="text-sm text-gray-600">Initializing camera...</p>
+                    </div>
+                    
+                    <div id="match-confidence" class="hidden mb-4">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-sm font-semibold">Match Confidence:</span>
+                            <span class="text-sm font-bold" id="confidence-value">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4">
+                            <div id="confidence-bar" class="h-4 rounded-full transition-all duration-300" style="width: 0%; background: linear-gradient(to right, #14b8a6, #0d9488);"></div>
+                        </div>
+                    </div>
+                    
+                    <button id="scan-btn" onclick="scanFace()" disabled
+                            class="w-full px-6 py-4 text-white rounded-lg font-bold text-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style="background: linear-gradient(to right, #14b8a6, #0d9488);">
+                        <i class="fas fa-search mr-2"></i>Scan Face Now
+                    </button>
+                </div>
+
+                <!-- Result Section -->
+                <div class="bg-white rounded-xl shadow-2xl p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-teal-600">
+                        <i class="fas fa-id-card"></i>
+                        Guest Information
+                    </h2>
+                    
+                    <div id="guest-info" class="hidden">
+                        <!-- Guest details will be inserted here -->
+                    </div>
+                    
+                    <div id="waiting-state" class="text-center py-12">
+                        <i class="fas fa-user-circle text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500 text-lg">Waiting for face scan...</p>
+                        <p class="text-gray-400 text-sm mt-2">Position guest face in camera view and click "Scan Face Now"</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Check-ins -->
+            <div class="mt-6 bg-white rounded-xl shadow-2xl p-6">
+                <h2 class="text-xl font-bold mb-4 text-teal-600">
+                    <i class="fas fa-history mr-2"></i>Recent Check-ins
+                </h2>
+                <div id="recent-checkins" class="space-y-3">
+                    <p class="text-gray-500 text-center py-4">No check-ins yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let faceApiLoaded = false;
+        let video, canvas, displaySize;
+        let isScanning = false;
+        let checkedInToday = 0;
+        let enrolledCount = 0;
+        let scanTimes = [];
+        
+        // Auth helper
+        function fetchWithAuth(url, options = {}) {
+            const user_id = localStorage.getItem('user_id');
+            const property_id = localStorage.getItem('property_id');
+            
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-User-ID': user_id,
+                    'X-Property-ID': property_id,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        // Load face-api.js models
+        async function loadFaceAPI() {
+            try {
+                console.log('Loading face-api.js models...');
+                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                faceApiLoaded = true;
+                console.log('face-api.js loaded successfully');
+            } catch (error) {
+                console.error('Failed to load face-api.js:', error);
+                alert('Failed to load facial recognition. Please refresh the page.');
+            }
+        }
+        
+        // Start camera
+        async function startCamera() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: 640, height: 480 } 
+                });
+                video.srcObject = stream;
+                
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    displaySize = { width: video.videoWidth, height: video.videoHeight };
+                    
+                    document.getElementById('scan-btn').disabled = false;
+                    document.getElementById('camera-status').innerHTML = `
+                        <i class="fas fa-video text-green-500 text-3xl mb-2"></i>
+                        <p class="text-sm text-green-600 font-semibold">Camera Active</p>
+                        <p class="text-xs text-gray-500 mt-1">Ready to scan faces</p>
+                    `;
+                    
+                    // Start continuous face detection
+                    detectFacesContinuously();
+                });
+            } catch (error) {
+                console.error('Camera error:', error);
+                document.getElementById('camera-status').innerHTML = `
+                    <i class="fas fa-exclamation-circle text-red-500 text-3xl mb-2"></i>
+                    <p class="text-sm text-red-600 font-semibold">Camera Access Denied</p>
+                    <p class="text-xs text-gray-500 mt-1">Please allow camera access</p>
+                `;
+            }
+        }
+        
+        // Continuous face detection (visual feedback)
+        async function detectFacesContinuously() {
+            if (!faceApiLoaded || !video.srcObject) return;
+            
+            const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (detections.length > 0) {
+                const detection = detections[0];
+                const { x, y, width, height } = detection.box;
+                
+                // Mirror the x coordinate
+                const mirroredX = canvas.width - x - width;
+                
+                ctx.strokeStyle = '#14b8a6';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(mirroredX, y, width, height);
+                
+                // Draw corner accents
+                const cornerLength = 20;
+                ctx.strokeStyle = '#14b8a6';
+                ctx.lineWidth = 6;
+                
+                // Top-left
+                ctx.beginPath();
+                ctx.moveTo(mirroredX, y + cornerLength);
+                ctx.lineTo(mirroredX, y);
+                ctx.lineTo(mirroredX + cornerLength, y);
+                ctx.stroke();
+                
+                // Top-right
+                ctx.beginPath();
+                ctx.moveTo(mirroredX + width - cornerLength, y);
+                ctx.lineTo(mirroredX + width, y);
+                ctx.lineTo(mirroredX + width, y + cornerLength);
+                ctx.stroke();
+                
+                // Bottom-left
+                ctx.beginPath();
+                ctx.moveTo(mirroredX, y + height - cornerLength);
+                ctx.lineTo(mirroredX, y + height);
+                ctx.lineTo(mirroredX + cornerLength, y + height);
+                ctx.stroke();
+                
+                // Bottom-right
+                ctx.beginPath();
+                ctx.moveTo(mirroredX + width - cornerLength, y + height);
+                ctx.lineTo(mirroredX + width, y + height);
+                ctx.lineTo(mirroredX + width, y + height - cornerLength);
+                ctx.stroke();
+            }
+            
+            requestAnimationFrame(detectFacesContinuously);
+        }
+        
+        // Scan face and identify guest
+        async function scanFace() {
+            if (!faceApiLoaded || isScanning) return;
+            
+            isScanning = true;
+            const startTime = Date.now();
+            
+            document.getElementById('scan-btn').disabled = true;
+            document.getElementById('scan-btn').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Scanning...';
+            document.getElementById('scanning-line').classList.remove('hidden');
+            document.getElementById('match-confidence').classList.remove('hidden');
+            
+            try {
+                // Detect face and extract descriptor
+                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+                
+                if (!detection) {
+                    showError('No face detected', 'Please ensure face is clearly visible in frame');
+                    resetScanner();
+                    return;
+                }
+                
+                const liveEmbedding = Array.from(detection.descriptor);
+                
+                // Send to backend for 1:N identification
+                const response = await fetchWithAuth('/api/staff/all-inclusive/identify-face', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        live_face_embedding: liveEmbedding,
+                        staff_name: localStorage.getItem('staff_name') || 'Staff',
+                        location: 'Main Entrance'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Update confidence display
+                const confidencePercent = result.confidence_percent || 0;
+                document.getElementById('confidence-value').textContent = confidencePercent + '%';
+                document.getElementById('confidence-bar').style.width = confidencePercent + '%';
+                
+                const scanTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                scanTimes.push(parseFloat(scanTime));
+                updateAvgTime();
+                
+                if (result.success && result.pass_details) {
+                    showGuestInfo(result, scanTime);
+                    enrolledCount = result.total_enrolled_faces || 0;
+                    updateStats();
+                } else {
+                    showError(
+                        'No Match Found',
+                        result.message || 'Face does not match any enrolled guest. Please check QR code or enroll guest first.'
+                    );
+                }
+                
+            } catch (error) {
+                console.error('Face scan error:', error);
+                showError('Scan Failed', 'An error occurred. Please try again.');
+            }
+            
+            resetScanner();
+        }
+        
+        // Show guest information
+        function showGuestInfo(result, scanTime) {
+            const pass = result.pass_details;
+            const isApproved = result.verification_status === 'approved';
+            const isManual = result.verification_status === 'manual_override';
+            
+            const statusColor = isApproved ? 'green' : isManual ? 'yellow' : 'red';
+            const statusIcon = isApproved ? 'fa-check-circle' : isManual ? 'fa-exclamation-triangle' : 'fa-times-circle';
+            const statusText = isApproved ? 'VERIFIED' : isManual ? 'MANUAL REVIEW' : 'DENIED';
+            
+            document.getElementById('waiting-state').classList.add('hidden');
+            document.getElementById('guest-info').classList.remove('hidden');
+            
+            document.getElementById('guest-info').innerHTML = `
+                <div class="border-4 border-${statusColor}-500 rounded-xl p-6 bg-${statusColor}-50">
+                    <div class="text-center mb-6">
+                        <i class="fas ${statusIcon} text-6xl text-${statusColor}-600 mb-3"></i>
+                        <h3 class="text-2xl font-bold text-${statusColor}-700">${statusText}</h3>
+                        <p class="text-sm text-gray-600 mt-2">Scan completed in ${scanTime}s</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="text-center">
+                            <img src="${pass.face_photo_url}" alt="${pass.guest_name}" 
+                                 class="w-32 h-32 rounded-full object-cover mx-auto border-4 border-${statusColor}-500 mb-2">
+                        </div>
+                        <div>
+                            <div class="mb-3">
+                                <p class="text-xs text-gray-500">Guest Name</p>
+                                <p class="text-xl font-bold">${pass.guest_name}</p>
+                            </div>
+                            <div class="mb-3">
+                                <p class="text-xs text-gray-500">Room Number</p>
+                                <p class="text-lg font-semibold">${pass.room_number}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Pass Reference</p>
+                                <p class="text-sm font-mono">${pass.pass_reference}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-4 mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-semibold">Tier Level:</span>
+                            <span class="text-lg font-bold" style="color: ${pass.tier_color};">
+                                <i class="fas ${pass.tier_icon} mr-2"></i>${pass.tier}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-600 mb-3">${pass.tier_description || ''}</p>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <span class="text-gray-500">Adults:</span>
+                                <span class="font-semibold ml-2">${pass.num_adults}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Children:</span>
+                                <span class="font-semibold ml-2">${pass.num_children}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Valid From:</span>
+                                <span class="font-semibold ml-2">${pass.valid_from}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Valid Until:</span>
+                                <span class="font-semibold ml-2">${pass.valid_until}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${isApproved || isManual ? `
+                        <button onclick="checkInGuest('${pass.pass_id}', '${pass.guest_name}')" 
+                                class="w-full px-6 py-4 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg font-bold text-lg hover:from-teal-700 hover:to-teal-800 shadow-lg">
+                            <i class="fas fa-check-double mr-2"></i>CHECK IN GUEST
+                        </button>
+                    ` : `
+                        <div class="bg-red-100 border-2 border-red-500 rounded-lg p-4 text-center">
+                            <p class="text-red-700 font-semibold">Access Denied - Please verify ID</p>
+                        </div>
+                    `}
+                </div>
+            `;
+        }
+        
+        // Show error message
+        function showError(title, message) {
+            document.getElementById('waiting-state').classList.add('hidden');
+            document.getElementById('guest-info').classList.remove('hidden');
+            
+            document.getElementById('guest-info').innerHTML = `
+                <div class="border-4 border-red-500 rounded-xl p-6 bg-red-50 text-center">
+                    <i class="fas fa-exclamation-circle text-6xl text-red-600 mb-4"></i>
+                    <h3 class="text-2xl font-bold text-red-700 mb-2">${title}</h3>
+                    <p class="text-gray-700">${message}</p>
+                    <button onclick="resetForNewScan()" 
+                            class="mt-6 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Check in guest
+        async function checkInGuest(passId, guestName) {
+            if (!confirm(`Check in ${guestName}?`)) return;
+            
+            // You can add a check-in API endpoint here
+            // For now, just update the UI
+            
+            checkedInToday++;
+            updateStats();
+            
+            addToRecentCheckins(guestName);
+            
+            alert(`${guestName} checked in successfully!`);
+            resetForNewScan();
+        }
+        
+        // Add to recent check-ins
+        function addToRecentCheckins(guestName) {
+            const container = document.getElementById('recent-checkins');
+            const time = new Date().toLocaleTimeString();
+            
+            const item = document.createElement('div');
+            item.className = 'bg-green-50 border-l-4 border-green-500 p-4 rounded-lg flex items-center justify-between';
+            item.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold">${guestName}</p>
+                        <p class="text-xs text-gray-500">Checked in at ${time}</p>
+                    </div>
+                </div>
+                <span class="text-green-600 font-semibold">✓</span>
+            `;
+            
+            if (container.children[0]?.textContent.includes('No check-ins')) {
+                container.innerHTML = '';
+            }
+            
+            container.insertBefore(item, container.firstChild);
+            
+            // Keep only last 10
+            while (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        // Reset scanner
+        function resetScanner() {
+            isScanning = false;
+            document.getElementById('scan-btn').disabled = false;
+            document.getElementById('scan-btn').innerHTML = '<i class="fas fa-search mr-2"></i>Scan Face Now';
+            document.getElementById('scanning-line').classList.add('hidden');
+        }
+        
+        // Reset for new scan
+        function resetForNewScan() {
+            document.getElementById('guest-info').classList.add('hidden');
+            document.getElementById('waiting-state').classList.remove('hidden');
+            document.getElementById('match-confidence').classList.add('hidden');
+            document.getElementById('confidence-value').textContent = '0%';
+            document.getElementById('confidence-bar').style.width = '0%';
+            resetScanner();
+        }
+        
+        // Update stats
+        function updateStats() {
+            document.getElementById('checked-in-count').textContent = checkedInToday;
+            document.getElementById('enrolled-count').textContent = enrolledCount;
+        }
+        
+        // Update average time
+        function updateAvgTime() {
+            if (scanTimes.length === 0) return;
+            const avg = scanTimes.reduce((a, b) => a + b, 0) / scanTimes.length;
+            document.getElementById('avg-time').textContent = avg.toFixed(1) + 's';
+        }
+        
+        // Logout
+        function logout() {
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('property_id');
+            localStorage.removeItem('staff_name');
+            window.location.href = '/admin/login';
+        }
+        
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            // Check auth
+            if (!localStorage.getItem('user_id') || !localStorage.getItem('property_id')) {
+                window.location.href = '/admin/login';
+                return;
+            }
+            
+            // Load face-api.js
+            await loadFaceAPI();
+            
+            // Start camera
+            await startCamera();
+        });
+    </script>
+</body>
+</html>

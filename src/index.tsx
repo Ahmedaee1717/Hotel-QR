@@ -15046,6 +15046,186 @@ app.get('/api/admin/all-inclusive/passes/:property_id/:pass_id', async (c) => {
   }
 })
 
+// Staff: Face-only identification (1:N matching - search all enrolled faces)
+app.post('/api/staff/all-inclusive/identify-face', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { live_face_embedding, staff_name, location } = await c.req.json()
+    
+    if (!live_face_embedding || !Array.isArray(live_face_embedding)) {
+      return c.json({ error: 'Face embedding required' }, 400)
+    }
+
+    // Get all active passes with enrolled faces for this property
+    const enrolledPasses = await DB.prepare(`
+      SELECT 
+        dp.pass_id,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        dp.room_number,
+        dp.face_embedding,
+        dp.face_photo_url,
+        dp.num_adults,
+        dp.num_children,
+        dp.pass_status,
+        dp.valid_from,
+        dp.valid_until,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon,
+        ait.daily_upgrade_price,
+        ait.tier_description
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE dp.property_id = ? 
+        AND dp.face_embedding IS NOT NULL
+        AND dp.pass_status = 'active'
+    `).bind(property_id).all()
+
+    if (!enrolledPasses.results || enrolledPasses.results.length === 0) {
+      return c.json({ 
+        success: false,
+        error: 'No enrolled faces found',
+        message: 'No guests have enrolled their faces yet'
+      })
+    }
+
+    // Calculate match scores for all enrolled faces
+    // Note: In production, use a vector database for faster search
+    let bestMatch = null
+    let bestScore = 0
+
+    for (const pass of enrolledPasses.results) {
+      try {
+        const storedEmbedding = JSON.parse(pass.face_embedding)
+        
+        // Calculate Euclidean distance
+        let sumSquares = 0
+        for (let i = 0; i < live_face_embedding.length; i++) {
+          const diff = live_face_embedding[i] - storedEmbedding[i]
+          sumSquares += diff * diff
+        }
+        const distance = Math.sqrt(sumSquares)
+        
+        // Convert distance to similarity score (0-1)
+        const similarity = Math.max(0, 1 - distance)
+        
+        if (similarity > bestScore) {
+          bestScore = similarity
+          bestMatch = pass
+        }
+      } catch (e) {
+        console.error('Error comparing face:', e)
+      }
+    }
+
+    // Get face recognition settings
+    const settings = await DB.prepare(`
+      SELECT match_threshold, manual_review_threshold 
+      FROM face_recognition_settings 
+      WHERE property_id = ?
+    `).bind(property_id).first()
+
+    const matchThreshold = settings?.match_threshold || 0.6
+    const manualReviewThreshold = settings?.manual_review_threshold || 0.5
+
+    // Determine result based on score
+    let verificationResult = 'no_match'
+    let verificationStatus = 'denied'
+    let message = 'No match found'
+
+    if (bestScore >= matchThreshold) {
+      verificationResult = 'matched'
+      verificationStatus = 'approved'
+      message = 'Face matched successfully'
+    } else if (bestScore >= manualReviewThreshold) {
+      verificationResult = 'manual_review'
+      verificationStatus = 'manual_override'
+      message = 'Manual review required'
+    } else if (bestMatch) {
+      verificationResult = 'no_match'
+      verificationStatus = 'denied'
+      message = 'Face does not match any enrolled guest'
+      
+      // Create fraud alert
+      await DB.prepare(`
+        INSERT INTO face_verification_fraud_alerts (
+          property_id, pass_id, match_score, alert_notes, alert_timestamp
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        property_id,
+        bestMatch.pass_id,
+        bestScore,
+        'Low confidence match during face-only identification: ' + Math.round(bestScore * 100) + '%'
+      ).run()
+    }
+
+    // Log verification if we have a match
+    if (bestMatch && bestScore >= manualReviewThreshold) {
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          property_id, pass_id, staff_user_id, staff_name, 
+          verification_location, verification_result, verification_status,
+          face_match_score, verification_timestamp, verification_method
+        ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'face_only')
+      `).bind(
+        property_id,
+        bestMatch.pass_id,
+        staff_name || 'Staff',
+        location || 'Entrance',
+        verificationResult,
+        verificationStatus,
+        bestScore
+      ).run()
+
+      // Update pass last verified timestamp
+      await DB.prepare(`
+        UPDATE digital_passes 
+        SET last_verified_at = CURRENT_TIMESTAMP,
+            total_verifications = total_verifications + 1
+        WHERE pass_id = ?
+      `).bind(bestMatch.pass_id).run()
+    }
+
+    return c.json({
+      success: bestScore >= manualReviewThreshold,
+      verification_result: verificationResult,
+      verification_status: verificationStatus,
+      match_score: bestScore,
+      confidence_percent: Math.round(bestScore * 100),
+      message: message,
+      pass_details: bestMatch ? {
+        pass_id: bestMatch.pass_id,
+        pass_reference: bestMatch.pass_reference,
+        guest_name: bestMatch.primary_guest_name,
+        room_number: bestMatch.room_number,
+        tier: bestMatch.tier_display_name,
+        tier_color: bestMatch.tier_color,
+        tier_icon: bestMatch.tier_icon,
+        tier_price: bestMatch.daily_upgrade_price,
+        tier_description: bestMatch.tier_description,
+        num_adults: bestMatch.num_adults,
+        num_children: bestMatch.num_children,
+        pass_status: bestMatch.pass_status,
+        valid_from: bestMatch.valid_from,
+        valid_until: bestMatch.valid_until,
+        face_photo_url: bestMatch.face_photo_url
+      } : null,
+      total_enrolled_faces: enrolledPasses.results.length
+    })
+
+  } catch (error) {
+    console.error('Face identification error:', error)
+    return c.json({ error: 'Face identification failed: ' + error.message }, 500)
+  }
+})
+
 app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', async (c) => {
   const { DB } = c.env
   const property_id = c.req.param('property_id')
@@ -27006,6 +27186,9 @@ app.get('/staff/beach-check-in', (c) => {
 })
 
 // Staff Pass Verification Scanner with Facial Recognition
+// Staff: Face-Only Check-In Scanner
+// File is served from /staff-face-scanner.html via static files
+
 app.get('/staff/verify-pass', (c) => {
   return c.html(`
 <!DOCTYPE html>
