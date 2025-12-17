@@ -56085,4 +56085,96 @@ app.get('/room-service/:property_id', (c) => {
   `)
 })
 
-export default app
+// GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
+// This runs every hour (configured in wrangler.jsonc)
+export default {
+  fetch: app.fetch,
+  async scheduled(event: any, env: any, ctx: any) {
+    console.log('Running scheduled biometric data deletion job...')
+    
+    try {
+      // Call the auto-delete endpoint internally
+      const request = new Request('https://internal/api/admin/all-inclusive/biometric/auto-delete', {
+        method: 'POST',
+        headers: {
+          'X-Cron-Token': env.CRON_SECRET || 'change-this-in-production',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      // Create a context with the environment
+      const c = {
+        env,
+        req: {
+          method: 'POST',
+          header: (name: string) => {
+            if (name === 'X-Cron-Token') return env.CRON_SECRET || 'change-this-in-production'
+            return null
+          }
+        }
+      }
+      
+      // Execute the deletion logic directly
+      const { DB } = env
+      const now = new Date().toISOString()
+      
+      const passesToDelete = await DB.prepare(`
+        SELECT pass_id, property_id, primary_guest_name, guest_email,
+               scheduled_deletion_date, valid_until
+        FROM digital_passes
+        WHERE (face_embedding IS NOT NULL OR face_photo_url IS NOT NULL)
+          AND biometric_consent_withdrawn = 0
+          AND (
+            scheduled_deletion_date <= ?
+            OR valid_until < date('now', '-1 day')
+          )
+      `).bind(now).all()
+
+      const deletedCount = passesToDelete.results.length
+
+      for (const pass of passesToDelete.results) {
+        await DB.prepare(`
+          UPDATE digital_passes
+          SET face_embedding = NULL,
+              face_photo_url = NULL,
+              face_enrolled_at = NULL,
+              face_embedding_version = NULL,
+              biometric_consent_given = 0,
+              scheduled_deletion_date = NULL
+          WHERE pass_id = ? AND property_id = ?
+        `).bind(pass.pass_id, pass.property_id).run()
+
+        await DB.prepare(`
+          UPDATE pass_family_members
+          SET face_embedding = NULL,
+              face_photo_url = NULL,
+              face_enrolled_at = NULL,
+              face_embedding_version = NULL
+          WHERE pass_id = ?
+        `).bind(pass.pass_id).run()
+
+        await DB.prepare(`
+          INSERT INTO biometric_audit_log (
+            pass_id, property_id, action_type, action_details,
+            performed_by, ip_address, user_agent
+          ) VALUES (?, ?, 'AUTO_DELETED', ?, 'automated_job', 'system', 'cloudflare-worker-cron')
+        `).bind(
+          pass.pass_id,
+          pass.property_id,
+          JSON.stringify({
+            guest_name: pass.primary_guest_name,
+            guest_email: pass.guest_email,
+            scheduled_deletion_date: pass.scheduled_deletion_date,
+            valid_until: pass.valid_until,
+            deletion_reason: 'retention_period_expired',
+            deletion_time: now
+          })
+        ).run()
+      }
+
+      console.log(`Biometric auto-deletion completed: ${deletedCount} passes processed`)
+    } catch (error) {
+      console.error('Scheduled biometric deletion error:', error)
+    }
+  }
+}
