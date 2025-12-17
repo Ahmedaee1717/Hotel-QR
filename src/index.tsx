@@ -15635,7 +15635,7 @@ app.post('/api/staff/verify-pass', async (c) => {
   }
 
   try {
-    const { pass_reference } = await c.req.json()
+    const { pass_reference, verification_method = 'qr', staff_name = 'Staff', location = 'Entrance' } = await c.req.json()
     
     if (!pass_reference) {
       return c.json({ error: 'Pass reference required' }, 400)
@@ -15666,6 +15666,55 @@ app.post('/api/staff/verify-pass', async (c) => {
     if (today < pass.valid_from || today > pass.valid_until) {
       return c.json({ error: 'Pass is not valid for today' }, 403)
     }
+
+    // CHECK FOR DUPLICATE CHECK-IN TODAY
+    const todayStart = `${today} 00:00:00`
+    const todayEnd = `${today} 23:59:59`
+    
+    const existingCheckIn = await DB.prepare(`
+      SELECT verification_id, verification_timestamp, staff_name
+      FROM pass_verifications
+      WHERE pass_id = ? 
+        AND property_id = ?
+        AND verification_result = 'allowed'
+        AND verification_timestamp BETWEEN ? AND ?
+      ORDER BY verification_timestamp DESC
+      LIMIT 1
+    `).bind(pass.pass_id, property_id, todayStart, todayEnd).first()
+
+    if (existingCheckIn) {
+      // DUPLICATE CHECK-IN DETECTED
+      return c.json({ 
+        error: 'DUPLICATE_CHECK_IN',
+        already_checked_in: true,
+        first_check_in_time: existingCheckIn.verification_timestamp,
+        first_check_in_staff: existingCheckIn.staff_name,
+        pass_details: {
+          pass_reference: pass.pass_reference,
+          guest_name: pass.primary_guest_name,
+          room_number: pass.room_number,
+          tier: pass.tier_display_name
+        }
+      }, 409)
+    }
+
+    // Record the check-in
+    await DB.prepare(`
+      INSERT INTO pass_verifications (
+        property_id, pass_id, staff_name, verification_location,
+        verification_result, guest_name, room_number, tier_name,
+        verification_method, verification_timestamp
+      ) VALUES (?, ?, ?, ?, 'allowed', ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      property_id, 
+      pass.pass_id, 
+      staff_name, 
+      location,
+      pass.primary_guest_name,
+      pass.room_number,
+      pass.tier_display_name,
+      verification_method
+    ).run()
 
     return c.json({
       success: true,
@@ -15903,6 +15952,58 @@ app.post('/api/staff/all-inclusive/search-face', async (c) => {
     const matchThreshold = 0.6
     
     if (bestMatch && bestScore >= matchThreshold) {
+      // CHECK FOR DUPLICATE CHECK-IN TODAY
+      const today = new Date().toISOString().split('T')[0]
+      const todayStart = `${today} 00:00:00`
+      const todayEnd = `${today} 23:59:59`
+      
+      const existingCheckIn = await DB.prepare(`
+        SELECT verification_id, verification_timestamp, staff_name
+        FROM pass_verifications
+        WHERE pass_id = ? 
+          AND property_id = ?
+          AND verification_result = 'allowed'
+          AND verification_timestamp BETWEEN ? AND ?
+        ORDER BY verification_timestamp DESC
+        LIMIT 1
+      `).bind(bestMatch.pass_id, property_id, todayStart, todayEnd).first()
+
+      if (existingCheckIn) {
+        // DUPLICATE CHECK-IN DETECTED
+        return c.json({ 
+          error: 'DUPLICATE_CHECK_IN',
+          already_checked_in: true,
+          first_check_in_time: existingCheckIn.verification_timestamp,
+          first_check_in_staff: existingCheckIn.staff_name,
+          match_found: true,
+          match_score: bestScore,
+          pass_details: {
+            pass_reference: bestMatch.pass_reference,
+            guest_name: bestMatch.primary_guest_name,
+            room_number: bestMatch.room_number,
+            tier: bestMatch.tier_display_name,
+            tier_color: bestMatch.tier_color,
+            tier_icon: bestMatch.tier_icon
+          }
+        }, 409)
+      }
+
+      // Record the check-in
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          property_id, pass_id, staff_name, verification_location,
+          verification_result, guest_name, room_number, tier_name,
+          verification_method, face_match_score, verification_timestamp
+        ) VALUES (?, ?, 'Staff', 'Entrance', 'allowed', ?, ?, ?, 'face', ?, datetime('now'))
+      `).bind(
+        property_id, 
+        bestMatch.pass_id,
+        bestMatch.primary_guest_name,
+        bestMatch.room_number,
+        bestMatch.tier_display_name,
+        bestScore
+      ).run()
+
       return c.json({
         match_found: true,
         match_score: bestScore,
@@ -15925,6 +16026,50 @@ app.post('/api/staff/all-inclusive/search-face', async (c) => {
   } catch (error) {
     console.error('Face search error:', error)
     return c.json({ error: 'Failed to search faces: ' + error.message }, 500)
+  }
+})
+
+// Staff: Get today's checked-in guests
+app.get('/api/staff/checked-in-today', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const todayStart = `${today} 00:00:00`
+    const todayEnd = `${today} 23:59:59`
+    
+    const checkedInGuests = await DB.prepare(`
+      SELECT 
+        pv.verification_id,
+        pv.guest_name,
+        pv.room_number,
+        pv.tier_name,
+        pv.verification_method,
+        pv.face_match_score,
+        pv.verification_timestamp,
+        pv.staff_name,
+        dp.pass_reference
+      FROM pass_verifications pv
+      LEFT JOIN digital_passes dp ON pv.pass_id = dp.pass_id
+      WHERE pv.property_id = ?
+        AND pv.verification_result = 'allowed'
+        AND pv.verification_timestamp BETWEEN ? AND ?
+      ORDER BY pv.verification_timestamp DESC
+    `).bind(property_id, todayStart, todayEnd).all()
+
+    return c.json({
+      success: true,
+      count: checkedInGuests.results?.length || 0,
+      guests: checkedInGuests.results || []
+    })
+  } catch (error) {
+    console.error('Get checked-in guests error:', error)
+    return c.json({ error: 'Failed to get checked-in guests' }, 500)
   }
 })
 
