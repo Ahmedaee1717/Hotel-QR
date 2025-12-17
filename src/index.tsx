@@ -27185,10 +27185,16 @@ app.get('/staff/beach-check-in', (c) => {
   `)
 })
 
-// Staff Pass Verification Scanner with Facial Recognition
-// Staff: Face-Only Check-In Scanner
-// File is served from /staff-face-scanner.html via static files
+// Staff: Face-Only Check-In Scanner (multiple route patterns)
+app.get('/staff-face-scanner', async (c) => {
+  return c.redirect('/staff-face-scanner.html')
+})
 
+app.get('/staff/face-scanner', async (c) => {
+  return c.redirect('/staff-face-scanner.html')
+})
+
+// Staff Pass Verification Scanner with Facial Recognition
 app.get('/staff/verify-pass', (c) => {
   return c.html(`
 <!DOCTYPE html>
