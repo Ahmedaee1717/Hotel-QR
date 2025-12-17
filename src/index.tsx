@@ -15756,6 +15756,238 @@ app.post('/api/staff/all-inclusive/verify-face', async (c) => {
   }
 })
 
+// GUEST SELF-SERVICE API ENDPOINTS
+// These allow guests to manage their own passes and consent without staff intervention
+
+// Guest: Get pass details (with secure token)
+app.get('/api/guest/pass/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const token = c.req.query('token')
+  
+  if (!token) {
+    return c.json({ error: 'Access token required' }, 401)
+  }
+  
+  try {
+    // Get pass with token verification
+    const pass = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name as tier_name,
+        t.tier_color,
+        t.tier_icon
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.guest_access_token = ?
+    `).bind(pass_reference, token).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Invalid pass or access token' }, 404)
+    }
+    
+    return c.json({
+      pass_reference: pass.pass_reference,
+      primary_guest_name: pass.primary_guest_name,
+      guest_email: pass.guest_email,
+      room_number: pass.room_number,
+      tier_name: pass.tier_name,
+      tier_color: pass.tier_color,
+      tier_icon: pass.tier_icon,
+      valid_from: pass.valid_from,
+      valid_until: pass.valid_until,
+      pass_status: pass.pass_status,
+      verification_preference: pass.verification_preference || 'qr',
+      face_enrolled: !!pass.face_embedding,
+      wallet_pass_generated: !!pass.wallet_pass_generated
+    })
+  } catch (error) {
+    console.error('Get guest pass error:', error)
+    return c.json({ error: 'Failed to load pass' }, 500)
+  }
+})
+
+// Guest: Update verification preference
+app.post('/api/guest/pass/:pass_reference/preference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const { token, preference } = await c.req.json()
+  
+  if (!token) {
+    return c.json({ error: 'Access token required' }, 401)
+  }
+  
+  if (!['qr', 'face', 'wallet', 'both'].includes(preference)) {
+    return c.json({ error: 'Invalid preference' }, 400)
+  }
+  
+  try {
+    // Verify token
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, verification_preference 
+      FROM digital_passes 
+      WHERE pass_reference = ? AND guest_access_token = ?
+    `).bind(pass_reference, token).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Invalid pass or access token' }, 404)
+    }
+    
+    const oldPreference = pass.verification_preference || 'qr'
+    
+    // Update preference
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET verification_preference = ?,
+          guest_portal_accessed_at = CURRENT_TIMESTAMP
+      WHERE pass_reference = ? AND guest_access_token = ?
+    `).bind(preference, pass_reference, token).run()
+    
+    // Log the change
+    await DB.prepare(`
+      INSERT INTO guest_consent_changes (
+        pass_id, property_id, old_preference, new_preference,
+        change_reason, changed_by, ip_address, user_agent
+      ) VALUES (?, ?, ?, ?, 'guest_switched', 'guest', ?, ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      oldPreference,
+      preference,
+      c.req.header('CF-Connecting-IP') || 'unknown',
+      c.req.header('User-Agent') || 'unknown'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Preference updated successfully'
+    })
+  } catch (error) {
+    console.error('Update preference error:', error)
+    return c.json({ error: 'Failed to update preference' }, 500)
+  }
+})
+
+// Guest: Withdraw biometric consent (self-service, no staff needed)
+app.post('/api/guest/pass/:pass_reference/withdraw-consent', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const { token } = await c.req.json()
+  
+  if (!token) {
+    return c.json({ error: 'Access token required' }, 401)
+  }
+  
+  try {
+    // Verify token and get pass details
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, primary_guest_name, face_embedding, face_photo_url
+      FROM digital_passes 
+      WHERE pass_reference = ? AND guest_access_token = ?
+    `).bind(pass_reference, token).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Invalid pass or access token' }, 404)
+    }
+    
+    const hadBiometricData = !!(pass.face_embedding || pass.face_photo_url)
+    
+    // IMMEDIATE deletion of ALL biometric data
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET face_embedding = NULL,
+          face_photo_url = NULL,
+          face_enrolled_at = NULL,
+          face_embedding_version = NULL,
+          biometric_consent_given = 0,
+          biometric_consent_withdrawn = 1,
+          biometric_consent_withdrawn_at = CURRENT_TIMESTAMP,
+          verification_preference = 'qr',
+          scheduled_deletion_date = NULL,
+          guest_portal_accessed_at = CURRENT_TIMESTAMP
+      WHERE pass_reference = ? AND guest_access_token = ?
+    `).bind(pass_reference, token).run()
+    
+    // Log the withdrawal
+    await DB.prepare(`
+      INSERT INTO biometric_audit_log (
+        pass_id, property_id, action_type, action_details,
+        performed_by, ip_address, user_agent
+      ) VALUES (?, ?, 'CONSENT_WITHDRAWN_SELF_SERVICE', ?, 'guest_self_service', ?, ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      JSON.stringify({
+        guest_name: pass.primary_guest_name,
+        data_deleted: hadBiometricData,
+        withdrawal_method: 'guest_self_service_portal',
+        timestamp: new Date().toISOString()
+      }),
+      c.req.header('CF-Connecting-IP') || 'unknown',
+      c.req.header('User-Agent') || 'unknown'
+    ).run()
+    
+    // Log consent change
+    await DB.prepare(`
+      INSERT INTO guest_consent_changes (
+        pass_id, property_id, old_preference, new_preference,
+        change_reason, changed_by, ip_address, user_agent
+      ) VALUES (?, ?, 'face', 'qr', 'consent_withdrawn', 'guest', ?, ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      c.req.header('CF-Connecting-IP') || 'unknown',
+      c.req.header('User-Agent') || 'unknown'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Biometric consent withdrawn successfully',
+      data_deleted: hadBiometricData,
+      fallback_method: 'qr'
+    })
+  } catch (error) {
+    console.error('Guest withdraw consent error:', error)
+    return c.json({ error: 'Failed to withdraw consent' }, 500)
+  }
+})
+
+// Guest: Generate Apple Wallet pass
+app.get('/api/guest/pass/:pass_reference/wallet/apple', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const token = c.req.query('token')
+  
+  if (!token) {
+    return c.json({ error: 'Access token required' }, 401)
+  }
+  
+  // TODO: Implement Apple Wallet .pkpass generation
+  // For now, return a placeholder response
+  return c.json({ 
+    error: 'Apple Wallet pass generation coming soon',
+    message: 'Please use the QR code for now'
+  }, 501)
+})
+
+// Guest: Generate Google Pay pass
+app.get('/api/guest/pass/:pass_reference/wallet/google', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const token = c.req.query('token')
+  
+  if (!token) {
+    return c.json({ error: 'Access token required' }, 401)
+  }
+  
+  // TODO: Implement Google Pay pass generation
+  // For now, return a placeholder response
+  return c.json({ 
+    error: 'Google Pay pass generation coming soon',
+    message: 'Please use the QR code for now'
+  }, 501)
+})
+
 // Admin: Get face recognition settings
 app.get('/api/admin/all-inclusive/face-settings/:property_id', async (c) => {
   const { DB } = c.env
