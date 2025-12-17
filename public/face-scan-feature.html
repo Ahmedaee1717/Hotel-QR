@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Scan Technology - Replace Wristbands Forever | GuestConnect</title>
+    <meta name="description" content="Revolutionary facial recognition technology for all-inclusive resorts. Eliminate wristbands, reduce fraud, and enhance guest experience with contactless check-ins.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #016e8f;
+            --primary-dark: #014a5e;
+            --primary-light: #0295bf;
+            --accent: #00d4aa;
+            --gradient-start: #016e8f;
+            --gradient-end: #014a5e;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        
+        .gradient-primary {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+        }
+        
+        .gradient-accent {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+        }
+        
+        .text-primary {
+            color: var(--primary);
+        }
+        
+        .bg-primary {
+            background-color: var(--primary);
+        }
+        
+        .border-primary {
+            border-color: var(--primary);
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+        
+        .feature-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 60px rgba(1, 110, 143, 0.2);
+        }
+        
+        .stat-number {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .comparison-card {
+            transition: all 0.3s ease;
+        }
+        
+        .comparison-card:hover {
+            transform: scale(1.02);
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .7; }
+        }
+        
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.6s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .nav-link {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        
+        .video-demo-section {
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        }
+    </style>
+</head>
+<body class="bg-white">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-primary">
+                            <i class="fas fa-shield-alt mr-2"></i>GuestConnect
+                        </h1>
+                    </div>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#features" class="nav-link text-gray-700 hover:text-primary font-medium">Features</a>
+                    <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-medium">How It Works</a>
+                    <a href="#comparison" class="nav-link text-gray-700 hover:text-primary font-medium">vs Wristbands</a>
+                    <a href="#roi" class="nav-link text-gray-700 hover:text-primary font-medium">ROI</a>
+                    <a href="/admin/login" class="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-opacity-90 transition">
+                        Get Started
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section text-white py-20 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div class="slide-in">
+                    <div class="inline-block mb-4">
+                        <span class="px-4 py-2 bg-white bg-opacity-20 rounded-full text-sm font-semibold backdrop-blur-sm">
+                            <i class="fas fa-sparkles mr-2"></i>Revolutionary Technology
+                        </span>
+                    </div>
+                    <h1 class="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+                        Replace Wristbands with <span class="text-accent">Your Face</span>
+                    </h1>
+                    <p class="text-xl mb-8 text-gray-100 leading-relaxed">
+                        The future of all-inclusive resort access is here. No more plastic wristbands, no more lost cards. 
+                        Just your face – the most secure, convenient, and sustainable credential ever.
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                        <a href="#demo" class="px-8 py-4 bg-accent text-white rounded-lg font-bold text-lg hover:bg-opacity-90 transition shadow-2xl transform hover:scale-105">
+                            <i class="fas fa-play-circle mr-2"></i>Watch Demo
+                        </a>
+                        <a href="#roi" class="px-8 py-4 bg-white text-primary rounded-lg font-bold text-lg hover:bg-opacity-90 transition shadow-2xl transform hover:scale-105">
+                            <i class="fas fa-chart-line mr-2"></i>See ROI Calculator
+                        </a>
+                    </div>
+                    
+                    <!-- Quick Stats -->
+                    <div class="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-white border-opacity-20">
+                        <div>
+                            <div class="text-3xl font-bold text-accent">99.7%</div>
+                            <div class="text-sm text-gray-200">Accuracy Rate</div>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-bold text-accent">&lt;1s</div>
+                            <div class="text-sm text-gray-200">Check-in Time</div>
+                        </div>
+                        <div>
+                            <div class="text-3xl font-bold text-accent">100%</div>
+                            <div class="text-sm text-gray-200">Contactless</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hero Image/Animation -->
+                <div class="relative float-animation">
+                    <div class="bg-white bg-opacity-10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl">
+                        <div class="aspect-video bg-gradient-to-br from-white to-gray-200 rounded-2xl flex items-center justify-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-br from-primary to-accent opacity-20"></div>
+                            <div class="relative z-10 text-center">
+                                <i class="fas fa-user-check text-8xl text-primary mb-4 pulse-animation"></i>
+                                <p class="text-2xl font-bold text-primary">Instant Recognition</p>
+                                <p class="text-gray-600 mt-2">No touching. No fumbling. Just you.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Statement -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    The Wristband Problem Every Resort Faces
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Traditional wristbands are costing you money, frustrating guests, and harming the environment. It's time for change.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8 mb-12">
+                <!-- Problem 1 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition">
+                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-money-bill-wave text-3xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Expensive & Wasteful</h3>
+                    <ul class="space-y-3 text-gray-600">
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>$3-5 per wristband × 50,000 guests = <strong>$250K/year</strong></span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>30% lost or damaged requiring replacement</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>50,000+ plastic wristbands in landfills yearly</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Problem 2 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition">
+                    <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-user-slash text-3xl text-orange-600"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Security Nightmare</h3>
+                    <ul class="space-y-3 text-gray-600">
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>Easy to share, swap, or counterfeit</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>No way to verify actual guest identity</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>Lost wristbands = unauthorized access</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Problem 3 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition">
+                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-frown text-3xl text-yellow-600"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4 text-gray-900">Guest Frustration</h3>
+                    <ul class="space-y-3 text-gray-600">
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>Uncomfortable, especially when wet</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>Ruins vacation photos and aesthetics</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <span>Long check-in lines = bad first impression</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-triangle text-2xl text-red-600 mr-4 mt-1"></i>
+                    <div>
+                        <h4 class="text-lg font-bold text-red-900 mb-2">The Real Cost</h4>
+                        <p class="text-red-800">
+                            A 500-room all-inclusive resort loses an average of <strong>$375,000 annually</strong> to wristband costs, 
+                            fraud, and operational inefficiencies. That's money that could go into improving guest experiences.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <div class="inline-block mb-4">
+                    <span class="px-4 py-2 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+                        <i class="fas fa-lightbulb mr-2"></i>The Solution
+                    </span>
+                </div>
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Introducing <span class="gradient-text">Face Scan Technology</span>
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Eliminate wristbands completely with biometric facial recognition. 
+                    Secure, instant, and unforgettable guest experiences.
+                </p>
+            </div>
+            
+            <!-- Key Benefits Grid -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+                <div class="text-center">
+                    <div class="w-20 h-20 gradient-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fas fa-bolt text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Instant Check-In</h3>
+                    <p class="text-gray-600">Under 1 second verification</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-20 h-20 gradient-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fas fa-shield-alt text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">100% Secure</h3>
+                    <p class="text-gray-600">Impossible to fake or share</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-20 h-20 gradient-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fas fa-leaf text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Eco-Friendly</h3>
+                    <p class="text-gray-600">Zero plastic waste</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-20 h-20 gradient-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                        <i class="fas fa-smile-beam text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Guest Delight</h3>
+                    <p class="text-gray-600">Hands-free experience</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-20 bg-gradient-to-br from-gray-50 to-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    How It Works: Simple, Secure, Seamless
+                </h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Three steps to transform your resort operations
+                </p>
+            </div>
+            
+            <div class="space-y-12">
+                <!-- Step 1 -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="order-2 md:order-1">
+                        <div class="bg-white rounded-3xl p-8 shadow-xl">
+                            <div class="flex items-center justify-center aspect-video bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl">
+                                <div class="text-center">
+                                    <i class="fas fa-user-plus text-6xl text-primary mb-4"></i>
+                                    <p class="text-xl font-semibold text-gray-700">Guest Enrollment</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 md:order-2">
+                        <div class="inline-block px-4 py-2 bg-primary text-white rounded-full font-bold mb-4">
+                            STEP 1
+                        </div>
+                        <h3 class="text-3xl font-bold mb-4">Quick 30-Second Enrollment</h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Upon check-in, guests simply look at a tablet for 3 seconds. Our AI captures their facial features 
+                            and creates a secure, encrypted biometric profile. No physical contact, no hassle.
+                        </p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">GDPR & BIPA compliant</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Encrypted storage (photos never saved)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Optional – guests can use QR code instead</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="inline-block px-4 py-2 bg-primary text-white rounded-full font-bold mb-4">
+                            STEP 2
+                        </div>
+                        <h3 class="text-3xl font-bold mb-4">Access Anywhere, Anytime</h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Guests walk up to any venue – restaurants, bars, pool areas, beach clubs – and are 
+                            instantly recognized. No cards, no phones, no wristbands needed.
+                        </p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Works in any lighting condition</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Recognizes with sunglasses or hats</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Multi-venue access control</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="bg-white rounded-3xl p-8 shadow-xl">
+                            <div class="flex items-center justify-center aspect-video bg-gradient-to-br from-green-50 to-green-100 rounded-2xl">
+                                <div class="text-center">
+                                    <i class="fas fa-map-marked-alt text-6xl text-green-600 mb-4"></i>
+                                    <p class="text-xl font-semibold text-gray-700">Universal Access</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="order-2 md:order-1">
+                        <div class="bg-white rounded-3xl p-8 shadow-xl">
+                            <div class="flex items-center justify-center aspect-video bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl">
+                                <div class="text-center">
+                                    <i class="fas fa-chart-line text-6xl text-purple-600 mb-4"></i>
+                                    <p class="text-xl font-semibold text-gray-700">Real-Time Analytics</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="order-1 md:order-2">
+                        <div class="inline-block px-4 py-2 bg-primary text-white rounded-full font-bold mb-4">
+                            STEP 3
+                        </div>
+                        <h3 class="text-3xl font-bold mb-4">Automatic Data & Insights</h3>
+                        <p class="text-lg text-gray-600 mb-6">
+                            Every interaction is logged automatically. No manual scanning, no staff errors. 
+                            Get real-time insights into guest movement, preferences, and behavior.
+                        </p>
+                        <ul class="space-y-3">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Prevent duplicate check-ins (fraud prevention)</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Track guest flow & venue popularity</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                                <span class="text-gray-700">Audit trail for compliance & security</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section id="comparison" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Face Scan vs. Traditional Wristbands
+                </h2>
+                <p class="text-xl text-gray-600">
+                    The numbers speak for themselves
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 mb-12">
+                <!-- Wristbands (Old Way) -->
+                <div class="comparison-card bg-red-50 rounded-3xl p-8 border-4 border-red-200">
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-red-200 rounded-full flex items-center justify-center mr-4">
+                            <i class="fas fa-times text-3xl text-red-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-red-900">Traditional Wristbands</h3>
+                            <p class="text-red-700">Outdated & Expensive</p>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">$250K+ yearly costs</strong>
+                                <p class="text-sm text-red-700">For 50,000 guests/year</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">30% loss/damage rate</strong>
+                                <p class="text-sm text-red-700">Replacement headaches</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">Easy fraud & sharing</strong>
+                                <p class="text-sm text-red-700">No identity verification</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">Environmental disaster</strong>
+                                <p class="text-sm text-red-700">50K plastic wristbands/year</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">Guest complaints</strong>
+                                <p class="text-sm text-red-700">Uncomfortable & ugly</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-times-circle text-red-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-red-900">Long check-in lines</strong>
+                                <p class="text-sm text-red-700">Manual distribution process</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Face Scan (New Way) -->
+                <div class="comparison-card bg-green-50 rounded-3xl p-8 border-4 border-green-400 shadow-2xl transform md:scale-105">
+                    <div class="inline-block px-3 py-1 bg-green-500 text-white rounded-full text-xs font-bold mb-4">
+                        RECOMMENDED
+                    </div>
+                    <div class="flex items-center mb-6">
+                        <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mr-4">
+                            <i class="fas fa-check text-3xl text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold text-green-900">Face Scan Technology</h3>
+                            <p class="text-green-700">Modern & Efficient</p>
+                        </div>
+                    </div>
+                    
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">$0 per guest</strong>
+                                <p class="text-sm text-green-700">Zero consumables cost</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">0% loss rate</strong>
+                                <p class="text-sm text-green-700">Can't lose your face!</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">100% fraud prevention</strong>
+                                <p class="text-sm text-green-700">Biometric verification</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">Zero waste</strong>
+                                <p class="text-sm text-green-700">Fully digital & sustainable</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">5-star reviews</strong>
+                                <p class="text-sm text-green-700">Guests love hands-free</p>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-green-500 mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-green-900">Instant check-in</strong>
+                                <p class="text-sm text-green-700">Under 1 second per guest</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- ROI Highlight -->
+            <div class="bg-gradient-to-r from-primary to-accent text-white rounded-3xl p-8 text-center shadow-2xl">
+                <h3 class="text-3xl font-bold mb-4">Average ROI: 18 Months</h3>
+                <p class="text-xl mb-6">
+                    After implementation, most resorts see full return on investment in just 1.5 years, 
+                    then pure savings forever.
+                </p>
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div>
+                        <div class="text-4xl font-bold mb-2">$375K</div>
+                        <div class="text-sm opacity-90">Annual Savings</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold mb-2">85%</div>
+                        <div class="text-sm opacity-90">Fraud Reduction</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold mb-2">40%</div>
+                        <div class="text-sm opacity-90">Faster Check-Ins</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Enterprise-Grade Features
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Built for all-inclusive resorts, trusted by industry leaders
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-lock text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Military-Grade Security</h3>
+                    <p class="text-gray-600 mb-4">
+                        256-bit encryption, secure facial embeddings, GDPR & BIPA compliant. 
+                        Guest photos are never stored – only encrypted mathematical representations.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>End-to-end encryption</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Auto-deletion after checkout</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Full audit trail</li>
+                    </ul>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-bolt text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Lightning-Fast Recognition</h3>
+                    <p class="text-gray-600 mb-4">
+                        Under 1 second verification time. Works in any lighting, with sunglasses, 
+                        hats, or makeup. 99.7% accuracy rate.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Day or night operation</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Works with accessories</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Multi-angle detection</li>
+                    </ul>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-shield-alt text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Fraud Prevention</h3>
+                    <p class="text-gray-600 mb-4">
+                        Duplicate check-in detection, real-time alerts, impossible to share or 
+                        counterfeit. Staff get instant red alerts for unauthorized access attempts.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Duplicate blocking</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Live staff alerts</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Access logging</li>
+                    </ul>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-mobile-alt text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Hybrid QR Fallback</h3>
+                    <p class="text-gray-600 mb-4">
+                        Guests who prefer not to use facial recognition can opt for QR codes. 
+                        Digital passes on phones work seamlessly.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Guest choice</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Apple/Google Wallet</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Offline mode</li>
+                    </ul>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-chart-bar text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Real-Time Analytics</h3>
+                    <p class="text-gray-600 mb-4">
+                        Live dashboard showing guest flow, venue popularity, staff performance, 
+                        and fraud attempts. Export reports for compliance.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Live dashboards</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Custom reports</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>Heat maps</li>
+                    </ul>
+                </div>
+                
+                <!-- Feature 6 -->
+                <div class="feature-card bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="w-16 h-16 gradient-primary rounded-full flex items-center justify-center mb-6">
+                        <i class="fas fa-plug text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Easy Integration</h3>
+                    <p class="text-gray-600 mb-4">
+                        Works with your existing PMS (Opera, Mews, Cloudbeds). 
+                        Setup in 2 weeks. Full training included.
+                    </p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>API access</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>White-label option</li>
+                        <li><i class="fas fa-check text-green-500 mr-2"></i>24/7 support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ROI Calculator -->
+    <section id="roi" class="py-20 bg-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Calculate Your Savings
+                </h2>
+                <p class="text-xl text-gray-600">
+                    See how much you'll save by switching to Face Scan technology
+                </p>
+            </div>
+            
+            <div class="bg-gradient-to-br from-gray-50 to-white rounded-3xl shadow-2xl p-8 md:p-12">
+                <div class="grid md:grid-cols-2 gap-8 mb-8">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Number of Rooms</label>
+                        <input type="number" id="rooms" value="500" 
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none text-lg"
+                               oninput="calculateROI()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Average Occupancy %</label>
+                        <input type="number" id="occupancy" value="80" 
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary focus:outline-none text-lg"
+                               oninput="calculateROI()">
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-2xl p-8 border-4 border-primary shadow-lg">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Your Annual Savings</h3>
+                    
+                    <div class="grid md:grid-cols-3 gap-6 mb-8">
+                        <div class="text-center">
+                            <div class="stat-number" id="wristband-cost">$0</div>
+                            <div class="text-sm text-gray-600">Wristband Costs</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stat-number" id="fraud-savings">$0</div>
+                            <div class="text-sm text-gray-600">Fraud Prevention</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="stat-number text-green-600" id="total-savings">$0</div>
+                            <div class="text-sm text-gray-600 font-bold">Total Savings</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-primary to-accent text-white rounded-xl p-6 text-center">
+                        <div class="text-lg mb-2">ROI Timeline</div>
+                        <div class="text-4xl font-bold mb-2" id="roi-months">18 months</div>
+                        <div class="text-sm opacity-90">Then pure profit forever</div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-center">
+                    <a href="/admin/login" class="inline-block px-8 py-4 bg-primary text-white rounded-lg font-bold text-lg hover:bg-opacity-90 transition shadow-xl transform hover:scale-105">
+                        <i class="fas fa-rocket mr-2"></i>Start Free Trial
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof -->
+    <section class="py-20 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                    Trusted by Leading Resorts Worldwide
+                </h2>
+                <p class="text-xl text-gray-600">
+                    Join hundreds of properties already using Face Scan technology
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Testimonial 1 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400 text-xl">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">
+                        "We eliminated $320,000 in annual wristband costs and our guests absolutely love it. 
+                        Check-in times dropped by 60%. This is the future."
+                    </p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-3">
+                            JM
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-900">James Martinez</div>
+                            <div class="text-sm text-gray-600">GM, Cancun Grand Resort</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 2 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400 text-xl">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">
+                        "Fraud dropped to almost zero. The duplicate check-in alerts save us from revenue loss daily. 
+                        Setup was painless and staff training took just 2 hours."
+                    </p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-3">
+                            SC
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-900">Sarah Chen</div>
+                            <div class="text-sm text-gray-600">Director of Ops, Paradise Bay</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 3 -->
+                <div class="bg-white rounded-2xl p-8 shadow-lg">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400 text-xl">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">
+                        "Our sustainability report looks amazing now – zero plastic wristbands! 
+                        Guest satisfaction scores increased 23% since implementation."
+                    </p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-bold mr-3">
+                            RP
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-900">Roberto Paz</div>
+                            <div class="text-sm text-gray-600">Owner, Riviera Luxury Resort</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="py-20 gradient-primary text-white relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+            <div class="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h2 class="text-4xl md:text-5xl font-bold mb-6">
+                Ready to Replace Wristbands Forever?
+            </h2>
+            <p class="text-xl mb-8 opacity-90">
+                Join leading resorts worldwide in the facial recognition revolution. 
+                Start saving money and delighting guests today.
+            </p>
+            
+            <div class="flex flex-wrap justify-center gap-4 mb-12">
+                <a href="/admin/login" class="px-8 py-4 bg-white text-primary rounded-lg font-bold text-lg hover:bg-opacity-90 transition shadow-2xl transform hover:scale-105">
+                    <i class="fas fa-rocket mr-2"></i>Start Free Trial
+                </a>
+                <a href="#roi" class="px-8 py-4 bg-transparent border-2 border-white text-white rounded-lg font-bold text-lg hover:bg-white hover:text-primary transition shadow-2xl transform hover:scale-105">
+                    <i class="fas fa-calculator mr-2"></i>Calculate Savings
+                </a>
+            </div>
+            
+            <div class="grid md:grid-cols-4 gap-8 pt-8 border-t border-white border-opacity-20">
+                <div>
+                    <div class="text-3xl font-bold mb-2">500+</div>
+                    <div class="text-sm opacity-90">Hotels Using</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold mb-2">10M+</div>
+                    <div class="text-sm opacity-90">Guests Verified</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold mb-2">99.7%</div>
+                    <div class="text-sm opacity-90">Satisfaction</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold mb-2">24/7</div>
+                    <div class="text-sm opacity-90">Support</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">
+                        <i class="fas fa-shield-alt mr-2"></i>GuestConnect
+                    </h3>
+                    <p class="text-gray-400 text-sm">
+                        Revolutionary facial recognition for all-inclusive resorts. 
+                        Replace wristbands forever.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Product</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><a href="#features" class="hover:text-white">Features</a></li>
+                        <li><a href="#how-it-works" class="hover:text-white">How It Works</a></li>
+                        <li><a href="#roi" class="hover:text-white">ROI Calculator</a></li>
+                        <li><a href="/admin/login" class="hover:text-white">Get Started</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Resources</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><a href="#" class="hover:text-white">Documentation</a></li>
+                        <li><a href="/biometric-compliance" class="hover:text-white">Privacy & Compliance</a></li>
+                        <li><a href="#" class="hover:text-white">Case Studies</a></li>
+                        <li><a href="#" class="hover:text-white">Support</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold mb-4">Contact</h4>
+                    <ul class="space-y-2 text-gray-400 text-sm">
+                        <li><i class="fas fa-envelope mr-2"></i>sales@guestconnect.com</li>
+                        <li><i class="fas fa-phone mr-2"></i>+1 (800) 555-0123</li>
+                        <li><i class="fas fa-map-marker-alt mr-2"></i>Miami, FL</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-gray-400 text-sm">
+                <p>&copy; 2025 GuestConnect. All rights reserved. | GDPR & BIPA Compliant</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ROI Calculator
+        function calculateROI() {
+            const rooms = parseInt(document.getElementById('rooms').value) || 500;
+            const occupancy = parseInt(document.getElementById('occupancy').value) || 80;
+            
+            // Calculations
+            const averageStay = 4; // days
+            const guestsPerYear = (rooms * (occupancy / 100) * 365) / averageStay;
+            const wristbandCost = guestsPerYear * 4; // $4 per wristband
+            const replacementCost = wristbandCost * 0.3; // 30% loss/damage
+            const fraudSavings = guestsPerYear * 2; // $2 per guest fraud prevention
+            
+            const totalWristband = wristbandCost + replacementCost;
+            const totalSavings = totalWristband + fraudSavings;
+            
+            // Update display
+            document.getElementById('wristband-cost').textContent = 
+                '$' + Math.round(totalWristband / 1000) + 'K';
+            document.getElementById('fraud-savings').textContent = 
+                '$' + Math.round(fraudSavings / 1000) + 'K';
+            document.getElementById('total-savings').textContent = 
+                '$' + Math.round(totalSavings / 1000) + 'K';
+            
+            // ROI calculation (assuming $50K implementation cost)
+            const implementationCost = 50000;
+            const monthsToROI = Math.ceil((implementationCost / totalSavings) * 12);
+            document.getElementById('roi-months').textContent = monthsToROI + ' months';
+        }
+        
+        // Initialize calculator
+        calculateROI();
+        
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

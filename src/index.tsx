@@ -29,6 +29,17 @@ app.get('/guest-portal.html', async (c) => {
   return c.html(await response.text())
 })
 
+// Face Scan Feature Marketing Page
+app.get('/face-scan-feature', async (c) => {
+  const response = await c.env.ASSETS.fetch(new URL('/face-scan-feature.html', c.req.url))
+  return c.html(await response.text())
+})
+
+app.get('/features/face-scan', async (c) => {
+  const response = await c.env.ASSETS.fetch(new URL('/face-scan-feature.html', c.req.url))
+  return c.html(await response.text())
+})
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
