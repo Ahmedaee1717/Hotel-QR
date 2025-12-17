@@ -14655,6 +14655,58 @@ app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermissio
   }
 })
 
+// Admin: Delete pass permanently
+app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // Verify pass belongs to property
+    const pass = await DB.prepare(`
+      SELECT * FROM digital_passes WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Delete family members first (foreign key constraint)
+    await DB.prepare(`
+      DELETE FROM pass_family_members WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // Delete verification records
+    await DB.prepare(`
+      DELETE FROM pass_verifications WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // Delete fraud alerts
+    await DB.prepare(`
+      DELETE FROM face_verification_fraud_alerts WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // Delete pass upgrades
+    await DB.prepare(`
+      DELETE FROM pass_upgrades WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // Finally delete the pass itself
+    await DB.prepare(`
+      DELETE FROM digital_passes WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete pass error:', error)
+    return c.json({ error: 'Failed to delete pass: ' + error.message }, 500)
+  }
+})
+
 // =================
 // STAFF VERIFICATION
 // =================
@@ -47132,8 +47184,99 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // Open create pass modal
-      window.openCreatePassModal = function() {
-        alert('Create Pass Modal - Coming in next phase!\\n\\nFor now, you can create passes via API:\\nPOST /api/admin/all-inclusive/passes');
+      window.openCreatePassModal = async function() {
+        // Load tiers first
+        let tiers = [];
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/tiers/' + propertyId);
+          const data = await response.json();
+          tiers = data.tiers || [];
+        } catch (error) {
+          console.error('Failed to load tiers:', error);
+          alert('Failed to load tiers. Please try again.');
+          return;
+        }
+        
+        if (tiers.length === 0) {
+          alert('No tiers configured. Please create tiers first.');
+          return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'create-pass-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
+        html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-plus-circle"></i>Issue New Digital Pass';
+        html += '</h2>';
+        html += '<button onclick="closeCreatePassModal()" class="text-white hover:text-gray-200 text-2xl">';
+        html += '<i class="fas fa-times"></i>';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<form id="create-pass-form" onsubmit="submitCreatePass(event)">';
+        
+        // Primary Guest Info
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+        html += '<i class="fas fa-user"></i>Primary Guest Information';
+        html += '</h3>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Guest Name *</label>';
+        html += '<input type="text" name="primary_guest_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="John Doe"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Room Number</label>';
+        html += '<input type="text" name="room_number" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="101"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Email</label>';
+        html += '<input type="email" name="guest_email" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="guest@email.com"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Phone</label>';
+        html += '<input type="tel" name="guest_phone" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="+1234567890"></div>';
+        html += '</div></div>';
+        
+        // Pass Details
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+        html += '<i class="fas fa-id-badge"></i>Pass Details';
+        html += '</h3>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Level *</label>';
+        html += '<select name="tier_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="">Select Tier</option>';
+        tiers.forEach(tier => {
+          html += '<option value="' + tier.tier_id + '">' + tier.tier_display_name + '</option>';
+        });
+        html += '</select></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Number of Adults</label>';
+        html += '<input type="number" name="num_adults" value="1" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Number of Children</label>';
+        html += '<input type="number" name="num_children" value="0" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Valid From *</label>';
+        html += '<input type="date" name="valid_from" required class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Valid Until *</label>';
+        html += '<input type="date" name="valid_until" required class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '</div></div>';
+        
+        // Notes
+        html += '<div class="mb-6">';
+        html += '<label class="block text-sm font-semibold mb-1">Notes (Optional)</label>';
+        html += '<textarea name="notes" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Any special notes or requests..."></textarea>';
+        html += '</div>';
+        
+        // Submit button
+        html += '<div class="flex gap-3 justify-end">';
+        html += '<button type="button" onclick="closeCreatePassModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<i class="fas fa-check mr-2"></i>Issue Pass';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '</form>';
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
       };
 
       // View pass
@@ -47141,11 +47284,229 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         window.open(\`/guest-pass/\${passReference}\`, '_blank');
       };
 
+      // Close create pass modal
+      window.closeCreatePassModal = function() {
+        const modal = document.getElementById('create-pass-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit create pass form
+      window.submitCreatePass = async function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Convert numeric fields
+        data.num_adults = parseInt(data.num_adults) || 1;
+        data.num_children = parseInt(data.num_children) || 0;
+        data.tier_id = parseInt(data.tier_id);
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/passes', {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Digital Pass Issued Successfully!\\n\\nPass Reference: ' + result.pass_reference + '\\n\\nYou can now enroll the guest\\'s face for verification.');
+            closeCreatePassModal();
+            loadPasses();
+          } else {
+            alert('❌ Failed to issue pass: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Create pass error:', error);
+          alert('❌ Failed to issue pass. Please try again.');
+        }
+      };
+      
       // Edit pass
-      window.editPass = function(passId) {
-        alert('Edit Pass Modal - Coming in next phase!\\n\\nPass ID: ' + passId);
+      window.editPass = async function(passId) {
+        // Load pass details
+        let passData = null;
+        let tiers = [];
+        
+        try {
+          const [passResponse, tiersResponse] = await Promise.all([
+            fetchWithAuth('/api/admin/all-inclusive/passes/' + passId),
+            fetchWithAuth('/api/admin/all-inclusive/tiers/' + propertyId)
+          ]);
+          
+          const passResult = await passResponse.json();
+          const tiersResult = await tiersResponse.json();
+          
+          passData = passResult.pass;
+          tiers = tiersResult.tiers || [];
+        } catch (error) {
+          console.error('Failed to load pass:', error);
+          alert('Failed to load pass details. Please try again.');
+          return;
+        }
+        
+        if (!passData) {
+          alert('Pass not found.');
+          return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'edit-pass-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
+        html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-edit"></i>Edit Digital Pass - ' + passData.pass_reference;
+        html += '</h2>';
+        html += '<button onclick="closeEditPassModal()" class="text-white hover:text-gray-200 text-2xl">';
+        html += '<i class="fas fa-times"></i>';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<form id="edit-pass-form" onsubmit="submitEditPass(event, ' + passId + ')">';
+        
+        // Primary Guest Info
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+        html += '<i class="fas fa-user"></i>Primary Guest Information';
+        html += '</h3>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Guest Name *</label>';
+        html += '<input type="text" name="primary_guest_name" required value="' + (passData.primary_guest_name || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Room Number</label>';
+        html += '<input type="text" name="room_number" value="' + (passData.room_number || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Email</label>';
+        html += '<input type="email" name="guest_email" value="' + (passData.guest_email || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Phone</label>';
+        html += '<input type="tel" name="guest_phone" value="' + (passData.guest_phone || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '</div></div>';
+        
+        // Pass Details
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+        html += '<i class="fas fa-id-badge"></i>Pass Details';
+        html += '</h3>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Status *</label>';
+        html += '<select name="pass_status" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="active"' + (passData.pass_status === 'active' ? ' selected' : '') + '>Active</option>';
+        html += '<option value="expired"' + (passData.pass_status === 'expired' ? ' selected' : '') + '>Expired</option>';
+        html += '<option value="deactivated"' + (passData.pass_status === 'deactivated' ? ' selected' : '') + '>Deactivated</option>';
+        html += '</select></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Level *</label>';
+        html += '<select name="tier_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        tiers.forEach(tier => {
+          const selected = tier.tier_id === passData.tier_id ? ' selected' : '';
+          html += '<option value="' + tier.tier_id + '"' + selected + '>' + tier.tier_display_name + '</option>';
+        });
+        html += '</select></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Number of Adults</label>';
+        html += '<input type="number" name="num_adults" value="' + (passData.num_adults || 1) + '" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Number of Children</label>';
+        html += '<input type="number" name="num_children" value="' + (passData.num_children || 0) + '" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Valid From *</label>';
+        html += '<input type="date" name="valid_from" required value="' + (passData.valid_from || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Valid Until *</label>';
+        html += '<input type="date" name="valid_until" required value="' + (passData.valid_until || '') + '" class="w-full border border-gray-300 rounded-lg px-3 py-2"></div>';
+        html += '</div></div>';
+        
+        // Notes
+        html += '<div class="mb-6">';
+        html += '<label class="block text-sm font-semibold mb-1">Notes (Optional)</label>';
+        html += '<textarea name="notes" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2">' + (passData.notes || '') + '</textarea>';
+        html += '</div>';
+        
+        // Submit and Delete buttons
+        html += '<div class="flex gap-3 justify-between">';
+        html += '<button type="button" onclick="deletePass(' + passId + ')" class="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">';
+        html += '<i class="fas fa-trash mr-2"></i>Delete Pass';
+        html += '</button>';
+        html += '<div class="flex gap-3">';
+        html += '<button type="button" onclick="closeEditPassModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<i class="fas fa-save mr-2"></i>Save Changes';
+        html += '</button>';
+        html += '</div></div>';
+        
+        html += '</form>';
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
       };
 
+      // Close edit pass modal
+      window.closeEditPassModal = function() {
+        const modal = document.getElementById('edit-pass-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit edit pass form
+      window.submitEditPass = async function(event, passId) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Convert numeric fields
+        data.num_adults = parseInt(data.num_adults) || 1;
+        data.num_children = parseInt(data.num_children) || 0;
+        data.tier_id = parseInt(data.tier_id);
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/passes/' + passId, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Pass updated successfully!');
+            closeEditPassModal();
+            loadPasses();
+          } else {
+            alert('❌ Failed to update pass: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Update pass error:', error);
+          alert('❌ Failed to update pass. Please try again.');
+        }
+      };
+      
+      // Delete pass
+      window.deletePass = async function(passId) {
+        if (!confirm('⚠️ Are you sure you want to DELETE this pass?\\n\\nThis action CANNOT be undone. All pass data and face enrollment will be permanently deleted.')) {
+          return;
+        }
+        
+        if (!confirm('🚨 FINAL CONFIRMATION\\n\\nPlease confirm you want to permanently delete this digital pass.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/passes/' + passId, {
+            method: 'DELETE'
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Pass deleted successfully.');
+            closeEditPassModal();
+            loadPasses();
+          } else {
+            alert('❌ Failed to delete pass: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Delete pass error:', error);
+          alert('❌ Failed to delete pass. Please try again.');
+        }
+      };
+      
       // Deactivate pass
       window.deactivatePass = async function(passId) {
         const reason = prompt('Enter reason for deactivation:');
