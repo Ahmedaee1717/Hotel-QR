@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Pass Verification Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- QR Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <!-- Face Recognition Library -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
+    <style>
+        #unified-video {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 12px;
+            transform: scaleX(-1);
+        }
+        
+        #face-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .scan-indicator {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        .scanner-border {
+            border: 4px solid #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen p-4">
+        <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold flex items-center gap-3" style="color: #016e8f;">
+                            <i class="fas fa-shield-alt"></i>
+                            Unified Verification Scanner
+                        </h1>
+                        <p class="text-gray-600 mt-2">One Camera - Scans QR Code OR Face</p>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-green-500">
+                            <i class="fas fa-check text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="verified-count">0</div>
+                            <div class="text-xs text-gray-600">Verified</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-blue-500">
+                            <i class="fas fa-qrcode text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="qr-count">0</div>
+                            <div class="text-xs text-gray-600">QR Scans</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-purple-500">
+                            <i class="fas fa-user-check text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="face-count">0</div>
+                            <div class="text-xs text-gray-600">Face Scans</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Scanner -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="text-center mb-4">
+                    <div class="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-full font-semibold">
+                        <i class="fas fa-camera scan-indicator"></i>
+                        <span id="scanner-mode">Camera Ready - Point at QR Code or Guest Face</span>
+                    </div>
+                </div>
+
+                <div class="relative flex justify-center mb-4">
+                    <div id="video-container" class="relative inline-block scanner-border rounded-xl overflow-hidden">
+                        <video id="unified-video" autoplay muted playsinline></video>
+                        <canvas id="face-overlay"></canvas>
+                    </div>
+                </div>
+
+                <div id="detection-status" class="text-center p-4 bg-gray-50 rounded-lg mb-4">
+                    <p class="text-gray-600">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Waiting for QR code or face...
+                    </p>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="switchMode('qr')" id="qr-mode-btn" 
+                            class="flex-1 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600">
+                        <i class="fas fa-qrcode mr-2"></i>QR Priority
+                    </button>
+                    <button onclick="switchMode('face')" id="face-mode-btn"
+                            class="flex-1 py-3 bg-purple-500 text-white rounded-lg font-semibold hover:bg-purple-600">
+                        <i class="fas fa-user mr-2"></i>Face Priority
+                    </button>
+                    <button onclick="switchMode('auto')" id="auto-mode-btn"
+                            class="flex-1 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600">
+                        <i class="fas fa-magic mr-2"></i>Auto (Both)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Verification Result -->
+            <div id="verification-result" class="hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        let video, canvas, ctx;
+        let faceApiLoaded = false;
+        let scannerMode = 'auto'; // 'auto', 'qr', 'face'
+        let isScanning = false;
+        let qrCodeReader;
+        
+        // Stats
+        let stats = { verified: 0, qr: 0, face: 0 };
+        
+        // Auth helper
+        function fetchWithAuth(url, options = {}) {
+            const user_id = localStorage.getItem('user_id');
+            const property_id = localStorage.getItem('property_id');
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-User-ID': user_id,
+                    'X-Property-ID': property_id,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        // Initialize
+        async function init() {
+            // Check auth
+            if (!localStorage.getItem('user_id') || !localStorage.getItem('property_id')) {
+                window.location.href = '/admin/login';
+                return;
+            }
+            
+            // Setup video
+            video = document.getElementById('unified-video');
+            canvas = document.getElementById('face-overlay');
+            ctx = canvas.getContext('2d');
+            
+            // Start camera
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                video.srcObject = stream;
+                
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    startScanning();
+                });
+                
+                updateStatus('Camera active - Ready to scan', 'success');
+            } catch (error) {
+                console.error('Camera error:', error);
+                updateStatus('Camera access denied', 'error');
+            }
+            
+            // Load face-api.js
+            loadFaceAPI();
+        }
+        
+        async function loadFaceAPI() {
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model');
+                faceApiLoaded = true;
+                console.log('Face-API loaded');
+            } catch (error) {
+                console.error('Face-API load error:', error);
+            }
+        }
+        
+        // Unified scanning loop
+        function startScanning() {
+            isScanning = true;
+            scanLoop();
+        }
+        
+        async function scanLoop() {
+            if (!isScanning) return;
+            
+            // Scan QR Code (if mode allows)
+            if ((scannerMode === 'auto' || scannerMode === 'qr') && video.readyState === video.HAVE_ENOUGH_DATA) {
+                await scanQRCode();
+            }
+            
+            // Scan Face (if mode allows and face-api loaded)
+            if ((scannerMode === 'auto' || scannerMode === 'face') && faceApiLoaded && video.readyState === video.HAVE_ENOUGH_DATA) {
+                await scanFace();
+            }
+            
+            requestAnimationFrame(scanLoop);
+        }
+        
+        async function scanQRCode() {
+            try {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = video.videoWidth;
+                tempCanvas.height = video.videoHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(video, 0, 0);
+                
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code && code.data.startsWith('PASS-')) {
+                    isScanning = false; // Pause scanning
+                    updateStatus('QR Code detected! Verifying...', 'success');
+                    await verifyPass(code.data, 'qr');
+                }
+            } catch (error) {
+                // Silent - QR scanning errors are normal
+            }
+        }
+        
+        async function scanFace() {
+            try {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+                
+                // Clear previous drawings
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                if (detections.length > 0) {
+                    // Draw face box
+                    const detection = detections[0];
+                    const box = detection.detection.box;
+                    
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(box.x, box.y, box.width, box.height);
+                    
+                    // Show face detected
+                    updateStatus('Face detected! Tap to verify', 'success');
+                    
+                    // Auto-verify if in face-only mode
+                    if (scannerMode === 'face') {
+                        isScanning = false;
+                        await verifyFace(detection.descriptor);
+                    }
+                }
+            } catch (error) {
+                // Silent - face detection errors are normal
+            }
+        }
+        
+        async function verifyPass(passReference, method) {
+            try {
+                updateStatus('Verifying pass...', 'loading');
+                
+                const response = await fetchWithAuth('/api/staff/verify-pass', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        pass_reference: passReference,
+                        verification_method: method 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    stats.verified++;
+                    stats.qr++;
+                    updateStats();
+                    showSuccess(data.pass_details);
+                } else {
+                    showError(data.error || 'Verification failed');
+                }
+            } catch (error) {
+                console.error('Verify error:', error);
+                showError('Verification failed');
+            }
+        }
+        
+        async function verifyFace(faceDescriptor) {
+            try {
+                updateStatus('Matching face...', 'loading');
+                
+                const response = await fetchWithAuth('/api/staff/verify-face', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        face_descriptor: Array.from(faceDescriptor)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.match) {
+                    stats.verified++;
+                    stats.face++;
+                    updateStats();
+                    showSuccess(data.pass_details, data.match_score);
+                } else {
+                    showError('Face not recognized');
+                }
+            } catch (error) {
+                console.error('Face verify error:', error);
+                showError('Face verification failed');
+            }
+        }
+        
+        function showSuccess(passDetails, matchScore = null) {
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.innerHTML = `
+                <div class="bg-green-50 border-4 border-green-500 rounded-xl p-8 text-center">
+                    <i class="fas fa-check-circle text-6xl text-green-600 mb-4"></i>
+                    <h3 class="text-3xl font-bold text-green-700 mb-4">✅ VERIFIED</h3>
+                    <div class="bg-white rounded-lg p-6 text-left max-w-md mx-auto">
+                        <p class="mb-2"><strong>Guest:</strong> ${passDetails.guest_name || 'N/A'}</p>
+                        <p class="mb-2"><strong>Pass:</strong> ${passDetails.pass_reference || 'N/A'}</p>
+                        <p class="mb-2"><strong>Tier:</strong> ${passDetails.tier || 'N/A'}</p>
+                        ${matchScore ? `<p class="mb-2"><strong>Match:</strong> ${(matchScore * 100).toFixed(1)}%</p>` : ''}
+                        <p class="mb-2"><strong>Room:</strong> ${passDetails.room_number || 'N/A'}</p>
+                    </div>
+                    <button onclick="resetScanner()" 
+                            class="mt-6 px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
+                        <i class="fas fa-redo mr-2"></i>Scan Next Guest
+                    </button>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+        
+        function showError(message) {
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.innerHTML = `
+                <div class="bg-red-50 border-4 border-red-500 rounded-xl p-8 text-center">
+                    <i class="fas fa-times-circle text-6xl text-red-600 mb-4"></i>
+                    <h3 class="text-3xl font-bold text-red-700 mb-4">❌ DENIED</h3>
+                    <p class="text-gray-700 text-lg mb-6">${message}</p>
+                    <button onclick="resetScanner()" 
+                            class="px-8 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">
+                        <i class="fas fa-redo mr-2"></i>Try Again
+                    </button>
+                </div>
+            `;
+            resultDiv.classList.remove('hidden');
+        }
+        
+        function resetScanner() {
+            document.getElementById('verification-result').classList.add('hidden');
+            isScanning = true;
+            updateStatus('Camera active - Ready to scan', 'success');
+        }
+        
+        function switchMode(mode) {
+            scannerMode = mode;
+            document.querySelectorAll('[id$="-mode-btn"]').forEach(btn => {
+                btn.classList.remove('ring-4', 'ring-offset-2');
+            });
+            document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2');
+            
+            const modeText = {
+                'auto': 'Auto Mode - Scans QR or Face',
+                'qr': 'QR Mode - Scans QR codes only',
+                'face': 'Face Mode - Scans faces only'
+            };
+            document.getElementById('scanner-mode').textContent = modeText[mode];
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('detection-status');
+            const icons = {
+                'success': '<i class="fas fa-check-circle text-green-500 mr-2"></i>',
+                'error': '<i class="fas fa-exclamation-circle text-red-500 mr-2"></i>',
+                'loading': '<i class="fas fa-spinner fa-spin text-blue-500 mr-2"></i>',
+                'info': '<i class="fas fa-info-circle text-gray-500 mr-2"></i>'
+            };
+            statusDiv.innerHTML = `<p class="text-gray-600">${icons[type]}${message}</p>`;
+        }
+        
+        function updateStats() {
+            document.getElementById('verified-count').textContent = stats.verified;
+            document.getElementById('qr-count').textContent = stats.qr;
+            document.getElementById('face-count').textContent = stats.face;
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/admin/login';
+        }
+        
+        // Start on load
+        window.addEventListener('load', init);
+    </script>
+    
+    <!-- jsQR for QR code detection -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</body>
+</html>

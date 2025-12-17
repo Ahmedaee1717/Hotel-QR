@@ -27783,13 +27783,13 @@ app.get('/compliance', async (c) => {
 })
 
 // Staff Pass Verification Scanner with Facial Recognition
-// Staff Pass Verification Scanner (QR + Face unified)
+// Staff Pass Verification Scanner (QR + Face unified - ONE camera)
 app.get('/staff/verify-pass', async (c) => {
   try {
-    const htmlContent = await c.env.ASSETS.fetch(new URL('/staff-pass-scanner.html', c.req.url))
+    const htmlContent = await c.env.ASSETS.fetch(new URL('/staff-unified-scanner.html', c.req.url))
     return htmlContent
   } catch (error) {
-    console.error('Failed to load staff-pass-scanner.html:', error)
+    console.error('Failed to load staff-unified-scanner.html:', error)
     return c.text('Scanner page not found', 404)
   }
 })
