@@ -5,7 +5,24 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [
-    build(),
+    build({
+      exclude: [
+        '/static/*',
+        '/feedback.html',
+        '/activity.html',
+        '/activity-detail.html',
+        '/admin-dashboard.html',
+        '/admin-login.html',
+        '/staff-face-scanner.html',
+        '/staff-pass-scanner.html',
+        '/vendor-dashboard.html',
+        '/vendor-login.html',
+        '/welcome.html',
+        '/guestconnect-logo.png',
+        '/guestconnect-logo-small.png',
+        '/guestconnect-logo-horizontal.png'
+      ]
+    }),
     devServer({
       adapter,
       entry: 'src/index.tsx'
