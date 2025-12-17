@@ -27461,6 +27461,17 @@ app.get('/staff/face-scanner', async (c) => {
   return c.html(await html.text())
 })
 
+// GDPR/BIPA Compliance Documentation Page
+app.get('/biometric-compliance', async (c) => {
+  const html = await fetch(new URL('/biometric-compliance.html', c.req.url))
+  return c.html(await html.text())
+})
+
+app.get('/compliance', async (c) => {
+  const html = await fetch(new URL('/biometric-compliance.html', c.req.url))
+  return c.html(await html.text())
+})
+
 // Staff Pass Verification Scanner with Facial Recognition
 app.get('/staff/verify-pass', (c) => {
   return c.html(`
