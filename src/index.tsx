@@ -47679,6 +47679,35 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
       // ========== END ALL-INCLUSIVE FUNCTIONS ==========
+      
+      // Load face-api.js models on page load
+      async function loadFaceAPIModels() {
+        try {
+          if (!window.faceapi) {
+            console.log('face-api.js library not loaded yet, waiting...');
+            setTimeout(loadFaceAPIModels, 500);
+            return;
+          }
+          
+          console.log('Loading face-api.js models for admin dashboard...');
+          const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+          
+          await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+          ]);
+          
+          console.log('face-api.js models loaded successfully!');
+        } catch (error) {
+          console.error('Failed to load face-api.js models:', error);
+        }
+      }
+      
+      // Initialize on page load
+      window.addEventListener('load', () => {
+        loadFaceAPIModels();
+      });
     </script>
 </body>
 </html>
