@@ -12,10 +12,5 @@
       "database_name": "webapp-production",
       "database_id": "a0237b95-a68c-46c3-a9b8-0d21bd181fac"
     }
-  ],
-  // GDPR/BIPA Compliance: Automated biometric data deletion
-  // Runs every hour to check for expired biometric data
-  "triggers": {
-    "crons": ["0 * * * *"]
-  }
+  ]
 }
