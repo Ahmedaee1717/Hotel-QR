@@ -16,18 +16,17 @@ app.use('/api/*', cors())
 // GUEST DIGITAL PASS ROUTES (Priority routes - must be first)
 // ============================================
 
-// Guest Digital Pass Display (QR + Face in ONE place)
+// Guest Digital Pass Display (QR + Face in ONE place)  
 app.get('/guest-pass/:pass_reference', async (c) => {
-  // Create the full URL to fetch the static HTML file
-  const url = new URL('/guest-pass.html', c.req.url)
-  const response = await fetch(url.toString())
+  // Use c.env.ASSETS to access static files in Cloudflare Pages
+  const response = await c.env.ASSETS.fetch(new URL('/guest-pass.html', c.req.url))
   return c.html(await response.text())
 })
 
 // Guest Self-Service Portal  
 app.get('/guest-portal.html', async (c) => {
-  const html = await fetch(new URL('/guest-portal.html', c.req.url))
-  return c.html(await html.text())
+  const response = await c.env.ASSETS.fetch(new URL('/guest-portal.html', c.req.url))
+  return c.html(await response.text())
 })
 
 // ============================================
