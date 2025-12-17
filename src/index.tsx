@@ -39964,7 +39964,6 @@ app.get('/admin/dashboard', (c) => {
           totalVendorsEl.textContent = data.stats.totalVendors || '0';
           
           // Show comparison for scans
-          const scansComparisonEl = document.getElementById('scansComparison');
           if (scansComparisonEl && data.stats.scansChange !== undefined) {
             const scansChange = parseFloat(data.stats.scansChange);
             const scansIcon = scansChange > 0 ? 'arrow-up' : scansChange < 0 ? 'arrow-down' : 'minus';
@@ -39977,7 +39976,6 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Show comparison for bookings
-          const bookingsComparisonEl = document.getElementById('bookingsComparison');
           if (bookingsComparisonEl && data.stats.bookingsChange !== undefined) {
             const bookingsChange = parseFloat(data.stats.bookingsChange);
             const bookingsIcon = bookingsChange > 0 ? 'arrow-up' : bookingsChange < 0 ? 'arrow-down' : 'minus';
