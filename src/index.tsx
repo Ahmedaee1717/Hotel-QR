@@ -47382,7 +47382,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             method: 'POST',
             body: JSON.stringify({
               photo_data: currentPhotoData,
-              face_embedding: currentFaceEmbedding ? JSON.stringify(currentFaceEmbedding) : null
+              face_embedding: currentFaceEmbedding || null
             })
           });
           
