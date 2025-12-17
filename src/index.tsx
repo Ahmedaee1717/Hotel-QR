@@ -15116,6 +15116,8 @@ app.post('/api/staff/all-inclusive/identify-face', async (c) => {
         // Convert distance to similarity score (0-1)
         const similarity = Math.max(0, 1 - distance)
         
+        console.log(`Comparing with ${pass.primary_guest_name}: distance=${distance.toFixed(4)}, similarity=${similarity.toFixed(4)}`)
+        
         if (similarity > bestScore) {
           bestScore = similarity
           bestMatch = pass
@@ -15134,6 +15136,8 @@ app.post('/api/staff/all-inclusive/identify-face', async (c) => {
 
     const matchThreshold = settings?.match_threshold || 0.6
     const manualReviewThreshold = settings?.manual_review_threshold || 0.5
+
+    console.log(`Best match: ${bestMatch?.primary_guest_name}, score=${bestScore.toFixed(4)}, threshold=${matchThreshold}`)
 
     // Determine result based on score
     let verificationResult = 'no_match'
@@ -15171,7 +15175,7 @@ app.post('/api/staff/all-inclusive/identify-face', async (c) => {
       await DB.prepare(`
         INSERT INTO pass_verifications (
           property_id, pass_id, staff_user_id, staff_name, 
-          verification_location, verification_result, verification_status,
+          verification_location, verification_result, face_verification_status,
           face_match_score, verification_timestamp, verification_method
         ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'face_only')
       `).bind(
