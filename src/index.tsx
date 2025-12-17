@@ -14918,6 +14918,128 @@ app.get('/api/guest/digital-pass/:pass_reference', async (c) => {
 // ========== FACIAL RECOGNITION API ENDPOINTS ==========
 
 // Admin: Enroll face for a digital pass
+// Admin: Get analytics for All-Inclusive passes
+app.get('/api/admin/all-inclusive/analytics/:property_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  
+  // Auth check
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized - Property mismatch' }, 401)
+  }
+
+  try {
+    // Total verifications
+    const totalVerifications = await DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM pass_verifications 
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    // Face verifications (where face_match_score is not null)
+    const faceVerifications = await DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM pass_verifications 
+      WHERE property_id = ? AND face_match_score IS NOT NULL
+    `).bind(property_id).first()
+    
+    // Manual reviews (verification_status = 'manual_override')
+    const manualReviews = await DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM pass_verifications 
+      WHERE property_id = ? AND verification_status = 'manual_override'
+    `).bind(property_id).first()
+    
+    // Fraud alerts
+    const fraudAlerts = await DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM face_verification_fraud_alerts 
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    // Verifications by tier
+    const byTier = await DB.prepare(`
+      SELECT 
+        ait.tier_display_name as tier_name,
+        ait.tier_color,
+        ait.tier_icon,
+        COUNT(pv.verification_id) as count
+      FROM pass_verifications pv
+      JOIN digital_passes dp ON pv.pass_id = dp.pass_id
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE pv.property_id = ?
+      GROUP BY dp.tier_id, ait.tier_display_name, ait.tier_color, ait.tier_icon
+      ORDER BY count DESC
+    `).bind(property_id).all()
+    
+    // Recent fraud alerts
+    const recentFraudAlerts = await DB.prepare(`
+      SELECT 
+        fvfa.*,
+        dp.pass_reference
+      FROM face_verification_fraud_alerts fvfa
+      JOIN digital_passes dp ON fvfa.pass_id = dp.pass_id
+      WHERE fvfa.property_id = ?
+      ORDER BY fvfa.alert_timestamp DESC
+      LIMIT 10
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      stats: {
+        total_verifications: totalVerifications?.count || 0,
+        face_verifications: faceVerifications?.count || 0,
+        manual_reviews: manualReviews?.count || 0,
+        fraud_alerts: fraudAlerts?.count || 0,
+        by_tier: byTier.results || [],
+        recent_fraud_alerts: recentFraudAlerts.results || []
+      }
+    })
+  } catch (error) {
+    console.error('Get analytics error:', error)
+    return c.json({ error: 'Failed to get analytics' }, 500)
+  }
+})
+
+// Admin: Get single pass details (for face viewer)
+app.get('/api/admin/all-inclusive/passes/:property_id/:pass_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.param('property_id')
+  const pass_id = c.req.param('pass_id')
+  
+  // Auth check
+  const authPropertyId = c.req.header('X-Property-ID')
+  if (authPropertyId !== property_id) {
+    return c.json({ error: 'Unauthorized - Property mismatch' }, 401)
+  }
+
+  try {
+    const pass = await DB.prepare(`
+      SELECT 
+        dp.*,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon
+      FROM digital_passes dp
+      LEFT JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE dp.pass_id = ? AND dp.property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    return c.json({
+      success: true,
+      pass
+    })
+  } catch (error) {
+    console.error('Get pass details error:', error)
+    return c.json({ error: 'Failed to get pass details' }, 500)
+  }
+})
+
 app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', async (c) => {
   const { DB } = c.env
   const property_id = c.req.param('property_id')
@@ -14930,10 +15052,11 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
   }
 
   try {
-    const { face_embedding, face_photo_url } = await c.req.json()
+    const { face_embedding, photo_data } = await c.req.json()
     
-    if (!face_embedding) {
-      return c.json({ error: 'Face embedding is required' }, 400)
+    // Photo data is required, face_embedding is optional (can be null if face-api.js fails)
+    if (!photo_data) {
+      return c.json({ error: 'Photo data is required' }, 400)
     }
 
     // Verify pass belongs to this property
@@ -14946,7 +15069,10 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
       return c.json({ error: 'Pass not found or unauthorized' }, 404)
     }
 
-    // Store face embedding
+    // Store face data
+    // Note: photo_data is base64 data URL (data:image/jpeg;base64,...)
+    // In production, you'd upload to R2/S3 and store the URL instead
+    // For now, we store the base64 directly (works for MVP)
     await DB.prepare(`
       UPDATE digital_passes
       SET face_embedding = ?,
@@ -14955,19 +15081,20 @@ app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', as
           face_embedding_version = 'face-api-v1'
       WHERE pass_id = ? AND property_id = ?
     `).bind(
-      JSON.stringify(face_embedding),
-      face_photo_url,
+      face_embedding ? JSON.stringify(face_embedding) : null,
+      photo_data,
       pass_id,
       property_id
     ).run()
 
     return c.json({ 
       success: true,
-      message: 'Face enrolled successfully'
+      message: 'Face enrolled successfully',
+      face_embedding_stored: !!face_embedding
     })
   } catch (error) {
     console.error('Face enrollment error:', error)
-    return c.json({ error: 'Failed to enroll face' }, 500)
+    return c.json({ error: 'Failed to enroll face: ' + error.message }, 500)
   }
 })
 
@@ -47081,8 +47208,116 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       };
       
       // View pass face
-      window.viewPassFace = function(passId) {
-        alert('Viewing face photo for Pass ID: ' + passId + '. Full photo viewer coming soon!');
+      window.viewPassFace = async function(passId) {
+        const property_id = localStorage.getItem('property_id');
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/passes/' + property_id + '/' + passId);
+          const data = await response.json();
+          
+          if (!data.success || !data.pass) {
+            alert('Failed to load pass details');
+            return;
+          }
+          
+          const pass = data.pass;
+          
+          if (!pass.face_photo_url) {
+            alert('No face photo enrolled for this pass');
+            return;
+          }
+          
+          const modal = document.createElement('div');
+          modal.id = 'face-viewer-modal';
+          modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+          
+          let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-screen overflow-y-auto">';
+          html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+          html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+          html += '<i class="fas fa-user-circle"></i>';
+          html += 'Enrolled Face Photo - ' + pass.primary_guest_name;
+          html += '</h2>';
+          html += '<button onclick="closeFaceViewerModal()" class="text-white hover:text-gray-200 text-2xl">';
+          html += '<i class="fas fa-times"></i>';
+          html += '</button>';
+          html += '</div>';
+          
+          html += '<div class="p-6">';
+          html += '<div class="grid md:grid-cols-3 gap-6">';
+          
+          html += '<div class="md:col-span-2">';
+          html += '<h3 class="font-semibold mb-3 text-lg">Guest Photo:</h3>';
+          html += '<div class="border-2 border-gray-300 rounded-lg overflow-hidden">';
+          html += '<img src="' + pass.face_photo_url + '" alt="' + pass.primary_guest_name + '" class="w-full h-auto">';
+          html += '</div>';
+          html += '</div>';
+          
+          html += '<div>';
+          html += '<h3 class="font-semibold mb-3 text-lg">Pass Details:</h3>';
+          html += '<div class="space-y-3">';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Guest Name</p>';
+          html += '<p class="font-semibold">' + pass.primary_guest_name + '</p>';
+          html += '</div>';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Room Number</p>';
+          html += '<p class="font-semibold">' + pass.room_number + '</p>';
+          html += '</div>';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Pass Reference</p>';
+          html += '<p class="font-semibold text-sm">' + pass.pass_reference + '</p>';
+          html += '</div>';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Tier</p>';
+          html += '<p class="font-semibold">';
+          html += '<i class="fas ' + (pass.tier_icon || 'fa-star') + '" style="color: ' + (pass.tier_color || '#3B82F6') + ';"></i> ';
+          html += (pass.tier_display_name || 'Standard');
+          html += '</p>';
+          html += '</div>';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Face Enrolled</p>';
+          html += '<p class="font-semibold text-green-600"><i class="fas fa-check-circle mr-1"></i>' + (pass.face_enrolled_at || 'Yes') + '</p>';
+          html += '</div>';
+          html += '<div class="bg-gray-50 p-3 rounded-lg">';
+          html += '<p class="text-xs text-gray-500">Recognition Status</p>';
+          html += '<p class="font-semibold">' + (pass.face_embedding ? '<span class="text-green-600">Active</span>' : '<span class="text-yellow-600">Photo Only</span>') + '</p>';
+          html += '</div>';
+          html += '</div>';
+          html += '</div>';
+          
+          html += '</div>';
+          
+          html += '<div class="mt-6 flex gap-3">';
+          html += '<button onclick="reEnrollFace(' + passId + ', &quot;' + pass.pass_reference + '&quot;)" class="flex-1 px-6 py-3 text-white rounded-lg font-semibold hover:opacity-90" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+          html += '<i class="fas fa-camera mr-2"></i>Re-enroll Face';
+          html += '</button>';
+          html += '<button onclick="closeFaceViewerModal()" class="px-6 py-3 bg-gray-500 text-white rounded-lg font-semibold hover:bg-gray-600">';
+          html += 'Close';
+          html += '</button>';
+          html += '</div>';
+          
+          html += '</div>';
+          html += '</div>';
+          
+          modal.innerHTML = html;
+          document.body.appendChild(modal);
+          
+        } catch (error) {
+          console.error('View face error:', error);
+          alert('Failed to load face photo');
+        }
+      };
+      
+      window.closeFaceViewerModal = function() {
+        const modal = document.getElementById('face-viewer-modal');
+        if (modal) {
+          modal.remove();
+        }
+      };
+      
+      window.reEnrollFace = function(passId, passReference) {
+        closeFaceViewerModal();
+        enrollPassFace(passId, passReference);
       };
 
       // Load locations
@@ -47101,12 +47336,149 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       // Load pass analytics
       async function loadPassAnalytics() {
-        document.getElementById('pass-content-analytics').innerHTML = '<h3 class="text-xl font-bold mb-4">Pass Analytics</h3>' +
-          '<div class="text-center py-12 text-gray-500">' +
-          '<i class="fas fa-chart-bar text-5xl mb-4"></i>' +
-          '<p class="text-lg mb-2">Analytics Dashboard Coming Soon!</p>' +
-          '<p class="text-sm">Track verifications by tier, location, time of day, and more</p>' +
-          '</div>';
+        loadAnalytics();
+      }
+      
+      // Load Analytics
+      async function loadAnalytics() {
+        const container = document.getElementById('pass-content-analytics');
+        container.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
+        
+        try {
+          const property_id = localStorage.getItem('property_id');
+          const response = await fetchWithAuth('/api/admin/all-inclusive/analytics/' + property_id);
+          const data = await response.json();
+          
+          if (!data.success) {
+            container.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load analytics</div>';
+            return;
+          }
+          
+          const stats = data.stats;
+          
+          let html = '<h3 class="text-xl font-bold mb-6 flex items-center gap-2" style="color: #016e8f;">';
+          html += '<i class="fas fa-chart-line"></i>Facial Recognition Analytics';
+          html += '</h3>';
+          
+          html += '<div class="grid md:grid-cols-4 gap-4 mb-8">';
+          
+          html += '<div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<div class="text-3xl font-bold">' + (stats.total_verifications || 0) + '</div>';
+          html += '<i class="fas fa-check-circle text-4xl opacity-50"></i>';
+          html += '</div>';
+          html += '<div class="text-blue-100 text-sm">Total Verifications</div>';
+          html += '</div>';
+          
+          html += '<div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<div class="text-3xl font-bold">' + (stats.face_verifications || 0) + '</div>';
+          html += '<i class="fas fa-camera text-4xl opacity-50"></i>';
+          html += '</div>';
+          html += '<div class="text-green-100 text-sm">Face Verifications</div>';
+          html += '</div>';
+          
+          html += '<div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<div class="text-3xl font-bold">' + (stats.manual_reviews || 0) + '</div>';
+          html += '<i class="fas fa-exclamation-triangle text-4xl opacity-50"></i>';
+          html += '</div>';
+          html += '<div class="text-yellow-100 text-sm">Manual Reviews</div>';
+          html += '</div>';
+          
+          html += '<div class="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<div class="text-3xl font-bold">' + (stats.fraud_alerts || 0) + '</div>';
+          html += '<i class="fas fa-shield-alt text-4xl opacity-50"></i>';
+          html += '</div>';
+          html += '<div class="text-red-100 text-sm">Fraud Alerts</div>';
+          html += '</div>';
+          
+          html += '</div>';
+          
+          html += '<div class="grid md:grid-cols-2 gap-6 mb-6">';
+          
+          html += '<div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">';
+          html += '<h4 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+          html += '<i class="fas fa-trophy"></i>Verifications by Tier';
+          html += '</h4>';
+          if (stats.by_tier && stats.by_tier.length > 0) {
+            html += '<div class="space-y-3">';
+            stats.by_tier.forEach(tier => {
+              const percentage = stats.total_verifications > 0 ? Math.round((tier.count / stats.total_verifications) * 100) : 0;
+              html += '<div>';
+              html += '<div class="flex justify-between mb-1">';
+              html += '<span class="font-semibold"><i class="fas ' + (tier.tier_icon || 'fa-star') + '" style="color: ' + (tier.tier_color || '#3B82F6') + ';"></i> ' + tier.tier_name + '</span>';
+              html += '<span class="text-gray-600">' + tier.count + ' (' + percentage + '%)</span>';
+              html += '</div>';
+              html += '<div class="w-full bg-gray-200 rounded-full h-2">';
+              html += '<div class="h-2 rounded-full" style="width: ' + percentage + '%; background: ' + (tier.tier_color || '#3B82F6') + ';"></div>';
+              html += '</div>';
+              html += '</div>';
+            });
+            html += '</div>';
+          } else {
+            html += '<p class="text-gray-500 text-center py-8">No verification data yet</p>';
+          }
+          html += '</div>';
+          
+          html += '<div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">';
+          html += '<h4 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+          html += '<i class="fas fa-percentage"></i>Verification Success Rate';
+          html += '</h4>';
+          const successRate = stats.total_verifications > 0 ? Math.round(((stats.total_verifications - stats.fraud_alerts) / stats.total_verifications) * 100) : 0;
+          html += '<div class="text-center py-6">';
+          html += '<div class="text-6xl font-bold mb-2" style="color: ' + (successRate >= 90 ? '#10b981' : successRate >= 70 ? '#f59e0b' : '#ef4444') + ';">' + successRate + '%</div>';
+          html += '<p class="text-gray-600">Successful Verifications</p>';
+          html += '</div>';
+          html += '<div class="grid grid-cols-3 gap-4 mt-6">';
+          html += '<div class="text-center">';
+          html += '<div class="text-2xl font-bold text-green-600">' + ((stats.total_verifications || 0) - (stats.fraud_alerts || 0) - (stats.manual_reviews || 0)) + '</div>';
+          html += '<div class="text-xs text-gray-500">Approved</div>';
+          html += '</div>';
+          html += '<div class="text-center">';
+          html += '<div class="text-2xl font-bold text-yellow-600">' + (stats.manual_reviews || 0) + '</div>';
+          html += '<div class="text-xs text-gray-500">Manual</div>';
+          html += '</div>';
+          html += '<div class="text-center">';
+          html += '<div class="text-2xl font-bold text-red-600">' + (stats.fraud_alerts || 0) + '</div>';
+          html += '<div class="text-xs text-gray-500">Denied</div>';
+          html += '</div>';
+          html += '</div>';
+          html += '</div>';
+          
+          html += '</div>';
+          
+          html += '<div class="bg-white rounded-xl shadow-lg p-6 border border-gray-200">';
+          html += '<h4 class="font-bold text-lg mb-4 flex items-center gap-2" style="color: #016e8f;">';
+          html += '<i class="fas fa-history"></i>Recent Fraud Alerts';
+          html += '</h4>';
+          if (stats.recent_fraud_alerts && stats.recent_fraud_alerts.length > 0) {
+            html += '<div class="space-y-3">';
+            stats.recent_fraud_alerts.forEach(alert => {
+              html += '<div class="border-l-4 border-red-500 pl-4 py-2 bg-red-50 rounded">';
+              html += '<div class="flex justify-between items-start">';
+              html += '<div>';
+              html += '<p class="font-semibold text-red-900">' + alert.pass_reference + '</p>';
+              html += '<p class="text-sm text-gray-600">Match Score: ' + Math.round((alert.match_score || 0) * 100) + '%</p>';
+              html += '</div>';
+              html += '<span class="text-xs text-gray-500">' + (alert.alert_timestamp || '') + '</span>';
+              html += '</div>';
+              html += '<p class="text-sm text-gray-700 mt-1">' + (alert.alert_notes || 'Face mismatch detected') + '</p>';
+              html += '</div>';
+            });
+            html += '</div>';
+          } else {
+            html += '<p class="text-gray-500 text-center py-8"><i class="fas fa-shield-alt text-4xl mb-2"></i><br>No fraud alerts - System secure!</p>';
+          }
+          html += '</div>';
+          
+          container.innerHTML = html;
+          
+        } catch (error) {
+          console.error('Load analytics error:', error);
+          container.innerHTML = '<div class="text-center py-8 text-red-600">Failed to load analytics</div>';
+        }
       }
       // ========== END ALL-INCLUSIVE FUNCTIONS ==========
     </script>
