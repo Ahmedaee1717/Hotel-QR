@@ -30963,7 +30963,7 @@ app.get('/vendor/:vendor_slug', async (c) => {
             <div class="bg-gradient-to-r from-blue-500 to-green-500 h-32"></div>
             <div class="px-6 pb-6">
                 <div class="flex items-end gap-6 -mt-16 mb-6">
-                    <img src="${vendor.profile_image || 'https://via.placeholder.com/150'}" alt="${vendor.business_name}" class="w-32 h-32 rounded-full border-4 border-white object-cover">
+                    <img src="${vendor.profile_image || 'data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"150\" height=\"150\"%3E%3Crect fill=\"%23e5e7eb\" width=\"150\" height=\"150\"/%3E%3Ctext x=\"50%25\" y=\"50%25\" dominant-baseline=\"middle\" text-anchor=\"middle\" font-family=\"Arial\" font-size=\"40\" fill=\"%239ca3af\"%3E%F0%9F%8F%A8%3C/text%3E%3C/svg%3E'}" alt="${vendor.business_name}" class="w-32 h-32 rounded-full border-4 border-white object-cover">
                     <div class="flex-1 pt-16">
                         <h2 class="text-3xl font-bold">${vendor.business_name}</h2>
                         <div class="flex gap-4 mt-2 text-gray-600">
@@ -47937,7 +47937,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         passes.forEach(pass => {
           const statusColor = pass.pass_status === 'active' ? 'bg-green-100 text-green-700' : pass.pass_status === 'expired' ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700';
           const hasFace = !!pass.face_photo_url || !!pass.face_embedding;
-          const photoUrl = pass.face_photo_url || pass.primary_guest_photo_url || 'https://via.placeholder.com/150?text=No+Photo';
+          const photoUrl = pass.face_photo_url || pass.primary_guest_photo_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23f3f4f6" width="150" height="150"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280"%3ENo Photo%3C/text%3E%3C/svg%3E';
           const tierColor = pass.tier_color || '#3B82F6';
           const tierIcon = pass.tier_icon || 'fa-star';
           const tierName = pass.tier_display_name || 'Standard';
