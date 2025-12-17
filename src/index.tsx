@@ -14133,6 +14133,790 @@ app.get('/api/analytics/beach/dashboard/:property_id', async (c) => {
 // API: Get Booking Details
 // ========== END BEACH BOOKING API ENDPOINTS ==========
 
+// ==================== ALL-INCLUSIVE DIGITAL PASS API ENDPOINTS ====================
+
+// =================
+// TIER MANAGEMENT
+// =================
+
+// Admin: Get all tiers for a property
+app.get('/api/admin/all-inclusive/tiers/:property_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const tiers = await DB.prepare(`
+      SELECT * FROM all_inclusive_tiers
+      WHERE property_id = ?
+      ORDER BY display_order ASC, tier_id ASC
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, tiers: tiers.results || [] })
+  } catch (error) {
+    console.error('Get tiers error:', error)
+    return c.json({ error: 'Failed to get tiers' }, 500)
+  }
+})
+
+// Admin: Create new tier
+app.post('/api/admin/all-inclusive/tiers', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      tier_code,
+      tier_display_name,
+      tier_color,
+      tier_icon,
+      tier_description,
+      tier_features,
+      access_locations,
+      daily_upgrade_price,
+      display_order
+    } = body
+    
+    // Validate required fields
+    if (!tier_code || !tier_display_name) {
+      return c.json({ error: 'Tier code and display name are required' }, 400)
+    }
+    
+    const result = await DB.prepare(`
+      INSERT INTO all_inclusive_tiers (
+        property_id, tier_code, tier_display_name, tier_color, tier_icon,
+        tier_description, tier_features, access_locations, daily_upgrade_price, display_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      tier_code,
+      tier_display_name,
+      tier_color || '#3B82F6',
+      tier_icon || 'fa-star',
+      tier_description || null,
+      tier_features ? JSON.stringify(tier_features) : null,
+      access_locations ? JSON.stringify(access_locations) : null,
+      daily_upgrade_price || 0,
+      display_order || 0
+    ).run()
+    
+    return c.json({ success: true, tier_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Create tier error:', error)
+    return c.json({ error: 'Failed to create tier' }, 500)
+  }
+})
+
+// Admin: Update tier
+app.put('/api/admin/all-inclusive/tiers/:tier_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { tier_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      tier_display_name,
+      tier_color,
+      tier_icon,
+      tier_description,
+      tier_features,
+      access_locations,
+      daily_upgrade_price,
+      is_active,
+      display_order
+    } = body
+    
+    // Verify tier belongs to property
+    const tier = await DB.prepare(`
+      SELECT * FROM all_inclusive_tiers WHERE tier_id = ? AND property_id = ?
+    `).bind(tier_id, property_id).first()
+    
+    if (!tier) {
+      return c.json({ error: 'Tier not found' }, 404)
+    }
+    
+    await DB.prepare(`
+      UPDATE all_inclusive_tiers
+      SET tier_display_name = ?,
+          tier_color = ?,
+          tier_icon = ?,
+          tier_description = ?,
+          tier_features = ?,
+          access_locations = ?,
+          daily_upgrade_price = ?,
+          is_active = ?,
+          display_order = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE tier_id = ? AND property_id = ?
+    `).bind(
+      tier_display_name || tier.tier_display_name,
+      tier_color || tier.tier_color,
+      tier_icon || tier.tier_icon,
+      tier_description,
+      tier_features ? JSON.stringify(tier_features) : tier.tier_features,
+      access_locations ? JSON.stringify(access_locations) : tier.access_locations,
+      daily_upgrade_price !== undefined ? daily_upgrade_price : tier.daily_upgrade_price,
+      is_active !== undefined ? is_active : tier.is_active,
+      display_order !== undefined ? display_order : tier.display_order,
+      tier_id,
+      property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update tier error:', error)
+    return c.json({ error: 'Failed to update tier' }, 500)
+  }
+})
+
+// Admin: Delete tier
+app.delete('/api/admin/all-inclusive/tiers/:tier_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { tier_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // Check if any passes are using this tier
+    const passCount = await DB.prepare(`
+      SELECT COUNT(*) as count FROM digital_passes
+      WHERE tier_id = ? AND pass_status = 'active'
+    `).bind(tier_id).first()
+    
+    if (passCount && passCount.count > 0) {
+      return c.json({ error: `Cannot delete tier: ${passCount.count} active passes are using it` }, 400)
+    }
+    
+    await DB.prepare(`
+      DELETE FROM all_inclusive_tiers
+      WHERE tier_id = ? AND property_id = ?
+    `).bind(tier_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete tier error:', error)
+    return c.json({ error: 'Failed to delete tier' }, 500)
+  }
+})
+
+// =================
+// DIGITAL PASS MANAGEMENT
+// =================
+
+// Admin: Get all digital passes for property
+app.get('/api/admin/all-inclusive/passes', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  const status = c.req.query('status') // active, expired, all
+  const page = parseInt(c.req.query('page') || '1')
+  const per_page = 50
+  const offset = (page - 1) * per_page
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    let query = `
+      SELECT 
+        dp.*,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon,
+        (SELECT COUNT(*) FROM pass_family_members WHERE pass_id = dp.pass_id) as family_count
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE dp.property_id = ?
+    `
+    
+    const bindings = [property_id]
+    
+    if (status && status !== 'all') {
+      query += ` AND dp.pass_status = ?`
+      bindings.push(status)
+    }
+    
+    query += ` ORDER BY dp.issued_at DESC LIMIT ? OFFSET ?`
+    bindings.push(per_page, offset)
+    
+    const passes = await DB.prepare(query).bind(...bindings).all()
+    
+    // Get total count
+    let countQuery = `SELECT COUNT(*) as total FROM digital_passes WHERE property_id = ?`
+    const countBindings = [property_id]
+    
+    if (status && status !== 'all') {
+      countQuery += ` AND pass_status = ?`
+      countBindings.push(status)
+    }
+    
+    const countResult = await DB.prepare(countQuery).bind(...countBindings).first()
+    
+    return c.json({
+      success: true,
+      passes: passes.results || [],
+      pagination: {
+        page,
+        per_page,
+        total: countResult?.total || 0,
+        total_pages: Math.ceil((countResult?.total || 0) / per_page)
+      }
+    })
+  } catch (error) {
+    console.error('Get passes error:', error)
+    return c.json({ error: 'Failed to get passes' }, 500)
+  }
+})
+
+// Admin: Create new digital pass
+app.post('/api/admin/all-inclusive/passes', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  const user_id = c.req.header('X-User-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      primary_guest_name,
+      primary_guest_photo_url,
+      guest_email,
+      guest_phone,
+      room_number,
+      tier_id,
+      num_adults,
+      num_children,
+      valid_from,
+      valid_until,
+      family_members,
+      notes
+    } = body
+    
+    // Validate required fields
+    if (!primary_guest_name || !tier_id || !valid_from || !valid_until) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Verify tier belongs to property
+    const tier = await DB.prepare(`
+      SELECT * FROM all_inclusive_tiers WHERE tier_id = ? AND property_id = ?
+    `).bind(tier_id, property_id).first()
+    
+    if (!tier) {
+      return c.json({ error: 'Invalid tier' }, 400)
+    }
+    
+    // Generate unique pass reference
+    const timestamp = Date.now()
+    const random = Math.random().toString(36).substring(2, 7).toUpperCase()
+    const pass_reference = `PASS-${timestamp}-${random}`
+    
+    // Generate QR secret for rotating QR codes
+    const qr_secret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    
+    // Insert digital pass
+    const result = await DB.prepare(`
+      INSERT INTO digital_passes (
+        property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
+        guest_email, guest_phone, room_number, tier_id, pass_status,
+        num_adults, num_children, valid_from, valid_until,
+        qr_secret, issued_by_user_id, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      pass_reference,
+      primary_guest_name,
+      primary_guest_photo_url || null,
+      guest_email || null,
+      guest_phone || null,
+      room_number || null,
+      tier_id,
+      num_adults || 1,
+      num_children || 0,
+      valid_from,
+      valid_until,
+      qr_secret,
+      user_id || null,
+      notes || null
+    ).run()
+    
+    const pass_id = result.meta.last_row_id
+    
+    // Insert family members if provided
+    if (family_members && Array.isArray(family_members)) {
+      for (const member of family_members) {
+        await DB.prepare(`
+          INSERT INTO pass_family_members (
+            pass_id, member_name, member_type, member_age, member_photo_url, relationship, is_primary
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          pass_id,
+          member.member_name,
+          member.member_type || 'adult',
+          member.member_age || null,
+          member.member_photo_url || null,
+          member.relationship || null,
+          member.is_primary || 0
+        ).run()
+      }
+    }
+    
+    return c.json({
+      success: true,
+      pass_id,
+      pass_reference,
+      pass_url: `/guest-pass/${pass_reference}`
+    })
+  } catch (error) {
+    console.error('Create pass error:', error)
+    return c.json({ error: 'Failed to create pass' }, 500)
+  }
+})
+
+// Admin: Get single pass details
+app.get('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const pass = await DB.prepare(`
+      SELECT 
+        dp.*,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon,
+        ait.tier_features,
+        ait.access_locations
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE dp.pass_id = ? AND dp.property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Get family members
+    const family = await DB.prepare(`
+      SELECT * FROM pass_family_members
+      WHERE pass_id = ?
+      ORDER BY is_primary DESC, member_id ASC
+    `).bind(pass_id).all()
+    
+    // Get recent verifications
+    const verifications = await DB.prepare(`
+      SELECT * FROM pass_verifications
+      WHERE pass_id = ?
+      ORDER BY verification_timestamp DESC
+      LIMIT 20
+    `).bind(pass_id).all()
+    
+    return c.json({
+      success: true,
+      pass,
+      family_members: family.results || [],
+      recent_verifications: verifications.results || []
+    })
+  } catch (error) {
+    console.error('Get pass details error:', error)
+    return c.json({ error: 'Failed to get pass details' }, 500)
+  }
+})
+
+// Admin: Update pass
+app.put('/api/admin/all-inclusive/passes/:pass_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      primary_guest_name,
+      primary_guest_photo_url,
+      guest_email,
+      guest_phone,
+      room_number,
+      tier_id,
+      pass_status,
+      num_adults,
+      num_children,
+      valid_from,
+      valid_until,
+      notes
+    } = body
+    
+    // Verify pass belongs to property
+    const pass = await DB.prepare(`
+      SELECT * FROM digital_passes WHERE pass_id = ? AND property_id = ?
+    `).bind(pass_id, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET primary_guest_name = ?,
+          primary_guest_photo_url = ?,
+          guest_email = ?,
+          guest_phone = ?,
+          room_number = ?,
+          tier_id = ?,
+          pass_status = ?,
+          num_adults = ?,
+          num_children = ?,
+          valid_from = ?,
+          valid_until = ?,
+          notes = ?
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(
+      primary_guest_name || pass.primary_guest_name,
+      primary_guest_photo_url !== undefined ? primary_guest_photo_url : pass.primary_guest_photo_url,
+      guest_email !== undefined ? guest_email : pass.guest_email,
+      guest_phone !== undefined ? guest_phone : pass.guest_phone,
+      room_number !== undefined ? room_number : pass.room_number,
+      tier_id || pass.tier_id,
+      pass_status || pass.pass_status,
+      num_adults !== undefined ? num_adults : pass.num_adults,
+      num_children !== undefined ? num_children : pass.num_children,
+      valid_from || pass.valid_from,
+      valid_until || pass.valid_until,
+      notes !== undefined ? notes : pass.notes,
+      pass_id,
+      property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update pass error:', error)
+    return c.json({ error: 'Failed to update pass' }, 500)
+  }
+})
+
+// Admin: Deactivate pass
+app.post('/api/admin/all-inclusive/passes/:pass_id/deactivate', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { pass_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  const user_id = c.req.header('X-User-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const { reason } = body
+    
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET pass_status = 'deactivated',
+          deactivated_at = CURRENT_TIMESTAMP,
+          deactivated_by = ?,
+          deactivation_reason = ?
+      WHERE pass_id = ? AND property_id = ?
+    `).bind(user_id || 'admin', reason || 'Manual deactivation', pass_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Deactivate pass error:', error)
+    return c.json({ error: 'Failed to deactivate pass' }, 500)
+  }
+})
+
+// =================
+// STAFF VERIFICATION
+// =================
+
+// Staff: Verify digital pass (QR scan)
+app.post('/api/staff/verify-digital-pass', requirePermission('all_inclusive_verify'), async (c) => {
+  const { DB } = c.env
+  const property_id = getAuthenticatedPropertyId(c)
+  const staff_user_id = c.req.header('X-User-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      pass_reference,
+      location_code,
+      location_name,
+      staff_name
+    } = body
+    
+    if (!pass_reference) {
+      return c.json({ error: 'Pass reference required' }, 400)
+    }
+    
+    // Get pass with tier info
+    const pass = await DB.prepare(`
+      SELECT 
+        dp.*,
+        ait.tier_code,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon,
+        ait.access_locations
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      WHERE dp.pass_reference = ? AND dp.property_id = ?
+    `).bind(pass_reference, property_id).first()
+    
+    if (!pass) {
+      // Log fraud attempt
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          property_id, pass_id, staff_user_id, staff_name,
+          verification_location, verification_location_name,
+          verification_result, denial_reason
+        ) VALUES (?, ?, ?, ?, ?, ?, 'fraud_attempt', 'Pass not found')
+      `).bind(property_id, 0, staff_user_id || null, staff_name || 'Staff', location_code || 'unknown', location_name || 'Unknown Location').run()
+      
+      return c.json({
+        success: false,
+        result: 'invalid',
+        message: 'Invalid pass - Pass not found'
+      })
+    }
+    
+    // Check if pass is active
+    if (pass.pass_status !== 'active') {
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          property_id, pass_id, staff_user_id, staff_name,
+          verification_location, verification_location_name,
+          verification_result, denial_reason,
+          guest_name, room_number, tier_name
+        ) VALUES (?, ?, ?, ?, ?, ?, 'deactivated', ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        pass.pass_id,
+        staff_user_id || null,
+        staff_name || 'Staff',
+        location_code || 'unknown',
+        location_name || 'Unknown Location',
+        `Pass is ${pass.pass_status}`,
+        pass.primary_guest_name,
+        pass.room_number,
+        pass.tier_display_name
+      ).run()
+      
+      return c.json({
+        success: false,
+        result: 'deactivated',
+        message: `Pass is ${pass.pass_status}`,
+        pass: {
+          guest_name: pass.primary_guest_name,
+          room_number: pass.room_number,
+          tier: pass.tier_display_name,
+          status: pass.pass_status
+        }
+      })
+    }
+    
+    // Check validity dates
+    const today = new Date().toISOString().split('T')[0]
+    if (today < pass.valid_from || today > pass.valid_until) {
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          property_id, pass_id, staff_user_id, staff_name,
+          verification_location, verification_location_name,
+          verification_result, denial_reason,
+          guest_name, room_number, tier_name
+        ) VALUES (?, ?, ?, ?, ?, ?, 'expired', ?, ?, ?, ?)
+      `).bind(
+        property_id,
+        pass.pass_id,
+        staff_user_id || null,
+        staff_name || 'Staff',
+        location_code || 'unknown',
+        location_name || 'Unknown Location',
+        today < pass.valid_from ? 'Pass not yet valid' : 'Pass expired',
+        pass.primary_guest_name,
+        pass.room_number,
+        pass.tier_display_name
+      ).run()
+      
+      return c.json({
+        success: false,
+        result: 'expired',
+        message: today < pass.valid_from ? 'Pass not yet valid' : 'Pass expired',
+        pass: {
+          guest_name: pass.primary_guest_name,
+          room_number: pass.room_number,
+          tier: pass.tier_display_name,
+          valid_from: pass.valid_from,
+          valid_until: pass.valid_until
+        }
+      })
+    }
+    
+    // Check tier access if location provided
+    let tier_allowed = true
+    let denial_reason = null
+    
+    if (location_code) {
+      const location = await DB.prepare(`
+        SELECT * FROM verification_locations
+        WHERE property_id = ? AND location_code = ? AND is_active = 1
+      `).bind(property_id, location_code).first()
+      
+      if (location && location.required_tier_codes) {
+        const required_tiers = JSON.parse(location.required_tier_codes)
+        if (!required_tiers.includes(pass.tier_code)) {
+          tier_allowed = false
+          denial_reason = `${location.location_name} requires ${required_tiers.join(' or ')} tier`
+        }
+      }
+    }
+    
+    // Log verification
+    await DB.prepare(`
+      INSERT INTO pass_verifications (
+        property_id, pass_id, staff_user_id, staff_name,
+        verification_location, verification_location_name,
+        verification_result, denial_reason,
+        guest_name, room_number, tier_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      pass.pass_id,
+      staff_user_id || null,
+      staff_name || 'Staff',
+      location_code || 'unknown',
+      location_name || 'Unknown Location',
+      tier_allowed ? 'valid' : 'wrong_tier',
+      denial_reason,
+      pass.primary_guest_name,
+      pass.room_number,
+      pass.tier_display_name
+    ).run()
+    
+    // Update pass stats
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET last_verified_at = CURRENT_TIMESTAMP,
+          total_verifications = total_verifications + 1
+      WHERE pass_id = ?
+    `).bind(pass.pass_id).run()
+    
+    if (!tier_allowed) {
+      return c.json({
+        success: false,
+        result: 'wrong_tier',
+        message: denial_reason,
+        pass: {
+          guest_name: pass.primary_guest_name,
+          room_number: pass.room_number,
+          tier: pass.tier_display_name,
+          tier_color: pass.tier_color,
+          tier_icon: pass.tier_icon,
+          photo_url: pass.primary_guest_photo_url,
+          num_guests: pass.num_adults + pass.num_children
+        }
+      })
+    }
+    
+    // SUCCESS
+    return c.json({
+      success: true,
+      result: 'valid',
+      message: 'Access granted',
+      pass: {
+        guest_name: pass.primary_guest_name,
+        room_number: pass.room_number,
+        tier: pass.tier_display_name,
+        tier_color: pass.tier_color,
+        tier_icon: pass.tier_icon,
+        photo_url: pass.primary_guest_photo_url,
+        num_guests: pass.num_adults + pass.num_children,
+        valid_until: pass.valid_until
+      }
+    })
+  } catch (error) {
+    console.error('Verify pass error:', error)
+    return c.json({ error: 'Verification failed' }, 500)
+  }
+})
+
+// =================
+// GUEST-FACING
+// =================
+
+// Guest: Get digital pass by reference
+app.get('/api/guest/digital-pass/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const { pass_reference } = c.req.param()
+  
+  try {
+    const pass = await DB.prepare(`
+      SELECT 
+        dp.*,
+        ait.tier_display_name,
+        ait.tier_color,
+        ait.tier_icon,
+        ait.tier_description,
+        ait.tier_features,
+        p.name as property_name,
+        p.brand_logo_url
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
+      JOIN properties p ON dp.property_id = p.property_id
+      WHERE dp.pass_reference = ? AND dp.pass_status = 'active'
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found or inactive' }, 404)
+    }
+    
+    // Get family members
+    const family = await DB.prepare(`
+      SELECT * FROM pass_family_members
+      WHERE pass_id = ?
+      ORDER BY is_primary DESC, member_id ASC
+    `).bind(pass.pass_id).all()
+    
+    return c.json({
+      success: true,
+      pass,
+      family_members: family.results || []
+    })
+  } catch (error) {
+    console.error('Get guest pass error:', error)
+    return c.json({ error: 'Failed to get pass' }, 500)
+  }
+})
+
+// ==================== END ALL-INCLUSIVE DIGITAL PASS API ENDPOINTS ====================
+
 // ========== FEEDBACK SYSTEM API ENDPOINTS ==========
 
 // Admin: Get all feedback forms for a property
