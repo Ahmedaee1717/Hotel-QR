@@ -33757,23 +33757,6 @@ app.get('/gm/features', (c) => {
   `)
 })
 
-// GDPR/BIPA Compliance Documentation
-app.get('/biometric-compliance', async (c) => {
-  // Serve the static HTML file
-  try {
-    const response = await fetch(new URL('/biometric-compliance.html', c.req.url))
-    const html = await response.text()
-    return c.html(html)
-  } catch (error) {
-    return c.text('Compliance documentation not found', 404)
-  }
-})
-
-app.get('/compliance', async (c) => {
-  // Redirect to main compliance page
-  return c.redirect('/biometric-compliance')
-})
-
 // Super Admin Dashboard page
 // Admin Dashboard page
 app.get('/admin/dashboard', (c) => {
