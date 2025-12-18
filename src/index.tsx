@@ -12313,31 +12313,18 @@ app.post('/api/chatbot/chat', async (c) => {
         console.log('📚 Context length:', context.length)
         console.log('📝 Context preview:', context.substring(0, 200))
         
-        const systemPrompt = `You are ${chatbotName}, the personal concierge assistant for ${hotelName}, a 5-star luxury resort. Your role is to provide impeccable, professional service with warmth and sophistication.
+        const systemPrompt = `You are ${chatbotName}, ${hotelName}'s concierge. Respond in the SAME LANGUAGE as the question.
 
-CRITICAL LANGUAGE RULE: You MUST respond in the EXACT SAME LANGUAGE as the guest's question.
-- English question → English response
-- Arabic question → Arabic response (Egyptian dialect if colloquial)
-- French question → French response
-- Spanish question → Spanish response
+Rules:
+- English Q → English A | Arabic Q → Arabic A | French Q → French A
+- Use hotel info below. Be brief (1-2 sentences). Include prices/times.
+- Add links if provided: [text](url)
+- If no info, suggest contacting staff
 
-IMPORTANT: First identify what language they used, then respond ONLY in that language. Do NOT auto-translate!
-
-Relevant Hotel Information (English):
+Hotel Info:
 ${context}${linkContext}
 
-Instructions:
-1. **Language Detection**: Detect the guest's language from their question. Then respond ONLY in that language. If English, stay in English!
-2. **Tone**: Professional yet warm. Match their formality level
-3. **Accuracy**: Use ONLY the information provided above. Translate and adapt the information naturally.
-4. **Specifics**: Include prices, times, locations, booking details when mentioned (keep numbers/times as-is)
-5. **Brevity**: Keep responses concise (2-3 sentences) but complete
-6. **LINKS**: If relevant links are provided above, ALWAYS include them in your response using this EXACT format: [Link Text](URL). For example: "You can [view our diving activities here](/activity?id=7&property=1&lang=en)."
-7. **Referrals**: If information is NOT in the context above, politely refer to hotel staff IN THE GUEST'S LANGUAGE
-8. **Complaints/Issues**: If guest mentions a problem or complaint, acknowledge it professionally and assure them management will be notified. If they mention their room number or last name, acknowledge it gracefully.
-9. **Never** say "I don't have that information" - always be gracious
-
-Provide your response now IN THE SAME LANGUAGE as the guest's question:`
+Respond in guest's language:`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
@@ -12351,8 +12338,8 @@ Provide your response now IN THE SAME LANGUAGE as the guest's question:`
               { role: 'system', content: systemPrompt },
               { role: 'user', content: message }
             ],
-            temperature: 0.7,
-            max_tokens: 300
+            temperature: 0.5, // Lower = faster, more focused (was 0.7)
+            max_tokens: 200 // Shorter responses = faster (was 300)
           })
         })
         
@@ -22220,7 +22207,25 @@ app.get('/hotel/:property_slug', async (c) => {
                   // IMMEDIATE call - try to preserve gesture, but mobile may still block
                   speakText(cleanText, speakerBtn, language).catch(err => {
                     console.warn('Auto-play blocked on mobile:', err);
-                    // Fallback: just show the speaker button for manual play
+                    // Show visual prompt to click speaker button
+                    speakerBtn.classList.add('animate-pulse');
+                    speakerBtn.style.color = '#ef4444';
+                    speakerBtn.style.fontSize = '1.2rem';
+                    speakerBtn.title = '🔊 Click to hear response!';
+                    
+                    // Add a small notification bubble
+                    const notification = document.createElement('span');
+                    notification.className = 'text-xs text-red-500 ml-1 animate-pulse';
+                    notification.textContent = '👆 Tap to hear';
+                    speakerBtn.parentElement?.appendChild(notification);
+                    
+                    // Remove notification after click
+                    speakerBtn.addEventListener('click', () => {
+                      notification.remove();
+                      speakerBtn.classList.remove('animate-pulse');
+                      speakerBtn.style.color = '';
+                      speakerBtn.style.fontSize = '';
+                    }, { once: true });
                   });
                 }
               }
