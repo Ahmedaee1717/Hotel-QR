@@ -35296,6 +35296,9 @@ app.get('/admin/dashboard', (c) => {
                 <!-- Services Section -->
                 <div class="px-3 mb-6">
                     <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Services</h3>
+                    <button data-tab="rooms" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-door-open w-5"></i><span>Rooms</span>
+                    </button>
                     <button data-tab="restaurants" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-utensils w-5"></i><span>F&B</span>
                     </button>
