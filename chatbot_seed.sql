@@ -26,36 +26,37 @@ VALUES
 (2, 1, 1, 'We offer world-class diving, spa treatments, restaurants, and activities for all ages.', 1),
 
 -- Dining chunks
-(3, 2, 1, 'Main Restaurant offers international buffet open 7am-10pm daily.', 0),
-(4, 2, 1, 'Beach Grill serves seafood and grills open 12pm-11pm.', 1),
-(5, 2, 1, 'Italian Restaurant offers authentic Italian cuisine 6pm-11pm. All restaurants accept reservations.', 2),
+(3, 2, 1, 'We have 3 restaurants: Main Restaurant (international buffet 7am-10pm), Beach Grill (seafood 12pm-11pm), and Italian Restaurant (authentic Italian 6pm-11pm).', 0),
+(4, 2, 1, 'Main Restaurant offers international buffet open 7am-10pm daily with breakfast, lunch, and dinner.', 1),
+(5, 2, 1, 'Beach Grill restaurant serves fresh seafood and grills open 12pm-11pm at the beachfront location.', 2),
+(6, 2, 1, 'Italian Restaurant offers authentic Italian cuisine 6pm-11pm. All restaurants accept reservations.', 3),
 
 -- Spa chunks
-(6, 3, 1, 'Serenity Spa offers massage therapy, facials, body treatments, and wellness programs. Open daily 9am-9pm.', 0),
-(7, 3, 1, 'Hot Stone Massage 60 minutes costs $80. Thai Massage 90 minutes costs $100.', 1),
-(8, 3, 1, 'Aromatherapy Facial 45 minutes costs $60. Advance booking recommended for all spa treatments.', 2),
+(7, 3, 1, 'Serenity Spa offers massage therapy, facials, body treatments, and wellness programs. Open daily 9am-9pm.', 0),
+(8, 3, 1, 'Hot Stone Massage 60 minutes costs $80. Thai Massage 90 minutes costs $100.', 1),
+(9, 3, 1, 'Aromatherapy Facial 45 minutes costs $60. Advance booking recommended for all spa treatments.', 2),
 
 -- Water Activities chunks
-(9, 4, 1, 'We offer scuba diving, snorkeling, jet skiing, parasailing, and banana boat rides.', 0),
-(10, 4, 1, 'Our PADI-certified dive center offers beginner courses and advanced dives to famous Red Sea dive sites.', 1),
-(11, 4, 1, 'Snorkeling equipment available for rent at the beach.', 2),
+(10, 4, 1, 'We offer scuba diving, snorkeling, jet skiing, parasailing, and banana boat rides.', 0),
+(11, 4, 1, 'Our PADI-certified dive center offers beginner courses and advanced dives to famous Red Sea dive sites.', 1),
+(12, 4, 1, 'Snorkeling equipment available for rent at the beach.', 2),
 
 -- Check-in Policy chunks
-(12, 5, 1, 'Check-in time is 3:00 PM and check-out time is 12:00 PM.', 0),
-(13, 5, 1, 'Early check-in and late check-out available upon request subject to availability.', 1),
-(14, 5, 1, 'Valid ID and credit card required at check-in.', 2),
+(13, 5, 1, 'Check-in time is 3:00 PM and check-out time is 12:00 PM.', 0),
+(14, 5, 1, 'Early check-in and late check-out available upon request subject to availability.', 1),
+(15, 5, 1, 'Valid ID and credit card required at check-in.', 2),
 
 -- Beach Access chunks
-(15, 6, 1, 'Private beach open 6am-8pm daily. Beach towels provided free of charge.', 0),
-(16, 6, 1, 'Sunbeds and umbrellas available free of charge for all guests.', 1),
-(17, 6, 1, 'Beach bar serves drinks and snacks 10am-6pm. Watersports equipment rentals available.', 2),
+(16, 6, 1, 'Private beach open 6am-8pm daily. Beach towels provided free of charge.', 0),
+(17, 6, 1, 'Sunbeds and umbrellas available free of charge for all guests.', 1),
+(18, 6, 1, 'Beach bar serves drinks and snacks 10am-6pm. Watersports equipment rentals available.', 2),
 
 -- Gym chunks
-(18, 7, 1, 'Fitness center open 24/7 with modern cardio and strength equipment.', 0),
-(19, 7, 1, 'Free weights, treadmills, ellipticals available. Complimentary water and towels provided.', 1),
-(20, 7, 1, 'Personal training sessions available upon request at additional cost.', 2),
+(19, 7, 1, 'Fitness center open 24/7 with modern cardio and strength equipment.', 0),
+(20, 7, 1, 'Free weights, treadmills, ellipticals available. Complimentary water and towels provided.', 1),
+(21, 7, 1, 'Personal training sessions available upon request at additional cost.', 2),
 
 -- Kids Club chunks
-(21, 8, 1, 'Kids Club for ages 4-12 open daily 9am-5pm with trained staff supervision.', 0),
-(22, 8, 1, 'Activities include arts & crafts, games, swimming, and outdoor play.', 1),
-(23, 8, 1, 'Kids Club is completely free for all resort guests.', 2);
+(22, 8, 1, 'Kids Club for ages 4-12 open daily 9am-5pm with trained staff supervision.', 0),
+(23, 8, 1, 'Activities include arts & crafts, games, swimming, and outdoor play.', 1),
+(24, 8, 1, 'Kids Club is completely free for all resort guests.', 2);

@@ -11065,7 +11065,7 @@ app.post('/api/ai/proofread', async (c) => {
     try {
       // Check if GenSpark API is configured
       const apiKey = process.env.OPENAI_API_KEY
-      const baseURL = process.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+      const baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
       
       if (!apiKey) {
         // Fallback: Return formatted text with basic improvements
@@ -11505,7 +11505,7 @@ async function analyzeSentimentAndCaptureFeedback(DB: any, property_id: number, 
     let confidence = 0
     
     if (apiKey) {
-      const aiResult = await detectComplaintWithAI(guestMessage, apiKey, baseURL || 'https://www.genspark.ai/api/llm_proxy/v1')
+      const aiResult = await detectComplaintWithAI(guestMessage, apiKey, baseURL || 'https://api.openai.com/v1')
       isComplaint = aiResult.isComplaint && aiResult.confidence >= 70
       isUrgent = aiResult.isUrgent
       complaintCategory = aiResult.category
@@ -12168,7 +12168,7 @@ app.post('/api/chatbot/chat', async (c) => {
     // 🌐 MULTILINGUAL QUERY TRANSLATION: Translate non-English queries to English for chunk search
     let searchQuery = message
     const apiKey = c.env.OPENAI_API_KEY
-    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
     
     // Detect if query is likely non-English (contains Arabic, Chinese, Cyrillic, etc.)
     const isNonEnglish = /[\u0600-\u06FF\u4E00-\u9FFF\u0400-\u04FF]/.test(message)
@@ -17763,7 +17763,7 @@ app.post('/api/admin/feedback/generate-insights/:property_id', async (c) => {
     
     // Use AI API for advanced analysis
     const apiKey = c.env.OPENAI_API_KEY
-    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
     
     if (!apiKey) {
       return c.json({ 
