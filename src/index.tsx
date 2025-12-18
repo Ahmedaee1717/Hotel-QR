@@ -12883,7 +12883,9 @@ app.post('/api/voice/transcribe', async (c) => {
     whisperFormData.append('model', 'whisper-1')
     whisperFormData.append('response_format', 'verbose_json')
     // Add prompt to help with Egyptian Arabic dialect recognition
-    whisperFormData.append('prompt', 'Egyptian Arabic dialect, colloquial speech, hotel guest questions in Arabic or English')
+    whisperFormData.append('prompt', 'فين المطاعم؟ ايه الاسعار؟ Where are the restaurants? Egyptian Arabic dialect.')
+    // Set language hint to Arabic to improve detection for Arabic speech
+    whisperFormData.append('language', 'ar')
 
     console.log('📡 Sending to Whisper API...')
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -12901,7 +12903,17 @@ app.post('/api/voice/transcribe', async (c) => {
     }
 
     const result = await response.json()
-    console.log('✅ Whisper result:', result.text, '| Language:', result.language)
+    console.log('✅ Whisper transcription:', {
+      text: result.text,
+      language: result.language,
+      duration: result.duration,
+      audioSize: audioFile.size
+    })
+    
+    // If detected as English but contains Arabic words, log warning
+    if (result.language === 'en' && /[\u0600-\u06FF]/.test(result.text)) {
+      console.warn('⚠️ Detected English but text contains Arabic characters!')
+    }
     
     return c.json({
       success: true,
@@ -21802,7 +21814,15 @@ app.get('/hotel/:property_slug', async (c) => {
           // Start recording audio using MediaRecorder with auto-stop on silence
           async function startRecording() {
             try {
-              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              // Request high-quality audio with better settings for Arabic speech recognition
+              const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                  sampleRate: 48000 // Higher sample rate for better Arabic phoneme capture
+                }
+              });
               const audioContext = new (window.AudioContext || window.webkitAudioContext)();
               const source = audioContext.createMediaStreamSource(stream);
               const analyser = audioContext.createAnalyser();
@@ -21812,13 +21832,28 @@ app.get('/hotel/:property_slug', async (c) => {
               const bufferLength = analyser.frequencyBinCount;
               const dataArray = new Uint8Array(bufferLength);
               
-              mediaRecorder = new MediaRecorder(stream);
+              // Use better audio quality for Whisper
+              const options = {
+                mimeType: 'audio/webm;codecs=opus',
+                audioBitsPerSecond: 128000 // Higher quality for better transcription
+              };
+              
+              // Fallback if opus not supported
+              if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options.mimeType = 'audio/webm';
+              }
+              
+              mediaRecorder = new MediaRecorder(stream, options);
               audioChunks = [];
+              
+              console.log('🎤 Recording with:', options.mimeType, 'at', options.audioBitsPerSecond, 'bps');
               
               let silenceStart = null;
               const silenceThreshold = 20; // Adjust sensitivity
               const silenceDuration = 1500; // Stop after 1.5s of silence
               let hasSpoken = false;
+              const recordingStartTime = Date.now();
+              const minRecordingDuration = 800; // Minimum 800ms to capture full Arabic phrases
               
               // Monitor audio level for silence detection
               function checkAudioLevel() {
@@ -21843,9 +21878,11 @@ app.get('/hotel/:property_slug', async (c) => {
                   if (!silenceStart) {
                     silenceStart = Date.now();
                   } else if (Date.now() - silenceStart > silenceDuration) {
-                    // Auto-stop after silence
-                    stopRecording();
-                    return;
+                    // Only auto-stop if minimum duration has passed
+                    if (Date.now() - recordingStartTime >= minRecordingDuration) {
+                      stopRecording();
+                      return;
+                    }
                   }
                 }
                 
@@ -21881,6 +21918,8 @@ app.get('/hotel/:property_slug', async (c) => {
           // Stop recording
           function stopRecording() {
             if (mediaRecorder && isRecording) {
+              const recordingDuration = Date.now() - recordingStartTime;
+              console.log('🎤 Recording stopped. Duration:', recordingDuration, 'ms');
               mediaRecorder.stop();
               isRecording = false;
               const primaryColor = window.chatbotPrimaryColor || '#667eea';
@@ -21896,17 +21935,20 @@ app.get('/hotel/:property_slug', async (c) => {
               const formData = new FormData();
               formData.append('audio', audioBlob, 'recording.webm');
               
+              console.log('📤 Sending audio to transcribe API, size:', audioBlob.size, 'bytes');
+              
               const response = await fetch('/api/voice/transcribe', {
                 method: 'POST',
                 body: formData
               });
               
               const data = await response.json();
+              console.log('📥 Transcribe response:', data);
               
               if (data.success) {
                 chatInput.value = data.text;
                 detectedLanguage = data.language || 'en';
-                console.log('✅ Transcribed:', data.text, '| Language:', detectedLanguage);
+                console.log('✅ Transcribed:', data.text, '| Language:', detectedLanguage, '| Audio size:', audioBlob.size);
                 chatInput.focus();
                 
                 // Auto-send quickly for seamless experience (500ms instead of 1500ms)
