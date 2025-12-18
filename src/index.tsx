@@ -49727,6 +49727,9 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             'zh': '🇨🇳 Chinese'
           };
           
+          const guestName = (consent.primary_guest_name || 'Guest').replace(/"/g, '&quot;');
+          const signatureData = (consent.signature_data || '').replace(/"/g, '&quot;');
+          
           html += '<tr class="' + bgColor + ' hover:bg-blue-50 transition-colors">';
           html += '<td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">' + (consent.primary_guest_name || 'N/A') + '</div></td>';
           html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600 font-mono">' + (consent.pass_reference || 'N/A') + '</div></td>';
@@ -49734,8 +49737,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">' + consentDate + '</div></td>';
           html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm">' + (languageLabels[consent.consent_language] || consent.consent_language) + '</div></td>';
           html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">' + (consent.staff_witness_id || 'N/A') + '</div></td>';
-          html += '<td class="px-6 py-4"><button onclick="viewSignature(' + consent.consent_id + ', \'' + (consent.signature_data || '') + '\', \'' + (consent.primary_guest_name || 'Guest').replace(/'/g, "\\'") + '\')" class="text-blue-600 hover:text-blue-800 font-semibold text-sm"><i class="fas fa-eye mr-1"></i>View</button></td>';
-          html += '<td class="px-6 py-4"><button onclick="downloadSignature(' + consent.consent_id + ', \'' + (consent.signature_data || '') + '\', \'' + (consent.primary_guest_name || 'Guest').replace(/'/g, "\\'") + '\')" class="text-green-600 hover:text-green-800 font-semibold text-sm"><i class="fas fa-download mr-1"></i>Download</button></td>';
+          html += '<td class="px-6 py-4"><button onclick="viewSignature(' + consent.consent_id + ')" data-signature="' + signatureData + '" data-guest="' + guestName + '" class="text-blue-600 hover:text-blue-800 font-semibold text-sm"><i class="fas fa-eye mr-1"></i>View</button></td>';
+          html += '<td class="px-6 py-4"><button onclick="downloadSignature(' + consent.consent_id + ')" data-signature="' + signatureData + '" data-guest="' + guestName + '" class="text-green-600 hover:text-green-800 font-semibold text-sm"><i class="fas fa-download mr-1"></i>Download</button></td>';
           html += '</tr>';
         });
         
@@ -49752,7 +49755,11 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
       
       // View signature image
-      window.viewSignature = function(consentId, signatureData, guestName) {
+      window.viewSignature = function(consentId) {
+        const button = event.target.closest('button');
+        const signatureData = button.getAttribute('data-signature');
+        const guestName = button.getAttribute('data-guest');
+        
         const modal = document.createElement('div');
         modal.id = 'signature-viewer-modal';
         modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
@@ -49775,7 +49782,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</div>';
         
         html += '<div class="mt-6 flex gap-2">';
-        html += '<button onclick="downloadSignature(' + consentId + ', \'' + signatureData + '\', \'' + guestName.replace(/'/g, "\\'") + '\')" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">';
+        html += '<button onclick="downloadSignatureFromModal(' + consentId + ')" data-signature="' + signatureData + '" data-guest="' + guestName + '" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">';
         html += '<i class="fas fa-download mr-2"></i>Download Signature';
         html += '</button>';
         html += '<button onclick="closeSignatureViewer()" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold">';
@@ -49795,12 +49802,39 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       };
       
       // Download signature image
-      window.downloadSignature = function(consentId, signatureData, guestName) {
-        // Create download link
-        const link = document.createElement('a');
-        link.href = signatureData;
-        link.download = 'consent_signature_' + guestName.replace(/ /g, '_') + '_' + consentId + '.png';
-        document.body.appendChild(link);
+      window.downloadSignature = function(consentId) {
+        try {
+          const button = event.target.closest('button');
+          const signatureData = button.getAttribute('data-signature');
+          const guestName = button.getAttribute('data-guest');
+          
+          // Create download link
+          const link = document.createElement('a');
+          link.href = signatureData;
+          link.download = 'consent_signature_' + guestName.replace(/ /g, '_') + '_' + consentId + '.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          alert('✅ Signature downloaded successfully!');
+        } catch (error) {
+          console.error('Download signature error:', error);
+          alert('Failed to download signature: ' + error.message);
+        }
+      };
+      
+      // Download signature from modal
+      window.downloadSignatureFromModal = function(consentId) {
+        try {
+          const button = event.target.closest('button');
+          const signatureData = button.getAttribute('data-signature');
+          const guestName = button.getAttribute('data-guest');
+          
+          // Create download link
+          const link = document.createElement('a');
+          link.href = signatureData;
+          link.download = 'consent_signature_' + guestName.replace(/ /g, '_') + '_' + consentId + '.png';
+          document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
           
