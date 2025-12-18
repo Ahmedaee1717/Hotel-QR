@@ -22126,12 +22126,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 };
                 bubble.appendChild(speakerBtn);
                 
-                // Auto-speak if voice input was used
+                // Auto-speak if voice input was used (immediate, no setTimeout to preserve user gesture)
                 if (autoSpeak) {
-                  setTimeout(() => {
-                    const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
-                    speakText(cleanText, speakerBtn, language);
-                  }, 300);
+                  // Immediate call to preserve user gesture context (allows autoplay on mobile)
+                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
+                  // Use queueMicrotask to avoid blocking UI but keep gesture context
+                  queueMicrotask(() => speakText(cleanText, speakerBtn, language));
                 }
               }
               
