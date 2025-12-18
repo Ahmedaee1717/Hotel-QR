@@ -16766,7 +16766,9 @@ app.post('/api/staff/all-inclusive/search-face', async (c) => {
             room_number: bestMatch.room_number,
             tier: bestMatch.tier_display_name,
             tier_color: bestMatch.tier_color,
-            tier_icon: bestMatch.tier_icon
+            tier_icon: bestMatch.tier_icon,
+            face_photo_url: bestMatch.face_photo_url,
+            primary_guest_photo_url: bestMatch.primary_guest_photo_url
           }
         }, 409)
       }
