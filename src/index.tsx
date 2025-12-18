@@ -12165,17 +12165,58 @@ app.post('/api/chatbot/chat', async (c) => {
       });
     }
     
-    // RAG: Find relevant chunks
+    // 🌐 MULTILINGUAL QUERY TRANSLATION: Translate non-English queries to English for chunk search
+    let searchQuery = message
+    const apiKey = c.env.OPENAI_API_KEY
+    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
+    
+    // Detect if query is likely non-English (contains Arabic, Chinese, Cyrillic, etc.)
+    const isNonEnglish = /[\u0600-\u06FF\u4E00-\u9FFF\u0400-\u04FF]/.test(message)
+    
+    if (isNonEnglish && apiKey) {
+      try {
+        console.log('🌍 Translating query to English for chunk search:', message)
+        const translateResponse = await fetch(`${baseURL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { 
+                role: 'system', 
+                content: 'You are a translator. Translate the following text to English. Return ONLY the English translation, nothing else.' 
+              },
+              { role: 'user', content: message }
+            ],
+            temperature: 0.3,
+            max_tokens: 100
+          })
+        })
+        
+        if (translateResponse.ok) {
+          const translateData = await translateResponse.json()
+          searchQuery = translateData.choices[0]?.message?.content?.trim() || message
+          console.log('✅ Translated query for search:', searchQuery)
+        }
+      } catch (err) {
+        console.warn('⚠️ Translation failed, using original query:', err)
+      }
+    }
+    
+    // RAG: Find relevant chunks using translated query
     const allChunks = await DB.prepare(`
       SELECT chunk_id, chunk_text, document_id
       FROM chatbot_chunks
       WHERE property_id = ?
     `).bind(property_id).all()
     
-    // Score and rank chunks
+    // Score and rank chunks using translated search query
     const scoredChunks = (allChunks.results || []).map((chunk: any) => ({
       ...chunk,
-      score: calculateRelevanceScore(message, chunk.chunk_text)
+      score: calculateRelevanceScore(searchQuery, chunk.chunk_text)
     })).filter((chunk: any) => chunk.score > 0)
       .sort((a: any, b: any) => b.score - a.score)
       .slice(0, 3) // Top 3 most relevant chunks
@@ -12185,11 +12226,12 @@ app.post('/api/chatbot/chat', async (c) => {
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
     
     // 🔗 SMART LINK SEARCH: Find relevant activities, restaurants, spa, events
-    const messageLowerCase = message.toLowerCase()
+    // Use translated query for better multilingual search
+    const searchMessageLower = searchQuery.toLowerCase()
     const relevantLinks: any[] = []
     
-    // Search keywords from user message
-    const searchTerms = messageLowerCase.split(/\s+/).filter(w => w.length > 3)
+    // Search keywords from translated query for better multilingual matching
+    const searchTerms = searchMessageLower.split(/\s+/).filter(w => w.length > 3)
     
     try {
       // Search Activities
@@ -12261,10 +12303,7 @@ app.post('/api/chatbot/chat', async (c) => {
       })
     }
     
-    // Generate AI response - use Cloudflare env bindings
-    const apiKey = c.env.OPENAI_API_KEY
-    const baseURL = c.env.OPENAI_BASE_URL || 'https://www.genspark.ai/api/llm_proxy/v1'
-    
+    // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
     // Call AI if we have API key AND (context OR relevant links)
