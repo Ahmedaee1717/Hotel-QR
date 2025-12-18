@@ -15689,6 +15689,57 @@ app.post('/api/admin/face-enrollment/consent', async (c) => {
   }
 })
 
+// API Endpoint: Get All Consent Signatures (for admin viewing/export)
+app.get('/api/admin/consent-signatures', async (c) => {
+  const { DB } = c.env
+  
+  // Accept either Bearer token OR admin session headers
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  const userId = c.req.header('X-User-ID')
+  const propertyId = c.req.header('X-Property-ID')
+  
+  if (!token && !userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    // Get property_id from session or default to 1
+    const propId = propertyId ? parseInt(propertyId) : 1
+    
+    // Fetch all consent signatures with guest details
+    const consents = await DB.prepare(`
+      SELECT 
+        cs.consent_id,
+        cs.pass_id,
+        cs.signature_data,
+        cs.consent_language,
+        cs.consent_timestamp,
+        cs.consent_given_by,
+        cs.staff_witness_id,
+        cs.consent_withdrawn,
+        cs.consent_withdrawn_at,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        dp.guest_email,
+        dp.room_number,
+        dp.valid_from,
+        dp.valid_until
+      FROM biometric_consent_signatures cs
+      JOIN digital_passes dp ON cs.pass_id = dp.pass_id
+      WHERE cs.property_id = ?
+      ORDER BY cs.consent_timestamp DESC
+    `).bind(propId).all()
+    
+    return c.json({ 
+      success: true,
+      consents: consents.results || []
+    })
+  } catch (error) {
+    console.error('Failed to fetch consent signatures:', error)
+    return c.json({ error: 'Failed to fetch consents: ' + error.message }, 500)
+  }
+})
+
 // API Endpoint: Complete Face Enrollment (after consent captured)
 app.post('/api/admin/face-enrollment/complete', async (c) => {
   const { DB } = c.env
@@ -38926,6 +38977,9 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="switchPassTab('analytics')" id="pass-tab-analytics" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
                         <i class="fas fa-chart-bar mr-2"></i>Analytics
                     </button>
+                    <button onclick="switchPassTab('consents')" id="pass-tab-consents" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-file-signature mr-2"></i>Consent Signatures
+                    </button>
                 </nav>
             </div>
 
@@ -39073,6 +39127,40 @@ app.get('/admin/dashboard', (c) => {
                     <h4 class="font-bold text-lg mb-1">Fraud Prevention</h4>
                     <p class="opacity-90 text-sm">View fraud alerts and suspicious activity</p>
                 </a>
+            </div>
+            
+            <!-- Consent Signatures Tab -->
+            <div id="pass-content-consents" class="pass-tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold">Biometric Consent Signatures</h3>
+                        <p class="text-gray-600 text-sm mt-1">View and export digital consent signatures for GDPR/BIPA compliance</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportConsentsCSV()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-file-csv mr-2"></i>Export CSV
+                        </button>
+                        <button onclick="loadConsents()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                            <i class="fas fa-sync mr-2"></i>Refresh
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
+                    <p class="text-sm text-gray-700">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>Legal Compliance:</strong> All biometric consent signatures are stored for audit purposes. Guests signed these digitally before face enrollment. Keep these records for compliance with GDPR Article 7 and BIPA Section 15.
+                    </p>
+                </div>
+                
+                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div id="consents-list-container">
+                        <div class="text-center py-12 text-gray-500">
+                            <i class="fas fa-file-signature text-4xl mb-3"></i>
+                            <p>Loading consent signatures...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -48060,6 +48148,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           loadLocations();
         } else if (tabName === 'analytics') {
           loadPassAnalytics();
+        } else if (tabName === 'consents') {
+          loadConsents();
         }
       };
 
@@ -49578,6 +49668,195 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
       // ========== END ALL-INCLUSIVE FUNCTIONS ==========
+      
+      // ========== CONSENT SIGNATURES MANAGEMENT ==========
+      
+      // Load consent signatures
+      window.loadConsents = async function() {
+        const container = document.getElementById('consents-list-container');
+        container.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-3"></i><p class="text-gray-500">Loading consent signatures...</p></div>';
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/consent-signatures');
+          const data = await response.json();
+          
+          if (data.success && data.consents) {
+            displayConsents(data.consents);
+          } else {
+            container.innerHTML = '<div class="text-center py-12"><i class="fas fa-exclamation-circle text-4xl text-gray-400 mb-3"></i><p class="text-gray-500">Failed to load consents</p></div>';
+          }
+        } catch (error) {
+          console.error('Load consents error:', error);
+          container.innerHTML = '<div class="text-center py-12"><i class="fas fa-times-circle text-4xl text-red-400 mb-3"></i><p class="text-red-600">Error loading consents: ' + error.message + '</p></div>';
+        }
+      };
+      
+      // Display consent signatures
+      function displayConsents(consents) {
+        const container = document.getElementById('consents-list-container');
+        
+        if (consents.length === 0) {
+          container.innerHTML = '<div class="text-center py-12"><i class="fas fa-file-signature text-4xl text-gray-400 mb-3"></i><p class="text-gray-500">No consent signatures yet</p><p class="text-sm text-gray-400 mt-2">Consent signatures will appear here after guests enroll facial recognition</p></div>';
+          return;
+        }
+        
+        let html = '<div class="overflow-x-auto">';
+        html += '<table class="w-full">';
+        html += '<thead class="bg-gray-50 border-b-2 border-gray-200">';
+        html += '<tr>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Guest</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Pass Ref</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Room</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Consent Date</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Language</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Staff Witness</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Signature</th>';
+        html += '<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>';
+        html += '</tr>';
+        html += '</thead>';
+        html += '<tbody class="divide-y divide-gray-200">';
+        
+        consents.forEach((consent, index) => {
+          const bgColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+          const consentDate = new Date(consent.consent_timestamp).toLocaleString();
+          const languageLabels = {
+            'en': '🇬🇧 English',
+            'es': '🇪🇸 Spanish', 
+            'fr': '🇫🇷 French',
+            'de': '🇩🇪 German',
+            'zh': '🇨🇳 Chinese'
+          };
+          
+          html += '<tr class="' + bgColor + ' hover:bg-blue-50 transition-colors">';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">' + (consent.primary_guest_name || 'N/A') + '</div></td>';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600 font-mono">' + (consent.pass_reference || 'N/A') + '</div></td>';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">' + (consent.room_number || 'N/A') + '</div></td>';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">' + consentDate + '</div></td>';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm">' + (languageLabels[consent.consent_language] || consent.consent_language) + '</div></td>';
+          html += '<td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-600">' + (consent.staff_witness_id || 'N/A') + '</div></td>';
+          html += '<td class="px-6 py-4"><button onclick="viewSignature(' + consent.consent_id + ', \'' + (consent.signature_data || '') + '\', \'' + (consent.primary_guest_name || 'Guest').replace(/'/g, "\\'") + '\')" class="text-blue-600 hover:text-blue-800 font-semibold text-sm"><i class="fas fa-eye mr-1"></i>View</button></td>';
+          html += '<td class="px-6 py-4"><button onclick="downloadSignature(' + consent.consent_id + ', \'' + (consent.signature_data || '') + '\', \'' + (consent.primary_guest_name || 'Guest').replace(/'/g, "\\'") + '\')" class="text-green-600 hover:text-green-800 font-semibold text-sm"><i class="fas fa-download mr-1"></i>Download</button></td>';
+          html += '</tr>';
+        });
+        
+        html += '</tbody>';
+        html += '</table>';
+        html += '</div>';
+        
+        html += '<div class="p-4 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">';
+        html += '<i class="fas fa-info-circle mr-2"></i>';
+        html += 'Total: <strong>' + consents.length + '</strong> consent signatures';
+        html += '</div>';
+        
+        container.innerHTML = html;
+      }
+      
+      // View signature image
+      window.viewSignature = function(consentId, signatureData, guestName) {
+        const modal = document.createElement('div');
+        modal.id = 'signature-viewer-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">';
+        html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-file-signature"></i>';
+        html += 'Digital Consent Signature - ' + guestName;
+        html += '</h2>';
+        html += '<button onclick="closeSignatureViewer()" class="text-white hover:text-gray-200 text-2xl">';
+        html += '<i class="fas fa-times"></i>';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<div class="bg-gray-100 rounded-lg p-4 border-2 border-gray-300">';
+        html += '<p class="text-sm font-semibold mb-2 text-gray-700">Guest Signature:</p>';
+        html += '<img src="' + signatureData + '" alt="Signature" class="max-w-full bg-white border-2 border-gray-400 rounded">';
+        html += '</div>';
+        
+        html += '<div class="mt-6 flex gap-2">';
+        html += '<button onclick="downloadSignature(' + consentId + ', \'' + signatureData + '\', \'' + guestName.replace(/'/g, "\\'") + '\')" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">';
+        html += '<i class="fas fa-download mr-2"></i>Download Signature';
+        html += '</button>';
+        html += '<button onclick="closeSignatureViewer()" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold">';
+        html += 'Close';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+      };
+      
+      window.closeSignatureViewer = function() {
+        const modal = document.getElementById('signature-viewer-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Download signature image
+      window.downloadSignature = function(consentId, signatureData, guestName) {
+        // Create download link
+        const link = document.createElement('a');
+        link.href = signatureData;
+        link.download = 'consent_signature_' + guestName.replace(/ /g, '_') + '_' + consentId + '.png';
+        document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          alert('✅ Signature downloaded successfully!');
+        } catch (error) {
+          console.error('Download signature error:', error);
+          alert('Failed to download signature: ' + error.message);
+        }
+      };
+      
+      // Export consents as CSV
+      window.exportConsentsCSV = async function() {
+        try {
+          const response = await fetchWithAuth('/api/admin/consent-signatures');
+          const data = await response.json();
+          
+          if (!data.success || !data.consents) {
+            alert('Failed to load consents');
+            return;
+          }
+          
+          // Create CSV content
+          let csv = 'Consent ID,Guest Name,Email,Pass Reference,Room Number,Consent Date,Language,Staff Witness,Check-in,Check-out\\n';
+          
+          data.consents.forEach(consent => {
+            csv += consent.consent_id + ',';
+            csv += '"' + (consent.primary_guest_name || '') + '",';
+            csv += '"' + (consent.guest_email || '') + '",';
+            csv += '"' + (consent.pass_reference || '') + '",';
+            csv += '"' + (consent.room_number || '') + '",';
+            csv += '"' + (consent.consent_timestamp ? new Date(consent.consent_timestamp).toLocaleString() : '') + '",';
+            csv += consent.consent_language + ',';
+            csv += '"' + (consent.staff_witness_id || '') + '",';
+            csv += '"' + (consent.valid_from ? new Date(consent.valid_from).toLocaleDateString() : '') + '",';
+            csv += '"' + (consent.valid_until ? new Date(consent.valid_until).toLocaleDateString() : '') + '"\\n';
+          });
+          
+          // Download CSV
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = 'biometric_consent_signatures_' + new Date().toISOString().split('T')[0] + '.csv';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          alert('✅ Exported ' + data.consents.length + ' consent signatures to CSV!\\n\\nFile: ' + link.download);
+        } catch (error) {
+          console.error('Export CSV error:', error);
+          alert('Failed to export consents: ' + error.message);
+        }
+      };
+      
+      // ========== END CONSENT SIGNATURES MANAGEMENT ==========
       
       // Load face-api.js models on page load
       async function loadFaceAPIModels() {
