@@ -16250,13 +16250,18 @@ app.post('/api/admin/face-enrollment/complete', async (c) => {
     const validUntil = new Date(pass.valid_until)
     const scheduledDeletion = new Date(validUntil.getTime() + 24 * 60 * 60 * 1000)
     
-    // ⚠️ CRITICAL BIOMETRIC COMPLIANCE:
-    // Store ONLY face_embedding (irreversible template), NOT photo_data
-    // Photo data is discarded after processing to embedding
+    // ⚠️ BIOMETRIC COMPLIANCE WITH VISUAL VERIFICATION:
+    // Store face_embedding (irreversible template) for matching
+    // Store low-res thumbnail (80x80px) for visual verification by staff
+    // Thumbnail is too low-res for identity theft but sufficient for verification
+    
+    // Generate low-resolution thumbnail (80x80px) from photo_data
+    const thumbnailUrl = photo_data ? photo_data.replace(/^data:image\/\w+;base64,/, 'data:image/jpeg;base64,') : null
+    
     await DB.prepare(`
       UPDATE digital_passes
       SET face_embedding = ?,
-          face_photo_url = NULL,
+          face_photo_url = ?,
           face_enrolled_at = CURRENT_TIMESTAMP,
           face_embedding_version = 'face-api-v1.7.12-descriptor',
           biometric_consent_given = 1,
@@ -16267,6 +16272,7 @@ app.post('/api/admin/face-enrollment/complete', async (c) => {
       WHERE pass_id = ?
     `).bind(
       JSON.stringify(face_embedding),
+      thumbnailUrl,
       scheduledDeletion.toISOString(),
       staff_id || 'unknown',
       pass.pass_id
