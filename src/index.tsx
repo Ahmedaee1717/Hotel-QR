@@ -15560,11 +15560,15 @@ app.post('/api/staff/all-inclusive/identify-face', async (c) => {
 // API Endpoint: Get Pass by Reference (for front desk staff)
 app.get('/api/admin/passes/:pass_reference', async (c) => {
   const { DB } = c.env
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
   const pass_reference = c.req.param('pass_reference')
   
-  if (!token) {
-    return c.json({ error: 'Unauthorized' }, 401)
+  // Accept either Bearer token OR admin session headers
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  const userId = c.req.header('X-User-ID')
+  const propertyId = c.req.header('X-Property-ID')
+  
+  if (!token && !userId) {
+    return c.json({ error: 'Unauthorized - No authentication provided' }, 401)
   }
   
   try {
@@ -15605,10 +15609,14 @@ app.get('/api/admin/passes/:pass_reference', async (c) => {
 // API Endpoint: Save Digital Consent Signature
 app.post('/api/admin/face-enrollment/consent', async (c) => {
   const { DB } = c.env
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
   
-  if (!token) {
-    return c.json({ error: 'Unauthorized' }, 401)
+  // Accept either Bearer token OR admin session headers
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  const userId = c.req.header('X-User-ID')
+  const propertyId = c.req.header('X-Property-ID')
+  
+  if (!token && !userId) {
+    return c.json({ error: 'Unauthorized - No authentication provided' }, 401)
   }
   
   try {
@@ -15684,10 +15692,14 @@ app.post('/api/admin/face-enrollment/consent', async (c) => {
 // API Endpoint: Complete Face Enrollment (after consent captured)
 app.post('/api/admin/face-enrollment/complete', async (c) => {
   const { DB } = c.env
-  const token = c.req.header('Authorization')?.replace('Bearer ', '')
   
-  if (!token) {
-    return c.json({ error: 'Unauthorized' }, 401)
+  // Accept either Bearer token OR admin session headers
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  const userId = c.req.header('X-User-ID')
+  const propertyId = c.req.header('X-Property-ID')
+  
+  if (!token && !userId) {
+    return c.json({ error: 'Unauthorized - No authentication provided' }, 401)
   }
   
   try {
