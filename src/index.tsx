@@ -15401,24 +15401,45 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
       return c.json({ error: 'Pass not found' }, 404)
     }
     
-    // Delete family members first (foreign key constraint)
+    // Delete all related records first (foreign key constraints)
+    
+    // 1. Delete family members
     await DB.prepare(`
       DELETE FROM pass_family_members WHERE pass_id = ?
     `).bind(pass_id).run()
     
-    // Delete verification records
+    // 2. Delete verification records
     await DB.prepare(`
       DELETE FROM pass_verifications WHERE pass_id = ?
     `).bind(pass_id).run()
     
-    // Delete fraud alerts
+    // 3. Delete fraud alerts (two tables)
     await DB.prepare(`
       DELETE FROM face_verification_fraud_alerts WHERE pass_id = ?
     `).bind(pass_id).run()
     
-    // Delete pass upgrades
+    await DB.prepare(`
+      DELETE FROM pass_fraud_alerts WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 4. Delete pass upgrades
     await DB.prepare(`
       DELETE FROM pass_upgrades WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 5. Delete biometric consent signatures
+    await DB.prepare(`
+      DELETE FROM biometric_consent_signatures WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 6. Delete biometric audit log
+    await DB.prepare(`
+      DELETE FROM biometric_audit_log WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 7. Delete biometric deletion queue
+    await DB.prepare(`
+      DELETE FROM biometric_deletion_queue WHERE pass_id = ?
     `).bind(pass_id).run()
     
     // Finally delete the pass itself
