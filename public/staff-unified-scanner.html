@@ -411,9 +411,7 @@
                 if (response.status === 409 && data.already_checked_in) {
                     // DUPLICATE CHECK-IN
                     showDuplicateAlert(data);
-                    setTimeout(() => {
-                        resetScanner();
-                    }, 5000); // Longer delay for staff to read alert
+                    // NO AUTO-TIMEOUT - Staff must manually dismiss by clicking "Dismiss" button
                 } else if (response.ok && data.match_found) {
                     const confidence = data.match_score * 100; // Convert to percentage
                     
@@ -626,38 +624,61 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+            
+            // Get guest photo (prioritize face_photo_url over primary_guest_photo_url)
+            const photoUrl = data.pass_details?.face_photo_url || data.pass_details?.primary_guest_photo_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23f3f4f6" width="150" height="150"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280"%3ENo Photo%3C/text%3E%3C/svg%3E';
+            
             resultDiv.innerHTML = `
-                <div class="bg-red-100 border-l-4 border-red-600 p-4 rounded-lg animate-pulse">
-                    <div class="flex items-center mb-3">
-                        <i class="fas fa-exclamation-circle text-4xl text-red-700 mr-3"></i>
-                        <div>
-                            <h3 class="text-xl font-bold text-red-800">🚨 DUPLICATE CHECK-IN</h3>
-                            <p class="text-xs text-red-700">Already checked in today!</p>
+                <div class="bg-red-100 border-l-4 border-red-600 p-4 rounded-lg">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <i class="fas fa-exclamation-circle text-4xl text-red-700"></i>
+                            <div>
+                                <h3 class="text-xl font-bold text-red-800">🚨 DUPLICATE CHECK-IN</h3>
+                                <p class="text-xs text-red-700">Already checked in today!</p>
+                            </div>
+                        </div>
+                        <button onclick="resetScanner()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
+                            <i class="fas fa-times mr-1"></i>Dismiss
+                        </button>
+                    </div>
+                    
+                    <!-- Guest Photo & Details Side by Side -->
+                    <div class="grid grid-cols-3 gap-4 bg-white rounded-lg p-4 border-2 border-red-300">
+                        <!-- Photo Column -->
+                        <div class="flex flex-col items-center">
+                            <div class="w-32 h-32 rounded-lg overflow-hidden border-4 border-red-400 bg-gray-50">
+                                <img src="${photoUrl}" alt="${data.pass_details?.guest_name || 'Guest'}" class="w-full h-full object-cover">
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2 text-center">Guest Identity Photo</p>
+                        </div>
+                        
+                        <!-- Details Columns -->
+                        <div class="col-span-2 space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 font-semibold">Guest:</span>
+                                <span class="font-bold text-red-700">${data.pass_details?.guest_name || 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 font-semibold">Room:</span>
+                                <span class="font-bold">${data.pass_details?.room_number || 'N/A'}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 font-semibold">Tier:</span>
+                                <span class="font-bold">${data.pass_details?.tier || 'N/A'}</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="flex justify-between bg-red-50 p-2 rounded">
+                                <span class="text-gray-600 font-semibold">First Check-In:</span>
+                                <span class="font-bold text-red-700">${checkInTime}</span>
+                            </div>
+                            <div class="flex justify-between bg-red-50 p-2 rounded">
+                                <span class="text-gray-600 font-semibold">Checked By:</span>
+                                <span class="font-bold">${data.first_check_in_staff || 'Staff'}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="bg-white rounded-lg p-3 space-y-2 text-sm border-2 border-red-300">
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 font-semibold">Guest:</span>
-                            <span class="font-bold text-red-700">${data.pass_details?.guest_name || 'N/A'}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 font-semibold">Room:</span>
-                            <span class="font-bold">${data.pass_details?.room_number || 'N/A'}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600 font-semibold">Tier:</span>
-                            <span class="font-bold">${data.pass_details?.tier || 'N/A'}</span>
-                        </div>
-                        <hr class="my-2">
-                        <div class="flex justify-between bg-red-50 p-2 rounded">
-                            <span class="text-gray-600 font-semibold">First Check-In:</span>
-                            <span class="font-bold text-red-700">${checkInTime}</span>
-                        </div>
-                        <div class="flex justify-between bg-red-50 p-2 rounded">
-                            <span class="text-gray-600 font-semibold">Checked By:</span>
-                            <span class="font-bold">${data.first_check_in_staff || 'Staff'}</span>
-                        </div>
-                    </div>
+                    
                     <div class="mt-3 p-3 bg-red-200 rounded-lg text-center">
                         <p class="text-red-900 font-bold text-sm">
                             <i class="fas fa-ban mr-2"></i>

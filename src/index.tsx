@@ -16470,7 +16470,9 @@ app.post('/api/staff/verify-pass', async (c) => {
           pass_reference: pass.pass_reference,
           guest_name: pass.primary_guest_name,
           room_number: pass.room_number,
-          tier: pass.tier_display_name
+          tier: pass.tier_display_name,
+          face_photo_url: pass.face_photo_url,
+          primary_guest_photo_url: pass.primary_guest_photo_url
         }
       }, 409)
     }
@@ -16508,7 +16510,9 @@ app.post('/api/staff/verify-pass', async (c) => {
         num_adults: pass.num_adults,
         num_children: pass.num_children,
         valid_from: pass.valid_from,
-        valid_until: pass.valid_until
+        valid_until: pass.valid_until,
+        face_photo_url: pass.face_photo_url,
+        primary_guest_photo_url: pass.primary_guest_photo_url
       }
     })
   } catch (error) {
@@ -58829,4 +58833,6 @@ export default {
       console.error('Scheduled biometric deletion error:', error)
     }
   }
+}
+}
 }
