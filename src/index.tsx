@@ -23,6 +23,209 @@ app.get('/guest-pass/:pass_reference', async (c) => {
   return c.html(await response.text())
 })
 
+// Room-Based Guest Landing Page (scanned from room QR code)
+app.get('/room/:room_qr_code', async (c) => {
+  const { DB } = c.env
+  const room_qr_code = c.req.param('room_qr_code')
+
+  try {
+    // Get room and current guest information
+    const room = await DB.prepare(`
+      SELECT 
+        r.room_id,
+        r.room_number,
+        r.room_type,
+        r.property_id,
+        p.name as property_name,
+        p.slug as property_slug,
+        p.primary_color,
+        p.secondary_color
+      FROM rooms r
+      JOIN properties p ON r.property_id = p.property_id
+      WHERE r.room_qr_code = ?
+    `).bind(room_qr_code).first()
+
+    if (!room) {
+      return c.html(`
+        <html>
+        <head>
+          <title>Room Not Found</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+          <div class="bg-white p-8 rounded-lg shadow-lg text-center">
+            <i class="fas fa-times-circle text-red-500 text-6xl mb-4"></i>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Room Not Found</h1>
+            <p class="text-gray-600">Invalid QR code. Please contact reception.</p>
+          </div>
+        </body>
+        </html>
+      `, 404)
+    }
+
+    // Get guest information for this room (from digital_passes table)
+    const guestPass = await DB.prepare(`
+      SELECT 
+        pass_id,
+        pass_reference,
+        primary_guest_name,
+        guest_email,
+        guest_phone,
+        tier_id,
+        valid_from,
+        valid_until,
+        face_enrolled_at
+      FROM digital_passes
+      WHERE property_id = ? AND room_number = ? AND pass_status = 'active'
+      ORDER BY pass_id DESC
+      LIMIT 1
+    `).bind(room.property_id, room.room_number).first()
+
+    // Extract last name from primary_guest_name
+    const guestName = guestPass?.primary_guest_name || 'Guest'
+    const nameParts = guestName.split(' ')
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : guestName
+
+    return c.html(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome - ${room.property_name}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+          <style>
+            .gradient-bg { background: linear-gradient(135deg, ${room.primary_color || '#016e8f'} 0%, ${room.secondary_color || '#014a5e'} 100%); }
+          </style>
+      </head>
+      <body class="bg-gray-50">
+          <!-- Welcome Header -->
+          <div class="gradient-bg text-white py-12 px-4">
+              <div class="max-w-4xl mx-auto text-center">
+                  <img src="/guestconnect-logo-transparent.png" alt="${room.property_name}" class="h-20 mx-auto mb-4">
+                  <h1 class="text-4xl font-bold mb-2">Welcome back, ${lastName}!</h1>
+                  <p class="text-xl opacity-90">Room ${room.room_number} • ${room.room_type.charAt(0).toUpperCase() + room.room_type.slice(1)}</p>
+              </div>
+          </div>
+
+          <!-- Quick Access Cards -->
+          <div class="max-w-6xl mx-auto px-4 py-8">
+              ${guestPass ? `
+              <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                  <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <i class="fas fa-id-card"></i>
+                      Your Digital Pass
+                  </h2>
+                  <div class="grid md:grid-cols-2 gap-4">
+                      <div>
+                          <p class="text-gray-600"><strong>Name:</strong> ${guestName}</p>
+                          <p class="text-gray-600"><strong>Pass:</strong> ${guestPass.pass_reference}</p>
+                          <p class="text-gray-600"><strong>Valid:</strong> ${new Date(guestPass.valid_from).toLocaleDateString()} - ${new Date(guestPass.valid_until).toLocaleDateString()}</p>
+                      </div>
+                      <div class="flex items-center justify-end">
+                          <a href="/guest-pass/${guestPass.pass_reference}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2">
+                              <i class="fas fa-qrcode"></i>
+                              View My Pass
+                          </a>
+                      </div>
+                  </div>
+              </div>
+              ` : ''}
+
+              <div class="grid md:grid-cols-3 gap-6 mb-8">
+                  <!-- Activities -->
+                  <a href="/${room.property_slug}" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer">
+                      <div class="text-center">
+                          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <i class="fas fa-calendar-check text-blue-600 text-2xl"></i>
+                          </div>
+                          <h3 class="text-xl font-bold text-gray-800 mb-2">Activities</h3>
+                          <p class="text-gray-600 text-sm">Book excursions and activities</p>
+                      </div>
+                  </a>
+
+                  <!-- Dining -->
+                  <a href="/room-service/${room.property_id}" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer">
+                      <div class="text-center">
+                          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <i class="fas fa-utensils text-green-600 text-2xl"></i>
+                          </div>
+                          <h3 class="text-xl font-bold text-gray-800 mb-2">Dining</h3>
+                          <p class="text-gray-600 text-sm">Order room service & book tables</p>
+                      </div>
+                  </a>
+
+                  <!-- Hotel Info -->
+                  <a href="/info/${room.property_slug}" class="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer">
+                      <div class="text-center">
+                          <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <i class="fas fa-info-circle text-purple-600 text-2xl"></i>
+                          </div>
+                          <h3 class="text-xl font-bold text-gray-800 mb-2">Hotel Info</h3>
+                          <p class="text-gray-600 text-sm">Amenities, services & contact</p>
+                      </div>
+                  </a>
+              </div>
+
+              <!-- Additional Services -->
+              <div class="grid md:grid-cols-2 gap-6">
+                  <div class="bg-white rounded-xl shadow-lg p-6">
+                      <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <i class="fas fa-concierge-bell"></i>
+                          Concierge
+                      </h3>
+                      <p class="text-gray-600 mb-4">Need assistance? Our concierge team is here to help 24/7.</p>
+                      <a href="tel:+1234567890" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 inline-flex items-center gap-2">
+                          <i class="fas fa-phone"></i>
+                          Call Concierge
+                      </a>
+                  </div>
+
+                  <div class="bg-white rounded-xl shadow-lg p-6">
+                      <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                          <i class="fas fa-spa"></i>
+                          Spa & Wellness
+                      </h3>
+                      <p class="text-gray-600 mb-4">Relax and rejuvenate with our spa treatments.</p>
+                      <a href="/${room.property_slug}#spa" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 inline-flex items-center gap-2">
+                          <i class="fas fa-calendar"></i>
+                          Book Spa
+                      </a>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="bg-gray-800 text-white py-8 mt-12">
+              <div class="max-w-4xl mx-auto text-center px-4">
+                  <p class="text-gray-400">Room ${room.room_number} • ${room.property_name}</p>
+                  <p class="text-gray-500 text-sm mt-2">Powered by GuestConnect</p>
+              </div>
+          </div>
+      </body>
+      </html>
+    `)
+  } catch (error) {
+    console.error('Room landing page error:', error)
+    return c.html(`
+      <html>
+      <head>
+        <title>Error</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+      </head>
+      <body class="bg-gray-100 flex items-center justify-center min-h-screen">
+        <div class="bg-white p-8 rounded-lg shadow-lg text-center">
+          <i class="fas fa-exclamation-triangle text-yellow-500 text-6xl mb-4"></i>
+          <h1 class="text-2xl font-bold text-gray-800 mb-2">Error</h1>
+          <p class="text-gray-600">Unable to load room information. Please try again later.</p>
+        </div>
+      </body>
+      </html>
+    `, 500)
+  }
+})
+
 // Guest Self-Service Portal  
 app.get('/guest-portal.html', async (c) => {
   const response = await c.env.ASSETS.fetch(new URL('/guest-portal.html', c.req.url))
@@ -5750,6 +5953,54 @@ app.post('/api/admin/rooms/:room_id/regenerate-qr', async (c) => {
   } catch (error) {
     console.error('Regenerate QR error:', error)
     return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Generate unique room QR codes for all rooms (for guest auto-detection)
+app.post('/api/admin/rooms/generate-guest-qr-codes', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+
+  try {
+    // Get all rooms for the property
+    const rooms = await DB.prepare(`
+      SELECT room_id, room_number, room_qr_code
+      FROM rooms
+      WHERE property_id = ?
+      ORDER BY room_number
+    `).bind(propertyId).all()
+
+    let generated = 0
+    let skipped = 0
+
+    // Generate QR codes for rooms that don't have one
+    for (const room of rooms.results) {
+      if (!room.room_qr_code) {
+        // Generate unique QR code: ROOM-{PROPERTY_ID}-{ROOM_NUMBER}-{RANDOM}
+        const roomQrCode = `ROOM-${propertyId}-${room.room_number}-${crypto.randomUUID().substring(0, 8).toUpperCase()}`
+        
+        await DB.prepare(`
+          UPDATE rooms
+          SET room_qr_code = ?
+          WHERE room_id = ?
+        `).bind(roomQrCode, room.room_id).run()
+        
+        generated++
+      } else {
+        skipped++
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: `Generated ${generated} room QR codes, skipped ${skipped} existing`,
+      generated,
+      skipped,
+      total: rooms.results.length
+    })
+  } catch (error) {
+    console.error('Generate room QR codes error:', error)
+    return c.json({ error: 'Failed to generate QR codes: ' + error.message }, 500)
   }
 })
 
