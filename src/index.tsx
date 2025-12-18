@@ -34898,6 +34898,7 @@ app.get('/admin/dashboard', (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
       /* Sidebar Navigation Styles */
       .sidebar-btn {
@@ -35796,6 +35797,49 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Old Rooms Tab (keep for backward compatibility but hide) -->
         <div id="roomsTab" class="tab-content hidden">
+            <!-- Room-Based Guest QR Codes (New System) -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-qrcode text-blue-600"></i>
+                            Room Guest QR Codes
+                        </h2>
+                        <p class="text-gray-600 mt-2">Generate unique QR codes for each room. Guests scan the code in their room for instant access to services.</p>
+                    </div>
+                    <button onclick="generateAllRoomQRCodes()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2 shadow-lg">
+                        <i class="fas fa-magic"></i>
+                        Generate All QR Codes
+                    </button>
+                </div>
+                
+                <div class="grid md:grid-cols-3 gap-4 mt-6">
+                    <div class="bg-white rounded-lg p-4 text-center shadow">
+                        <div class="text-3xl font-bold text-blue-600" id="totalRoomsCount">0</div>
+                        <div class="text-gray-600 text-sm mt-1">Total Rooms</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 text-center shadow">
+                        <div class="text-3xl font-bold text-green-600" id="roomsWithQRCount">0</div>
+                        <div class="text-gray-600 text-sm mt-1">With QR Codes</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 text-center shadow">
+                        <div class="text-3xl font-bold text-gray-600" id="roomsWithoutQRCount">0</div>
+                        <div class="text-gray-600 text-sm mt-1">Without QR Codes</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Room QR Codes List -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-gray-800">Room QR Codes</h3>
+                <div id="roomQRCodesList" class="space-y-3">
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                        <p>Loading rooms...</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4"><i class="fas fa-door-open mr-2 text-blue-600"></i>Individual Room QR Codes (Legacy)</h2>
                 <form id="addRoomForm" class="grid md:grid-cols-3 gap-4">
@@ -41621,10 +41665,185 @@ app.get('/admin/dashboard', (c) => {
           }
           
           list.innerHTML = rooms.map(r => '<div class="border rounded-lg p-4 flex justify-between items-center hover:shadow-md transition"><div><span class="font-bold text-lg">Room ' + r.room_number + '</span><span class="text-gray-600 ml-3">' + r.room_type + '</span></div><div class="flex gap-2"><a href="/hotel/paradise-resort" target="_blank" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200"><i class="fas fa-external-link-alt mr-2"></i>Test QR</a><button onclick="regenerateQR(' + r.room_id + ')" class="bg-yellow-100 text-yellow-700 px-4 py-2 rounded hover:bg-yellow-200"><i class="fas fa-sync mr-2"></i>Regenerate QR</button></div></div>').join('');
+          
+          // Also load room QR codes for the new system
+          loadRoomQRCodes();
         } catch (error) {
           console.error('Load rooms error:', error);
         }
       }
+
+      // Load Room QR Codes (New System)
+      async function loadRoomQRCodes() {
+        try {
+          const response = await fetch('/api/admin/rooms?property_id=' + propertyId);
+          const rooms = await response.json();
+          
+          const totalRooms = rooms.length;
+          const roomsWithQR = rooms.filter(r => r.room_qr_code).length;
+          const roomsWithoutQR = totalRooms - roomsWithQR;
+          
+          // Update stats
+          document.getElementById('totalRoomsCount').textContent = totalRooms;
+          document.getElementById('roomsWithQRCount').textContent = roomsWithQR;
+          document.getElementById('roomsWithoutQRCount').textContent = roomsWithoutQR;
+          
+          // Display room QR codes
+          const list = document.getElementById('roomQRCodesList');
+          
+          if (rooms.length === 0) {
+            list.innerHTML = '<div class="text-center py-8 text-gray-400"><i class="fas fa-inbox text-4xl mb-3"></i><p>No rooms found. Create rooms first.</p></div>';
+            return;
+          }
+          
+          list.innerHTML = rooms.map(room => {
+            const hasQR = room.room_qr_code;
+            const qrUrl = hasQR ? window.location.origin + '/room/' + room.room_qr_code : null;
+            
+            return '<div class="border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg transition">' +
+              '<div class="flex justify-between items-center">' +
+                '<div class="flex-1">' +
+                  '<div class="font-bold text-lg text-gray-800">Room ' + room.room_number + '</div>' +
+                  '<div class="text-sm text-gray-600 capitalize">' + room.room_type + ' • ' + (room.status || 'vacant') + '</div>' +
+                  (hasQR ? '<div class="text-xs text-green-600 mt-1"><i class="fas fa-check-circle mr-1"></i>QR Code: ' + room.room_qr_code + '</div>' : '<div class="text-xs text-gray-400 mt-1"><i class="fas fa-times-circle mr-1"></i>No QR Code</div>') +
+                '</div>' +
+                '<div class="flex gap-2">' +
+                  (hasQR ? 
+                    '<button onclick="viewRoomQRCode(\'' + room.room_qr_code + '\', \'' + room.room_number + '\')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-1">' +
+                      '<i class="fas fa-qrcode"></i> View QR' +
+                    '</button>' +
+                    '<button onclick="downloadRoomQR(\'' + qrUrl + '\', \'' + room.room_number + '\')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-1">' +
+                      '<i class="fas fa-download"></i>' +
+                    '</button>' +
+                    '<a href="' + qrUrl + '" target="_blank" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold flex items-center gap-1">' +
+                      '<i class="fas fa-external-link-alt"></i>' +
+                    '</a>'
+                    : 
+                    '<button onclick="generateSingleRoomQR(' + room.room_id + ')" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-semibold">' +
+                      '<i class="fas fa-magic mr-1"></i> Generate' +
+                    '</button>'
+                  ) +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+        } catch (error) {
+          console.error('Load room QR codes error:', error);
+        }
+      }
+
+      // Generate all room QR codes
+      window.generateAllRoomQRCodes = async function() {
+        if (!confirm('Generate QR codes for all rooms?\n\nThis will create unique QR codes for rooms that don\'t have one yet.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/rooms/generate-guest-qr-codes', {
+            method: 'POST',
+            headers: {
+              'X-Property-ID': propertyId,
+              'X-User-ID': localStorage.getItem('user_id')
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Success!\n\nGenerated: ' + data.generated + ' QR codes\nSkipped: ' + data.skipped + ' (already had QR codes)\nTotal Rooms: ' + data.total);
+            loadRoomQRCodes();
+          } else {
+            alert('❌ Failed to generate QR codes');
+          }
+        } catch (error) {
+          console.error('Generate QR codes error:', error);
+          alert('❌ Error generating QR codes');
+        }
+      };
+
+      // View room QR code
+      window.viewRoomQRCode = function(qrCode, roomNumber) {
+        const url = window.location.origin + '/room/' + qrCode;
+        const modal = document.createElement('div');
+        modal.id = 'qr-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">' +
+          '<div class="flex justify-between items-center mb-4">' +
+            '<h3 class="text-2xl font-bold">Room ' + roomNumber + ' QR Code</h3>' +
+            '<button onclick="closeQRModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>' +
+          '</div>' +
+          '<div class="text-center mb-4">' +
+            '<div id="qrcode-container" class="inline-block p-4 bg-white border-2 border-gray-300 rounded-lg"></div>' +
+          '</div>' +
+          '<div class="text-sm text-gray-600 mb-4 break-all bg-gray-100 p-3 rounded">' +
+            '<strong>URL:</strong> ' + url +
+          '</div>' +
+          '<div class="flex gap-2">' +
+            '<button onclick="downloadRoomQR(\'' + url + '\', \'' + roomNumber + '\')" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">' +
+              '<i class="fas fa-download mr-2"></i>Download QR' +
+            '</button>' +
+            '<button onclick="closeQRModal()" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold">Close</button>' +
+          '</div>' +
+        '</div>';
+        
+        document.body.appendChild(modal);
+        
+        // Generate QR code using QRCode library (assume it's loaded)
+        new QRCode(document.getElementById('qrcode-container'), {
+          text: url,
+          width: 256,
+          height: 256
+        });
+      };
+
+      window.closeQRModal = function() {
+        const modal = document.getElementById('qr-modal');
+        if (modal) modal.remove();
+      };
+
+      // Download room QR code
+      window.downloadRoomQR = function(url, roomNumber) {
+        // Create canvas and generate QR code
+        const canvas = document.createElement('canvas');
+        QRCode.toCanvas(canvas, url, { width: 512 }, function(error) {
+          if (error) {
+            console.error('QR generation error:', error);
+            alert('Failed to generate QR code');
+            return;
+          }
+          
+          // Download canvas as image
+          const link = document.createElement('a');
+          link.download = 'room-' + roomNumber + '-qr-code.png';
+          link.href = canvas.toDataURL();
+          link.click();
+        });
+      };
+
+      // Generate single room QR code
+      window.generateSingleRoomQR = async function(roomId) {
+        try {
+          const response = await fetch('/api/admin/rooms/' + roomId + '/regenerate-qr', {
+            method: 'POST',
+            headers: {
+              'X-Property-ID': propertyId,
+              'X-User-ID': localStorage.getItem('user_id')
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ QR code generated successfully!');
+            loadRoomQRCodes();
+          } else {
+            alert('❌ Failed to generate QR code');
+          }
+        } catch (error) {
+          console.error('Generate QR error:', error);
+          alert('❌ Error generating QR code');
+        }
+      };
 
       async function loadVendors() {
         try {
