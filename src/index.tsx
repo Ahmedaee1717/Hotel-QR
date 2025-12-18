@@ -12075,11 +12075,14 @@ app.post('/api/chatbot/chat', async (c) => {
       }
     }
     
-    // 🏖️ BOOKING INTENT DETECTION - Beach & Restaurant Reservations
+    // 🏖️ BOOKING INTENT DETECTION - Beach & Restaurant Reservations (Multilingual)
     const bookingKeywords = {
-      beach: ['beach', 'umbrella', 'cabana', 'lounger', 'daybed', 'spot', 'sunbed'],
-      restaurant: ['restaurant', 'table', 'dinner', 'lunch', 'breakfast', 'dine', 'eat', 'reserve'],
-      booking: ['book', 'reserve', 'reservation', 'make a booking', 'i want to', 'can i']
+      beach: ['beach', 'umbrella', 'cabana', 'lounger', 'daybed', 'spot', 'sunbed',
+              'بحر', 'شاطئ', 'مظلة', 'كابانا', 'كرسي', 'سرير'], // Arabic
+      restaurant: ['restaurant', 'table', 'dinner', 'lunch', 'breakfast', 'dine', 'eat', 'reserve',
+                   'مطعم', 'طاولة', 'عشاء', 'غداء', 'فطور', 'طرابيزة', 'أكل'], // Arabic
+      booking: ['book', 'reserve', 'reservation', 'make a booking', 'i want to', 'can i', 'want', 'need',
+                'احجز', 'حجز', 'عايز', 'محتاج', 'اريد', 'ممكن', 'نفسي'] // Arabic
     };
     
     const messageLowerBooking = message.toLowerCase();
@@ -12100,21 +12103,45 @@ app.post('/api/chatbot/chat', async (c) => {
         `).bind(property_id).first();
         
         if (beachSettings?.beach_booking_enabled === 1) {
-          bookingResponse = `🏖️ **I'd be delighted to help you reserve a beach spot!**\n\n`;
-          bookingResponse += `We offer:\n`;
-          bookingResponse += `🔵 **Umbrellas** - Classic beach experience\n`;
-          bookingResponse += `🟢 **Cabanas** - Private & cozy\n`;
-          bookingResponse += `🟡 **Loungers** - Relax in style\n`;
-          bookingResponse += `🟣 **Daybeds** - Ultimate comfort\n\n`;
-          bookingResponse += `**[Click here to select your spot and complete your beach reservation](/beach-booking/${property_id})**\n\n`;
-          bookingResponse += `You'll be able to:\n`;
-          bookingResponse += `✅ Choose your preferred date and time slot\n`;
-          bookingResponse += `✅ See available spots on our interactive beach map\n`;
-          bookingResponse += `✅ Select your ideal spot type\n`;
-          bookingResponse += `✅ Receive instant confirmation with QR code\n\n`;
-          bookingResponse += `The booking takes just 2 minutes! 🌊`;
+          // Detect language from message
+          const isArabic = /[\u0600-\u06FF]/.test(message);
+          
+          if (isArabic) {
+            // Arabic response
+            bookingResponse = `🏖️ **يسعدني مساعدتك في حجز مكانك على الشاطئ!**\n\n`;
+            bookingResponse += `نوفر لك:\n`;
+            bookingResponse += `🔵 **مظلات** - تجربة شاطئية كلاسيكية\n`;
+            bookingResponse += `🟢 **كابانات** - خصوصية وراحة\n`;
+            bookingResponse += `🟡 **كراسي استرخاء** - استرخاء بأناقة\n`;
+            bookingResponse += `🟣 **أسرّة مريحة** - راحة قصوى\n\n`;
+            bookingResponse += `**[اضغط هنا لاختيار مكانك وإتمام حجز الشاطئ](/beach-booking/${property_id})**\n\n`;
+            bookingResponse += `يمكنك:\n`;
+            bookingResponse += `✅ اختيار التاريخ والوقت المفضل\n`;
+            bookingResponse += `✅ رؤية الأماكن المتاحة على خريطة تفاعلية\n`;
+            bookingResponse += `✅ اختيار نوع المكان المثالي\n`;
+            bookingResponse += `✅ الحصول على تأكيد فوري مع رمز QR\n\n`;
+            bookingResponse += `الحجز يستغرق دقيقتين فقط! 🌊`;
+          } else {
+            // English response
+            bookingResponse = `🏖️ **I'd be delighted to help you reserve a beach spot!**\n\n`;
+            bookingResponse += `We offer:\n`;
+            bookingResponse += `🔵 **Umbrellas** - Classic beach experience\n`;
+            bookingResponse += `🟢 **Cabanas** - Private & cozy\n`;
+            bookingResponse += `🟡 **Loungers** - Relax in style\n`;
+            bookingResponse += `🟣 **Daybeds** - Ultimate comfort\n\n`;
+            bookingResponse += `**[Click here to select your spot and complete your beach reservation](/beach-booking/${property_id})**\n\n`;
+            bookingResponse += `You'll be able to:\n`;
+            bookingResponse += `✅ Choose your preferred date and time slot\n`;
+            bookingResponse += `✅ See available spots on our interactive beach map\n`;
+            bookingResponse += `✅ Select your ideal spot type\n`;
+            bookingResponse += `✅ Receive instant confirmation with QR code\n\n`;
+            bookingResponse += `The booking takes just 2 minutes! 🌊`;
+          }
         } else {
-          bookingResponse = `I apologize, but beach bookings are currently not available. Please contact our front desk for assistance.`;
+          const isArabic = /[\u0600-\u06FF]/.test(message);
+          bookingResponse = isArabic 
+            ? `عذراً، حجز الشاطئ غير متاح حالياً. يرجى التواصل مع مكتب الاستقبال.`
+            : `I apologize, but beach bookings are currently not available. Please contact our front desk for assistance.`;
         }
       } else if (bookingType === 'restaurant') {
         // Get active restaurants
@@ -12127,8 +12154,15 @@ app.post('/api/chatbot/chat', async (c) => {
         `).bind(property_id).all();
         
         if (restaurants.results && restaurants.results.length > 0) {
-          bookingResponse = `🍽️ **I'd be happy to help you make a restaurant reservation!**\n\n`;
-          bookingResponse += `We have ${restaurants.results.length} dining options available:\n\n`;
+          const isArabic = /[\u0600-\u06FF]/.test(message);
+          
+          if (isArabic) {
+            bookingResponse = `🍽️ **يسعدني مساعدتك في حجز طاولة بالمطعم!**\n\n`;
+            bookingResponse += `لدينا ${restaurants.results.length} خيارات طعام متاحة:\n\n`;
+          } else {
+            bookingResponse = `🍽️ **I'd be happy to help you make a restaurant reservation!**\n\n`;
+            bookingResponse += `We have ${restaurants.results.length} dining options available:\n\n`;
+          }
           
           restaurants.results.forEach((restaurant: any, index: number) => {
             const emoji = index === 0 ? '☀️' : index === 1 ? '🏖️' : index === 2 ? '🌿' : '🍴';
@@ -12139,14 +12173,26 @@ app.post('/api/chatbot/chat', async (c) => {
             bookingResponse += `\n`;
           });
           
-          bookingResponse += `**Simply click on any restaurant above to:**\n`;
-          bookingResponse += `✅ View the full menu\n`;
-          bookingResponse += `✅ Select your preferred date and time\n`;
-          bookingResponse += `✅ Choose party size\n`;
-          bookingResponse += `✅ Get instant confirmation\n\n`;
-          bookingResponse += `Looking forward to serving you! 🎉`;
+          if (isArabic) {
+            bookingResponse += `**اضغط على أي مطعم أعلاه من أجل:**\n`;
+            bookingResponse += `✅ عرض القائمة الكاملة\n`;
+            bookingResponse += `✅ اختيار التاريخ والوقت المفضل\n`;
+            bookingResponse += `✅ تحديد عدد الأشخاص\n`;
+            bookingResponse += `✅ الحصول على تأكيد فوري\n\n`;
+            bookingResponse += `نتطلع لخدمتك! 🎉`;
+          } else {
+            bookingResponse += `**Simply click on any restaurant above to:**\n`;
+            bookingResponse += `✅ View the full menu\n`;
+            bookingResponse += `✅ Select your preferred date and time\n`;
+            bookingResponse += `✅ Choose party size\n`;
+            bookingResponse += `✅ Get instant confirmation\n\n`;
+            bookingResponse += `Looking forward to serving you! 🎉`;
+          }
         } else {
-          bookingResponse = `I apologize, but I couldn't find available restaurants at the moment. Please contact our concierge for assistance.`;
+          const isArabic = /[\u0600-\u06FF]/.test(message);
+          bookingResponse = isArabic
+            ? `عذراً، لم أتمكن من العثور على مطاعم متاحة حالياً. يرجى التواصل مع خدمة الكونسيرج.`
+            : `I apologize, but I couldn't find available restaurants at the moment. Please contact our concierge for assistance.`;
         }
       }
       
