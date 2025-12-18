@@ -21849,11 +21849,12 @@ app.get('/hotel/:property_slug', async (c) => {
               console.log('🎤 Recording with:', options.mimeType, 'at', options.audioBitsPerSecond, 'bps');
               
               let silenceStart = null;
-              const silenceThreshold = 20; // Adjust sensitivity
-              const silenceDuration = 1500; // Stop after 1.5s of silence
+              const silenceThreshold = 10; // Lower = more sensitive to silence (was 20)
+              const silenceDuration = 1000; // Stop after 1s of silence (was 1500ms)
               let hasSpoken = false;
               const recordingStartTime = Date.now();
-              const minRecordingDuration = 800; // Minimum 800ms to capture full Arabic phrases
+              const minRecordingDuration = 500; // Minimum 500ms (was 800ms)
+              const maxRecordingDuration = 10000; // Maximum 10s to prevent infinite recording
               
               // Monitor audio level for silence detection
               function checkAudioLevel() {
@@ -21869,6 +21870,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 }
                 const average = sum / bufferLength;
                 
+                // Force stop after max duration
+                if (Date.now() - recordingStartTime > maxRecordingDuration) {
+                  console.log('⏱️ Max recording duration reached');
+                  stopRecording();
+                  return;
+                }
+                
                 // Detect speech vs silence
                 if (average > silenceThreshold) {
                   hasSpoken = true;
@@ -21880,6 +21888,7 @@ app.get('/hotel/:property_slug', async (c) => {
                   } else if (Date.now() - silenceStart > silenceDuration) {
                     // Only auto-stop if minimum duration has passed
                     if (Date.now() - recordingStartTime >= minRecordingDuration) {
+                      console.log('🔇 Auto-stop: Silence detected');
                       stopRecording();
                       return;
                     }
@@ -21894,24 +21903,36 @@ app.get('/hotel/:property_slug', async (c) => {
               };
               
               mediaRecorder.onstop = async () => {
+                console.log('📼 MediaRecorder stopped, processing audio...');
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                await transcribeAudio(audioBlob);
+                
+                // Clean up media stream first
                 stream.getTracks().forEach(track => track.stop());
-                audioContext.close();
+                
+                // Close audio context
+                try {
+                  await audioContext.close();
+                } catch (e) {
+                  console.warn('AudioContext close error:', e);
+                }
+                
+                // Transcribe audio
+                await transcribeAudio(audioBlob);
               };
               
               mediaRecorder.start();
               isRecording = true;
-              voiceInputBtn.innerHTML = '<i class="fas fa-circle animate-pulse" style="color: #ef4444;"></i>';
-              voiceInputBtn.title = 'Listening... (speak naturally)';
-              voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.1)';
-              chatInput.placeholder = '🎤 Listening... (stops automatically when you finish)';
+              voiceInputBtn.innerHTML = '<i class="fas fa-stop-circle" style="color: #ef4444;"></i>';
+              voiceInputBtn.title = 'Click to stop recording OR wait for auto-stop after silence';
+              voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+              chatInput.placeholder = '🎤 Recording... Click mic to stop OR it will auto-stop after 1s of silence';
               
               // Start monitoring audio level
               checkAudioLevel();
             } catch (error) {
               console.error('Microphone error:', error);
               addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings.', 'assistant');
+              resetVoiceButton();
             }
           }
           
@@ -21920,13 +21941,36 @@ app.get('/hotel/:property_slug', async (c) => {
             if (mediaRecorder && isRecording) {
               const recordingDuration = Date.now() - recordingStartTime;
               console.log('🎤 Recording stopped. Duration:', recordingDuration, 'ms');
-              mediaRecorder.stop();
+              
+              // Set flag immediately to prevent double-stop
               isRecording = false;
+              
+              // Update UI immediately
               const primaryColor = window.chatbotPrimaryColor || '#667eea';
               voiceInputBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
               voiceInputBtn.title = 'Processing...';
+              voiceInputBtn.disabled = true; // Disable button during processing
               chatInput.placeholder = '⏳ Processing audio...';
+              
+              // Stop the recorder
+              try {
+                mediaRecorder.stop();
+              } catch (e) {
+                console.error('Error stopping recorder:', e);
+                resetVoiceButton();
+              }
             }
+          }
+          
+          // Reset voice button to initial state
+          function resetVoiceButton() {
+            isRecording = false;
+            const primaryColor = window.chatbotPrimaryColor || '#667eea';
+            voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+            voiceInputBtn.title = 'Voice Input';
+            voiceInputBtn.disabled = false;
+            voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+            chatInput.placeholder = 'Ask me anything...';
           }
           
           // Transcribe audio using OpenAI Whisper
@@ -21965,11 +22009,7 @@ app.get('/hotel/:property_slug', async (c) => {
               console.error('Transcription error:', error);
               addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
             } finally {
-              const primaryColor = window.chatbotPrimaryColor || '#667eea';
-              voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-              voiceInputBtn.title = 'Voice Input';
-              voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
-              chatInput.placeholder = 'Ask me anything...';
+              // resetVoiceButton() already called above, handles all UI reset
             }
           }
           
