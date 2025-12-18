@@ -41734,7 +41734,7 @@ app.get('/admin/dashboard', (c) => {
 
       // Generate all room QR codes
       window.generateAllRoomQRCodes = async function() {
-        if (!confirm('Generate QR codes for all rooms?\n\nThis will create unique QR codes for rooms that don\'t have one yet.')) {
+        if (!confirm('Generate QR codes for all rooms?\\n\\nThis will create unique QR codes for rooms that don' + String.fromCharCode(39) + 't have one yet.')) {
           return;
         }
         
@@ -41750,7 +41750,7 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           if (data.success) {
-            alert('✅ Success!\n\nGenerated: ' + data.generated + ' QR codes\nSkipped: ' + data.skipped + ' (already had QR codes)\nTotal Rooms: ' + data.total);
+            alert('✅ Success!\\n\\nGenerated: ' + data.generated + ' QR codes\\nSkipped: ' + data.skipped + ' (already had QR codes)\\nTotal Rooms: ' + data.total);
             loadRoomQRCodes();
           } else {
             alert('❌ Failed to generate QR codes');
