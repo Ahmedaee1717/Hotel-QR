@@ -21810,6 +21810,7 @@ app.get('/hotel/:property_slug', async (c) => {
           let mediaRecorder = null;
           let audioChunks = [];
           let detectedLanguage = 'en';
+          let recordingStartTime = 0;
           
           // Start recording audio using MediaRecorder with auto-stop on silence
           async function startRecording() {
@@ -21852,7 +21853,7 @@ app.get('/hotel/:property_slug', async (c) => {
               const silenceThreshold = 10; // Lower = more sensitive to silence (was 20)
               const silenceDuration = 1000; // Stop after 1s of silence (was 1500ms)
               let hasSpoken = false;
-              const recordingStartTime = Date.now();
+              recordingStartTime = Date.now(); // Set outer scope variable
               const minRecordingDuration = 500; // Minimum 500ms (was 800ms)
               const maxRecordingDuration = 10000; // Maximum 10s to prevent infinite recording
               
