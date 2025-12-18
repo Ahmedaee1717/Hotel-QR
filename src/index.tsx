@@ -21653,9 +21653,10 @@ app.get('/hotel/:property_slug', async (c) => {
             
             recognition.onstart = function() {
               isRecording = true;
-              voiceInputBtn.innerHTML = '<i class="fas fa-stop-circle animate-pulse"></i>';
-              voiceInputBtn.title = 'Stop Recording';
-              chatInput.placeholder = 'Listening...';
+              voiceInputBtn.innerHTML = '<i class="fas fa-circle animate-pulse" style="color: #ef4444;"></i>';
+              voiceInputBtn.title = 'Listening... (click to stop)';
+              voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+              chatInput.placeholder = '🎤 Listening...';
             };
             
             recognition.onresult = function(event) {
@@ -21663,10 +21664,15 @@ app.get('/hotel/:property_slug', async (c) => {
               chatInput.value = transcript;
               chatInput.placeholder = 'Ask me anything...';
               
-              // Automatically send message after voice input
+              // Show transcript and let user review before sending
+              chatInput.focus();
+              
+              // Optional: Auto-send after a moment (user can still edit)
               setTimeout(() => {
-                sendMessage(true);
-              }, 500);
+                if (chatInput.value.trim() === transcript.trim()) {
+                  sendMessage(false); // Don't auto-speak response
+                }
+              }, 1500);
             };
             
             recognition.onerror = function(event) {
@@ -21674,9 +21680,13 @@ app.get('/hotel/:property_slug', async (c) => {
               isRecording = false;
               voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
               voiceInputBtn.title = 'Voice Input';
+              const primaryColor = window.chatbotPrimaryColor || '#667eea';
+              voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
               chatInput.placeholder = 'Ask me anything...';
               if (event.error === 'not-allowed') {
-                alert('Microphone access denied. Please allow microphone access to use voice input.');
+                addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings to use voice input.', 'assistant');
+              } else if (event.error === 'no-speech') {
+                addMessage('👂 No speech detected. Please try again and speak clearly.', 'assistant');
               }
             };
             
@@ -21684,6 +21694,8 @@ app.get('/hotel/:property_slug', async (c) => {
               isRecording = false;
               voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
               voiceInputBtn.title = 'Voice Input';
+              const primaryColor = window.chatbotPrimaryColor || '#667eea';
+              voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
             };
           } else {
             // Hide voice button if not supported
@@ -21708,35 +21720,61 @@ app.get('/hotel/:property_slug', async (c) => {
             });
           }
           
-          // Text-to-speech function
-          function speakText(text) {
+          // Text-to-speech function (opt-in only, improved voice quality)
+          function speakText(text, button) {
             if (!speechSynthesis) return;
             
-            // Stop any ongoing speech
-            speechSynthesis.cancel();
+            // If already speaking, stop it
+            if (isSpeaking) {
+              speechSynthesis.cancel();
+              isSpeaking = false;
+              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
+              return;
+            }
             
-            // Create utterance
+            // Create utterance with better voice settings
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'en-US';
-            utterance.rate = 1.0;
+            utterance.rate = 0.95; // Slightly slower for clarity
             utterance.pitch = 1.0;
             utterance.volume = 1.0;
             
+            // Try to find a better quality voice
+            const voices = speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v => 
+              v.name.includes('Google') || 
+              v.name.includes('Enhanced') || 
+              v.name.includes('Premium') ||
+              v.name.includes('Samantha') || // macOS
+              v.name.includes('Daniel') // Windows
+            );
+            if (preferredVoice) utterance.voice = preferredVoice;
+            
             utterance.onstart = function() {
               isSpeaking = true;
+              if (button) button.innerHTML = '<i class="fas fa-stop-circle"></i>';
             };
             
             utterance.onend = function() {
               isSpeaking = false;
+              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
             };
             
             utterance.onerror = function(event) {
               console.error('Speech synthesis error:', event.error);
               isSpeaking = false;
+              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
             };
             
             // Speak
             speechSynthesis.speak(utterance);
+          }
+          
+          // Load voices when available
+          if (speechSynthesis) {
+            speechSynthesis.onvoiceschanged = function() {
+              speechSynthesis.getVoices();
+            };
           }
           
           // Load chatbot settings and show if enabled
@@ -21761,6 +21799,9 @@ app.get('/hotel/:property_slug', async (c) => {
                   }
                   if (sendBtn) {
                     sendBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
+                  }
+                  if (voiceInputBtn) {
+                    voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
                   }
                   
                   // Store color for message bubbles
@@ -21823,24 +21864,18 @@ app.get('/hotel/:property_slug', async (c) => {
                 const htmlContent = parseMarkdownLinks(text);
                 bubble.innerHTML = htmlContent.replace(/\\n/g, '<br>'); // Preserve line breaks
                 
-                // Add speaker button for bot messages
-                const speakerBtn = document.createElement('button');
-                speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition';
-                speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                speakerBtn.title = 'Listen to response';
-                speakerBtn.onclick = function() {
-                  // Remove markdown links for speech (extract only text)
-                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1');
-                  speakText(cleanText);
-                };
-                bubble.appendChild(speakerBtn);
-                
-                // Auto-speak if voice input was used
-                if (autoSpeak && speechSynthesis) {
-                  setTimeout(() => {
-                    const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1');
-                    speakText(cleanText);
-                  }, 300);
+                // Add speaker button for bot messages (opt-in)
+                if (speechSynthesis) {
+                  const speakerBtn = document.createElement('button');
+                  speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition text-sm';
+                  speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                  speakerBtn.title = 'Listen to response (click to play/stop)';
+                  speakerBtn.onclick = function() {
+                    // Remove markdown links for speech (extract only text)
+                    const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
+                    speakText(cleanText, speakerBtn);
+                  };
+                  bubble.appendChild(speakerBtn);
                 }
               }
               
