@@ -12315,7 +12315,7 @@ app.post('/api/chatbot/chat', async (c) => {
         
         const systemPrompt = `You are ${chatbotName}, the personal concierge assistant for ${hotelName}, a 5-star luxury resort. Your role is to provide impeccable, professional service with warmth and sophistication.
 
-CRITICAL: You MUST respond in the SAME LANGUAGE as the guest's question. If they ask in Arabic, respond in Arabic. If French, respond in French. If Spanish, respond in Spanish. This is ESSENTIAL for international guests.
+CRITICAL: You MUST respond in the SAME LANGUAGE and DIALECT as the guest's question. If they ask in Egyptian Arabic (عامية مصرية), respond in Egyptian Arabic dialect, not Modern Standard Arabic. If they ask in French, respond in French. If Spanish, respond in Spanish. Match their speaking style - if casual/colloquial, respond casually. This is ESSENTIAL for natural conversation.
 
 Guest's Question: "${message}"
 
@@ -12323,8 +12323,8 @@ Relevant Hotel Information (English):
 ${context}${linkContext}
 
 Instructions:
-1. **Language Matching**: ALWAYS respond in the SAME language as the guest's question. Translate your response accordingly.
-2. **Tone**: Professional yet warm, like a luxury hotel concierge. Use phrases appropriate to the language (e.g., "بكل سرور" in Arabic, "Avec plaisir" in French, "Con mucho gusto" in Spanish)
+1. **Language & Dialect Matching**: ALWAYS respond in the SAME language and dialect as the guest. Egyptian Arabic (عامية)? Use Egyptian dialect (e.g., "ازيك", "عامل ايه", "ممكن"). Modern Standard Arabic? Use formal Arabic. French? French. Match their style - if they're casual, be friendly and approachable.
+2. **Tone**: Professional yet warm for formal questions, friendly and natural for casual speech. Use appropriate phrases: Egyptian Arabic ("تمام", "اكيد", "على طول"), MSA ("بكل سرور"), French ("Avec plaisir"), Spanish ("Con mucho gusto")
 3. **Accuracy**: Use ONLY the information provided above. Translate and adapt the information naturally.
 4. **Specifics**: Include prices, times, locations, booking details when mentioned (keep numbers/times as-is)
 5. **Brevity**: Keep responses concise (2-3 sentences) but complete
@@ -12882,7 +12882,8 @@ app.post('/api/voice/transcribe', async (c) => {
     whisperFormData.append('file', audioBlob, 'audio.webm')
     whisperFormData.append('model', 'whisper-1')
     whisperFormData.append('response_format', 'verbose_json')
-    // Auto-detect language - Whisper will identify it automatically
+    // Add prompt to help with Egyptian Arabic dialect recognition
+    whisperFormData.append('prompt', 'Egyptian Arabic dialect, colloquial speech, hotel guest questions in Arabic or English')
 
     console.log('📡 Sending to Whisper API...')
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -22126,12 +22127,14 @@ app.get('/hotel/:property_slug', async (c) => {
                 };
                 bubble.appendChild(speakerBtn);
                 
-                // Auto-speak if voice input was used (immediate, no setTimeout to preserve user gesture)
+                // Auto-speak if voice input was used
                 if (autoSpeak) {
-                  // Immediate call to preserve user gesture context (allows autoplay on mobile)
                   const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
-                  // Use queueMicrotask to avoid blocking UI but keep gesture context
-                  queueMicrotask(() => speakText(cleanText, speakerBtn, language));
+                  // IMMEDIATE call - try to preserve gesture, but mobile may still block
+                  speakText(cleanText, speakerBtn, language).catch(err => {
+                    console.warn('Auto-play blocked on mobile:', err);
+                    // Fallback: just show the speaker button for manual play
+                  });
                 }
               }
               
