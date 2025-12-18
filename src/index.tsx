@@ -21750,12 +21750,58 @@ app.get('/hotel/:property_slug', async (c) => {
           let audioChunks = [];
           let detectedLanguage = 'en';
           
-          // Start recording audio using MediaRecorder
+          // Start recording audio using MediaRecorder with auto-stop on silence
           async function startRecording() {
             try {
               const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              const source = audioContext.createMediaStreamSource(stream);
+              const analyser = audioContext.createAnalyser();
+              analyser.fftSize = 2048;
+              source.connect(analyser);
+              
+              const bufferLength = analyser.frequencyBinCount;
+              const dataArray = new Uint8Array(bufferLength);
+              
               mediaRecorder = new MediaRecorder(stream);
               audioChunks = [];
+              
+              let silenceStart = null;
+              const silenceThreshold = 20; // Adjust sensitivity
+              const silenceDuration = 1500; // Stop after 1.5s of silence
+              let hasSpoken = false;
+              
+              // Monitor audio level for silence detection
+              function checkAudioLevel() {
+                if (!isRecording) return;
+                
+                analyser.getByteTimeDomainData(dataArray);
+                
+                // Calculate volume
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                  const value = Math.abs(dataArray[i] - 128);
+                  sum += value;
+                }
+                const average = sum / bufferLength;
+                
+                // Detect speech vs silence
+                if (average > silenceThreshold) {
+                  hasSpoken = true;
+                  silenceStart = null;
+                } else if (hasSpoken) {
+                  // User has spoken, now checking for silence
+                  if (!silenceStart) {
+                    silenceStart = Date.now();
+                  } else if (Date.now() - silenceStart > silenceDuration) {
+                    // Auto-stop after silence
+                    stopRecording();
+                    return;
+                  }
+                }
+                
+                requestAnimationFrame(checkAudioLevel);
+              }
               
               mediaRecorder.ondataavailable = (event) => {
                 audioChunks.push(event.data);
@@ -21765,14 +21811,18 @@ app.get('/hotel/:property_slug', async (c) => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 await transcribeAudio(audioBlob);
                 stream.getTracks().forEach(track => track.stop());
+                audioContext.close();
               };
               
               mediaRecorder.start();
               isRecording = true;
               voiceInputBtn.innerHTML = '<i class="fas fa-circle animate-pulse" style="color: #ef4444;"></i>';
-              voiceInputBtn.title = 'Recording... (click to stop)';
+              voiceInputBtn.title = 'Listening... (speak naturally)';
               voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.1)';
-              chatInput.placeholder = '🎤 Recording...';
+              chatInput.placeholder = '🎤 Listening... (stops automatically when you finish)';
+              
+              // Start monitoring audio level
+              checkAudioLevel();
             } catch (error) {
               console.error('Microphone error:', error);
               addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings.', 'assistant');
@@ -21807,14 +21857,16 @@ app.get('/hotel/:property_slug', async (c) => {
               if (data.success) {
                 chatInput.value = data.text;
                 detectedLanguage = data.language || 'en';
+                console.log('✅ Transcribed:', data.text, '| Language:', detectedLanguage);
                 chatInput.focus();
                 
-                // Auto-send after review period
+                // Auto-send quickly for seamless experience (500ms instead of 1500ms)
                 setTimeout(() => {
                   if (chatInput.value.trim() === data.text.trim()) {
+                    console.log('📤 Auto-sending message...');
                     sendMessage(true, detectedLanguage); // Pass language and enable auto-speak
                   }
-                }, 1500);
+                }, 500);
               } else {
                 addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
               }
@@ -21857,6 +21909,8 @@ app.get('/hotel/:property_slug', async (c) => {
             try {
               if (button) button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
               
+              console.log('🔊 Requesting TTS for:', text.substring(0, 50), 'Language:', language);
+              
               // Call OpenAI TTS API
               const response = await fetch('/api/voice/synthesize', {
                 method: 'POST',
@@ -21865,37 +21919,63 @@ app.get('/hotel/:property_slug', async (c) => {
               });
               
               if (!response.ok) {
-                throw new Error('TTS failed');
+                console.error('TTS API failed:', response.status, response.statusText);
+                throw new Error('TTS failed: ' + response.statusText);
               }
               
               const audioBlob = await response.blob();
+              console.log('✅ Received audio blob:', audioBlob.size, 'bytes, type:', audioBlob.type);
+              
               const audioUrl = URL.createObjectURL(audioBlob);
               
               currentAudio = new Audio(audioUrl);
+              
+              // Critical: Set volume and preload
+              currentAudio.volume = 1.0;
+              currentAudio.preload = 'auto';
+              
+              currentAudio.onloadeddata = () => {
+                console.log('✅ Audio loaded, duration:', currentAudio.duration);
+              };
+              
               currentAudio.onplay = () => {
+                console.log('▶️ Audio playing');
                 isSpeaking = true;
                 if (button) button.innerHTML = '<i class="fas fa-stop-circle"></i>';
               };
               
               currentAudio.onended = () => {
+                console.log('⏹️ Audio ended');
                 isSpeaking = false;
                 currentAudio = null;
                 if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
                 URL.revokeObjectURL(audioUrl);
               };
               
-              currentAudio.onerror = () => {
+              currentAudio.onerror = (e) => {
+                console.error('❌ Audio playback error:', e);
                 isSpeaking = false;
                 currentAudio = null;
                 if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
                 URL.revokeObjectURL(audioUrl);
+                addMessage('⚠️ Audio playback failed. Click the speaker icon to try again.', 'assistant');
               };
               
-              await currentAudio.play();
+              // Try to play - handle autoplay restrictions
+              try {
+                await currentAudio.play();
+                console.log('✅ Audio.play() succeeded');
+              } catch (playError) {
+                console.error('❌ Audio.play() failed:', playError);
+                // Show message to user
+                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
+                addMessage('🔊 Click the speaker icon to hear the response (browser blocked autoplay).', 'assistant');
+              }
             } catch (error) {
-              console.error('TTS error:', error);
+              console.error('❌ TTS error:', error);
               isSpeaking = false;
               if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
+              addMessage('⚠️ Voice synthesis failed: ' + error.message, 'assistant');
             }
           }
           
