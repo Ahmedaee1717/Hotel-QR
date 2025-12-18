@@ -41709,10 +41709,10 @@ app.get('/admin/dashboard', (c) => {
                 '</div>' +
                 '<div class="flex gap-2">' +
                   (hasQR ? 
-                    '<button onclick="viewRoomQRCode(\'' + room.room_qr_code + '\', \'' + room.room_number + '\')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-1">' +
+                    '<button onclick="viewRoomQRCodeBtn(this)" data-qrcode="' + room.room_qr_code + '" data-room="' + room.room_number + '" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-1">' +
                       '<i class="fas fa-qrcode"></i> View QR' +
                     '</button>' +
-                    '<button onclick="downloadRoomQR(\'' + qrUrl + '\', \'' + room.room_number + '\')" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-1">' +
+                    '<button onclick="downloadRoomQRBtn(this)" data-url="' + qrUrl + '" data-room="' + room.room_number + '" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-1">' +
                       '<i class="fas fa-download"></i>' +
                     '</button>' +
                     '<a href="' + qrUrl + '" target="_blank" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold flex items-center gap-1">' +
@@ -41761,9 +41761,12 @@ app.get('/admin/dashboard', (c) => {
         }
       };
 
-      // View room QR code
-      window.viewRoomQRCode = function(qrCode, roomNumber) {
+      // View room QR code (with data attributes)
+      window.viewRoomQRCodeBtn = function(button) {
+        const qrCode = button.getAttribute('data-qrcode');
+        const roomNumber = button.getAttribute('data-room');
         const url = window.location.origin + '/room/' + qrCode;
+        
         const modal = document.createElement('div');
         modal.id = 'qr-modal';
         modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
@@ -41779,7 +41782,7 @@ app.get('/admin/dashboard', (c) => {
             '<strong>URL:</strong> ' + url +
           '</div>' +
           '<div class="flex gap-2">' +
-            '<button onclick="downloadRoomQR(\'' + url + '\', \'' + roomNumber + '\')" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">' +
+            '<button onclick="downloadRoomQRFromModal(this)" data-url="' + url + '" data-room="' + roomNumber + '" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">' +
               '<i class="fas fa-download mr-2"></i>Download QR' +
             '</button>' +
             '<button onclick="closeQRModal()" class="px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold">Close</button>' +
@@ -41788,12 +41791,14 @@ app.get('/admin/dashboard', (c) => {
         
         document.body.appendChild(modal);
         
-        // Generate QR code using QRCode library (assume it's loaded)
-        new QRCode(document.getElementById('qrcode-container'), {
-          text: url,
-          width: 256,
-          height: 256
-        });
+        // Generate QR code using QRCode library
+        if (typeof QRCode !== 'undefined') {
+          new QRCode(document.getElementById('qrcode-container'), {
+            text: url,
+            width: 256,
+            height: 256
+          });
+        }
       };
 
       window.closeQRModal = function() {
@@ -41801,23 +41806,56 @@ app.get('/admin/dashboard', (c) => {
         if (modal) modal.remove();
       };
 
-      // Download room QR code
-      window.downloadRoomQR = function(url, roomNumber) {
+      // Download room QR code (with data attributes)
+      window.downloadRoomQRBtn = function(button) {
+        const url = button.getAttribute('data-url');
+        const roomNumber = button.getAttribute('data-room');
+        
         // Create canvas and generate QR code
-        const canvas = document.createElement('canvas');
-        QRCode.toCanvas(canvas, url, { width: 512 }, function(error) {
-          if (error) {
-            console.error('QR generation error:', error);
-            alert('Failed to generate QR code');
-            return;
-          }
-          
-          // Download canvas as image
-          const link = document.createElement('a');
-          link.download = 'room-' + roomNumber + '-qr-code.png';
-          link.href = canvas.toDataURL();
-          link.click();
-        });
+        if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+          const canvas = document.createElement('canvas');
+          QRCode.toCanvas(canvas, url, { width: 512 }, function(error) {
+            if (error) {
+              console.error('QR generation error:', error);
+              alert('Failed to generate QR code');
+              return;
+            }
+            
+            // Download canvas as image
+            const link = document.createElement('a');
+            link.download = 'room-' + roomNumber + '-qr-code.png';
+            link.href = canvas.toDataURL();
+            link.click();
+          });
+        } else {
+          alert('QR Code library not loaded');
+        }
+      };
+
+      // Download from modal
+      window.downloadRoomQRFromModal = function(button) {
+        const url = button.getAttribute('data-url');
+        const roomNumber = button.getAttribute('data-room');
+        
+        // Create canvas and generate QR code
+        if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+          const canvas = document.createElement('canvas');
+          QRCode.toCanvas(canvas, url, { width: 512 }, function(error) {
+            if (error) {
+              console.error('QR generation error:', error);
+              alert('Failed to generate QR code');
+              return;
+            }
+            
+            // Download canvas as image
+            const link = document.createElement('a');
+            link.download = 'room-' + roomNumber + '-qr-code.png';
+            link.href = canvas.toDataURL();
+            link.click();
+          });
+        } else {
+          alert('QR Code library not loaded');
+        }
       };
 
       // Generate single room QR code
