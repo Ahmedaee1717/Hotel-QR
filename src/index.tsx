@@ -48770,8 +48770,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         let html = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">';
         html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
         html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
-        html += '<i class="fas fa-camera"></i>';
-        html += 'Enroll Guest Face - ' + passReference;
+        html += '<i class="fas fa-user-check"></i>';
+        html += 'Face Enrollment with Consent - ' + passReference;
         html += '</h2>';
         html += '<button onclick="closeFaceEnrollModal()" class="text-white hover:text-gray-200 text-2xl">';
         html += '<i class="fas fa-times"></i>';
@@ -48779,8 +48779,73 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</div>';
         
         html += '<div class="p-6">';
+        
+        // STEP 1: Biometric Consent Agreement (shown first, required before photo capture)
+        html += '<div id="consent-step-' + passId + '">';
+        html += '<div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">';
+        html += '<p class="text-sm text-yellow-800 font-semibold">';
+        html += '<i class="fas fa-exclamation-triangle mr-2"></i>';
+        html += 'GDPR/BIPA Compliance: Guest consent is REQUIRED before capturing biometric data';
+        html += '</p>';
+        html += '</div>';
+        
+        html += '<div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 text-blue-900">';
+        html += '<i class="fas fa-shield-alt mr-2"></i>Biometric Data Consent Agreement';
+        html += '</h3>';
+        html += '<div class="text-sm text-gray-700 space-y-2 max-h-64 overflow-y-auto bg-white p-4 rounded border">';
+        html += '<p class="font-semibold">By signing below, I consent to the collection and use of my facial biometric data for the following purposes:</p>';
+        html += '<ul class="list-disc ml-6 space-y-1">';
+        html += '<li><strong>Identity Verification:</strong> To verify my identity when accessing hotel facilities and services</li>';
+        html += '<li><strong>Access Control:</strong> To grant me touchless access to venues, restaurants, bars, and spa facilities</li>';
+        html += '<li><strong>Fraud Prevention:</strong> To prevent unauthorized use of my digital pass</li>';
+        html += '</ul>';
+        html += '<p class="font-semibold mt-4">I understand that:</p>';
+        html += '<ul class="list-disc ml-6 space-y-1">';
+        html += '<li>Only an <strong>irreversible mathematical template</strong> will be stored (not my photo)</li>';
+        html += '<li>My biometric data will be <strong>automatically deleted 24 hours after checkout</strong></li>';
+        html += '<li>I can <strong>withdraw consent at any time</strong> through the guest portal</li>';
+        html += '<li>Facial recognition is <strong>completely optional</strong> - I can use QR code instead</li>';
+        html += '<li>My data is protected with <strong>encryption and access controls</strong></li>';
+        html += '<li>This enrollment is witnessed by hotel staff</li>';
+        html += '</ul>';
+        html += '<p class="font-semibold mt-4 text-blue-900">My Rights:</p>';
+        html += '<ul class="list-disc ml-6 space-y-1">';
+        html += '<li>Right to withdraw consent at any time</li>';
+        html += '<li>Right to request deletion of my biometric data</li>';
+        html += '<li>Right to access my biometric data records</li>';
+        html += '<li>Right to use alternative access methods (QR code)</li>';
+        html += '</ul>';
+        html += '</div>';
+        html += '</div>';
+        
         html += '<div class="mb-6">';
-        html += '<p class="text-gray-600 mb-4">Upload a photo or capture from webcam to enable facial recognition for this pass.</p>';
+        html += '<label class="block font-semibold mb-2">Guest Digital Signature (Required):</label>';
+        html += '<div class="border-2 border-gray-300 rounded-lg">';
+        html += '<canvas id="signature-pad-' + passId + '" width="500" height="150" class="cursor-crosshair bg-white rounded-lg" style="touch-action: none;"></canvas>';
+        html += '</div>';
+        html += '<div class="flex gap-2 mt-2">';
+        html += '<button onclick="clearSignature(' + passId + ')" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm">';
+        html += '<i class="fas fa-eraser mr-1"></i>Clear Signature';
+        html += '</button>';
+        html += '<button onclick="proceedToPhotoCapture(' + passId + ', &quot;' + passReference + '&quot;)" id="consent-btn-' + passId + '" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold" disabled>';
+        html += '<i class="fas fa-check mr-2"></i>I Consent - Proceed to Photo Capture';
+        html += '</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+        
+        // STEP 2: Photo Capture (hidden until consent given)
+        html += '<div id="photo-capture-step-' + passId + '" class="hidden">';
+        html += '<div class="bg-green-50 border-l-4 border-green-500 p-4 mb-6">';
+        html += '<p class="text-sm text-green-800 font-semibold">';
+        html += '<i class="fas fa-check-circle mr-2"></i>';
+        html += 'Consent received. You may now capture the guest photo.';
+        html += '</p>';
+        html += '</div>';
+        
+        html += '<div class="mb-6">';
+        html += '<p class="text-gray-600 mb-4">Upload a photo or capture from webcam to enable facial recognition.</p>';
         
         html += '<div class="grid md:grid-cols-2 gap-4">';
         html += '<div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 cursor-pointer" onclick="document.getElementById(&quot;photo-upload-' + passId + '&quot;).click()">';
@@ -48810,7 +48875,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<div id="webcam-area-' + passId + '" class="hidden mb-6">';
         html += '<h3 class="font-semibold mb-3">Position Face in Frame:</h3>';
         html += '<div class="relative inline-block">';
-        html += '<video id="webcam-' + passId + '" width="640" height="480" autoplay class="rounded-lg border-2 border-gray-300"></video>';
+        html += '<video id="webcam-' + passId + '" width="640" height="480" autoplay class="rounded-lg border-2 border-300"></video>';
         html += '<canvas id="webcam-canvas-' + passId + '" class="absolute top-0 left-0"></canvas>';
         html += '</div>';
         html += '<div class="mt-4 flex gap-2">';
@@ -48829,10 +48894,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</button>';
         html += '</div>';
         html += '</div>';
+        
+        html += '</div>';
         html += '</div>';
         
         modal.innerHTML = html;
         document.body.appendChild(modal);
+        
+        // Initialize signature pad
+        initializeSignaturePad(passId);
       };
       
       window.closeFaceEnrollModal = function() {
@@ -48846,6 +48916,137 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             }
           });
           modal.remove();
+        }
+      };
+      
+      // Signature pad drawing state
+      let signatureData = {};
+      
+      window.initializeSignaturePad = function(passId) {
+        const canvas = document.getElementById('signature-pad-' + passId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+        let hasSignature = false;
+        
+        signatureData[passId] = null;
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+          drawing = true;
+          const rect = canvas.getBoundingClientRect();
+          ctx.beginPath();
+          ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+          if (!drawing) return;
+          const rect = canvas.getBoundingClientRect();
+          ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          hasSignature = true;
+          document.getElementById('consent-btn-' + passId).disabled = false;
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+          drawing = false;
+          if (hasSignature) {
+            signatureData[passId] = canvas.toDataURL('image/png');
+          }
+        });
+        
+        // Touch events for tablets
+        canvas.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          drawing = true;
+          const rect = canvas.getBoundingClientRect();
+          const touch = e.touches[0];
+          ctx.beginPath();
+          ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          if (!drawing) return;
+          const rect = canvas.getBoundingClientRect();
+          const touch = e.touches[0];
+          ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          hasSignature = true;
+          document.getElementById('consent-btn-' + passId).disabled = false;
+        });
+        
+        canvas.addEventListener('touchend', () => {
+          drawing = false;
+          if (hasSignature) {
+            signatureData[passId] = canvas.toDataURL('image/png');
+          }
+        });
+      };
+      
+      window.clearSignature = function(passId) {
+        const canvas = document.getElementById('signature-pad-' + passId);
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        signatureData[passId] = null;
+        document.getElementById('consent-btn-' + passId).disabled = true;
+      };
+      
+      let currentPassReference = null;
+      
+      window.proceedToPhotoCapture = async function(passId, passReference) {
+        const signature = signatureData[passId];
+        if (!signature) {
+          alert('Please sign the consent form before proceeding.');
+          return;
+        }
+        
+        currentPassReference = passReference;
+        
+        // Show loading state
+        const consentBtn = document.getElementById('consent-btn-' + passId);
+        consentBtn.disabled = true;
+        consentBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving consent...';
+        
+        try {
+          // Save consent signature to database
+          const response = await fetchWithAuth('/api/admin/face-enrollment/consent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pass_reference: passReference,
+              signature_data: signature,
+              consent_language: 'en',
+              consent_timestamp: new Date().toISOString(),
+              staff_id: localStorage.getItem('userEmail') || 'unknown'
+            })
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to save consent');
+          }
+          
+          const data = await response.json();
+          console.log('Consent saved:', data);
+          
+          // Hide consent step, show photo capture step
+          document.getElementById('consent-step-' + passId).classList.add('hidden');
+          document.getElementById('photo-capture-step-' + passId).classList.remove('hidden');
+        } catch (error) {
+          console.error('Consent save error:', error);
+          alert('❌ Failed to save consent: ' + error.message);
+          consentBtn.disabled = false;
+          consentBtn.innerHTML = '<i class="fas fa-check mr-2"></i>I Consent - Proceed to Photo Capture';
         }
       };
 
@@ -49032,36 +49233,60 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           return;
         }
         
+        if (!currentFaceEmbedding) {
+          alert('Face detection failed. Please try another photo with a clear view of the face.');
+          return;
+        }
+        
+        if (!currentPassReference) {
+          alert('Pass reference not found. Please close and try again.');
+          return;
+        }
+        
         const submitBtn = document.querySelector('#submit-area-' + passId + ' button');
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enrolling...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Enrolling with consent...';
         
         try {
-          const property_id = localStorage.getItem('property_id');
-          const url = '/api/admin/all-inclusive/passes/' + property_id + '/' + passId + '/enroll-face';
-          
-          const response = await fetchWithAuth(url, {
+          // Use the new consent-based enrollment endpoint
+          const response = await fetchWithAuth('/api/admin/face-enrollment/complete', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              photo_data: currentPhotoData,
-              face_embedding: currentFaceEmbedding || null
+              pass_reference: currentPassReference,
+              photo_data: currentPhotoData, // Sent but not stored permanently
+              face_embedding: currentFaceEmbedding,
+              staff_id: localStorage.getItem('userEmail') || 'unknown'
             })
           });
           
           const data = await response.json();
           
           if (data.success) {
-            alert('Face enrolled successfully!');
+            alert(
+              '✅ Face Enrolled Successfully!\\n\\n' +
+              'Guest can now use facial recognition.\\n' +
+              'Data will be auto-deleted: ' + new Date(data.scheduled_deletion_date).toLocaleDateString() + '\\n\\n' +
+              '🔒 Privacy Protected:\\n' +
+              '• Only irreversible face template stored\\n' +
+              '• Photo not saved permanently\\n' +
+              '• Digital consent signature captured\\n' +
+              '• Automatic deletion after checkout'
+            );
             closeFaceEnrollModal();
             loadPasses(); // Reload passes to show updated status
           } else {
-            alert('Failed to enroll face: ' + data.error);
+            if (data.requires_consent) {
+              alert('❌ Consent Required\\n\\nPlease complete the consent signature step first before enrolling.');
+            } else {
+              alert('❌ Failed to enroll face: ' + (data.error || 'Unknown error'));
+            }
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Enroll Face & Save';
           }
         } catch (error) {
           console.error('Face enrollment error:', error);
-          alert('Failed to enroll face');
+          alert('❌ Failed to enroll face: ' + error.message);
           submitBtn.disabled = false;
           submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Enroll Face & Save';
         }
