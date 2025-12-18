@@ -12822,6 +12822,7 @@ app.post('/api/voice/transcribe', async (c) => {
   try {
     const { OPENAI_API_KEY } = c.env
     if (!OPENAI_API_KEY) {
+      console.error('❌ OpenAI API key not configured')
       return c.json({ error: 'OpenAI API key not configured' }, 500)
     }
 
@@ -12829,15 +12830,22 @@ app.post('/api/voice/transcribe', async (c) => {
     const audioFile = formData.get('audio')
     
     if (!audioFile) {
+      console.error('❌ No audio file in request')
       return c.json({ error: 'No audio file provided' }, 400)
     }
 
-    // Forward to OpenAI Whisper API
+    console.log('🎤 Received audio file:', audioFile.name, 'Size:', audioFile.size, 'Type:', audioFile.type)
+
+    // Forward to OpenAI Whisper API with better file naming
     const whisperFormData = new FormData()
-    whisperFormData.append('file', audioFile)
+    // Rename to .webm to help Whisper understand the format
+    const audioBlob = new Blob([await audioFile.arrayBuffer()], { type: 'audio/webm' })
+    whisperFormData.append('file', audioBlob, 'audio.webm')
     whisperFormData.append('model', 'whisper-1')
+    whisperFormData.append('response_format', 'verbose_json')
     // Auto-detect language - Whisper will identify it automatically
 
+    console.log('📡 Sending to Whisper API...')
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -12848,11 +12856,12 @@ app.post('/api/voice/transcribe', async (c) => {
 
     if (!response.ok) {
       const error = await response.text()
-      console.error('Whisper API error:', error)
+      console.error('❌ Whisper API error:', response.status, error)
       return c.json({ error: 'Transcription failed', details: error }, 500)
     }
 
     const result = await response.json()
+    console.log('✅ Whisper result:', result.text, '| Language:', result.language)
     
     return c.json({
       success: true,
@@ -12860,8 +12869,8 @@ app.post('/api/voice/transcribe', async (c) => {
       language: result.language || 'unknown'
     })
   } catch (error) {
-    console.error('Transcribe error:', error)
-    return c.json({ error: 'Failed to transcribe audio' }, 500)
+    console.error('❌ Transcribe error:', error)
+    return c.json({ error: 'Failed to transcribe audio', details: error.message }, 500)
   }
 })
 
