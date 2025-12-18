@@ -16412,7 +16412,7 @@ app.post('/api/staff/verify-pass', async (c) => {
   }
 
   try {
-    const { pass_reference, verification_method = 'qr', staff_name = 'Staff', location = 'Entrance' } = await c.req.json()
+    const { pass_reference, verification_method = 'qr', staff_name = 'Staff', location = 'Entrance', allow_duplicate = false } = await c.req.json()
     
     if (!pass_reference) {
       return c.json({ error: 'Pass reference required' }, 400)
@@ -16444,37 +16444,39 @@ app.post('/api/staff/verify-pass', async (c) => {
       return c.json({ error: 'Pass is not valid for today' }, 403)
     }
 
-    // CHECK FOR DUPLICATE CHECK-IN TODAY
-    const todayStart = `${today} 00:00:00`
-    const todayEnd = `${today} 23:59:59`
-    
-    const existingCheckIn = await DB.prepare(`
-      SELECT verification_id, verification_timestamp, staff_name
-      FROM pass_verifications
-      WHERE pass_id = ? 
-        AND property_id = ?
-        AND verification_result = 'allowed'
-        AND verification_timestamp BETWEEN ? AND ?
-      ORDER BY verification_timestamp DESC
-      LIMIT 1
-    `).bind(pass.pass_id, property_id, todayStart, todayEnd).first()
+    // CHECK FOR DUPLICATE CHECK-IN TODAY (unless override flag is set)
+    if (!allow_duplicate) {
+      const todayStart = `${today} 00:00:00`
+      const todayEnd = `${today} 23:59:59`
+      
+      const existingCheckIn = await DB.prepare(`
+        SELECT verification_id, verification_timestamp, staff_name
+        FROM pass_verifications
+        WHERE pass_id = ? 
+          AND property_id = ?
+          AND verification_result = 'allowed'
+          AND verification_timestamp BETWEEN ? AND ?
+        ORDER BY verification_timestamp DESC
+        LIMIT 1
+      `).bind(pass.pass_id, property_id, todayStart, todayEnd).first()
 
-    if (existingCheckIn) {
-      // DUPLICATE CHECK-IN DETECTED
-      return c.json({ 
-        error: 'DUPLICATE_CHECK_IN',
-        already_checked_in: true,
-        first_check_in_time: existingCheckIn.verification_timestamp,
-        first_check_in_staff: existingCheckIn.staff_name,
-        pass_details: {
-          pass_reference: pass.pass_reference,
-          guest_name: pass.primary_guest_name,
-          room_number: pass.room_number,
-          tier: pass.tier_display_name,
-          face_photo_url: pass.face_photo_url,
-          primary_guest_photo_url: pass.primary_guest_photo_url
-        }
-      }, 409)
+      if (existingCheckIn) {
+        // DUPLICATE CHECK-IN DETECTED
+        return c.json({ 
+          error: 'DUPLICATE_CHECK_IN',
+          already_checked_in: true,
+          first_check_in_time: existingCheckIn.verification_timestamp,
+          first_check_in_staff: existingCheckIn.staff_name,
+          pass_details: {
+            pass_reference: pass.pass_reference,
+            guest_name: pass.primary_guest_name,
+            room_number: pass.room_number,
+            tier: pass.tier_display_name,
+            face_photo_url: pass.face_photo_url,
+            primary_guest_photo_url: pass.primary_guest_photo_url
+          }
+        }, 409)
+      }
     }
 
     // Record the check-in

@@ -626,67 +626,129 @@
             });
             
             // Get guest photo (prioritize face_photo_url over primary_guest_photo_url)
-            const photoUrl = data.pass_details?.face_photo_url || data.pass_details?.primary_guest_photo_url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23f3f4f6" width="150" height="150"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="16" fill="%236b7280"%3ENo Photo%3C/text%3E%3C/svg%3E';
+            const photoUrl = data.pass_details?.face_photo_url || data.pass_details?.primary_guest_photo_url;
+            const placeholderSvg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23f3f4f6" width="200" height="200"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="18" fill="%236b7280"%3ENo Photo%3C/text%3E%3C/svg%3E';
             
             resultDiv.innerHTML = `
-                <div class="bg-red-100 border-l-4 border-red-600 p-4 rounded-lg">
-                    <div class="flex items-start justify-between mb-3">
+                <div class="bg-red-100 border-l-4 border-red-600 p-6 rounded-lg">
+                    <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3">
-                            <i class="fas fa-exclamation-circle text-4xl text-red-700"></i>
+                            <i class="fas fa-exclamation-circle text-5xl text-red-700"></i>
                             <div>
-                                <h3 class="text-xl font-bold text-red-800">🚨 DUPLICATE CHECK-IN</h3>
-                                <p class="text-xs text-red-700">Already checked in today!</p>
+                                <h3 class="text-2xl font-bold text-red-800">🚨 DUPLICATE CHECK-IN</h3>
+                                <p class="text-sm text-red-700">Already checked in today!</p>
                             </div>
                         </div>
-                        <button onclick="resetScanner()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold text-sm">
-                            <i class="fas fa-times mr-1"></i>Dismiss
+                        <button onclick="resetScanner()" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold">
+                            <i class="fas fa-times mr-2"></i>Dismiss
                         </button>
                     </div>
                     
-                    <!-- Guest Photo & Details Side by Side -->
-                    <div class="grid grid-cols-3 gap-4 bg-white rounded-lg p-4 border-2 border-red-300">
-                        <!-- Photo Column -->
-                        <div class="flex flex-col items-center">
-                            <div class="w-32 h-32 rounded-lg overflow-hidden border-4 border-red-400 bg-gray-50">
-                                <img src="${photoUrl}" alt="${data.pass_details?.guest_name || 'Guest'}" class="w-full h-full object-cover">
+                    <!-- Guest Photo & Details - Better Layout -->
+                    <div class="bg-white rounded-xl p-6 border-4 border-red-300 shadow-lg">
+                        <div class="flex gap-6">
+                            <!-- Photo Column (Fixed Width) -->
+                            <div class="flex-shrink-0">
+                                <div class="w-48 h-48 rounded-xl overflow-hidden border-4 border-red-500 bg-gray-100 shadow-lg">
+                                    <img 
+                                        src="${photoUrl || placeholderSvg}" 
+                                        alt="${data.pass_details?.guest_name || 'Guest'}" 
+                                        class="w-full h-full object-cover"
+                                        onerror="this.src='${placeholderSvg}'; this.onerror=null;"
+                                    >
+                                </div>
+                                <p class="text-xs text-gray-600 mt-2 text-center font-semibold">Guest Identity Photo</p>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2 text-center">Guest Identity Photo</p>
-                        </div>
-                        
-                        <!-- Details Columns -->
-                        <div class="col-span-2 space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600 font-semibold">Guest:</span>
-                                <span class="font-bold text-red-700">${data.pass_details?.guest_name || 'N/A'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600 font-semibold">Room:</span>
-                                <span class="font-bold">${data.pass_details?.room_number || 'N/A'}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600 font-semibold">Tier:</span>
-                                <span class="font-bold">${data.pass_details?.tier || 'N/A'}</span>
-                            </div>
-                            <hr class="my-2">
-                            <div class="flex justify-between bg-red-50 p-2 rounded">
-                                <span class="text-gray-600 font-semibold">First Check-In:</span>
-                                <span class="font-bold text-red-700">${checkInTime}</span>
-                            </div>
-                            <div class="flex justify-between bg-red-50 p-2 rounded">
-                                <span class="text-gray-600 font-semibold">Checked By:</span>
-                                <span class="font-bold">${data.first_check_in_staff || 'Staff'}</span>
+                            
+                            <!-- Details Column (Flexible Width) -->
+                            <div class="flex-1 space-y-3">
+                                <div class="grid grid-cols-2 gap-4 text-base">
+                                    <div class="bg-gray-50 p-3 rounded-lg">
+                                        <span class="text-gray-600 font-semibold block text-sm mb-1">Guest:</span>
+                                        <span class="font-bold text-red-700 text-lg">${data.pass_details?.guest_name || 'N/A'}</span>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded-lg">
+                                        <span class="text-gray-600 font-semibold block text-sm mb-1">Room:</span>
+                                        <span class="font-bold text-xl">${data.pass_details?.room_number || 'N/A'}</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <span class="text-gray-600 font-semibold block text-sm mb-1">Tier:</span>
+                                    <span class="font-bold text-lg">${data.pass_details?.tier || 'N/A'}</span>
+                                </div>
+                                
+                                <hr class="border-gray-300">
+                                
+                                <div class="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-gray-700 font-semibold">First Check-In:</span>
+                                        <span class="font-bold text-red-700 text-xl">${checkInTime}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-700 font-semibold">Checked By:</span>
+                                        <span class="font-bold text-lg">${data.first_check_in_staff || 'Staff'}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mt-3 p-3 bg-red-200 rounded-lg text-center">
-                        <p class="text-red-900 font-bold text-sm">
-                            <i class="fas fa-ban mr-2"></i>
-                            STAFF: DO NOT ALLOW RE-ENTRY
-                        </p>
+                    <!-- Action Buttons -->
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="p-4 bg-red-200 rounded-lg text-center">
+                            <p class="text-red-900 font-bold">
+                                <i class="fas fa-ban mr-2"></i>
+                                STAFF: DO NOT ALLOW RE-ENTRY
+                            </p>
+                        </div>
+                        <button onclick="allowReEntry('${data.pass_details?.pass_reference}')" class="p-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 font-bold shadow-lg">
+                            <i class="fas fa-unlock-alt mr-2"></i>
+                            OVERRIDE: Allow Re-Entry
+                        </button>
                     </div>
                 </div>
             `;
+        }
+        
+        async function allowReEntry(passReference) {
+            if (!confirm('⚠️ Are you sure you want to allow re-entry for this guest?\n\nThis will create a new check-in record.')) {
+                return;
+            }
+            
+            try {
+                updateStatus('Processing override...', 'loading');
+                
+                const response = await fetchWithAuth('/api/staff/all-inclusive/verify-pass', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        pass_reference: passReference,
+                        allow_duplicate: true  // Override flag
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    stats.verified++;
+                    stats.qr++;
+                    updateStats();
+                    showSuccess(data.pass_details);
+                    loadCheckedInGuests();
+                    
+                    setTimeout(() => {
+                        resetScanner();
+                    }, 2000);
+                } else {
+                    showError(data.error || 'Override failed');
+                    setTimeout(() => {
+                        resetScanner();
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Override error:', error);
+                showError('Override failed');
+            }
         }
         
         async function loadCheckedInGuests() {
