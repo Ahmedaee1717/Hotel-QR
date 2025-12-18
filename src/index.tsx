@@ -15553,6 +15553,240 @@ app.post('/api/staff/all-inclusive/identify-face', async (c) => {
   }
 })
 
+// ===========================================================================
+// 🎯 FRONT DESK FACE ENROLLMENT WITH DIGITAL CONSENT
+// ===========================================================================
+
+// API Endpoint: Get Pass by Reference (for front desk staff)
+app.get('/api/admin/passes/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  const pass_reference = c.req.param('pass_reference')
+  
+  if (!token) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const pass = await DB.prepare(`
+      SELECT 
+        pass_id,
+        pass_reference,
+        property_id,
+        primary_guest_name,
+        guest_email,
+        guest_phone,
+        room_number,
+        tier_id,
+        valid_from,
+        valid_until,
+        face_photo_url,
+        face_embedding,
+        biometric_consent_given,
+        face_enrolled_at
+      FROM digital_passes
+      WHERE pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    return c.json({ 
+      success: true,
+      pass: pass
+    })
+  } catch (error) {
+    console.error('Get pass error:', error)
+    return c.json({ error: 'Failed to get pass' }, 500)
+  }
+})
+
+// API Endpoint: Save Digital Consent Signature
+app.post('/api/admin/face-enrollment/consent', async (c) => {
+  const { DB } = c.env
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  
+  if (!token) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const { 
+      pass_reference, 
+      signature_data, 
+      consent_language, 
+      consent_timestamp,
+      staff_id 
+    } = await c.req.json()
+    
+    if (!pass_reference || !signature_data) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    // Get pass_id from reference
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, primary_guest_name
+      FROM digital_passes
+      WHERE pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Store consent signature in database
+    await DB.prepare(`
+      INSERT INTO biometric_consent_signatures (
+        pass_id, property_id, signature_data, consent_language,
+        consent_timestamp, consent_given_by, staff_witness_id
+      ) VALUES (?, ?, ?, ?, ?, 'guest', ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      signature_data, // Base64 PNG image
+      consent_language || 'en',
+      consent_timestamp || new Date().toISOString(),
+      staff_id || 'unknown'
+    ).run()
+    
+    // Log consent event in audit trail (GDPR requirement)
+    await DB.prepare(`
+      INSERT INTO biometric_audit_log (
+        pass_id, property_id, event_type, event_details,
+        actor_type, actor_id, actor_ip_address
+      ) VALUES (?, ?, 'CONSENT_SIGNATURE_CAPTURED', ?, 'guest', ?, ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      JSON.stringify({
+        guest_name: pass.primary_guest_name,
+        consent_language: consent_language || 'en',
+        staff_witness: staff_id || 'unknown',
+        timestamp: consent_timestamp || new Date().toISOString(),
+        consent_method: 'digital_signature_touchscreen'
+      }),
+      pass.primary_guest_name,
+      c.req.header('CF-Connecting-IP') || 'unknown'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Consent saved successfully',
+      pass_id: pass.pass_id
+    })
+  } catch (error) {
+    console.error('Consent save error:', error)
+    return c.json({ error: 'Failed to save consent: ' + error.message }, 500)
+  }
+})
+
+// API Endpoint: Complete Face Enrollment (after consent captured)
+app.post('/api/admin/face-enrollment/complete', async (c) => {
+  const { DB } = c.env
+  const token = c.req.header('Authorization')?.replace('Bearer ', '')
+  
+  if (!token) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const { 
+      pass_reference, 
+      photo_data, // Base64 image
+      face_embedding, // Face embedding array from face-api.js
+      staff_id 
+    } = await c.req.json()
+    
+    if (!pass_reference || !face_embedding) {
+      return c.json({ error: 'Missing pass_reference or face_embedding' }, 400)
+    }
+    
+    // Get pass details
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, primary_guest_name, valid_until
+      FROM digital_passes
+      WHERE pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Verify consent signature exists
+    const consent = await DB.prepare(`
+      SELECT consent_id FROM biometric_consent_signatures
+      WHERE pass_id = ?
+      ORDER BY consent_timestamp DESC
+      LIMIT 1
+    `).bind(pass.pass_id).first()
+    
+    if (!consent) {
+      return c.json({ 
+        error: 'Consent signature not found. Please complete consent step first.',
+        requires_consent: true
+      }, 400)
+    }
+    
+    // Calculate scheduled deletion (24 hours after checkout)
+    const validUntil = new Date(pass.valid_until)
+    const scheduledDeletion = new Date(validUntil.getTime() + 24 * 60 * 60 * 1000)
+    
+    // ⚠️ CRITICAL BIOMETRIC COMPLIANCE:
+    // Store ONLY face_embedding (irreversible template), NOT photo_data
+    // Photo data is discarded after processing to embedding
+    await DB.prepare(`
+      UPDATE digital_passes
+      SET face_embedding = ?,
+          face_photo_url = NULL,
+          face_enrolled_at = CURRENT_TIMESTAMP,
+          face_embedding_version = 'face-api-v1.7.12-descriptor',
+          biometric_consent_given = 1,
+          biometric_consent_timestamp = CURRENT_TIMESTAMP,
+          biometric_consent_withdrawn = 0,
+          scheduled_deletion_date = ?,
+          enrollment_staff_id = ?
+      WHERE pass_id = ?
+    `).bind(
+      JSON.stringify(face_embedding),
+      scheduledDeletion.toISOString(),
+      staff_id || 'unknown',
+      pass.pass_id
+    ).run()
+    
+    // Log enrollment in audit trail
+    await DB.prepare(`
+      INSERT INTO biometric_audit_log (
+        pass_id, property_id, event_type, event_details,
+        actor_type, actor_id, actor_ip_address
+      ) VALUES (?, ?, 'FACE_ENROLLED', ?, 'staff', ?, ?)
+    `).bind(
+      pass.pass_id,
+      pass.property_id,
+      JSON.stringify({
+        guest_name: pass.primary_guest_name,
+        staff_id: staff_id || 'unknown',
+        scheduled_deletion: scheduledDeletion.toISOString(),
+        enrollment_method: 'frontdesk_touchscreen_with_consent',
+        data_stored: 'face_embedding_only',
+        photo_stored: false
+      }),
+      staff_id || 'unknown',
+      c.req.header('CF-Connecting-IP') || 'unknown'
+    ).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Face enrolled successfully with digital consent',
+      scheduled_deletion_date: scheduledDeletion.toISOString(),
+      compliance_notes: 'Only irreversible face template stored. Photo discarded. Auto-deletion scheduled 24h after checkout.'
+    })
+  } catch (error) {
+    console.error('Enrollment error:', error)
+    return c.json({ error: 'Failed to complete enrollment: ' + error.message }, 500)
+  }
+})
+
 app.post('/api/admin/all-inclusive/passes/:property_id/:pass_id/enroll-face', async (c) => {
   const { DB } = c.env
   const property_id = c.req.param('property_id')
@@ -38803,7 +39037,13 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <!-- Quick Actions -->
-            <div class="mt-8 grid md:grid-cols-3 gap-4">
+            <div class="mt-8 grid md:grid-cols-4 gap-4">
+                <a href="/frontdesk-face-enrollment.html" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #00d4aa, #00a589);">
+                    <i class="fas fa-user-check text-3xl mb-3"></i>
+                    <h4 class="font-bold text-lg mb-1">Face Enrollment</h4>
+                    <p class="opacity-90 text-sm">Enroll guests with digital consent signature</p>
+                </a>
+
                 <a href="/staff/verify-pass" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
                     <i class="fas fa-qrcode text-3xl mb-3"></i>
                     <h4 class="font-bold text-lg mb-1">Staff Verification</h4>
