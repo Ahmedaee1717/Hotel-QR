@@ -21609,6 +21609,9 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
               <div class="flex gap-2">
                 <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button id="voiceInputBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Voice Input">
+                  <i class="fas fa-microphone"></i>
+                </button>
                 <button id="sendChatBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                   <i class="fas fa-paper-plane"></i>
                 </button>
@@ -21629,9 +21632,112 @@ app.get('/hotel/:property_slug', async (c) => {
           const chatMessages = document.getElementById('chatMessages');
           const chatInput = document.getElementById('chatInput');
           const sendChatBtn = document.getElementById('sendChatBtn');
+          const voiceInputBtn = document.getElementById('voiceInputBtn');
           
           let chatConversationId = null;
           let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          // Voice capabilities
+          let isRecording = false;
+          let isSpeaking = false;
+          let recognition = null;
+          let speechSynthesis = window.speechSynthesis;
+          
+          // Initialize Speech Recognition
+          if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onstart = function() {
+              isRecording = true;
+              voiceInputBtn.innerHTML = '<i class="fas fa-stop-circle animate-pulse"></i>';
+              voiceInputBtn.title = 'Stop Recording';
+              chatInput.placeholder = 'Listening...';
+            };
+            
+            recognition.onresult = function(event) {
+              const transcript = event.results[0][0].transcript;
+              chatInput.value = transcript;
+              chatInput.placeholder = 'Ask me anything...';
+              
+              // Automatically send message after voice input
+              setTimeout(() => {
+                sendMessage(true);
+              }, 500);
+            };
+            
+            recognition.onerror = function(event) {
+              console.error('Speech recognition error:', event.error);
+              isRecording = false;
+              voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+              voiceInputBtn.title = 'Voice Input';
+              chatInput.placeholder = 'Ask me anything...';
+              if (event.error === 'not-allowed') {
+                alert('Microphone access denied. Please allow microphone access to use voice input.');
+              }
+            };
+            
+            recognition.onend = function() {
+              isRecording = false;
+              voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+              voiceInputBtn.title = 'Voice Input';
+            };
+          } else {
+            // Hide voice button if not supported
+            if (voiceInputBtn) {
+              voiceInputBtn.style.display = 'none';
+            }
+          }
+          
+          // Voice input button handler
+          if (voiceInputBtn) {
+            voiceInputBtn.addEventListener('click', () => {
+              if (!recognition) {
+                alert('Voice input is not supported in your browser. Please try Chrome, Edge, or Safari.');
+                return;
+              }
+              
+              if (isRecording) {
+                recognition.stop();
+              } else {
+                recognition.start();
+              }
+            });
+          }
+          
+          // Text-to-speech function
+          function speakText(text) {
+            if (!speechSynthesis) return;
+            
+            // Stop any ongoing speech
+            speechSynthesis.cancel();
+            
+            // Create utterance
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = function() {
+              isSpeaking = true;
+            };
+            
+            utterance.onend = function() {
+              isSpeaking = false;
+            };
+            
+            utterance.onerror = function(event) {
+              console.error('Speech synthesis error:', event.error);
+              isSpeaking = false;
+            };
+            
+            // Speak
+            speechSynthesis.speak(utterance);
+          }
           
           // Load chatbot settings and show if enabled
           window.initChatbot = async function() {
@@ -21701,7 +21807,7 @@ app.get('/hotel/:property_slug', async (c) => {
               return text.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
             }
             
-            function addMessage(text, role) {
+            function addMessage(text, role, autoSpeak = false) {
               const messageDiv = document.createElement('div');
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
               
@@ -21716,6 +21822,26 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Bot messages can have markdown links
                 const htmlContent = parseMarkdownLinks(text);
                 bubble.innerHTML = htmlContent.replace(/\\n/g, '<br>'); // Preserve line breaks
+                
+                // Add speaker button for bot messages
+                const speakerBtn = document.createElement('button');
+                speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition';
+                speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                speakerBtn.title = 'Listen to response';
+                speakerBtn.onclick = function() {
+                  // Remove markdown links for speech (extract only text)
+                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1');
+                  speakText(cleanText);
+                };
+                bubble.appendChild(speakerBtn);
+                
+                // Auto-speak if voice input was used
+                if (autoSpeak && speechSynthesis) {
+                  setTimeout(() => {
+                    const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1');
+                    speakText(cleanText);
+                  }, 300);
+                }
               }
               
               messageDiv.appendChild(bubble);
@@ -21724,13 +21850,14 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             // Send message
-            async function sendMessage() {
+            async function sendMessage(fromVoiceInput = false) {
               const message = chatInput.value.trim();
               if (!message) return;
               
               // Add user message
               addMessage(message, 'user');
               chatInput.value = '';
+              chatInput.placeholder = 'Ask me anything...';
               
               // Show typing indicator
               const typingDiv = document.createElement('div');
@@ -21759,16 +21886,16 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 if (data.success) {
                   chatConversationId = data.conversation_id;
-                  addMessage(data.response, 'assistant');
+                  addMessage(data.response, 'assistant', fromVoiceInput);
                 } else if (response.status === 429) {
-                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant');
+                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant', fromVoiceInput);
                 } else {
-                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant', fromVoiceInput);
                 }
               } catch (error) {
                 console.error('Chat error:', error);
                 document.getElementById('typing')?.remove();
-                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant');
+                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant', fromVoiceInput);
               }
             }
             
