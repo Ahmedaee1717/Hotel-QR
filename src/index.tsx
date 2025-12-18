@@ -12813,6 +12813,112 @@ app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
   }
 })
 
+// ============================================
+// OPENAI VOICE API - Whisper STT + TTS
+// ============================================
+
+// API: Speech-to-Text using OpenAI Whisper (auto language detection)
+app.post('/api/voice/transcribe', async (c) => {
+  try {
+    const { OPENAI_API_KEY } = c.env
+    if (!OPENAI_API_KEY) {
+      return c.json({ error: 'OpenAI API key not configured' }, 500)
+    }
+
+    const formData = await c.req.formData()
+    const audioFile = formData.get('audio')
+    
+    if (!audioFile) {
+      return c.json({ error: 'No audio file provided' }, 400)
+    }
+
+    // Forward to OpenAI Whisper API
+    const whisperFormData = new FormData()
+    whisperFormData.append('file', audioFile)
+    whisperFormData.append('model', 'whisper-1')
+    // Auto-detect language - Whisper will identify it automatically
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: whisperFormData
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('Whisper API error:', error)
+      return c.json({ error: 'Transcription failed', details: error }, 500)
+    }
+
+    const result = await response.json()
+    
+    return c.json({
+      success: true,
+      text: result.text,
+      language: result.language || 'unknown'
+    })
+  } catch (error) {
+    console.error('Transcribe error:', error)
+    return c.json({ error: 'Failed to transcribe audio' }, 500)
+  }
+})
+
+// API: Text-to-Speech using OpenAI TTS (natural voices)
+app.post('/api/voice/synthesize', async (c) => {
+  try {
+    const { OPENAI_API_KEY } = c.env
+    if (!OPENAI_API_KEY) {
+      return c.json({ error: 'OpenAI API key not configured' }, 500)
+    }
+
+    const { text, voice = 'alloy', language = 'en' } = await c.req.json()
+    
+    if (!text) {
+      return c.json({ error: 'No text provided' }, 400)
+    }
+
+    // Map language to appropriate voice
+    let selectedVoice = voice
+    if (language === 'ar' || language.startsWith('ar')) {
+      selectedVoice = 'onyx' // Deeper voice works better for Arabic
+    }
+
+    // Call OpenAI TTS API
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        input: text,
+        voice: selectedVoice,
+        response_format: 'mp3'
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('TTS API error:', error)
+      return c.json({ error: 'Synthesis failed', details: error }, 500)
+    }
+
+    // Return audio stream
+    return new Response(response.body, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    })
+  } catch (error) {
+    console.error('Synthesize error:', error)
+    return c.json({ error: 'Failed to synthesize speech' }, 500)
+  }
+})
+
 // API: Get chatbot analytics stats
 app.get('/api/admin/chatbot/analytics/stats', async (c) => {
   const { DB } = c.env
@@ -21637,144 +21743,160 @@ app.get('/hotel/:property_slug', async (c) => {
           let chatConversationId = null;
           let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
           
-          // Voice capabilities
+          // Voice capabilities - Using OpenAI Whisper + TTS
           let isRecording = false;
           let isSpeaking = false;
-          let recognition = null;
-          let speechSynthesis = window.speechSynthesis;
+          let mediaRecorder = null;
+          let audioChunks = [];
+          let detectedLanguage = 'en';
           
-          // Initialize Speech Recognition
-          if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'en-US';
-            
-            recognition.onstart = function() {
+          // Start recording audio using MediaRecorder
+          async function startRecording() {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              mediaRecorder = new MediaRecorder(stream);
+              audioChunks = [];
+              
+              mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+              };
+              
+              mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                await transcribeAudio(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+              };
+              
+              mediaRecorder.start();
               isRecording = true;
               voiceInputBtn.innerHTML = '<i class="fas fa-circle animate-pulse" style="color: #ef4444;"></i>';
-              voiceInputBtn.title = 'Listening... (click to stop)';
+              voiceInputBtn.title = 'Recording... (click to stop)';
               voiceInputBtn.style.background = 'rgba(239, 68, 68, 0.1)';
-              chatInput.placeholder = '🎤 Listening...';
-            };
-            
-            recognition.onresult = function(event) {
-              const transcript = event.results[0][0].transcript;
-              chatInput.value = transcript;
-              chatInput.placeholder = 'Ask me anything...';
-              
-              // Show transcript and let user review before sending
-              chatInput.focus();
-              
-              // Optional: Auto-send after a moment (user can still edit)
-              setTimeout(() => {
-                if (chatInput.value.trim() === transcript.trim()) {
-                  sendMessage(false); // Don't auto-speak response
-                }
-              }, 1500);
-            };
-            
-            recognition.onerror = function(event) {
-              console.error('Speech recognition error:', event.error);
+              chatInput.placeholder = '🎤 Recording...';
+            } catch (error) {
+              console.error('Microphone error:', error);
+              addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings.', 'assistant');
+            }
+          }
+          
+          // Stop recording
+          function stopRecording() {
+            if (mediaRecorder && isRecording) {
+              mediaRecorder.stop();
               isRecording = false;
-              voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
-              voiceInputBtn.title = 'Voice Input';
               const primaryColor = window.chatbotPrimaryColor || '#667eea';
-              voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
-              chatInput.placeholder = 'Ask me anything...';
-              if (event.error === 'not-allowed') {
-                addMessage('⚠️ Microphone access denied. Please allow microphone access in your browser settings to use voice input.', 'assistant');
-              } else if (event.error === 'no-speech') {
-                addMessage('👂 No speech detected. Please try again and speak clearly.', 'assistant');
+              voiceInputBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+              voiceInputBtn.title = 'Processing...';
+              chatInput.placeholder = '⏳ Processing audio...';
+            }
+          }
+          
+          // Transcribe audio using OpenAI Whisper
+          async function transcribeAudio(audioBlob) {
+            try {
+              const formData = new FormData();
+              formData.append('audio', audioBlob, 'recording.webm');
+              
+              const response = await fetch('/api/voice/transcribe', {
+                method: 'POST',
+                body: formData
+              });
+              
+              const data = await response.json();
+              
+              if (data.success) {
+                chatInput.value = data.text;
+                detectedLanguage = data.language || 'en';
+                chatInput.focus();
+                
+                // Auto-send after review period
+                setTimeout(() => {
+                  if (chatInput.value.trim() === data.text.trim()) {
+                    sendMessage(true, detectedLanguage); // Pass language and enable auto-speak
+                  }
+                }, 1500);
+              } else {
+                addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
               }
-            };
-            
-            recognition.onend = function() {
-              isRecording = false;
+            } catch (error) {
+              console.error('Transcription error:', error);
+              addMessage('❌ Failed to transcribe audio. Please try again.', 'assistant');
+            } finally {
+              const primaryColor = window.chatbotPrimaryColor || '#667eea';
               voiceInputBtn.innerHTML = '<i class="fas fa-microphone"></i>';
               voiceInputBtn.title = 'Voice Input';
-              const primaryColor = window.chatbotPrimaryColor || '#667eea';
               voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
-            };
-          } else {
-            // Hide voice button if not supported
-            if (voiceInputBtn) {
-              voiceInputBtn.style.display = 'none';
+              chatInput.placeholder = 'Ask me anything...';
             }
           }
           
           // Voice input button handler
           if (voiceInputBtn) {
             voiceInputBtn.addEventListener('click', () => {
-              if (!recognition) {
-                alert('Voice input is not supported in your browser. Please try Chrome, Edge, or Safari.');
-                return;
-              }
-              
               if (isRecording) {
-                recognition.stop();
+                stopRecording();
               } else {
-                recognition.start();
+                startRecording();
               }
             });
           }
           
-          // Text-to-speech function (opt-in only, improved voice quality)
-          function speakText(text, button) {
-            if (!speechSynthesis) return;
-            
+          // Text-to-speech using OpenAI TTS (natural AI voices)
+          let currentAudio = null;
+          
+          async function speakText(text, button, language = 'en') {
             // If already speaking, stop it
-            if (isSpeaking) {
-              speechSynthesis.cancel();
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio = null;
               isSpeaking = false;
               if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
               return;
             }
             
-            // Create utterance with better voice settings
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.95; // Slightly slower for clarity
-            utterance.pitch = 1.0;
-            utterance.volume = 1.0;
-            
-            // Try to find a better quality voice
-            const voices = speechSynthesis.getVoices();
-            const preferredVoice = voices.find(v => 
-              v.name.includes('Google') || 
-              v.name.includes('Enhanced') || 
-              v.name.includes('Premium') ||
-              v.name.includes('Samantha') || // macOS
-              v.name.includes('Daniel') // Windows
-            );
-            if (preferredVoice) utterance.voice = preferredVoice;
-            
-            utterance.onstart = function() {
-              isSpeaking = true;
-              if (button) button.innerHTML = '<i class="fas fa-stop-circle"></i>';
-            };
-            
-            utterance.onend = function() {
+            try {
+              if (button) button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+              
+              // Call OpenAI TTS API
+              const response = await fetch('/api/voice/synthesize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, language })
+              });
+              
+              if (!response.ok) {
+                throw new Error('TTS failed');
+              }
+              
+              const audioBlob = await response.blob();
+              const audioUrl = URL.createObjectURL(audioBlob);
+              
+              currentAudio = new Audio(audioUrl);
+              currentAudio.onplay = () => {
+                isSpeaking = true;
+                if (button) button.innerHTML = '<i class="fas fa-stop-circle"></i>';
+              };
+              
+              currentAudio.onended = () => {
+                isSpeaking = false;
+                currentAudio = null;
+                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
+                URL.revokeObjectURL(audioUrl);
+              };
+              
+              currentAudio.onerror = () => {
+                isSpeaking = false;
+                currentAudio = null;
+                if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
+                URL.revokeObjectURL(audioUrl);
+              };
+              
+              await currentAudio.play();
+            } catch (error) {
+              console.error('TTS error:', error);
               isSpeaking = false;
               if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-            };
-            
-            utterance.onerror = function(event) {
-              console.error('Speech synthesis error:', event.error);
-              isSpeaking = false;
-              if (button) button.innerHTML = '<i class="fas fa-volume-up"></i>';
-            };
-            
-            // Speak
-            speechSynthesis.speak(utterance);
-          }
-          
-          // Load voices when available
-          if (speechSynthesis) {
-            speechSynthesis.onvoiceschanged = function() {
-              speechSynthesis.getVoices();
-            };
+            }
           }
           
           // Load chatbot settings and show if enabled
@@ -21848,7 +21970,7 @@ app.get('/hotel/:property_slug', async (c) => {
               return text.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
             }
             
-            function addMessage(text, role, autoSpeak = false) {
+            function addMessage(text, role, autoSpeak = false, language = 'en') {
               const messageDiv = document.createElement('div');
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
               
@@ -21864,18 +21986,24 @@ app.get('/hotel/:property_slug', async (c) => {
                 const htmlContent = parseMarkdownLinks(text);
                 bubble.innerHTML = htmlContent.replace(/\\n/g, '<br>'); // Preserve line breaks
                 
-                // Add speaker button for bot messages (opt-in)
-                if (speechSynthesis) {
-                  const speakerBtn = document.createElement('button');
-                  speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition text-sm';
-                  speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-                  speakerBtn.title = 'Listen to response (click to play/stop)';
-                  speakerBtn.onclick = function() {
-                    // Remove markdown links for speech (extract only text)
+                // Add speaker button for bot messages - using OpenAI TTS
+                const speakerBtn = document.createElement('button');
+                speakerBtn.className = 'ml-2 text-gray-500 hover:text-purple-600 transition text-sm';
+                speakerBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                speakerBtn.title = 'Listen with AI voice (natural sound)';
+                speakerBtn.onclick = function() {
+                  // Remove markdown links for speech (extract only text)
+                  const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
+                  speakText(cleanText, speakerBtn, language);
+                };
+                bubble.appendChild(speakerBtn);
+                
+                // Auto-speak if voice input was used
+                if (autoSpeak) {
+                  setTimeout(() => {
                     const cleanText = text.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g, '$1').replace(/<[^>]+>/g, '');
-                    speakText(cleanText, speakerBtn);
-                  };
-                  bubble.appendChild(speakerBtn);
+                    speakText(cleanText, speakerBtn, language);
+                  }, 300);
                 }
               }
               
@@ -21885,7 +22013,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             // Send message
-            async function sendMessage(fromVoiceInput = false) {
+            async function sendMessage(fromVoiceInput = false, language = 'en') {
               const message = chatInput.value.trim();
               if (!message) return;
               
@@ -21921,16 +22049,16 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 if (data.success) {
                   chatConversationId = data.conversation_id;
-                  addMessage(data.response, 'assistant', fromVoiceInput);
+                  addMessage(data.response, 'assistant', fromVoiceInput, language);
                 } else if (response.status === 429) {
-                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant', fromVoiceInput);
+                  addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant', fromVoiceInput, language);
                 } else {
-                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant', fromVoiceInput);
+                  addMessage('Sorry, I encountered an error. Please try again.', 'assistant', fromVoiceInput, language);
                 }
               } catch (error) {
                 console.error('Chat error:', error);
                 document.getElementById('typing')?.remove();
-                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant', fromVoiceInput);
+                addMessage('Sorry, I am unable to respond right now. Please try again later.', 'assistant', fromVoiceInput, language);
               }
             }
             
