@@ -14964,14 +14964,18 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
     // Generate secure guest access token for self-service portal
     const guest_access_token = Math.random().toString(36).substring(2) + Date.now().toString(36) + Math.random().toString(36).substring(2)
     
-    // Insert digital pass with guest portal token
+    // Generate unique NFC ID (16-character alphanumeric for NFC compatibility)
+    const nfc_id = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase()
+    
+    // Insert digital pass with guest portal token and NFC support
     const result = await DB.prepare(`
       INSERT INTO digital_passes (
         property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
         guest_email, guest_phone, room_number, tier_id, pass_status,
         num_adults, num_children, valid_from, valid_until,
-        qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1)
+        qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed,
+        nfc_id, nfc_enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1)
     `).bind(
       property_id,
       pass_reference,
@@ -14988,7 +14992,8 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
       qr_secret,
       user_id || null,
       notes || null,
-      guest_access_token
+      guest_access_token,
+      nfc_id
     ).run()
     
     const pass_id = result.meta.last_row_id
@@ -16718,6 +16723,143 @@ app.post('/api/staff/all-inclusive/verify-face', async (c) => {
   } catch (error) {
     console.error('Face verification error:', error)
     return c.json({ error: 'Failed to verify face' }, 500)
+  }
+})
+
+// NFC Verification Endpoint
+app.post('/api/staff/all-inclusive/verify-nfc', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  const user_id = parseInt(c.req.header('X-User-ID') || '0')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { nfc_id, staff_name, location, device_info } = await c.req.json()
+    
+    if (!nfc_id) {
+      return c.json({ error: 'NFC ID required' }, 400)
+    }
+
+    console.log('🔷 NFC Verification Request:', { nfc_id, location, property_id })
+
+    // Get pass by NFC ID
+    const pass = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon,
+        t.tier_badge_style
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.nfc_id = ? AND p.property_id = ? AND p.nfc_enabled = 1
+    `).bind(nfc_id, property_id).first()
+
+    if (!pass) {
+      console.log('❌ NFC Pass not found:', nfc_id)
+      return c.json({ 
+        success: false,
+        error: 'Pass not found or NFC disabled',
+        message: 'Invalid NFC tag' 
+      }, 404)
+    }
+
+    // Check pass status
+    if (pass.pass_status !== 'active') {
+      return c.json({ 
+        success: false,
+        error: 'Pass is not active',
+        pass_status: pass.pass_status,
+        message: `Pass is ${pass.pass_status}` 
+      }, 403)
+    }
+
+    // Check validity dates
+    const now = new Date()
+    const validFrom = new Date(pass.valid_from)
+    const validUntil = new Date(pass.valid_until)
+    
+    if (now < validFrom) {
+      return c.json({
+        success: false,
+        error: 'Pass not yet valid',
+        valid_from: pass.valid_from,
+        message: `Pass becomes valid on ${validFrom.toLocaleDateString()}`
+      }, 403)
+    }
+    
+    if (now > validUntil) {
+      return c.json({
+        success: false,
+        error: 'Pass expired',
+        valid_until: pass.valid_until,
+        message: `Pass expired on ${validUntil.toLocaleDateString()}`
+      }, 403)
+    }
+
+    // Log NFC verification
+    await DB.prepare(`
+      INSERT INTO nfc_verifications (
+        pass_id, nfc_id, verification_location, verified_by, 
+        verification_result, device_info
+      ) VALUES (?, ?, ?, ?, 'success', ?)
+    `).bind(
+      pass.pass_id,
+      nfc_id,
+      location || 'Unknown',
+      user_id || null,
+      device_info || null
+    ).run()
+
+    // Update last NFC use timestamp
+    await DB.prepare(`
+      UPDATE digital_passes 
+      SET nfc_last_used = datetime('now'), total_verifications = total_verifications + 1
+      WHERE pass_id = ?
+    `).bind(pass.pass_id).run()
+
+    // Also log in unified pass_verifications table
+    await DB.prepare(`
+      INSERT INTO pass_verifications (
+        pass_id, verification_method, verification_status, verified_by, verification_location
+      ) VALUES (?, 'nfc', 'valid', ?, ?)
+    `).bind(
+      pass.pass_id,
+      user_id || null,
+      location || 'Unknown'
+    ).run()
+
+    console.log('✅ NFC Verification Success:', pass.pass_reference)
+
+    return c.json({
+      success: true,
+      verification_method: 'nfc',
+      pass_details: {
+        pass_id: pass.pass_id,
+        pass_reference: pass.pass_reference,
+        guest_name: pass.primary_guest_name,
+        guest_photo_url: pass.primary_guest_photo_url,
+        room_number: pass.room_number,
+        guest_email: pass.guest_email,
+        guest_phone: pass.guest_phone,
+        tier: pass.tier_display_name,
+        tier_color: pass.tier_color,
+        tier_icon: pass.tier_icon,
+        tier_badge_style: pass.tier_badge_style,
+        num_adults: pass.num_adults,
+        num_children: pass.num_children,
+        valid_from: pass.valid_from,
+        valid_until: pass.valid_until,
+        nfc_last_used: new Date().toISOString()
+      },
+      message: 'NFC verification successful - Access granted'
+    })
+  } catch (error) {
+    console.error('❌ NFC verification error:', error)
+    return c.json({ error: 'Failed to verify NFC tag' }, 500)
   }
 })
 
