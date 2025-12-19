@@ -4,10 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://baa66594.project-c8738f5c.pages.dev
-**OnePass Tri-Method Page:** https://baa66594.project-c8738f5c.pages.dev/face-scan-feature (🎯 "The Last Wristband You'll Ever Buy" ✓)
-**NFC Test Simulator:** https://baa66594.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
-**Guest Welcome Page:** https://baa66594.project-c8738f5c.pages.dev/welcome.html (🆕 With Pass Linking!)
+**Production:** https://ea85f51e.project-c8738f5c.pages.dev
+**Property Landing Page (THE CORRECT ONE!):** https://ea85f51e.project-c8738f5c.pages.dev/hotel/paradise-resort 🔥
+**OnePass Tri-Method Page:** https://ea85f51e.project-c8738f5c.pages.dev/face-scan-feature (🎯 "The Last Wristband You'll Ever Buy" ✓)
+**NFC Test Simulator:** https://ea85f51e.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
 **Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
 
 ### Quick Test Links
