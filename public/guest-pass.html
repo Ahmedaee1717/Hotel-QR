@@ -291,6 +291,19 @@
                             <div class="text-xs text-gray-500 mt-2 font-mono bg-gray-100 py-2 px-3 rounded">
                                 ${pass.pass_reference}
                             </div>
+                            ${pass.guest_pin ? `
+                            <div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+                                <div class="text-sm font-semibold text-blue-800 mb-2">
+                                    <i class="fas fa-key mr-2"></i>Your Quick Access PIN
+                                </div>
+                                <div class="text-3xl font-bold text-blue-900 tracking-widest font-mono">
+                                    ${pass.guest_pin}
+                                </div>
+                                <div class="text-xs text-blue-600 mt-2">
+                                    Use this 6-digit PIN for instant booking and access
+                                </div>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
