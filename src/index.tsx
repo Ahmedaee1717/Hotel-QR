@@ -24633,8 +24633,8 @@ app.get('/superadmin/dashboard', (c) => {
             </div>
         </div>
 
-        <!-- Analytics Tab -->
-        <div id="analyticsTab" class="tab-content hidden">
+        <!-- Platform Analytics Tab (SuperAdmin) -->
+        <div id="platformAnalyticsTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">Platform Analytics</h2>
                 <p class="text-gray-600">Analytics dashboard coming soon...</p>
@@ -25236,7 +25236,12 @@ app.get('/superadmin/dashboard', (c) => {
             });
             
             // Show selected tab
-            const targetTab = document.getElementById(tab + 'Tab');
+            // Handle special tab ID mappings for SuperAdmin
+            const tabIdMap = {
+              'analytics': 'platformAnalyticsTab'
+            };
+            const tabId = tabIdMap[tab] || (tab + 'Tab');
+            const targetTab = document.getElementById(tabId);
             if (targetTab) {
                 targetTab.classList.add('active');
                 currentTab = tab;
@@ -41011,6 +41016,7 @@ app.get('/admin/dashboard', (c) => {
       document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
         btn.addEventListener('click', function() {
           const tab = this.getAttribute('data-tab');
+          console.log('🖱️ Sidebar button clicked:', tab);
           showTab(tab, this);
         });
       });
