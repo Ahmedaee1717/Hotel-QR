@@ -36337,44 +36337,53 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-4 md:mb-8">
-                    <div class="stats-card bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-4 md:p-6">
+                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex-1">
-                                <p class="text-blue-100 text-xs md:text-sm">QR Code Scans</p>
-                                <p class="text-2xl md:text-3xl font-bold" id="totalScans">0</p>
+                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">QR Code Scans</p>
+                                <p class="text-4xl font-bold mt-2" id="totalScans">0</p>
                             </div>
-                            <i class="fas fa-qrcode text-2xl md:text-4xl opacity-30"></i>
+                            <div class="bg-white/10 rounded-full p-4">
+                                <i class="fas fa-qrcode text-3xl"></i>
+                            </div>
                         </div>
-                        <div id="scansComparison" class="text-xs md:text-sm text-blue-100 flex items-center gap-1">
+                        <div id="scansComparison" class="text-sm text-white/80 flex items-center gap-1 mt-2">
                             <i class="fas fa-spinner fa-spin"></i> Loading...
                         </div>
                     </div>
-                    <div class="stats-card bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-4 md:p-6">
+                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
                         <div class="flex items-center justify-between mb-2">
                             <div class="flex-1">
-                                <p class="text-green-100 text-xs md:text-sm">Bookings</p>
-                                <p class="text-2xl md:text-3xl font-bold" id="activeBookings">0</p>
+                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Bookings</p>
+                                <p class="text-4xl font-bold mt-2" id="activeBookings">0</p>
                             </div>
-                            <i class="fas fa-calendar-check text-2xl md:text-4xl opacity-30"></i>
+                            <div class="bg-white/10 rounded-full p-4">
+                                <i class="fas fa-calendar-check text-3xl"></i>
+                            </div>
                         </div>
-                        <div id="bookingsComparison" class="text-xs md:text-sm text-green-100 flex items-center gap-1">
+                        <div id="bookingsComparison" class="text-sm text-white/80 flex items-center gap-1 mt-2">
                             <i class="fas fa-spinner fa-spin"></i> Loading...
                         </div>
                     </div>
-                    <div class="stats-card bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg shadow-lg p-4 md:p-6">
+                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-purple-100 text-xs md:text-sm">Total Activities</p>
-                                <p class="text-2xl md:text-3xl font-bold" id="totalActivities">0</p>
+                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Total Activities</p>
+                                <p class="text-4xl font-bold mt-2" id="totalActivities">0</p>
                             </div>
-                            <i class="fas fa-hiking text-2xl md:text-4xl opacity-30"></i>
+                            <div class="bg-white/10 rounded-full p-4">
+                                <i class="fas fa-hiking text-3xl"></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="stats-card bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-lg shadow-lg p-4 md:p-6">
+                    <div class="stats-card text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                         <div class="flex items-center justify-between">
                             <div>
-                                <p class="text-orange-100 text-xs md:text-sm">Total Vendors</p>
-                                <p class="text-2xl md:text-3xl font-bold" id="totalVendors">0</p>
+                                <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Total Vendors</p>
+                                <p class="text-4xl font-bold mt-2" id="totalVendors">0</p>
+                            </div>
+                            <div class="bg-white/10 rounded-full p-4">
+                                <i class="fas fa-store text-3xl"></i>
                             </div>
                             <i class="fas fa-store text-2xl md:text-4xl opacity-30"></i>
                         </div>
@@ -40078,40 +40087,48 @@ app.get('/admin/dashboard', (c) => {
             
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="feedbackStats">
-                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                <div class="text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-blue-600 font-semibold">Total Responses</p>
-                            <p class="text-3xl font-bold text-blue-900" id="totalResponses">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Total Responses</p>
+                            <p class="text-4xl font-bold mt-2" id="totalResponses">0</p>
                         </div>
-                        <i class="fas fa-inbox text-4xl text-blue-400"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-inbox text-3xl"></i>
+                        </div>
                     </div>
                 </div>
-                <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                <div class="text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-green-600 font-semibold">Positive</p>
-                            <p class="text-3xl font-bold text-green-900" id="positiveCount">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Positive</p>
+                            <p class="text-4xl font-bold mt-2" id="positiveCount">0</p>
                         </div>
-                        <i class="fas fa-smile text-4xl text-green-400"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-smile text-3xl"></i>
+                        </div>
                     </div>
                 </div>
-                <div class="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
+                <div class="text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-red-600 font-semibold">Urgent</p>
-                            <p class="text-3xl font-bold text-red-900" id="urgentCount">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Urgent</p>
+                            <p class="text-4xl font-bold mt-2" id="urgentCount">0</p>
                         </div>
-                        <i class="fas fa-exclamation-triangle text-4xl text-red-400"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-exclamation-triangle text-3xl"></i>
+                        </div>
                     </div>
                 </div>
-                <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                <div class="text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-yellow-600 font-semibold">Avg Sentiment</p>
-                            <p class="text-3xl font-bold text-yellow-900" id="avgSentiment">0.0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Avg Sentiment</p>
+                            <p class="text-4xl font-bold mt-2" id="avgSentiment">0.0</p>
                         </div>
-                        <i class="fas fa-chart-line text-4xl text-yellow-400"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-chart-line text-3xl"></i>
+                        </div>
                     </div>
                 </div>
             </div>
