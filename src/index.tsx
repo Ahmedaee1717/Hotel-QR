@@ -55833,9 +55833,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const labelSize = fontSize * 0.8;
           
           // Escape label to prevent XSS and quote issues
-          const safeLabel = element.element_label.replace(/['"<>&]/g, (c) => {
-            return {'\'': '&#39;', '"': '&quot;', '<': '&lt;', '>': '&gt;', '&': '&amp;'}[c];
-          });
+          const safeLabel = element.element_label
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
           
           div.innerHTML = '<div class="text-center" style="position: relative; width: 100%; height: 100%;">' +
               '<button onclick="deleteElementById(' + element.element_id + ')" ' +
