@@ -14973,7 +14973,7 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
     // Try to insert with NFC support first, fallback to without if columns don't exist
     let result
     try {
-      // Insert digital pass with guest portal token and NFC support
+      // Try to insert with guest_pin column
       result = await DB.prepare(`
         INSERT INTO digital_passes (
           property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
@@ -15002,7 +15002,38 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
         nfc_id,
         guest_pin
       ).run()
-    } catch (nfcError) {
+    } catch (pinError) {
+      console.log('guest_pin column not found, trying without PIN:', pinError)
+      try {
+        // Fallback: Insert with NFC but without PIN
+        result = await DB.prepare(`
+          INSERT INTO digital_passes (
+            property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
+            guest_email, guest_phone, room_number, tier_id, pass_status,
+            num_adults, num_children, valid_from, valid_until,
+            qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed,
+            nfc_id, nfc_enabled
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1)
+        `).bind(
+          property_id,
+          pass_reference,
+          primary_guest_name,
+          primary_guest_photo_url || null,
+          guest_email || null,
+          guest_phone || null,
+          room_number || null,
+          tier_id,
+          num_adults || 1,
+          num_children || 0,
+          valid_from,
+          valid_until,
+          qr_secret,
+          user_id || null,
+          notes || null,
+          guest_access_token,
+          nfc_id
+        ).run()
+      } catch (nfcError) {
       console.log('NFC columns not found, inserting without NFC support:', nfcError)
       // Fallback: Insert without NFC columns
       result = await DB.prepare(`
@@ -15030,6 +15061,7 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
         notes || null,
         guest_access_token
       ).run()
+      }
     }
     
     const pass_id = result.meta.last_row_id
