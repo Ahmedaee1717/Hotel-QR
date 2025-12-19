@@ -29625,6 +29625,17 @@ app.get('/staff/nfc-encoder', async (c) => {
   }
 })
 
+// NFC Test Simulator Route - For testing NFC functionality without physical hardware
+app.get('/nfc-test-simulator', async (c) => {
+  try {
+    const htmlContent = await c.env.ASSETS.fetch(new URL('/nfc-test-simulator.html', c.req.url))
+    return htmlContent
+  } catch (error) {
+    console.error('Failed to load nfc-test-simulator.html:', error)
+    return c.text('NFC Test Simulator page not found', 404)
+  }
+})
+
 // OLD INLINE VERSION - KEEPING FOR REFERENCE
 app.get('/staff/verify-pass-old', (c) => {
   return c.html(`
