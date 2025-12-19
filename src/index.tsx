@@ -16914,20 +16914,43 @@ app.get('/api/staff/all-inclusive/pass-by-reference/:pass_reference', async (c) 
   }
 
   try {
-    const pass = await DB.prepare(`
-      SELECT 
-        p.*,
-        t.tier_display_name,
-        t.tier_color,
-        t.tier_icon,
-        t.tier_badge_style
-      FROM digital_passes p
-      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
-      WHERE p.pass_reference = ? AND p.property_id = ?
-    `).bind(pass_reference, property_id).first()
+    console.log('🔍 Looking up pass:', pass_reference, 'for property:', property_id)
+    
+    // First try with tier join
+    let pass
+    try {
+      pass = await DB.prepare(`
+        SELECT 
+          p.*,
+          t.tier_display_name,
+          t.tier_color,
+          t.tier_icon,
+          t.tier_badge_style
+        FROM digital_passes p
+        LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+        WHERE p.pass_reference = ? AND p.property_id = ?
+      `).bind(pass_reference, property_id).first()
+    } catch (joinError) {
+      console.log('Tier join failed, trying without tier info:', joinError)
+      // Fallback: Try without tier join if all_inclusive_tiers table doesn't exist
+      pass = await DB.prepare(`
+        SELECT * FROM digital_passes
+        WHERE pass_reference = ? AND property_id = ?
+      `).bind(pass_reference, property_id).first()
+    }
     
     if (!pass) {
+      console.log('❌ Pass not found:', pass_reference)
       return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    console.log('✅ Pass found:', pass.primary_guest_name)
+    
+    // Add default tier info if missing
+    if (!pass.tier_display_name) {
+      pass.tier_display_name = 'Standard'
+      pass.tier_color = '#016e8f'
+      pass.tier_icon = 'fa-star'
     }
     
     return c.json({
@@ -16936,7 +16959,10 @@ app.get('/api/staff/all-inclusive/pass-by-reference/:pass_reference', async (c) 
     })
   } catch (error) {
     console.error('❌ Error fetching pass by reference:', error)
-    return c.json({ error: 'Failed to fetch pass details' }, 500)
+    return c.json({ 
+      error: 'Failed to fetch pass details',
+      details: error.message 
+    }, 500)
   }
 })
 
