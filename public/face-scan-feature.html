@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OnePass - Replace Wristbands Forever | GuestConnect</title>
-    <meta name="description" content="OnePass: Revolutionary digital pass + face recognition for all-inclusive resorts. Guest choice: QR Code or Face Scan. Eliminate wristbands, reduce fraud, enhance guest experience.">
+    <title>OnePass - Three Ways to Access Paradise | GuestConnect</title>
+    <meta name="description" content="OnePass: Revolutionary tri-method verification for all-inclusive resorts. QR Code, Face Recognition, OR NFC Bracelet. Guest choice, unlimited access, zero hassle.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -14,9 +14,9 @@
             --onepass-teal: #00d4aa;
             --primary: #016e8f;
             --primary-dark: #014a5e;
-            --primary-light: #0295bf;
             --accent: #00d4aa;
-            --gold: #ffd700;
+            --nfc-purple: #9333ea;
+            --nfc-pink: #ec4899;
         }
         
         body {
@@ -24,111 +24,66 @@
             overflow-x: hidden;
         }
         
-        /* OnePass Hero Background */
         .hero-section {
-            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);
+            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 50%, #9333ea 100%);
             position: relative;
         }
         
-        .onepass-gradient {
-            background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);
-        }
-        
-        
-        /* 3D card hover effect */
         .card-3d {
-            transition: all 0.4s ease;
+            transition: all 0.5s ease;
             transform-style: preserve-3d;
         }
         
         .card-3d:hover {
-            transform: translateY(-15px) rotateX(5deg);
-            box-shadow: 0 30px 80px rgba(1, 110, 143, 0.3);
+            transform: translateY(-20px) rotateY(5deg) scale(1.02);
+            box-shadow: 0 40px 100px rgba(147, 51, 234, 0.3);
         }
         
-        
-        /* Professional button shadow */
-        .btn-shadow {
-            box-shadow: 0 4px 20px rgba(0, 212, 170, 0.3);
-            transition: all 0.3s ease;
+        .pulse-animation {
+            animation: pulse 3s ease-in-out infinite;
         }
         
-        .btn-shadow:hover {
-            box-shadow: 0 6px 30px rgba(0, 212, 170, 0.4);
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
         }
         
-        /* Professional text accent */
-        .gradient-text {
-            color: #016e8f;
-            font-weight: 900;
-        }
-        
-        /* Slide up animation */
         .slide-up {
             animation: slideUp 0.8s ease-out;
         }
         
         @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        
-        
-        /* Subtle icon hover */
-        .icon-hover {
-            transition: transform 0.3s ease;
+        .gradient-text {
+            background: linear-gradient(135deg, #00d4aa 0%, #9333ea 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
-        .icon-hover:hover {
-            transform: translateY(-5px);
+        .nfc-glow {
+            box-shadow: 0 0 30px rgba(147, 51, 234, 0.6);
         }
         
-        /* Comparison scale effect */
-        .comparison-scale {
-            transition: all 0.3s ease;
+        .floating {
+            animation: floating 3s ease-in-out infinite;
         }
         
-        .comparison-scale:hover {
-            transform: scale(1.05);
+        @keyframes floating {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
         }
         
-        /* Nav link underline */
-        .nav-link {
-            position: relative;
-            padding-bottom: 4px;
+        .rotate-3d {
+            animation: rotate3d 20s linear infinite;
         }
         
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            width: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #016e8f, #00d4aa);
-            transition: all 0.3s ease;
-            transform: translateX(-50%);
-        }
-        
-        .nav-link:hover::after {
-            width: 100%;
-        }
-        
-        /* Subtle card elevation */
-        .hero-card {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .hero-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        @keyframes rotate3d {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
         }
     </style>
 </head>
@@ -138,24 +93,18 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <div class="flex items-center gap-4">
-                    <div class="flex-shrink-0">
-                        <img src="/guestconnect-logo-transparent.png" alt="GuestConnect Logo" class="h-12 w-auto">
-                    </div>
+                    <img src="/guestconnect-logo-transparent.png" alt="GuestConnect Logo" class="h-12 w-auto">
                     <div class="hidden lg:block w-px h-8 bg-gray-300"></div>
-                    <div class="hidden lg:flex items-center gap-2 px-3 py-1 rounded-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
+                    <div class="hidden lg:flex items-center gap-2 px-3 py-1 rounded-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #9333ea 100%);">
                         <img src="/onepass-logo.png" alt="OnePass" style="height: 20px; filter: brightness(0) invert(1);">
-                        <span class="text-white font-bold text-sm">OnePass</span>
+                        <span class="text-white font-bold text-sm">OnePass TRI-METHOD</span>
                     </div>
                 </div>
                 <div class="hidden md:flex items-center space-x-6">
-                    <a href="#guest-choice" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">Guest Choice</a>
-                    <a href="#how-it-works" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">How It Works</a>
-                    <a href="#comparison" class="nav-link text-gray-700 hover:text-primary font-semibold text-base">vs Wristbands</a>
-                    <a href="/face-scan-feature" class="px-6 py-2 text-white rounded-lg font-bold text-base shadow-lg hover:shadow-xl transform hover:scale-105 transition border-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
-                        <img src="/onepass-logo.png" alt="OnePass" class="inline h-4 mr-2" style="filter: brightness(0) invert(1);">
-                        OnePass
-                    </a>
-                    <a href="/admin/login" class="px-6 py-2 bg-teal-600 text-white rounded-lg font-bold text-base shadow-lg hover:shadow-xl hover:bg-teal-700 transform hover:scale-105 transition">
+                    <a href="#tri-choice" class="text-gray-700 hover:text-primary font-semibold">3 Ways</a>
+                    <a href="#benefits" class="text-gray-700 hover:text-primary font-semibold">Benefits</a>
+                    <a href="#comparison" class="text-gray-700 hover:text-primary font-semibold">vs Wristbands</a>
+                    <a href="/admin-login.html" class="px-6 py-2 bg-gradient-to-r from-teal-600 to-purple-600 text-white rounded-lg font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition">
                         Get Started
                     </a>
                 </div>
@@ -163,732 +112,671 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="onepass-gradient text-white py-24 md:py-32 relative">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="grid md:grid-cols-2 gap-16 items-center">
-                <div class="slide-up">
-                    <div class="inline-block mb-6">
-                        <div class="flex items-center gap-3 px-6 py-3 bg-white/10 rounded-full backdrop-blur-sm border-2" style="border-color: #00d4aa;">
-                            <img src="/onepass-logo.png" alt="OnePass" style="height: 24px; filter: brightness(0) invert(1);">
-                            <span class="font-black text-lg">OnePass</span>
-                            <span class="px-3 py-1 rounded-full text-xs font-black" style="background: #00d4aa; color: #16304d;">PRO</span>
-                        </div>
-                    </div>
-                    <h1 class="text-6xl md:text-7xl font-black mb-8 leading-tight">
-                        Replace Wristbands<br/>
-                        <span style="color: #00d4aa;">Forever</span>
-                    </h1>
-                    <p class="text-2xl mb-8 text-gray-100 leading-relaxed font-light">
-                        Give your guests the power to choose: <strong>QR Code</strong> or <strong>Face Recognition</strong>.
-                        No plastic wristbands. No hassle. Just seamless access everywhere.
-                    </p>
-                    <div class="flex flex-wrap gap-6">
-                        <a href="#guest-choice" class="px-10 py-5 text-white rounded-xl font-black text-xl shadow-2xl transition transform hover:scale-105 border-2" style="background: #00d4aa; border-color: #00ffd0;">
-                            <i class="fas fa-hand-pointer mr-3"></i>See Guest Choice
-                        </a>
-                        <a href="#comparison" class="px-10 py-5 bg-white rounded-xl font-black text-xl shadow-lg hover:shadow-xl transition transform hover:scale-105" style="color: #1e3a5f;">
-                            <i class="fas fa-chart-bar mr-3"></i>Why Switch?
-                        </a>
-                    </div>
-                    
-                    <!-- Impressive Stats -->
-                    <div class="grid grid-cols-3 gap-8 mt-16 pt-12 border-t" style="border-color: #00d4aa;">
-                        <div class="text-center">
-                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">2</div>
-                            <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Guest Options</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">&lt;1s</div>
-                            <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Verification</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-5xl font-black mb-2" style="color: #00d4aa;">$0</div>
-                            <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Per Guest</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Hero Visual -->
-                <div class="relative">
-                    <div class="hero-card bg-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl border border-white/20">
-                        <div class="space-y-8">
-                            <!-- QR + Face Icons -->
-                            <div class="flex justify-around items-center">
-                                <div class="text-center">
-                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-hover shadow-lg">
-                                        <i class="fas fa-qrcode text-7xl" style="color: var(--primary);"></i>
-                                    </div>
-                                    <p class="text-xl font-bold">QR Code</p>
-                                </div>
-                                <div class="text-6xl font-black text-white/70">OR</div>
-                                <div class="text-center">
-                                    <div class="w-32 h-32 bg-white rounded-3xl flex items-center justify-center mb-4 icon-hover shadow-lg">
-                                        <i class="fas fa-user-check text-7xl" style="color: var(--accent);"></i>
-                                    </div>
-                                    <p class="text-xl font-bold">Face Scan</p>
-                                </div>
-                            </div>
-                            
-                            <div class="text-center">
-                                <p class="text-3xl font-black text-white mb-4">Guest's Choice!</p>
-                                <p class="text-lg text-gray-200 leading-relaxed">
-                                    Privacy-conscious? Use QR. Want touchless? Use face. It's entirely up to them.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Guest Choice Section (NEW & PROMINENT) -->
-    <section id="guest-choice" class="py-24 bg-gradient-to-br from-gray-50 via-white to-gray-50 relative overflow-hidden">
-        <div class="absolute inset-0 opacity-5">
-            <div class="absolute top-0 left-0 w-96 h-96 bg-primary rounded-full blur-3xl"></div>
-            <div class="absolute bottom-0 right-0 w-96 h-96 bg-accent rounded-full blur-3xl"></div>
+    <!-- Hero Section - TRI-METHOD -->
+    <section class="hero-section text-white py-32 md:py-40 relative overflow-hidden">
+        <!-- Animated background elements -->
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-10 left-10 w-72 h-72 bg-teal-400 rounded-full blur-3xl pulse-animation"></div>
+            <div class="absolute bottom-10 right-10 w-96 h-96 bg-purple-500 rounded-full blur-3xl pulse-animation" style="animation-delay: 1.5s;"></div>
         </div>
         
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div class="text-center mb-20">
-                <div class="inline-block mb-6">
-                    <span class="px-6 py-3 text-white rounded-full text-sm font-bold shadow-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
-                        <i class="fas fa-user-friends mr-2"></i>Guest Freedom
-                    </span>
-                </div>
-                <h2 class="text-6xl font-black text-gray-900 mb-6">
-                    Your Guest's Choice,<br/>
-                    <span class="gradient-text">Your Peace of Mind</span>
-                </h2>
-                <p class="text-2xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-                    Not everyone wants facial recognition. That's why we give <strong>every guest two options</strong> 
-                    – both equally secure, both incredibly convenient.
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 gap-12 mb-16">
-                <!-- Option 1: QR Code -->
-                <div class="card-3d bg-white rounded-3xl p-12 shadow-2xl border-4" style="border-color: #1e3a5f;">
-                    <div class="flex justify-center mb-8">
-                        <div class="w-32 h-32 rounded-3xl flex items-center justify-center shadow-2xl transform rotate-3 hover:rotate-0 transition" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
-                            <i class="fas fa-qrcode text-7xl text-white"></i>
-                        </div>
-                    </div>
-                    <h3 class="text-4xl font-black text-center mb-6" style="color: #1e3a5f;">
-                        <i class="fas fa-mobile-alt mr-3"></i>QR Code Access
-                    </h3>
-                    <p class="text-xl text-gray-700 text-center mb-8 leading-relaxed">
-                        Classic, proven, and universally trusted. Guest shows their digital pass on their phone, 
-                        staff scans the QR code. Instant verification.
-                    </p>
-                    
-                    <div class="space-y-4">
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(30, 58, 95, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #1e3a5f;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #1e3a5f;">Works Everywhere</h4>
-                                <p class="text-gray-700">Any smartphone, any time, even offline</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(30, 58, 95, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #1e3a5f;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #1e3a5f;">100% Privacy</h4>
-                                <p class="text-gray-700">No biometric data needed</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(30, 58, 95, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #1e3a5f;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #1e3a5f;">Apple/Google Wallet</h4>
-                                <p class="text-gray-700">Add to wallet for quick access</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(30, 58, 95, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #1e3a5f;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #1e3a5f;">Instant Scanning</h4>
-                                <p class="text-gray-700">Sub-second verification time</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-8 p-6 rounded-2xl text-white text-center shadow-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
-                        <p class="text-xl font-bold">Perfect for privacy-focused guests</p>
+            <div class="text-center mb-20 slide-up">
+                <div class="inline-block mb-8">
+                    <div class="flex items-center gap-3 px-8 py-4 bg-white/10 rounded-full backdrop-blur-sm border-2 border-white/30 nfc-glow">
+                        <img src="/onepass-logo.png" alt="OnePass" style="height: 28px; filter: brightness(0) invert(1);">
+                        <span class="font-black text-2xl">OnePass</span>
+                        <span class="px-4 py-1 rounded-full text-sm font-black" style="background: linear-gradient(135deg, #00d4aa 0%, #9333ea 100%); color: white;">TRI-METHOD</span>
                     </div>
                 </div>
                 
-                <!-- Option 2: Face Recognition -->
-                <div class="card-3d bg-white rounded-3xl p-12 shadow-2xl border-4 relative" style="border-color: #00d4aa;">
-                    <div class="absolute top-6 right-6">
+                <h1 class="text-7xl md:text-8xl font-black mb-10 leading-tight">
+                    Three Ways to<br/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-cyan-300 to-purple-300">
+                        Access Paradise
+                    </span>
+                </h1>
+                
+                <p class="text-3xl mb-12 text-gray-100 leading-relaxed font-light max-w-5xl mx-auto">
+                    <strong>QR Code</strong>, <strong>Face Recognition</strong>, or <strong>NFC Bracelet</strong>.<br/>
+                    Your guests choose. Hundreds of benefits for everyone.
+                </p>
+            </div>
+            
+            <!-- Tri-Method Visual -->
+            <div class="grid md:grid-cols-3 gap-8 mb-20">
+                <!-- QR Method -->
+                <div class="card-3d bg-white/10 backdrop-blur-2xl rounded-3xl p-12 border border-white/20 relative group">
+                    <div class="absolute -top-4 -right-4 w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center shadow-2xl">
+                        <span class="text-2xl font-black text-white">1</span>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-40 h-40 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center mb-6 icon-hover shadow-2xl floating">
+                            <i class="fas fa-qrcode text-8xl text-white"></i>
+                        </div>
+                        <h3 class="text-3xl font-black mb-4">QR Code</h3>
+                        <p class="text-xl text-gray-200">Classic, proven, universally trusted</p>
+                    </div>
+                </div>
+                
+                <!-- Face Method -->
+                <div class="card-3d bg-white/10 backdrop-blur-2xl rounded-3xl p-12 border-2 border-teal-400 relative group nfc-glow">
+                    <div class="absolute -top-4 -right-4 w-16 h-16 bg-teal-400 rounded-full flex items-center justify-center shadow-2xl">
+                        <span class="text-2xl font-black text-white">2</span>
+                    </div>
+                    <div class="absolute top-6 left-6">
                         <span class="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-full text-xs font-black shadow-lg uppercase">
                             Most Popular
                         </span>
                     </div>
-                    <div class="flex justify-center mb-8">
-                        <div class="w-32 h-32 rounded-3xl flex items-center justify-center shadow-2xl transform -rotate-3 hover:rotate-0 transition" style="background: linear-gradient(135deg, #00d4aa 0%, #00a589 100%);">
-                            <i class="fas fa-user-check text-7xl text-white"></i>
+                    <div class="text-center">
+                        <div class="w-40 h-40 mx-auto bg-gradient-to-br from-teal-400 to-teal-600 rounded-3xl flex items-center justify-center mb-6 shadow-2xl floating" style="animation-delay: 1s;">
+                            <i class="fas fa-user-check text-8xl text-white"></i>
                         </div>
+                        <h3 class="text-3xl font-black mb-4">Face Scan</h3>
+                        <p class="text-xl text-gray-200">Touchless, hands-free luxury</p>
                     </div>
-                    <h3 class="text-4xl font-black text-center mb-6" style="color: #00a589;">
-                        <i class="fas fa-sparkles mr-3"></i>Face Recognition
-                    </h3>
-                    <p class="text-xl text-gray-700 text-center mb-8 leading-relaxed">
-                        The ultimate convenience. Guest simply walks up, camera recognizes their face, 
-                        instant access. No phone needed. True touchless experience.
-                    </p>
-                    
-                    <div class="space-y-4">
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(0, 212, 170, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #00d4aa;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #00a589;">Truly Hands-Free</h4>
-                                <p class="text-gray-700">No phone, no card, no touching anything</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(0, 212, 170, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #00d4aa;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #00a589;">99.7% Accuracy</h4>
-                                <p class="text-gray-700">Military-grade facial recognition</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(0, 212, 170, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #00d4aa;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #00a589;">Ultra Secure</h4>
-                                <p class="text-gray-700">Impossible to share, fake, or lose</p>
-                            </div>
-                        </div>
-                        <div class="flex items-start rounded-2xl p-5" style="background: rgba(0, 212, 170, 0.08);">
-                            <i class="fas fa-check-circle text-3xl mr-4 mt-1" style="color: #00d4aa;"></i>
-                            <div>
-                                <h4 class="font-bold text-lg mb-1" style="color: #00a589;">GDPR Compliant</h4>
-                                <p class="text-gray-700">Auto-delete after checkout</p>
-                            </div>
-                        </div>
+                </div>
+                
+                <!-- NFC Method -->
+                <div class="card-3d bg-white/10 backdrop-blur-2xl rounded-3xl p-12 border border-white/20 relative group">
+                    <div class="absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-2xl nfc-glow">
+                        <span class="text-2xl font-black text-white">3</span>
                     </div>
-                    
-                    <div class="mt-8 p-6 rounded-2xl text-white text-center shadow-lg" style="background: linear-gradient(135deg, #00d4aa 0%, #00a589 100%);">
-                        <p class="text-xl font-bold">Perfect for touchless, VIP experience</p>
+                    <div class="absolute top-6 left-6">
+                        <span class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-xs font-black shadow-lg uppercase">
+                            ✨ NEW
+                        </span>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-40 h-40 mx-auto bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl floating nfc-glow" style="animation-delay: 2s;">
+                            <i class="fas fa-broadcast-tower text-8xl text-white"></i>
+                        </div>
+                        <h3 class="text-3xl font-black mb-4">NFC Bracelet</h3>
+                        <p class="text-xl text-gray-200">Tap-and-go convenience</p>
                     </div>
                 </div>
             </div>
             
-            <!-- Both Together -->
-            <div class="bg-white border-4 rounded-3xl p-12 text-center shadow-2xl" style="border-color: #00d4aa;">
-                <div class="inline-block px-6 py-3 text-white rounded-full font-black mb-6 text-xl" style="background: linear-gradient(135deg, #00d4aa 0%, #00a589 100%);">
-                    <i class="fas fa-star mr-2"></i>BEST OF BOTH WORLDS
+            <!-- Impressive Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-white/30">
+                <div class="text-center">
+                    <div class="text-6xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-cyan-300">3</div>
+                    <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Methods</div>
                 </div>
-                <h3 class="text-5xl font-black mb-8 text-gray-900">Ultimate Guest Flexibility</h3>
-                <p class="text-2xl mb-10 leading-relaxed max-w-4xl mx-auto text-gray-700">
-                    Guests can even <strong style="color: #00d4aa;">switch between methods anytime!</strong><br/>
-                    Started with QR? <strong>Enroll face later.</strong><br/>
-                    Prefer privacy one day? <strong>Use QR.</strong><br/>
-                    Want convenience? <strong>Use face.</strong><br/><br/>
-                    <span class="text-3xl font-black" style="color: #00d4aa;">Total flexibility.</span>
+                <div class="text-center">
+                    <div class="text-6xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-300">0.5s</div>
+                    <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Verification</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-6xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-300">100%</div>
+                    <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Choice</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-6xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-teal-300">$0</div>
+                    <div class="text-sm text-gray-200 font-semibold uppercase tracking-wider">Per Guest</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tri-Choice Detail Section -->
+    <section id="tri-choice" class="py-32 bg-gradient-to-br from-gray-50 via-white to-purple-50 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-20">
+                <h2 class="text-7xl font-black text-gray-900 mb-8">
+                    <span class="gradient-text">Ultimate Flexibility</span><br/>
+                    For Every Guest
+                </h2>
+                <p class="text-3xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+                    Not everyone is the same. That's why we give <strong>three powerful options</strong> – 
+                    all equally secure, all incredibly convenient.
                 </p>
-                <div class="grid md:grid-cols-3 gap-10 max-w-5xl mx-auto">
-                    <div class="p-8 rounded-2xl" style="background: linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 212, 170, 0.05) 100%);">
-                        <div class="text-6xl font-black mb-4" style="color: #00d4aa;">100%</div>
-                        <div class="text-xl font-bold text-gray-800">Guest Satisfaction</div>
+            </div>
+            
+            <div class="space-y-16">
+                <!-- Method 1: QR Code -->
+                <div class="card-3d bg-white rounded-3xl p-16 shadow-2xl border-4 border-blue-500">
+                    <div class="grid md:grid-cols-2 gap-12 items-center">
+                        <div>
+                            <div class="flex items-center gap-4 mb-8">
+                                <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl">
+                                    <i class="fas fa-qrcode text-5xl text-white"></i>
+                                </div>
+                                <div>
+                                    <span class="px-4 py-2 bg-blue-100 text-blue-900 rounded-full text-sm font-black uppercase">Method 1</span>
+                                    <h3 class="text-5xl font-black text-blue-600 mt-2">QR Code</h3>
+                                </div>
+                            </div>
+                            
+                            <p class="text-2xl text-gray-700 mb-10 leading-relaxed">
+                                The <strong>universal standard</strong>. Works on any smartphone, any time, anywhere. 
+                                Perfect for privacy-conscious guests who want zero biometric data stored.
+                            </p>
+                            
+                            <div class="space-y-5">
+                                <div class="flex items-start bg-blue-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-blue-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-blue-900 mb-2">100% Privacy</h4>
+                                        <p class="text-lg text-gray-700">No biometric data collected or stored. Perfect for GDPR compliance.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-blue-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-blue-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-blue-900 mb-2">Works Offline</h4>
+                                        <p class="text-lg text-gray-700">QR stored locally on phone. No internet needed to show pass.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-blue-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-blue-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-blue-900 mb-2">Apple/Google Wallet</h4>
+                                        <p class="text-lg text-gray-700">Add to wallet for lock screen access. Instant convenience.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="relative">
+                            <div class="bg-gradient-to-br from-blue-100 to-blue-200 rounded-3xl p-12 text-center shadow-2xl">
+                                <div class="bg-white rounded-3xl p-10 shadow-xl mb-8">
+                                    <i class="fas fa-mobile-alt text-9xl text-blue-600 mb-6"></i>
+                                    <div class="bg-blue-600 rounded-2xl p-6">
+                                        <i class="fas fa-qrcode text-8xl text-white"></i>
+                                    </div>
+                                </div>
+                                <p class="text-3xl font-black text-blue-900">Scan & Go!</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="p-8 rounded-2xl" style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.1) 0%, rgba(30, 58, 95, 0.05) 100%);">
-                        <div class="text-6xl font-black mb-4" style="color: #1e3a5f;">Zero</div>
-                        <div class="text-xl font-bold text-gray-800">Forced Biometrics</div>
+                </div>
+                
+                <!-- Method 2: Face Recognition -->
+                <div class="card-3d bg-white rounded-3xl p-16 shadow-2xl border-4 border-teal-500 nfc-glow">
+                    <div class="grid md:grid-cols-2 gap-12 items-center">
+                        <div class="order-2 md:order-1 relative">
+                            <div class="bg-gradient-to-br from-teal-100 to-teal-200 rounded-3xl p-12 text-center shadow-2xl">
+                                <div class="bg-white rounded-3xl p-10 shadow-xl mb-8">
+                                    <div class="relative inline-block">
+                                        <i class="fas fa-user-circle text-9xl text-teal-600 mb-6"></i>
+                                        <div class="absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center animate-ping">
+                                            <i class="fas fa-check text-3xl text-white"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-3xl font-black text-teal-900">Look & Enter!</p>
+                            </div>
+                        </div>
+                        
+                        <div class="order-1 md:order-2">
+                            <div class="flex items-center gap-4 mb-8">
+                                <div class="w-24 h-24 bg-gradient-to-br from-teal-400 to-teal-600 rounded-3xl flex items-center justify-center shadow-2xl">
+                                    <i class="fas fa-user-check text-5xl text-white"></i>
+                                </div>
+                                <div>
+                                    <span class="px-4 py-2 bg-teal-100 text-teal-900 rounded-full text-sm font-black uppercase">Method 2</span>
+                                    <h3 class="text-5xl font-black text-teal-600 mt-2">Face Scan</h3>
+                                </div>
+                            </div>
+                            
+                            <p class="text-2xl text-gray-700 mb-10 leading-relaxed">
+                                <strong>Ultimate convenience</strong>. No phone, no card, no touching anything. 
+                                Just walk up and go. The VIP experience guests love.
+                            </p>
+                            
+                            <div class="space-y-5">
+                                <div class="flex items-start bg-teal-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-teal-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-teal-900 mb-2">Truly Hands-Free</h4>
+                                        <p class="text-lg text-gray-700">Perfect for pool, beach, restaurants. Nothing to carry or remember.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-teal-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-teal-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-teal-900 mb-2">99.9% Accuracy</h4>
+                                        <p class="text-lg text-gray-700">Works with sunglasses, hats, makeup. Any lighting condition.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-teal-50 rounded-2xl p-6">
+                                    <i class="fas fa-check-circle text-4xl text-teal-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-teal-900 mb-2">Auto-Delete After Checkout</h4>
+                                        <p class="text-lg text-gray-700">Full GDPR & BIPA compliance. Data never shared or sold.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="p-8 rounded-2xl" style="background: linear-gradient(135deg, rgba(0, 165, 137, 0.1) 0%, rgba(0, 165, 137, 0.05) 100%);">
-                        <div class="text-6xl font-black mb-4" style="color: #00a589;">Always</div>
-                        <div class="text-xl font-bold text-gray-800">Their Choice</div>
+                </div>
+                
+                <!-- Method 3: NFC Bracelet (NEW!) -->
+                <div class="card-3d bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl p-16 shadow-2xl border-4 border-purple-500 relative nfc-glow">
+                    <div class="absolute -top-6 left-1/2 transform -translate-x-1/2">
+                        <span class="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-lg font-black shadow-2xl uppercase">
+                            ✨ NEW BREAKTHROUGH TECHNOLOGY ✨
+                        </span>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-12 items-center mt-8">
+                        <div>
+                            <div class="flex items-center gap-4 mb-8">
+                                <div class="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl nfc-glow">
+                                    <i class="fas fa-broadcast-tower text-5xl text-white"></i>
+                                </div>
+                                <div>
+                                    <span class="px-4 py-2 bg-purple-100 text-purple-900 rounded-full text-sm font-black uppercase">Method 3</span>
+                                    <h3 class="text-5xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mt-2">NFC Bracelet</h3>
+                                </div>
+                            </div>
+                            
+                            <p class="text-2xl text-gray-700 mb-10 leading-relaxed">
+                                <strong>The future of resort access</strong>. Tap your stylish NFC bracelet for instant entry. 
+                                Waterproof, fashionable, and incredibly fast. <strong>No phone battery worries!</strong>
+                            </p>
+                            
+                            <div class="space-y-5">
+                                <div class="flex items-start bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
+                                    <i class="fas fa-check-circle text-4xl text-purple-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-purple-900 mb-2">0.3 Second Verification</h4>
+                                        <p class="text-lg text-gray-700">Fastest method. Just tap and go. No scanning, no waiting.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
+                                    <i class="fas fa-check-circle text-4xl text-purple-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-purple-900 mb-2">100% Waterproof</h4>
+                                        <p class="text-lg text-gray-700">Swim, surf, shower. Works perfectly wet or dry. Never remove it.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
+                                    <i class="fas fa-check-circle text-4xl text-purple-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-purple-900 mb-2">No Battery, No Charging</h4>
+                                        <p class="text-lg text-gray-700">NFC powered by reader. Works for entire stay, guaranteed.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start bg-purple-50 rounded-2xl p-6 border-2 border-purple-200">
+                                    <i class="fas fa-check-circle text-4xl text-purple-600 mr-5 mt-1"></i>
+                                    <div>
+                                        <h4 class="text-2xl font-bold text-purple-900 mb-2">Stylish & Comfortable</h4>
+                                        <p class="text-lg text-gray-700">Multiple colors. Lightweight. Won't irritate skin. Fashion accessory!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="relative">
+                            <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-3xl p-12 text-center shadow-2xl">
+                                <div class="bg-white rounded-3xl p-10 shadow-xl mb-8 relative">
+                                    <div class="relative">
+                                        <i class="fas fa-hand-paper text-9xl text-purple-600 mb-6"></i>
+                                        <div class="absolute top-0 right-0 rotate-3d">
+                                            <div class="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-2xl nfc-glow">
+                                                <i class="fas fa-wifi text-5xl text-white"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Tap & Access!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ALL THREE TOGETHER -->
+            <div class="mt-24 bg-gradient-to-r from-blue-500 via-teal-500 via-purple-500 to-pink-500 rounded-3xl p-2">
+                <div class="bg-white rounded-3xl p-16 text-center">
+                    <div class="inline-block px-10 py-5 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-full font-black mb-10 text-2xl shadow-2xl nfc-glow">
+                        <i class="fas fa-crown mr-3"></i>THE ULTIMATE PACKAGE
+                    </div>
+                    <h3 class="text-7xl font-black mb-10 text-gray-900">
+                        <span class="gradient-text">Mix & Match Anytime!</span>
+                    </h3>
+                    <p class="text-3xl mb-16 leading-relaxed max-w-5xl mx-auto text-gray-700">
+                        Guests can <strong style="color: #9333ea;">switch between all three methods</strong> whenever they want!<br/>
+                        Phone died? <strong style="color: #00d4aa;">Use face or bracelet.</strong><br/>
+                        Want privacy? <strong style="color: #3b82f6;">Use QR code.</strong><br/>
+                        Love convenience? <strong style="color: #ec4899;">Tap bracelet.</strong><br/><br/>
+                        <span class="text-5xl font-black gradient-text">Total freedom. Zero limits.</span>
+                    </p>
+                    
+                    <div class="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-10 rounded-3xl">
+                            <div class="text-8xl font-black mb-6 text-blue-600">100%</div>
+                            <div class="text-2xl font-bold text-gray-800">Guest Satisfaction</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-teal-50 to-teal-100 p-10 rounded-3xl">
+                            <div class="text-8xl font-black mb-6 text-teal-600">∞</div>
+                            <div class="text-2xl font-bold text-gray-800">Flexibility</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-pink-100 p-10 rounded-3xl">
+                            <div class="text-8xl font-black mb-6 text-purple-600">Zero</div>
+                            <div class="text-2xl font-bold text-gray-800">Forced Methods</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Problem Statement -->
-    <section class="py-24 bg-gray-900 text-white relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full">
-                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                            <path d="M 50 0 L 0 0 0 50" fill="none" stroke="white" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)"/>
-                </svg>
-            </div>
-        </div>
-        
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <!-- Hundreds of Benefits Section -->
+    <section id="benefits" class="py-32 bg-gradient-to-b from-white to-gray-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-20">
-                <h2 class="text-6xl font-black mb-6">
-                    The <span class="text-red-400">Wristband Problem</span><br/>
-                    Every Resort Faces
+                <h2 class="text-7xl font-black text-gray-900 mb-8">
+                    <span class="gradient-text">Hundreds of Benefits</span><br/>
+                    For Everyone
                 </h2>
-                <p class="text-2xl text-gray-300 max-w-3xl mx-auto">
-                    Traditional wristbands are bleeding your revenue, frustrating guests, and destroying the planet.
+                <p class="text-3xl text-gray-600 max-w-4xl mx-auto">
+                    Not just better than wristbands. Better for <strong>guests, staff, environment, and your bottom line.</strong>
                 </p>
             </div>
             
             <div class="grid md:grid-cols-3 gap-10">
-                <!-- Problem 1 -->
-                <div class="card-3d bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-white/10">
-                    <div class="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-8">
-                        <i class="fas fa-money-bill-wave text-5xl text-red-400"></i>
+                <!-- Guest Benefits -->
+                <div class="card-3d bg-white rounded-3xl p-12 shadow-2xl border-t-8 border-teal-500">
+                    <div class="text-center mb-8">
+                        <div class="w-32 h-32 mx-auto bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                            <i class="fas fa-user-friends text-6xl text-white"></i>
+                        </div>
+                        <h3 class="text-4xl font-black text-teal-600">For Guests</h3>
                     </div>
-                    <h3 class="text-3xl font-black mb-6 text-red-400">Expensive Waste</h3>
-                    <ul class="space-y-5 text-lg text-gray-300">
+                    <ul class="space-y-4 text-lg text-gray-700">
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">$3-5 per wristband</strong> × 50K guests = $250K/year</span>
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>No uncomfortable wristbands</strong> - no skin irritation</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">30% lost/damaged</strong> requiring costly replacement</span>
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Choose verification method</strong> - total control</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">50,000+ plastic bands</strong> in landfills yearly</span>
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Switch methods anytime</strong> - ultimate flexibility</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Faster check-ins</strong> - start vacation immediately</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Better vacation photos</strong> - no ugly bands</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Privacy respected</strong> - biometrics optional</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Can't lose access</strong> - multiple backup methods</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-teal-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Instant venue access</strong> - no waiting in lines</span>
                         </li>
                     </ul>
                 </div>
                 
-                <!-- Problem 2 -->
-                <div class="card-3d bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-white/10">
-                    <div class="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mb-8">
-                        <i class="fas fa-user-slash text-5xl text-orange-400"></i>
+                <!-- Resort Benefits -->
+                <div class="card-3d bg-white rounded-3xl p-12 shadow-2xl border-t-8 border-purple-500">
+                    <div class="text-center mb-8">
+                        <div class="w-32 h-32 mx-auto bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-2xl mb-6 nfc-glow">
+                            <i class="fas fa-hotel text-6xl text-white"></i>
+                        </div>
+                        <h3 class="text-4xl font-black text-purple-600">For Resorts</h3>
                     </div>
-                    <h3 class="text-3xl font-black mb-6 text-orange-400">Security Nightmare</h3>
-                    <ul class="space-y-5 text-lg text-gray-300">
+                    <ul class="space-y-4 text-lg text-gray-700">
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-orange-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">Easy to share</strong>, swap, or counterfeit</span>
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>$250K+ saved yearly</strong> - zero consumables</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-orange-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">No identity verification</strong> – anyone can use them</span>
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>85% fraud reduction</strong> - secure verification</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-orange-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">Lost wristbands</strong> = unauthorized access & fraud</span>
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Real-time analytics</strong> - track guest flow</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Zero inventory management</strong> - no stock tracking</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Faster check-outs</strong> - no band collection</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Better reviews</strong> - happier guests</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Marketing advantage</strong> - modern technology</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-purple-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Compliance ready</strong> - GDPR/BIPA certified</span>
                         </li>
                     </ul>
                 </div>
                 
-                <!-- Problem 3 -->
-                <div class="card-3d bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-white/10">
-                    <div class="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-8">
-                        <i class="fas fa-frown text-5xl text-yellow-400"></i>
+                <!-- Environment Benefits -->
+                <div class="card-3d bg-white rounded-3xl p-12 shadow-2xl border-t-8 border-green-500">
+                    <div class="text-center mb-8">
+                        <div class="w-32 h-32 mx-auto bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                            <i class="fas fa-leaf text-6xl text-white"></i>
+                        </div>
+                        <h3 class="text-4xl font-black text-green-600">For Planet</h3>
                     </div>
-                    <h3 class="text-3xl font-black mb-6 text-yellow-400">Guest Frustration</h3>
-                    <ul class="space-y-5 text-lg text-gray-300">
+                    <ul class="space-y-4 text-lg text-gray-700">
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-yellow-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">Uncomfortable</strong>, especially when wet or sleeping</span>
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>50K+ plastic bands eliminated</strong> per year</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-yellow-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">Ruins photos</strong> & destroys vacation aesthetics</span>
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Zero landfill waste</strong> - 100% digital</span>
                         </li>
                         <li class="flex items-start">
-                            <i class="fas fa-times-circle text-yellow-400 mr-4 mt-1 text-2xl"></i>
-                            <span><strong class="text-white">Long check-in lines</strong> = terrible first impression</span>
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Carbon footprint reduced</strong> - no manufacturing</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Ocean pollution prevented</strong> - no lost bands</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Sustainability certifications</strong> - marketing boost</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>ESG score improved</strong> - investor appeal</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Green tourism awards</strong> - industry recognition</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check text-green-600 mr-3 mt-1 text-xl"></i>
+                            <span><strong>Guest eco-conscious appeal</strong> - attract millennials</span>
                         </li>
                     </ul>
-                </div>
-            </div>
-            
-            <div class="mt-16 bg-red-900/30 border-l-8 border-red-500 p-10 rounded-2xl backdrop-blur-sm">
-                <div class="flex items-start">
-                    <i class="fas fa-exclamation-triangle text-5xl text-red-400 mr-6 mt-2"></i>
-                    <div>
-                        <h4 class="text-3xl font-black text-red-400 mb-4">The Real Cost</h4>
-                        <p class="text-xl text-gray-200 leading-relaxed">
-                            A 500-room all-inclusive resort loses an average of <strong class="text-white text-2xl">$375,000 annually</strong> 
-                            to wristband costs, fraud, operational inefficiencies, and environmental penalties. 
-                            <strong class="text-yellow-300">That's nearly half a million dollars thrown away.</strong>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- How It Works -->
-    <section id="how-it-works" class="py-24 bg-gradient-to-b from-white to-gray-100">
+    <!-- Comparison: Tri-Method vs Wristbands -->
+    <section id="comparison" class="py-32 bg-gray-900 text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-20">
-                <div class="inline-block mb-6">
-                    <span class="px-6 py-3 text-white rounded-full text-sm font-bold shadow-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
-                        <i class="fas fa-cogs mr-2"></i>Simple Process
-                    </span>
-                </div>
-                <h2 class="text-6xl font-black text-gray-900 mb-6">
-                    Three Steps to<br/>
-                    <span class="gradient-text">Transform Your Resort</span>
+                <h2 class="text-7xl font-black mb-8">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-purple-300">Tri-Method OnePass</span> vs.<br/>
+                    <span class="text-red-400">Traditional Wristbands</span>
                 </h2>
-                <p class="text-2xl text-gray-600 max-w-3xl mx-auto">
-                    Setup is fast. Implementation is seamless. Results are immediate.
-                </p>
-            </div>
-            
-            <div class="space-y-20">
-                <!-- Step 1 -->
-                <div class="grid md:grid-cols-2 gap-16 items-center">
-                    <div class="order-2 md:order-1">
-                        <div class="card-3d rounded-3xl p-12 shadow-2xl" style="background: linear-gradient(135deg, rgba(30, 58, 95, 0.08) 0%, rgba(30, 58, 95, 0.05) 100%);">
-                            <div class="flex items-center justify-center aspect-square bg-white rounded-3xl shadow-xl">
-                                <div class="text-center">
-                                    <i class="fas fa-user-plus text-9xl mb-6" style="color: #1e3a5f;"></i>
-                                    <p class="text-3xl font-black text-gray-700">30 Seconds</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="order-1 md:order-2">
-                        <div class="inline-block px-6 py-3 text-white rounded-full font-black mb-6 text-xl shadow-lg" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%);">
-                            STEP 1
-                        </div>
-                        <h3 class="text-5xl font-black mb-6 text-gray-900">Guest Chooses Their Method</h3>
-                        <p class="text-2xl text-gray-700 mb-8 leading-relaxed">
-                            At check-in, guests pick: <strong>QR Code</strong> (instant) or <strong>Face Recognition</strong> 
-                            (30-second enrollment). Both are secure, both are easy.
-                        </p>
-                        <ul class="space-y-5">
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <div>
-                                    <strong class="text-xl text-gray-900">QR: </strong>
-                                    <span class="text-lg text-gray-700">Digital pass sent to phone instantly</span>
-                                </div>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <div>
-                                    <strong class="text-xl text-gray-900">Face: </strong>
-                                    <span class="text-lg text-gray-700">Look at camera for 3 seconds, done (photos never saved)</span>
-                                </div>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <div>
-                                    <span class="text-lg text-gray-700"><strong>Optional enrollment</strong> – guest decides</span>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <!-- Step 2 -->
-                <div class="grid md:grid-cols-2 gap-16 items-center">
-                    <div>
-                        <div class="inline-block px-6 py-3 text-white rounded-full font-black mb-6 text-xl shadow-lg" style="background: linear-gradient(135deg, #00d4aa 0%, #00a589 100%);">
-                            STEP 2
-                        </div>
-                        <h3 class="text-5xl font-black mb-6 text-gray-900">Instant Access Everywhere</h3>
-                        <p class="text-2xl text-gray-700 mb-8 leading-relaxed">
-                            Guests walk up to any venue – restaurants, pools, bars, beaches – and are instantly verified. 
-                            <strong>QR or Face, their choice every time.</strong>
-                        </p>
-                        <ul class="space-y-5">
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700">Works in <strong>any lighting</strong> condition (sun, rain, night)</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700">Face recognition works with <strong>sunglasses, hats, makeup</strong></span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700"><strong>Multi-venue</strong> access control – one system for all areas</span>
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <div class="card-3d rounded-3xl p-12 shadow-2xl" style="background: linear-gradient(135deg, rgba(0, 212, 170, 0.08) 0%, rgba(0, 212, 170, 0.05) 100%);">
-                            <div class="flex items-center justify-center aspect-square bg-white rounded-3xl shadow-xl">
-                                <div class="text-center">
-                                    <i class="fas fa-map-marked-alt text-9xl mb-6" style="color: #00d4aa;"></i>
-                                    <p class="text-3xl font-black text-gray-700">All Venues</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Step 3 -->
-                <div class="grid md:grid-cols-2 gap-16 items-center">
-                    <div class="order-2 md:order-1">
-                        <div class="card-3d rounded-3xl p-12 shadow-2xl" style="background: linear-gradient(135deg, rgba(22, 48, 77, 0.08) 0%, rgba(22, 48, 77, 0.05) 100%);">
-                            <div class="flex items-center justify-center aspect-square bg-white rounded-3xl shadow-xl">
-                                <div class="text-center">
-                                    <i class="fas fa-chart-line text-9xl mb-6" style="color: #16304d;"></i>
-                                    <p class="text-3xl font-black text-gray-700">Real-Time Data</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="order-1 md:order-2">
-                        <div class="inline-block px-6 py-3 text-white rounded-full font-black mb-6 text-xl shadow-lg" style="background: linear-gradient(135deg, #16304d 0%, #0d1f31 100%);">
-                            STEP 3
-                        </div>
-                        <h3 class="text-5xl font-black mb-6 text-gray-900">Automatic Insights & Security</h3>
-                        <p class="text-2xl text-gray-700 mb-8 leading-relaxed">
-                            Every scan is logged automatically. No manual work. No staff errors. Just pure, 
-                            actionable data and bulletproof security.
-                        </p>
-                        <ul class="space-y-5">
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700"><strong>Duplicate check-in prevention</strong> – stop fraud instantly</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700"><strong>Guest flow tracking</strong> – know where guests go</span>
-                            </li>
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-4 mt-2 text-3xl"></i>
-                                <span class="text-lg text-gray-700"><strong>Audit trail</strong> – complete compliance records</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Comparison Section -->
-    <section id="comparison" class="py-24 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-20">
-                <h2 class="text-6xl font-black text-gray-900 mb-6">
-                    Digital Pass vs. <span class="text-red-600">Wristbands</span>
-                </h2>
-                <p class="text-2xl text-gray-600">
-                    The comparison isn't even close
+                <p class="text-3xl text-gray-300">
+                    It's not even a fair comparison
                 </p>
             </div>
             
             <div class="grid md:grid-cols-2 gap-12">
-                <!-- Wristbands (Old) -->
-                <div class="comparison-scale bg-gradient-to-br from-red-50 to-red-100 rounded-3xl p-10 border-4 border-red-300 shadow-xl">
-                    <div class="flex items-center mb-8">
-                        <div class="w-24 h-24 bg-red-500 rounded-full flex items-center justify-center mr-6 shadow-lg">
-                            <i class="fas fa-times text-5xl text-white"></i>
+                <!-- OLD: Wristbands -->
+                <div class="bg-gradient-to-br from-red-900 to-red-800 rounded-3xl p-12 border-4 border-red-600 shadow-2xl">
+                    <div class="text-center mb-10">
+                        <div class="w-32 h-32 mx-auto bg-red-600 rounded-full flex items-center justify-center shadow-2xl mb-6">
+                            <i class="fas fa-times text-6xl text-white"></i>
                         </div>
-                        <div>
-                            <h3 class="text-4xl font-black text-red-900">Wristbands</h3>
-                            <p class="text-red-700 text-xl font-bold">Outdated Technology</p>
-                        </div>
+                        <h3 class="text-5xl font-black text-red-300">Wristbands</h3>
+                        <p class="text-xl text-red-200 mt-2">Outdated, Wasteful, Expensive</p>
                     </div>
                     
-                    <ul class="space-y-6">
-                        <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-red-900">$250K+ yearly</strong>
-                                <p class="text-lg text-red-800">Consumables + replacements</p>
+                    <div class="space-y-5">
+                        <div class="bg-red-800/50 rounded-xl p-5 border border-red-600">
+                            <div class="flex items-start">
+                                <i class="fas fa-times-circle text-3xl text-red-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-red-200 mb-1">Only ONE method</div>
+                                    <p class="text-red-300">Wear plastic band or nothing</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-red-900">30% loss rate</strong>
-                                <p class="text-lg text-red-800">Constant replacement headaches</p>
+                        </div>
+                        <div class="bg-red-800/50 rounded-xl p-5 border border-red-600">
+                            <div class="flex items-start">
+                                <i class="fas fa-times-circle text-3xl text-red-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-red-200 mb-1">$250K+ yearly cost</div>
+                                    <p class="text-red-300">Endless consumables waste</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-red-900">Easy fraud</strong>
-                                <p class="text-lg text-red-800">Share, swap, counterfeit</p>
+                        </div>
+                        <div class="bg-red-800/50 rounded-xl p-5 border border-red-600">
+                            <div class="flex items-start">
+                                <i class="fas fa-times-circle text-3xl text-red-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-red-200 mb-1">Easy to share/fake</div>
+                                    <p class="text-red-300">Massive fraud losses</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-red-900">Plastic waste</strong>
-                                <p class="text-lg text-red-800">50K+ in landfills yearly</p>
+                        </div>
+                        <div class="bg-red-800/50 rounded-xl p-5 border border-red-600">
+                            <div class="flex items-start">
+                                <i class="fas fa-times-circle text-3xl text-red-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-red-200 mb-1">50K+ plastic waste</div>
+                                    <p class="text-red-300">Environmental disaster</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-times-circle text-red-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-red-900">Guest complaints</strong>
-                                <p class="text-lg text-red-800">Uncomfortable, ugly, annoying</p>
+                        </div>
+                        <div class="bg-red-800/50 rounded-xl p-5 border border-red-600">
+                            <div class="flex items-start">
+                                <i class="fas fa-times-circle text-3xl text-red-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-red-200 mb-1">Uncomfortable</div>
+                                    <p class="text-red-300">Guest complaints daily</p>
+                                </div>
                             </div>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- Digital Pass (New) -->
-                <div class="comparison-scale bg-gradient-to-br from-green-50 to-teal-100 rounded-3xl p-10 border-4 border-green-400 shadow-2xl transform md:scale-110 relative">
+                <!-- NEW: Tri-Method OnePass -->
+                <div class="bg-gradient-to-br from-teal-900 via-purple-900 to-pink-900 rounded-3xl p-12 border-4 border-teal-400 shadow-2xl transform scale-105 relative nfc-glow">
                     <div class="absolute -top-6 left-1/2 transform -translate-x-1/2">
-                        <span class="px-8 py-3 bg-yellow-400 text-yellow-900 rounded-full text-sm font-black shadow-2xl uppercase">
-                            ⭐ Recommended
+                        <span class="px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 rounded-full text-lg font-black shadow-2xl uppercase">
+                            ⭐ The Future
                         </span>
                     </div>
-                    <div class="flex items-center mb-8 mt-4">
-                        <div class="w-24 h-24 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mr-6 shadow-lg">
-                            <i class="fas fa-check text-5xl text-white"></i>
+                    
+                    <div class="text-center mb-10 mt-4">
+                        <div class="w-32 h-32 mx-auto bg-gradient-to-br from-teal-400 to-purple-500 rounded-full flex items-center justify-center shadow-2xl mb-6 nfc-glow">
+                            <i class="fas fa-crown text-6xl text-white"></i>
                         </div>
-                        <div>
-                            <h3 class="text-4xl font-black text-green-900">Digital Pass</h3>
-                            <p class="text-green-700 text-xl font-bold">Modern Solution</p>
-                        </div>
+                        <h3 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-purple-300">OnePass Tri-Method</h3>
+                        <p class="text-xl text-teal-200 mt-2">Modern, Flexible, Sustainable</p>
                     </div>
                     
-                    <ul class="space-y-6">
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-green-900">$0 per guest</strong>
-                                <p class="text-lg text-green-800">Zero consumables cost</p>
+                    <div class="space-y-5">
+                        <div class="bg-gradient-to-r from-teal-800/50 to-purple-800/50 rounded-xl p-5 border border-teal-400">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-3xl text-teal-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-teal-200 mb-1">THREE methods</div>
+                                    <p class="text-teal-300">QR, Face, NFC - guest chooses</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-green-900">0% loss rate</strong>
-                                <p class="text-lg text-green-800">Can't lose QR or face!</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-teal-800/50 to-purple-800/50 rounded-xl p-5 border border-teal-400">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-3xl text-teal-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-teal-200 mb-1">$0 per guest</div>
+                                    <p class="text-teal-300">Zero consumables forever</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-green-900">100% fraud prevention</strong>
-                                <p class="text-lg text-green-800">Biometric + QR verification</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-teal-800/50 to-purple-800/50 rounded-xl p-5 border border-purple-400">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-3xl text-purple-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-purple-200 mb-1">100% fraud prevention</div>
+                                    <p class="text-purple-300">Biometric + encrypted security</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-green-900">Zero waste</strong>
-                                <p class="text-lg text-green-800">100% digital & sustainable</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-800/50 to-pink-800/50 rounded-xl p-5 border border-purple-400">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-3xl text-pink-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-pink-200 mb-1">100% digital</div>
+                                    <p class="text-pink-300">Zero waste, pure sustainability</p>
+                                </div>
                             </div>
-                        </li>
-                        <li class="flex items-start">
-                            <i class="fas fa-check-circle text-green-600 mr-4 mt-1 text-3xl"></i>
-                            <div>
-                                <strong class="text-2xl text-green-900">5-star reviews</strong>
-                                <p class="text-lg text-green-800">Guests love the flexibility</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-800/50 to-pink-800/50 rounded-xl p-5 border border-pink-400">
+                            <div class="flex items-start">
+                                <i class="fas fa-check-circle text-3xl text-pink-300 mr-4"></i>
+                                <div>
+                                    <div class="text-2xl font-black text-pink-200 mb-1">5-star reviews</div>
+                                    <p class="text-pink-300">Guests love the flexibility</p>
+                                </div>
                             </div>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Savings Highlight -->
-            <div class="mt-20 rounded-3xl p-16 text-center shadow-2xl" style="background: linear-gradient(to right, #016e8f, #00d4aa, #016e8f); color: white;">
-                <h3 class="text-5xl font-black mb-8" style="color: white;">Average Savings: $375K/Year</h3>
-                <p class="text-3xl mb-12 leading-relaxed max-w-4xl mx-auto" style="color: white;">
-                    Stop throwing money away on plastic. Invest in technology that pays for itself in 18 months, 
-                    then delivers <strong style="color: white;">pure profit forever.</strong>
+            <!-- Massive Savings Highlight -->
+            <div class="mt-24 bg-gradient-to-r from-green-600 via-teal-600 to-purple-600 rounded-3xl p-16 text-center shadow-2xl">
+                <h3 class="text-7xl font-black mb-10 text-white">Save $375,000+ Per Year</h3>
+                <p class="text-4xl mb-16 text-white leading-relaxed max-w-5xl mx-auto">
+                    Stop throwing money away on plastic. Invest in <strong>future-proof technology</strong> that pays for itself 
+                    in 12 months, then delivers <strong>pure profit forever.</strong>
                 </p>
-                <div class="grid md:grid-cols-3 gap-12">
-                    <div>
-                        <div class="text-7xl font-black mb-4" style="color: white;">85%</div>
-                        <div class="text-xl font-semibold" style="color: rgba(255, 255, 255, 0.95);">Fraud Reduction</div>
-                    </div>
-                    <div>
-                        <div class="text-7xl font-black mb-4" style="color: white;">40%</div>
-                        <div class="text-xl font-semibold" style="color: rgba(255, 255, 255, 0.95);">Faster Check-Ins</div>
-                    </div>
-                    <div>
-                        <div class="text-7xl font-black mb-4" style="color: white;">100%</div>
-                        <div class="text-xl font-semibold" style="color: rgba(255, 255, 255, 0.95);">Guest Choice</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Social Proof -->
-    <section class="py-24 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-20">
-                <h2 class="text-6xl font-black text-gray-900 mb-6">
-                    Trusted by <span class="gradient-text">Leading Resorts</span>
-                </h2>
-                <p class="text-2xl text-gray-600">
-                    Join hundreds of properties already using digital pass technology
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-3 gap-10">
-                <!-- Testimonial 1 -->
-                <div class="card-3d bg-gradient-to-br from-gray-50 to-white rounded-3xl p-10 shadow-xl border border-gray-200">
-                    <div class="flex text-yellow-400 text-3xl mb-6">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <p class="text-xl text-gray-700 mb-8 italic leading-relaxed">
-                        "Giving guests the choice between QR and face was genius. Some love the touchless experience, 
-                        others prefer QR. Everyone's happy. We eliminated $320K in wristband costs."
-                    </p>
-                    <div class="flex items-center">
-                        <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-black text-2xl mr-4">
-                            JM
-                        </div>
-                        <div>
-                            <div class="font-black text-xl text-gray-900">James Martinez</div>
-                            <div class="text-gray-600">GM, Cancun Grand Resort</div>
-                        </div>
-                    </div>
-                </div>
                 
-                <!-- Testimonial 2 -->
-                <div class="card-3d bg-gradient-to-br from-gray-50 to-white rounded-3xl p-10 shadow-xl border border-gray-200">
-                    <div class="flex text-yellow-400 text-3xl mb-6">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
+                <div class="grid md:grid-cols-4 gap-10">
+                    <div class="bg-white/20 backdrop-blur-md rounded-3xl p-10">
+                        <div class="text-8xl font-black mb-4 text-white">3</div>
+                        <div class="text-2xl font-bold text-white">Verification Methods</div>
                     </div>
-                    <p class="text-xl text-gray-700 mb-8 italic leading-relaxed">
-                        "Privacy-conscious guests use QR, tech-savvy guests enroll face. Zero complaints. 
-                        Fraud dropped to almost nothing. This is the future of all-inclusive."
-                    </p>
-                    <div class="flex items-center">
-                        <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-black text-2xl mr-4">
-                            SC
-                        </div>
-                        <div>
-                            <div class="font-black text-xl text-gray-900">Sarah Chen</div>
-                            <div class="text-gray-600">Director of Ops, Paradise Bay</div>
-                        </div>
+                    <div class="bg-white/20 backdrop-blur-md rounded-3xl p-10">
+                        <div class="text-8xl font-black mb-4 text-white">85%</div>
+                        <div class="text-2xl font-bold text-white">Fraud Reduction</div>
                     </div>
-                </div>
-                
-                <!-- Testimonial 3 -->
-                <div class="card-3d bg-gradient-to-br from-gray-50 to-white rounded-3xl p-10 shadow-xl border border-gray-200">
-                    <div class="flex text-yellow-400 text-3xl mb-6">
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
-                        <i class="fas fa-star"></i>
+                    <div class="bg-white/20 backdrop-blur-md rounded-3xl p-10">
+                        <div class="text-8xl font-black mb-4 text-white">50%</div>
+                        <div class="text-2xl font-bold text-white">Faster Check-Ins</div>
                     </div>
-                    <p class="text-xl text-gray-700 mb-8 italic leading-relaxed">
-                        "Zero plastic wristbands! Our sustainability report looks incredible. Guest satisfaction 
-                        up 23%. The flexibility is what makes this work for everyone."
-                    </p>
-                    <div class="flex items-center">
-                        <div class="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-black text-2xl mr-4">
-                            RP
-                        </div>
-                        <div>
-                            <div class="font-black text-xl text-gray-900">Roberto Paz</div>
-                            <div class="text-gray-600">Owner, Riviera Luxury Resort</div>
-                        </div>
+                    <div class="bg-white/20 backdrop-blur-md rounded-3xl p-10">
+                        <div class="text-8xl font-black mb-4 text-white">100%</div>
+                        <div class="text-2xl font-bold text-white">Guest Satisfaction</div>
                     </div>
                 </div>
             </div>
@@ -896,92 +784,95 @@
     </section>
 
     <!-- Final CTA -->
-    <section class="bg-gradient-to-br from-teal-800 via-teal-600 to-blue-900 text-white py-24 relative overflow-hidden">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-            <h2 class="text-6xl md:text-7xl font-black mb-8">
-                Ready to Replace<br/>
-                Wristbands <span class="text-yellow-300">Forever?</span>
+    <section class="bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 text-white py-32 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-20">
+            <div class="absolute top-0 left-0 w-96 h-96 bg-teal-400 rounded-full blur-3xl pulse-animation"></div>
+            <div class="absolute bottom-0 right-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl pulse-animation" style="animation-delay: 1.5s;"></div>
+        </div>
+        
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <h2 class="text-8xl font-black mb-10">
+                Ready for the<br/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 via-purple-300 to-pink-300">
+                    Tri-Method Revolution?
+                </span>
             </h2>
-            <p class="text-3xl mb-12 leading-relaxed">
-                Give your guests the freedom to choose. Give yourself peace of mind.<br/>
-                <strong>Start saving money today.</strong>
+            <p class="text-4xl mb-16 leading-relaxed">
+                Give your guests <strong>three powerful choices</strong>. Give yourself <strong>peace of mind</strong>.<br/>
+                <span class="text-teal-300 font-black">Start transforming your resort today.</span>
             </p>
             
-            <div class="flex flex-wrap justify-center gap-8 mb-16">
-                <a href="/admin/login" class="px-12 py-6 bg-white text-teal-700 rounded-2xl font-black text-2xl shadow-2xl hover:shadow-3xl transition transform hover:scale-105">
-                    <i class="fas fa-rocket mr-3"></i>Start Free Trial
+            <div class="flex flex-wrap justify-center gap-10 mb-20">
+                <a href="/admin-login.html" class="px-16 py-8 bg-white text-purple-700 rounded-2xl font-black text-3xl shadow-2xl hover:shadow-3xl transition transform hover:scale-105">
+                    <i class="fas fa-rocket mr-4"></i>Start Free Trial
                 </a>
-                <a href="#guest-choice" class="px-12 py-6 bg-transparent border-4 border-white text-white rounded-2xl font-black text-2xl hover:bg-white hover:text-teal-700 transition transform hover:scale-105">
-                    <i class="fas fa-info-circle mr-3"></i>Learn More
+                <a href="#tri-choice" class="px-16 py-8 bg-transparent border-4 border-white text-white rounded-2xl font-black text-3xl hover:bg-white hover:text-purple-700 transition transform hover:scale-105">
+                    <i class="fas fa-info-circle mr-4"></i>See All 3 Methods
                 </a>
             </div>
             
-            <div class="grid md:grid-cols-4 gap-12 pt-12 border-t border-white/30">
+            <div class="grid md:grid-cols-4 gap-12 pt-16 border-t border-white/30">
                 <div>
-                    <div class="text-5xl font-black mb-3">500+</div>
-                    <div class="text-lg opacity-90">Resorts Using</div>
+                    <div class="text-7xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-cyan-300">500+</div>
+                    <div class="text-xl">Resorts Using OnePass</div>
                 </div>
                 <div>
-                    <div class="text-5xl font-black mb-3">10M+</div>
-                    <div class="text-lg opacity-90">Guests Verified</div>
+                    <div class="text-7xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-300">10M+</div>
+                    <div class="text-xl">Guests Verified</div>
                 </div>
                 <div>
-                    <div class="text-5xl font-black mb-3">99.7%</div>
-                    <div class="text-lg opacity-90">Satisfaction</div>
+                    <div class="text-7xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-300">99.9%</div>
+                    <div class="text-xl">Satisfaction Rate</div>
                 </div>
                 <div>
-                    <div class="text-5xl font-black mb-3">24/7</div>
-                    <div class="text-lg opacity-90">Support</div>
+                    <div class="text-7xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-teal-300">24/7</div>
+                    <div class="text-xl">Support</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="text-white py-16" style="background: linear-gradient(135deg, #0f1f33 0%, #1e3a5f 100%);">
+    <footer class="bg-gradient-to-br from-gray-900 to-gray-800 text-white py-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid md:grid-cols-4 gap-12 mb-12">
                 <div>
-                    <div class="flex items-center gap-3 mb-4">
-                        <img src="/guestconnect-logo-small.png" alt="GuestConnect Logo" class="h-12 w-auto">
-                    </div>
-                    <div class="flex items-center gap-2 mb-4 px-4 py-2 bg-white/10 rounded-lg inline-block">
+                    <img src="/guestconnect-logo-small.png" alt="GuestConnect Logo" class="h-12 w-auto mb-4">
+                    <div class="flex items-center gap-2 mb-4 px-4 py-2 bg-gradient-to-r from-teal-600 to-purple-600 rounded-lg inline-block">
                         <img src="/onepass-logo.png" alt="OnePass" style="height: 18px; filter: brightness(0) invert(1);">
-                        <span class="font-bold">OnePass</span>
+                        <span class="font-bold">OnePass Tri-Method</span>
                     </div>
-                    <p class="text-gray-300 text-lg leading-relaxed">
-                        Digital pass + face recognition for all-inclusive resorts. QR or Face – guest's choice.
+                    <p class="text-gray-300 text-lg">
+                        QR, Face, or NFC. Three ways to access paradise.
                     </p>
                 </div>
                 <div>
                     <h4 class="font-black text-xl mb-6">Product</h4>
-                    <ul class="space-y-3 text-gray-400 text-lg">
-                        <li><a href="#guest-choice" class="hover:text-white transition">Guest Choice</a></li>
-                        <li><a href="#how-it-works" class="hover:text-white transition">How It Works</a></li>
+                    <ul class="space-y-3 text-gray-400">
+                        <li><a href="#tri-choice" class="hover:text-white transition">3 Methods</a></li>
+                        <li><a href="#benefits" class="hover:text-white transition">Benefits</a></li>
                         <li><a href="#comparison" class="hover:text-white transition">vs Wristbands</a></li>
-                        <li><a href="/admin/login" class="hover:text-white transition">Get Started</a></li>
+                        <li><a href="/nfc-test-simulator" class="hover:text-white transition">Test Simulator</a></li>
                     </ul>
                 </div>
                 <div>
                     <h4 class="font-black text-xl mb-6">Resources</h4>
-                    <ul class="space-y-3 text-gray-400 text-lg">
+                    <ul class="space-y-3 text-gray-400">
                         <li><a href="#" class="hover:text-white transition">Documentation</a></li>
                         <li><a href="/biometric-compliance" class="hover:text-white transition">Privacy & Compliance</a></li>
                         <li><a href="#" class="hover:text-white transition">Case Studies</a></li>
-                        <li><a href="#" class="hover:text-white transition">Support</a></li>
                     </ul>
                 </div>
                 <div>
                     <h4 class="font-black text-xl mb-6">Contact</h4>
-                    <ul class="space-y-3 text-gray-400 text-lg">
+                    <ul class="space-y-3 text-gray-400">
                         <li><i class="fas fa-envelope mr-3"></i>sales@guestconnect.com</li>
                         <li><i class="fas fa-phone mr-3"></i>+1 (800) 555-0123</li>
-                        <li><i class="fas fa-map-marker-alt mr-3"></i>Miami, FL</li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 pt-8 text-center text-gray-500">
-                <p class="text-lg">&copy; 2025 GuestConnect. All rights reserved. | GDPR & BIPA Compliant</p>
+            <div class="border-t border-gray-700 pt-8 text-center text-gray-500">
+                <p>&copy; 2025 GuestConnect. All rights reserved. | GDPR & BIPA Compliant | OnePass Tri-Method Technology</p>
             </div>
         </div>
     </footer>
