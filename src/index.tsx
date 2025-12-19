@@ -40988,11 +40988,21 @@ app.get('/admin/dashboard', (c) => {
             loadAnalyticsExists: !!window.loadAnalytics
           });
           requestAnimationFrame(() => {
-            if (typeof window.loadAnalytics === 'function') {
-              console.log('✅ Calling window.loadAnalytics()');
-              window.loadAnalytics().catch(err => console.error('❌ Analytics error:', err));
-            } else {
-              console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
+            try {
+              if (typeof window.loadAnalytics === 'function') {
+                console.log('✅ Calling window.loadAnalytics()');
+                window.loadAnalytics()
+                  .then(() => console.log('✅ loadAnalytics completed successfully'))
+                  .catch(err => {
+                    console.error('❌ Analytics promise error:', err);
+                    console.error('Error stack:', err.stack);
+                  });
+              } else {
+                console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
+              }
+            } catch (syncError) {
+              console.error('❌ Synchronous error calling loadAnalytics:', syncError);
+              console.error('Sync error stack:', syncError.stack);
             }
           });
         }
@@ -42086,8 +42096,13 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
-        console.log('🎯 loadAnalytics FUNCTION STARTED');
-        console.log('🔍 PropertyId:', propertyId, 'User:', user);
+        try {
+          console.log('🎯 loadAnalytics FUNCTION STARTED');
+          console.log('🔍 PropertyId:', propertyId, 'User:', user);
+        } catch (immediateError) {
+          console.error('❌ IMMEDIATE ERROR in loadAnalytics:', immediateError);
+          return;
+        }
         try {
           console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
           if (range) currentAnalyticsRange = range;
