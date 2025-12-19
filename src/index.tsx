@@ -16871,6 +16871,100 @@ app.post('/api/staff/all-inclusive/verify-nfc', async (c) => {
   }
 })
 
+// Get pass details by pass reference (for encoding station)
+app.get('/api/staff/all-inclusive/pass-by-reference/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  const pass_reference = c.req.param('pass_reference')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const pass = await DB.prepare(`
+      SELECT 
+        p.*,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon,
+        t.tier_badge_style
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.property_id = ?
+    `).bind(pass_reference, property_id).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    return c.json({
+      success: true,
+      pass: pass
+    })
+  } catch (error) {
+    console.error('❌ Error fetching pass by reference:', error)
+    return c.json({ error: 'Failed to fetch pass details' }, 500)
+  }
+})
+
+// Log NFC encoding activity
+app.post('/api/staff/all-inclusive/log-encoding', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { pass_id, nfc_id, staff_name, device_info, encoding_result, error_message } = await c.req.json()
+    
+    // Log to nfc_encodings table (we'll create this)
+    await DB.prepare(`
+      INSERT INTO nfc_encodings (property_id, pass_id, nfc_id, staff_name, device_info, encoding_result, error_message, encoded_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(property_id, pass_id, nfc_id, staff_name || 'Unknown', device_info, encoding_result, error_message).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('❌ Error logging encoding:', error)
+    return c.json({ error: 'Failed to log encoding' }, 500)
+  }
+})
+
+// Get encoding history
+app.get('/api/staff/all-inclusive/encoding-history', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const encodings = await DB.prepare(`
+      SELECT 
+        e.*,
+        p.pass_reference,
+        p.primary_guest_name as guest_name
+      FROM nfc_encodings e
+      LEFT JOIN digital_passes p ON e.pass_id = p.pass_id
+      WHERE e.property_id = ?
+      ORDER BY e.encoded_at DESC
+      LIMIT 20
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      encodings: encodings.results || []
+    })
+  } catch (error) {
+    console.error('❌ Error fetching encoding history:', error)
+    return c.json({ error: 'Failed to fetch encoding history' }, 500)
+  }
+})
+
 // Search for face across all active passes
 app.post('/api/staff/all-inclusive/search-face', async (c) => {
   const { DB } = c.env
@@ -29395,6 +29489,17 @@ app.get('/staff/nfc-scanner', async (c) => {
   }
 })
 
+// NFC Encoding Station Route - For encoding digital passes to NFC wristbands
+app.get('/staff/nfc-encoder', async (c) => {
+  try {
+    const htmlContent = await c.env.ASSETS.fetch(new URL('/staff-nfc-encoder.html', c.req.url))
+    return htmlContent
+  } catch (error) {
+    console.error('Failed to load staff-nfc-encoder.html:', error)
+    return c.text('NFC Encoding Station page not found', 404)
+  }
+})
+
 // OLD INLINE VERSION - KEEPING FOR REFERENCE
 app.get('/staff/verify-pass-old', (c) => {
   return c.html(`
@@ -40243,6 +40348,33 @@ app.get('/admin/dashboard', (c) => {
                     <h4 class="font-bold text-lg mb-1">Fraud Prevention</h4>
                     <p class="opacity-90 text-sm">View fraud alerts and suspicious activity</p>
                 </a>
+            </div>
+            
+            <!-- Second Row: NFC Encoding Station (NEW) -->
+            <div class="mt-4 grid md:grid-cols-4 gap-4">
+                <a href="/staff/nfc-encoder" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #ec4899, #be185d);">
+                    <i class="fas fa-pen-nib text-3xl mb-3"></i>
+                    <h4 class="font-bold text-lg mb-1">🆕 NFC Encoding Station</h4>
+                    <p class="opacity-90 text-sm">Write digital passes to NFC wristbands</p>
+                </a>
+                
+                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
+                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
+                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
+                    <p class="opacity-50 text-sm">Additional features coming soon</p>
+                </div>
+                
+                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
+                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
+                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
+                    <p class="opacity-50 text-sm">Additional features coming soon</p>
+                </div>
+                
+                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
+                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
+                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
+                    <p class="opacity-50 text-sm">Additional features coming soon</p>
+                </div>
             </div>
             
             <!-- Consent Signatures Tab -->
