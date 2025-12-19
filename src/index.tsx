@@ -42087,10 +42087,12 @@ app.get('/admin/dashboard', (c) => {
       
       async function loadAnalytics(range) {
         console.log('🎯 loadAnalytics FUNCTION STARTED');
+        console.log('🔍 PropertyId:', propertyId, 'User:', user);
         try {
           console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
           if (range) currentAnalyticsRange = range;
           
+          console.log('🔍 Looking for DOM elements...');
           // Get all DOM elements once at the start
           const totalScansEl = document.getElementById('totalScans');
           const activeBookingsEl = document.getElementById('activeBookings');
@@ -42101,6 +42103,13 @@ app.get('/admin/dashboard', (c) => {
           const popularActivitiesEl = document.getElementById('popularActivities');
           const popularSectionsEl = document.getElementById('popularSections');
           
+          console.log('✅ Found DOM elements:', {
+            totalScans: !!totalScansEl,
+            activeBookings: !!activeBookingsEl,
+            totalActivities: !!totalActivitiesEl,
+            totalVendors: !!totalVendorsEl
+          });
+          
           // Show loading state
           if (popularActivitiesEl) {
             popularActivitiesEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading activities...</p></div>';
@@ -42109,8 +42118,14 @@ app.get('/admin/dashboard', (c) => {
             popularSectionsEl.innerHTML = '<div class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin text-xl mb-2"></i><p class="text-sm">Loading sections...</p></div>';
           }
           
-          console.log('📡 Fetching analytics from /api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
-          const response = await fetchWithAuth('/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange);
+          const apiUrl = '/api/admin/analytics?property_id=' + propertyId + '&range=' + currentAnalyticsRange;
+          console.log('📡 About to fetch analytics from:', apiUrl);
+          console.log('🔐 Using fetchWithAuth with headers:', {
+            'X-User-ID': user.user_id,
+            'X-Property-ID': propertyId
+          });
+          const response = await fetchWithAuth(apiUrl);
+          console.log('📥 Response received:', response.status, response.statusText);
           
           if (!response.ok) {
             console.error('❌ Analytics API error:', response.status, response.statusText);
