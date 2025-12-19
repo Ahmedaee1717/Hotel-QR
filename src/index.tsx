@@ -42096,8 +42096,8 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
+        console.log('🎯🎯🎯 ADMIN DASHBOARD loadAnalytics FUNCTION STARTED 🎯🎯🎯');
         try {
-          console.log('🎯 loadAnalytics FUNCTION STARTED');
           console.log('🔍 PropertyId:', propertyId, 'User:', user);
         } catch (immediateError) {
           console.error('❌ IMMEDIATE ERROR in loadAnalytics:', immediateError);
@@ -50732,11 +50732,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 
       // Load pass analytics
       async function loadPassAnalytics() {
-        loadAnalytics();
+        loadOnePassAnalytics();
       }
       
-      // Load Analytics
-      async function loadAnalytics() {
+      // Load OnePass Analytics
+      async function loadOnePassAnalytics() {
+        console.log('🎫 Loading OnePass Analytics');
         const container = document.getElementById('pass-content-analytics');
         container.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i></div>';
         
