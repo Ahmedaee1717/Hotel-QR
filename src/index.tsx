@@ -16785,18 +16785,35 @@ app.post('/api/staff/all-inclusive/verify-nfc', async (c) => {
 
     console.log('🔷 NFC Verification Request:', { nfc_id, location, property_id })
 
-    // Get pass by NFC ID
-    const pass = await DB.prepare(`
-      SELECT 
-        p.*,
-        t.tier_display_name,
-        t.tier_color,
-        t.tier_icon,
-        t.tier_badge_style
-      FROM digital_passes p
-      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
-      WHERE p.nfc_id = ? AND p.property_id = ? AND p.nfc_enabled = 1
-    `).bind(nfc_id, property_id).first()
+    // Get pass by NFC ID - with fallback for missing tier table
+    let pass
+    try {
+      pass = await DB.prepare(`
+        SELECT 
+          p.*,
+          t.tier_display_name,
+          t.tier_color,
+          t.tier_icon,
+          t.tier_badge_style
+        FROM digital_passes p
+        LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+        WHERE p.nfc_id = ? AND p.property_id = ? AND p.nfc_enabled = 1
+      `).bind(nfc_id, property_id).first()
+    } catch (error) {
+      console.log('⚠️ Tier table not found, using simple query')
+      pass = await DB.prepare(`
+        SELECT * FROM digital_passes 
+        WHERE nfc_id = ? AND property_id = ? AND nfc_enabled = 1
+      `).bind(nfc_id, property_id).first()
+      
+      if (pass) {
+        // Add default tier info
+        pass.tier_display_name = pass.tier_name || 'Standard'
+        pass.tier_color = '#3b82f6'
+        pass.tier_icon = 'fa-star'
+        pass.tier_badge_style = 'bg-blue-100 text-blue-800'
+      }
+    }
 
     if (!pass) {
       console.log('❌ NFC Pass not found:', nfc_id)
@@ -16840,37 +16857,65 @@ app.post('/api/staff/all-inclusive/verify-nfc', async (c) => {
       }, 403)
     }
 
-    // Log NFC verification
-    await DB.prepare(`
-      INSERT INTO nfc_verifications (
-        pass_id, nfc_id, verification_location, verified_by, 
-        verification_result, device_info
-      ) VALUES (?, ?, ?, ?, 'success', ?)
-    `).bind(
-      pass.pass_id,
-      nfc_id,
-      location || 'Unknown',
-      user_id || null,
-      device_info || null
-    ).run()
+    // Log NFC verification - Create table if not exists
+    try {
+      await DB.prepare(`
+        CREATE TABLE IF NOT EXISTS nfc_verifications (
+          verification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pass_id INTEGER NOT NULL,
+          nfc_id TEXT NOT NULL,
+          verification_location TEXT,
+          verified_by INTEGER,
+          verification_result TEXT DEFAULT 'success',
+          device_info TEXT,
+          verified_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+      
+      await DB.prepare(`
+        INSERT INTO nfc_verifications (
+          pass_id, nfc_id, verification_location, verified_by, 
+          verification_result, device_info
+        ) VALUES (?, ?, ?, ?, 'success', ?)
+      `).bind(
+        pass.pass_id,
+        nfc_id,
+        location || 'Unknown',
+        user_id || null,
+        device_info || null
+      ).run()
+    } catch (logError) {
+      console.log('⚠️ NFC verification logging failed:', logError)
+      // Continue even if logging fails
+    }
 
     // Update last NFC use timestamp
-    await DB.prepare(`
-      UPDATE digital_passes 
-      SET nfc_last_used = datetime('now'), total_verifications = total_verifications + 1
-      WHERE pass_id = ?
-    `).bind(pass.pass_id).run()
+    try {
+      await DB.prepare(`
+        UPDATE digital_passes 
+        SET nfc_last_used = datetime('now'), total_verifications = total_verifications + 1
+        WHERE pass_id = ?
+      `).bind(pass.pass_id).run()
+    } catch (updateError) {
+      console.log('⚠️ Pass update failed:', updateError)
+      // Continue even if update fails
+    }
 
     // Also log in unified pass_verifications table
-    await DB.prepare(`
-      INSERT INTO pass_verifications (
-        pass_id, verification_method, verification_status, verified_by, verification_location
-      ) VALUES (?, 'nfc', 'valid', ?, ?)
-    `).bind(
-      pass.pass_id,
-      user_id || null,
-      location || 'Unknown'
-    ).run()
+    try {
+      await DB.prepare(`
+        INSERT INTO pass_verifications (
+          pass_id, verification_method, verification_status, verified_by, verification_location
+        ) VALUES (?, 'nfc', 'valid', ?, ?)
+      `).bind(
+        pass.pass_id,
+        user_id || null,
+        location || 'Unknown'
+      ).run()
+    } catch (logError) {
+      console.log('⚠️ Unified verification logging failed:', logError)
+      // Continue even if logging fails
+    }
 
     console.log('✅ NFC Verification Success:', pass.pass_reference)
 
