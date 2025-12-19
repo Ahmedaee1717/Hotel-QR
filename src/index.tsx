@@ -52580,7 +52580,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                 </div>
             </div>
             
-            <button onclick="goToStep2()" class="mt-6 w-full md:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+            <button onclick="goToStep2()" class="mt-6 w-full md:w-auto px-8 py-3 text-white rounded-lg font-semibold" style="background: var(--primary-color);">
                 Continue to Time Selection
                 <i class="fas fa-arrow-right ml-2"></i>
             </button>
