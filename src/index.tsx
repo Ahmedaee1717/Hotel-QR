@@ -35948,43 +35948,51 @@ app.get('/admin/dashboard', (c) => {
 
             <!-- Live Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-4 text-white">
+                <div class="rounded-lg shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-blue-100 text-sm font-medium">Today's Feedback</p>
-                            <p class="text-3xl font-bold mt-1" id="statTodayFeedback">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Today's Feedback</p>
+                            <p class="text-4xl font-bold mt-2" id="statTodayFeedback">0</p>
                         </div>
-                        <i class="fas fa-comment-dots text-4xl opacity-30"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-comment-dots text-3xl"></i>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-4 text-white">
+                <div class="rounded-lg shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-green-100 text-sm font-medium">Active Chats</p>
-                            <p class="text-3xl font-bold mt-1" id="statActiveChats">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Active Chats</p>
+                            <p class="text-4xl font-bold mt-2" id="statActiveChats">0</p>
                         </div>
-                        <i class="fas fa-comments text-4xl opacity-30"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-comments text-3xl"></i>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow-lg p-4 text-white">
+                <div class="rounded-lg shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-red-100 text-sm font-medium">Urgent Issues</p>
-                            <p class="text-3xl font-bold mt-1" id="statUrgentIssues">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Urgent Issues</p>
+                            <p class="text-4xl font-bold mt-2" id="statUrgentIssues">0</p>
                         </div>
-                        <i class="fas fa-exclamation-triangle text-4xl opacity-30"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-exclamation-triangle text-3xl"></i>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-4 text-white">
+                <div class="rounded-lg shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-purple-100 text-sm font-medium">Unread Messages</p>
-                            <p class="text-3xl font-bold mt-1" id="statUnreadMessages">0</p>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Unread Messages</p>
+                            <p class="text-4xl font-bold mt-2" id="statUnreadMessages">0</p>
                         </div>
-                        <i class="fas fa-envelope text-4xl opacity-30"></i>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-envelope text-3xl"></i>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -35992,7 +36000,7 @@ app.get('/admin/dashboard', (c) => {
             <!-- Filter and Controls -->
             <div class="bg-white rounded-lg shadow-lg p-4 mb-6">
                 <div class="flex flex-wrap gap-3 items-center">
-                    <button onclick="setFrontDeskView('all')" id="viewAllBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
+                    <button onclick="setFrontDeskView('all')" id="viewAllBtn" class="px-4 py-2 text-white rounded-lg font-semibold shadow-md transition-all hover:shadow-lg" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
                         <i class="fas fa-th-large mr-2"></i>All Communications
                     </button>
                     <button onclick="setFrontDeskView('feedback')" id="viewFeedbackBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
