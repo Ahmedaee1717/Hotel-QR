@@ -17394,8 +17394,8 @@ app.post('/api/guest/link-pass', async (c) => {
         p.guest_email,
         p.guest_phone,
         p.room_number,
-        p.number_of_adults,
-        p.number_of_children,
+        p.num_adults,
+        p.num_children,
         p.pass_status,
         p.valid_from,
         p.valid_until,
@@ -17458,8 +17458,8 @@ app.post('/api/guest/link-pass', async (c) => {
         email: pass.guest_email,
         phone: pass.guest_phone,
         room_number: pass.room_number,
-        adults: pass.number_of_adults,
-        children: pass.number_of_children,
+        adults: pass.num_adults,
+        children: pass.num_children,
         tier: pass.tier_name,
         tier_color: pass.tier_color
       }
