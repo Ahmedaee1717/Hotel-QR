@@ -14858,21 +14858,37 @@ app.get('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
   }
   
   try {
-    const benefits = await DB.prepare(`
-      SELECT 
-        tb.*,
-        ho.name as venue_name,
-        ho.offering_type as venue_type
-      FROM tier_benefits tb
-      LEFT JOIN hotel_offerings ho ON tb.venue_id = ho.offering_id
-      WHERE tb.tier_id = ? AND tb.property_id = ?
-      ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
-    `).bind(tier_id, property_id).all()
+    let benefits = []
     
-    return c.json({ success: true, benefits: benefits.results || [] })
+    // Try with LEFT JOIN first (if hotel_offerings exists)
+    try {
+      const result = await DB.prepare(`
+        SELECT 
+          tb.*,
+          ho.name as venue_name,
+          ho.offering_type as venue_type
+        FROM tier_benefits tb
+        LEFT JOIN hotel_offerings ho ON tb.venue_id = ho.offering_id
+        WHERE tb.tier_id = ? AND tb.property_id = ?
+        ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
+      `).bind(tier_id, property_id).all()
+      benefits = result.results || []
+    } catch (joinError) {
+      // If LEFT JOIN fails (table doesn't exist), query without join
+      console.log('hotel_offerings table not found, querying benefits without venue names')
+      const result = await DB.prepare(`
+        SELECT tb.*
+        FROM tier_benefits tb
+        WHERE tb.tier_id = ? AND tb.property_id = ?
+        ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
+      `).bind(tier_id, property_id).all()
+      benefits = result.results || []
+    }
+    
+    return c.json({ success: true, benefits })
   } catch (error) {
     console.error('Get tier benefits error:', error)
-    return c.json({ error: 'Failed to get benefits' }, 500)
+    return c.json({ error: 'Failed to get benefits', details: error.message }, 500)
   }
 })
 
