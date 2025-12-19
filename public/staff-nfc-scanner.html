@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Pass Scanner - OnePass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);
+            min-height: 100vh;
+        }
+        
+        .nfc-scanner-card {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .nfc-pulse {
+            animation: nfcPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes nfcPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .verification-success {
+            animation: successPulse 0.5s ease-in-out;
+        }
+        
+        @keyframes successPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-2xl p-6 mb-4 nfc-scanner-card">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <img src="/onepass-logo.png" alt="OnePass" class="h-12">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">NFC Pass Scanner</h1>
+                        <p class="text-sm text-gray-600">Tap NFC card to verify access</p>
+                    </div>
+                </div>
+                <button onclick="goBack()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+            </div>
+        </div>
+
+        <!-- NFC Status Card -->
+        <div class="bg-white rounded-xl shadow-2xl p-8 mb-4 nfc-scanner-card" id="nfcStatusCard">
+            <div class="text-center">
+                <div class="w-32 h-32 mx-auto mb-6 relative">
+                    <div id="nfcIcon" class="nfc-pulse">
+                        <i class="fas fa-wifi text-8xl" style="color: #016e8f; transform: rotate(-45deg);"></i>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold mb-2" id="statusTitle">Ready to Scan</h2>
+                <p class="text-gray-600 mb-6" id="statusMessage">Tap or bring NFC card near your device</p>
+                
+                <button 
+                    id="scanButton" 
+                    onclick="startNFCScan()"
+                    class="w-full py-4 text-xl font-bold rounded-xl shadow-lg transition-all transform hover:scale-105"
+                    style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%); color: white;">
+                    <i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>
+                    Start NFC Scan
+                </button>
+                
+                <div class="mt-6 flex items-center justify-center gap-4 text-sm" id="nfcSupport">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-circle text-gray-400 text-xs"></i>
+                        <span class="text-gray-600">Checking NFC support...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Result Card (Hidden by default) -->
+        <div id="resultCard" class="bg-white rounded-xl shadow-2xl p-6 mb-4 hidden nfc-scanner-card">
+            <div id="resultContent"></div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6 text-white nfc-scanner-card">
+            <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
+                <i class="fas fa-info-circle"></i>
+                How to Use NFC Scanner
+            </h3>
+            <ul class="space-y-2 text-sm">
+                <li class="flex items-start gap-2">
+                    <i class="fas fa-check text-green-400 mt-1"></i>
+                    <span>Ensure your device has NFC enabled in settings</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <i class="fas fa-check text-green-400 mt-1"></i>
+                    <span>Click "Start NFC Scan" button above</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <i class="fas fa-check text-green-400 mt-1"></i>
+                    <span>Hold guest's NFC card close to your device (usually back of phone)</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <i class="fas fa-check text-green-400 mt-1"></i>
+                    <span>Wait for verification confirmation</span>
+                </li>
+            </ul>
+            
+            <div class="mt-4 p-3 bg-white/20 rounded-lg">
+                <p class="text-xs flex items-start gap-2">
+                    <i class="fas fa-exclamation-triangle text-yellow-300"></i>
+                    <span><strong>Note:</strong> Web NFC API is supported on Android devices with Chrome/Edge browsers. iOS devices require native NFC app.</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let propertyId = localStorage.getItem('property_id') || '1';
+        let userId = localStorage.getItem('user_id');
+        let staffName = localStorage.getItem('admin_user') ? JSON.parse(localStorage.getItem('admin_user')).first_name : 'Staff';
+        let nfcReader = null;
+
+        function goBack() {
+            window.history.back();
+        }
+
+        // Check NFC Support
+        async function checkNFCSupport() {
+            if ('NDEFReader' in window) {
+                document.getElementById('nfcSupport').innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-circle text-green-500 text-xs"></i>
+                        <span class="text-green-600 font-semibold">NFC Supported</span>
+                    </div>
+                `;
+                return true;
+            } else {
+                document.getElementById('nfcSupport').innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-circle text-red-500 text-xs"></i>
+                        <span class="text-red-600">NFC Not Supported</span>
+                    </div>
+                `;
+                document.getElementById('scanButton').disabled = true;
+                document.getElementById('scanButton').classList.add('opacity-50', 'cursor-not-allowed');
+                document.getElementById('statusMessage').textContent = 'Your device does not support Web NFC API. Try using Chrome on Android.';
+                return false;
+            }
+        }
+
+        // Start NFC Scan
+        async function startNFCScan() {
+            try {
+                // Check permission first
+                if ('NDEFReader' in window) {
+                    const scanButton = document.getElementById('scanButton');
+                    scanButton.disabled = true;
+                    scanButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Scanning...';
+                    
+                    document.getElementById('statusTitle').textContent = 'Scanning...';
+                    document.getElementById('statusMessage').textContent = 'Hold NFC card near your device';
+                    document.getElementById('nfcIcon').classList.add('nfc-pulse');
+
+                    nfcReader = new NDEFReader();
+                    
+                    // Request permission and start scan
+                    await nfcReader.scan();
+                    
+                    console.log('✅ NFC scan started');
+                    
+                    nfcReader.onreading = async event => {
+                        console.log('📲 NFC tag detected');
+                        const message = event.message;
+                        const serialNumber = event.serialNumber;
+                        
+                        // Read NFC ID from tag
+                        let nfcId = null;
+                        
+                        // Try to read text record from NFC tag
+                        for (const record of message.records) {
+                            if (record.recordType === 'text') {
+                                const textDecoder = new TextDecoder(record.encoding || 'utf-8');
+                                nfcId = textDecoder.decode(record.data);
+                                break;
+                            } else if (record.recordType === 'url') {
+                                const textDecoder = new TextDecoder();
+                                nfcId = textDecoder.decode(record.data);
+                                break;
+                            }
+                        }
+                        
+                        // Fallback to serial number if no data
+                        if (!nfcId) {
+                            nfcId = serialNumber;
+                        }
+                        
+                        console.log('🔷 NFC ID:', nfcId);
+                        
+                        // Verify the NFC tag
+                        await verifyNFC(nfcId);
+                    };
+                    
+                    nfcReader.onerror = error => {
+                        console.error('❌ NFC scan error:', error);
+                        showError('NFC scan failed: ' + error.message);
+                        resetScanner();
+                    };
+                }
+            } catch (error) {
+                console.error('❌ Failed to start NFC scan:', error);
+                showError('Failed to start NFC scan: ' + error.message);
+                resetScanner();
+            }
+        }
+
+        // Verify NFC with backend
+        async function verifyNFC(nfcId) {
+            try {
+                console.log('🔍 Verifying NFC:', nfcId);
+                
+                document.getElementById('statusTitle').textContent = 'Verifying...';
+                document.getElementById('statusMessage').textContent = 'Checking pass validity';
+                
+                const response = await fetch('/api/staff/all-inclusive/verify-nfc', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId,
+                        'X-User-ID': userId || '0'
+                    },
+                    body: JSON.stringify({
+                        nfc_id: nfcId,
+                        staff_name: staffName,
+                        location: 'NFC Scanner',
+                        device_info: navigator.userAgent
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(data.pass_details);
+                } else {
+                    showError(data.message || data.error || 'Verification failed');
+                }
+            } catch (error) {
+                console.error('❌ Verification error:', error);
+                showError('Failed to verify NFC tag');
+            }
+        }
+
+        // Show Success Result
+        function showSuccess(passDetails) {
+            document.getElementById('nfcIcon').classList.remove('nfc-pulse');
+            document.getElementById('statusTitle').textContent = '✅ Access Granted';
+            document.getElementById('statusMessage').textContent = 'Pass verified successfully';
+            
+            const resultCard = document.getElementById('resultCard');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = `
+                <div class="verification-success">
+                    <div class="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-4">
+                        <div class="flex items-center gap-4 mb-4">
+                            <i class="fas fa-check-circle text-5xl text-green-500"></i>
+                            <div>
+                                <h3 class="text-2xl font-bold text-green-800">Access Granted</h3>
+                                <p class="text-green-600">NFC Verification Successful</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-4">
+                        ${passDetails.guest_photo_url ? `
+                        <div class="md:col-span-2 flex justify-center">
+                            <img src="${passDetails.guest_photo_url}" 
+                                 alt="Guest Photo" 
+                                 class="w-32 h-32 rounded-full object-cover border-4 border-green-500 shadow-lg">
+                        </div>
+                        ` : ''}
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Guest Name</p>
+                            <p class="font-bold text-lg">${passDetails.guest_name}</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Pass Reference</p>
+                            <p class="font-bold text-lg font-mono">${passDetails.pass_reference}</p>
+                        </div>
+                        
+                        ${passDetails.room_number ? `
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Room Number</p>
+                            <p class="font-bold text-lg">${passDetails.room_number}</p>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Tier</p>
+                            <div class="flex items-center gap-2">
+                                ${passDetails.tier_icon ? `<i class="${passDetails.tier_icon}"></i>` : ''}
+                                <span class="font-bold" style="color: ${passDetails.tier_color || '#016e8f'}">${passDetails.tier}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Guests</p>
+                            <p class="font-bold text-lg">${passDetails.num_adults || 0} Adults, ${passDetails.num_children || 0} Children</p>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600 mb-1">Valid Until</p>
+                            <p class="font-bold text-lg">${new Date(passDetails.valid_until).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="resetScanner()" 
+                            class="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>Scan Another Card
+                    </button>
+                </div>
+            `;
+            
+            resultCard.classList.remove('hidden');
+            
+            // Auto-reset after 10 seconds
+            setTimeout(() => {
+                resetScanner();
+            }, 10000);
+        }
+
+        // Show Error
+        function showError(message) {
+            document.getElementById('statusTitle').textContent = '❌ Verification Failed';
+            document.getElementById('statusMessage').textContent = message;
+            
+            const resultCard = document.getElementById('resultCard');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = `
+                <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-lg">
+                    <div class="flex items-center gap-4 mb-4">
+                        <i class="fas fa-times-circle text-5xl text-red-500"></i>
+                        <div>
+                            <h3 class="text-2xl font-bold text-red-800">Access Denied</h3>
+                            <p class="text-red-600">${message}</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="resetScanner()" 
+                            class="w-full mt-4 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>Try Again
+                    </button>
+                </div>
+            `;
+            
+            resultCard.classList.remove('hidden');
+            
+            // Auto-reset after 5 seconds
+            setTimeout(() => {
+                resetScanner();
+            }, 5000);
+        }
+
+        // Reset Scanner
+        function resetScanner() {
+            if (nfcReader) {
+                try {
+                    // Note: Web NFC doesn't have a stop() method, it auto-stops
+                    nfcReader = null;
+                } catch (e) {
+                    console.error('Error stopping NFC:', e);
+                }
+            }
+            
+            document.getElementById('statusTitle').textContent = 'Ready to Scan';
+            document.getElementById('statusMessage').textContent = 'Tap or bring NFC card near your device';
+            document.getElementById('nfcIcon').classList.remove('nfc-pulse');
+            
+            const scanButton = document.getElementById('scanButton');
+            scanButton.disabled = false;
+            scanButton.innerHTML = '<i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>Start NFC Scan';
+            
+            document.getElementById('resultCard').classList.add('hidden');
+        }
+
+        // Initialize on page load
+        window.onload = async () => {
+            await checkNFCSupport();
+        };
+    </script>
+</body>
+</html>

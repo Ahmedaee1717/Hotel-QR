@@ -15789,6 +15789,13 @@ app.get('/api/admin/all-inclusive/analytics/:property_id', async (c) => {
       WHERE property_id = ? AND face_match_score IS NOT NULL
     `).bind(property_id).first()
     
+    // NFC verifications
+    const nfcVerifications = await DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM nfc_verifications 
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
     // Manual reviews (face_verification_status = 'manual_override')
     const manualReviews = await DB.prepare(`
       SELECT COUNT(*) as count 
@@ -15835,6 +15842,7 @@ app.get('/api/admin/all-inclusive/analytics/:property_id', async (c) => {
       stats: {
         total_verifications: totalVerifications?.count || 0,
         face_verifications: faceVerifications?.count || 0,
+        nfc_verifications: nfcVerifications?.count || 0,
         manual_reviews: manualReviews?.count || 0,
         fraud_alerts: fraudAlerts?.count || 0,
         by_tier: byTier.results || [],
@@ -29376,6 +29384,17 @@ app.get('/staff/verify-pass', async (c) => {
   }
 })
 
+// NFC Scanner Route - For staff to verify digital passes using NFC
+app.get('/staff/nfc-scanner', async (c) => {
+  try {
+    const htmlContent = await c.env.ASSETS.fetch(new URL('/staff-nfc-scanner.html', c.req.url))
+    return htmlContent
+  } catch (error) {
+    console.error('Failed to load staff-nfc-scanner.html:', error)
+    return c.text('NFC Scanner page not found', 404)
+  }
+})
+
 // OLD INLINE VERSION - KEEPING FOR REFERENCE
 app.get('/staff/verify-pass-old', (c) => {
   return c.html(`
@@ -40203,8 +40222,14 @@ app.get('/admin/dashboard', (c) => {
 
                 <a href="/staff/verify-pass" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
                     <i class="fas fa-qrcode text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">Staff Verification</h4>
-                    <p class="opacity-90 text-sm">Open QR scanner for staff to verify guests</p>
+                    <h4 class="font-bold text-lg mb-1">QR & Face Verification</h4>
+                    <p class="opacity-90 text-sm">Unified QR + Face recognition scanner</p>
+                </a>
+
+                <a href="/staff/nfc-scanner" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #7c3aed, #5b21b6);">
+                    <i class="fas fa-wifi text-3xl mb-3" style="transform: rotate(-45deg);"></i>
+                    <h4 class="font-bold text-lg mb-1">NFC Scanner</h4>
+                    <p class="opacity-90 text-sm">Tap NFC cards to verify digital passes</p>
                 </a>
 
                 <a href="/admin/all-inclusive/reports" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
@@ -50917,6 +50942,18 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<div class="text-green-100 text-sm">Face Verifications</div>';
           html += '</div>';
           
+          html += '<div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          html += '<div class="text-3xl font-bold">' + (stats.nfc_verifications || 0) + '</div>';
+          html += '<i class="fas fa-wifi text-4xl opacity-50" style="transform: rotate(-45deg);"></i>';
+          html += '</div>';
+          html += '<div class="text-purple-100 text-sm">NFC Verifications</div>';
+          html += '</div>';
+          
+          html += '</div>';
+          
+          html += '<div class="grid md:grid-cols-3 gap-4 mb-8">';
+          
           html += '<div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg">';
           html += '<div class="flex items-center justify-between mb-2">';
           html += '<div class="text-3xl font-bold">' + (stats.manual_reviews || 0) + '</div>';
@@ -50931,6 +50968,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<i class="fas fa-shield-alt text-4xl opacity-50"></i>';
           html += '</div>';
           html += '<div class="text-red-100 text-sm">Fraud Alerts</div>';
+          html += '</div>';
+          
+          html += '<div class="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-6 text-white shadow-lg">';
+          html += '<div class="flex items-center justify-between mb-2">';
+          const qrVerifications = (stats.total_verifications || 0) - (stats.face_verifications || 0) - (stats.nfc_verifications || 0);
+          html += '<div class="text-3xl font-bold">' + Math.max(0, qrVerifications) + '</div>';
+          html += '<i class="fas fa-qrcode text-4xl opacity-50"></i>';
+          html += '</div>';
+          html += '<div class="text-cyan-100 text-sm">QR Code Only</div>';
           html += '</div>';
           
           html += '</div>';
