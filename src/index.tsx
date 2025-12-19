@@ -14967,34 +14967,66 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
     // Generate unique NFC ID (16-character alphanumeric for NFC compatibility)
     const nfc_id = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase()
     
-    // Insert digital pass with guest portal token and NFC support
-    const result = await DB.prepare(`
-      INSERT INTO digital_passes (
-        property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
-        guest_email, guest_phone, room_number, tier_id, pass_status,
-        num_adults, num_children, valid_from, valid_until,
-        qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed,
-        nfc_id, nfc_enabled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1)
-    `).bind(
-      property_id,
-      pass_reference,
-      primary_guest_name,
-      primary_guest_photo_url || null,
-      guest_email || null,
-      guest_phone || null,
-      room_number || null,
-      tier_id,
-      num_adults || 1,
-      num_children || 0,
-      valid_from,
-      valid_until,
-      qr_secret,
-      user_id || null,
-      notes || null,
-      guest_access_token,
-      nfc_id
-    ).run()
+    // Try to insert with NFC support first, fallback to without if columns don't exist
+    let result
+    try {
+      // Insert digital pass with guest portal token and NFC support
+      result = await DB.prepare(`
+        INSERT INTO digital_passes (
+          property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
+          guest_email, guest_phone, room_number, tier_id, pass_status,
+          num_adults, num_children, valid_from, valid_until,
+          qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed,
+          nfc_id, nfc_enabled
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1)
+      `).bind(
+        property_id,
+        pass_reference,
+        primary_guest_name,
+        primary_guest_photo_url || null,
+        guest_email || null,
+        guest_phone || null,
+        room_number || null,
+        tier_id,
+        num_adults || 1,
+        num_children || 0,
+        valid_from,
+        valid_until,
+        qr_secret,
+        user_id || null,
+        notes || null,
+        guest_access_token,
+        nfc_id
+      ).run()
+    } catch (nfcError) {
+      console.log('NFC columns not found, inserting without NFC support:', nfcError)
+      // Fallback: Insert without NFC columns
+      result = await DB.prepare(`
+        INSERT INTO digital_passes (
+          property_id, pass_reference, primary_guest_name, primary_guest_photo_url,
+          guest_email, guest_phone, room_number, tier_id, pass_status,
+          num_adults, num_children, valid_from, valid_until,
+          qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1)
+      `).bind(
+        property_id,
+        pass_reference,
+        primary_guest_name,
+        primary_guest_photo_url || null,
+        guest_email || null,
+        guest_phone || null,
+        room_number || null,
+        tier_id,
+        num_adults || 1,
+        num_children || 0,
+        valid_from,
+        valid_until,
+        qr_secret,
+        user_id || null,
+        notes || null,
+        guest_access_token
+      ).run()
+    }
     
     const pass_id = result.meta.last_row_id
     
