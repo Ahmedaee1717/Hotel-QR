@@ -221,6 +221,43 @@
             const container = document.getElementById('pass-container');
             container.style.display = 'block';
             
+            // Apply custom colors from property settings
+            const primaryColor = pass.primary_color || '#667eea';
+            const secondaryColor = pass.secondary_color || '#764ba2';
+            const accentColor = pass.accent_color || '#667eea';
+            
+            // Inject dynamic CSS
+            const style = document.createElement('style');
+            style.id = 'dynamic-pass-styles';
+            // Remove old style if exists
+            const oldStyle = document.getElementById('dynamic-pass-styles');
+            if (oldStyle) oldStyle.remove();
+            
+            style.textContent = `
+                body {
+                    background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%) !important;
+                }
+                .pass-header {
+                    background: linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%) !important;
+                }
+                .badge-qr {
+                    background: ${accentColor}20 !important;
+                    color: ${accentColor} !important;
+                }
+                .action-button.btn-wallet {
+                    background: ${primaryColor} !important;
+                }
+                .action-button.btn-secondary {
+                    background: white !important;
+                    color: ${primaryColor} !important;
+                    border: 2px solid ${primaryColor} !important;
+                }
+                .action-button.btn-secondary:hover {
+                    background: ${primaryColor}10 !important;
+                }
+            `;
+            document.head.appendChild(style);
+            
             // Format dates
             const validFrom = new Date(pass.valid_from).toLocaleDateString();
             const validUntil = new Date(pass.valid_until).toLocaleDateString();

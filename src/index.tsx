@@ -15800,7 +15800,10 @@ app.get('/api/guest/digital-pass/:pass_reference', async (c) => {
         ait.tier_description,
         ait.tier_features,
         p.name as property_name,
-        p.brand_logo_url
+        p.brand_logo_url,
+        p.primary_color,
+        p.secondary_color,
+        p.accent_color
       FROM digital_passes dp
       JOIN all_inclusive_tiers ait ON dp.tier_id = ait.tier_id
       JOIN properties p ON dp.property_id = p.property_id
