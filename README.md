@@ -4,11 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://fe7e40b3.project-c8738f5c.pages.dev
-**Property Landing Page (WORKING PASS BAR!):** https://fe7e40b3.project-c8738f5c.pages.dev/hotel/paradise-resort ✅✅✅
-**OnePass Tri-Method Page:** https://fe7e40b3.project-c8738f5c.pages.dev/face-scan-feature
-**NFC Test Simulator:** https://fe7e40b3.project-c8738f5c.pages.dev/nfc-test-simulator
-**Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
+**Production:** https://4797b9b2.project-c8738f5c.pages.dev
+**Property Landing Page (DYNAMIC COLORS!):** https://4797b9b2.project-c8738f5c.pages.dev/hotel/paradise-resort ✅🎨
+**OnePass Tri-Method Page:** https://4797b9b2.project-c8738f5c.pages.dev/face-scan-feature
+**NFC Test Simulator:** https://4797b9b2.project-c8738f5c.pages.dev/nfc-test-simulator
+**Admin Dashboard:** https://4797b9b2.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
