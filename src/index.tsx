@@ -41422,8 +41422,12 @@ app.get('/admin/dashboard', (c) => {
         });
       }
       
-      // Run permission enforcement on page load
-      enforcePermissions();
+      // Run permission enforcement after DOM is fully loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', enforcePermissions);
+      } else {
+        enforcePermissions();
+      }
       
       // Helper function for authenticated API requests
       async function fetchWithAuth(url, options = {}) {
