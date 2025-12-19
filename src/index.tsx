@@ -16953,6 +16953,30 @@ app.get('/api/staff/all-inclusive/pass-by-reference/:pass_reference', async (c) 
       pass.tier_icon = 'fa-star'
     }
     
+    // Generate NFC ID on-the-fly if missing (for passes created before NFC support)
+    if (!pass.nfc_id) {
+      const nfc_id = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase()
+      console.log('🆕 Generating NFC ID on-the-fly:', nfc_id)
+      
+      // Try to update the pass with NFC ID
+      try {
+        await DB.prepare(`
+          UPDATE digital_passes 
+          SET nfc_id = ?, nfc_enabled = 1 
+          WHERE pass_id = ?
+        `).bind(nfc_id, pass.pass_id).run()
+        
+        pass.nfc_id = nfc_id
+        pass.nfc_enabled = 1
+        console.log('✅ NFC ID saved to database')
+      } catch (updateError) {
+        console.log('⚠️ Could not save NFC ID to database (columns may not exist), using temporary ID:', updateError)
+        // Even if we can't save it, return it for encoding this session
+        pass.nfc_id = nfc_id
+        pass.nfc_enabled = 1
+      }
+    }
+    
     return c.json({
       success: true,
       pass: pass
