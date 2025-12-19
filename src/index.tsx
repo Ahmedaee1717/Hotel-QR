@@ -56090,7 +56090,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           }
         
         // Show wall info
-        alert('Wall selected! Press Delete or Backspace to remove it.\n\nStyle: ' + wall.style + '\nThickness: ' + wall.thickness + 'px');
+        alert('Wall selected! Press Delete or Backspace to remove it.\\n\\nStyle: ' + wall.style + '\\nThickness: ' + wall.thickness + 'px');
       }
       
       async function deleteSelectedWall() {
