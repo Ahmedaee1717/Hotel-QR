@@ -55558,8 +55558,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         tables.forEach(table => {
           totalCap += table.capacity;
           const div = document.createElement('div');
-          div.className = \`table-item table-\${table.shape}\`;
-          div.id = \`table-\${table.table_id}\`;
+          div.className = 'table-item table-' + table.shape;
+          div.id = 'table-' + table.table_id;
           
           // Apply master scale to position and size
           const scale = masterScale / 100;
@@ -55570,7 +55570,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           
           // Scale font size too
           const fontSize = Math.max(8, 14 * scale);
-          div.innerHTML = \`<div class="text-center" style="font-size: \${fontSize}px;"><div class="font-bold">\${table.table_number}</div><div class="text-gray-600" style="font-size: \${fontSize * 0.8}px;">\${table.capacity}p</div></div>\`;
+          div.innerHTML = '<div class="text-center" style="font-size: ' + fontSize + 'px;"><div class="font-bold">' + table.table_number + '</div><div class="text-gray-600" style="font-size: ' + (fontSize * 0.8) + 'px;">' + table.capacity + 'p</div></div>';
           
           div.addEventListener('mousedown', (e) => startDrag(e, table));
           div.addEventListener('click', (e) => {
@@ -55589,7 +55589,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         e.preventDefault();
         isDragging = true;
         selectedTable = table;
-        const div = document.getElementById(\`table-\${table.table_id}\`);
+        const div = document.getElementById('table-' + table.table_id);
         const rect = div.getBoundingClientRect();
         dragOffset.x = e.clientX - rect.left;
         dragOffset.y = e.clientY - rect.top;
@@ -55618,7 +55618,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           selectedTable.position_y = Math.max(0, Math.min(unscaledY, (canvasRect.height / scale) - unscaledHeight));
           
           // But display with scaled positions
-          const div = document.getElementById(\`table-\${selectedTable.table_id}\`);
+          const div = document.getElementById('table-' + selectedTable.table_id);
           div.style.left = (selectedTable.position_x * scale) + 'px';
           div.style.top = (selectedTable.position_y * scale) + 'px';
         } else if (selectedElement) {
@@ -55675,7 +55675,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       function selectTable(table) {
         document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
-        document.getElementById(\`table-\${table.table_id}\`).classList.add('selected');
+        document.getElementById('table-' + table.table_id).classList.add('selected');
         selectedTable = table;
         
         const infoPanel = document.getElementById('selectedTableInfo');
@@ -55832,6 +55832,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const btnFontSize = Math.max(10, 12 * scale);
           const labelSize = fontSize * 0.8;
           
+          // Escape label to prevent XSS and quote issues
+          const safeLabel = element.element_label.replace(/['"<>&]/g, (c) => {
+            return {'\'': '&#39;', '"': '&quot;', '<': '&lt;', '>': '&gt;', '&': '&amp;'}[c];
+          });
+          
           div.innerHTML = '<div class="text-center" style="position: relative; width: 100%; height: 100%;">' +
               '<button onclick="deleteElementById(' + element.element_id + ')" ' +
                       'class="element-delete-btn" ' +
@@ -55840,7 +55845,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 '<i class="fas fa-times"></i>' +
               '</button>' +
               '<i class="' + icon + ' mr-1"></i><br>' +
-              '<span style="font-size: ' + labelSize + 'px;">' + element.element_label + '</span>' +
+              '<span style="font-size: ' + labelSize + 'px;">' + safeLabel + '</span>' +
             '</div>';
           
           // Show delete button on hover
