@@ -4,8 +4,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://5f41ad06.project-c8738f5c.pages.dev
-**NFC Test Simulator:** https://5f41ad06.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
+**Production:** https://57f81f22.project-c8738f5c.pages.dev
+**OnePass Tri-Method Page:** https://57f81f22.project-c8738f5c.pages.dev/face-scan-feature (✨ NEW!)
+**NFC Test Simulator:** https://57f81f22.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
 **Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
 
 ### Quick Test Links
@@ -48,21 +49,42 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ Real-time booking notifications capability
 - ✅ Send payment links to guests for "pay at vendor" bookings
 
-### 🎟️ OnePass Digital Pass System (NEW ✨)
-- ✅ **Multi-Verification Methods** - QR Code, Face Recognition, and NFC support
-- ✅ **Digital Pass Creation** - Create all-inclusive passes for guests with room numbers and tiers
-- ✅ **NFC Encoding Station** 🆕 - Write digital passes to NFC wristbands (Web NFC API)
+### 🎟️ OnePass Tri-Method Digital Pass System (NEW ✨)
+
+**THREE WAYS TO ACCESS PARADISE** - The most flexible all-inclusive verification system in the world!
+
+**Verification Methods:**
+- ✅ **Method 1: QR Code** - Classic, proven, universally trusted. Works on any smartphone offline.
+- ✅ **Method 2: Face Recognition** - Touchless luxury. No phone needed. Ultimate convenience.
+- ✅ **Method 3: NFC Bracelet** 🆕 - Tap-and-go. Waterproof. 0.3 second verification. The future!
+
+**Guest Freedom:**
+- ✅ **Total Choice** - Guests choose their preferred method at check-in
+- ✅ **Switch Anytime** - Can change methods during their stay
+- ✅ **Multiple Backups** - Phone died? Use face or bracelet. Privacy conscious? Use QR.
+- ✅ **Zero Forced Biometrics** - Face recognition is 100% optional
+
+**Complete Feature Set:**
+- ✅ **Digital Pass Creation** - Create all-inclusive passes with room numbers and tiers
+- ✅ **NFC Encoding Station** - Write digital passes to NFC wristbands (Web NFC API)
 - ✅ **Face Enrollment** - Biometric face enrollment with digital consent signatures (GDPR/BIPA compliant)
-- ✅ **NFC Scanner Interface** - Tap-to-verify NFC cards for instant access verification
-- ✅ **QR & Face Scanner** - Unified scanner supporting both QR codes and facial recognition
-- ✅ **Pass Verification API** - Backend verification endpoints for all three methods (QR/Face/NFC)
-- ✅ **Verification Analytics** - Track total verifications, by method (QR/Face/NFC), manual reviews, and fraud alerts
-- ✅ **Tiered Access** - Support for different pass tiers (Gold, Silver, Bronze, VIP)
+- ✅ **NFC Scanner Interface** - Tap-to-verify NFC bracelets for instant access
+- ✅ **QR & Face Scanner** - Unified scanner supporting QR codes and facial recognition
+- ✅ **Tri-Method Verification API** - Backend verification for all three methods
+- ✅ **Verification Analytics** - Track verifications by method (QR/Face/NFC), fraud alerts, trends
+- ✅ **Tiered Access** - Support for Gold, Silver, Bronze, VIP tiers
 - ✅ **Family Members** - Add family members to digital passes
-- ✅ **Fraud Prevention** - Real-time fraud detection and alerting system
-- ✅ **Biometric Audit Trail** - Complete audit log of all biometric operations
-- ✅ **Consent Management** - Digital signature collection and storage for compliance
+- ✅ **Fraud Prevention** - Real-time fraud detection and alerting
+- ✅ **Biometric Audit Trail** - Complete audit log of all operations
+- ✅ **Consent Management** - Digital signature collection for compliance
 - ✅ **Encoding Audit Log** - Track all NFC wristband encoding activities
+- ✅ **NFC Test Simulator** - Test NFC system without hardware (works on iPhone!)
+
+**Marketing Page:**
+- ✅ **Stunning Tri-Method Showcase** - https://57f81f22.project-c8738f5c.pages.dev/face-scan-feature
+- Features: Animated hero section, 3D card effects, gradient backgrounds, floating elements
+- Highlights: Hundreds of benefits for guests, resorts, and environment
+- Comparison: Tri-Method OnePass vs Traditional Wristbands
 
 ### 🛡️ Admin Dashboard
 - ✅ Secure admin login with multi-tenancy isolation
