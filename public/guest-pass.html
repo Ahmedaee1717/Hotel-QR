@@ -207,12 +207,50 @@
                 
                 if (data.success) {
                     displayPass(data.pass, data.family_members);
+                    
+                    // Auto-save to session storage so pass stays linked
+                    savePassToSession(data.pass);
                 } else {
                     showError(data.error || 'Failed to load pass');
                 }
             } catch (error) {
                 console.error('Load pass error:', error);
                 showError(error.message);
+            }
+        }
+        
+        function savePassToSession(pass) {
+            // Check if pass is valid (not expired)
+            const now = new Date();
+            const validFrom = new Date(pass.valid_from);
+            const validUntil = new Date(pass.valid_until);
+            
+            // Only save if pass is currently valid
+            if (now >= validFrom && now <= validUntil && pass.pass_status === 'active') {
+                const nameParts = pass.primary_guest_name?.split(' ') || ['', ''];
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                
+                const sessionData = {
+                    guest: {
+                        pass_reference: pass.pass_reference,
+                        token: pass.guest_access_token,
+                        first_name: firstName,
+                        last_name: lastName,
+                        full_name: pass.primary_guest_name,
+                        email: pass.guest_email,
+                        phone: pass.guest_phone,
+                        room_number: pass.room_number,
+                        adults: pass.num_adults,
+                        children: pass.num_children,
+                        tier: pass.tier_display_name,
+                        tier_color: pass.tier_color
+                    },
+                    timestamp: Date.now()
+                };
+                
+                localStorage.setItem('guestPassSession', JSON.stringify(sessionData));
+                console.log('✅ Pass auto-linked to session');
             }
         }
 
