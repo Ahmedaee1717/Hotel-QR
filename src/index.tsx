@@ -333,16 +333,23 @@ function requirePermission(permissionSlug: string) {
     const userId = c.get('userId') || parseInt(c.req.header('X-User-ID') || '0')
     const { DB } = c.env
     
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401)
+    console.log('🔐 requirePermission middleware:', { permissionSlug, userId, header: c.req.header('X-User-ID') })
+    
+    if (!userId || userId === 0) {
+      console.error('❌ Unauthorized: No valid userId found')
+      return c.json({ error: 'Unauthorized - Missing user ID' }, 401)
     }
     
     const hasPermission = await checkPermission(DB, userId, permissionSlug)
     
+    console.log('✅ Permission check result:', { userId, permissionSlug, hasPermission })
+    
     if (!hasPermission) {
-      return c.json({ error: 'Forbidden - Insufficient permissions' }, 403)
+      console.error('❌ Forbidden: User lacks permission:', { userId, permissionSlug })
+      return c.json({ error: 'Forbidden - Insufficient permissions for ' + permissionSlug }, 403)
     }
     
+    console.log('✅ Permission granted, proceeding to next()')
     await next()
   }
 }
@@ -5727,6 +5734,8 @@ app.get('/api/admin/analytics', requirePermission('analytics_view'), async (c) =
   const startDate = c.req.query('start_date')
   const endDate = c.req.query('end_date')
 
+  console.log('📊 Analytics API called:', { property_id, dateRange, startDate, endDate })
+
   try {
     // Calculate date ranges
     let currentStartDate, currentEndDate, previousStartDate, previousEndDate
@@ -5854,6 +5863,13 @@ app.get('/api/admin/analytics', requirePermission('analytics_view'), async (c) =
       icon: sectionIcons[s.name] || 'eye'
     }))
 
+    console.log('✅ Analytics data prepared:', {
+      totalScans: currentScans.count,
+      activeBookings: currentBookings.count,
+      totalActivities: activities.count,
+      totalVendors: vendors.count
+    })
+
     return c.json({
       stats: {
         totalScans: currentScans.count,
@@ -5873,8 +5889,27 @@ app.get('/api/admin/analytics', requirePermission('analytics_view'), async (c) =
       }
     })
   } catch (error) {
-    console.error('Analytics error:', error)
-    return c.json({ error: 'Internal server error' }, 500)
+    console.error('❌ Analytics API error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      property_id,
+      dateRange
+    })
+    return c.json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      stats: {
+        totalScans: 0,
+        scansChange: 0,
+        totalActivities: 0,
+        totalVendors: 0,
+        activeBookings: 0,
+        bookingsChange: 0
+      },
+      popularActivities: [],
+      popularSections: []
+    }, 500)
   }
 })
 
