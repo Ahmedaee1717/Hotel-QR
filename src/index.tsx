@@ -52410,18 +52410,23 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
+      :root {
+        --primary-color: ${property.primary_color || '#3B82F6'};
+        --secondary-color: ${property.secondary_color || '#10B981'};
+        --accent-color: ${property.accent_color || '#3B82F6'};
+      }
       .table-item {
         cursor: pointer;
         transition: all 0.3s;
         border: 2px solid #D1D5DB;
       }
       .table-item:hover {
-        border-color: #3B82F6;
+        border-color: var(--primary-color);
         transform: scale(1.05);
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
       }
       .table-item.selected {
-        border-color: #10B981;
+        border-color: var(--secondary-color);
         border-width: 3px;
         background: #D1FAE5 !important;
       }
@@ -52451,7 +52456,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
       }
       .table-item-mobile.selected {
-        border-color: #10B981 !important;
+        border-color: var(--secondary-color) !important;
         border-width: 3px !important;
         background: #D1FAE5 !important;
       }
@@ -52464,7 +52469,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         transform: scale(1.02);
       }
       .time-slot.selected {
-        background: #3B82F6 !important;
+        background: var(--primary-color) !important;
         color: white !important;
         font-weight: bold;
       }
@@ -52486,11 +52491,11 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         font-weight: bold;
       }
       .step-indicator.active {
-        background: #3B82F6;
+        background: var(--primary-color);
         color: white;
       }
       .step-indicator.completed {
-        background: #10B981;
+        background: var(--secondary-color);
         color: white;
       }
     </style>
@@ -52509,7 +52514,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
     </script>
     
     <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 px-4 shadow-lg">
+    <div class="text-white py-6 px-4 shadow-lg" style="background: linear-gradient(to right, ${property.primary_color || '#3B82F6'}, ${property.secondary_color || '#6366F1'});">
         <div class="max-w-6xl mx-auto">
             <a href="/hotel/${slug}" class="inline-block mb-4 text-white/80 hover:text-white">
                 <i class="fas fa-arrow-left mr-2"></i>Back to Hotel
@@ -52596,7 +52601,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                 <button onclick="goToStep1()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
-                <button onclick="goToStep3()" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                <button onclick="goToStep3()" class="px-8 py-3 text-white rounded-lg font-semibold" style="background: var(--primary-color);">
                     Continue to Table Selection
                     <i class="fas fa-arrow-right ml-2"></i>
                 </button>
@@ -52640,7 +52645,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                 <button onclick="goToStep2()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
-                <button onclick="goToStep4()" id="continueToConfirm" class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold" disabled>
+                <button onclick="goToStep4()" id="continueToConfirm" class="px-8 py-3 text-white rounded-lg font-semibold" style="background: var(--primary-color);" disabled>
                     Continue to Confirmation
                     <i class="fas fa-arrow-right ml-2"></i>
                 </button>
@@ -52698,7 +52703,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                 <button onclick="goToStep3()" class="px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
-                <button onclick="submitReservation()" class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                <button onclick="submitReservation()" class="px-8 py-3 text-white rounded-lg font-semibold" style="background: var(--secondary-color);">
                     <i class="fas fa-check mr-2"></i>Confirm Reservation
                 </button>
             </div>
