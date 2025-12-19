@@ -18606,8 +18606,12 @@ app.get('/hotel/:property_slug', async (c) => {
   const passLinkBarHTML = `
 <!-- Guest Pass Link Bar Component -->
 <style>
+    :root {
+        --pass-bar-primary: #016e8f;
+        --pass-bar-secondary: #00d4aa;
+    }
     .pass-link-bar {
-        background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%);
+        background: linear-gradient(135deg, var(--pass-bar-primary) 0%, var(--pass-bar-secondary) 100%);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         position: sticky;
         top: 0;
@@ -18634,7 +18638,7 @@ app.get('/hotel/:property_slug', async (c) => {
     }
     .pass-link-button {
         background: white;
-        color: #016e8f;
+        color: var(--pass-bar-primary);
         transition: all 0.3s ease;
     }
     .pass-link-button:hover {
@@ -20018,6 +20022,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           const useGradient = settings.use_gradient || 0;
           const heroImageEffect = settings.hero_image_effect || 'none';
           const heroOverlay = (settings.hero_overlay_opacity || 30) / 100;
+          
+          // Apply colors to pass link bar via CSS variables
+          document.documentElement.style.setProperty('--pass-bar-primary', primaryColor);
+          document.documentElement.style.setProperty('--pass-bar-secondary', secondaryColor);
           
           // Logo - add to propertyLogo container (Facebook Profile Style)
           console.log('🎨 Loading logo from settings:', settings.brand_logo_url);
