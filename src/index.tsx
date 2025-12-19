@@ -52686,10 +52686,6 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
                     <div class="space-y-3">
                         <input type="text" id="guestName" placeholder="Full Name *" required
                                class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
-                        <input type="email" id="guestEmail" placeholder="Email *" required
-                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
-                        <input type="tel" id="guestPhone" placeholder="Phone Number *" required
-                               class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
                         <input type="text" id="roomNumber" placeholder="Room Number (if hotel guest)"
                                class="w-full px-4 py-2 border-2 rounded-lg focus:border-blue-500">
                         <textarea id="specialRequests" placeholder="Special Requests / Dietary Requirements" rows="3"
@@ -53060,12 +53056,24 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
 
       window.submitReservation = async function() {
         const name = document.getElementById('guestName').value;
-        const email = document.getElementById('guestEmail').value;
-        const phone = document.getElementById('guestPhone').value;
         
-        if (!name || !email || !phone) {
-          alert('Please fill in all required fields');
+        if (!name) {
+          alert('Please fill in your name');
           return;
+        }
+        
+        // Get email and phone from OnePass session
+        let email = '';
+        let phone = '';
+        try {
+          const session = localStorage.getItem('guestPassSession');
+          if (session) {
+            const guest = JSON.parse(session).guest;
+            email = guest.email || '';
+            phone = guest.phone || '';
+          }
+        } catch (e) {
+          console.error('Session error:', e);
         }
         
         const roomNumber = document.getElementById('roomNumber').value;
@@ -53137,18 +53145,10 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
             if (guest) {
               // Auto-fill form fields
               const nameField = document.getElementById('guestName');
-              const emailField = document.getElementById('guestEmail');
-              const phoneField = document.getElementById('guestPhone');
               const roomField = document.getElementById('roomNumber');
               
               if (nameField && guest.full_name && !nameField.value) {
                 nameField.value = guest.full_name;
-              }
-              if (emailField && guest.email && !emailField.value) {
-                emailField.value = guest.email;
-              }
-              if (phoneField && guest.phone && !phoneField.value) {
-                phoneField.value = guest.phone;
               }
               if (roomField && guest.room_number && !roomField.value) {
                 roomField.value = guest.room_number;
