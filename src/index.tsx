@@ -35849,7 +35849,7 @@ app.get('/admin/dashboard', (c) => {
                 </div>
                 <!-- Core Section -->
                 <div class="px-3 mb-6">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Core</h3>
+                    <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-blue-500 pl-2">Core</h3>
                     <button data-tab="frontdesk" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-concierge-bell w-5"></i><span>Front Desk</span>
                     </button>
@@ -35872,7 +35872,7 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- Content Section -->
                 <div class="px-3 mb-6">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Content</h3>
+                    <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-purple-500 pl-2">Content</h3>
                     <button data-tab="offerings" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-utensils w-5"></i><span>Offerings</span>
                     </button>
@@ -35889,7 +35889,7 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- Services Section -->
                 <div class="px-3 mb-6">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Services</h3>
+                    <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-green-500 pl-2">Services</h3>
                     <button data-tab="rooms" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-door-open w-5"></i><span>Rooms</span>
                     </button>
@@ -35909,7 +35909,7 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- AI & Advanced Section -->
                 <div class="px-3 mb-6">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">AI & Advanced</h3>
+                    <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-orange-500 pl-2">AI & Advanced</h3>
                     <button data-tab="chatbot" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-robot w-5"></i><span>AI Chatbot</span>
                     </button>
@@ -35920,7 +35920,7 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- Help & Documentation Section -->
                 <div class="px-3 mb-6">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider px-3 mb-2">Help & Support</h3>
+                    <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-gray-500 pl-2">Help & Support</h3>
                     <button data-tab="documentation" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-book w-5"></i><span>Documentation</span>
                     </button>
