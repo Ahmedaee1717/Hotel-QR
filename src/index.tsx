@@ -52496,6 +52496,18 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- OnePass Bar -->
+    <div id="onepass-bar-container"></div>
+    <script>
+      // Load OnePass bar component
+      fetch('/guest-pass-bar')
+        .then(response => response.text())
+        .then(html => {
+          document.getElementById('onepass-bar-container').innerHTML = html;
+        })
+        .catch(err => console.error('Failed to load OnePass bar:', err));
+    </script>
+    
     <!-- Header -->
     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 px-4 shadow-lg">
         <div class="max-w-6xl mx-auto">
@@ -53107,6 +53119,47 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         // Show current step
         document.getElementById('step' + stepNum).classList.remove('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Auto-fill guest information on step 4
+        if (stepNum === 4) {
+          autoFillGuestInfo();
+        }
+      }
+      
+      // Auto-fill guest information from OnePass session
+      function autoFillGuestInfo() {
+        try {
+          const session = localStorage.getItem('guestPassSession');
+          if (session) {
+            const data = JSON.parse(session);
+            const guest = data.guest;
+            
+            if (guest) {
+              // Auto-fill form fields
+              const nameField = document.getElementById('guestName');
+              const emailField = document.getElementById('guestEmail');
+              const phoneField = document.getElementById('guestPhone');
+              const roomField = document.getElementById('roomNumber');
+              
+              if (nameField && guest.full_name && !nameField.value) {
+                nameField.value = guest.full_name;
+              }
+              if (emailField && guest.email && !emailField.value) {
+                emailField.value = guest.email;
+              }
+              if (phoneField && guest.phone && !phoneField.value) {
+                phoneField.value = guest.phone;
+              }
+              if (roomField && guest.room_number && !roomField.value) {
+                roomField.value = guest.room_number;
+              }
+              
+              console.log('✅ Auto-filled guest information from OnePass');
+            }
+          }
+        } catch (error) {
+          console.error('Auto-fill error:', error);
+        }
       }
     </script>
 </body>
