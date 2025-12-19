@@ -4,11 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://dff8609b.project-c8738f5c.pages.dev
-**Property Landing Page (6-DIGIT PIN!):** https://dff8609b.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**OnePass Tri-Method Page:** https://dff8609b.project-c8738f5c.pages.dev/face-scan-feature
-**NFC Test Simulator:** https://dff8609b.project-c8738f5c.pages.dev/nfc-test-simulator
-**Admin Dashboard:** https://dff8609b.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://4b966ecc.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://4b966ecc.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**OnePass Tri-Method Page:** https://4b966ecc.project-c8738f5c.pages.dev/face-scan-feature
+**NFC Test Simulator:** https://4b966ecc.project-c8738f5c.pages.dev/nfc-test-simulator
+**Admin Dashboard:** https://4b966ecc.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -68,6 +68,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 **Complete Feature Set:**
 - ✅ **Digital Pass Creation** - Create all-inclusive passes with room numbers and tiers
+- ✅ **Comprehensive Tier Management** 🆕 - Full admin UI for creating and managing tiers with granular benefits
+- ✅ **Dynamic Benefit System** 🆕 - Assign specific restaurants, bars, activities to each tier
+- ✅ **Benefit Templates** 🆕 - Quick-start with pre-built Basic, Premium, and Ultra tier packages
+- ✅ **Venue-Specific Access** 🆕 - Link benefits to specific venues with quantity limits
+- ✅ **Access Level Control** 🆕 - Set unlimited, limited, or excluded access per benefit
 - ✅ **NFC Encoding Station** - Write digital passes to NFC wristbands (Web NFC API)
 - ✅ **Face Enrollment** - Biometric face enrollment with digital consent signatures (GDPR/BIPA compliant)
 - ✅ **NFC Scanner Interface** - Tap-to-verify NFC bracelets for instant access
@@ -82,6 +87,58 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Consent Management** - Digital signature collection for compliance
 - ✅ **Encoding Audit Log** - Track all NFC wristband encoding activities
 - ✅ **NFC Test Simulator** - Test NFC system without hardware (works on iPhone!)
+
+**🎯 Tier Management System (NEW! 🚀)**
+
+**Purpose:** Complete admin system for creating and managing all-inclusive tiers with granular benefit control
+
+**Key Features:**
+- 🏗️ **Dynamic Tier Creation** - Create custom tiers (Basic, Premium, Ultra) with unique names, colors, icons
+- ✨ **Benefit Templates** - Quick-start with pre-built benefit packages:
+  - **Basic All-Inclusive** - Buffet meals, local drinks, basic activities
+  - **Premium All-Inclusive** - + Limited à la carte, premium drinks, room service
+  - **Ultra All-Inclusive** - + Unlimited à la carte, concierge, spa credits, butler
+- 🏪 **Venue-Specific Benefits** - Assign specific restaurants, bars, activities to each tier
+- 📊 **Granular Controls** - Set access levels (unlimited/limited/excluded), quantity limits, time restrictions
+- 🎨 **Visual Customization** - Custom colors, Font Awesome icons, descriptions for each tier
+- 💰 **Upgrade Pricing** - Set daily upgrade prices for upselling
+- 📋 **Benefit Categories** - Organize by Dining, Drinks, Recreation, Services, Amenities
+- 🔧 **Full CRUD Operations** - Create, Read, Update, Delete tiers and benefits
+
+**Admin Workflow:**
+1. Navigate to OnePass → Tier Management tab
+2. Click "Create New Tier" or choose a pre-built template
+3. Customize tier name, color, icon, description, upgrade price
+4. Template benefits are automatically applied
+5. Click "Manage" on a tier to edit details and benefits
+6. Add custom benefits with specific venues and access rules
+7. Guests receive passes with tiered benefits
+
+**Benefit Types Supported:**
+- 🍽️ **Dining**: Restaurant access, à la carte meals, buffet access, room service
+- 🍹 **Drinks**: Bar access, drink quality (local/premium/top-shelf)
+- 🏊 **Recreation**: Pool access, water sports, fitness classes, activities
+- 🔔 **Services**: Concierge, late checkout, butler service, spa credits
+- 🛏️ **Amenities**: Minibar, premium rooms, exclusive lounges
+
+**Technical Implementation:**
+- **Database Tables**: `tier_benefits`, `tier_benefit_templates`, `tier_benefit_usage`
+- **API Endpoints**: 
+  - `GET /api/admin/all-inclusive/tiers/:tier_id/benefits` - List benefits
+  - `POST /api/admin/all-inclusive/tiers/:tier_id/benefits` - Add benefit
+  - `PUT /api/admin/all-inclusive/benefits/:benefit_id` - Update benefit
+  - `DELETE /api/admin/all-inclusive/benefits/:benefit_id` - Delete benefit
+  - `GET /api/admin/all-inclusive/venues/:property_id` - List venues
+  - `POST /api/admin/all-inclusive/tiers/:tier_id/apply-template` - Apply template
+- **UI Components**: Modal-based tier editor with tabbed interface (Basic Info + Benefits)
+
+**Use Cases:**
+1. **Create Tiered Packages** - Offer Basic ($99/day), Premium ($149/day), Ultra ($249/day) tiers
+2. **Venue-Specific Access** - "VIP guests can access Rooftop Bar, Premium guests cannot"
+3. **Quantity Limits** - "2 à la carte dinners per stay" for Premium tier
+4. **Time Restrictions** - "Happy hour drinks only 5-7 PM" for Basic tier
+5. **Upselling** - Display upgrade options with clear benefit differences
+6. **Gamification Ready** - Foundation for future gamified tiers and rewards
 
 **Marketing Page:**
 - ✅ **Stunning Tri-Method Showcase** - https://0c66f197.project-c8738f5c.pages.dev/face-scan-feature
@@ -251,6 +308,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 - `pass_verifications` - Verification audit log (all methods)
 - `nfc_verifications` - NFC-specific verification tracking 🆕
 - `all_inclusive_tiers` - Pass tier definitions (Gold, Silver, etc.)
+- `tier_benefits` 🆕 - Granular benefit definitions (dining, drinks, recreation, services, amenities)
+- `tier_benefit_templates` 🆕 - Pre-built benefit packages (Basic, Premium, Ultra templates)
+- `tier_benefit_usage` 🆕 - Track usage of limited benefits (e.g., "2 à la carte meals per stay")
 - `biometric_consent_signatures` - GDPR/BIPA compliant consent records
 - `biometric_audit_log` - Complete audit trail of biometric operations
 - `face_verification_fraud_alerts` - Fraud detection and alerting
