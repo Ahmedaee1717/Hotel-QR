@@ -56145,7 +56145,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             tempWallLine = null;
           }
         }
-      }"}
+      }
 
       // Live preview for wall drawing
       document.getElementById('canvas').addEventListener('mousemove', function(e) {
