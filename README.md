@@ -50,8 +50,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 ### 🎟️ OnePass Digital Pass System (NEW ✨)
 - ✅ **Multi-Verification Methods** - QR Code, Face Recognition, and NFC support
 - ✅ **Digital Pass Creation** - Create all-inclusive passes for guests with room numbers and tiers
+- ✅ **NFC Encoding Station** 🆕 - Write digital passes to NFC wristbands (Web NFC API)
 - ✅ **Face Enrollment** - Biometric face enrollment with digital consent signatures (GDPR/BIPA compliant)
-- ✅ **NFC Scanner Interface** 🆕 - Tap-to-verify NFC cards for instant access verification
+- ✅ **NFC Scanner Interface** - Tap-to-verify NFC cards for instant access verification
 - ✅ **QR & Face Scanner** - Unified scanner supporting both QR codes and facial recognition
 - ✅ **Pass Verification API** - Backend verification endpoints for all three methods (QR/Face/NFC)
 - ✅ **Verification Analytics** - Track total verifications, by method (QR/Face/NFC), manual reviews, and fraud alerts
@@ -60,6 +61,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Fraud Prevention** - Real-time fraud detection and alerting system
 - ✅ **Biometric Audit Trail** - Complete audit log of all biometric operations
 - ✅ **Consent Management** - Digital signature collection and storage for compliance
+- ✅ **Encoding Audit Log** - Track all NFC wristband encoding activities
 
 ### 🛡️ Admin Dashboard
 - ✅ Secure admin login with multi-tenancy isolation
@@ -427,6 +429,86 @@ Body: {
 1. **OnePass Dashboard** → NFC Scanner button (purple card)
 2. **Direct URL**: `/staff/nfc-scanner`
 3. **Staff Unified Scanner** → Switch to NFC tab (future enhancement)
+
+---
+
+## 🏷️ NFC Encoding Station (NEW ✨)
+
+### Purpose
+Front desk tool to write digital pass NFC IDs onto physical NFC wristbands/cards for guests.
+
+### Complete Workflow
+
+**Step 1: Create Digital Pass**
+- Admin creates digital pass in OnePass dashboard
+- System automatically generates unique NFC ID (16 characters)
+- Pass Reference displayed: `PASS-ABC-123`
+
+**Step 2: Encode Wristband**
+- Staff opens NFC Encoding Station: `/staff/nfc-encoder`
+- Enters Pass Reference: `PASS-ABC-123`
+- System loads pass details + NFC ID
+- Staff clicks "Encode Wristband Now"
+- Taps blank NTAG215/216 wristband to Android device
+- Web NFC API writes NFC ID to wristband
+- Success confirmation shown
+
+**Step 3: Give to Guest**
+- Staff hands encoded wristband to guest
+- Guest can now tap wristband anywhere for instant verification
+- Backup methods (QR code, face) still available
+
+### Key Features
+- 🔍 **Pass Lookup** - Load pass details by reference number
+- 📝 **Pass Preview** - Shows guest name, room, tier, NFC ID before encoding
+- ✍️ **One-Click Encoding** - Web NFC API writes NFC ID to wristband
+- 📊 **Encoding History** - View recent encodings with staff name and timestamp
+- ✅ **Success Feedback** - Clear visual confirmation after encoding
+- 🔧 **Error Handling** - Troubleshooting tips if encoding fails
+- 📱 **Test Integration** - Direct link to test wristband in NFC Scanner
+
+### Technical Details
+
+**Frontend:**
+- Web NFC API (`NDEFReader.write()`)
+- Real-time NFC device detection
+- Beautiful pink/purple gradient UI
+- Auto-reset after encoding
+
+**Backend Endpoints:**
+```
+GET  /api/staff/all-inclusive/pass-by-reference/:ref  - Load pass details
+POST /api/staff/all-inclusive/log-encoding            - Log encoding attempt
+GET  /api/staff/all-inclusive/encoding-history        - View recent encodings
+```
+
+**Database:**
+```sql
+nfc_encodings (
+  encoding_log_id, property_id, pass_id, nfc_id,
+  staff_name, device_info, encoding_result, error_message, encoded_at
+)
+```
+
+### Hardware Requirements
+- **Android Device** (phone or tablet with NFC, Android 10+)
+- **Chrome or Edge browser**
+- **Blank NFC Wristbands** (NTAG215 or NTAG216 chips)
+
+### Recommended Setup
+**Front Desk Station:**
+- Samsung Galaxy Tab A8 (~$200) with NFC
+- Tablet stand for stability
+- Runs encoding station in browser (no app required!)
+
+**Alternative:**
+- ACR122U USB NFC Writer (~$40) + Desktop computer
+- Good for bulk encoding
+
+### Access Points
+1. **OnePass Dashboard** → "NFC Encoding Station" button (pink card, second row)
+2. **Direct URL**: `/staff/nfc-encoder`
+3. **From Pass Creation** → "Encode Wristband" button (future enhancement)
 
 ---
 
