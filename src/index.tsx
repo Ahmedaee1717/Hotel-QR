@@ -54485,11 +54485,19 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         </button>
                     </form>
                     <div class="mt-4 pt-4 border-t">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                            <p class="text-sm text-green-800 font-semibold mb-1">
+                                <i class="fas fa-lightbulb mr-1"></i>Quick Delete
+                            </p>
+                            <p class="text-xs text-green-700">
+                                Hover over any element on the canvas and click the ❌ button in the top-right corner!
+                            </p>
+                        </div>
                         <button onclick="deleteSelectedElement()" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
                             <i class="fas fa-trash mr-2"></i>Delete Selected Element
                         </button>
                         <p class="text-xs text-gray-500 mt-2 text-center">
-                            <i class="fas fa-info-circle mr-1"></i>Click an element to select it (green border), then click delete or press Delete/Backspace key
+                            <i class="fas fa-info-circle mr-1"></i>Or select element (green border) and press Delete/Backspace key
                         </p>
                     </div>
                 </div>
@@ -54510,8 +54518,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         <button id="startWallDrawing" onclick="toggleWallDrawing()" class="w-full bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">
                             <i class="fas fa-pen mr-2"></i>Start Drawing Walls
                         </button>
-                        <div id="wallDrawingHint" class="hidden text-sm text-blue-600 bg-blue-50 p-2 rounded">
-                            <i class="fas fa-info-circle mr-1"></i>Click canvas to set start point, then click again for end point
+                        <button onclick="deleteSelectedWall()" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 mt-2">
+                            <i class="fas fa-trash mr-2"></i>Delete Selected Wall
+                        </button>
+                        <div id="wallDrawingHint" class="hidden text-sm text-blue-600 bg-blue-50 p-2 rounded mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>Click canvas to set start point, then click again for end point. You'll see a preview line as you move!
+                        </div>
+                        <div class="text-sm text-gray-600 bg-gray-50 p-2 rounded mt-2">
+                            <i class="fas fa-hand-pointer mr-1"></i><strong>To delete:</strong> Click a wall to select it (turns green), then click Delete button or press Delete/Backspace key
                         </div>
                     </div>
                 </div>
@@ -55812,7 +55826,32 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           div.style.color = '#1F2937';
           
           const icon = getElementIcon(element.element_type);
-          div.innerHTML = '<div class="text-center"><i class="' + icon + ' mr-1"></i><br><span style="font-size: ' + (fontSize * 0.8) + 'px;">' + element.element_label + '</span></div>';
+          
+          // Add delete button overlay
+          const btnSize = Math.max(20, 24 * scale);
+          const btnFontSize = Math.max(10, 12 * scale);
+          const labelSize = fontSize * 0.8;
+          
+          div.innerHTML = '<div class="text-center" style="position: relative; width: 100%; height: 100%;">' +
+              '<button onclick="deleteElementById(' + element.element_id + ')" ' +
+                      'class="element-delete-btn" ' +
+                      'style="position: absolute; top: 2px; right: 2px; background: #EF4444; color: white; border: none; border-radius: 4px; width: ' + btnSize + 'px; height: ' + btnSize + 'px; cursor: pointer; display: none; font-size: ' + btnFontSize + 'px; z-index: 10;" ' +
+                      'title="Delete Element">' +
+                '<i class="fas fa-times"></i>' +
+              '</button>' +
+              '<i class="' + icon + ' mr-1"></i><br>' +
+              '<span style="font-size: ' + labelSize + 'px;">' + element.element_label + '</span>' +
+            '</div>';
+          
+          // Show delete button on hover
+          div.addEventListener('mouseenter', () => {
+            const btn = div.querySelector('.element-delete-btn');
+            if (btn) btn.style.display = 'block';
+          });
+          div.addEventListener('mouseleave', () => {
+            const btn = div.querySelector('.element-delete-btn');
+            if (btn) btn.style.display = 'none';
+          });
           
           div.addEventListener('mousedown', (e) => startElementDrag(e, element));
           div.addEventListener('click', (e) => {
@@ -55869,10 +55908,17 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           return;
         }
         
+        await deleteElementById(selectedElement.element_id);
+      }
+      
+      // Delete element by ID (for button clicks)
+      window.deleteElementById = async function(elementId) {
+        event.stopPropagation();
+        
         if (!confirm('Delete this floor element?')) return;
         
         try {
-          const response = await fetchWithAuth('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
+          const response = await fetchWithAuth('/api/admin/restaurant/floor-element/' + elementId, {
             method: 'DELETE'
           });
           
@@ -55880,7 +55926,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           if (data.success) {
             selectedElement = null;
             await loadFloorElements();
-            alert('Floor element deleted!');
           }
         } catch (error) {
           console.error('Delete element error:', error);
@@ -55897,6 +55942,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           } else if (selectedTable) {
             e.preventDefault();
             deleteSelectedTable();
+          } else if (selectedWall) {
+            e.preventDefault();
+            deleteSelectedWall();
           }
         }
       });
@@ -55942,6 +55990,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let wallStartPoint = null;
       let walls = [];
       let tempWallLine = null;
+      let selectedWall = null;
 
       async function loadWalls() {
         try {
@@ -55967,8 +56016,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       function createWallElement(wall) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.className = 'wall-line';
+        svg.id = 'wall-' + wall.wall_id;
         svg.style.position = 'absolute';
-        svg.style.pointerEvents = 'none';
+        svg.style.pointerEvents = 'auto'; // Enable clicks
+        svg.style.cursor = 'pointer';
         svg.style.zIndex = '0';
         
         // Apply master scale to wall coordinates
@@ -56006,8 +56057,64 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           line.setAttribute('stroke-dasharray', '5,5');
         }
         
+        // Add click handler for wall selection
+        svg.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectWall(wall);
+        });
+        
         svg.appendChild(line);
         return svg;
+      }
+
+      function selectWall(wall) {
+        selectedWall = wall;
+        selectedElement = null;
+        selectedTable = null;
+        
+        // Highlight selected wall
+        document.querySelectorAll('.wall-line').forEach(el => {
+          const line = el.querySelector('line');
+          if (line) {
+            line.setAttribute('stroke-width', (wall.thickness || 4) * (masterScale / 100));
+          }
+        });
+        
+        const wallEl = document.getElementById('wall-' + wall.wall_id);
+        if (wallEl) {
+          const line = wallEl.querySelector('line');
+          if (line) {
+            line.setAttribute('stroke-width', ((wall.thickness || 4) + 4) * (masterScale / 100));
+            line.setAttribute('stroke', '#10B981');
+          }
+          }
+        
+        // Show wall info
+        alert('Wall selected! Press Delete or Backspace to remove it.\n\nStyle: ' + wall.style + '\nThickness: ' + wall.thickness + 'px');
+      }
+      
+      async function deleteSelectedWall() {
+        if (!selectedWall) {
+          alert('Please select a wall to delete (click on it)');
+          return;
+        }
+        
+        if (!confirm('Delete this wall?')) return;
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/wall/' + selectedWall.wall_id, {
+            method: 'DELETE'
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            selectedWall = null;
+            await loadWalls();
+          }
+        } catch (error) {
+          console.error('Delete wall error:', error);
+          alert('Failed to delete wall');
+        }
       }
 
       window.toggleWallDrawing = function() {
@@ -56021,7 +56128,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           hint.classList.remove('hidden');
           wallStartPoint = null;
         } else {
-          button.innerHTML = '<i class="fas fa-pen mr-2"></i>Start Drawing Walls';
+          button.innerHTML = '<i class=\"fas fa-pen mr-2\"></i>Start Drawing Walls';
           button.className = 'w-full bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700';
           hint.classList.add('hidden');
           wallStartPoint = null;
@@ -56030,8 +56137,59 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             tempWallLine = null;
           }
         }
-      }
+      }"}
 
+      // Live preview for wall drawing
+      document.getElementById('canvas').addEventListener('mousemove', function(e) {
+        if (!isDrawingWall || !wallStartPoint) return;
+        
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
+        const scale = masterScale / 100;
+        
+        const scaledX = Math.round(e.clientX - rect.left);
+        const scaledY = Math.round(e.clientY - rect.top);
+        
+        // Remove old preview line
+        if (tempWallLine) {
+          tempWallLine.remove();
+        }
+        
+        // Create preview line
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.className = 'temp-wall-preview';
+        svg.style.position = 'absolute';
+        svg.style.pointerEvents = 'none';
+        svg.style.zIndex = '999';
+        
+        const startScaledX = wallStartPoint.x * scale;
+        const startScaledY = wallStartPoint.y * scale;
+        
+        const minX = Math.min(startScaledX, scaledX);
+        const minY = Math.min(startScaledY, scaledY);
+        const width = Math.abs(scaledX - startScaledX);
+        const height = Math.abs(scaledY - startScaledY);
+        
+        svg.style.left = minX + 'px';
+        svg.style.top = minY + 'px';
+        svg.style.width = (width + 10) + 'px';
+        svg.style.height = (height + 10) + 'px';
+        
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', startScaledX - minX);
+        line.setAttribute('y1', startScaledY - minY);
+        line.setAttribute('x2', scaledX - minX);
+        line.setAttribute('y2', scaledY - minY);
+        line.setAttribute('stroke', document.getElementById('wallColor').value);
+        line.setAttribute('stroke-width', parseInt(document.getElementById('wallThickness').value) * scale);
+        line.setAttribute('stroke-dasharray', '5,5');
+        line.setAttribute('opacity', '0.7');
+        
+        svg.appendChild(line);
+        canvas.appendChild(svg);
+        tempWallLine = svg;
+      });
+      
       document.getElementById('canvas').addEventListener('click', async function(e) {
         if (!isDrawingWall) return;
         
