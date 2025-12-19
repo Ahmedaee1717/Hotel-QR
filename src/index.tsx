@@ -17332,6 +17332,105 @@ app.get('/api/staff/checked-in-today', async (c) => {
 // These allow guests to manage their own passes and consent without staff intervention
 
 // Guest: Get pass details (with secure token)
+// Guest: Link pass by pass reference (for session linking)
+app.post('/api/guest/link-pass', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const { pass_reference } = await c.req.json()
+  
+  if (!pass_reference) {
+    return c.json({ error: 'Pass reference required' }, 400)
+  }
+  
+  try {
+    // Get pass with property isolation
+    const pass = await DB.prepare(`
+      SELECT 
+        p.pass_reference,
+        p.guest_access_token,
+        p.primary_guest_name,
+        p.guest_email,
+        p.guest_phone,
+        p.room_number,
+        p.number_of_adults,
+        p.number_of_children,
+        p.pass_status,
+        p.valid_from,
+        p.valid_until,
+        p.property_id,
+        t.tier_display_name as tier_name,
+        t.tier_color
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.property_id = ?
+    `).bind(pass_reference, propertyId).first()
+    
+    if (!pass) {
+      return c.json({ 
+        success: false, 
+        error: 'Pass not found. Please check your pass reference.' 
+      }, 404)
+    }
+    
+    // Check if pass is active
+    if (pass.pass_status !== 'active') {
+      return c.json({ 
+        success: false, 
+        error: 'This pass is not active. Please contact the front desk.' 
+      }, 400)
+    }
+    
+    // Check if pass is valid (current date between valid_from and valid_until)
+    const now = new Date()
+    const validFrom = new Date(pass.valid_from)
+    const validUntil = new Date(pass.valid_until)
+    
+    if (now < validFrom) {
+      return c.json({ 
+        success: false, 
+        error: 'This pass is not yet active. Valid from: ' + validFrom.toLocaleDateString() 
+      }, 400)
+    }
+    
+    if (now > validUntil) {
+      return c.json({ 
+        success: false, 
+        error: 'This pass has expired. Valid until: ' + validUntil.toLocaleDateString() 
+      }, 400)
+    }
+    
+    // Split name into first and last
+    const nameParts = pass.primary_guest_name?.split(' ') || ['', '']
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ') || ''
+    
+    // Return success with token for session
+    return c.json({
+      success: true,
+      guest: {
+        pass_reference: pass.pass_reference,
+        token: pass.guest_access_token, // This is the secure session token
+        first_name: firstName,
+        last_name: lastName,
+        full_name: pass.primary_guest_name,
+        email: pass.guest_email,
+        phone: pass.guest_phone,
+        room_number: pass.room_number,
+        adults: pass.number_of_adults,
+        children: pass.number_of_children,
+        tier: pass.tier_name,
+        tier_color: pass.tier_color
+      }
+    })
+  } catch (error) {
+    console.error('Link pass error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to link pass. Please try again.' 
+    }, 500)
+  }
+})
+
 app.get('/api/guest/pass/:pass_reference', async (c) => {
   const { DB } = c.env
   const pass_reference = c.req.param('pass_reference')

@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#0EA5E9">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; }
         .gradient-bg { background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%); }
@@ -17,6 +18,9 @@
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Pass Link Bar (Include Component) -->
+    <div id="passLinkBarContainer"></div>
+    
     <!-- Loading Spinner -->
     <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
         <div class="text-center">
@@ -28,7 +32,7 @@
     <!-- Main Content -->
     <div id="content" class="hidden min-h-screen">
         <!-- Header -->
-        <div class="gradient-bg text-white py-8 px-4 sticky top-0 z-10 shadow-lg">
+        <div class="gradient-bg text-white py-8 px-4 shadow-lg">
             <div class="max-w-6xl mx-auto">
                 <div class="flex items-center justify-between">
                     <div>
@@ -292,6 +296,16 @@
 
         // Initialize on page load
         window.addEventListener('DOMContentLoaded', init);
+    </script>
+    
+    <!-- Load Pass Link Bar Component -->
+    <script>
+        fetch('/guest-pass-bar.html')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('passLinkBarContainer').innerHTML = html;
+            })
+            .catch(error => console.error('Failed to load pass bar:', error));
     </script>
 </body>
 </html>

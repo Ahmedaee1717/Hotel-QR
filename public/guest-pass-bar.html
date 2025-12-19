@@ -1,0 +1,329 @@
+<!-- Guest Pass Link Bar Component -->
+<!-- Include this at the top of every guest-facing page -->
+
+<style>
+    .pass-link-bar {
+        background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        transition: all 0.3s ease;
+    }
+    
+    .pass-link-input {
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.95);
+        transition: all 0.3s ease;
+    }
+    
+    .pass-link-input:focus {
+        border-color: white;
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+        outline: none;
+    }
+    
+    .pass-linked-badge {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        animation: slideInRight 0.5s ease;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .pass-link-button {
+        background: white;
+        color: #016e8f;
+        transition: all 0.3s ease;
+    }
+    
+    .pass-link-button:hover {
+        background: #f0f9ff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .pass-link-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+</style>
+
+<!-- Unlinked State: Show input field -->
+<div id="passLinkBarUnlinked" class="pass-link-bar py-3">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-white min-w-fit">
+                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                    <i class="fas fa-check text-sm" style="color: #016e8f;"></i>
+                </div>
+                <span class="font-semibold hidden sm:inline">OnePass</span>
+            </div>
+            
+            <div class="flex-1 flex items-center gap-2">
+                <input 
+                    type="text" 
+                    id="passReferenceInput" 
+                    placeholder="Enter your pass reference (e.g., PASS-1234...)" 
+                    class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                    maxlength="30"
+                >
+                <button 
+                    onclick="linkGuestPass()" 
+                    id="linkPassButton"
+                    class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
+                    <i class="fas fa-link mr-2"></i>
+                    <span class="hidden sm:inline">Link Pass</span>
+                    <span class="sm:hidden">Link</span>
+                </button>
+            </div>
+            
+            <button 
+                onclick="togglePassInfo()" 
+                class="text-white hover:text-gray-100 transition-colors">
+                <i class="fas fa-info-circle text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- Info Panel (Hidden by default) -->
+        <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
+            <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>What is this?</p>
+            <p class="mb-2">Link your OnePass digital pass to enjoy seamless booking and instant access to your guest portal.</p>
+            <p class="text-xs opacity-80">Your pass reference was provided at check-in (e.g., PASS-1766111567631-C89RE)</p>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span id="passLinkErrorMessage"></span>
+        </div>
+    </div>
+</div>
+
+<!-- Linked State: Show guest info -->
+<div id="passLinkBarLinked" class="hidden pass-link-bar py-3">
+    <div class="max-w-7xl mx-auto px-4">
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-check text-sm" style="color: #016e8f;"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-white text-sm opacity-80">Welcome back,</p>
+                    <p class="text-white font-bold text-lg truncate" id="linkedGuestName">Guest</p>
+                </div>
+                <div class="pass-linked-badge px-3 py-1 rounded-full text-white text-xs font-semibold flex items-center gap-1 flex-shrink-0">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="hidden sm:inline">Pass Linked</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
+                <a 
+                    href="#" 
+                    id="viewPassButton"
+                    class="pass-link-button px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
+                    <i class="fas fa-id-card mr-2"></i>
+                    <span class="hidden sm:inline">My Pass</span>
+                    <span class="sm:hidden">Pass</span>
+                </a>
+                <button 
+                    onclick="unlinkGuestPass()" 
+                    class="text-white hover:text-gray-200 transition-colors p-2"
+                    title="Unlink pass">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Session management for guest pass
+    const PASS_SESSION_KEY = 'guestPassSession';
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPassSession();
+        
+        // Allow Enter key to link pass
+        document.getElementById('passReferenceInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                linkGuestPass();
+            }
+        });
+    });
+    
+    function loadPassSession() {
+        const session = localStorage.getItem(PASS_SESSION_KEY);
+        if (session) {
+            try {
+                const data = JSON.parse(session);
+                // Verify session is not expired (24 hours)
+                if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+                    showLinkedState(data.guest);
+                    return;
+                }
+            } catch (e) {
+                console.error('Invalid session data');
+            }
+        }
+        showUnlinkedState();
+    }
+    
+    async function linkGuestPass() {
+        const input = document.getElementById('passReferenceInput');
+        const button = document.getElementById('linkPassButton');
+        const passReference = input.value.trim().toUpperCase();
+        
+        if (!passReference) {
+            showError('Please enter your pass reference');
+            return;
+        }
+        
+        // Show loading state
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Linking...';
+        button.disabled = true;
+        hideError();
+        
+        try {
+            const propertyId = getPropertyId(); // Get from URL or default
+            
+            const response = await fetch('/api/guest/link-pass', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Property-ID': propertyId
+                },
+                body: JSON.stringify({ pass_reference: passReference })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.guest) {
+                // Save session to localStorage
+                localStorage.setItem(PASS_SESSION_KEY, JSON.stringify({
+                    guest: data.guest,
+                    timestamp: Date.now()
+                }));
+                
+                // Show linked state
+                showLinkedState(data.guest);
+                
+                // Celebrate!
+                if (typeof confetti !== 'undefined') {
+                    confetti({
+                        particleCount: 100,
+                        spread: 70,
+                        origin: { y: 0.3 }
+                    });
+                }
+                
+                // Trigger event for other scripts to react
+                window.dispatchEvent(new CustomEvent('passLinked', { detail: data.guest }));
+            } else {
+                showError(data.error || 'Failed to link pass. Please check your reference.');
+            }
+        } catch (error) {
+            console.error('Link pass error:', error);
+            showError('Connection error. Please try again.');
+        } finally {
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }
+    }
+    
+    function showLinkedState(guest) {
+        document.getElementById('passLinkBarUnlinked').classList.add('hidden');
+        document.getElementById('passLinkBarLinked').classList.remove('hidden');
+        
+        document.getElementById('linkedGuestName').textContent = guest.full_name || 'Guest';
+        document.getElementById('linkedRoomNumber').textContent = guest.room_number || '—';
+        
+        // Set guest portal link
+        const portalLink = `/guest-portal.html?pass=${guest.pass_reference}&token=${guest.token}`;
+        document.getElementById('viewPassButton').href = portalLink;
+    }
+    
+    function showUnlinkedState() {
+        document.getElementById('passLinkBarUnlinked').classList.remove('hidden');
+        document.getElementById('passLinkBarLinked').classList.add('hidden');
+    }
+    
+    function unlinkGuestPass() {
+        if (confirm('Are you sure you want to unlink your pass? You can always link it again.')) {
+            localStorage.removeItem(PASS_SESSION_KEY);
+            showUnlinkedState();
+            
+            // Trigger event
+            window.dispatchEvent(new Event('passUnlinked'));
+            
+            // Clear input
+            document.getElementById('passReferenceInput').value = '';
+        }
+    }
+    
+    function togglePassInfo() {
+        const panel = document.getElementById('passInfoPanel');
+        panel.classList.toggle('hidden');
+    }
+    
+    function showError(message) {
+        const errorDiv = document.getElementById('passLinkError');
+        document.getElementById('passLinkErrorMessage').textContent = message;
+        errorDiv.classList.remove('hidden');
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            hideError();
+        }, 5000);
+    }
+    
+    function hideError() {
+        document.getElementById('passLinkError').classList.add('hidden');
+    }
+    
+    function getPropertyId() {
+        // Try to get from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const propertyParam = urlParams.get('property');
+        if (propertyParam) return propertyParam;
+        
+        // Try to get from localStorage
+        const stored = localStorage.getItem('property_id');
+        if (stored) return stored;
+        
+        // Default to 1
+        return '1';
+    }
+    
+    // Helper function for other pages to get current guest session
+    function getGuestSession() {
+        const session = localStorage.getItem(PASS_SESSION_KEY);
+        if (session) {
+            try {
+                const data = JSON.parse(session);
+                if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+                    return data.guest;
+                }
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    }
+    
+    // Make it globally available
+    window.getGuestSession = getGuestSession;
+</script>
