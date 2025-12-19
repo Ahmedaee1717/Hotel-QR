@@ -40978,9 +40978,16 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
+          console.log('📊 Analytics tab clicked!', {
+            loadAnalyticsType: typeof window.loadAnalytics,
+            loadAnalyticsExists: !!window.loadAnalytics
+          });
           requestAnimationFrame(() => {
             if (typeof window.loadAnalytics === 'function') {
-              window.loadAnalytics().catch(err => console.error('Analytics error:', err));
+              console.log('✅ Calling window.loadAnalytics()');
+              window.loadAnalytics().catch(err => console.error('❌ Analytics error:', err));
+            } else {
+              console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
             }
           });
         }
@@ -42073,6 +42080,7 @@ app.get('/admin/dashboard', (c) => {
       let currentAnalyticsRange = 'today';
       
       async function loadAnalytics(range) {
+        console.log('🎯 loadAnalytics FUNCTION STARTED');
         try {
           console.log('🔍 loadAnalytics called with range:', range, 'currentAnalyticsRange:', currentAnalyticsRange);
           if (range) currentAnalyticsRange = range;
