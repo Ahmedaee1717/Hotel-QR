@@ -14967,6 +14967,9 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
     // Generate unique NFC ID (16-character alphanumeric for NFC compatibility)
     const nfc_id = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase()
     
+    // Generate 6-digit PIN for easy guest access
+    const guest_pin = Math.floor(100000 + Math.random() * 900000).toString() // 100000-999999
+    
     // Try to insert with NFC support first, fallback to without if columns don't exist
     let result
     try {
@@ -14977,8 +14980,8 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
           guest_email, guest_phone, room_number, tier_id, pass_status,
           num_adults, num_children, valid_from, valid_until,
           qr_secret, issued_by_user_id, notes, guest_access_token, verification_preference, qr_code_displayed,
-          nfc_id, nfc_enabled
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1)
+          nfc_id, nfc_enabled, guest_pin
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, 'qr', 1, ?, 1, ?)
       `).bind(
         property_id,
         pass_reference,
@@ -14996,7 +14999,8 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
         user_id || null,
         notes || null,
         guest_access_token,
-        nfc_id
+        nfc_id,
+        guest_pin
       ).run()
     } catch (nfcError) {
       console.log('NFC columns not found, inserting without NFC support:', nfcError)
@@ -15056,6 +15060,7 @@ app.post('/api/admin/all-inclusive/passes', requirePermission('settings_manage')
       success: true,
       pass_id,
       pass_reference,
+      guest_pin,
       pass_url: `/guest-pass/${pass_reference}`,
       guest_portal_url,
       guest_access_token
@@ -17337,18 +17342,18 @@ app.get('/guest-pass-bar', async (c) => {
   return c.html(`<!-- Guest Pass Bar Component Loaded -->`)
 })
 
-// Guest: Link pass by pass reference (for session linking)
+// Guest: Link pass by PIN (for session linking)
 app.post('/api/guest/link-pass', async (c) => {
   const { DB } = c.env
   const propertyId = c.req.header('X-Property-ID') || '1'
-  const { pass_reference } = await c.req.json()
+  const { guest_pin } = await c.req.json()
   
-  if (!pass_reference) {
-    return c.json({ error: 'Pass reference required' }, 400)
+  if (!guest_pin) {
+    return c.json({ error: 'PIN code required' }, 400)
   }
   
   try {
-    // Get pass with property isolation
+    // Get pass with property isolation using PIN
     const pass = await DB.prepare(`
       SELECT 
         p.pass_reference,
@@ -17367,13 +17372,13 @@ app.post('/api/guest/link-pass', async (c) => {
         t.tier_color
       FROM digital_passes p
       LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
-      WHERE p.pass_reference = ? AND p.property_id = ?
-    `).bind(pass_reference, propertyId).first()
+      WHERE p.guest_pin = ? AND p.property_id = ?
+    `).bind(guest_pin, propertyId).first()
     
     if (!pass) {
       return c.json({ 
         success: false, 
-        error: 'Pass not found. Please check your pass reference.' 
+        error: 'Invalid PIN code. Please check and try again.' 
       }, 404)
     }
     
@@ -18661,7 +18666,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 <span class="font-semibold hidden sm:inline">OnePass</span>
             </div>
             <div class="flex-1 flex items-center gap-2">
-                <input type="text" id="passReferenceInput" placeholder="Enter your pass reference (e.g., PASS-1234...)" class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm" maxlength="30">
+                <input type="text" id="passReferenceInput" placeholder="Enter your 6-digit PIN (e.g., 123456)" class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                 <button onclick="linkGuestPass()" id="linkPassButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
                     <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
                 </button>
@@ -18670,8 +18675,8 @@ app.get('/hotel/:property_slug', async (c) => {
         </div>
         <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
             <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>What is this?</p>
-            <p class="mb-2">Link your OnePass digital pass to enjoy seamless booking and instant access to your guest portal.</p>
-            <p class="text-xs opacity-80">Your pass reference was provided at check-in (e.g., PASS-1766111567631-C89RE)</p>
+            <p class="mb-2">Link your OnePass digital pass using your 6-digit PIN to enjoy seamless booking and instant access to your guest portal.</p>
+            <p class="text-xs opacity-80">Your PIN was provided at check-in (e.g., 123456)</p>
         </div>
         <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i><span id="passLinkErrorMessage"></span>
@@ -18706,7 +18711,7 @@ app.get('/hotel/:property_slug', async (c) => {
     </div>
 </div>
 <script>
-const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentLoaded',function(){loadPassSession();document.getElementById('passReferenceInput')?.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();linkGuestPass();}});});function loadPassSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.timestamp&&Date.now()-data.timestamp<24*60*60*1000){showLinkedState(data.guest);return;}}catch(e){console.error('Invalid session data');}}showUnlinkedState();}async function linkGuestPass(){const input=document.getElementById('passReferenceInput');const button=document.getElementById('linkPassButton');const passReference=input.value.trim().toUpperCase();if(!passReference){showError('Please enter your pass reference');return;}const originalHTML=button.innerHTML;button.innerHTML='<i class="fas fa-spinner fa-spin mr-2"></i>Linking...';button.disabled=true;hideError();try{const propertyId=getPropertyId();const response=await fetch('/api/guest/link-pass',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':propertyId},body:JSON.stringify({pass_reference:passReference})});const data=await response.json();if(data.success&&data.guest){localStorage.setItem(PASS_SESSION_KEY,JSON.stringify({guest:data.guest,timestamp:Date.now()}));showLinkedState(data.guest);if(typeof confetti!=='undefined'){confetti({particleCount:100,spread:70,origin:{y:0.3}});}window.dispatchEvent(new CustomEvent('passLinked',{detail:data.guest}));}else{showError(data.error||'Failed to link pass. Please check your reference.');}}catch(error){console.error('Link pass error:',error);showError('Connection error. Please try again.');}finally{button.innerHTML=originalHTML;button.disabled=false;}}function showLinkedState(guest){document.getElementById('passLinkBarUnlinked').classList.add('hidden');document.getElementById('passLinkBarLinked').classList.remove('hidden');document.getElementById('linkedGuestName').textContent=guest.full_name||'Guest';document.getElementById('linkedRoomNumber').textContent=guest.room_number||'—';const portalLink=\`/guest-portal.html?pass=\${guest.pass_reference}&token=\${guest.token}\`;document.getElementById('viewPassButton').href=portalLink;}function showUnlinkedState(){document.getElementById('passLinkBarUnlinked').classList.remove('hidden');document.getElementById('passLinkBarLinked').classList.add('hidden');}function unlinkGuestPass(){if(confirm('Are you sure you want to unlink your pass?')){localStorage.removeItem(PASS_SESSION_KEY);showUnlinkedState();window.dispatchEvent(new Event('passUnlinked'));document.getElementById('passReferenceInput').value='';}}function togglePassInfo(){document.getElementById('passInfoPanel').classList.toggle('hidden');}function showError(message){document.getElementById('passLinkErrorMessage').textContent=message;document.getElementById('passLinkError').classList.remove('hidden');setTimeout(()=>{hideError();},5000);}function hideError(){document.getElementById('passLinkError').classList.add('hidden');}function getPropertyId(){const urlParams=new URLSearchParams(window.location.search);const propertyParam=urlParams.get('property');if(propertyParam)return propertyParam;const stored=localStorage.getItem('property_id');if(stored)return stored;return'1';}function getGuestSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.timestamp&&Date.now()-data.timestamp<24*60*60*1000){return data.guest;}}catch(e){return null;}}return null;}window.getGuestSession=getGuestSession;
+const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentLoaded',function(){loadPassSession();document.getElementById('passReferenceInput')?.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();linkGuestPass();}});});function loadPassSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.timestamp&&Date.now()-data.timestamp<24*60*60*1000){showLinkedState(data.guest);return;}}catch(e){console.error('Invalid session data');}}showUnlinkedState();}async function linkGuestPass(){const input=document.getElementById('passReferenceInput');const button=document.getElementById('linkPassButton');const guestPin=input.value.trim();if(!guestPin){showError('Please enter your 6-digit PIN');return;}if(guestPin.length!==6||!/^\d+$/.test(guestPin)){showError('PIN must be exactly 6 digits');return;}const originalHTML=button.innerHTML;button.innerHTML='<i class="fas fa-spinner fa-spin mr-2"></i>Linking...';button.disabled=true;hideError();try{const propertyId=getPropertyId();const response=await fetch('/api/guest/link-pass',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':propertyId},body:JSON.stringify({guest_pin:guestPin})});const data=await response.json();if(data.success&&data.guest){localStorage.setItem(PASS_SESSION_KEY,JSON.stringify({guest:data.guest,timestamp:Date.now()}));showLinkedState(data.guest);if(typeof confetti!=='undefined'){confetti({particleCount:100,spread:70,origin:{y:0.3}});}window.dispatchEvent(new CustomEvent('passLinked',{detail:data.guest}));}else{showError(data.error||'Invalid PIN. Please check and try again.');}}catch(error){console.error('Link pass error:',error);showError('Connection error. Please try again.');}finally{button.innerHTML=originalHTML;button.disabled=false;}}function showLinkedState(guest){document.getElementById('passLinkBarUnlinked').classList.add('hidden');document.getElementById('passLinkBarLinked').classList.remove('hidden');document.getElementById('linkedGuestName').textContent=guest.full_name||'Guest';document.getElementById('linkedRoomNumber').textContent=guest.room_number||'—';const portalLink=\`/guest-portal.html?pass=\${guest.pass_reference}&token=\${guest.token}\`;document.getElementById('viewPassButton').href=portalLink;}function showUnlinkedState(){document.getElementById('passLinkBarUnlinked').classList.remove('hidden');document.getElementById('passLinkBarLinked').classList.add('hidden');}function unlinkGuestPass(){if(confirm('Are you sure you want to unlink your pass?')){localStorage.removeItem(PASS_SESSION_KEY);showUnlinkedState();window.dispatchEvent(new Event('passUnlinked'));document.getElementById('passReferenceInput').value='';}}function togglePassInfo(){document.getElementById('passInfoPanel').classList.toggle('hidden');}function showError(message){document.getElementById('passLinkErrorMessage').textContent=message;document.getElementById('passLinkError').classList.remove('hidden');setTimeout(()=>{hideError();},5000);}function hideError(){document.getElementById('passLinkError').classList.add('hidden');}function getPropertyId(){const urlParams=new URLSearchParams(window.location.search);const propertyParam=urlParams.get('property');if(propertyParam)return propertyParam;const stored=localStorage.getItem('property_id');if(stored)return stored;return'1';}function getGuestSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.timestamp&&Date.now()-data.timestamp<24*60*60*1000){return data.guest;}}catch(e){return null;}}return null;}window.getGuestSession=getGuestSession;
 </script>
 `;
   
