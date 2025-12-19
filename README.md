@@ -4,8 +4,8 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://783fdb6a.project-c8738f5c.pages.dev
-**NFC Test Simulator:** https://783fdb6a.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
+**Production:** https://5f41ad06.project-c8738f5c.pages.dev
+**NFC Test Simulator:** https://5f41ad06.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
 **Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
 
 ### Quick Test Links
@@ -388,7 +388,7 @@ Enable staff to verify digital passes using NFC technology for contactless, inst
 
 **For users with iPhones or without NFC hardware**, we provide a complete NFC testing simulator:
 
-**Access:** `https://783fdb6a.project-c8738f5c.pages.dev/nfc-test-simulator`
+**Access:** `https://5f41ad06.project-c8738f5c.pages.dev/nfc-test-simulator`
 
 **Features:**
 - ✅ **Works on ANY device** - iPhone, iPad, Mac, PC, Android
