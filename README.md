@@ -4,7 +4,8 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Public Access:** https://3000-i4hrxjmvko3zsm1dlnsdp-b237eb32.sandbox.novita.ai
+**Production:** https://97e3ea32.project-c8738f5c.pages.dev
+**Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
 
 ### Quick Test Links
 
@@ -46,6 +47,20 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ Real-time booking notifications capability
 - ✅ Send payment links to guests for "pay at vendor" bookings
 
+### 🎟️ OnePass Digital Pass System (NEW ✨)
+- ✅ **Multi-Verification Methods** - QR Code, Face Recognition, and NFC support
+- ✅ **Digital Pass Creation** - Create all-inclusive passes for guests with room numbers and tiers
+- ✅ **Face Enrollment** - Biometric face enrollment with digital consent signatures (GDPR/BIPA compliant)
+- ✅ **NFC Scanner Interface** 🆕 - Tap-to-verify NFC cards for instant access verification
+- ✅ **QR & Face Scanner** - Unified scanner supporting both QR codes and facial recognition
+- ✅ **Pass Verification API** - Backend verification endpoints for all three methods (QR/Face/NFC)
+- ✅ **Verification Analytics** - Track total verifications, by method (QR/Face/NFC), manual reviews, and fraud alerts
+- ✅ **Tiered Access** - Support for different pass tiers (Gold, Silver, Bronze, VIP)
+- ✅ **Family Members** - Add family members to digital passes
+- ✅ **Fraud Prevention** - Real-time fraud detection and alerting system
+- ✅ **Biometric Audit Trail** - Complete audit log of all biometric operations
+- ✅ **Consent Management** - Digital signature collection and storage for compliance
+
 ### 🛡️ Admin Dashboard
 - ✅ Secure admin login with multi-tenancy isolation
 - ✅ Generate QR codes for new rooms
@@ -74,7 +89,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🗄️ Database Schema
 
-**13 Interconnected Tables:**
+**20+ Interconnected Tables:**
+
+**Core Platform:**
 - `properties` - Resort/hotel properties
 - `rooms` - Guest rooms with QR codes
 - `categories` - Activity categories
@@ -88,6 +105,16 @@ A complete, production-ready resort activity booking platform with QR code entry
 - `users` - Admin and property manager accounts
 - `analytics_events` - User interaction tracking
 - `vendor_availability_overrides` - Special availability rules
+
+**OnePass Digital Pass System (NEW):**
+- `digital_passes` - All-inclusive digital passes with QR/Face/NFC support
+- `pass_family_members` - Family members linked to passes
+- `pass_verifications` - Verification audit log (all methods)
+- `nfc_verifications` - NFC-specific verification tracking 🆕
+- `all_inclusive_tiers` - Pass tier definitions (Gold, Silver, etc.)
+- `biometric_consent_signatures` - GDPR/BIPA compliant consent records
+- `biometric_audit_log` - Complete audit trail of biometric operations
+- `face_verification_fraud_alerts` - Fraud detection and alerting
 
 ---
 
@@ -313,6 +340,93 @@ npm test  # curl http://localhost:3000
 - Wrangler (Cloudflare CLI)
 - Vite (build tool)
 - Git (version control)
+
+---
+
+## 📱 NFC Scanner System (NEW ✨)
+
+### Purpose
+Enable staff to verify digital passes using NFC technology for contactless, instant verification.
+
+### Key Features
+- 🌐 **Web NFC API** - Browser-based NFC scanning (no app required)
+- 📲 **Tap-to-Verify** - Instant verification by tapping NFC card to device
+- 🔐 **Secure Verification** - Backend verification with fraud detection
+- 📊 **Real-time Stats** - Track NFC verifications in analytics dashboard
+- 🎨 **Beautiful UI** - Professional purple gradient design with animations
+- ✅ **Auto-generated NFC IDs** - Unique 16-character NFC IDs for each pass
+- 📝 **Verification Logging** - Complete audit trail in nfc_verifications table
+- 🏷️ **Pass Details Display** - Shows guest name, room, tier, photo after verification
+
+### How It Works
+
+**Backend:**
+1. Digital passes automatically get unique `nfc_id` when created
+2. NFC verification endpoint: `POST /api/staff/all-inclusive/verify-nfc`
+3. Verifies NFC ID, checks pass validity, logs verification
+4. Returns pass details with guest information
+
+**Frontend:**
+1. Staff navigates to OnePass → NFC Scanner button
+2. Browser requests NFC permission (Chrome/Edge on Android)
+3. Staff taps guest's NFC card to device
+4. Web NFC API reads NFC ID from tag
+5. Frontend sends NFC ID to backend for verification
+6. Shows success/failure with guest details
+
+### Browser Support
+- ✅ **Android** - Chrome, Edge, Samsung Internet (Android 10+)
+- ❌ **iOS** - Not supported (Web NFC API unavailable)
+- ❌ **Desktop** - Limited support
+
+**Recommendation:** Use Android devices with Chrome for best NFC experience.
+
+### Technical Implementation
+
+**Database Schema:**
+```sql
+-- Digital passes table (enhanced with NFC)
+ALTER TABLE digital_passes ADD COLUMN nfc_id TEXT UNIQUE;
+ALTER TABLE digital_passes ADD COLUMN nfc_enabled INTEGER DEFAULT 1;
+ALTER TABLE digital_passes ADD COLUMN nfc_last_used DATETIME;
+
+-- NFC verifications audit log
+CREATE TABLE nfc_verifications (
+  verification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  property_id INTEGER NOT NULL,
+  pass_id INTEGER NOT NULL,
+  nfc_id TEXT NOT NULL,
+  verified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  staff_name TEXT,
+  location TEXT,
+  device_info TEXT,
+  verification_result TEXT DEFAULT 'success',
+  FOREIGN KEY (pass_id) REFERENCES digital_passes(pass_id)
+);
+```
+
+**API Endpoint:**
+```typescript
+POST /api/staff/all-inclusive/verify-nfc
+Headers: X-Property-ID, X-User-ID
+Body: {
+  nfc_id: string,
+  staff_name: string,
+  location: string,
+  device_info: string
+}
+```
+
+### Analytics Integration
+- **Total Verifications** - Combined QR + Face + NFC counts
+- **NFC Verifications** - Separate tracking for NFC-only verifications
+- **QR Code Only** - Calculated as: Total - Face - NFC
+- **Verification Methods Chart** - Visual breakdown of all three methods
+
+### Access Points
+1. **OnePass Dashboard** → NFC Scanner button (purple card)
+2. **Direct URL**: `/staff/nfc-scanner`
+3. **Staff Unified Scanner** → Switch to NFC tab (future enhancement)
 
 ---
 
