@@ -22928,7 +22928,7 @@ app.get('/hotel/:property_slug', async (c) => {
         
         <!-- Load Pass Link Bar Component -->
         <script>
-          fetch('/guest-pass-bar.html')
+          fetch('/guest-pass-bar')
             .then(response => response.text())
             .then(html => {
               document.getElementById('passLinkBarContainer').innerHTML = html;
