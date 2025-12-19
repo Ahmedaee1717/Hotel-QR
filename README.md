@@ -4,7 +4,8 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://97e3ea32.project-c8738f5c.pages.dev
+**Production:** https://783fdb6a.project-c8738f5c.pages.dev
+**NFC Test Simulator:** https://783fdb6a.project-c8738f5c.pages.dev/nfc-test-simulator (Works on iPhone!)
 **Sandbox (Dev):** https://3000-i4hrxjmvko3zsm1dlnsdp-02b9cc79.sandbox.novita.ai
 
 ### Quick Test Links
@@ -382,6 +383,39 @@ Enable staff to verify digital passes using NFC technology for contactless, inst
 - ❌ **Desktop** - Limited support
 
 **Recommendation:** Use Android devices with Chrome for best NFC experience.
+
+### 🧪 NFC Test Simulator (iPhone Compatible!)
+
+**For users with iPhones or without NFC hardware**, we provide a complete NFC testing simulator:
+
+**Access:** `https://783fdb6a.project-c8738f5c.pages.dev/nfc-test-simulator`
+
+**Features:**
+- ✅ **Works on ANY device** - iPhone, iPad, Mac, PC, Android
+- 🎯 **End-to-End Testing** - Test entire NFC workflow without hardware
+- 📋 **Pass Creation Testing** - Verify NFC ID generation
+- 🔍 **Pass Lookup Testing** - Test encoding station pass loading
+- 🏷️ **NFC ID Simulation** - Simulate encoding wristbands
+- 📊 **API Verification** - Test all NFC endpoints
+- 🎨 **Visual Feedback** - See real-time test results
+
+**How to Use:**
+1. Open the simulator in Safari (iPhone) or any browser
+2. Create a digital pass in the admin dashboard
+3. Copy the Pass Reference (e.g., PASS-1766110874785-GT5W8)
+4. Paste into simulator and click "Test Pass Lookup"
+5. Click "Simulate Encoding" to test the full workflow
+6. Check "Test API Directly" to verify backend endpoints
+
+**What Gets Tested:**
+- ✅ Pass creation with NFC ID generation
+- ✅ Pass lookup by reference number
+- ✅ NFC encoding logging
+- ✅ Database operations (CREATE TABLE IF NOT EXISTS)
+- ✅ Error handling and fallback logic
+- ✅ Complete request/response cycle
+
+**No Hardware Needed!** This simulator lets you verify your entire NFC system works correctly before investing in Android tablets or NFC wristbands.
 
 ### Technical Implementation
 
