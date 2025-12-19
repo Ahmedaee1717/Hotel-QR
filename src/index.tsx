@@ -14844,6 +14844,310 @@ app.delete('/api/admin/all-inclusive/tiers/:tier_id', requirePermission('propert
 })
 
 // =================
+// TIER BENEFITS MANAGEMENT
+// =================
+
+// Get all benefits for a tier
+app.get('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
+  const { DB } = c.env
+  const { tier_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const benefits = await DB.prepare(`
+      SELECT 
+        tb.*,
+        ho.name as venue_name,
+        ho.offering_type as venue_type
+      FROM tier_benefits tb
+      LEFT JOIN hotel_offerings ho ON tb.venue_id = ho.offering_id
+      WHERE tb.tier_id = ? AND tb.property_id = ?
+      ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
+    `).bind(tier_id, property_id).all()
+    
+    return c.json({ success: true, benefits: benefits.results || [] })
+  } catch (error) {
+    console.error('Get tier benefits error:', error)
+    return c.json({ error: 'Failed to get benefits' }, 500)
+  }
+})
+
+// Add benefit to tier
+app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { tier_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const {
+      benefit_category,
+      benefit_type,
+      venue_id,
+      venue_name,
+      access_level,
+      quantity_limit,
+      time_restrictions,
+      benefit_title,
+      benefit_description,
+      included,
+      upgrade_price,
+      icon,
+      display_order
+    } = body
+    
+    // Validate required fields
+    if (!benefit_category || !benefit_type || !access_level || !benefit_title) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+    
+    const result = await DB.prepare(`
+      INSERT INTO tier_benefits (
+        tier_id, property_id, benefit_category, benefit_type, venue_id, venue_name,
+        access_level, quantity_limit, time_restrictions, benefit_title, benefit_description,
+        included, upgrade_price, icon, display_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      tier_id,
+      property_id,
+      benefit_category,
+      benefit_type,
+      venue_id || null,
+      venue_name || null,
+      access_level,
+      quantity_limit || null,
+      time_restrictions ? JSON.stringify(time_restrictions) : null,
+      benefit_title,
+      benefit_description || null,
+      included !== undefined ? included : 1,
+      upgrade_price || 0,
+      icon || 'fa-check-circle',
+      display_order || 0
+    ).run()
+    
+    return c.json({ success: true, benefit_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('Add benefit error:', error)
+    return c.json({ error: 'Failed to add benefit' }, 500)
+  }
+})
+
+// Update benefit
+app.put('/api/admin/all-inclusive/benefits/:benefit_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { benefit_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    
+    // Verify benefit belongs to property
+    const benefit = await DB.prepare(`
+      SELECT * FROM tier_benefits WHERE benefit_id = ? AND property_id = ?
+    `).bind(benefit_id, property_id).first()
+    
+    if (!benefit) {
+      return c.json({ error: 'Benefit not found' }, 404)
+    }
+    
+    const {
+      venue_id,
+      venue_name,
+      access_level,
+      quantity_limit,
+      time_restrictions,
+      benefit_title,
+      benefit_description,
+      included,
+      upgrade_price,
+      icon,
+      display_order,
+      is_active
+    } = body
+    
+    await DB.prepare(`
+      UPDATE tier_benefits
+      SET venue_id = ?,
+          venue_name = ?,
+          access_level = ?,
+          quantity_limit = ?,
+          time_restrictions = ?,
+          benefit_title = ?,
+          benefit_description = ?,
+          included = ?,
+          upgrade_price = ?,
+          icon = ?,
+          display_order = ?,
+          is_active = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE benefit_id = ? AND property_id = ?
+    `).bind(
+      venue_id !== undefined ? venue_id : benefit.venue_id,
+      venue_name !== undefined ? venue_name : benefit.venue_name,
+      access_level || benefit.access_level,
+      quantity_limit !== undefined ? quantity_limit : benefit.quantity_limit,
+      time_restrictions ? JSON.stringify(time_restrictions) : benefit.time_restrictions,
+      benefit_title || benefit.benefit_title,
+      benefit_description !== undefined ? benefit_description : benefit.benefit_description,
+      included !== undefined ? included : benefit.included,
+      upgrade_price !== undefined ? upgrade_price : benefit.upgrade_price,
+      icon || benefit.icon,
+      display_order !== undefined ? display_order : benefit.display_order,
+      is_active !== undefined ? is_active : benefit.is_active,
+      benefit_id,
+      property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update benefit error:', error)
+    return c.json({ error: 'Failed to update benefit' }, 500)
+  }
+})
+
+// Delete benefit
+app.delete('/api/admin/all-inclusive/benefits/:benefit_id', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { benefit_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM tier_benefits
+      WHERE benefit_id = ? AND property_id = ?
+    `).bind(benefit_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete benefit error:', error)
+    return c.json({ error: 'Failed to delete benefit' }, 500)
+  }
+})
+
+// Get available venues for benefit assignment
+app.get('/api/admin/all-inclusive/venues/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  const authPropertyId = c.req.header('X-Property-ID')
+  
+  if (!authPropertyId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const venues = await DB.prepare(`
+      SELECT 
+        offering_id as id,
+        name,
+        offering_type as type,
+        description
+      FROM hotel_offerings
+      WHERE property_id = ? AND is_active = 1
+      ORDER BY offering_type, name
+    `).bind(property_id).all()
+    
+    return c.json({ success: true, venues: venues.results || [] })
+  } catch (error) {
+    console.error('Get venues error:', error)
+    return c.json({ error: 'Failed to get venues' }, 500)
+  }
+})
+
+// Get benefit templates
+app.get('/api/admin/all-inclusive/benefit-templates', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const templates = await DB.prepare(`
+      SELECT * FROM tier_benefit_templates
+      ORDER BY template_tier_level, template_id
+    `).all()
+    
+    return c.json({ success: true, templates: templates.results || [] })
+  } catch (error) {
+    console.error('Get templates error:', error)
+    return c.json({ error: 'Failed to get templates' }, 500)
+  }
+})
+
+// Apply template to tier
+app.post('/api/admin/all-inclusive/tiers/:tier_id/apply-template', requirePermission('property_settings'), async (c) => {
+  const { DB } = c.env
+  const { tier_id } = c.req.param()
+  const property_id = getAuthenticatedPropertyId(c)
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const { template_id } = body
+    
+    if (!template_id) {
+      return c.json({ error: 'Template ID required' }, 400)
+    }
+    
+    // Get template
+    const template = await DB.prepare(`
+      SELECT * FROM tier_benefit_templates WHERE template_id = ?
+    `).bind(template_id).first()
+    
+    if (!template) {
+      return c.json({ error: 'Template not found' }, 404)
+    }
+    
+    // Parse benefits
+    const benefits = JSON.parse(template.benefits_json)
+    
+    // Insert all benefits
+    for (const benefit of benefits) {
+      await DB.prepare(`
+        INSERT INTO tier_benefits (
+          tier_id, property_id, benefit_category, benefit_type,
+          access_level, quantity_limit, time_restrictions,
+          benefit_title, benefit_description, included, upgrade_price, icon
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        tier_id,
+        property_id,
+        benefit.category,
+        benefit.type,
+        benefit.access_level,
+        benefit.quantity_limit || null,
+        benefit.time_restrictions || null,
+        benefit.title,
+        benefit.description || null,
+        1,
+        0,
+        'fa-check-circle'
+      ).run()
+    }
+    
+    return c.json({ success: true, benefits_added: benefits.length })
+  } catch (error) {
+    console.error('Apply template error:', error)
+    return c.json({ error: 'Failed to apply template' }, 500)
+  }
+})
+
+// =================
 // DIGITAL PASS MANAGEMENT
 // =================
 
@@ -50129,10 +50433,18 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         if (tiers.length === 0) {
           container.innerHTML = '<div class="text-center py-12">' +
             '<i class="fas fa-layer-group text-gray-300 text-5xl mb-4"></i>' +
-            '<p class="text-gray-600 mb-4">No tiers created yet</p>' +
-            '<button onclick="openCreateTierModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold">' +
-            '<i class="fas fa-plus mr-2"></i>Create First Tier' +
+            '<p class="text-gray-600 mb-4">No tiers created yet. Get started with pre-built templates:</p>' +
+            '<div class="flex gap-3 justify-center flex-wrap">' +
+            '<button onclick="openCreateTierModal(1)" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold">' +
+            '<i class="fas fa-star mr-2"></i>Basic Tier' +
             '</button>' +
+            '<button onclick="openCreateTierModal(2)" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold">' +
+            '<i class="fas fa-gem mr-2"></i>Premium Tier' +
+            '</button>' +
+            '<button onclick="openCreateTierModal(3)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-semibold">' +
+            '<i class="fas fa-crown mr-2"></i>Ultra Tier' +
+            '</button>' +
+            '</div>' +
             '</div>';
           return;
         }
@@ -50148,12 +50460,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                   '<h4 class="text-xl font-bold mb-1">' + tier.tier_display_name + '</h4>' +
                   '<p class="text-sm text-gray-600 mb-2">Code: <code class="bg-gray-100 px-2 py-1 rounded">' + tier.tier_code + '</code></p>' +
                   (tier.tier_description ? '<p class="text-sm text-gray-700 mb-2">' + tier.tier_description + '</p>' : '') +
-                  (tier.daily_upgrade_price > 0 ? '<p class="text-sm font-semibold text-green-600">Upgrade: $' + tier.daily_upgrade_price + '/day</p>' : '') +
+                  '<div class="flex gap-2 flex-wrap">' +
+                  (tier.daily_upgrade_price > 0 ? '<span class="text-sm font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full">💰 $' + tier.daily_upgrade_price + '/day upgrade</span>' : '') +
+                  '<span class="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded-full"><i class="fas fa-list-check mr-1"></i>Manage Benefits</span>' +
+                  '</div>' +
                 '</div>' +
               '</div>' +
               '<div class="flex gap-2">' +
-                '<button onclick="editTier(' + tier.tier_id + ')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">' +
-                  '<i class="fas fa-edit"></i>' +
+                '<button onclick="editTier(' + tier.tier_id + ')" class="px-4 py-2 text-white rounded-lg hover:opacity-90 font-semibold" style="background-color: ' + tier.tier_color + '" title="Edit Tier & Benefits">' +
+                  '<i class="fas fa-edit mr-1"></i>Manage' +
                 '</button>' +
                 '<button onclick="deleteTier(' + tier.tier_id + ')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">' +
                   '<i class="fas fa-trash"></i>' +
@@ -50165,13 +50480,431 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // Open create tier modal
-      window.openCreateTierModal = function() {
-        alert('Create Tier Modal - Coming in next phase!\\n\\nFor now, you can create tiers via API:\\nPOST /api/admin/all-inclusive/tiers\\n\\nSample tiers will be auto-created for testing.');
+      window.openCreateTierModal = async function(templateLevel = null) {
+        // Load venues for benefit selection
+        let venues = [];
+        try {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/venues/' + propertyId);
+          const data = await response.json();
+          venues = data.venues || [];
+        } catch (error) {
+          console.error('Failed to load venues:', error);
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'create-tier-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+        
+        const tierLevels = [
+          { value: 1, name: 'Basic All-Inclusive', color: '#3B82F6', icon: 'fa-star' },
+          { value: 2, name: 'Premium All-Inclusive', color: '#8B5CF6', icon: 'fa-gem' },
+          { value: 3, name: 'Ultra All-Inclusive', color: '#F59E0B', icon: 'fa-crown' }
+        ];
+        
+        const selectedLevel = tierLevels[templateLevel - 1] || tierLevels[0];
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">';
+        html += '<div class="p-6 border-b bg-gradient-to-r from-purple-600 to-indigo-600">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-layer-group"></i>Create New Tier';
+        html += '</h2>';
+        html += '<p class="text-purple-100 text-sm mt-1">Define tier details and benefits</p>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<form id="create-tier-form" onsubmit="submitCreateTier(event)">';
+        
+        // Basic Tier Info
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-4 flex items-center gap-2 text-purple-700">';
+        html += '<i class="fas fa-info-circle"></i>Basic Information';
+        html += '</h3>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Display Name *</label>';
+        html += '<input type="text" name="tier_display_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Gold Club" value="' + selectedLevel.name + '"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Code (System ID) *</label>';
+        html += '<input type="text" name="tier_code" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="gold" pattern="[a-z0-9_]+" title="Lowercase letters, numbers, and underscores only"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Color</label>';
+        html += '<input type="color" name="tier_color" class="w-full h-12 border border-gray-300 rounded-lg px-2 py-1 cursor-pointer" value="' + selectedLevel.color + '"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Icon (Font Awesome)</label>';
+        html += '<select name="tier_icon" class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="fa-star" ' + (selectedLevel.icon === 'fa-star' ? 'selected' : '') + '>⭐ Star</option>';
+        html += '<option value="fa-gem" ' + (selectedLevel.icon === 'fa-gem' ? 'selected' : '') + '>💎 Diamond</option>';
+        html += '<option value="fa-crown" ' + (selectedLevel.icon === 'fa-crown' ? 'selected' : '') + '>👑 Crown</option>';
+        html += '<option value="fa-certificate">🏆 Certificate</option>';
+        html += '<option value="fa-trophy">🏆 Trophy</option>';
+        html += '</select></div>';
+        html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Description</label>';
+        html += '<textarea name="tier_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="What\\'s included in this tier..."></textarea></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Daily Upgrade Price ($)</label>';
+        html += '<input type="number" name="daily_upgrade_price" step="0.01" min="0" value="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="50.00"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Display Order</label>';
+        html += '<input type="number" name="display_order" min="0" value="' + templateLevel + '" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="0"></div>';
+        html += '</div></div>';
+        
+        // Benefit Template Selection
+        html += '<div class="mb-6 bg-purple-50 border-2 border-purple-200 rounded-lg p-4">';
+        html += '<h3 class="font-bold text-lg mb-3 text-purple-900 flex items-center gap-2">';
+        html += '<i class="fas fa-magic"></i>Quick Setup: Apply Benefit Template';
+        html += '</h3>';
+        html += '<p class="text-sm text-purple-700 mb-3">Start with a pre-configured benefits package (you can customize after creating the tier):</p>';
+        html += '<div class="grid md:grid-cols-3 gap-3">';
+        tierLevels.forEach(level => {
+          const isSelected = level.value === selectedLevel.value;
+          html += '<button type="button" onclick="selectTierTemplate(' + level.value + ')" ';
+          html += 'class="tier-template-btn p-4 border-2 rounded-lg text-left transition-all ' + (isSelected ? 'border-purple-600 bg-purple-100' : 'border-gray-300 hover:border-purple-400') + '" ';
+          html += 'data-template="' + level.value + '">';
+          html += '<div class="flex items-center gap-3 mb-2">';
+          html += '<i class="fas ' + level.icon + ' text-2xl" style="color: ' + level.color + '"></i>';
+          html += '<span class="font-bold">' + level.name + '</span>';
+          html += '</div>';
+          if (level.value === 1) {
+            html += '<p class="text-xs text-gray-600">Buffet meals, local drinks, basic activities</p>';
+          } else if (level.value === 2) {
+            html += '<p class="text-xs text-gray-600">+ Limited à la carte, premium drinks, room service</p>';
+          } else {
+            html += '<p class="text-xs text-gray-600">+ Unlimited à la carte, concierge, spa credit</p>';
+          }
+          html += '</button>';
+        });
+        html += '</div>';
+        html += '<input type="hidden" name="template_id" id="selected-template" value="' + selectedLevel.value + '">';
+        html += '</div>';
+        
+        // Benefits Preview
+        html += '<div class="mb-6">';
+        html += '<h3 class="font-bold text-lg mb-3 flex items-center gap-2 text-purple-700">';
+        html += '<i class="fas fa-list-check"></i>Benefits (Manage after creating tier)';
+        html += '</h3>';
+        html += '<div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">';
+        html += '<p class="text-sm text-blue-900">';
+        html += '<i class="fas fa-info-circle mr-2"></i>';
+        html += '<strong>After creating this tier</strong>, you\\'ll be able to add specific benefits like:';
+        html += '</p>';
+        html += '<ul class="mt-2 text-sm text-blue-800 space-y-1 ml-6">';
+        html += '<li>• Choose specific restaurants and bars for each tier</li>';
+        html += '<li>• Set quantity limits (e.g., "2 à la carte dinners per stay")</li>';
+        html += '<li>• Define time restrictions (e.g., "Happy hour 5-7 PM only")</li>';
+        html += '<li>• Link activities, spa services, and amenities</li>';
+        html += '</ul>';
+        html += '</div></div>';
+        
+        // Submit buttons
+        html += '<div class="flex gap-3 justify-end pt-4 border-t">';
+        html += '<button type="button" onclick="closeCreateTierModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700">';
+        html += '<i class="fas fa-check mr-2"></i>Create Tier';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '</form>';
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+      };
+      
+      // Select tier template
+      window.selectTierTemplate = function(templateId) {
+        document.querySelectorAll('.tier-template-btn').forEach(btn => {
+          if (btn.dataset.template == templateId) {
+            btn.classList.add('border-purple-600', 'bg-purple-100');
+            btn.classList.remove('border-gray-300');
+          } else {
+            btn.classList.remove('border-purple-600', 'bg-purple-100');
+            btn.classList.add('border-gray-300');
+          }
+        });
+        document.getElementById('selected-template').value = templateId;
+      };
+      
+      // Close create tier modal
+      window.closeCreateTierModal = function() {
+        const modal = document.getElementById('create-tier-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit create tier
+      window.submitCreateTier = async function(event) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Convert numeric fields
+        data.daily_upgrade_price = parseFloat(data.daily_upgrade_price) || 0;
+        data.display_order = parseInt(data.display_order) || 0;
+        const templateId = parseInt(data.template_id);
+        delete data.template_id;
+        
+        try {
+          // Create tier
+          const response = await fetchWithAuth('/api/admin/all-inclusive/tiers', {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            // Apply template if selected
+            if (templateId) {
+              try {
+                await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${result.tier_id}/apply-template\`, {
+                  method: 'POST',
+                  body: JSON.stringify({ template_id: templateId })
+                });
+              } catch (error) {
+                console.error('Apply template error:', error);
+              }
+            }
+            
+            alert('✅ Tier created successfully!');
+            closeCreateTierModal();
+            loadTiers();
+          } else {
+            alert('❌ Failed to create tier: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Create tier error:', error);
+          alert('❌ Failed to create tier. Please try again.');
+        }
       };
 
-      // Edit tier
-      window.editTier = function(tierId) {
-        alert('Edit Tier Modal - Coming in next phase!\\n\\nTier ID: ' + tierId);
+      // Edit tier - now with full benefits management
+      window.editTier = async function(tierId) {
+        window.location.href = '#tier-benefits-' + tierId;
+        // Show a modal with tier and benefits management
+        const modal = document.createElement('div');
+        modal.id = 'edit-tier-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+        
+        // Load tier and benefits data
+        let tier = null;
+        let benefits = [];
+        let venues = [];
+        
+        try {
+          const [tierRes, benefitsRes, venuesRes] = await Promise.all([
+            fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${propertyId}\`),
+            fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}/benefits\`),
+            fetchWithAuth(\`/api/admin/all-inclusive/venues/\${propertyId}\`)
+          ]);
+          
+          const tierData = await tierRes.json();
+          const benefitsData = await benefitsRes.json();
+          const venuesData = await venuesRes.json();
+          
+          tier = tierData.tiers.find(t => t.tier_id == tierId);
+          benefits = benefitsData.benefits || [];
+          venues = venuesData.venues || [];
+        } catch (error) {
+          console.error('Load tier data error:', error);
+          alert('Failed to load tier data');
+          return;
+        }
+        
+        if (!tier) {
+          alert('Tier not found');
+          return;
+        }
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full my-8">';
+        html += '<div class="p-6 border-b" style="background: linear-gradient(to right, ' + tier.tier_color + ', ' + tier.tier_color + '88);">';
+        html += '<div class="flex items-center justify-between">';
+        html += '<div class="flex items-center gap-4">';
+        html += '<div class="w-16 h-16 bg-white rounded-full flex items-center justify-center">';
+        html += '<i class="fas ' + tier.tier_icon + ' text-3xl" style="color: ' + tier.tier_color + '"></i>';
+        html += '</div>';
+        html += '<div>';
+        html += '<h2 class="text-2xl font-bold text-white">' + tier.tier_display_name + '</h2>';
+        html += '<p class="text-white text-sm opacity-90">Manage tier settings and benefits</p>';
+        html += '</div></div>';
+        html += '<button onclick="closeEditTierModal()" class="text-white hover:text-gray-200 text-2xl">';
+        html += '<i class="fas fa-times"></i>';
+        html += '</button>';
+        html += '</div></div>';
+        
+        html += '<div class="p-6">';
+        
+        // Tab Navigation
+        html += '<div class="flex border-b mb-6">';
+        html += '<button onclick="switchEditTab(\\\'basic-info\\\')" class="edit-tab-btn px-4 py-2 font-semibold border-b-2 border-purple-600 text-purple-600" data-tab="basic-info">';
+        html += '<i class="fas fa-info-circle mr-2"></i>Basic Info';
+        html += '</button>';
+        html += '<button onclick="switchEditTab(\\\'benefits\\\')" class="edit-tab-btn px-4 py-2 font-semibold text-gray-600 hover:text-purple-600" data-tab="benefits">';
+        html += '<i class="fas fa-list-check mr-2"></i>Benefits (' + benefits.length + ')';
+        html += '</button>';
+        html += '</div>';
+        
+        // Basic Info Tab
+        html += '<div id="edit-tab-basic-info" class="edit-tab-content">';
+        html += '<form id="edit-tier-form" onsubmit="submitEditTier(event, ' + tierId + ')">';
+        html += '<div class="grid md:grid-cols-2 gap-4 mb-6">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Display Name *</label>';
+        html += '<input type="text" name="tier_display_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + tier.tier_display_name + '"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Tier Color</label>';
+        html += '<input type="color" name="tier_color" class="w-full h-12 border border-gray-300 rounded-lg px-2 py-1" value="' + tier.tier_color + '"></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Icon</label>';
+        html += '<select name="tier_icon" class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        ['fa-star', 'fa-gem', 'fa-crown', 'fa-certificate', 'fa-trophy'].forEach(icon => {
+          html += '<option value="' + icon + '" ' + (tier.tier_icon === icon ? 'selected' : '') + '>' + icon + '</option>';
+        });
+        html += '</select></div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Daily Upgrade Price ($)</label>';
+        html += '<input type="number" name="daily_upgrade_price" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + tier.daily_upgrade_price + '"></div>';
+        html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Description</label>';
+        html += '<textarea name="tier_description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2">' + (tier.tier_description || '') + '</textarea></div>';
+        html += '</div>';
+        html += '<div class="flex gap-3 justify-end">';
+        html += '<button type="button" onclick="closeEditTierModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700">';
+        html += '<i class="fas fa-save mr-2"></i>Save Changes';
+        html += '</button>';
+        html += '</div>';
+        html += '</form>';
+        html += '</div>';
+        
+        // Benefits Tab
+        html += '<div id="edit-tab-benefits" class="edit-tab-content hidden">';
+        html += '<div class="flex justify-between items-center mb-4">';
+        html += '<h3 class="text-lg font-bold">Tier Benefits</h3>';
+        html += '<button onclick="openAddBenefitModal(' + tierId + ')" class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">';
+        html += '<i class="fas fa-plus mr-2"></i>Add Benefit';
+        html += '</button>';
+        html += '</div>';
+        
+        // Group benefits by category
+        const categories = {
+          'dining': { name: 'Dining', icon: 'fa-utensils', color: 'orange' },
+          'drinks': { name: 'Drinks', icon: 'fa-cocktail', color: 'blue' },
+          'recreation': { name: 'Recreation', icon: 'fa-swimmer', color: 'cyan' },
+          'services': { name: 'Services', icon: 'fa-concierge-bell', color: 'purple' },
+          'amenities': { name: 'Amenities', icon: 'fa-bed', color: 'pink' }
+        };
+        
+        if (benefits.length === 0) {
+          html += '<div class="text-center py-12 bg-gray-50 rounded-lg">';
+          html += '<i class="fas fa-list-check text-gray-300 text-5xl mb-4"></i>';
+          html += '<p class="text-gray-600 mb-4">No benefits added yet</p>';
+          html += '<button onclick="openAddBenefitModal(' + tierId + ')" class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">';
+          html += '<i class="fas fa-plus mr-2"></i>Add First Benefit';
+          html += '</button>';
+          html += '</div>';
+        } else {
+          html += '<div class="space-y-6">';
+          Object.entries(categories).forEach(([catKey, cat]) => {
+            const catBenefits = benefits.filter(b => b.benefit_category === catKey);
+            if (catBenefits.length === 0) return;
+            
+            html += '<div>';
+            html += '<h4 class="font-bold text-md mb-3 flex items-center gap-2 text-' + cat.color + '-700">';
+            html += '<i class="fas ' + cat.icon + '"></i>' + cat.name;
+            html += '</h4>';
+            html += '<div class="space-y-2">';
+            catBenefits.forEach(benefit => {
+              const accessBadge = benefit.access_level === 'unlimited' ? 'bg-green-100 text-green-700' : 
+                                 benefit.access_level === 'limited' ? 'bg-yellow-100 text-yellow-700' : 
+                                 'bg-red-100 text-red-700';
+              html += '<div class="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-all">';
+              html += '<div class="flex items-start justify-between">';
+              html += '<div class="flex-1">';
+              html += '<div class="flex items-center gap-2 mb-1">';
+              html += '<i class="fas ' + benefit.icon + ' text-purple-600"></i>';
+              html += '<h5 class="font-semibold">' + benefit.benefit_title + '</h5>';
+              html += '<span class="' + accessBadge + ' px-2 py-0.5 rounded text-xs font-semibold uppercase">' + benefit.access_level + '</span>';
+              if (benefit.quantity_limit) {
+                html += '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">Limit: ' + benefit.quantity_limit + '</span>';
+              }
+              html += '</div>';
+              if (benefit.benefit_description) {
+                html += '<p class="text-sm text-gray-600 mb-2">' + benefit.benefit_description + '</p>';
+              }
+              if (benefit.venue_name) {
+                html += '<p class="text-xs text-gray-500"><i class="fas fa-map-marker-alt mr-1"></i>' + benefit.venue_name + '</p>';
+              }
+              html += '</div>';
+              html += '<div class="flex gap-2">';
+              html += '<button onclick="editBenefit(' + benefit.benefit_id + ')" class="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Edit">';
+              html += '<i class="fas fa-edit"></i>';
+              html += '</button>';
+              html += '<button onclick="deleteBenefit(' + benefit.benefit_id + ', ' + tierId + ')" class="p-2 text-red-600 hover:bg-red-50 rounded" title="Delete">';
+              html += '<i class="fas fa-trash"></i>';
+              html += '</button>';
+              html += '</div>';
+              html += '</div>';
+              html += '</div>';
+            });
+            html += '</div></div>';
+          });
+          html += '</div>';
+        }
+        
+        html += '</div>';
+        
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        
+        // Store venues for add benefit modal
+        window.currentTierVenues = venues;
+      };
+      
+      // Switch edit tab
+      window.switchEditTab = function(tabName) {
+        document.querySelectorAll('.edit-tab-btn').forEach(btn => {
+          if (btn.dataset.tab === tabName) {
+            btn.classList.add('border-b-2', 'border-purple-600', 'text-purple-600');
+            btn.classList.remove('text-gray-600');
+          } else {
+            btn.classList.remove('border-b-2', 'border-purple-600', 'text-purple-600');
+            btn.classList.add('text-gray-600');
+          }
+        });
+        
+        document.querySelectorAll('.edit-tab-content').forEach(content => {
+          if (content.id === 'edit-tab-' + tabName) {
+            content.classList.remove('hidden');
+          } else {
+            content.classList.add('hidden');
+          }
+        });
+      };
+      
+      // Close edit tier modal
+      window.closeEditTierModal = function() {
+        const modal = document.getElementById('edit-tier-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit edit tier
+      window.submitEditTier = async function(event, tierId) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        data.daily_upgrade_price = parseFloat(data.daily_upgrade_price) || 0;
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}\`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Tier updated successfully!');
+            loadTiers();
+          } else {
+            alert('❌ Failed to update tier: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Update tier error:', error);
+          alert('❌ Failed to update tier. Please try again.');
+        }
       };
 
       // Delete tier
@@ -50193,6 +50926,170 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         } catch (error) {
           console.error('Delete tier error:', error);
           alert('Failed to delete tier');
+        }
+      };
+      
+      // Open add benefit modal
+      window.openAddBenefitModal = function(tierId) {
+        const modal = document.createElement('div');
+        modal.id = 'add-benefit-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4';
+        
+        const venues = window.currentTierVenues || [];
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
+        html += '<div class="p-6 border-b bg-gradient-to-r from-green-600 to-emerald-600">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-plus-circle"></i>Add Benefit';
+        html += '</h2>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<form id="add-benefit-form" onsubmit="submitAddBenefit(event, ' + tierId + ')">';
+        
+        html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Category *</label>';
+        html += '<select name="benefit_category" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="dining">🍽️ Dining</option>';
+        html += '<option value="drinks">🍹 Drinks</option>';
+        html += '<option value="recreation">🏊 Recreation</option>';
+        html += '<option value="services">🔔 Services</option>';
+        html += '<option value="amenities">🛏️ Amenities</option>';
+        html += '</select></div>';
+        
+        html += '<div><label class="block text-sm font-semibold mb-1">Type *</label>';
+        html += '<select name="benefit_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="restaurant_access">Restaurant Access</option>';
+        html += '<option value="bar_access">Bar Access</option>';
+        html += '<option value="a_la_carte">À La Carte Dining</option>';
+        html += '<option value="buffet_access">Buffet Access</option>';
+        html += '<option value="room_service">Room Service</option>';
+        html += '<option value="spa_service">Spa Service</option>';
+        html += '<option value="activity">Activity</option>';
+        html += '<option value="minibar">Minibar</option>';
+        html += '<option value="concierge">Concierge</option>';
+        html += '</select></div>';
+        html += '</div>';
+        
+        html += '<div class="mb-4">';
+        html += '<label class="block text-sm font-semibold mb-1">Benefit Title *</label>';
+        html += '<input type="text" name="benefit_title" required class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Unlimited Buffet Meals">';
+        html += '</div>';
+        
+        html += '<div class="mb-4">';
+        html += '<label class="block text-sm font-semibold mb-1">Description</label>';
+        html += '<textarea name="benefit_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Details about this benefit..."></textarea>';
+        html += '</div>';
+        
+        html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Access Level *</label>';
+        html += '<select name="access_level" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="unlimited">✅ Unlimited</option>';
+        html += '<option value="limited">⚠️ Limited</option>';
+        html += '<option value="excluded">❌ Excluded</option>';
+        html += '</select></div>';
+        
+        html += '<div><label class="block text-sm font-semibold mb-1">Quantity Limit (if limited)</label>';
+        html += '<input type="number" name="quantity_limit" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="e.g., 2">';
+        html += '</div>';
+        html += '</div>';
+        
+        if (venues.length > 0) {
+          html += '<div class="mb-4">';
+          html += '<label class="block text-sm font-semibold mb-1">Specific Venue (Optional)</label>';
+          html += '<select name="venue_id" class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+          html += '<option value="">All Venues</option>';
+          venues.forEach(v => {
+            html += '<option value="' + v.id + '">' + v.name + ' (' + v.type + ')</option>';
+          });
+          html += '</select>';
+          html += '<p class="text-xs text-gray-500 mt-1">Link this benefit to a specific restaurant, bar, or activity</p>';
+          html += '</div>';
+        }
+        
+        html += '<div class="flex gap-3 justify-end pt-4 border-t">';
+        html += '<button type="button" onclick="closeAddBenefitModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">';
+        html += '<i class="fas fa-check mr-2"></i>Add Benefit';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '</form>';
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+      };
+      
+      // Close add benefit modal
+      window.closeAddBenefitModal = function() {
+        const modal = document.getElementById('add-benefit-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit add benefit
+      window.submitAddBenefit = async function(event, tierId) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        if (data.quantity_limit) {
+          data.quantity_limit = parseInt(data.quantity_limit);
+        } else {
+          delete data.quantity_limit;
+        }
+        
+        if (data.venue_id) {
+          data.venue_id = parseInt(data.venue_id);
+        } else {
+          delete data.venue_id;
+        }
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}/benefits\`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Benefit added successfully!');
+            closeAddBenefitModal();
+            // Reload tier modal
+            closeEditTierModal();
+            editTier(tierId);
+          } else {
+            alert('❌ Failed to add benefit: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Add benefit error:', error);
+          alert('❌ Failed to add benefit. Please try again.');
+        }
+      };
+      
+      // Delete benefit
+      window.deleteBenefit = async function(benefitId, tierId) {
+        if (!confirm('Delete this benefit?')) return;
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/all-inclusive/benefits/\${benefitId}\`, {
+            method: 'DELETE'
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Benefit deleted!');
+            closeEditTierModal();
+            editTier(tierId);
+          } else {
+            alert('❌ Failed to delete benefit: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Delete benefit error:', error);
+          alert('❌ Failed to delete benefit');
         }
       };
 
