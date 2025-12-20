@@ -19365,8 +19365,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                 <div class="space-y-6">
                                     <!-- Dining Benefits -->
                                     <div id="diningBenefitsSection" class="hidden">
-                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-orange-200">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white shadow-lg">
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" id="diningHeader">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" id="diningIcon">
                                                 <i class="fas fa-utensils"></i>
                                             </div>
                                             <span data-i18n="tier-dining">Dining</span>
@@ -19376,8 +19376,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     
                                     <!-- Drinks Benefits -->
                                     <div id="drinksBenefitsSection" class="hidden">
-                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-pink-200">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white shadow-lg">
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" id="drinksHeader">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" id="drinksIcon">
                                                 <i class="fas fa-cocktail"></i>
                                             </div>
                                             <span data-i18n="tier-drinks">Drinks</span>
@@ -19387,8 +19387,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     
                                     <!-- Recreation Benefits -->
                                     <div id="recreationBenefitsSection" class="hidden">
-                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-blue-200">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" id="recreationHeader">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" id="recreationIcon">
                                                 <i class="fas fa-swimming-pool"></i>
                                             </div>
                                             <span data-i18n="tier-recreation">Recreation</span>
@@ -19398,8 +19398,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     
                                     <!-- Services Benefits -->
                                     <div id="servicesBenefitsSection" class="hidden">
-                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-purple-200">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" id="servicesHeader">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" id="servicesIcon">
                                                 <i class="fas fa-concierge-bell"></i>
                                             </div>
                                             <span data-i18n="tier-services">Services</span>
@@ -19409,8 +19409,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     
                                     <!-- Amenities Benefits -->
                                     <div id="amenitiesBenefitsSection" class="hidden">
-                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-yellow-200">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-white shadow-lg">
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" id="amenitiesHeader">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" id="amenitiesIcon">
                                                 <i class="fas fa-star"></i>
                                             </div>
                                             <span data-i18n="tier-amenities">Amenities</span>
@@ -21040,6 +21040,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Nad brzegiem',
             rooftop: 'Dach',
             garden: 'Ogród'
+          ,
+            'tier-your-membership': 'Twoje Członkostwo',
+            'tier-dining': 'Jedzenie',
+            'tier-drinks': 'Napoje',
+            'tier-services': 'Usługi',
+            'tier-unlimited': 'Nieograniczone',
+            'tier-daily': 'Codziennie',
+            'tier-limited': 'Ograniczone'
           },
           it: { 
             all: 'Tutti', 
@@ -21056,6 +21064,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Fronte mare',
             rooftop: 'Terrazza',
             garden: 'Giardino'
+          ,
+            'tier-your-membership': 'La Tua Iscrizione',
+            'tier-dining': 'Ristorazione',
+            'tier-drinks': 'Bevande',
+            'tier-services': 'Servizi',
+            'tier-unlimited': 'Illimitato',
+            'tier-daily': 'Giornaliero',
+            'tier-limited': 'Limitato'
           },
           fr: { 
             all: 'Tout', 
@@ -21098,6 +21114,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Nábřeží',
             rooftop: 'Střecha',
             garden: 'Zahrada'
+          ,
+            'tier-your-membership': 'Vaše Členství',
+            'tier-dining': 'Stravování',
+            'tier-drinks': 'Nápoje',
+            'tier-services': 'Služby',
+            'tier-unlimited': 'Neomezené',
+            'tier-daily': 'Denně',
+            'tier-limited': 'Omezené'
           },
           uk: { 
             all: 'Все', 
@@ -21114,6 +21138,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Набережна',
             rooftop: 'Дах',
             garden: 'Сад'
+          ,
+            'tier-your-membership': 'Ваше Членство',
+            'tier-dining': 'Харчування',
+            'tier-drinks': 'Напої',
+            'tier-services': 'Послуги',
+            'tier-unlimited': 'Необмежено',
+            'tier-daily': 'Щодня',
+            'tier-limited': 'Обмежено'
           },
           zh: { 
             all: '全部', 
@@ -21130,6 +21162,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: '海滨',
             rooftop: '屋顶',
             garden: '花园'
+          ,
+            'tier-your-membership': '您的会员资格',
+            'tier-dining': '餐饮',
+            'tier-drinks': '饮品',
+            'tier-services': '服务',
+            'tier-unlimited': '无限',
+            'tier-daily': '每日',
+            'tier-limited': '限制'
           },
           es: { 
             all: 'Todo', 
@@ -21146,6 +21186,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Frente a la playa',
             rooftop: 'Azotea',
             garden: 'Jardín'
+          ,
+            'tier-your-membership': 'Tu Membresía',
+            'tier-dining': 'Comidas',
+            'tier-drinks': 'Bebidas',
+            'tier-services': 'Servicios',
+            'tier-unlimited': 'Ilimitado',
+            'tier-daily': 'Diario',
+            'tier-limited': 'Limitado'
           },
           ja: { 
             all: 'すべて', 
@@ -21162,6 +21210,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'ビーチフロント',
             rooftop: '屋上',
             garden: '庭園'
+          ,
+            'tier-your-membership': '会員資格',
+            'tier-dining': '食事',
+            'tier-drinks': '飲み物',
+            'tier-services': 'サービス',
+            'tier-unlimited': '無制限',
+            'tier-daily': '毎日',
+            'tier-limited': '制限'
           },
           pt: { 
             all: 'Tudo', 
@@ -21178,6 +21234,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Beira-mar',
             rooftop: 'Cobertura',
             garden: 'Jardim'
+          ,
+            'tier-your-membership': 'Sua Associação',
+            'tier-dining': 'Refeições',
+            'tier-drinks': 'Bebidas',
+            'tier-services': 'Serviços',
+            'tier-unlimited': 'Ilimitado',
+            'tier-daily': 'Diário',
+            'tier-limited': 'Limitado'
           },
           ko: { 
             all: '전체', 
@@ -21194,6 +21258,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: '해변',
             rooftop: '루프탑',
             garden: '정원'
+          ,
+            'tier-your-membership': '회원 자격',
+            'tier-dining': '식사',
+            'tier-drinks': '음료',
+            'tier-services': '서비스',
+            'tier-unlimited': '무제한',
+            'tier-daily': '매일',
+            'tier-limited': '제한'
           },
           hi: { 
             all: 'सभी', 
@@ -21210,6 +21282,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'बीचफ्रंट',
             rooftop: 'छत',
             garden: 'बगीचा'
+          ,
+            'tier-your-membership': 'आपकी सदस्यता',
+            'tier-dining': 'भोजन',
+            'tier-drinks': 'पेय',
+            'tier-services': 'सेवाएं',
+            'tier-unlimited': 'असीमित',
+            'tier-daily': 'दैनिक',
+            'tier-limited': 'सीमित'
           },
           tr: { 
             all: 'Tümü', 
@@ -21226,6 +21306,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Sahil',
             rooftop: 'Çatı katı',
             garden: 'Bahçe'
+          ,
+            'tier-your-membership': 'Üyeliğiniz',
+            'tier-dining': 'Yemek',
+            'tier-drinks': 'İçecekler',
+            'tier-services': 'Hizmetler',
+            'tier-unlimited': 'Sınırsız',
+            'tier-daily': 'Günlük',
+            'tier-limited': 'Sınırlı'
           },
           el: { 
             all: 'Όλα', 
@@ -21242,6 +21330,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Μπροστά στην παραλία',
             rooftop: 'Ταράτσα',
             garden: 'Κήπος'
+          ,
+            'tier-your-membership': 'Η Συνδρομή Σας',
+            'tier-dining': 'Φαγητό',
+            'tier-drinks': 'Ποτά',
+            'tier-services': 'Υπηρεσίες',
+            'tier-unlimited': 'Απεριόριστο',
+            'tier-daily': 'Καθημερινά',
+            'tier-limited': 'Περιορισμένο'
           },
           sv: { 
             all: 'Alla', 
@@ -21258,6 +21354,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Strandfront',
             rooftop: 'Takfönster',
             garden: 'Trädgård'
+          ,
+            'tier-your-membership': 'Ditt Medlemskap',
+            'tier-dining': 'Mat',
+            'tier-drinks': 'Dryck',
+            'tier-services': 'Tjänster',
+            'tier-unlimited': 'Obegränsat',
+            'tier-daily': 'Dagligen',
+            'tier-limited': 'Begränsat'
           },
           no: { 
             all: 'Alle', 
@@ -21274,6 +21378,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Strandfront',
             rooftop: 'Takterrasse',
             garden: 'Hage'
+          ,
+            'tier-your-membership': 'Ditt Medlemskap',
+            'tier-dining': 'Mat',
+            'tier-drinks': 'Drikke',
+            'tier-services': 'Tjenester',
+            'tier-unlimited': 'Ubegrenset',
+            'tier-daily': 'Daglig',
+            'tier-limited': 'Begrenset'
           },
           da: { 
             all: 'Alle', 
@@ -21290,6 +21402,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Strandfront',
             rooftop: 'Tagterrasse',
             garden: 'Have'
+          ,
+            'tier-your-membership': 'Dit Medlemskab',
+            'tier-dining': 'Mad',
+            'tier-drinks': 'Drikkevarer',
+            'tier-services': 'Tjenester',
+            'tier-unlimited': 'Ubegrænset',
+            'tier-daily': 'Daglig',
+            'tier-limited': 'Begrænset'
           },
           ro: { 
             all: 'Toate', 
@@ -21306,6 +21426,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Front de plajă',
             rooftop: 'Terasă',
             garden: 'Grădină'
+          ,
+            'tier-your-membership': 'Membri Tale',
+            'tier-dining': 'Mâncare',
+            'tier-drinks': 'Băuturi',
+            'tier-services': 'Servicii',
+            'tier-unlimited': 'Nelimitat',
+            'tier-daily': 'Zilnic',
+            'tier-limited': 'Limitat'
           },
           hu: { 
             all: 'Összes', 
@@ -21322,6 +21450,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Tengerpart',
             rooftop: 'Tetőterasz',
             garden: 'Kert'
+          ,
+            'tier-your-membership': 'Tagsága',
+            'tier-dining': 'Étkezés',
+            'tier-drinks': 'Italok',
+            'tier-services': 'Szolgáltatások',
+            'tier-unlimited': 'Korlátlan',
+            'tier-daily': 'Napi',
+            'tier-limited': 'Korlátozott'
           },
           fi: { 
             all: 'Kaikki', 
@@ -21338,6 +21474,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Rantakatu',
             rooftop: 'Kattoterassi',
             garden: 'Puutarha'
+          ,
+            'tier-your-membership': 'Jäsenyytesi',
+            'tier-dining': 'Ruokailu',
+            'tier-drinks': 'Juomat',
+            'tier-services': 'Palvelut',
+            'tier-unlimited': 'Rajaton',
+            'tier-daily': 'Päivittäin',
+            'tier-limited': 'Rajoitettu'
           },
           hr: { 
             all: 'Sve', 
@@ -21354,6 +21498,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Plaža',
             rooftop: 'Terasa na krovu',
             garden: 'Vrt'
+          ,
+            'tier-your-membership': 'Vaše Članstvo',
+            'tier-dining': 'Jelo',
+            'tier-drinks': 'Piće',
+            'tier-services': 'Usluge',
+            'tier-unlimited': 'Neograničeno',
+            'tier-daily': 'Dnevno',
+            'tier-limited': 'Ograničeno'
           },
           sk: { 
             all: 'Všetko', 
@@ -21370,6 +21522,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Pobrežie',
             rooftop: 'Strecha',
             garden: 'Záhrada'
+          ,
+            'tier-your-membership': 'Vaše Členstvo',
+            'tier-dining': 'Stravovanie',
+            'tier-drinks': 'Nápoje',
+            'tier-services': 'Služby',
+            'tier-unlimited': 'Neobmedzené',
+            'tier-daily': 'Denne',
+            'tier-limited': 'Obmedzené'
           },
           bg: { 
             all: 'Всички', 
@@ -21386,6 +21546,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Плажна линия',
             rooftop: 'Покривна тераса',
             garden: 'Градина'
+          ,
+            'tier-your-membership': 'Вашето Членство',
+            'tier-dining': 'Хранене',
+            'tier-drinks': 'Напитки',
+            'tier-services': 'Услуги',
+            'tier-unlimited': 'Неограничено',
+            'tier-daily': 'Ежедневно',
+            'tier-limited': 'Ограничено'
           },
           sr: { 
             all: 'Све', 
@@ -21402,6 +21570,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Плажа',
             rooftop: 'Тераса на крову',
             garden: 'Башта'
+          ,
+            'tier-your-membership': 'Ваше Чланство',
+            'tier-dining': 'Јело',
+            'tier-drinks': 'Пиће',
+            'tier-services': 'Услуге',
+            'tier-unlimited': 'Неограничено',
+            'tier-daily': 'Дневно',
+            'tier-limited': 'Ограничено'
           },
           sl: { 
             all: 'Vse', 
@@ -21418,6 +21594,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Obmorska fronta',
             rooftop: 'Strešna terasa',
             garden: 'Vrt'
+          ,
+            'tier-your-membership': 'Vaše Članstvo',
+            'tier-dining': 'Hrana',
+            'tier-drinks': 'Pijača',
+            'tier-services': 'Storitve',
+            'tier-unlimited': 'Neomejeno',
+            'tier-daily': 'Dnevno',
+            'tier-limited': 'Omejeno'
           },
           th: { 
             all: 'ทั้งหมด', 
@@ -21434,6 +21618,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'ชายหาด',
             rooftop: 'ดาดฟ้า',
             garden: 'สวน'
+          ,
+            'tier-your-membership': 'สมาชิกของคุณ',
+            'tier-dining': 'อาหาร',
+            'tier-drinks': 'เครื่องดื่ม',
+            'tier-services': 'บริการ',
+            'tier-unlimited': 'ไม่จำกัด',
+            'tier-daily': 'รายวัน',
+            'tier-limited': 'จำกัด'
           },
           id: { 
             all: 'Semua', 
@@ -21450,6 +21642,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Tepi pantai',
             rooftop: 'Atap',
             garden: 'Taman'
+          ,
+            'tier-your-membership': 'Keanggotaan Anda',
+            'tier-dining': 'Makan',
+            'tier-drinks': 'Minuman',
+            'tier-services': 'Layanan',
+            'tier-unlimited': 'Tak Terbatas',
+            'tier-daily': 'Harian',
+            'tier-limited': 'Terbatas'
           },
           vi: { 
             all: 'Tất cả', 
@@ -21466,6 +21666,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Mặt tiền bãi biển',
             rooftop: 'Sân thượng',
             garden: 'Vườn'
+          ,
+            'tier-your-membership': 'Tư Cách Thành Viên',
+            'tier-dining': 'Ăn Uống',
+            'tier-drinks': 'Đồ Uống',
+            'tier-services': 'Dịch Vụ',
+            'tier-unlimited': 'Không Giới Hạn',
+            'tier-daily': 'Hàng Ngày',
+            'tier-limited': 'Hạn Chế'
           },
           tl: { 
             all: 'Lahat', 
@@ -21482,6 +21690,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Harap ng dalampasigan',
             rooftop: 'Bubungan',
             garden: 'Hardin'
+          ,
+            'tier-your-membership': 'Iyong Membership',
+            'tier-dining': 'Pagkain',
+            'tier-drinks': 'Inumin',
+            'tier-services': 'Mga Serbisyo',
+            'tier-unlimited': 'Walang Hangganan',
+            'tier-daily': 'Araw-araw',
+            'tier-limited': 'Limitado'
           },
           ms: { 
             all: 'Semua', 
@@ -21498,6 +21714,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             beachfront: 'Tepi pantai',
             rooftop: 'Bumbung',
             garden: 'Taman'
+          ,
+            'tier-your-membership': 'Keahlian Anda',
+            'tier-dining': 'Makan',
+            'tier-drinks': 'Minuman',
+            'tier-services': 'Perkhidmatan',
+            'tier-unlimited': 'Tanpa Had',
+            'tier-daily': 'Harian',
+            'tier-limited': 'Terhad'
           }
         };
 
@@ -23109,6 +23333,38 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
           displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
           
+          // Apply accent color to category headers
+          const accentColor = propertyData?.accent_color || '#F59E0B';
+          const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities'];
+          categories.forEach(cat => {
+            const header = document.getElementById(cat + 'Header');
+            const icon = document.getElementById(cat + 'Icon');
+            if (header && accentColor) {
+              // Convert hex to RGB for border
+              const hex = accentColor.replace('#', '');
+              const r = parseInt(hex.slice(0, 2), 16);
+              const g = parseInt(hex.slice(2, 4), 16);
+              const b = parseInt(hex.slice(4, 6), 16);
+              const borderColor = 'rgba(' + r + ',' + g + ',' + b + ', 0.3)';
+              header.style.borderColor = borderColor;
+            }
+            if (icon && accentColor) {
+              // Calculate darker shade for gradient
+              const hex = accentColor.replace('#', '');
+              const r = parseInt(hex.slice(0, 2), 16);
+              const g = parseInt(hex.slice(2, 4), 16);
+              const b = parseInt(hex.slice(4, 6), 16);
+              const darkerR = Math.max(0, r - 40);
+              const darkerG = Math.max(0, g - 40);
+              const darkerB = Math.max(0, b - 40);
+              const darkerColor = '#' + 
+                darkerR.toString(16).padStart(2, '0') +
+                darkerG.toString(16).padStart(2, '0') +
+                darkerB.toString(16).padStart(2, '0');
+              icon.style.background = 'linear-gradient(135deg, ' + accentColor + ' 0%, ' + darkerColor + ' 100%)';
+            }
+          });
+          
           // Show total benefits count in description if empty
           if (!data.tier.description && tierDesc) {
             tierDesc.textContent = data.total_benefits + ' exclusive benefits included';
@@ -23127,6 +23383,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
           
           section.classList.remove('hidden');
+          
+          // Use admin's accent color for all icons
+          const accentColor = propertyData?.accent_color || '#F59E0B';
           
           let html = '';
           benefits.forEach(benefit => {
@@ -23149,8 +23408,22 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-gray-50 text-gray-600 text-xs font-bold rounded-full border-2 border-gray-200"><i class="fas fa-lock"></i> <span data-i18n="tier-limited">Limited</span></span>';
             }
             
-            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 border-gray-100 hover:border-' + getCategoryColor(category) + '-200 hover:shadow-lg transition-all duration-300">' +
-              '<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-' + getCategoryColor(category) + '-400 to-' + getCategoryColor(category) + '-600 flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform">' +
+            // Convert hex to RGB for background
+            const hexToRgb = (hex) => {
+              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+              return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+              } : { r: 245, g: 158, b: 11 }; // fallback orange
+            };
+            
+            const rgb = hexToRgb(accentColor);
+            const accentBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.1)';
+            const accentBorder = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.2)';
+            
+            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 hover:shadow-lg transition-all duration-300" style="border-color: ' + accentBorder + ';">' +
+              '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
                 '<i class="' + icon + ' text-lg"></i>' +
               '</div>' +
               '<div class="flex-1 min-w-0">' +
@@ -23167,14 +23440,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         }
         
         function getCategoryColor(category) {
-          const colorMap = {
-            'dining': 'orange',
-            'drinks': 'pink',
-            'recreation': 'blue',
-            'services': 'purple',
-            'amenities': 'yellow'
-          };
-          return colorMap[category] || 'gray';
+          // This function is no longer used since we use accent color
+          return 'orange';
         }
         
         function getBenefitIcon(benefitType, category) {
