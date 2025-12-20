@@ -19985,7 +19985,7 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
-                <a href="/my-perfect-week" id="myWeekButton" class="text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: ${propertyData.accent_color || '#8B5CF6'};">
+                <a href="/my-perfect-week" id="myWeekButton" class="text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #8B5CF6;">
                     <i class="fas fa-calendar-week mr-2"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
                 </a>
                 <a href="#" id="viewPassButton" class="pass-link-button px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
@@ -24225,6 +24225,12 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             }
           } catch (e) {
             console.warn('Could not load accent color, using default:', e);
+          }
+          
+          // Apply accent color to My Week button
+          const myWeekButton = document.getElementById('myWeekButton');
+          if (myWeekButton && accentColor) {
+            myWeekButton.style.backgroundColor = accentColor;
           }
           
           const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities'];
