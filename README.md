@@ -4,11 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://00fbf21b.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://00fbf21b.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**OnePass Tri-Method Page:** https://00fbf21b.project-c8738f5c.pages.dev/face-scan-feature
-**NFC Test Simulator:** https://00fbf21b.project-c8738f5c.pages.dev/nfc-test-simulator
-**Admin Dashboard:** https://00fbf21b.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://12777341.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://12777341.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**OnePass Tri-Method Page:** https://12777341.project-c8738f5c.pages.dev/face-scan-feature
+**NFC Test Simulator:** https://12777341.project-c8738f5c.pages.dev/nfc-test-simulator
+**Admin Dashboard:** https://12777341.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -41,6 +41,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ Multi-language support (EN/AR in database)
 - ✅ **Live Beach Occupancy Traffic Light** 🆕 - Real-time beach availability indicator on guest homepage
 - ✅ **Seamless Pass Linking System** 🔥 **NEW!** - One-click pass reference linking with auto-fill everywhere
+- ✅ **Tier Benefits Card** 🎯 **NEW!** - Beautiful guest-facing card showing tier membership and all benefits
 
 ### 🏢 Vendor Portal
 - ✅ Secure vendor login
@@ -256,6 +257,99 @@ A complete, production-ready resort activity booking platform with QR code entry
 - Makes OnePass digital passes ESSENTIAL for guests
 - Creates a seamless ecosystem experience
 - Increases pass enrollment motivation
+
+### 🎨 Guest Tier Benefits Card (NEW! 🎯)
+
+**THE EXPERIENCE:** Guests with digital passes see a stunning card displaying their tier membership and all included benefits
+
+**Visual Features:**
+- 💎 **Premium Design** - Gradient backgrounds using admin-configured primary/secondary colors
+- 🎨 **Brand Integration** - Seamlessly matches property's color scheme and branding
+- 🏆 **Tier Badge** - Large circular badge with tier icon and color
+- 📊 **Collapsible Details** - Expand/collapse benefits panel with smooth animation
+- 🌍 **Multi-Language** - AI-translated into 30+ languages automatically
+- 📱 **Responsive** - Perfectly adapts to all screen sizes
+
+**Benefits Display:**
+- 🍽️ **Dining Category** - Restaurant access, buffet, à la carte, room service
+- 🍹 **Drinks Category** - Bar access, drink quality (local/premium/imported)
+- 🏊 **Recreation Category** - Pool, beach, activities, entertainment
+- 🔔 **Services Category** - Concierge, late checkout, spa, butler
+- 🛏️ **Amenities Category** - Minibar, premium rooms, exclusive lounges
+
+**Access Indicators:**
+- ✅ **Unlimited** - Green badge for unlimited access
+- 🔢 **Limited** - Blue badge showing quantity (e.g., "2x per stay")
+- 📅 **Once Daily** - Orange badge for daily restrictions
+- 🚫 **Restricted** - Gray badge for limited access
+
+**Smart Features:**
+- 🎯 **Auto-Load** - Appears automatically when guest links their pass
+- 🔄 **Real-Time** - Updates instantly when pass is linked/unlinked
+- 📍 **Venue-Specific** - Shows specific restaurants, bars assigned to tier
+- 🎮 **Gamification Ready** - Placeholder sections for points, badges, streaks
+- 💰 **Upgrade CTA** - Hidden section for future upsell campaigns
+
+**How It Works:**
+1. Guest enters 6-digit PIN in pass link bar
+2. System validates pass and fetches tier benefits
+3. Card appears below link bar showing tier name and description
+4. Guest clicks chevron to expand and see all benefits
+5. Benefits organized by category with icons and access levels
+6. Venue names shown for location-specific benefits
+7. Card uses property's primary/secondary colors for branding
+8. All text translated based on selected language
+
+**API Integration:**
+- **Endpoint:** `GET /api/guest/tier-benefits?pass_reference=PASS-123`
+- **Returns:** Tier details + grouped benefits by category
+- **Security:** Property ID isolation, active pass validation
+- **Performance:** Cached tier data, fast rendering
+
+**Translations Supported:**
+- English, Arabic, German, Russian, French, Spanish
+- Portuguese, Italian, Polish, Czech, Ukrainian, Chinese
+- Japanese, Korean, Hindi, Turkish, Greek, Swedish
+- Norwegian, Danish, Romanian, Hungarian, and more!
+
+**Technical Implementation:**
+- Event-driven: Listens to `passLinked` event
+- Color theming: Uses `propertyData.primary_color` and `secondary_color`
+- Icon mapping: 30+ benefit type icons (FontAwesome)
+- Responsive: Tailwind CSS with mobile-first design
+- Accessible: ARIA labels and keyboard navigation
+
+**Guest Experience:**
+```
+1. Guest opens: /hotel/paradise-resort
+2. Enters PIN: 123456
+3. ✨ Pass linked! Confetti animation
+4. Tier card appears: "Welcome to Gold Tier"
+5. Card shows: Tier color, icon, description
+6. Guest clicks expand: Shows all 15 benefits
+7. Sees dining: "Unlimited buffet at Main Restaurant"
+8. Sees drinks: "Premium bar access at Rooftop Lounge"
+9. Sees services: "Late checkout until 2 PM"
+10. Guest feels VIP: "Wow, I get all this!"
+```
+
+**Why This is Important:**
+- Increases perceived value of all-inclusive packages
+- Reduces front desk questions about "what's included"
+- Encourages tier upgrades (Premium/Ultra look amazing)
+- Makes digital passes essential (guests want to see benefits)
+- Builds excitement about staying at the resort
+- Clear communication eliminates confusion
+- Premium UX increases brand loyalty
+
+**Next Phase:**
+- Enable gamification stats (points, badges, streak)
+- Add upgrade CTA with pricing comparison
+- Show benefit usage tracking (e.g., "Used 1 of 2 spa credits")
+- Tier progress bar to next level
+- Social sharing ("Check out my Gold Tier!")
+
+**Location:** `/hotel/paradise-resort` (shows automatically when pass is linked)
 
 ### 🛡️ Admin Dashboard
 - ✅ Secure admin login with multi-tenancy isolation
