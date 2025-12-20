@@ -18326,17 +18326,19 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
     // Get guest info from digital_passes
     const guest = await DB.prepare(`
       SELECT 
-        pass_id as guest_id,
-        property_id,
-        pass_reference,
-        primary_guest_name as name,
-        guest_email as email,
-        room_number,
-        valid_from as check_in,
-        valid_until as check_out,
-        JULIANDAY(valid_until) - JULIANDAY(valid_from) as nights
-      FROM digital_passes
-      WHERE pass_reference = ?
+        p.pass_id as guest_id,
+        p.property_id,
+        p.pass_reference,
+        p.primary_guest_name as name,
+        p.guest_email as email,
+        p.room_number,
+        p.valid_from as check_in,
+        p.valid_until as check_out,
+        JULIANDAY(p.valid_until) - JULIANDAY(p.valid_from) as nights,
+        t.tier_display_name as tier_name
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ?
     `).bind(pass_reference).first()
     
     if (!guest) {
@@ -18442,9 +18444,9 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
       timeline_items: timelineItems.results,
       suggestions: suggestions.results,
       guest: {
-        name: guest.full_name,
+        name: guest.name,
         room: guest.room_number,
-        tier: guest.tier_name
+        tier: guest.tier_name || 'Standard'
       }
     })
     
