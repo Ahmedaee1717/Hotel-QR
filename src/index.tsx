@@ -52671,6 +52671,18 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       };
       
+      // Edit benefit
+      window.editBenefit = async function(benefitId) {
+        alert('🚧 Edit Benefit Feature Coming Soon!\n\nCurrently, you can:\n✅ Delete the benefit\n✅ Add a new benefit with updated info\n\n⏳ Full edit functionality (including multi-venue editing) will be added in the next update.');
+        // TODO: Implement edit benefit modal with pre-filled data and existing venues
+        // Will need to:
+        // 1. Fetch benefit details + linked venues
+        // 2. Open modal similar to addBenefit
+        // 3. Pre-populate all fields
+        // 4. Show existing venues in multi-venue selector
+        // 5. PUT endpoint instead of POST
+      };
+      
       // Delete benefit
       window.deleteBenefit = async function(benefitId, tierId) {
         if (!confirm('Delete this benefit?')) return;
