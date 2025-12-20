@@ -11828,7 +11828,7 @@ app.post('/api/chatbot/chat', async (c) => {
   
   try {
     const body = await c.req.json()
-    const { property_id, session_id, message, conversation_id } = body
+    const { property_id, session_id, message, conversation_id, guest_context } = body
     
     if (!property_id || !session_id || !message) {
       return c.json({ error: 'Missing required fields' }, 400)
@@ -12394,6 +12394,21 @@ app.post('/api/chatbot/chat', async (c) => {
         console.log('📚 Context length:', context.length)
         console.log('📝 Context preview:', context.substring(0, 200))
         
+        // Build guest context string if available
+        let guestContextStr = ''
+        if (guest_context && guest_context.tier_name) {
+          guestContextStr = `\n\n🎯 GUEST INFORMATION (Use this when answering tier/benefit questions):
+- Guest Name: ${guest_context.guest_name || 'Guest'}
+- Room Number: ${guest_context.room_number || 'N/A'}
+- Membership Tier: ${guest_context.tier_name}
+- Tier Color: ${guest_context.tier_color || 'N/A'}
+
+💎 INCLUDED BENEFITS:
+${guest_context.benefits_summary || 'Standard benefits'}
+
+When guest asks about "my tier", "my benefits", "what's included", or "my package", refer to the above information.`
+        }
+        
         const systemPrompt = `You are ${chatbotName}, ${hotelName}'s concierge. Respond in the SAME LANGUAGE as the question.
 
 Rules:
@@ -12403,7 +12418,7 @@ Rules:
 - If no info, suggest contacting staff
 
 Hotel Info:
-${context}${linkContext}
+${context}${linkContext}${guestContextStr}
 
 Respond in guest's language:`
         
@@ -24435,6 +24450,36 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               chatMessages.scrollTop = chatMessages.scrollHeight;
               
               try {
+                // Get guest session data for context
+                const guestSession = getGuestSession()
+                let guest_context = null
+                
+                if (guestSession && tierBenefitsData) {
+                  // Build benefits summary
+                  const benefitsSummary = []
+                  const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities']
+                  
+                  categories.forEach(cat => {
+                    const benefits = tierBenefitsData.benefits[cat] || []
+                    if (benefits.length > 0) {
+                      benefitsSummary.push(cat.toUpperCase() + ':')
+                      benefits.forEach(b => {
+                        const name = b.display_name || b.venue_name || b.benefit_type || ''
+                        const access = b.access_level || 'unlimited'
+                        benefitsSummary.push('  - ' + name + ' (' + access + ')')
+                      })
+                    }
+                  })
+                  
+                  guest_context = {
+                    guest_name: guestSession.guest_name,
+                    room_number: guestSession.room_number,
+                    tier_name: tierBenefitsData.tier.name,
+                    tier_color: tierBenefitsData.tier.color,
+                    benefits_summary: benefitsSummary.join('\\n')
+                  }
+                }
+                
                 const response = await fetch('/api/chatbot/chat', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -24442,7 +24487,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     property_id: window.propertyData.property_id,
                     session_id: chatSessionId,
                     message: message,
-                    conversation_id: chatConversationId
+                    conversation_id: chatConversationId,
+                    guest_context: guest_context
                   })
                 });
                 
