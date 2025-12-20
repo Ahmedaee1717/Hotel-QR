@@ -20351,7 +20351,15 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         // Get UI translation
         function t(key) {
             const dict = uiTranslations[currentLanguage] || uiTranslations['en'];
-            return dict[key] || uiTranslations['en'][key] || key;
+            const translation = dict[key] || uiTranslations['en'][key];
+            
+            // If not found in uiTranslations, check translations object (for tier keys)
+            if (!translation || translation === key) {
+                const tierDict = translations[currentLanguage] || translations['en'];
+                return tierDict[key] || key;
+            }
+            
+            return translation;
         }
         
         // Cache for AI translations
@@ -20361,8 +20369,11 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         async function translateText(text, targetLanguage) {
             if (!text || targetLanguage === 'en') return text;
             
+            // Get property ID from propertyData
+            const propId = propertyData?.property_id || '1';
+            
             // Check cache first - CRITICAL: Include property_id for multi-tenancy isolation
-            const cacheKey = propertyId + '__' + text + '__' + targetLanguage;
+            const cacheKey = propId + '__' + text + '__' + targetLanguage;
             if (translationCache.has(cacheKey)) {
                 return translationCache.get(cacheKey);
             }
@@ -20396,7 +20407,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                 content: text
                             }
                         ],
-                        property_id: propertyId
+                        property_id: propId
                     })
                 });
                 
@@ -21524,9 +21535,15 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             garden: 'Záhrada'
           ,
             'tier-your-membership': 'Vaše Členstvo',
+            'tier-points': 'Body',
+            'tier-badges': 'Odznaky',
+            'tier-streak': 'Séria dní',
             'tier-dining': 'Stravovanie',
             'tier-drinks': 'Nápoje',
+            'tier-recreation': 'Rekreácia',
             'tier-services': 'Služby',
+            'tier-amenities': 'Vybavenie',
+            'tier-upgrade': 'Vylepšiť úroveň',
             'tier-unlimited': 'Neobmedzené',
             'tier-daily': 'Denne',
             'tier-limited': 'Obmedzené'
@@ -23333,8 +23350,28 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
           displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
           
+          // Apply translations to tier card elements
+          document.querySelectorAll('#tierBenefitsCard [data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            const translated = t(key);
+            if (translated && translated !== key) {
+              el.textContent = translated;
+            }
+          });
+          
           // Apply accent color to category headers
-          const accentColor = propertyData?.accent_color || '#F59E0B';
+          // Wait for propertyData to be loaded
+          let accentColor = '#F59E0B'; // Default fallback
+          try {
+            if (window.propertyData && window.propertyData.accent_color) {
+              accentColor = window.propertyData.accent_color;
+            } else if (propertyData && propertyData.accent_color) {
+              accentColor = propertyData.accent_color;
+            }
+          } catch (e) {
+            console.warn('Could not load accent color, using default:', e);
+          }
+          
           const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities'];
           categories.forEach(cat => {
             const header = document.getElementById(cat + 'Header');
