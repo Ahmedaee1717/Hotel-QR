@@ -4,11 +4,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://23adb50b.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://23adb50b.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**OnePass Tri-Method Page:** https://7f3d3c83.project-c8738f5c.pages.dev/face-scan-feature
-**NFC Test Simulator:** https://7f3d3c83.project-c8738f5c.pages.dev/nfc-test-simulator
-**Admin Dashboard:** https://7f3d3c83.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://cc05b283.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://cc05b283.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**Admin Dashboard:** https://cc05b283.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -43,6 +41,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Seamless Pass Linking System** 🔥 **NEW!** - One-click pass reference linking with auto-fill everywhere
 - ✅ **Tier Benefits Card** 🎯 **NEW!** - Beautiful guest-facing card showing tier membership and all benefits
 - ✅ **Clickable Venue Links in Benefits** 🔗 **NEW!** - Benefits linked to venues (restaurants/activities) are now clickable
+- ✅ **Premium Venue Cards with Thumbnails** 🖼️ **NEW!** - Venue links display as chic cards with images, not plain buttons
+- ✅ **Multi-Venue Support Per Benefit** 🏪 **NEW!** - Admins can add MULTIPLE venues to a single benefit
+- ✅ **Per-Venue Custom CTA Text** 📝 **NEW!** - Each linked venue gets its own custom button text (e.g., "View Bars", "Explore Spa")
 - ✅ **AI-Powered Benefit Translations** 🔥 **NEW!** - Auto-translate tier benefits to 28+ languages like custom sections
 - ✅ **Chatbot Guest Session Auto-Detection** 🤖 **NEW!** - Chatbot automatically knows guest tier and benefits
 
@@ -102,21 +103,39 @@ A complete, production-ready resort activity booking platform with QR code entry
   - **Basic All-Inclusive** - Buffet meals, local drinks, basic activities
   - **Premium All-Inclusive** - + Limited à la carte, premium drinks, room service
   - **Ultra All-Inclusive** - + Unlimited à la carte, concierge, spa credits, butler
-- 🏪 **Venue-Specific Benefits** - Assign specific restaurants, bars, activities to each tier
+- 🏪 **Multi-Venue Benefit Linking** 🆕🔥 - Link MULTIPLE venues (restaurants, bars, activities) to a single benefit!
+- 🎨 **Premium Venue Cards** 🆕 - Guests see beautiful venue cards with:
+  - 📸 **Thumbnail Images** - 80x80px venue photos
+  - 🏷️ **Venue Names** - Prominent display in chic typography
+  - 📍 **Location & Price** - Quick venue details
+  - 🔗 **Click for Details** - Direct link to full venue description page
+  - ✨ **Hover Animations** - Smooth zoom effects on interaction
+- 📝 **Custom CTA Text Per Venue** 🆕 - Each linked venue gets its own button text:
+  - "View Bars" for bar venues
+  - "Explore Spa" for spa services
+  - "See Activities" for recreation
+  - Admin can customize any text they want
 - 📊 **Granular Controls** - Set access levels (unlimited/limited/excluded), quantity limits, time restrictions
 - 🎨 **Visual Customization** - Custom colors, Font Awesome icons, descriptions for each tier
 - 💰 **Upgrade Pricing** - Set daily upgrade prices for upselling
 - 📋 **Benefit Categories** - Organize by Dining, Drinks, Recreation, Services, Amenities
 - 🔧 **Full CRUD Operations** - Create, Read, Update, Delete tiers and benefits
 
-**Admin Workflow:**
+**Admin Workflow for Multi-Venue Benefits:**
 1. Navigate to OnePass → Tier Management tab
-2. Click "Create New Tier" or choose a pre-built template
-3. Customize tier name, color, icon, description, upgrade price
-4. Template benefits are automatically applied
-5. Click "Manage" on a tier to edit details and benefits
-6. Add custom benefits with specific venues and access rules
-7. Guests receive passes with tiered benefits
+2. Click "Manage" on any tier (or create new tier)
+3. Click "Add Benefit" in Benefits tab
+4. Fill in benefit details (category, type, title, description, access level)
+5. 🆕 **NEW: Multi-Venue Section** appears with:
+   - Dropdown to select venues
+   - "Add" button to add each venue to the benefit
+   - Live preview of selected venues with:
+     - Remove button (❌) for each venue
+     - Up/down arrows (⬆️⬇️) to reorder venues
+     - Custom CTA text input for each venue
+   - Beautiful purple-themed cards showing each selected venue
+6. Click "Add Benefit" to save with ALL selected venues
+7. Guests see all venues as beautiful clickable cards on their tier benefits page!
 
 **Benefit Types Supported:**
 - 🍽️ **Dining**: Restaurant access, à la carte meals, buffet access, room service
@@ -126,23 +145,49 @@ A complete, production-ready resort activity booking platform with QR code entry
 - 🛏️ **Amenities**: Minibar, premium rooms, exclusive lounges
 
 **Technical Implementation:**
-- **Database Tables**: `tier_benefits`, `tier_benefit_templates`, `tier_benefit_usage`
+- **Database Tables**: 
+  - `tier_benefits` - Main benefit definitions
+  - `benefit_venues` 🆕 - Junction table for multi-venue relationships
+  - `hotel_offerings` - Venue details (restaurants, bars, activities)
+  - `tier_benefit_templates`, `tier_benefit_usage`
 - **API Endpoints**: 
-  - `GET /api/admin/all-inclusive/tiers/:tier_id/benefits` - List benefits
-  - `POST /api/admin/all-inclusive/tiers/:tier_id/benefits` - Add benefit
+  - `GET /api/admin/all-inclusive/tiers/:tier_id/benefits` - List benefits with linked venues
+  - `POST /api/admin/all-inclusive/tiers/:tier_id/benefits` 🆕 - Add benefit with `linked_venues` array
   - `PUT /api/admin/all-inclusive/benefits/:benefit_id` - Update benefit
   - `DELETE /api/admin/all-inclusive/benefits/:benefit_id` - Delete benefit
-  - `GET /api/admin/all-inclusive/venues/:property_id` - List venues
+  - `GET /api/admin/all-inclusive/venues/:property_id` - List all available venues
   - `POST /api/admin/all-inclusive/tiers/:tier_id/apply-template` - Apply template
-- **UI Components**: Modal-based tier editor with tabbed interface (Basic Info + Benefits)
+- **UI Components**: 
+  - Modal-based tier editor with tabbed interface (Basic Info + Benefits)
+  - 🆕 **Multi-venue selector** - Add/remove/reorder venues with live preview
+  - 🆕 **Venue card preview** - See how venues will appear to guests
+  - 🆕 **Per-venue CTA editor** - Customize button text for each venue
+
+**Guest Experience (Venue Display):**
+```
+1. Guest links pass with PIN
+2. Tier benefits card appears
+3. Guest expands "Dining" category
+4. Sees benefit: "Premium Restaurant Access"
+5. Below benefit, sees 3 beautiful venue cards:
+   
+   [🖼️ Azure Beach Grill]  [🖼️ Rooftop Lounge]  [🖼️ Main Buffet]
+   Mediterranean Cuisine     Premium Bar          International
+   Beachfront • $$$         Level 10 • $$$$      Ground Floor
+   [View Restaurant →]      [View Bar →]         [View Menu →]
+
+6. Clicks "View Restaurant" → Opens full venue detail page
+7. Guest can see venue hours, menu, photos, and book directly
+```
 
 **Use Cases:**
 1. **Create Tiered Packages** - Offer Basic ($99/day), Premium ($149/day), Ultra ($249/day) tiers
-2. **Venue-Specific Access** - "VIP guests can access Rooftop Bar, Premium guests cannot"
-3. **Quantity Limits** - "2 à la carte dinners per stay" for Premium tier
-4. **Time Restrictions** - "Happy hour drinks only 5-7 PM" for Basic tier
-5. **Upselling** - Display upgrade options with clear benefit differences
-6. **Gamification Ready** - Foundation for future gamified tiers and rewards
+2. **Multi-Venue Access** 🆕 - "Gold tier guests can access ANY of these 5 restaurants"
+3. **Venue-Specific Access** - "VIP guests can access Rooftop Bar, Premium guests cannot"
+4. **Quantity Limits** - "2 à la carte dinners per stay" for Premium tier
+5. **Time Restrictions** - "Happy hour drinks only 5-7 PM" for Basic tier
+6. **Upselling** - Display upgrade options with clear benefit differences
+7. **Gamification Ready** - Foundation for future gamified tiers and rewards
 
 **Marketing Page:**
 - ✅ **Stunning Tri-Method Showcase** - https://0c66f197.project-c8738f5c.pages.dev/face-scan-feature
