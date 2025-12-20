@@ -4,11 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://b596ff81.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://b596ff81.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**OnePass Tri-Method Page:** https://12862a37.project-c8738f5c.pages.dev/face-scan-feature
-**NFC Test Simulator:** https://12862a37.project-c8738f5c.pages.dev/nfc-test-simulator
-**Admin Dashboard:** https://12862a37.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://76f47787.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://76f47787.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**OnePass Tri-Method Page:** https://76f47787.project-c8738f5c.pages.dev/face-scan-feature
+**NFC Test Simulator:** https://76f47787.project-c8738f5c.pages.dev/nfc-test-simulator
+**Admin Dashboard:** https://76f47787.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -42,6 +42,8 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Live Beach Occupancy Traffic Light** 🆕 - Real-time beach availability indicator on guest homepage
 - ✅ **Seamless Pass Linking System** 🔥 **NEW!** - One-click pass reference linking with auto-fill everywhere
 - ✅ **Tier Benefits Card** 🎯 **NEW!** - Beautiful guest-facing card showing tier membership and all benefits
+- ✅ **AI-Powered Benefit Translations** 🔥 **NEW!** - Auto-translate tier benefits to 28+ languages like custom sections
+- ✅ **Chatbot Guest Session Auto-Detection** 🤖 **NEW!** - Chatbot automatically knows guest tier and benefits
 
 ### 🏢 Vendor Portal
 - ✅ Secure vendor login
@@ -350,6 +352,68 @@ A complete, production-ready resort activity booking platform with QR code entry
 - Social sharing ("Check out my Gold Tier!")
 
 **Location:** `/hotel/paradise-resort` (shows automatically when pass is linked)
+
+### 🤖 AI Chatbot with Guest Session Auto-Detection (NEW! 🚀)
+
+**THE INNOVATION:** Chatbot automatically knows who the guest is and what benefits they have - no manual entry needed!
+
+**How It Works:**
+1. **Guest links their digital pass** (enters PIN in pass link bar)
+2. **Guest session stored** in localStorage (name, tier, benefits, room)
+3. **Guest opens chatbot** (clicks floating chat button)
+4. **Chatbot auto-detects guest** from localStorage session
+5. **Chatbot knows everything**:
+   - ✅ Guest's name ("Welcome, John!")
+   - ✅ Guest's tier ("Your Gold Tier includes...")
+   - ✅ Guest's benefits ("You have unlimited buffet access")
+   - ✅ Room number (for service requests)
+6. **Personalized responses** to tier-related questions
+
+**Example Conversations:**
+
+```
+Guest: "What's included in my tier?"
+Bot: "Hi John! Your Gold Tier includes: Unlimited buffet access, Premium bar access at Rooftop Lounge, Pool and beach access, Concierge service, Late checkout until 2 PM."
+
+Guest: "Can I access the spa?"
+Bot: "Yes! Your Gold Tier includes spa access. Would you like to book a spa treatment?"
+
+Guest: "Do I have room service?"
+Bot: "Yes, your Gold Tier includes room service! You can order from your in-room menu anytime. Would you like recommendations?"
+```
+
+**Technical Implementation:**
+- **Frontend:** Auto-reads `localStorage.getItem('guestSession')` on chat open
+- **API Parameter:** `guest_context` sent with every chatbot message
+- **Backend:** Enhanced system prompt with guest details
+- **Format:** `{ guest_name, tier_name, benefits: { dining: [...], drinks: [...] } }`
+- **Smart Fallback:** If no session, bot works normally (no errors)
+
+**Key Features:**
+- 🎯 **Zero User Input** - No need to ask guest their tier
+- 🔐 **Secure** - Uses existing session validation system
+- 💬 **Context-Aware** - Bot gives personalized answers
+- 🌍 **Multi-Language** - Works in any selected language
+- ⚡ **Instant** - No additional API calls needed
+- 🎨 **Seamless** - Works with existing chatbot UI
+
+**Benefits:**
+- ✨ **Premium Experience** - Guests feel recognized and special
+- 🎯 **Accurate Answers** - Bot knows exactly what guest has access to
+- ⚡ **Faster Support** - No back-and-forth asking "What's your tier?"
+- 📊 **Better Data** - Track which tiers ask which questions
+- 💎 **VIP Treatment** - Every guest gets personalized service
+- 🔄 **Consistent** - Same information as tier benefits card
+
+**Use Cases:**
+1. **Benefit Questions** - "What restaurants can I access?"
+2. **Service Availability** - "Do I have spa access?"
+3. **Upgrade Inquiries** - "What do I get if I upgrade to Platinum?"
+4. **Room Service** - "Can I order room service?" (bot knows they have it)
+5. **Concierge Requests** - Bot knows if they have concierge service
+6. **Booking Assistance** - "Which activities are free for my tier?"
+
+**Location:** All guest-facing pages with chatbot floating button
 
 ### 🛡️ Admin Dashboard
 - ✅ Secure admin login with multi-tenancy isolation
