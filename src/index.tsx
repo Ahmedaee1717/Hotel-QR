@@ -23558,14 +23558,13 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             // Format benefit name - already translated by API, just capitalize
             let benefitName = benefit.venue_name || benefit.benefit_type || '';
             
-            // Debug logging
-            console.log('🔍 Benefit Debug:', {
-              venue_name: benefit.venue_name,
-              benefit_type: benefit.benefit_type,
-              description: benefit.description,
-              raw_description: benefit.description,
-              benefit_obj: benefit
-            });
+            // Debug logging - show actual values
+            console.log('🔍 BENEFIT:', benefitName);
+            console.log('   venue_name:', benefit.venue_name);
+            console.log('   benefit_type:', benefit.benefit_type);
+            console.log('   description:', benefit.description);
+            console.log('   description length:', benefit.description ? benefit.description.length : 0);
+            console.log('   ---');
             
             // Don't re-format if already a clean translated name (no underscores)
             if (benefitName.includes('_')) {
