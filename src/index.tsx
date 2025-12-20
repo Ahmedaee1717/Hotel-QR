@@ -23557,7 +23557,20 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             // Format benefit name - already translated by API, just capitalize
             let benefitName = benefit.venue_name || benefit.benefit_type || '';
-            benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            // Debug logging
+            console.log('🔍 Benefit Debug:', {
+              venue_name: benefit.venue_name,
+              benefit_type: benefit.benefit_type,
+              description: benefit.description,
+              raw_description: benefit.description,
+              benefit_obj: benefit
+            });
+            
+            // Don't re-format if already a clean translated name (no underscores)
+            if (benefitName.includes('_')) {
+              benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            }
             
             // Description is already translated by API
             let benefitDescription = benefit.description || '';
