@@ -24508,6 +24508,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               try {
                 // Get guest session data for context
                 const guestSession = getGuestSession()
+                console.log('👤 Guest session from localStorage:', guestSession)
                 let guest_context = null
                 
                 // Get tier benefits from variable or localStorage
@@ -24575,7 +24576,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 console.log('📤 Sending to API:', {
                   has_guest_context: !!guest_context,
                   guest_name: guest_context?.guest_name,
-                  tier_name: guest_context?.tier_name
+                  tier_name: guest_context?.tier_name,
+                  full_context: guest_context  // Log full object
                 })
                 
                 const response = await fetch('/api/chatbot/chat', {
