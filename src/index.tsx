@@ -8556,20 +8556,64 @@ app.post('/api/restaurant/reserve', async (c) => {
     // Generate reservation reference (using reservation_id)
     const reservationRef = `RES${String(result.meta.last_row_id).padStart(6, '0')}`
     
-    // Update timeline item if exists (change from 'planned' to 'confirmed')
-    await DB.prepare(`
+    // Try to update existing timeline item first (if guest added it from timeline)
+    const updateResult = await DB.prepare(`
       UPDATE timeline_items 
-      SET status = 'confirmed', reference_id = ?
-      WHERE item_type = 'offering' 
-      AND item_date = ?
+      SET status = 'confirmed', reference_id = ?, item_type = 'restaurant'
+      WHERE item_date = ?
       AND status = 'planned'
       AND SUBSTR(start_time, 1, 5) = ?
-      LIMIT 1
     `).bind(
       result.meta.last_row_id,
       data.reservation_date || session.session_date,
       session.session_time.substring(0, 5)
     ).run()
+    
+    // If no timeline item was updated, create a new one (direct booking from Reserve button)
+    if (updateResult.meta.changes === 0) {
+      // Get guest's stay plan
+      const guestPass = await DB.prepare(`
+        SELECT pass_id FROM digital_passes WHERE guest_id = ?
+      `).bind(guestId).first()
+      
+      if (guestPass) {
+        const plan = await DB.prepare(`
+          SELECT plan_id FROM guest_stay_plans WHERE guest_id = ? AND property_id = ?
+        `).bind(guestId, data.property_id || 1).first()
+        
+        if (plan) {
+          // Get restaurant details
+          const restaurant = await DB.prepare(`
+            SELECT title_en FROM hotel_offerings WHERE offering_id = ?
+          `).bind(session.offering_id).first()
+          
+          // Calculate end time (assume 2 hours for restaurant)
+          const startHour = parseInt(session.session_time.substring(0, 2))
+          const startMin = parseInt(session.session_time.substring(3, 5))
+          const endHour = startHour + 2
+          const endTime = `${String(endHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`
+          
+          // Create timeline item
+          await DB.prepare(`
+            INSERT INTO timeline_items 
+            (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            plan.plan_id,
+            'restaurant',
+            result.meta.last_row_id,
+            data.reservation_date || session.session_date,
+            session.session_time,
+            endTime,
+            restaurant?.title_en || 'Restaurant Reservation',
+            'Resort Dining',
+            '🍽️',
+            'orange',
+            'confirmed'
+          ).run()
+        }
+      }
+    }
     
     return c.json({ 
       success: true,
