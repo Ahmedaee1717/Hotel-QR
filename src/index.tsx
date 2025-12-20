@@ -18367,28 +18367,150 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
         total_nights: Math.round(guest.nights)
       }
       
-      // Auto-import existing bookings
-      const existingBookings = await DB.prepare(`
-        SELECT b.*, a.activity_name as title_en, a.activity_type as offering_type, a.activity_images as images
+      // Auto-import ALL existing bookings (activities, restaurants, beach, events)
+      
+      // 1. Activity Bookings
+      const activityBookings = await DB.prepare(`
+        SELECT 
+          b.booking_id,
+          b.activity_date as booking_date,
+          b.activity_time as booking_time,
+          b.duration_minutes,
+          a.activity_name as title,
+          a.activity_description as description,
+          a.activity_type,
+          'activity' as booking_type
         FROM bookings b
         LEFT JOIN activities a ON b.activity_id = a.activity_id
         WHERE b.guest_id = ? AND b.booking_status = 'confirmed'
       `).bind(guest.guest_id).all()
       
-      for (const booking of existingBookings.results) {
+      for (const booking of activityBookings.results) {
         await DB.prepare(`
           INSERT INTO timeline_items 
           (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
-          VALUES (?, 'booking', ?, ?, ?, ?, ?, ?, ?, 'green', 'confirmed')
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           plan.plan_id,
+          'activity',
           booking.booking_id,
-          booking.activity_date,
-          booking.activity_time || '09:00',
-          null,  // end_time not available in bookings
-          booking.title_en,
-          'Activity Location',  // location not available in bookings
-          booking.offering_type === 'adventure' ? '🎯' : '🏖️'
+          booking.booking_date,
+          booking.booking_time || '09:00',
+          null,
+          booking.title || 'Activity',
+          'Resort Activity',
+          '🎯',
+          'blue',
+          'confirmed'
+        ).run()
+      }
+      
+      // 2. Restaurant Reservations
+      const restaurantBookings = await DB.prepare(`
+        SELECT 
+          tr.reservation_id,
+          tr.reservation_date,
+          tr.reservation_time,
+          ho.title_en as restaurant_name,
+          tr.party_size,
+          'restaurant' as booking_type
+        FROM table_reservations tr
+        LEFT JOIN hotel_offerings ho ON tr.offering_id = ho.offering_id
+        WHERE tr.guest_id = ? AND tr.status = 'confirmed'
+      `).bind(guest.guest_id).all()
+      
+      for (const booking of restaurantBookings.results) {
+        await DB.prepare(`
+          INSERT INTO timeline_items 
+          (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          plan.plan_id,
+          'restaurant',
+          booking.reservation_id,
+          booking.reservation_date,
+          booking.reservation_time,
+          null,
+          booking.restaurant_name || 'Restaurant',
+          'Resort Dining',
+          '🍽️',
+          'orange',
+          'confirmed'
+        ).run()
+      }
+      
+      // 3. Beach Bookings
+      const beachBookings = await DB.prepare(`
+        SELECT 
+          bb.booking_id,
+          bb.booking_date,
+          bb.booking_time,
+          bb.zone_name,
+          bb.spot_number,
+          'beach' as booking_type
+        FROM beach_bookings bb
+        WHERE bb.guest_id = ? AND bb.status = 'confirmed'
+      `).bind(guest.guest_id).all()
+      
+      for (const booking of beachBookings.results) {
+        await DB.prepare(`
+          INSERT INTO timeline_items 
+          (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          plan.plan_id,
+          'beach',
+          booking.booking_id,
+          booking.booking_date,
+          booking.booking_time || '08:00',
+          null,
+          `Beach - ${booking.zone_name}`,
+          `Spot ${booking.spot_number}`,
+          '🏖️',
+          'cyan',
+          'confirmed'
+        ).run()
+      }
+      
+      // 4. Hotel Offering Bookings (Events, Spa, etc.)
+      const offeringBookings = await DB.prepare(`
+        SELECT 
+          ob.booking_id,
+          ob.booking_date,
+          ob.start_time,
+          ob.end_time,
+          ho.title_en,
+          ho.offering_type,
+          'offering' as booking_type
+        FROM offering_bookings ob
+        LEFT JOIN hotel_offerings ho ON ob.offering_id = ho.offering_id
+        WHERE ob.guest_id = ? AND ob.status = 'confirmed'
+      `).bind(guest.guest_id).all()
+      
+      for (const booking of offeringBookings.results) {
+        const icon = booking.offering_type === 'event' ? '🎉' : 
+                     booking.offering_type === 'spa' ? '💆' : 
+                     booking.offering_type === 'service' ? '🛎️' : '✨'
+        const color = booking.offering_type === 'event' ? 'purple' : 
+                      booking.offering_type === 'spa' ? 'pink' : 
+                      'green'
+        
+        await DB.prepare(`
+          INSERT INTO timeline_items 
+          (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          plan.plan_id,
+          booking.offering_type || 'event',
+          booking.booking_id,
+          booking.booking_date,
+          booking.start_time || '10:00',
+          booking.end_time,
+          booking.title_en || 'Event',
+          'Resort',
+          icon,
+          color,
+          'confirmed'
         ).run()
       }
     }
@@ -18435,6 +18557,7 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
     
     return c.json({
       success: true,
+      plan_id: plan?.plan_id,  // Add plan_id for frontend use
       stay: {
         checkin: plan?.checkin_date,
         checkout: plan?.checkout_date,
@@ -55035,6 +55158,7 @@ app.get('/my-perfect-week', async (c) => {
     
     <script>
         let weekData = null;
+        let timelineData = null;  // Store full timeline data including plan_id
         let currentTab = 'timeline';
         const propertyId = '${propertyId}';
         
@@ -55073,6 +55197,11 @@ app.get('/my-perfect-week', async (c) => {
                 
                 if (data.success) {
                     weekData = data;
+                    timelineData = {
+                        plan_id: data.plan_id,
+                        stay: data.stay,
+                        days: data.days
+                    };
                     renderUI();
                 } else {
                     alert('Failed to load timeline: ' + (data.error || 'Unknown error'));
@@ -55328,11 +55457,154 @@ app.get('/my-perfect-week', async (c) => {
         }
         
         function quickAdd(type) {
-            alert('Quick add feature coming soon! Type: ' + type);
+            showQuickAddModal(type);
         }
         
         function quickAddToDay(date) {
-            alert('Add activity for ' + date + ' - Coming soon!');
+            showQuickAddModal('custom', date);
+        }
+        
+        function showQuickAddModal(type, presetDate = null) {
+            const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your pass first');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            const typeConfig = {
+                activity: { icon: '🎯', title: 'Activity', color: 'blue' },
+                restaurant: { icon: '🍽️', title: 'Dining', color: 'orange' },
+                beach: { icon: '🏖️', title: 'Beach', color: 'cyan' },
+                spa: { icon: '💆', title: 'Spa', color: 'pink' },
+                event: { icon: '🎉', title: 'Event', color: 'purple' },
+                custom: { icon: '📅', title: 'Custom Activity', color: 'green' }
+            };
+            
+            const config = typeConfig[type] || typeConfig.custom;
+            const minDate = timelineData?.stay?.checkin || new Date().toISOString().split('T')[0];
+            const maxDate = timelineData?.stay?.checkout || new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+            
+            modal.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="p-6 border-b sticky top-0 bg-white z-10">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold flex items-center gap-2">
+                                <span class="text-3xl">\${config.icon}</span>
+                                Add \${config.title}
+                            </h2>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <form id="quickAddForm" class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Title *</label>
+                            <input type="text" name="title" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200"
+                                   placeholder="e.g., \${type === 'restaurant' ? 'Dinner at Sunset Grill' : type === 'activity' ? 'Snorkeling Tour' : type === 'beach' ? 'Beach Relaxation' : 'My Activity'}">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Date *</label>
+                            <input type="date" name="item_date" required 
+                                   value="\${presetDate || minDate}"
+                                   min="\${minDate}" max="\${maxDate}"
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-gray-700">Start Time *</label>
+                                <input type="time" name="start_time" required 
+                                       value="09:00"
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-gray-700">End Time</label>
+                                <input type="time" name="end_time" 
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Location</label>
+                            <input type="text" name="location" 
+                                   placeholder="e.g., Main Pool, Beach Bar"
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
+                            <textarea name="description" rows="3" 
+                                      placeholder="Add any notes or details..."
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-\${config.color}-500 focus:ring-2 focus:ring-\${config.color}-200"></textarea>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="this.closest('.fixed').remove()" 
+                                    class="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 px-6 py-3 bg-\${config.color}-500 text-white rounded-lg hover:bg-\${config.color}-600 font-semibold">
+                                <i class="fas fa-plus mr-2"></i>Add to Timeline
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            \`;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('quickAddForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = {
+                    plan_id: timelineData.plan_id,
+                    guest_id: guest.guest_id,
+                    item_type: type,
+                    title: formData.get('title'),
+                    item_date: formData.get('item_date'),
+                    start_time: formData.get('start_time'),
+                    end_time: formData.get('end_time') || null,
+                    location: formData.get('location') || null,
+                    description: formData.get('description') || null,
+                    icon: config.icon,
+                    color: config.color,
+                    status: 'planned'
+                };
+                
+                try {
+                    const response = await fetch('/api/guest/my-week/add-item', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId 
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        modal.remove();
+                        await loadTimeline();
+                        switchTab('timeline');
+                        alert('✅ ' + result.message);
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Add item error:', error);
+                    alert('Connection error');
+                }
+            };
         }
         
         async function deleteItem(itemId) {
