@@ -23874,7 +23874,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             // Determine if the card should be clickable
             const cardClass = hasVenueLink ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : '';
-            const cardClick = hasVenueLink ? 'onclick="window.location.href=\'' + venueUrl + '\'"' : '';
+            const cardClick = hasVenueLink ? 'onclick="window.location.href=&quot;' + venueUrl + '&quot;"' : '';
             
             html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 hover:shadow-lg transition-all duration-300 ' + cardClass + '" style="border-color: ' + accentBorder + ';" ' + cardClick + '>' +
               '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
