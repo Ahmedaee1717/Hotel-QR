@@ -4,8 +4,8 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://7f3d3c83.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://7f3d3c83.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**Production:** https://6fb5dcd1.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://6fb5dcd1.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
 **OnePass Tri-Method Page:** https://7f3d3c83.project-c8738f5c.pages.dev/face-scan-feature
 **NFC Test Simulator:** https://7f3d3c83.project-c8738f5c.pages.dev/nfc-test-simulator
 **Admin Dashboard:** https://7f3d3c83.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
@@ -42,6 +42,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Live Beach Occupancy Traffic Light** 🆕 - Real-time beach availability indicator on guest homepage
 - ✅ **Seamless Pass Linking System** 🔥 **NEW!** - One-click pass reference linking with auto-fill everywhere
 - ✅ **Tier Benefits Card** 🎯 **NEW!** - Beautiful guest-facing card showing tier membership and all benefits
+- ✅ **Clickable Venue Links in Benefits** 🔗 **NEW!** - Benefits linked to venues (restaurants/activities) are now clickable
 - ✅ **AI-Powered Benefit Translations** 🔥 **NEW!** - Auto-translate tier benefits to 28+ languages like custom sections
 - ✅ **Chatbot Guest Session Auto-Detection** 🤖 **NEW!** - Chatbot automatically knows guest tier and benefits
 
