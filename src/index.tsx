@@ -17804,6 +17804,98 @@ app.post('/api/guest/link-pass', async (c) => {
   }
 })
 
+// Guest: Get tier benefits for linked pass
+app.get('/api/guest/tier-benefits', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const passReference = c.req.query('pass_reference')
+  
+  if (!passReference) {
+    return c.json({ error: 'Pass reference required' }, 400)
+  }
+  
+  try {
+    // Get pass with tier information
+    const pass = await DB.prepare(`
+      SELECT 
+        p.pass_id,
+        p.tier_id,
+        p.property_id,
+        t.tier_display_name,
+        t.tier_color,
+        t.tier_icon,
+        t.tier_description,
+        t.daily_upgrade_price
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.pass_reference = ? AND p.property_id = ? AND p.pass_status = 'active'
+    `).bind(passReference, propertyId).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found or not active' }, 404)
+    }
+    
+    // Get tier benefits
+    let benefits = []
+    if (pass.tier_id) {
+      try {
+        const result = await DB.prepare(`
+          SELECT 
+            tb.*,
+            ho.name as venue_name,
+            ho.offering_type as venue_type
+          FROM tier_benefits tb
+          LEFT JOIN hotel_offerings ho ON tb.venue_id = ho.offering_id
+          WHERE tb.tier_id = ? AND tb.property_id = ? AND tb.is_active = 1
+          ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
+        `).bind(pass.tier_id, pass.property_id).all()
+        benefits = result.results || []
+      } catch (joinError) {
+        // Fallback without join if hotel_offerings doesn't exist
+        const result = await DB.prepare(`
+          SELECT tb.*
+          FROM tier_benefits tb
+          WHERE tb.tier_id = ? AND tb.property_id = ? AND tb.is_active = 1
+          ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
+        `).bind(pass.tier_id, pass.property_id).all()
+        benefits = result.results || []
+      }
+    }
+    
+    // Group benefits by category
+    const groupedBenefits = {
+      dining: [],
+      drinks: [],
+      recreation: [],
+      services: [],
+      amenities: []
+    }
+    
+    benefits.forEach(benefit => {
+      const category = benefit.benefit_category || 'amenities'
+      if (groupedBenefits[category]) {
+        groupedBenefits[category].push(benefit)
+      }
+    })
+    
+    return c.json({
+      success: true,
+      tier: {
+        name: pass.tier_display_name,
+        color: pass.tier_color,
+        icon: pass.tier_icon,
+        description: pass.tier_description,
+        upgrade_price: pass.daily_upgrade_price
+      },
+      benefits: groupedBenefits,
+      total_benefits: benefits.length
+    })
+  } catch (error) {
+    console.error('Get tier benefits error:', error)
+    return c.json({ error: 'Failed to load tier benefits' }, 500)
+  }
+})
+
 app.get('/api/guest/pass/:pass_reference', async (c) => {
   const { DB } = c.env
   const pass_reference = c.req.param('pass_reference')
@@ -19218,6 +19310,109 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
 
             <!-- Main Content -->
             <div class="max-w-6xl mx-auto px-4 py-6 pb-20">
+                
+                <!-- Tier Benefits Card (Shown when guest is linked) -->
+                <section id="tierBenefitsCard" class="mb-8 hidden">
+                    <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border-2 overflow-hidden" id="tierCard">
+                        <!-- Card Header with Tier Badge -->
+                        <div class="relative p-6 pb-4" id="tierCardHeader">
+                            <div class="flex items-start justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl shadow-lg" id="tierIconBadge">
+                                        <i class="fas fa-crown"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1" data-i18n="tier-your-membership">Your Membership</div>
+                                        <h3 class="text-2xl font-bold text-gray-900" id="tierName">Loading...</h3>
+                                        <p class="text-sm text-gray-600 mt-1" id="tierDescription"></p>
+                                    </div>
+                                </div>
+                                <button onclick="toggleTierDetails()" class="text-gray-500 hover:text-gray-700 transition p-2">
+                                    <i class="fas fa-chevron-down transition-transform" id="tierToggleIcon"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Gamification Stats (Future Phase) -->
+                            <div class="mt-4 pt-4 border-t border-gray-200 hidden" id="gamificationStats">
+                                <div class="grid grid-cols-3 gap-4 text-center">
+                                    <div>
+                                        <div class="text-2xl font-bold text-blue-600" id="pointsBalance">0</div>
+                                        <div class="text-xs text-gray-600" data-i18n="tier-points">Points</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold text-purple-600" id="badgesEarned">0</div>
+                                        <div class="text-xs text-gray-600" data-i18n="tier-badges">Badges</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-2xl font-bold text-green-600" id="streakDays">0</div>
+                                        <div class="text-xs text-gray-600" data-i18n="tier-streak">Day Streak</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Collapsible Benefits Details -->
+                        <div class="hidden" id="tierDetailsPanel">
+                            <div class="px-6 pb-6">
+                                <!-- Benefits by Category -->
+                                <div class="space-y-6">
+                                    <!-- Dining Benefits -->
+                                    <div id="diningBenefitsSection" class="hidden">
+                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <i class="fas fa-utensils text-orange-500"></i>
+                                            <span data-i18n="tier-dining">Dining</span>
+                                        </h4>
+                                        <div class="space-y-2" id="diningBenefitsList"></div>
+                                    </div>
+                                    
+                                    <!-- Drinks Benefits -->
+                                    <div id="drinksBenefitsSection" class="hidden">
+                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <i class="fas fa-cocktail text-pink-500"></i>
+                                            <span data-i18n="tier-drinks">Drinks</span>
+                                        </h4>
+                                        <div class="space-y-2" id="drinksBenefitsList"></div>
+                                    </div>
+                                    
+                                    <!-- Recreation Benefits -->
+                                    <div id="recreationBenefitsSection" class="hidden">
+                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <i class="fas fa-swimming-pool text-blue-500"></i>
+                                            <span data-i18n="tier-recreation">Recreation</span>
+                                        </h4>
+                                        <div class="space-y-2" id="recreationBenefitsList"></div>
+                                    </div>
+                                    
+                                    <!-- Services Benefits -->
+                                    <div id="servicesBenefitsSection" class="hidden">
+                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <i class="fas fa-concierge-bell text-purple-500"></i>
+                                            <span data-i18n="tier-services">Services</span>
+                                        </h4>
+                                        <div class="space-y-2" id="servicesBenefitsList"></div>
+                                    </div>
+                                    
+                                    <!-- Amenities Benefits -->
+                                    <div id="amenitiesBenefitsSection" class="hidden">
+                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <i class="fas fa-star text-yellow-500"></i>
+                                            <span data-i18n="tier-amenities">Amenities</span>
+                                        </h4>
+                                        <div class="space-y-2" id="amenitiesBenefitsList"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Upgrade CTA (Future Phase) -->
+                                <div class="mt-6 pt-6 border-t border-gray-200 hidden" id="upgradeSection">
+                                    <button class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2">
+                                        <i class="fas fa-arrow-up"></i>
+                                        <span data-i18n="tier-upgrade">Upgrade Your Tier</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 
                 <!-- Hotel Restaurants Section -->
                 <section id="restaurants-section" class="mb-12">
@@ -20717,7 +20912,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             poolside: 'Poolside',
             beachfront: 'Beachfront',
             rooftop: 'Rooftop',
-            garden: 'Garden'
+            garden: 'Garden',
+            'tier-your-membership': 'Your Membership',
+            'tier-points': 'Points',
+            'tier-badges': 'Badges',
+            'tier-streak': 'Day Streak',
+            'tier-dining': 'Dining',
+            'tier-drinks': 'Drinks',
+            'tier-recreation': 'Recreation',
+            'tier-services': 'Services',
+            'tier-amenities': 'Amenities',
+            'tier-upgrade': 'Upgrade Your Tier'
           },
           ar: { 
             all: 'الكل', 
@@ -20733,7 +20938,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             poolside: 'جانب المسبح',
             beachfront: 'الواجهة البحرية',
             rooftop: 'السطح',
-            garden: 'الحديقة'
+            garden: 'الحديقة',
+            'tier-your-membership': 'عضويتك',
+            'tier-points': 'نقاط',
+            'tier-badges': 'شارات',
+            'tier-streak': 'سلسلة أيام',
+            'tier-dining': 'طعام',
+            'tier-drinks': 'مشروبات',
+            'tier-recreation': 'ترفيه',
+            'tier-services': 'خدمات',
+            'tier-amenities': 'وسائل راحة',
+            'tier-upgrade': 'ترقية مستواك'
           },
           de: { 
             all: 'Alle', 
@@ -20749,7 +20964,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             poolside: 'Am Pool',
             beachfront: 'Strandfront',
             rooftop: 'Dachterrasse',
-            garden: 'Garten'
+            garden: 'Garten',
+            'tier-your-membership': 'Ihre Mitgliedschaft',
+            'tier-points': 'Punkte',
+            'tier-badges': 'Abzeichen',
+            'tier-streak': 'Tagessträhne',
+            'tier-dining': 'Essen',
+            'tier-drinks': 'Getränke',
+            'tier-recreation': 'Erholung',
+            'tier-services': 'Dienstleistungen',
+            'tier-amenities': 'Annehmlichkeiten',
+            'tier-upgrade': 'Upgrade Ihrer Stufe'
           },
           ru: { 
             all: 'Все', 
@@ -20765,7 +20990,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             poolside: 'У бассейна',
             beachfront: 'На берегу',
             rooftop: 'Крыша',
-            garden: 'Сад'
+            garden: 'Сад',
+            'tier-your-membership': 'Ваше членство',
+            'tier-points': 'Баллы',
+            'tier-badges': 'Значки',
+            'tier-streak': 'Серия дней',
+            'tier-dining': 'Питание',
+            'tier-drinks': 'Напитки',
+            'tier-recreation': 'Отдых',
+            'tier-services': 'Услуги',
+            'tier-amenities': 'Удобства',
+            'tier-upgrade': 'Повысить уровень'
           },
           pl: { 
             all: 'Wszystko', 
@@ -20813,7 +21048,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             poolside: 'Au bord de la piscine',
             beachfront: 'Front de mer',
             rooftop: 'Terrasse',
-            garden: 'Jardin'
+            garden: 'Jardin',
+            'tier-your-membership': 'Votre adhésion',
+            'tier-points': 'Points',
+            'tier-badges': 'Badges',
+            'tier-streak': 'Série de jours',
+            'tier-dining': 'Restauration',
+            'tier-drinks': 'Boissons',
+            'tier-recreation': 'Loisirs',
+            'tier-services': 'Services',
+            'tier-amenities': 'Commodités',
+            'tier-upgrade': 'Améliorer votre niveau'
           },
           cs: { 
             all: 'Vše', 
@@ -22732,6 +22977,218 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           
           // Redirect to feedback form page
           window.location.href = '/feedback/' + activeFeedbackForm.form_id;
+        }
+        
+        // ============================================
+        // TIER BENEFITS CARD FUNCTIONS
+        // ============================================
+        let tierBenefitsData = null;
+        
+        // Listen for pass linked event
+        window.addEventListener('passLinked', function(e) {
+          const guest = e.detail;
+          if (guest && guest.pass_reference) {
+            loadTierBenefits(guest.pass_reference);
+          }
+        });
+        
+        // Load tier benefits when page loads if guest is already linked
+        window.addEventListener('DOMContentLoaded', function() {
+          const guestSession = getGuestSession();
+          if (guestSession && guestSession.pass_reference) {
+            loadTierBenefits(guestSession.pass_reference);
+          }
+        });
+        
+        // Listen for pass unlinked event
+        window.addEventListener('passUnlinked', function() {
+          hideTierBenefitsCard();
+        });
+        
+        async function loadTierBenefits(passReference) {
+          try {
+            const propertyId = propertyData?.property_id || '1';
+            const response = await fetch('/api/guest/tier-benefits?pass_reference=' + passReference, {
+              headers: {
+                'X-Property-ID': propertyId
+              }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              tierBenefitsData = data;
+              displayTierBenefitsCard(data);
+            } else {
+              console.error('Failed to load tier benefits:', data.error);
+            }
+          } catch (error) {
+            console.error('Load tier benefits error:', error);
+          }
+        }
+        
+        function displayTierBenefitsCard(data) {
+          const card = document.getElementById('tierBenefitsCard');
+          if (!card) return;
+          
+          // Show the card
+          card.classList.remove('hidden');
+          
+          // Apply tier color to header and badge
+          const tierColor = data.tier.color || '#6366f1';
+          const primaryColor = propertyData?.primary_color || tierColor;
+          const secondaryColor = propertyData?.secondary_color || tierColor;
+          
+          const header = document.getElementById('tierCardHeader');
+          const badge = document.getElementById('tierIconBadge');
+          const tierCard = document.getElementById('tierCard');
+          
+          if (header) {
+            header.style.background = 'linear-gradient(135deg, ' + primaryColor + '15 0%, ' + secondaryColor + '10 100%)';
+          }
+          
+          if (badge) {
+            badge.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + secondaryColor + ' 100%)';
+          }
+          
+          if (tierCard) {
+            tierCard.style.borderColor = primaryColor + '40';
+          }
+          
+          // Set tier icon
+          const iconBadge = document.getElementById('tierIconBadge');
+          if (iconBadge && data.tier.icon) {
+            iconBadge.innerHTML = '<i class="' + data.tier.icon + '"></i>';
+          }
+          
+          // Set tier name and description
+          const tierName = document.getElementById('tierName');
+          const tierDesc = document.getElementById('tierDescription');
+          
+          if (tierName) {
+            tierName.textContent = data.tier.name || 'All-Inclusive';
+          }
+          
+          if (tierDesc && data.tier.description) {
+            tierDesc.textContent = data.tier.description;
+          }
+          
+          // Display benefits by category
+          displayBenefitsByCategory('dining', data.benefits.dining || []);
+          displayBenefitsByCategory('drinks', data.benefits.drinks || []);
+          displayBenefitsByCategory('recreation', data.benefits.recreation || []);
+          displayBenefitsByCategory('services', data.benefits.services || []);
+          displayBenefitsByCategory('amenities', data.benefits.amenities || []);
+          
+          // Show total benefits count in description if empty
+          if (!data.tier.description && tierDesc) {
+            tierDesc.textContent = data.total_benefits + ' exclusive benefits included';
+          }
+        }
+        
+        function displayBenefitsByCategory(category, benefits) {
+          const section = document.getElementById(category + 'BenefitsSection');
+          const list = document.getElementById(category + 'BenefitsList');
+          
+          if (!section || !list) return;
+          
+          if (benefits.length === 0) {
+            section.classList.add('hidden');
+            return;
+          }
+          
+          section.classList.remove('hidden');
+          
+          // Get primary color for benefit icons
+          const primaryColor = propertyData?.primary_color || '#6366f1';
+          
+          let html = '';
+          benefits.forEach(benefit => {
+            const icon = getBenefitIcon(benefit.benefit_type, category);
+            const accessLevel = benefit.access_level || 'unlimited';
+            const quantity = benefit.quantity_limit || null;
+            
+            let accessText = '';
+            if (accessLevel === 'unlimited') {
+              accessText = '<span class="text-green-600 font-semibold">Unlimited</span>';
+            } else if (accessLevel === 'limited' && quantity) {
+              accessText = '<span class="text-blue-600 font-semibold">' + quantity + 'x per stay</span>';
+            } else if (accessLevel === 'once_daily') {
+              accessText = '<span class="text-orange-600 font-semibold">Once daily</span>';
+            } else if (accessLevel === 'restricted') {
+              accessText = '<span class="text-gray-600 font-semibold">Limited access</span>';
+            }
+            
+            html += '<div class="flex items-start gap-3 bg-white p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition">' +
+              '<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background: ' + primaryColor + '20; color: ' + primaryColor + ';">' +
+                '<i class="' + icon + ' text-sm"></i>' +
+              '</div>' +
+              '<div class="flex-1 min-w-0">' +
+                '<div class="flex items-start justify-between gap-2">' +
+                  '<div class="flex-1">' +
+                    '<div class="font-semibold text-gray-900 text-sm">' + (benefit.venue_name || benefit.benefit_type) + '</div>' +
+                    (benefit.description ? '<div class="text-xs text-gray-600 mt-0.5">' + benefit.description + '</div>' : '') +
+                  '</div>' +
+                  '<div class="text-xs whitespace-nowrap">' + accessText + '</div>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          });
+          
+          list.innerHTML = html;
+        }
+        
+        function getBenefitIcon(benefitType, category) {
+          // Icon mapping based on benefit type and category
+          const iconMap = {
+            'buffet': 'fas fa-plate-wheat',
+            'a_la_carte': 'fas fa-utensils',
+            'room_service': 'fas fa-bell-concierge',
+            'snacks': 'fas fa-cookie-bite',
+            'alcoholic': 'fas fa-wine-glass',
+            'non_alcoholic': 'fas fa-glass-water',
+            'premium_bar': 'fas fa-martini-glass-citrus',
+            'minibar': 'fas fa-refrigerator',
+            'pool': 'fas fa-swimming-pool',
+            'beach': 'fas fa-umbrella-beach',
+            'gym': 'fas fa-dumbbell',
+            'spa': 'fas fa-spa',
+            'entertainment': 'fas fa-music',
+            'activities': 'fas fa-person-hiking',
+            'concierge': 'fas fa-concierge-bell',
+            'late_checkout': 'fas fa-clock',
+            'early_checkin': 'fas fa-door-open',
+            'turndown': 'fas fa-bed',
+            'laundry': 'fas fa-shirt',
+            'wifi': 'fas fa-wifi',
+            'parking': 'fas fa-parking',
+            'newspaper': 'fas fa-newspaper',
+            'safe': 'fas fa-vault'
+          };
+          
+          return iconMap[benefitType] || 'fas fa-check-circle';
+        }
+        
+        function hideTierBenefitsCard() {
+          const card = document.getElementById('tierBenefitsCard');
+          if (card) {
+            card.classList.add('hidden');
+          }
+          // Also collapse details if open
+          const details = document.getElementById('tierDetailsPanel');
+          if (details && !details.classList.contains('hidden')) {
+            toggleTierDetails();
+          }
+        }
+        
+        window.toggleTierDetails = function() {
+          const panel = document.getElementById('tierDetailsPanel');
+          const icon = document.getElementById('tierToggleIcon');
+          
+          if (panel && icon) {
+            panel.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+          }
         }
         
         </script>
