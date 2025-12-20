@@ -52465,7 +52465,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           html += '<select id="venue_selector" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white">';
           html += '<option value="">➕ Select a venue to add...</option>';
           venues.forEach(v => {
-            html += \`<option value="\${v.id}" data-name="\${v.name}" data-type="\${v.type}">\${v.name} (\${v.type})</option>\`;
+            html += '<option value="' + v.id + '" data-name="' + v.name + '" data-type="' + v.type + '">' + v.name + ' (' + v.type + ')</option>';
           });
           html += '</select>';
           html += '<button type="button" onclick="addSelectedVenue()" class="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors">';
@@ -52572,31 +52572,31 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           
           // Move buttons
           html += '<div class="flex flex-col gap-1">';
-          html += \`<button type="button" onclick="moveVenueUp(\${index})" class="text-gray-400 hover:text-purple-600 transition-colors" \${index === 0 ? 'disabled style="opacity:0.3"' : ''}>\`;
+          html += '<button type="button" onclick="moveVenueUp(' + index + ')" class="text-gray-400 hover:text-purple-600 transition-colors" ' + (index === 0 ? 'disabled style="opacity:0.3"' : '') + '>';
           html += '<i class="fas fa-chevron-up text-xs"></i>';
           html += '</button>';
-          html += \`<button type="button" onclick="moveVenueDown(\${index})" class="text-gray-400 hover:text-purple-600 transition-colors" \${index === window.selectedVenues.length - 1 ? 'disabled style="opacity:0.3"' : ''}>\`;
+          html += '<button type="button" onclick="moveVenueDown(' + index + ')" class="text-gray-400 hover:text-purple-600 transition-colors" ' + (index === window.selectedVenues.length - 1 ? 'disabled style="opacity:0.3"' : '') + '>';
           html += '<i class="fas fa-chevron-down text-xs"></i>';
           html += '</button>';
           html += '</div>';
           
           // Venue info
           html += '<div class="flex-1">';
-          html += \`<div class="flex items-center gap-2 mb-2">\`;
-          html += \`<span class="font-semibold text-gray-800">\${venue.name}</span>\`;
-          html += \`<span class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">\${venue.type}</span>\`;
+          html += '<div class="flex items-center gap-2 mb-2">';
+          html += '<span class="font-semibold text-gray-800">' + venue.name + '</span>';
+          html += '<span class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">' + venue.type + '</span>';
           html += '</div>';
           
           // CTA input
           html += '<div>';
           html += '<label class="text-xs text-gray-600 block mb-1">Button Text:</label>';
-          html += \`<input type="text" value="\${venue.cta}" onchange="updateVenueCTA(\${venue.id}, this.value)" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="View Details">\`;
+          html += '<input type="text" value="' + venue.cta + '" onchange="updateVenueCTA(' + venue.id + ', this.value)" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="View Details">';
           html += '</div>';
           html += '</div>';
           
           // Remove button
           html += '<div>';
-          html += \`<button type="button" onclick="removeVenue(\${venue.id})" class="text-red-500 hover:text-red-700 transition-colors" title="Remove venue">\`;
+          html += '<button type="button" onclick="removeVenue(' + venue.id + ')" class="text-red-500 hover:text-red-700 transition-colors" title="Remove venue">';
           html += '<i class="fas fa-times"></i>';
           html += '</button>';
           html += '</div>';
