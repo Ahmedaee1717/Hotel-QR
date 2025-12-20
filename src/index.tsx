@@ -19645,10 +19645,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
                                             <p class="text-sm text-white/90 mt-1 font-medium" id="tierDescription"></p>
                                             
-                                            <!-- Ask AI About Benefits Button -->
+                                            <!-- Ask About Benefits Button -->
                                             <button onclick="openChatbotWithBenefitsPrompt()" class="mt-4 bg-white/20 backdrop-blur-lg hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center gap-3 border border-white/30">
                                                 <i class="fas fa-comments text-xl"></i>
-                                                <span>Ask AI About My Benefits</span>
+                                                <span>Questions About Your Benefits?</span>
                                             </button>
                                         </div>
                                     </div>
@@ -19738,14 +19738,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     </div>
                                 </div>
                                 
-                                <!-- Ask AI Button -->
+                                <!-- Chat with Concierge Button -->
                                 <div class="mt-6 pt-6 border-t border-gray-200">
                                     <button onclick="openChatbotWithBenefitsPrompt()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3">
-                                        <i class="fas fa-robot text-xl"></i>
-                                        <span>Have Questions? Ask Our AI Concierge</span>
+                                        <i class="fas fa-concierge-bell text-xl"></i>
+                                        <span>Chat with Our Concierge</span>
                                         <i class="fas fa-arrow-right"></i>
                                     </button>
-                                    <p class="text-center text-xs text-gray-500 mt-2">Get instant answers about your tier benefits, dining options, and more!</p>
+                                    <p class="text-center text-xs text-gray-500 mt-2">Get instant answers about your benefits, dining, activities, and more!</p>
                                 </div>
                                 
                                 <!-- Upgrade CTA (Future Phase) -->
