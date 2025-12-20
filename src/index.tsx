@@ -23735,6 +23735,49 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             }
           });
           
+          // Apply SECONDARY COLOR to bottom "Chat with Concierge" button
+          let secondaryColor = '#764ba2'; // Default fallback
+          try {
+            if (window.propertyData && window.propertyData.secondary_color) {
+              secondaryColor = window.propertyData.secondary_color;
+            } else if (propertyData && propertyData.secondary_color) {
+              secondaryColor = propertyData.secondary_color;
+            }
+          } catch (e) {
+            console.warn('Could not load secondary color, using default:', e);
+          }
+          
+          // Find and style the bottom chat button
+          const chatButtons = document.querySelectorAll('#tierBenefitsCard button[onclick="openChatbotWithBenefitsPrompt()"]');
+          if (chatButtons.length > 1) {
+            // Second button is the bottom one
+            const bottomButton = chatButtons[1];
+            if (bottomButton) {
+              // Calculate darker shade for gradient
+              const hex = secondaryColor.replace('#', '');
+              const r = parseInt(hex.slice(0, 2), 16);
+              const g = parseInt(hex.slice(2, 4), 16);
+              const b = parseInt(hex.slice(4, 6), 16);
+              const darkerR = Math.max(0, r - 30);
+              const darkerG = Math.max(0, g - 30);
+              const darkerB = Math.max(0, b - 30);
+              const darkerSecondary = '#' + 
+                darkerR.toString(16).padStart(2, '0') +
+                darkerG.toString(16).padStart(2, '0') +
+                darkerB.toString(16).padStart(2, '0');
+              
+              bottomButton.style.background = 'linear-gradient(135deg, ' + secondaryColor + ' 0%, ' + darkerSecondary + ' 100%)';
+              
+              // Add hover effect
+              bottomButton.addEventListener('mouseenter', function() {
+                this.style.background = 'linear-gradient(135deg, ' + darkerSecondary + ' 0%, ' + secondaryColor + ' 100%)';
+              });
+              bottomButton.addEventListener('mouseleave', function() {
+                this.style.background = 'linear-gradient(135deg, ' + secondaryColor + ' 0%, ' + darkerSecondary + ' 100%)';
+              });
+            }
+          }
+          
           // Show total benefits count in description if empty
           if (!data.tier.description && tierDesc) {
             tierDesc.textContent = data.total_benefits + ' exclusive benefits included';
@@ -23886,10 +23929,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         
         // Open chatbot and optionally ask about benefits
         window.openChatbotWithBenefitsPrompt = function() {
-          // Open chatbot
-          const chatbotModal = document.getElementById('chatbotModal');
-          if (chatbotModal) {
-            chatbotModal.classList.remove('hidden');
+          // Open chatbot window
+          const chatWindow = document.getElementById('chatWindow');
+          if (chatWindow) {
+            chatWindow.classList.remove('hidden');
             
             // Focus on input
             setTimeout(() => {
