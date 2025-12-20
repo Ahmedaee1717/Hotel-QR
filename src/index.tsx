@@ -19985,7 +19985,7 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
-                <a href="/my-perfect-week.html" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors">
+                <a href="/my-perfect-week" id="myWeekButton" class="text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: ${propertyData.accent_color || '#8B5CF6'};">
                     <i class="fas fa-calendar-week mr-2"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
                 </a>
                 <a href="#" id="viewPassButton" class="pass-link-button px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
@@ -56100,6 +56100,530 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
   } catch (error) {
     console.error('Restaurant booking page error:', error)
     return c.text('Error loading booking page', 500)
+  }
+})
+
+// My Perfect Week - Visual Stay Planner
+app.get('/my-perfect-week', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.query('property') || '1'
+  
+  try {
+    // Get property data for styling
+    const property = await DB.prepare(`
+      SELECT property_id, property_name, primary_color, secondary_color, accent_color
+      FROM properties
+      WHERE property_id = ?
+    `).bind(propertyId).first()
+    
+    if (!property) {
+      return c.text('Property not found', 404)
+    }
+    
+    const accentColor = property.accent_color || '#8B5CF6'
+    const primaryColor = property.primary_color || '#016e8f'
+    const propertySlug = property.property_name.toLowerCase().replace(/ /g, '-')
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Perfect Week - ${property.property_name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent-color: ${accentColor};
+            --primary-color: ${primaryColor};
+        }
+        
+        .btn-accent {
+            background-color: var(--accent-color);
+        }
+        
+        .btn-accent:hover {
+            filter: brightness(1.1);
+        }
+        
+        .timeline-day {
+            min-width: 280px;
+            scroll-snap-align: start;
+        }
+        
+        .timeline-scroll {
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .timeline-item {
+            transition: all 0.3s ease;
+        }
+        
+        .timeline-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .suggestion-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .suggestion-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+        }
+        
+        .gradient-gold {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+        }
+        
+        .gradient-silver {
+            background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+        }
+        
+        .gradient-bronze {
+            background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%);
+        }
+        
+        .pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    
+    <!-- Top Bar -->
+    <div class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <button onclick="window.location.href='/hotel/${propertySlug}?property=${propertyId}'" class="text-gray-600 hover:text-purple-600">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </button>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">My Perfect Week 🗓️</h1>
+                    <p class="text-sm text-gray-600" id="guestName">Loading...</p>
+                </div>
+            </div>
+            <button onclick="generateSuggestions()" class="btn-accent text-white px-4 py-2 rounded-lg transition">
+                <i class="fas fa-magic mr-2"></i>
+                Get Suggestions
+            </button>
+        </div>
+    </div>
+    
+    <!-- Stay Overview -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Your ${property.property_name} Stay</h2>
+                    <div class="flex gap-4 text-gray-600">
+                        <span><i class="fas fa-calendar-check mr-2 text-green-600"></i>Check-in: <span id="checkinDate">-</span></span>
+                        <span><i class="fas fa-calendar-times mr-2 text-red-600"></i>Check-out: <span id="checkoutDate">-</span></span>
+                        <span><i class="fas fa-moon mr-2 text-blue-600"></i><span id="totalNights">-</span> nights</span>
+                    </div>
+                </div>
+                <div id="tierBadge" class="px-4 py-2 rounded-full font-semibold text-white">
+                    <!-- Tier badge rendered here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="bg-white rounded-2xl shadow-lg p-2 mb-6 flex gap-2">
+            <button onclick="switchTab('timeline')" id="tabTimeline" class="tab-button flex-1 px-6 py-3 rounded-xl font-semibold btn-accent text-white">
+                <i class="fas fa-calendar-week mr-2"></i>Timeline
+            </button>
+            <button onclick="switchTab('list')" id="tabList" class="tab-button flex-1 px-6 py-3 rounded-xl font-semibold text-gray-600 hover:bg-gray-100">
+                <i class="fas fa-list mr-2"></i>List View
+            </button>
+            <button onclick="switchTab('suggestions')" id="tabSuggestions" class="tab-button flex-1 px-6 py-3 rounded-xl font-semibold text-gray-600 hover:bg-gray-100">
+                <i class="fas fa-lightbulb mr-2"></i>Suggestions <span id="suggestionCount" class="ml-2 bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full text-xs">0</span>
+            </button>
+        </div>
+        
+        <!-- Timeline View -->
+        <div id="timelineView" class="view-content">
+            <div class="timeline-scroll flex gap-4 overflow-x-auto pb-4" id="timelineGrid">
+                <!-- Days rendered here -->
+                <div class="text-center py-20 w-full">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4" style="color: var(--accent-color)"></i>
+                    <p class="text-gray-600">Loading your perfect week...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- List View -->
+        <div id="listView" class="view-content hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <div id="listContainer">
+                    <!-- List items rendered here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Suggestions View -->
+        <div id="suggestionsView" class="view-content hidden">
+            <div class="grid gap-4" id="suggestionsContainer">
+                <!-- Suggestions rendered here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Add Floating Menu -->
+    <div class="fixed bottom-6 right-6 flex flex-col gap-3">
+        <button onclick="quickAdd('dining')" class="bg-orange-500 hover:bg-orange-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-xl">
+            🍽️
+        </button>
+        <button onclick="quickAdd('activity')" class="bg-blue-500 hover:bg-blue-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-xl">
+            🎯
+        </button>
+        <button onclick="quickAdd('beach')" class="bg-cyan-500 hover:bg-cyan-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-xl">
+            🏖️
+        </button>
+        <button onclick="quickAdd('custom')" class="btn-accent text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-xl">
+            ➕
+        </button>
+    </div>
+    
+    <script>
+        let weekData = null;
+        let currentTab = 'timeline';
+        const propertyId = '${propertyId}';
+        
+        function getPropertyId() {
+            return propertyId;
+        }
+        
+        function getGuestSession() {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                try {
+                    const data = JSON.parse(session);
+                    return data.guest;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+        
+        async function loadTimeline() {
+            const guest = getGuestSession();
+            
+            if (!guest) {
+                alert('Please link your pass first to access My Perfect Week');
+                window.location.href = '/hotel/${propertySlug}?property=' + propertyId;
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/guest/my-week/' + guest.pass_reference, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    weekData = data;
+                    renderUI();
+                } else {
+                    alert('Failed to load timeline: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Load timeline error:', error);
+                alert('Connection error. Please try again.');
+            }
+        }
+        
+        function renderUI() {
+            document.getElementById('guestName').textContent = weekData.guest.name + ' • Room ' + weekData.guest.room;
+            document.getElementById('checkinDate').textContent = new Date(weekData.stay.checkin).toLocaleDateString();
+            document.getElementById('checkoutDate').textContent = new Date(weekData.stay.checkout).toLocaleDateString();
+            document.getElementById('totalNights').textContent = weekData.stay.nights;
+            
+            const tierBadge = document.getElementById('tierBadge');
+            const tier = weekData.guest.tier || 'Standard';
+            if (tier.includes('Gold')) {
+                tierBadge.className = 'px-4 py-2 rounded-full font-semibold text-white gradient-gold';
+            } else if (tier.includes('Silver')) {
+                tierBadge.className = 'px-4 py-2 rounded-full font-semibold text-white gradient-silver';
+            } else {
+                tierBadge.className = 'px-4 py-2 rounded-full font-semibold text-white gradient-bronze';
+            }
+            tierBadge.textContent = tier;
+            
+            document.getElementById('suggestionCount').textContent = weekData.suggestions.length;
+            
+            renderTimeline();
+            renderList();
+            renderSuggestions();
+        }
+        
+        function renderTimeline() {
+            const container = document.getElementById('timelineGrid');
+            
+            if (!weekData.days || weekData.days.length === 0) {
+                container.innerHTML = '<div class="text-center py-20 w-full"><p class="text-gray-600">No stay information found.</p></div>';
+                return;
+            }
+            
+            container.innerHTML = weekData.days.map(day => \`
+                <div class="timeline-day bg-white rounded-2xl shadow-lg p-4 \${day.is_today ? 'ring-4 ring-opacity-50' : ''}" style="\${day.is_today ? 'border-color: var(--accent-color); border-width: 4px;' : ''}">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold \${day.is_past ? 'text-gray-400' : day.is_today ? '' : 'text-gray-800'}" style="\${day.is_today ? 'color: var(--accent-color)' : ''}">
+                                Day \${day.day_number}
+                            </h3>
+                            <p class="text-sm \${day.is_past ? 'text-gray-400' : 'text-gray-600'}">
+                                \${day.day_name}, \${new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                        </div>
+                        \${day.is_today ? '<span class="px-3 py-1 rounded-full text-xs font-semibold pulse-slow text-white" style="background-color: var(--accent-color)">Today</span>' : ''}
+                        \${day.is_past ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
+                    </div>
+                    
+                    <div class="space-y-3 min-h-[200px]">
+                        \${day.items.length > 0 ? day.items.map(item => \`
+                            <div class="timeline-item bg-\${item.color}-50 border-l-4 border-\${item.color}-500 p-3 rounded-lg \${item.status === 'completed' ? 'opacity-60' : ''}">
+                                <div class="flex justify-between items-start mb-1">
+                                    <span class="text-2xl">\${item.icon}</span>
+                                    \${item.status === 'confirmed' ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
+                                </div>
+                                <h4 class="font-semibold text-gray-800 text-sm mb-1">\${item.title}</h4>
+                                <p class="text-xs text-gray-600">
+                                    <i class="fas fa-clock mr-1"></i>\${item.start_time}\${item.end_time ? ' - ' + item.end_time : ''}
+                                </p>
+                                \${item.location ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
+                            </div>
+                        \`).join('') : \`
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fas fa-plus-circle text-3xl mb-2"></i>
+                                <p class="text-sm">Nothing planned yet</p>
+                                <button onclick="quickAddToDay('\${day.date}')" class="mt-2 text-xs hover:underline" style="color: var(--accent-color)">Add activity</button>
+                            </div>
+                        \`}
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function renderList() {
+            const container = document.getElementById('listContainer');
+            const allItems = weekData.timeline_items.sort((a, b) => {
+                const dateA = new Date(a.item_date + ' ' + a.start_time);
+                const dateB = new Date(b.item_date + ' ' + b.start_time);
+                return dateA - dateB;
+            });
+            
+            if (allItems.length === 0) {
+                container.innerHTML = '<div class="text-center py-20"><p class="text-gray-600">Your timeline is empty. Add some activities to get started!</p></div>';
+                return;
+            }
+            
+            container.innerHTML = allItems.map(item => \`
+                <div class="flex gap-4 items-start p-4 border-b hover:bg-gray-50 transition">
+                    <span class="text-3xl">\${item.icon}</span>
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-gray-800">\${item.title}</h4>
+                        <p class="text-sm text-gray-600">
+                            \${new Date(item.item_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} 
+                            at \${item.start_time}
+                        </p>
+                        \${item.description ? '<p class="text-sm text-gray-500 mt-1">' + item.description + '</p>' : ''}
+                        \${item.location ? '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
+                    </div>
+                    <div class="flex gap-2">
+                        \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Confirmed</span>' : ''}
+                        \${item.status === 'planned' ? '<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">Planned</span>' : ''}
+                        \${item.item_type !== 'booking' ? '<button onclick="deleteItem(' + item.item_id + ')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>' : ''}
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function renderSuggestions() {
+            const container = document.getElementById('suggestionsContainer');
+            
+            if (weekData.suggestions.length === 0) {
+                container.innerHTML = \`
+                    <div class="bg-white rounded-2xl shadow-lg p-12 text-center">
+                        <i class="fas fa-lightbulb text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">No suggestions yet</h3>
+                        <p class="text-gray-600 mb-4">Click "Get Suggestions" to discover personalized recommendations!</p>
+                        <button onclick="generateSuggestions()" class="btn-accent text-white px-6 py-3 rounded-lg">
+                            <i class="fas fa-magic mr-2"></i>Generate Suggestions
+                        </button>
+                    </div>
+                \`;
+                return;
+            }
+            
+            container.innerHTML = weekData.suggestions.map(suggestion => \`
+                <div class="suggestion-card bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition">
+                    <div class="flex gap-4">
+                        <div class="flex-shrink-0">
+                            \${suggestion.images ? '<img src="' + JSON.parse(suggestion.images)[0] + '" class="w-24 h-24 rounded-lg object-cover" alt="' + suggestion.title_en + '">' : '<div class="w-24 h-24 rounded-lg bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-3xl">🎯</div>'}
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-gray-800">\${suggestion.title_en}</h4>
+                                <span class="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">
+                                    \${suggestion.relevance_score}% match
+                                </span>
+                            </div>
+                            <p class="text-sm mb-2" style="color: var(--accent-color)">
+                                <i class="fas fa-star mr-1"></i>\${suggestion.reason_text}
+                            </p>
+                            <p class="text-sm text-gray-600 mb-3">\${suggestion.description_en || ''}</p>
+                            <div class="flex gap-2 text-xs text-gray-500 mb-3">
+                                <span><i class="fas fa-calendar mr-1"></i>\${new Date(suggestion.suggested_date).toLocaleDateString()}</span>
+                                <span><i class="fas fa-clock mr-1"></i>\${suggestion.suggested_time}</span>
+                                \${suggestion.price ? '<span><i class="fas fa-tag mr-1"></i>' + suggestion.price + ' ' + suggestion.currency + '</span>' : ''}
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="acceptSuggestion(\${suggestion.suggestion_id})" class="btn-accent text-white px-4 py-2 rounded-lg text-sm">
+                                    <i class="fas fa-plus mr-1"></i>Add to Timeline
+                                </button>
+                                <button onclick="dismissSuggestion(\${suggestion.suggestion_id})" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm">
+                                    Not Interested
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.className = 'tab-button flex-1 px-6 py-3 rounded-xl font-semibold text-gray-600 hover:bg-gray-100';
+            });
+            const activeTab = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+            activeTab.className = 'tab-button flex-1 px-6 py-3 rounded-xl font-semibold btn-accent text-white';
+            document.querySelectorAll('.view-content').forEach(view => view.classList.add('hidden'));
+            document.getElementById(tab + 'View').classList.remove('hidden');
+        }
+        
+        async function generateSuggestions() {
+            const guest = getGuestSession();
+            if (!guest) return;
+            
+            const button = event.target;
+            const originalHTML = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch('/api/guest/my-week/generate-suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Property-ID': propertyId },
+                    body: JSON.stringify({ pass_reference: guest.pass_reference })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadTimeline();
+                    switchTab('suggestions');
+                    alert('✨ ' + data.message);
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Generate suggestions error:', error);
+                alert('Connection error');
+            } finally {
+                button.innerHTML = originalHTML;
+                button.disabled = false;
+            }
+        }
+        
+        async function acceptSuggestion(suggestionId) {
+            const guest = getGuestSession();
+            if (!guest) return;
+            
+            try {
+                const response = await fetch('/api/guest/my-week/suggestions/' + suggestionId + '/accept', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Property-ID': propertyId },
+                    body: JSON.stringify({ guest_id: guest.guest_id })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadTimeline();
+                    switchTab('timeline');
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Accept suggestion error:', error);
+                alert('Connection error');
+            }
+        }
+        
+        async function dismissSuggestion(suggestionId) {
+            try {
+                const response = await fetch('/api/guest/my-week/suggestions/' + suggestionId + '/dismiss', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                if (data.success) await loadTimeline();
+            } catch (error) {
+                console.error('Dismiss suggestion error:', error);
+            }
+        }
+        
+        function quickAdd(type) {
+            alert('Quick add feature coming soon! Type: ' + type);
+        }
+        
+        function quickAddToDay(date) {
+            alert('Add activity for ' + date + ' - Coming soon!');
+        }
+        
+        async function deleteItem(itemId) {
+            if (!confirm('Remove this item from your timeline?')) return;
+            
+            try {
+                const response = await fetch('/api/guest/my-week/items/' + itemId, {
+                    method: 'DELETE',
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadTimeline();
+                    alert('✅ Item removed!');
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete item error:', error);
+                alert('Connection error');
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTimeline();
+        });
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('My Perfect Week error:', error)
+    return c.text('Error loading page', 500)
   }
 })
 
