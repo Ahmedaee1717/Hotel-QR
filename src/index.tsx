@@ -23928,7 +23928,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed mb-3">' + benefitDescription + '</p>' : '') +
                   '</div>' +
                 '</div>' +
-                '<button onclick="window.location.href=\'' + venueUrl + '\'" class="w-full mt-2 px-4 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
+                '<button onclick="window.location.href=&quot;' + venueUrl + '&quot;" class="w-full mt-2 px-4 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
                   '<i class="fas fa-arrow-right"></i>' +
                   '<span>' + venueCTA + '</span>' +
                 '</button>' +
