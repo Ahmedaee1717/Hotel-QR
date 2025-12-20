@@ -56114,21 +56114,26 @@ app.get('/my-perfect-week', async (c) => {
   const { DB } = c.env
   const propertyId = c.req.query('property') || '1'
   
+  console.log('🔍 My Perfect Week route hit! Property ID:', propertyId)
+  
   try {
     // Get property data for styling
     const property = await DB.prepare(`
-      SELECT property_id, property_name, primary_color, secondary_color, accent_color
+      SELECT property_id, name as property_name, slug, primary_color, secondary_color, accent_color
       FROM properties
       WHERE property_id = ?
     `).bind(propertyId).first()
     
+    console.log('📊 Property query result:', property ? property.property_name : 'NULL')
+    
     if (!property) {
-      return c.text('Property not found', 404)
+      console.error('❌ Property not found for ID:', propertyId)
+      return c.html('<html><body><h1>Property not found</h1><p>Please check the URL or visit <a href="/">homepage</a></p></body></html>', 404)
     }
     
     const accentColor = property.accent_color || '#8B5CF6'
     const primaryColor = property.primary_color || '#016e8f'
-    const propertySlug = property.property_name.toLowerCase().replace(/ /g, '-')
+    const propertySlug = property.slug  // Use slug from database directly
     
     return c.html(`
 <!DOCTYPE html>
