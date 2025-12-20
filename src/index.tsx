@@ -8556,6 +8556,21 @@ app.post('/api/restaurant/reserve', async (c) => {
     // Generate reservation reference (using reservation_id)
     const reservationRef = `RES${String(result.meta.last_row_id).padStart(6, '0')}`
     
+    // Update timeline item if exists (change from 'planned' to 'confirmed')
+    await DB.prepare(`
+      UPDATE timeline_items 
+      SET status = 'confirmed', reference_id = ?
+      WHERE item_type = 'offering' 
+      AND item_date = ?
+      AND status = 'planned'
+      AND SUBSTR(start_time, 1, 5) = ?
+      LIMIT 1
+    `).bind(
+      result.meta.last_row_id,
+      data.reservation_date || session.session_date,
+      session.session_time.substring(0, 5)
+    ).run()
+    
     return c.json({ 
       success: true,
       reservation_id: result.meta.last_row_id,
@@ -55372,7 +55387,7 @@ app.get('/my-perfect-week', async (c) => {
                 { time: '11:00', label: '11 AM', period: 'morning', icon: '☀️' },
                 { time: '11:30', label: '11:30 AM', period: 'morning', icon: '☀️' },
                 { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch', restaurant: 'Azure Beach Grill' },
-                { time: '12:30', label: '12:30 PM', period: 'lunch', icon: '🍽️', restaurant: 'Le Jardin Fine Dining' },
+                { time: '12:30', label: '12:30 PM', period: 'lunch', icon: '🍽️' },
                 { time: '13:00', label: '1 PM', period: 'lunch', icon: '🍽️' },
                 { time: '13:30', label: '1:30 PM', period: 'afternoon', icon: '🍽️' },
                 { time: '14:00', label: '2 PM', period: 'afternoon', icon: '🌤️' },
