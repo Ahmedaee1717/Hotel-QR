@@ -4,9 +4,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://50507c39.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://50507c39.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**Admin Dashboard:** https://50507c39.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://21d8eea1.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://21d8eea1.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**Admin Dashboard:** https://21d8eea1.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -190,7 +190,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 7. **Gamification Ready** - Foundation for future gamified tiers and rewards
 
 **Marketing Page:**
-- ✅ **Stunning Tri-Method Showcase** - https://50507c39.project-c8738f5c.pages.dev/face-scan-feature
+- ✅ **Stunning Tri-Method Showcase** - https://21d8eea1.project-c8738f5c.pages.dev/face-scan-feature
 - ✅ **Professional Enterprise Design** - Clean navy-teal palette, subtle animations, B2B messaging
 - ✅ **"The Last Wristband You'll Ever Buy"** - Genius headline for management-focused messaging
 - Features: Animated hero section, 3D card effects, gradient backgrounds, floating elements
@@ -788,7 +788,7 @@ Enable staff to verify digital passes using NFC technology for contactless, inst
 
 **For users with iPhones or without NFC hardware**, we provide a complete NFC testing simulator:
 
-**Access:** `https://50507c39.project-c8738f5c.pages.dev/nfc-test-simulator`
+**Access:** `https://21d8eea1.project-c8738f5c.pages.dev/nfc-test-simulator`
 
 **Features:**
 - ✅ **Works on ANY device** - iPhone, iPad, Mac, PC, Android
