@@ -18452,11 +18452,7 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
     
   } catch (error) {
     console.error('My Perfect Week error:', error)
-    return c.json({ 
-      error: 'Failed to load timeline', 
-      details: error.message,
-      stack: error.stack?.split('\n').slice(0, 3).join('\n')
-    }, 500)
+    return c.json({ error: 'Failed to load timeline' }, 500)
   }
 })
 
