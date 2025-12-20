@@ -11830,6 +11830,16 @@ app.post('/api/chatbot/chat', async (c) => {
     const body = await c.req.json()
     const { property_id, session_id, message, conversation_id, guest_context } = body
     
+    // Debug: Log received guest context
+    console.log('🔍 Backend received guest_context:', guest_context ? 'YES' : 'NO')
+    if (guest_context) {
+      console.log('📊 Guest context data:', {
+        guest_name: guest_context.guest_name,
+        tier_name: guest_context.tier_name,
+        has_benefits: !!guest_context.benefits_summary
+      })
+    }
+    
     if (!property_id || !session_id || !message) {
       return c.json({ error: 'Missing required fields' }, 400)
     }
@@ -24515,16 +24525,24 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   })
                 }
                 
+                const requestBody = {
+                  property_id: window.propertyData.property_id,
+                  session_id: chatSessionId,
+                  message: message,
+                  conversation_id: chatConversationId,
+                  guest_context: guest_context
+                }
+                
+                console.log('📤 Sending to API:', {
+                  has_guest_context: !!guest_context,
+                  guest_name: guest_context?.guest_name,
+                  tier_name: guest_context?.tier_name
+                })
+                
                 const response = await fetch('/api/chatbot/chat', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    property_id: window.propertyData.property_id,
-                    session_id: chatSessionId,
-                    message: message,
-                    conversation_id: chatConversationId,
-                    guest_context: guest_context
-                  })
+                  body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
