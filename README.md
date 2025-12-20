@@ -4,10 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://4e55db37.project-c8738f5c.pages.dev 🚀 **LATEST with Hourly Timeline!**
-**Property Landing Page (6-DIGIT PIN!):** https://4e55db37.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**My Perfect Week:** https://4e55db37.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NEW Hourly Slots!**
-**Admin Dashboard:** https://4e55db37.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://dfc977e8.project-c8738f5c.pages.dev 🚀 **LATEST with Restaurant Availability!**
+**Property Landing Page (6-DIGIT PIN!):** https://dfc977e8.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**My Perfect Week:** https://dfc977e8.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NOW with Restaurant Suggestions!**
+**Admin Dashboard:** https://dfc977e8.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -47,9 +47,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Per-Venue Custom CTA Text** 📝 **NEW!** - Each linked venue gets its own custom button text (e.g., "View Bars", "Explore Spa")
 - ✅ **AI-Powered Benefit Translations** 🔥 **NEW!** - Auto-translate tier benefits to 28+ languages like custom sections
 - ✅ **Chatbot Guest Session Auto-Detection** 🤖 **NEW!** - Chatbot automatically knows guest tier and benefits
-- ✅ **My Perfect Week Timeline Planner** 📅✨ **NEW with HOURLY TIMELINE!** - Interactive week planner with:
-  - **Hourly time slots (7 AM - 10 PM)** with visual timeline 🕐
-  - **Smart suggestions** for breakfast (7-8 AM), lunch (12-1 PM), dinner (6-7 PM) 🍽️
+- ✅ **My Perfect Week Timeline Planner** 📅✨ **NEW with RESTAURANT AVAILABILITY!** - Interactive week planner with:
+  - **30+ half-hour time slots (6 AM - 10 PM)** with visual timeline 🕐
+  - **Smart restaurant availability** - Le Jardin @ 7:30 AM, 12:30 PM, 7 PM; Azure Beach Grill @ 12 PM, 6 PM 🍽️
+  - **Visual restaurant cards** with gradient design and "Reserve" button ✨
+  - **Smart suggestions** for general breakfast/lunch/dinner times 🍽️
   - **Hover-to-add** functionality on any time slot ✨
   - **Auto-calculated end times** based on activity duration ⏱️
   - **Visual meal period indicators** (☀️ breakfast, 🌅 morning, 🍽️ lunch, 🌆 evening, 🌙 night)
