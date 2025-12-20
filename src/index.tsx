@@ -12397,8 +12397,8 @@ app.post('/api/chatbot/chat', async (c) => {
     // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
-    // Call AI if we have API key AND (context OR relevant links)
-    if (apiKey && (context.length > 0 || topLinks.length > 0)) {
+    // Call AI if we have API key AND (context OR relevant links OR guest context)
+    if (apiKey && (context.length > 0 || topLinks.length > 0 || guest_context)) {
       try {
         console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
         console.log('📚 Context length:', context.length)
@@ -24527,7 +24527,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 console.log('🔍 Chatbot Context Check:', {
                   hasGuestSession: !!guestSession,
                   hasBenefitsData: !!benefitsData,
-                  guestName: guestSession?.guest_name,
+                  guestName: guestSession?.full_name,
                   tierName: benefitsData?.tier?.name
                 })
                 
@@ -24549,7 +24549,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   })
                   
                   guest_context = {
-                    guest_name: guestSession.guest_name,
+                    guest_name: guestSession.full_name,
                     room_number: guestSession.room_number,
                     tier_name: benefitsData.tier.name,
                     tier_color: benefitsData.tier.color,
