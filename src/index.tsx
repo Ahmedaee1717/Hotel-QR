@@ -18369,10 +18369,10 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
       
       // Auto-import existing bookings
       const existingBookings = await DB.prepare(`
-        SELECT b.*, ho.title_en, ho.offering_type, ho.images
+        SELECT b.*, a.activity_name as title_en, a.activity_type as offering_type, a.activity_images as images
         FROM bookings b
-        JOIN hotel_offerings ho ON b.offering_id = ho.offering_id
-        WHERE b.guest_id = ? AND b.status = 'confirmed'
+        LEFT JOIN activities a ON b.activity_id = a.activity_id
+        WHERE b.guest_id = ? AND b.booking_status = 'confirmed'
       `).bind(guest.guest_id).all()
       
       for (const booking of existingBookings.results) {
@@ -18383,12 +18383,12 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
         `).bind(
           plan.plan_id,
           booking.booking_id,
-          booking.booking_date,
-          booking.start_time,
-          booking.end_time,
+          booking.activity_date,
+          booking.activity_time || '09:00',
+          null,  // end_time not available in bookings
           booking.title_en,
-          booking.location,
-          booking.offering_type === 'activity' ? '🎯' : booking.offering_type === 'dining' ? '🍽️' : '🏖️'
+          'Activity Location',  // location not available in bookings
+          booking.offering_type === 'adventure' ? '🎯' : '🏖️'
         ).run()
       }
     }
@@ -18452,7 +18452,11 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
     
   } catch (error) {
     console.error('My Perfect Week error:', error)
-    return c.json({ error: 'Failed to load timeline' }, 500)
+    return c.json({ 
+      error: 'Failed to load timeline', 
+      details: error.message,
+      stack: error.stack?.split('\n').slice(0, 3).join('\n')
+    }, 500)
   }
 })
 
