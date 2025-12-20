@@ -21297,7 +21297,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             'tier-upgrade': 'Upgrade Your Tier',
             'tier-unlimited': 'Unlimited',
             'tier-daily': 'Daily',
-            'tier-limited': 'Limited'
+            'tier-limited': 'Limited',
+            'tier-click-details': 'Click for details'
           },
           ar: { 
             all: 'الكل', 
@@ -21326,7 +21327,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             'tier-upgrade': 'ترقية مستواك',
             'tier-unlimited': 'غير محدود',
             'tier-daily': 'يومي',
-            'tier-limited': 'محدود'
+            'tier-limited': 'محدود',
+            'tier-click-details': 'انقر للتفاصيل'
           },
           de: { 
             all: 'Alle', 
@@ -23827,11 +23829,18 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             let benefitName = benefit.display_name || benefit.venue_name || benefit.benefit_type || '';
             let benefitDescription = benefit.display_description || benefit.description || '';
             
+            // Check if this benefit is linked to a venue (restaurant, bar, or activity)
+            const hasVenueLink = benefit.venue_id && benefit.venue_type;
+            const venueUrl = hasVenueLink ? '/offering-detail?id=' + benefit.venue_id + '&property=' + (window.propertyData?.property_id || '1') : null;
+            
             // Debug logging - show actual values
             console.log('🔍 BENEFIT:', benefitName);
             console.log('   display_name:', benefit.display_name);
             console.log('   venue_name:', benefit.venue_name);
             console.log('   benefit_type:', benefit.benefit_type);
+            console.log('   venue_id:', benefit.venue_id);
+            console.log('   venue_type:', benefit.venue_type);
+            console.log('   venue_url:', venueUrl);
             console.log('   display_description:', benefit.display_description);
             console.log('   description:', benefit.description);
             console.log('   final name:', benefitName);
@@ -23863,13 +23872,20 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             const accentBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.1)';
             const accentBorder = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.2)';
             
-            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 hover:shadow-lg transition-all duration-300" style="border-color: ' + accentBorder + ';">' +
+            // Determine if the card should be clickable
+            const cardClass = hasVenueLink ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : '';
+            const cardClick = hasVenueLink ? 'onclick="window.location.href=\'' + venueUrl + '\'"' : '';
+            
+            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 hover:shadow-lg transition-all duration-300 ' + cardClass + '" style="border-color: ' + accentBorder + ';" ' + cardClick + '>' +
               '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
                 '<i class="' + icon + ' text-lg"></i>' +
               '</div>' +
               '<div class="flex-1 min-w-0">' +
                 '<div class="flex items-start justify-between gap-3 mb-2">' +
-                  '<h5 class="font-bold text-gray-900 text-base leading-tight">' + benefitName + '</h5>' +
+                  '<div class="flex-1">' +
+                    '<h5 class="font-bold text-gray-900 text-base leading-tight">' + benefitName + '</h5>' +
+                    (hasVenueLink ? '<p class="text-xs text-gray-500 mt-1 flex items-center gap-1"><i class="fas fa-arrow-up-right-from-square"></i> <span data-i18n="tier-click-details">Click for details</span></p>' : '') +
+                  '</div>' +
                   '<div>' + accessBadgeHTML + '</div>' +
                 '</div>' +
                 (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
