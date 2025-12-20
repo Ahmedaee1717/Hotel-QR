@@ -4,10 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://fde5e4be.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://fde5e4be.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**My Perfect Week:** https://fde5e4be.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NEW!**
-**Admin Dashboard:** https://fde5e4be.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://e97f45b4.project-c8738f5c.pages.dev 🚀 **LATEST!**
+**Property Landing Page (6-DIGIT PIN!):** https://e97f45b4.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**My Perfect Week:** https://e97f45b4.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NEW!**
+**Admin Dashboard:** https://e97f45b4.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
