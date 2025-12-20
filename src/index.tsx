@@ -55357,23 +55357,40 @@ app.get('/my-perfect-week', async (c) => {
                 return;
             }
             
-            // Define hourly slots with meal period suggestions
+            // Define hourly slots with meal period suggestions and restaurant availability
             const hourlySlots = [
-                { time: '07:00', label: '7 AM', period: 'breakfast', icon: '☀️', suggestion: 'Breakfast' },
+                { time: '06:00', label: '6 AM', period: 'early', icon: '🌄' },
+                { time: '06:30', label: '6:30 AM', period: 'early', icon: '🌄' },
+                { time: '07:00', label: '7 AM', period: 'breakfast', icon: '☀️', suggestion: 'Breakfast', restaurant: 'Sunrise Breakfast Buffet' },
+                { time: '07:30', label: '7:30 AM', period: 'breakfast', icon: '☀️', restaurant: 'Le Jardin Fine Dining' },
                 { time: '08:00', label: '8 AM', period: 'breakfast', icon: '☀️' },
+                { time: '08:30', label: '8:30 AM', period: 'morning', icon: '☀️' },
                 { time: '09:00', label: '9 AM', period: 'morning', icon: '🌅' },
+                { time: '09:30', label: '9:30 AM', period: 'morning', icon: '🌅' },
                 { time: '10:00', label: '10 AM', period: 'morning', icon: '🌅' },
+                { time: '10:30', label: '10:30 AM', period: 'morning', icon: '🌅' },
                 { time: '11:00', label: '11 AM', period: 'morning', icon: '☀️' },
-                { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch' },
+                { time: '11:30', label: '11:30 AM', period: 'morning', icon: '☀️' },
+                { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch', restaurant: 'Azure Beach Grill' },
+                { time: '12:30', label: '12:30 PM', period: 'lunch', icon: '🍽️', restaurant: 'Le Jardin Fine Dining' },
                 { time: '13:00', label: '1 PM', period: 'lunch', icon: '🍽️' },
+                { time: '13:30', label: '1:30 PM', period: 'afternoon', icon: '🍽️' },
                 { time: '14:00', label: '2 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '14:30', label: '2:30 PM', period: 'afternoon', icon: '🌤️' },
                 { time: '15:00', label: '3 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '15:30', label: '3:30 PM', period: 'afternoon', icon: '🌤️' },
                 { time: '16:00', label: '4 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '16:30', label: '4:30 PM', period: 'afternoon', icon: '🌤️' },
                 { time: '17:00', label: '5 PM', period: 'evening', icon: '🌆' },
-                { time: '18:00', label: '6 PM', period: 'dinner', icon: '🍴', suggestion: 'Dinner' },
-                { time: '19:00', label: '7 PM', period: 'dinner', icon: '🍴' },
+                { time: '17:30', label: '5:30 PM', period: 'evening', icon: '🌆' },
+                { time: '18:00', label: '6 PM', period: 'dinner', icon: '🍴', suggestion: 'Dinner', restaurant: 'Azure Beach Grill' },
+                { time: '18:30', label: '6:30 PM', period: 'dinner', icon: '🍴' },
+                { time: '19:00', label: '7 PM', period: 'dinner', icon: '🍴', restaurant: 'Le Jardin Fine Dining' },
+                { time: '19:30', label: '7:30 PM', period: 'dinner', icon: '🍴' },
                 { time: '20:00', label: '8 PM', period: 'evening', icon: '🌙' },
+                { time: '20:30', label: '8:30 PM', period: 'evening', icon: '🌙' },
                 { time: '21:00', label: '9 PM', period: 'evening', icon: '🌙' },
+                { time: '21:30', label: '9:30 PM', period: 'night', icon: '🌙' },
                 { time: '22:00', label: '10 PM', period: 'night', icon: '🌙' }
             ];
             
@@ -55409,17 +55426,18 @@ app.get('/my-perfect-week', async (c) => {
                         \${hourlySlots.map(slot => {
                             const itemsInSlot = itemsByHour[slot.time] || [];
                             const hasSuggestion = slot.suggestion && itemsInSlot.length === 0;
+                            const hasRestaurant = slot.restaurant && itemsInSlot.length === 0;
                             
                             return \`
                                 <div class="flex gap-2 items-start group hover:bg-gray-50 p-2 rounded-lg transition">
                                     <!-- Time Label -->
-                                    <div class="w-16 flex-shrink-0 text-right">
+                                    <div class="w-20 flex-shrink-0 text-right">
                                         <span class="text-xs font-semibold text-gray-600">\${slot.label}</span>
                                         <span class="ml-1">\${slot.icon}</span>
                                     </div>
                                     
                                     <!-- Slot Content -->
-                                    <div class="flex-1 min-h-[40px] \${hasSuggestion ? 'border-l-2 border-dashed border-gray-300' : 'border-l-2 border-gray-200'} pl-3">
+                                    <div class="flex-1 min-h-[40px] \${(hasSuggestion || hasRestaurant) ? 'border-l-2 border-dashed border-purple-300' : 'border-l-2 border-gray-200'} pl-3">
                                         \${itemsInSlot.length > 0 ? itemsInSlot.map(item => \`
                                             <div class="bg-\${item.color}-50 border border-\${item.color}-200 rounded-lg p-2 mb-2">
                                                 <div class="flex items-start justify-between gap-2">
@@ -55450,7 +55468,26 @@ app.get('/my-perfect-week', async (c) => {
                                             </div>
                                         \`).join('') : ''}
                                         
-                                        \${hasSuggestion ? \`
+                                        \${hasRestaurant ? \`
+                                            <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-2 mb-2">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <div class="flex items-center gap-2 flex-1">
+                                                        <span class="text-lg">🍽️</span>
+                                                        <div class="flex-1 min-w-0">
+                                                            <h4 class="font-semibold text-purple-900 text-sm">\${slot.restaurant}</h4>
+                                                            <p class="text-xs text-purple-600">Available at \${slot.label}</p>
+                                                        </div>
+                                                    </div>
+                                                    <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
+                                                            class="px-3 py-1.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold hover:shadow-lg transition flex items-center gap-1.5 whitespace-nowrap">
+                                                        <i class="fas fa-calendar-plus"></i>
+                                                        Reserve
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        \` : ''}
+                                        
+                                        \${hasSuggestion && !hasRestaurant ? \`
                                             <div class="flex items-center justify-between gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <span class="text-xs text-gray-500 italic">\${slot.suggestion} time</span>
                                                 <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
@@ -55461,7 +55498,7 @@ app.get('/my-perfect-week', async (c) => {
                                             </div>
                                         \` : ''}
                                         
-                                        \${!hasSuggestion && itemsInSlot.length === 0 ? \`
+                                        \${!hasSuggestion && !hasRestaurant && itemsInSlot.length === 0 ? \`
                                             <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
                                                     class="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1">
                                                 <i class="fas fa-plus-circle"></i>
