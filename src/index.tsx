@@ -18072,8 +18072,33 @@ app.get('/api/guest/tier-benefits', async (c) => {
         `).bind(pass.tier_id, pass.property_id).all()
         benefits = result.results || []
         
-        // Add display names and descriptions from database
+        // Fetch linked venues for each benefit (new many-to-many relationship)
         for (const benefit of benefits) {
+          try {
+            const venuesResult = await DB.prepare(`
+              SELECT 
+                bv.custom_cta_text,
+                bv.display_order,
+                ho.offering_id,
+                ho.title_en as name,
+                ho.offering_type as type,
+                ho.short_description_en as description,
+                ho.images,
+                ho.location,
+                ho.price,
+                ho.currency
+              FROM benefit_venues bv
+              JOIN hotel_offerings ho ON bv.venue_id = ho.offering_id
+              WHERE bv.benefit_id = ? AND ho.status = 'active'
+              ORDER BY bv.display_order, bv.benefit_venue_id
+            `).bind(benefit.benefit_id).all()
+            
+            benefit.linked_venues = venuesResult.results || []
+          } catch (venuesError) {
+            // If benefit_venues table doesn't exist yet, fall back to single venue
+            benefit.linked_venues = []
+          }
+          
           // ALWAYS use benefit_title from database as primary source
           benefit.display_name = benefit.benefit_title || benefit.venue_name || benefit.benefit_type
           
@@ -23821,30 +23846,21 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           console.log('🔍 ALL BENEFITS FOR CATEGORY:', category);
           benefits.forEach(b => {
             console.log('  - Benefit:', b.benefit_title || b.display_name);
+            console.log('    linked_venues:', b.linked_venues);
             console.log('    venue_id:', b.venue_id);
-            console.log('    venue_type:', b.venue_type);
-            console.log('    venue_name:', b.venue_name);
-            console.log('    venue_cta_text:', b.venue_cta_text);
           });
-          
-          // Separate benefits with and without venue links
-          const regularBenefits = benefits.filter(b => !b.venue_id || !b.venue_type);
-          const linkedVenues = benefits.filter(b => b.venue_id && b.venue_type);
-          
-          console.log('📊 Split results:');
-          console.log('  - Regular benefits:', regularBenefits.length);
-          console.log('  - Linked venues:', linkedVenues.length);
           
           let html = '';
           
-          // Render regular benefits first
-          regularBenefits.forEach(benefit => {
+          // Render each benefit
+          benefits.forEach(benefit => {
             const icon = getBenefitIcon(benefit.benefit_type, category);
             const accessLevel = benefit.access_level || 'unlimited';
             const quantity = benefit.quantity_limit || null;
             
             let benefitName = benefit.display_name || benefit.venue_name || benefit.benefit_type || '';
             let benefitDescription = benefit.display_description || benefit.description || '';
+            const hasLinkedVenues = benefit.linked_venues && benefit.linked_venues.length > 0;
             
             let accessBadgeHTML = '';
             if (accessLevel === 'unlimited') {
@@ -23868,87 +23884,68 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             const rgb = hexToRgb(accentColor);
             const accentBorder = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.2)';
+            const accentBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.05)';
             
-            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 hover:shadow-lg transition-all duration-300" style="border-color: ' + accentBorder + ';">' +
-              '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
-                '<i class="' + icon + ' text-lg"></i>' +
-              '</div>' +
-              '<div class="flex-1 min-w-0">' +
-                '<div class="flex items-start justify-between gap-3 mb-2">' +
-                  '<div class="flex-1">' +
-                    '<h5 class="font-bold text-gray-900 text-base leading-tight">' + benefitName + '</h5>' +
-                  '</div>' +
-                  '<div>' + accessBadgeHTML + '</div>' +
+            // Main benefit card
+            html += '<div class="mb-6 p-5 bg-white rounded-2xl border-2 shadow-sm" style="border-color: ' + accentBorder + ';">' +
+              '<div class="flex items-start gap-4 mb-3">' +
+                '<div class="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-md flex-shrink-0" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
+                  '<i class="' + icon + ' text-lg"></i>' +
                 '</div>' +
-                (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
-              '</div>' +
-            '</div>';
-          });
-          
-          // Render linked venues in a special highlighted section
-          if (linkedVenues.length > 0) {
-            // Add a separator if there are regular benefits
-            if (regularBenefits.length > 0) {
-              html += '<div class="my-6 border-t-2 border-dashed border-gray-200"></div>';
+                '<div class="flex-1 min-w-0">' +
+                  '<div class="flex items-start justify-between gap-3 mb-2">' +
+                    '<h5 class="font-bold text-gray-900 text-lg leading-tight">' + benefitName + '</h5>' +
+                    accessBadgeHTML +
+                  '</div>' +
+                  (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
+                '</div>' +
+              '</div>';
+            
+            // Render linked venues in an elegant grid
+            if (hasLinkedVenues) {
+              html += '<div class="mt-4 pt-4 border-t border-gray-200">' +
+                '<p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Available At:</p>' +
+                '<div class="grid gap-3">';
+              
+              benefit.linked_venues.forEach(venue => {
+                const venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                const venueCTA = venue.custom_cta_text || 'View Details';
+                
+                // Parse images JSON
+                let venueImage = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400';
+                try {
+                  const images = JSON.parse(venue.images || '[]');
+                  if (images && images.length > 0) {
+                    venueImage = images[0];
+                  }
+                } catch (e) {}
+                
+                // Elegant venue card with image thumbnail
+                html += '<div onclick="window.location.href=&quot;' + venueUrl + '&quot;" class="group cursor-pointer bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden border border-gray-200 hover:border-' + accentColor.replace('#', '') + ' hover:shadow-xl transition-all duration-300">' +
+                  '<div class="flex items-center gap-4 p-3">' +
+                    // Venue thumbnail
+                    '<div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 shadow-md">' +
+                      '<img src="' + venueImage + '" alt="' + venue.name + '" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />' +
+                    '</div>' +
+                    // Venue info
+                    '<div class="flex-1 min-w-0">' +
+                      '<h6 class="font-bold text-gray-900 text-base mb-1 group-hover:text-' + accentColor.replace('#', '') + ' transition-colors">' + venue.name + '</h6>' +
+                      (venue.location ? '<p class="text-xs text-gray-500 mb-1 flex items-center gap-1"><i class="fas fa-map-marker-alt"></i> ' + venue.location + '</p>' : '') +
+                      (venue.price && venue.price > 0 ? '<p class="text-xs font-semibold text-gray-700">' + venue.currency + ' ' + venue.price + '</p>' : '') +
+                    '</div>' +
+                    // CTA arrow
+                    '<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
+                      '<i class="fas fa-arrow-right text-xs"></i>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>';
+              });
+              
+              html += '</div></div>';
             }
             
-            linkedVenues.forEach(benefit => {
-              const icon = getBenefitIcon(benefit.benefit_type, category);
-              const accessLevel = benefit.access_level || 'unlimited';
-              const quantity = benefit.quantity_limit || null;
-              
-              let benefitName = benefit.display_name || benefit.venue_name || benefit.benefit_type || '';
-              let benefitDescription = benefit.display_description || benefit.description || '';
-              const venueCTA = benefit.venue_cta_text || 'View Details';
-              const venueUrl = '/offering-detail?id=' + benefit.venue_id + '&property=' + (window.propertyData?.property_id || '1');
-              
-              let accessBadgeHTML = '';
-              if (accessLevel === 'unlimited') {
-                accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border-2 border-green-200"><i class="fas fa-infinity"></i> <span data-i18n="tier-unlimited">Unlimited</span></span>';
-              } else if (accessLevel === 'limited' && quantity) {
-                accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border-2 border-blue-200"><i class="fas fa-hashtag"></i> ' + quantity + 'x</span>';
-              } else if (accessLevel === 'once_daily') {
-                accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 text-xs font-bold rounded-full border-2 border-orange-200"><i class="fas fa-calendar-day"></i> <span data-i18n="tier-daily">Daily</span></span>';
-              } else if (accessLevel === 'restricted') {
-                accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-gray-50 text-gray-600 text-xs font-bold rounded-full border-2 border-gray-200"><i class="fas fa-lock"></i> <span data-i18n="tier-limited">Limited</span></span>';
-              }
-              
-              const hexToRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                return result ? {
-                  r: parseInt(result[1], 16),
-                  g: parseInt(result[2], 16),
-                  b: parseInt(result[3], 16)
-                } : { r: 245, g: 158, b: 11 };
-              };
-              
-              const rgb = hexToRgb(accentColor);
-              const accentBorder = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.3)';
-              const accentBg = 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ', 0.05)';
-              
-              // Special highlighted card for linked venues
-              html += '<div class="group relative bg-gradient-to-br from-white via-white to-gray-50 p-5 rounded-2xl border-2 shadow-md hover:shadow-2xl transition-all duration-300" style="border-color: ' + accentBorder + '; background-color: ' + accentBg + ';">' +
-                '<div class="flex items-start gap-4 mb-3">' +
-                  '<div class="w-14 h-14 rounded-xl flex items-center justify-center text-white shadow-xl flex-shrink-0 group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
-                    '<i class="' + icon + ' text-xl"></i>' +
-                  '</div>' +
-                  '<div class="flex-1 min-w-0">' +
-                    '<div class="flex items-start justify-between gap-3 mb-2">' +
-                      '<div class="flex-1">' +
-                        '<h5 class="font-bold text-gray-900 text-lg leading-tight">' + benefitName + '</h5>' +
-                      '</div>' +
-                      '<div>' + accessBadgeHTML + '</div>' +
-                    '</div>' +
-                    (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed mb-3">' + benefitDescription + '</p>' : '') +
-                  '</div>' +
-                '</div>' +
-                '<button onclick="window.location.href=&quot;' + venueUrl + '&quot;" class="w-full mt-2 px-4 py-3 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
-                  '<i class="fas fa-arrow-right"></i>' +
-                  '<span>' + venueCTA + '</span>' +
-                '</button>' +
-              '</div>';
-            });
-          }
+            html += '</div>';
+          });
           
           
           list.innerHTML = html;
