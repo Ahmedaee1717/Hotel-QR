@@ -55658,17 +55658,22 @@ app.get('/my-perfect-week', async (c) => {
             grid.innerHTML = offerings.map(offering => {
                 const typeIcons = {
                     activity: '🎯',
+                    restaurant: '🍽️',
                     dining: '🍽️',
                     spa: '💆',
                     event: '🎉',
+                    room_service: '🛎️',
                     service: '🛎️'
                 };
                 
                 const icon = typeIcons[offering.offering_type] || '✨';
                 const requiresBooking = offering.requires_booking === 1 || offering.capacity_per_slot > 0;
                 
+                // Map offering types for filter compatibility (restaurant → dining)
+                const displayType = offering.offering_type === 'restaurant' ? 'dining' : offering.offering_type;
+                
                 return \`
-                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${offering.offering_type}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}')">
+                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${displayType}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}')">
                         <div class="flex items-start gap-3">
                             <div class="text-3xl flex-shrink-0">\${icon}</div>
                             <div class="flex-1 min-w-0">
