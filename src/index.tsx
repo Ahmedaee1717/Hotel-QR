@@ -18402,7 +18402,7 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
     
     // Get smart suggestions
     const suggestions = await DB.prepare(`
-      SELECT ts.*, ho.title_en, ho.description_en, ho.offering_type, ho.images, ho.price, ho.currency
+      SELECT ts.*, ho.title_en, ho.full_description_en as description, ho.offering_type, ho.images, ho.price, ho.currency
       FROM timeline_suggestions ts
       JOIN hotel_offerings ho ON ts.offering_id = ho.offering_id
       WHERE ts.plan_id = ? AND ts.is_dismissed = 0 AND ts.is_accepted = 0
