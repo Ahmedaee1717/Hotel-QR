@@ -17809,6 +17809,7 @@ app.get('/api/guest/tier-benefits', async (c) => {
   const { DB } = c.env
   const propertyId = c.req.header('X-Property-ID') || '1'
   const passReference = c.req.query('pass_reference')
+  const language = c.req.query('lang') || c.req.query('language') || 'en'
   
   if (!passReference) {
     return c.json({ error: 'Pass reference required' }, 400)
@@ -17833,6 +17834,63 @@ app.get('/api/guest/tier-benefits', async (c) => {
     
     if (!pass) {
       return c.json({ error: 'Pass not found or not active' }, 404)
+    }
+    
+    // Translate tier name and description if needed
+    let tierName = pass.tier_display_name
+    let tierDescription = pass.tier_description
+    
+    if (language !== 'en') {
+      try {
+        if (tierName) {
+          const nameResult = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{
+                role: 'system',
+                content: `You are a professional translator. Translate the following hotel tier name to ${language}. Keep it concise. Return ONLY the translation, nothing else.`
+              }, {
+                role: 'user',
+                content: tierName
+              }],
+              temperature: 0.3
+            })
+          })
+          const nameData = await nameResult.json()
+          tierName = nameData.choices[0].message.content.trim()
+        }
+        
+        if (tierDescription) {
+          const descResult = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{
+                role: 'system',
+                content: `You are a professional translator. Translate the following hotel tier description to ${language}. Return ONLY the translation, nothing else.`
+              }, {
+                role: 'user',
+                content: tierDescription
+              }],
+              temperature: 0.3
+            })
+          })
+          const descData = await descResult.json()
+          tierDescription = descData.choices[0].message.content.trim()
+        }
+      } catch (translateError) {
+        console.error('Tier translation error:', translateError)
+        // Keep English if translation fails
+      }
     }
     
     // Get tier benefits
@@ -17862,6 +17920,70 @@ app.get('/api/guest/tier-benefits', async (c) => {
       }
     }
     
+    // Translate benefits if not English
+    if (language !== 'en' && benefits.length > 0) {
+      for (const benefit of benefits) {
+        try {
+          // Translate venue_name or benefit_type
+          const benefitName = benefit.venue_name || benefit.benefit_type || ''
+          if (benefitName) {
+            const nameResult = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{
+                  role: 'system',
+                  content: `You are a professional translator. Translate the following hotel benefit name to ${language}. Keep it concise (1-4 words). Return ONLY the translation, nothing else.`
+                }, {
+                  role: 'user',
+                  content: benefitName
+                }],
+                temperature: 0.3
+              })
+            })
+            const nameData = await nameResult.json()
+            const translatedName = nameData.choices[0].message.content.trim()
+            if (benefit.venue_name) {
+              benefit.venue_name = translatedName
+            } else {
+              benefit.benefit_type = translatedName
+            }
+          }
+          
+          // Translate description
+          if (benefit.description) {
+            const descResult = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{
+                  role: 'system',
+                  content: `You are a professional translator. Translate the following hotel benefit description to ${language}. Return ONLY the translation, nothing else.`
+                }, {
+                  role: 'user',
+                  content: benefit.description
+                }],
+                temperature: 0.3
+              })
+            })
+            const descData = await descResult.json()
+            benefit.description = descData.choices[0].message.content.trim()
+          }
+        } catch (translateError) {
+          console.error('Benefit translation error:', translateError)
+          // Keep English if translation fails
+        }
+      }
+    }
+    
     // Group benefits by category
     const groupedBenefits = {
       dining: [],
@@ -17881,10 +18003,10 @@ app.get('/api/guest/tier-benefits', async (c) => {
     return c.json({
       success: true,
       tier: {
-        name: pass.tier_display_name,
+        name: tierName,
         color: pass.tier_color,
         icon: pass.tier_icon,
-        description: pass.tier_description,
+        description: tierDescription,
         upgrade_price: pass.daily_upgrade_price
       },
       benefits: groupedBenefits,
@@ -23272,7 +23394,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         async function loadTierBenefits(passReference) {
           try {
             const propertyId = propertyData?.property_id || '1';
-            const response = await fetch('/api/guest/tier-benefits?pass_reference=' + passReference, {
+            // Pass language parameter to API
+            const response = await fetch('/api/guest/tier-benefits?pass_reference=' + passReference + '&lang=' + currentLanguage, {
               headers: {
                 'X-Property-ID': propertyId
               }
@@ -23282,7 +23405,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             if (data.success) {
               tierBenefitsData = data;
-              await displayTierBenefitsCard(data);
+              displayTierBenefitsCard(data);
             } else {
               console.error('Failed to load tier benefits:', data.error);
             }
@@ -23291,7 +23414,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        async function displayTierBenefitsCard(data) {
+        function displayTierBenefitsCard(data) {
           const card = document.getElementById('tierBenefitsCard');
           if (!card) return;
           
@@ -23331,34 +23454,24 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             iconBadge.innerHTML = '<i class="' + data.tier.icon + '"></i>';
           }
           
-          // Set tier name and description (translate if needed)
+          // Set tier name and description (already translated by API)
           const tierName = document.getElementById('tierName');
           const tierDesc = document.getElementById('tierDescription');
           
           if (tierName) {
-            let name = data.tier.name || 'All-Inclusive';
-            // Translate tier name if not English
-            if (currentLanguage !== 'en') {
-              name = await translateText(name, currentLanguage);
-            }
-            tierName.textContent = name;
+            tierName.textContent = data.tier.name || 'All-Inclusive';
           }
           
           if (tierDesc && data.tier.description) {
-            let description = data.tier.description;
-            // Translate tier description if not English
-            if (currentLanguage !== 'en') {
-              description = await translateText(description, currentLanguage);
-            }
-            tierDesc.textContent = description;
+            tierDesc.textContent = data.tier.description;
           }
           
-          // Display benefits by category (pass tier color) - await translations
-          await displayBenefitsByCategory('dining', data.benefits.dining || [], tierColor);
-          await displayBenefitsByCategory('drinks', data.benefits.drinks || [], tierColor);
-          await displayBenefitsByCategory('recreation', data.benefits.recreation || [], tierColor);
-          await displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
-          await displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
+          // Display benefits by category (already translated by API)
+          displayBenefitsByCategory('dining', data.benefits.dining || [], tierColor);
+          displayBenefitsByCategory('drinks', data.benefits.drinks || [], tierColor);
+          displayBenefitsByCategory('recreation', data.benefits.recreation || [], tierColor);
+          displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
+          displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
           
           // Apply translations to tier card elements
           document.querySelectorAll('#tierBenefitsCard [data-i18n]').forEach(el => {
@@ -23418,7 +23531,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        async function displayBenefitsByCategory(category, benefits, tierColor) {
+        function displayBenefitsByCategory(category, benefits, tierColor) {
           const section = document.getElementById(category + 'BenefitsSection');
           const list = document.getElementById(category + 'BenefitsList');
           
@@ -23436,26 +23549,18 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           
           let html = '';
           
-          // Translate all benefits before rendering
-          for (const benefit of benefits) {
+          // Benefits are already translated by the API
+          benefits.forEach(benefit => {
             const icon = getBenefitIcon(benefit.benefit_type, category);
             const accessLevel = benefit.access_level || 'unlimited';
             const quantity = benefit.quantity_limit || null;
             
-            // Format benefit name - replace underscores with spaces and capitalize
+            // Format benefit name - already translated by API, just capitalize
             let benefitName = benefit.venue_name || benefit.benefit_type || '';
             benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             
-            // TRANSLATE benefit name if not in English
-            if (currentLanguage !== 'en') {
-              benefitName = await translateText(benefitName, currentLanguage);
-            }
-            
-            // TRANSLATE description if exists and not in English
+            // Description is already translated by API
             let benefitDescription = benefit.description || '';
-            if (benefitDescription && currentLanguage !== 'en') {
-              benefitDescription = await translateText(benefitDescription, currentLanguage);
-            }
             
             let accessBadgeHTML = '';
             if (accessLevel === 'unlimited') {
@@ -23494,7 +23599,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
               '</div>' +
             '</div>';
-          }
+          });
           
           list.innerHTML = html;
         }
