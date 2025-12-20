@@ -19313,23 +19313,30 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 
                 <!-- Tier Benefits Card (Shown when guest is linked) -->
                 <section id="tierBenefitsCard" class="mb-8 hidden">
-                    <div class="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border-2 overflow-hidden" id="tierCard">
+                    <div class="rounded-3xl shadow-2xl overflow-hidden border-2 border-white/20" id="tierCard" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                         <!-- Card Header with Tier Badge -->
-                        <div class="relative p-6 pb-4" id="tierCardHeader">
-                            <div class="flex items-start justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl shadow-lg" id="tierIconBadge">
-                                        <i class="fas fa-crown"></i>
+                        <div class="relative p-8 pb-6 text-white" id="tierCardHeader">
+                            <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                            <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                            <div class="relative z-10">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex items-center gap-5">
+                                        <div class="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl shadow-2xl backdrop-blur-xl bg-white/20" id="tierIconBadge">
+                                            <i class="fas fa-crown"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-xs font-bold text-white/80 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <i class="fas fa-badge-check"></i>
+                                                <span data-i18n="tier-your-membership">Your Membership</span>
+                                            </div>
+                                            <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
+                                            <p class="text-sm text-white/90 mt-1 font-medium" id="tierDescription"></p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1" data-i18n="tier-your-membership">Your Membership</div>
-                                        <h3 class="text-2xl font-bold text-gray-900" id="tierName">Loading...</h3>
-                                        <p class="text-sm text-gray-600 mt-1" id="tierDescription"></p>
-                                    </div>
+                                    <button onclick="toggleTierDetails()" class="text-white/80 hover:text-white transition p-3 hover:bg-white/10 rounded-xl">
+                                        <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
+                                    </button>
                                 </div>
-                                <button onclick="toggleTierDetails()" class="text-gray-500 hover:text-gray-700 transition p-2">
-                                    <i class="fas fa-chevron-down transition-transform" id="tierToggleIcon"></i>
-                                </button>
                             </div>
                             
                             <!-- Gamification Stats (Future Phase) -->
@@ -19353,52 +19360,62 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         
                         <!-- Collapsible Benefits Details -->
                         <div class="hidden" id="tierDetailsPanel">
-                            <div class="px-6 pb-6">
+                            <div class="bg-white px-8 pb-8 pt-6">
                                 <!-- Benefits by Category -->
                                 <div class="space-y-6">
                                     <!-- Dining Benefits -->
                                     <div id="diningBenefitsSection" class="hidden">
-                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <i class="fas fa-utensils text-orange-500"></i>
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-orange-200">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white shadow-lg">
+                                                <i class="fas fa-utensils"></i>
+                                            </div>
                                             <span data-i18n="tier-dining">Dining</span>
                                         </h4>
-                                        <div class="space-y-2" id="diningBenefitsList"></div>
+                                        <div class="space-y-3" id="diningBenefitsList"></div>
                                     </div>
                                     
                                     <!-- Drinks Benefits -->
                                     <div id="drinksBenefitsSection" class="hidden">
-                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <i class="fas fa-cocktail text-pink-500"></i>
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-pink-200">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white shadow-lg">
+                                                <i class="fas fa-cocktail"></i>
+                                            </div>
                                             <span data-i18n="tier-drinks">Drinks</span>
                                         </h4>
-                                        <div class="space-y-2" id="drinksBenefitsList"></div>
+                                        <div class="space-y-3" id="drinksBenefitsList"></div>
                                     </div>
                                     
                                     <!-- Recreation Benefits -->
                                     <div id="recreationBenefitsSection" class="hidden">
-                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <i class="fas fa-swimming-pool text-blue-500"></i>
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-blue-200">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                                                <i class="fas fa-swimming-pool"></i>
+                                            </div>
                                             <span data-i18n="tier-recreation">Recreation</span>
                                         </h4>
-                                        <div class="space-y-2" id="recreationBenefitsList"></div>
+                                        <div class="space-y-3" id="recreationBenefitsList"></div>
                                     </div>
                                     
                                     <!-- Services Benefits -->
                                     <div id="servicesBenefitsSection" class="hidden">
-                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <i class="fas fa-concierge-bell text-purple-500"></i>
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-purple-200">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                                                <i class="fas fa-concierge-bell"></i>
+                                            </div>
                                             <span data-i18n="tier-services">Services</span>
                                         </h4>
-                                        <div class="space-y-2" id="servicesBenefitsList"></div>
+                                        <div class="space-y-3" id="servicesBenefitsList"></div>
                                     </div>
                                     
                                     <!-- Amenities Benefits -->
                                     <div id="amenitiesBenefitsSection" class="hidden">
-                                        <h4 class="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <i class="fas fa-star text-yellow-500"></i>
+                                        <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2 border-yellow-200">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-white shadow-lg">
+                                                <i class="fas fa-star"></i>
+                                            </div>
                                             <span data-i18n="tier-amenities">Amenities</span>
                                         </h4>
-                                        <div class="space-y-2" id="amenitiesBenefitsList"></div>
+                                        <div class="space-y-3" id="amenitiesBenefitsList"></div>
                                     </div>
                                 </div>
                                 
@@ -20922,7 +20939,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             'tier-recreation': 'Recreation',
             'tier-services': 'Services',
             'tier-amenities': 'Amenities',
-            'tier-upgrade': 'Upgrade Your Tier'
+            'tier-upgrade': 'Upgrade Your Tier',
+            'tier-unlimited': 'Unlimited',
+            'tier-daily': 'Daily',
+            'tier-limited': 'Limited'
           },
           ar: { 
             all: 'الكل', 
@@ -20948,7 +20968,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             'tier-recreation': 'ترفيه',
             'tier-services': 'خدمات',
             'tier-amenities': 'وسائل راحة',
-            'tier-upgrade': 'ترقية مستواك'
+            'tier-upgrade': 'ترقية مستواك',
+            'tier-unlimited': 'غير محدود',
+            'tier-daily': 'يومي',
+            'tier-limited': 'محدود'
           },
           de: { 
             all: 'Alle', 
@@ -23034,25 +23057,31 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           // Show the card
           card.classList.remove('hidden');
           
-          // Apply tier color to header and badge
-          const tierColor = data.tier.color || '#6366f1';
-          const primaryColor = propertyData?.primary_color || tierColor;
-          const secondaryColor = propertyData?.secondary_color || tierColor;
+          // Apply TIER COLOR (not property color!) to header and badge
+          const tierColor = data.tier.color || '#667eea';
+          
+          // Calculate darker shade for gradient
+          const hex = tierColor.replace('#', '');
+          const r = parseInt(hex.slice(0, 2), 16);
+          const g = parseInt(hex.slice(2, 4), 16);
+          const b = parseInt(hex.slice(4, 6), 16);
+          
+          // Darker shade for gradient end
+          const darkerR = Math.max(0, r - 50);
+          const darkerG = Math.max(0, g - 50);
+          const darkerB = Math.max(0, b - 50);
+          const darkerColor = '#' + 
+            darkerR.toString(16).padStart(2, '0') +
+            darkerG.toString(16).padStart(2, '0') +
+            darkerB.toString(16).padStart(2, '0');
           
           const header = document.getElementById('tierCardHeader');
-          const badge = document.getElementById('tierIconBadge');
-          const tierCard = document.getElementById('tierCard');
+          const tierCardMain = document.getElementById('tierCard');
           
-          if (header) {
-            header.style.background = 'linear-gradient(135deg, ' + primaryColor + '15 0%, ' + secondaryColor + '10 100%)';
-          }
-          
-          if (badge) {
-            badge.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + secondaryColor + ' 100%)';
-          }
-          
-          if (tierCard) {
-            tierCard.style.borderColor = primaryColor + '40';
+          // Apply tier color gradient to card background
+          if (tierCardMain) {
+            tierCardMain.style.background = 'linear-gradient(135deg, ' + tierColor + ' 0%, ' + darkerColor + ' 100%)';
+            tierCardMain.style.borderColor = tierColor + '40';
           }
           
           // Set tier icon
@@ -23073,12 +23102,12 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             tierDesc.textContent = data.tier.description;
           }
           
-          // Display benefits by category
-          displayBenefitsByCategory('dining', data.benefits.dining || []);
-          displayBenefitsByCategory('drinks', data.benefits.drinks || []);
-          displayBenefitsByCategory('recreation', data.benefits.recreation || []);
-          displayBenefitsByCategory('services', data.benefits.services || []);
-          displayBenefitsByCategory('amenities', data.benefits.amenities || []);
+          // Display benefits by category (pass tier color)
+          displayBenefitsByCategory('dining', data.benefits.dining || [], tierColor);
+          displayBenefitsByCategory('drinks', data.benefits.drinks || [], tierColor);
+          displayBenefitsByCategory('recreation', data.benefits.recreation || [], tierColor);
+          displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
+          displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
           
           // Show total benefits count in description if empty
           if (!data.tier.description && tierDesc) {
@@ -23086,7 +23115,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        function displayBenefitsByCategory(category, benefits) {
+        function displayBenefitsByCategory(category, benefits, tierColor) {
           const section = document.getElementById(category + 'BenefitsSection');
           const list = document.getElementById(category + 'BenefitsList');
           
@@ -23099,43 +23128,53 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           
           section.classList.remove('hidden');
           
-          // Get primary color for benefit icons
-          const primaryColor = propertyData?.primary_color || '#6366f1';
-          
           let html = '';
           benefits.forEach(benefit => {
             const icon = getBenefitIcon(benefit.benefit_type, category);
             const accessLevel = benefit.access_level || 'unlimited';
             const quantity = benefit.quantity_limit || null;
             
-            let accessText = '';
+            // Format benefit name - replace underscores with spaces and capitalize
+            let benefitName = benefit.venue_name || benefit.benefit_type || '';
+            benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            let accessBadgeHTML = '';
             if (accessLevel === 'unlimited') {
-              accessText = '<span class="text-green-600 font-semibold">Unlimited</span>';
+              accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-full border-2 border-green-200"><i class="fas fa-infinity"></i> <span data-i18n="tier-unlimited">Unlimited</span></span>';
             } else if (accessLevel === 'limited' && quantity) {
-              accessText = '<span class="text-blue-600 font-semibold">' + quantity + 'x per stay</span>';
+              accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border-2 border-blue-200"><i class="fas fa-hashtag"></i> ' + quantity + 'x</span>';
             } else if (accessLevel === 'once_daily') {
-              accessText = '<span class="text-orange-600 font-semibold">Once daily</span>';
+              accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-700 text-xs font-bold rounded-full border-2 border-orange-200"><i class="fas fa-calendar-day"></i> <span data-i18n="tier-daily">Daily</span></span>';
             } else if (accessLevel === 'restricted') {
-              accessText = '<span class="text-gray-600 font-semibold">Limited access</span>';
+              accessBadgeHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 bg-gray-50 text-gray-600 text-xs font-bold rounded-full border-2 border-gray-200"><i class="fas fa-lock"></i> <span data-i18n="tier-limited">Limited</span></span>';
             }
             
-            html += '<div class="flex items-start gap-3 bg-white p-3 rounded-lg border border-gray-100 hover:border-gray-200 transition">' +
-              '<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style="background: ' + primaryColor + '20; color: ' + primaryColor + ';">' +
-                '<i class="' + icon + ' text-sm"></i>' +
+            html += '<div class="group relative flex items-start gap-4 bg-gradient-to-r from-white to-gray-50 p-4 rounded-2xl border-2 border-gray-100 hover:border-' + getCategoryColor(category) + '-200 hover:shadow-lg transition-all duration-300">' +
+              '<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-' + getCategoryColor(category) + '-400 to-' + getCategoryColor(category) + '-600 flex items-center justify-center text-white shadow-lg flex-shrink-0 group-hover:scale-110 transition-transform">' +
+                '<i class="' + icon + ' text-lg"></i>' +
               '</div>' +
               '<div class="flex-1 min-w-0">' +
-                '<div class="flex items-start justify-between gap-2">' +
-                  '<div class="flex-1">' +
-                    '<div class="font-semibold text-gray-900 text-sm">' + (benefit.venue_name || benefit.benefit_type) + '</div>' +
-                    (benefit.description ? '<div class="text-xs text-gray-600 mt-0.5">' + benefit.description + '</div>' : '') +
-                  '</div>' +
-                  '<div class="text-xs whitespace-nowrap">' + accessText + '</div>' +
+                '<div class="flex items-start justify-between gap-3 mb-2">' +
+                  '<h5 class="font-bold text-gray-900 text-base leading-tight">' + benefitName + '</h5>' +
+                  '<div>' + accessBadgeHTML + '</div>' +
                 '</div>' +
+                (benefit.description ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefit.description + '</p>' : '') +
               '</div>' +
             '</div>';
           });
           
           list.innerHTML = html;
+        }
+        
+        function getCategoryColor(category) {
+          const colorMap = {
+            'dining': 'orange',
+            'drinks': 'pink',
+            'recreation': 'blue',
+            'services': 'purple',
+            'amenities': 'yellow'
+          };
+          return colorMap[category] || 'gray';
         }
         
         function getBenefitIcon(benefitType, category) {
