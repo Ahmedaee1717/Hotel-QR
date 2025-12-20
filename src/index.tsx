@@ -18094,6 +18094,35 @@ app.get('/api/guest/tier-benefits', async (c) => {
             `).bind(benefit.benefit_id).all()
             
             benefit.linked_venues = venuesResult.results || []
+            
+            // FALLBACK: If no linked venues but has old venue_id, create a linked venue
+            if (benefit.linked_venues.length === 0 && benefit.venue_id) {
+              try {
+                const singleVenueResult = await DB.prepare(`
+                  SELECT 
+                    offering_id,
+                    title_en as name,
+                    offering_type as type,
+                    short_description_en as description,
+                    images,
+                    location,
+                    price,
+                    currency
+                  FROM hotel_offerings
+                  WHERE offering_id = ? AND status = 'active'
+                `).bind(benefit.venue_id).first()
+                
+                if (singleVenueResult) {
+                  benefit.linked_venues = [{
+                    ...singleVenueResult,
+                    custom_cta_text: benefit.venue_cta_text || 'View Details',
+                    display_order: 1
+                  }]
+                }
+              } catch (singleVenueError) {
+                console.log('Could not fetch single venue fallback:', singleVenueError)
+              }
+            }
           } catch (venuesError) {
             // If benefit_venues table doesn't exist yet, fall back to single venue
             benefit.linked_venues = []
