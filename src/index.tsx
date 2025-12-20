@@ -18098,6 +18098,19 @@ app.get('/api/guest/tier-benefits', async (c) => {
       }
     }
     
+    // Deduplicate benefits by benefit_type and venue_id
+    // Keep only the first occurrence of each unique combination
+    const seenBenefits = new Set()
+    const uniqueBenefits = []
+    
+    for (const benefit of benefits) {
+      const key = `${benefit.benefit_type}_${benefit.venue_id || 'null'}_${benefit.benefit_category}`
+      if (!seenBenefits.has(key)) {
+        seenBenefits.add(key)
+        uniqueBenefits.push(benefit)
+      }
+    }
+    
     // Group benefits by category
     const groupedBenefits = {
       dining: [],
@@ -18107,7 +18120,7 @@ app.get('/api/guest/tier-benefits', async (c) => {
       amenities: []
     }
     
-    benefits.forEach(benefit => {
+    uniqueBenefits.forEach(benefit => {
       const category = benefit.benefit_category || 'amenities'
       if (groupedBenefits[category]) {
         groupedBenefits[category].push(benefit)
@@ -18124,7 +18137,7 @@ app.get('/api/guest/tier-benefits', async (c) => {
         upgrade_price: pass.daily_upgrade_price
       },
       benefits: groupedBenefits,
-      total_benefits: benefits.length
+      total_benefits: uniqueBenefits.length
     })
   } catch (error) {
     console.error('Get tier benefits error:', error)
