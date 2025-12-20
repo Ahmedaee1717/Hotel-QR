@@ -23282,7 +23282,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             if (data.success) {
               tierBenefitsData = data;
-              displayTierBenefitsCard(data);
+              await displayTierBenefitsCard(data);
             } else {
               console.error('Failed to load tier benefits:', data.error);
             }
@@ -23291,7 +23291,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        function displayTierBenefitsCard(data) {
+        async function displayTierBenefitsCard(data) {
           const card = document.getElementById('tierBenefitsCard');
           if (!card) return;
           
@@ -23331,24 +23331,34 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             iconBadge.innerHTML = '<i class="' + data.tier.icon + '"></i>';
           }
           
-          // Set tier name and description
+          // Set tier name and description (translate if needed)
           const tierName = document.getElementById('tierName');
           const tierDesc = document.getElementById('tierDescription');
           
           if (tierName) {
-            tierName.textContent = data.tier.name || 'All-Inclusive';
+            let name = data.tier.name || 'All-Inclusive';
+            // Translate tier name if not English
+            if (currentLanguage !== 'en') {
+              name = await translateText(name, currentLanguage);
+            }
+            tierName.textContent = name;
           }
           
           if (tierDesc && data.tier.description) {
-            tierDesc.textContent = data.tier.description;
+            let description = data.tier.description;
+            // Translate tier description if not English
+            if (currentLanguage !== 'en') {
+              description = await translateText(description, currentLanguage);
+            }
+            tierDesc.textContent = description;
           }
           
-          // Display benefits by category (pass tier color)
-          displayBenefitsByCategory('dining', data.benefits.dining || [], tierColor);
-          displayBenefitsByCategory('drinks', data.benefits.drinks || [], tierColor);
-          displayBenefitsByCategory('recreation', data.benefits.recreation || [], tierColor);
-          displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
-          displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
+          // Display benefits by category (pass tier color) - await translations
+          await displayBenefitsByCategory('dining', data.benefits.dining || [], tierColor);
+          await displayBenefitsByCategory('drinks', data.benefits.drinks || [], tierColor);
+          await displayBenefitsByCategory('recreation', data.benefits.recreation || [], tierColor);
+          await displayBenefitsByCategory('services', data.benefits.services || [], tierColor);
+          await displayBenefitsByCategory('amenities', data.benefits.amenities || [], tierColor);
           
           // Apply translations to tier card elements
           document.querySelectorAll('#tierBenefitsCard [data-i18n]').forEach(el => {
@@ -23408,7 +23418,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        function displayBenefitsByCategory(category, benefits, tierColor) {
+        async function displayBenefitsByCategory(category, benefits, tierColor) {
           const section = document.getElementById(category + 'BenefitsSection');
           const list = document.getElementById(category + 'BenefitsList');
           
@@ -23425,7 +23435,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           const accentColor = propertyData?.accent_color || '#F59E0B';
           
           let html = '';
-          benefits.forEach(benefit => {
+          
+          // Translate all benefits before rendering
+          for (const benefit of benefits) {
             const icon = getBenefitIcon(benefit.benefit_type, category);
             const accessLevel = benefit.access_level || 'unlimited';
             const quantity = benefit.quantity_limit || null;
@@ -23433,6 +23445,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             // Format benefit name - replace underscores with spaces and capitalize
             let benefitName = benefit.venue_name || benefit.benefit_type || '';
             benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            // TRANSLATE benefit name if not in English
+            if (currentLanguage !== 'en') {
+              benefitName = await translateText(benefitName, currentLanguage);
+            }
+            
+            // TRANSLATE description if exists and not in English
+            let benefitDescription = benefit.description || '';
+            if (benefitDescription && currentLanguage !== 'en') {
+              benefitDescription = await translateText(benefitDescription, currentLanguage);
+            }
             
             let accessBadgeHTML = '';
             if (accessLevel === 'unlimited') {
@@ -23468,10 +23491,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   '<h5 class="font-bold text-gray-900 text-base leading-tight">' + benefitName + '</h5>' +
                   '<div>' + accessBadgeHTML + '</div>' +
                 '</div>' +
-                (benefit.description ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefit.description + '</p>' : '') +
+                (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
               '</div>' +
             '</div>';
-          });
+          }
           
           list.innerHTML = html;
         }
