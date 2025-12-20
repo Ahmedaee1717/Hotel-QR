@@ -14971,8 +14971,6 @@ app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
     const {
       benefit_category,
       benefit_type,
-      venue_id,
-      venue_name,
       access_level,
       quantity_limit,
       time_restrictions,
@@ -14981,7 +14979,8 @@ app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
       included,
       upgrade_price,
       icon,
-      display_order
+      display_order,
+      linked_venues  // NEW: Array of { id, name, type, cta }
     } = body
     
     // Validate required fields
@@ -14989,19 +14988,18 @@ app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
       return c.json({ error: 'Missing required fields' }, 400)
     }
     
+    // Insert the benefit (without venue_id/venue_name - those are in junction table now)
     const result = await DB.prepare(`
       INSERT INTO tier_benefits (
-        tier_id, property_id, benefit_category, benefit_type, venue_id, venue_name,
+        tier_id, property_id, benefit_category, benefit_type,
         access_level, quantity_limit, time_restrictions, benefit_title, benefit_description,
         included, upgrade_price, icon, display_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       tier_id,
       property_id,
       benefit_category,
       benefit_type,
-      venue_id || null,
-      venue_name || null,
       access_level,
       quantity_limit || null,
       time_restrictions ? JSON.stringify(time_restrictions) : null,
@@ -15013,10 +15011,41 @@ app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
       display_order || 0
     ).run()
     
-    return c.json({ success: true, benefit_id: result.meta.last_row_id })
+    const benefit_id = result.meta.last_row_id
+    
+    // Insert linked venues into junction table
+    if (linked_venues && Array.isArray(linked_venues) && linked_venues.length > 0) {
+      // Check if benefit_venues table exists
+      const tableExists = await DB.prepare(`
+        SELECT name FROM sqlite_master WHERE type='table' AND name='benefit_venues'
+      `).first()
+      
+      if (tableExists) {
+        for (let i = 0; i < linked_venues.length; i++) {
+          const venue = linked_venues[i]
+          await DB.prepare(`
+            INSERT INTO benefit_venues (benefit_id, offering_id, venue_cta_text, display_order)
+            VALUES (?, ?, ?, ?)
+          `).bind(
+            benefit_id,
+            venue.id,
+            venue.cta || 'View Details',
+            i
+          ).run()
+        }
+      } else {
+        console.warn('⚠️ benefit_venues table does not exist - migration 0019 needed')
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      benefit_id,
+      linked_venues_count: linked_venues?.length || 0
+    })
   } catch (error) {
     console.error('Add benefit error:', error)
-    return c.json({ error: 'Failed to add benefit' }, 500)
+    return c.json({ error: 'Failed to add benefit: ' + error.message }, 500)
   }
 })
 
@@ -52421,21 +52450,35 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</div>';
         
         if (venues.length > 0) {
-          html += '<div class="mb-4">';
-          html += '<label class="block text-sm font-semibold mb-1">Specific Venue (Optional)</label>';
-          html += '<select name="venue_id" id="venue_select" class="w-full border border-gray-300 rounded-lg px-3 py-2" onchange="toggleVenueCTA()">';
-          html += '<option value="">All Venues</option>';
+          html += '<div class="mb-4 border-2 border-dashed border-purple-200 rounded-lg p-4 bg-purple-50">';
+          html += '<label class="block text-sm font-bold mb-2 text-purple-800">';
+          html += '<i class="fas fa-link mr-2"></i>Linked Venues (Optional)';
+          html += '</label>';
+          html += '<p class="text-xs text-gray-600 mb-3">Link this benefit to one or more venues. Guests will see beautiful venue cards with "Click for details" buttons.</p>';
+          
+          // Hidden input to store selected venue IDs as JSON array
+          html += '<input type="hidden" name="venue_ids" id="venue_ids_input" value="[]">';
+          
+          // Dropdown to add venues
+          html += '<div class="mb-3">';
+          html += '<div class="flex gap-2">';
+          html += '<select id="venue_selector" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white">';
+          html += '<option value="">➕ Select a venue to add...</option>';
           venues.forEach(v => {
-            html += '<option value="' + v.id + '">' + v.name + ' (' + v.type + ')</option>';
+            html += \`<option value="\${v.id}" data-name="\${v.name}" data-type="\${v.type}">\${v.name} (\${v.type})</option>\`;
           });
           html += '</select>';
-          html += '<p class="text-xs text-gray-500 mt-1">Link this benefit to a specific restaurant, bar, or activity</p>';
+          html += '<button type="button" onclick="addSelectedVenue()" class="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors">';
+          html += '<i class="fas fa-plus mr-2"></i>Add';
+          html += '</button>';
+          html += '</div>';
           html += '</div>';
           
-          html += '<div id="venue_cta_field" class="mb-4 hidden">';
-          html += '<label class="block text-sm font-semibold mb-1">Call-to-Action Button Text</label>';
-          html += '<input type="text" name="venue_cta_text" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="View Details" value="View Details">';
-          html += '<p class="text-xs text-gray-500 mt-1">Customize the button text (e.g., "View Bars", "Explore Activities", "See Menu")</p>';
+          // Selected venues container
+          html += '<div id="selected_venues_container" class="space-y-2">';
+          html += '<p class="text-xs text-gray-500 italic">No venues selected yet</p>';
+          html += '</div>';
+          
           html += '</div>';
         }
         
@@ -52453,18 +52496,121 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         document.body.appendChild(modal);
       };
       
-      // Toggle venue CTA field visibility
-      window.toggleVenueCTA = function() {
-        const venueSelect = document.getElementById('venue_select');
-        const ctaField = document.getElementById('venue_cta_field');
-        if (venueSelect && ctaField) {
-          if (venueSelect.value) {
-            ctaField.classList.remove('hidden');
-          } else {
-            ctaField.classList.add('hidden');
-          }
+      // Multi-venue management functions
+      window.selectedVenues = [];
+      
+      window.addSelectedVenue = function() {
+        const selector = document.getElementById('venue_selector');
+        if (!selector || !selector.value) return;
+        
+        const venueId = parseInt(selector.value);
+        const venueName = selector.options[selector.selectedIndex].dataset.name;
+        const venueType = selector.options[selector.selectedIndex].dataset.type;
+        
+        // Check if already added
+        if (window.selectedVenues.find(v => v.id === venueId)) {
+          alert('⚠️ This venue is already added!');
+          return;
+        }
+        
+        // Add to array
+        window.selectedVenues.push({ id: venueId, name: venueName, type: venueType, cta: 'View Details' });
+        
+        // Update UI
+        renderSelectedVenues();
+        
+        // Reset selector
+        selector.value = '';
+      };
+      
+      window.removeVenue = function(venueId) {
+        window.selectedVenues = window.selectedVenues.filter(v => v.id !== venueId);
+        renderSelectedVenues();
+      };
+      
+      window.updateVenueCTA = function(venueId, newCTA) {
+        const venue = window.selectedVenues.find(v => v.id === venueId);
+        if (venue) {
+          venue.cta = newCTA;
+          // Update hidden input
+          document.getElementById('venue_ids_input').value = JSON.stringify(window.selectedVenues);
         }
       };
+      
+      window.moveVenueUp = function(index) {
+        if (index > 0) {
+          const temp = window.selectedVenues[index];
+          window.selectedVenues[index] = window.selectedVenues[index - 1];
+          window.selectedVenues[index - 1] = temp;
+          renderSelectedVenues();
+        }
+      };
+      
+      window.moveVenueDown = function(index) {
+        if (index < window.selectedVenues.length - 1) {
+          const temp = window.selectedVenues[index];
+          window.selectedVenues[index] = window.selectedVenues[index + 1];
+          window.selectedVenues[index + 1] = temp;
+          renderSelectedVenues();
+        }
+      };
+      
+      function renderSelectedVenues() {
+        const container = document.getElementById('selected_venues_container');
+        if (!container) return;
+        
+        if (window.selectedVenues.length === 0) {
+          container.innerHTML = '<p class="text-xs text-gray-500 italic">No venues selected yet</p>';
+          document.getElementById('venue_ids_input').value = '[]';
+          return;
+        }
+        
+        let html = '<div class="space-y-2">';
+        window.selectedVenues.forEach((venue, index) => {
+          html += '<div class="bg-white border-2 border-purple-300 rounded-lg p-3">';
+          html += '<div class="flex items-start gap-3">';
+          
+          // Move buttons
+          html += '<div class="flex flex-col gap-1">';
+          html += \`<button type="button" onclick="moveVenueUp(\${index})" class="text-gray-400 hover:text-purple-600 transition-colors" \${index === 0 ? 'disabled style="opacity:0.3"' : ''}>\`;
+          html += '<i class="fas fa-chevron-up text-xs"></i>';
+          html += '</button>';
+          html += \`<button type="button" onclick="moveVenueDown(\${index})" class="text-gray-400 hover:text-purple-600 transition-colors" \${index === window.selectedVenues.length - 1 ? 'disabled style="opacity:0.3"' : ''}>\`;
+          html += '<i class="fas fa-chevron-down text-xs"></i>';
+          html += '</button>';
+          html += '</div>';
+          
+          // Venue info
+          html += '<div class="flex-1">';
+          html += \`<div class="flex items-center gap-2 mb-2">\`;
+          html += \`<span class="font-semibold text-gray-800">\${venue.name}</span>\`;
+          html += \`<span class="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full">\${venue.type}</span>\`;
+          html += '</div>';
+          
+          // CTA input
+          html += '<div>';
+          html += '<label class="text-xs text-gray-600 block mb-1">Button Text:</label>';
+          html += \`<input type="text" value="\${venue.cta}" onchange="updateVenueCTA(\${venue.id}, this.value)" class="w-full text-sm border border-gray-300 rounded px-2 py-1" placeholder="View Details">\`;
+          html += '</div>';
+          html += '</div>';
+          
+          // Remove button
+          html += '<div>';
+          html += \`<button type="button" onclick="removeVenue(\${venue.id})" class="text-red-500 hover:text-red-700 transition-colors" title="Remove venue">\`;
+          html += '<i class="fas fa-times"></i>';
+          html += '</button>';
+          html += '</div>';
+          
+          html += '</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+        // Update hidden input
+        document.getElementById('venue_ids_input').value = JSON.stringify(window.selectedVenues);
+      }
       
       // Close add benefit modal
       window.closeAddBenefitModal = function() {
@@ -52485,11 +52631,22 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           delete data.quantity_limit;
         }
         
-        if (data.venue_id) {
-          data.venue_id = parseInt(data.venue_id);
-        } else {
-          delete data.venue_id;
+        // Handle multi-venue data
+        try {
+          const venueIdsInput = document.getElementById('venue_ids_input');
+          if (venueIdsInput && venueIdsInput.value) {
+            data.linked_venues = JSON.parse(venueIdsInput.value);
+          } else {
+            data.linked_venues = [];
+          }
+        } catch (e) {
+          console.error('Failed to parse venue data:', e);
+          data.linked_venues = [];
         }
+        
+        // Remove old single venue_id field (backwards compatibility handled by backend)
+        delete data.venue_id;
+        delete data.venue_cta_text;
         
         try {
           const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}/benefits\`, {
@@ -52500,7 +52657,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const result = await response.json();
           
           if (result.success) {
-            alert('✅ Benefit added successfully!');
+            alert('✅ Benefit added successfully with ' + (data.linked_venues.length || 0) + ' linked venue(s)!');
             closeAddBenefitModal();
             // Reload tier modal
             closeEditTierModal();
