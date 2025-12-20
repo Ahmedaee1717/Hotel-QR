@@ -17893,6 +17893,105 @@ app.get('/api/guest/tier-benefits', async (c) => {
       }
     }
     
+    // Helper function to get default benefit name and description
+    function getBenefitDefaults(benefitType) {
+      const defaults = {
+        'buffet_access': {
+          name: 'Buffet Access',
+          description: 'Unlimited access to all buffet meals including breakfast, lunch, and dinner'
+        },
+        'restaurant_access': {
+          name: 'Restaurant Access',
+          description: 'Access to all à la carte restaurants with your meal plan'
+        },
+        'a_la_carte': {
+          name: 'À La Carte Dining',
+          description: 'Enjoy fine dining at our specialty restaurants'
+        },
+        'room_service': {
+          name: 'Room Service',
+          description: '24/7 in-room dining service'
+        },
+        'snacks': {
+          name: 'Snacks & Light Bites',
+          description: 'Complimentary snacks available throughout the day'
+        },
+        'alcoholic': {
+          name: 'Alcoholic Beverages',
+          description: 'Selection of alcoholic drinks including beer, wine, and spirits'
+        },
+        'non_alcoholic': {
+          name: 'Non-Alcoholic Beverages',
+          description: 'Unlimited soft drinks, juices, and hot beverages'
+        },
+        'premium_bar': {
+          name: 'Premium Bar Access',
+          description: 'Access to premium branded alcoholic beverages'
+        },
+        'minibar': {
+          name: 'Minibar',
+          description: 'Complimentary minibar stocked daily with drinks and snacks'
+        },
+        'pool': {
+          name: 'Pool Access',
+          description: 'Access to all swimming pools and pool amenities'
+        },
+        'beach': {
+          name: 'Beach Access',
+          description: 'Private beach access with complimentary beach chairs and umbrellas'
+        },
+        'gym': {
+          name: 'Fitness Center',
+          description: 'Fully equipped gym with modern exercise equipment'
+        },
+        'spa': {
+          name: 'Spa Services',
+          description: 'Access to spa facilities and wellness treatments'
+        },
+        'entertainment': {
+          name: 'Entertainment',
+          description: 'Daily entertainment programs and live shows'
+        },
+        'activities': {
+          name: 'Activities',
+          description: 'Complimentary access to hotel activities and sports'
+        },
+        'concierge': {
+          name: 'Concierge Service',
+          description: 'Dedicated concierge assistance for all your needs'
+        },
+        'late_checkout': {
+          name: 'Late Checkout',
+          description: 'Extended checkout time based on availability'
+        },
+        'early_checkin': {
+          name: 'Early Check-in',
+          description: 'Early check-in privilege based on availability'
+        },
+        'turndown': {
+          name: 'Turndown Service',
+          description: 'Evening turndown service with amenities'
+        },
+        'laundry': {
+          name: 'Laundry Service',
+          description: 'Complimentary laundry and pressing services'
+        },
+        'wifi': {
+          name: 'WiFi',
+          description: 'High-speed internet access throughout the property'
+        },
+        'parking': {
+          name: 'Parking',
+          description: 'Complimentary parking for your vehicle'
+        }
+      }
+      
+      return defaults[benefitType] || {
+        name: benefitType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        description: ''
+      }
+    }
+    
     // Get tier benefits
     let benefits = []
     if (pass.tier_id) {
@@ -17908,6 +18007,20 @@ app.get('/api/guest/tier-benefits', async (c) => {
           ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
         `).bind(pass.tier_id, pass.property_id).all()
         benefits = result.results || []
+        
+        // Add default names and descriptions for benefits without them
+        for (const benefit of benefits) {
+          // If no venue_name and no description, use defaults
+          if (!benefit.venue_name && !benefit.description) {
+            const defaults = getBenefitDefaults(benefit.benefit_type)
+            benefit.display_name = defaults.name
+            benefit.display_description = defaults.description
+          } else {
+            // Use venue name or benefit type
+            benefit.display_name = benefit.venue_name || benefit.benefit_type
+            benefit.display_description = benefit.description || ''
+          }
+        }
       } catch (joinError) {
         // Fallback without join if hotel_offerings doesn't exist
         const result = await DB.prepare(`
@@ -17917,6 +18030,13 @@ app.get('/api/guest/tier-benefits', async (c) => {
           ORDER BY tb.benefit_category, tb.display_order, tb.benefit_id
         `).bind(pass.tier_id, pass.property_id).all()
         benefits = result.results || []
+        
+        // Add default names and descriptions
+        for (const benefit of benefits) {
+          const defaults = getBenefitDefaults(benefit.benefit_type)
+          benefit.display_name = defaults.name
+          benefit.display_description = defaults.description
+        }
       }
     }
     
@@ -17924,9 +18044,8 @@ app.get('/api/guest/tier-benefits', async (c) => {
     if (language !== 'en' && benefits.length > 0) {
       for (const benefit of benefits) {
         try {
-          // Translate venue_name or benefit_type
-          const benefitName = benefit.venue_name || benefit.benefit_type || ''
-          if (benefitName) {
+          // Translate display_name
+          if (benefit.display_name) {
             const nameResult = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -17940,22 +18059,17 @@ app.get('/api/guest/tier-benefits', async (c) => {
                   content: `You are a professional translator. Translate the following hotel benefit name to ${language}. Keep it concise (1-4 words). Return ONLY the translation, nothing else.`
                 }, {
                   role: 'user',
-                  content: benefitName
+                  content: benefit.display_name
                 }],
                 temperature: 0.3
               })
             })
             const nameData = await nameResult.json()
-            const translatedName = nameData.choices[0].message.content.trim()
-            if (benefit.venue_name) {
-              benefit.venue_name = translatedName
-            } else {
-              benefit.benefit_type = translatedName
-            }
+            benefit.display_name = nameData.choices[0].message.content.trim()
           }
           
-          // Translate description
-          if (benefit.description) {
+          // Translate display_description
+          if (benefit.display_description) {
             const descResult = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -17969,13 +18083,13 @@ app.get('/api/guest/tier-benefits', async (c) => {
                   content: `You are a professional translator. Translate the following hotel benefit description to ${language}. Return ONLY the translation, nothing else.`
                 }, {
                   role: 'user',
-                  content: benefit.description
+                  content: benefit.display_description
                 }],
                 temperature: 0.3
               })
             })
             const descData = await descResult.json()
-            benefit.description = descData.choices[0].message.content.trim()
+            benefit.display_description = descData.choices[0].message.content.trim()
           }
         } catch (translateError) {
           console.error('Benefit translation error:', translateError)
@@ -23555,24 +23669,20 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             const accessLevel = benefit.access_level || 'unlimited';
             const quantity = benefit.quantity_limit || null;
             
-            // Format benefit name - already translated by API, just capitalize
-            let benefitName = benefit.venue_name || benefit.benefit_type || '';
+            // Get benefit name and description (already translated by API with defaults)
+            let benefitName = benefit.display_name || benefit.venue_name || benefit.benefit_type || '';
+            let benefitDescription = benefit.display_description || benefit.description || '';
             
             // Debug logging - show actual values
             console.log('🔍 BENEFIT:', benefitName);
+            console.log('   display_name:', benefit.display_name);
             console.log('   venue_name:', benefit.venue_name);
             console.log('   benefit_type:', benefit.benefit_type);
+            console.log('   display_description:', benefit.display_description);
             console.log('   description:', benefit.description);
-            console.log('   description length:', benefit.description ? benefit.description.length : 0);
+            console.log('   final name:', benefitName);
+            console.log('   final desc:', benefitDescription);
             console.log('   ---');
-            
-            // Don't re-format if already a clean translated name (no underscores)
-            if (benefitName.includes('_')) {
-              benefitName = benefitName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            }
-            
-            // Description is already translated by API
-            let benefitDescription = benefit.description || '';
             
             let accessBadgeHTML = '';
             if (accessLevel === 'unlimited') {
