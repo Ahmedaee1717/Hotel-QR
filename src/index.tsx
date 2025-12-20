@@ -55452,8 +55452,11 @@ app.get('/my-perfect-week', async (c) => {
                                                         </div>
                                                     </div>
                                                     <div class="flex flex-col gap-1 items-end">
-                                                        \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap"><i class="fas fa-check-circle mr-1"></i>Booked</span>' : ''}
-                                                        \${item.status === 'planned' ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Needs Booking</span>' : ''}
+                                                        <div class="flex gap-1 items-center">
+                                                            \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap"><i class="fas fa-check-circle mr-1"></i>Booked</span>' : ''}
+                                                            \${item.status === 'planned' ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Needs Booking</span>' : ''}
+                                                            \${item.item_type !== 'booking' ? '<button onclick="deleteItem(' + item.item_id + ')" class="text-red-500 hover:text-red-700 p-1" title="Remove from timeline"><i class="fas fa-trash text-xs"></i></button>' : ''}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 
@@ -55478,7 +55481,7 @@ app.get('/my-perfect-week', async (c) => {
                                                             <p class="text-xs text-purple-600">Available at \${slot.label}</p>
                                                         </div>
                                                     </div>
-                                                    <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
+                                                    <button onclick="quickReserveRestaurant('\${slot.restaurant}', '\${day.date}', '\${slot.time}')" 
                                                             class="px-3 py-1.5 rounded bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold hover:shadow-lg transition flex items-center gap-1.5 whitespace-nowrap">
                                                         <i class="fas fa-calendar-plus"></i>
                                                         Reserve
@@ -55707,6 +55710,37 @@ app.get('/my-perfect-week', async (c) => {
         
         function quickAddToTime(date, time) {
             showOfferingsModal('all', date, time);
+        }
+        
+        // NEW: Direct reserve function for restaurant availability cards
+        async function quickReserveRestaurant(restaurantName, date, time) {
+            // Find the restaurant offering by name
+            try {
+                const response = await fetch('/api/hotel-offerings/' + propertyId + '?lang=en', {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Failed to load restaurant details');
+                    return;
+                }
+                
+                const restaurant = data.offerings.find(o => 
+                    o.title_en === restaurantName && o.offering_type === 'restaurant'
+                );
+                
+                if (!restaurant) {
+                    alert('Restaurant not found');
+                    return;
+                }
+                
+                // Redirect to restaurant booking page
+                window.location.href = '/hotel/${propertySlug}/restaurant/' + restaurant.offering_id + '/book?date=' + date + '&time=' + time;
+            } catch (error) {
+                console.error('Reserve restaurant error:', error);
+                alert('Failed to load restaurant details');
+            }
         }
         
         async function showOfferingsModal(type, presetDate = null, presetTime = null) {
