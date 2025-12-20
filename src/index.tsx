@@ -54839,30 +54839,20 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 // ============================================
 
 // Property-specific homepage
-app.get('/test-my-week', async (c) => {
-  return c.html('<html><body><h1>TEST ROUTE WORKS!</h1></body></html>')
-})
-
 app.get('/my-perfect-week', async (c) => {
   const { DB } = c.env
-  const propertyIdParam = c.req.query('property')
-  const propertyId = 1  // Hard-code for testing
-  
-  console.log('🔍 Query param:', propertyIdParam, 'Using:', propertyId)
+  const propertyId = c.req.query('property') || '1'
   
   try {
     // Get property data for styling
     const property = await DB.prepare(`
       SELECT property_id, name as property_name, slug, primary_color, secondary_color, accent_color
       FROM properties
-      WHERE property_id = 1
-    `).first()
-    
-    console.log('📊 Property:', property)
+      WHERE property_id = ?
+    `).bind(propertyId).first()
     
     if (!property) {
-      console.error('❌ Property not found')
-      return c.html(`<html><body><h1>Property not found</h1><p>Hard-coded query for property_id=1 failed</p></body></html>`, 404)
+      return c.html(`<html><body><h1>Property not found</h1><p>Please check the URL or visit <a href="/">homepage</a></p></body></html>`, 404)
     }
     
     const accentColor = property.accent_color || '#8B5CF6'
