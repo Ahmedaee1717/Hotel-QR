@@ -10879,54 +10879,101 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
   const offering_type = c.req.query('type') // optional filter
   
   try {
+    // UNION query to merge hotel_offerings AND activities tables
     let query = `
-      SELECT 
-        ho.*,
-        CASE 
-          WHEN ? = 'ar' THEN COALESCE(ho.title_ar, ho.title_en)
-          WHEN ? = 'de' THEN COALESCE(ho.title_de, ho.title_en)
-          WHEN ? = 'ru' THEN COALESCE(ho.title_ru, ho.title_en)
-          WHEN ? = 'pl' THEN COALESCE(ho.title_pl, ho.title_en)
-          WHEN ? = 'it' THEN COALESCE(ho.title_it, ho.title_en)
-          WHEN ? = 'fr' THEN COALESCE(ho.title_fr, ho.title_en)
-          WHEN ? = 'cs' THEN COALESCE(ho.title_cs, ho.title_en)
-          WHEN ? = 'uk' THEN COALESCE(ho.title_uk, ho.title_en)
-          ELSE ho.title_en
-        END as title,
-        CASE 
-          WHEN ? = 'ar' THEN COALESCE(ho.short_description_ar, ho.short_description_en)
-          WHEN ? = 'de' THEN COALESCE(ho.short_description_de, ho.short_description_en)
-          WHEN ? = 'ru' THEN COALESCE(ho.short_description_ru, ho.short_description_en)
-          WHEN ? = 'pl' THEN COALESCE(ho.short_description_pl, ho.short_description_en)
-          WHEN ? = 'it' THEN COALESCE(ho.short_description_it, ho.short_description_en)
-          WHEN ? = 'fr' THEN COALESCE(ho.short_description_fr, ho.short_description_en)
-          WHEN ? = 'cs' THEN COALESCE(ho.short_description_cs, ho.short_description_en)
-          WHEN ? = 'uk' THEN COALESCE(ho.short_description_uk, ho.short_description_en)
-          ELSE ho.short_description_en
-        END as short_description,
-        CASE 
-          WHEN ? = 'ar' THEN COALESCE(ho.full_description_ar, ho.full_description_en)
-          WHEN ? = 'de' THEN COALESCE(ho.full_description_de, ho.full_description_en)
-          WHEN ? = 'ru' THEN COALESCE(ho.full_description_ru, ho.full_description_en)
-          WHEN ? = 'pl' THEN COALESCE(ho.full_description_pl, ho.full_description_en)
-          WHEN ? = 'it' THEN COALESCE(ho.full_description_it, ho.full_description_en)
-          WHEN ? = 'fr' THEN COALESCE(ho.full_description_fr, ho.full_description_en)
-          WHEN ? = 'cs' THEN COALESCE(ho.full_description_cs, ho.full_description_en)
-          WHEN ? = 'uk' THEN COALESCE(ho.full_description_uk, ho.full_description_en)
-          ELSE ho.full_description_en
-        END as full_description
-      FROM hotel_offerings ho
-      WHERE ho.property_id = ?
-        AND ho.status = 'active'
-        ${offering_type ? 'AND ho.offering_type = ?' : ''}
-      ORDER BY ho.is_featured DESC, ho.display_order ASC, ho.created_at DESC
+      SELECT * FROM (
+        -- Hotel offerings (restaurants, spa, events, room_service)
+        SELECT 
+          ho.offering_id,
+          ho.property_id,
+          ho.offering_type,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(ho.title_ar, ho.title_en)
+            ELSE ho.title_en
+          END as title_en,
+          ho.title_ar,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(ho.short_description_ar, ho.short_description_en)
+            ELSE ho.short_description_en
+          END as short_description_en,
+          ho.short_description_ar,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(ho.full_description_ar, ho.full_description_en)
+            ELSE ho.full_description_en
+          END as full_description_en,
+          ho.full_description_ar,
+          ho.images,
+          ho.price,
+          ho.currency,
+          ho.price_type,
+          ho.duration_minutes,
+          ho.capacity_per_slot,
+          ho.requires_booking,
+          ho.location,
+          ho.status,
+          ho.is_featured,
+          ho.display_order,
+          ho.created_at
+        FROM hotel_offerings ho
+        WHERE ho.property_id = ?
+          AND ho.status = 'active'
+          ${offering_type && offering_type !== 'activity' ? 'AND ho.offering_type = ?' : ''}
+        
+        UNION ALL
+        
+        -- Activities from activities table
+        SELECT 
+          a.activity_id as offering_id,
+          ? as property_id,
+          'activity' as offering_type,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(a.title_ar, a.title_en)
+            ELSE a.title_en
+          END as title_en,
+          a.title_ar,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(a.short_description_ar, a.short_description_en)
+            ELSE a.short_description_en
+          END as short_description_en,
+          a.short_description_ar,
+          CASE 
+            WHEN ? = 'ar' THEN COALESCE(a.full_description_ar, a.full_description_en)
+            ELSE a.full_description_en
+          END as full_description_en,
+          a.full_description_ar,
+          a.images,
+          a.price as price,
+          a.currency,
+          a.price_type,
+          a.duration_minutes,
+          a.capacity_per_slot,
+          1 as requires_booking,
+          'Activity Center' as location,
+          a.status,
+          a.is_featured,
+          a.popularity_score as display_order,
+          a.created_at
+        FROM activities a
+        JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
+        WHERE vp.property_id = ?
+          AND a.status = 'active'
+          ${offering_type === 'activity' ? '' : (offering_type ? 'AND 1=0' : '')}
+      )
+      ORDER BY is_featured DESC, display_order DESC, created_at DESC
     `
     
-    // Build params array: 8 params for title + 8 for short_desc + 8 for full_desc + property_id + optional type
-    const langParams = Array(24).fill(lang) // 8 CASE statements × 3 fields
-    const params = offering_type 
-      ? [...langParams, property_id, offering_type]
-      : [...langParams, property_id]
+    // Build params for UNION query
+    let params = []
+    if (offering_type && offering_type !== 'activity') {
+      // Hotel offerings only with type filter
+      params = [lang, lang, lang, property_id, offering_type, property_id, lang, lang, lang, property_id]
+    } else if (offering_type === 'activity') {
+      // Activities only
+      params = [lang, lang, lang, property_id, property_id, lang, lang, lang, property_id]
+    } else {
+      // All offerings (no type filter)
+      params = [lang, lang, lang, property_id, property_id, lang, lang, lang, property_id]
+    }
     
     const offerings = await DB.prepare(query).bind(...params).all()
     
