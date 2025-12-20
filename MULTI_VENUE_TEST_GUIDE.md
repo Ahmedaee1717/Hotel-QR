@@ -17,7 +17,7 @@ This is the feature you've been requesting. The system has been completely redes
 
 ### 1️⃣ **Admin Side: Add Multi-Venue Benefit**
 
-**URL:** https://cc05b283.project-c8738f5c.pages.dev/admin-login.html
+**URL:** https://8cd34385.project-c8738f5c.pages.dev/admin-login.html
 
 **Login:**
 - Email: `admin@paradiseresort.com`
@@ -66,7 +66,7 @@ This is the feature you've been requesting. The system has been completely redes
 
 ### 2️⃣ **Guest Side: See Beautiful Venue Cards**
 
-**URL:** https://cc05b283.project-c8738f5c.pages.dev/hotel/paradise-resort
+**URL:** https://8cd34385.project-c8738f5c.pages.dev/hotel/paradise-resort
 
 **Steps:**
 1. Enter PIN: `123456` in the pass link bar
