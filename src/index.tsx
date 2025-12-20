@@ -15024,7 +15024,7 @@ app.post('/api/admin/all-inclusive/tiers/:tier_id/benefits', async (c) => {
         for (let i = 0; i < linked_venues.length; i++) {
           const venue = linked_venues[i]
           await DB.prepare(`
-            INSERT INTO benefit_venues (benefit_id, offering_id, venue_cta_text, display_order)
+            INSERT INTO benefit_venues (benefit_id, venue_id, custom_cta_text, display_order)
             VALUES (?, ?, ?, ?)
           `).bind(
             benefit_id,
