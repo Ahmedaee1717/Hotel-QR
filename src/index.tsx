@@ -18622,6 +18622,72 @@ app.post('/api/guest/my-week/add-item', async (c) => {
   }
 })
 
+// Add hotel offering to timeline
+app.post('/api/guest/my-week/add-offering', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  
+  try {
+    // Get offering details
+    const offering = await DB.prepare(`
+      SELECT * FROM hotel_offerings WHERE offering_id = ?
+    `).bind(body.offering_id).first()
+    
+    if (!offering) {
+      return c.json({ error: 'Offering not found' }, 404)
+    }
+    
+    // Determine icon and color based on type
+    const typeConfig = {
+      activity: { icon: '🎯', color: 'blue' },
+      dining: { icon: '🍽️', color: 'orange' },
+      spa: { icon: '💆', color: 'pink' },
+      event: { icon: '🎉', color: 'purple' },
+      service: { icon: '🛎️', color: 'green' }
+    }
+    
+    const config = typeConfig[offering.offering_type] || { icon: '✨', color: 'purple' }
+    const requiresBooking = offering.requires_booking === 1 || offering.capacity_per_slot > 0
+    
+    // Add to timeline
+    const result = await DB.prepare(`
+      INSERT INTO timeline_items 
+      (plan_id, item_type, reference_id, item_date, start_time, end_time, title, description, location, icon, color, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.plan_id,
+      offering.offering_type,
+      body.offering_id,
+      body.item_date,
+      body.start_time,
+      body.end_time || null,
+      offering.title_en,
+      offering.short_description_en,
+      offering.location || 'Resort',
+      config.icon,
+      config.color,
+      requiresBooking ? 'planned' : 'added'  // 'planned' means needs booking
+    ).run()
+    
+    // Track analytics
+    await DB.prepare(`
+      INSERT INTO week_planner_analytics (guest_id, action_type, item_type, offering_id)
+      VALUES (?, 'add_offering', ?, ?)
+    `).bind(body.guest_id, offering.offering_type, body.offering_id).run()
+    
+    return c.json({ 
+      success: true, 
+      item_id: result.meta.last_row_id,
+      requires_booking: requiresBooking,
+      message: requiresBooking ? 'Added to timeline - Booking required!' : 'Added to your timeline!'
+    })
+    
+  } catch (error) {
+    console.error('Add offering error:', error)
+    return c.json({ error: 'Failed to add offering' }, 500)
+  }
+})
+
 // Update timeline item
 app.put('/api/guest/my-week/items/:item_id', async (c) => {
   const { DB } = c.env
@@ -55457,11 +55523,310 @@ app.get('/my-perfect-week', async (c) => {
         }
         
         function quickAdd(type) {
-            showQuickAddModal(type);
+            showOfferingsModal(type);
         }
         
         function quickAddToDay(date) {
-            showQuickAddModal('custom', date);
+            showOfferingsModal('all', date);
+        }
+        
+        async function showOfferingsModal(type, presetDate = null) {
+            const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your pass first');
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.id = 'offeringsModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            const typeConfig = {
+                activity: { icon: '🎯', title: 'Activities', color: 'blue', offeringType: 'activity' },
+                restaurant: { icon: '🍽️', title: 'Restaurants', color: 'orange', offeringType: 'dining' },
+                beach: { icon: '🏖️', title: 'Beach', color: 'cyan', offeringType: 'beach' },
+                spa: { icon: '💆', title: 'Spa', color: 'pink', offeringType: 'spa' },
+                event: { icon: '🎉', title: 'Events', color: 'purple', offeringType: 'event' },
+                all: { icon: '✨', title: 'All Offerings', color: 'purple', offeringType: 'all' }
+            };
+            
+            const config = typeConfig[type] || typeConfig.all;
+            
+            modal.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+                    <div class="p-6 border-b bg-white">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold flex items-center gap-2">
+                                <span class="text-3xl">\${config.icon}</span>
+                                Browse \${config.title}
+                            </h2>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-600 mt-2">Select an offering to add to your timeline</p>
+                        
+                        <!-- Filter Tabs -->
+                        <div class="flex gap-2 mt-4 overflow-x-auto">
+                            <button onclick="filterOfferings('all')" data-filter="all" class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-purple-500 text-white">
+                                All
+                            </button>
+                            <button onclick="filterOfferings('activity')" data-filter="activity" class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                🎯 Activities
+                            </button>
+                            <button onclick="filterOfferings('dining')" data-filter="dining" class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                🍽️ Dining
+                            </button>
+                            <button onclick="filterOfferings('spa')" data-filter="spa" class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                💆 Spa
+                            </button>
+                            <button onclick="filterOfferings('event')" data-filter="event" class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300">
+                                🎉 Events
+                            </button>
+                        </div>
+                        
+                        <!-- Custom Activity Option -->
+                        <div class="mt-4">
+                            <button onclick="showCustomAddModal('\${type}', '\${presetDate}')" class="w-full px-4 py-3 bg-green-50 border-2 border-green-500 border-dashed rounded-lg hover:bg-green-100 flex items-center justify-center gap-2 font-semibold text-green-700">
+                                <i class="fas fa-plus-circle"></i>
+                                Add Custom Activity (Personal Note)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div id="offeringsGrid" class="grid md:grid-cols-2 gap-4">
+                            <div class="col-span-full text-center py-8">
+                                <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+                                <p class="text-gray-600 mt-2">Loading offerings...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`;
+            
+            document.body.appendChild(modal);
+            
+            // Load offerings
+            await loadOfferings(config.offeringType, presetDate);
+        }
+        
+        async function loadOfferings(type = 'all', presetDate = null) {
+            try {
+                const typeParam = type !== 'all' ? '&type=' + type : '';
+                const response = await fetch('/api/hotel-offerings/' + propertyId + '?lang=en' + typeParam, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.offerings) {
+                    renderOfferings(data.offerings, presetDate);
+                } else {
+                    document.getElementById('offeringsGrid').innerHTML = \`
+                        <div class="col-span-full text-center py-8">
+                            <i class="fas fa-exclamation-circle text-3xl text-gray-400"></i>
+                            <p class="text-gray-600 mt-2">No offerings found</p>
+                        </div>
+                    \`;
+                }
+            } catch (error) {
+                console.error('Load offerings error:', error);
+                document.getElementById('offeringsGrid').innerHTML = \`
+                    <div class="col-span-full text-center py-8">
+                        <i class="fas fa-times-circle text-3xl text-red-400"></i>
+                        <p class="text-red-600 mt-2">Failed to load offerings</p>
+                    </div>
+                \`;
+            }
+        }
+        
+        function renderOfferings(offerings, presetDate) {
+            const grid = document.getElementById('offeringsGrid');
+            
+            if (offerings.length === 0) {
+                grid.innerHTML = \`
+                    <div class="col-span-full text-center py-8">
+                        <i class="fas fa-inbox text-3xl text-gray-400"></i>
+                        <p class="text-gray-600 mt-2">No offerings available</p>
+                    </div>
+                \`;
+                return;
+            }
+            
+            grid.innerHTML = offerings.map(offering => {
+                const typeIcons = {
+                    activity: '🎯',
+                    dining: '🍽️',
+                    spa: '💆',
+                    event: '🎉',
+                    service: '🛎️'
+                };
+                
+                const icon = typeIcons[offering.offering_type] || '✨';
+                const requiresBooking = offering.requires_booking === 1 || offering.capacity_per_slot > 0;
+                
+                return \`
+                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${offering.offering_type}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}')">
+                        <div class="flex items-start gap-3">
+                            <div class="text-3xl flex-shrink-0">\${icon}</div>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-bold text-gray-800 mb-1">\${offering.title_en || offering.activity_name || 'Untitled'}</h3>
+                                <p class="text-sm text-gray-600 mb-2 line-clamp-2">\${offering.short_description_en || offering.activity_description || ''}</p>
+                                
+                                <div class="flex flex-wrap gap-2 text-xs text-gray-600 mb-2">
+                                    \${offering.duration_minutes ? \`<span><i class="fas fa-clock mr-1"></i>\${offering.duration_minutes} min</span>\` : ''}
+                                    \${offering.price ? \`<span><i class="fas fa-tag mr-1"></i>\${offering.price} \${offering.currency || 'USD'}</span>\` : ''}
+                                    \${offering.capacity_per_slot ? \`<span><i class="fas fa-users mr-1"></i>Max \${offering.capacity_per_slot}</span>\` : ''}
+                                </div>
+                                
+                                \${requiresBooking ? \`
+                                    <div class="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                        <i class="fas fa-calendar-check mr-1"></i>Booking Required
+                                    </div>
+                                \` : \`
+                                    <div class="inline-block px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                                        <i class="fas fa-check-circle mr-1"></i>Add Instantly
+                                    </div>
+                                \`}
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
+        
+        window.filterOfferings = async function(type) {
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.dataset.filter === type) {
+                    btn.className = 'filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-purple-500 text-white';
+                } else {
+                    btn.className = 'filter-btn px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap bg-gray-200 text-gray-700 hover:bg-gray-300';
+                }
+            });
+            
+            // Filter visible cards
+            document.querySelectorAll('.offering-card').forEach(card => {
+                if (type === 'all' || card.dataset.type === type) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+        
+        async function selectOffering(offeringId, presetDate) {
+            const guest = getGuestSession();
+            
+            // Show date/time selection modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            const minDate = timelineData?.stay?.checkin || new Date().toISOString().split('T')[0];
+            const maxDate = timelineData?.stay?.checkout || new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
+            
+            modal.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full" onclick="event.stopPropagation()">
+                    <div class="p-6 border-b">
+                        <h3 class="text-xl font-bold">Choose Date & Time</h3>
+                        <p class="text-sm text-gray-600 mt-1">When would you like to schedule this?</p>
+                    </div>
+                    
+                    <form id="scheduleForm" class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Date *</label>
+                            <input type="date" name="item_date" required 
+                                   value="\${presetDate || minDate}"
+                                   min="\${minDate}" max="\${maxDate}"
+                                   class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-gray-700">Start Time *</label>
+                                <input type="time" name="start_time" required value="09:00"
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-2 text-gray-700">End Time</label>
+                                <input type="time" name="end_time"
+                                       class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg">
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-info-circle text-yellow-600 mt-1"></i>
+                                <div class="text-sm">
+                                    <p class="font-semibold text-yellow-800 mb-1">Booking Required</p>
+                                    <p class="text-yellow-700">This will be added to your timeline as "planned". You'll need to complete the booking separately to confirm.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="this.closest('.fixed').remove()" 
+                                    class="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold">
+                                <i class="fas fa-plus mr-2"></i>Add to Timeline
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            \`;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('scheduleForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                
+                try {
+                    const response = await fetch('/api/guest/my-week/add-offering', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId 
+                        },
+                        body: JSON.stringify({
+                            plan_id: timelineData.plan_id,
+                            guest_id: guest.guest_id,
+                            offering_id: offeringId,
+                            item_date: formData.get('item_date'),
+                            start_time: formData.get('start_time'),
+                            end_time: formData.get('end_time') || null
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        modal.remove();
+                        document.getElementById('offeringsModal')?.remove();
+                        await loadTimeline();
+                        switchTab('timeline');
+                        alert('✅ Added to your timeline! ' + (result.requires_booking ? '⚠️ Remember to complete booking.' : ''));
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Add offering error:', error);
+                    alert('Connection error');
+                }
+            };
+        }
+        
+        function showCustomAddModal(type, presetDate) {
+            // Close offerings modal
+            document.getElementById('offeringsModal')?.remove();
+            // Show the original custom add modal
+            showQuickAddModal(type, presetDate);
         }
         
         function showQuickAddModal(type, presetDate = null) {
