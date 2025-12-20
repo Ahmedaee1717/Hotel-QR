@@ -18323,13 +18323,20 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
   const pass_reference = c.req.param('pass_reference')
   
   try {
-    // Get guest info
+    // Get guest info from digital_passes
     const guest = await DB.prepare(`
-      SELECT g.*, r.check_in, r.check_out,
-             JULIANDAY(r.check_out) - JULIANDAY(r.check_in) as nights
-      FROM guests g
-      LEFT JOIN reservations r ON g.guest_id = r.guest_id
-      WHERE g.pass_reference = ?
+      SELECT 
+        pass_id as guest_id,
+        property_id,
+        pass_reference,
+        primary_guest_name as name,
+        guest_email as email,
+        room_number,
+        valid_from as check_in,
+        valid_until as check_out,
+        JULIANDAY(valid_until) - JULIANDAY(valid_from) as nights
+      FROM digital_passes
+      WHERE pass_reference = ?
     `).bind(pass_reference).first()
     
     if (!guest) {
