@@ -18063,7 +18063,7 @@ app.get('/api/guest/tier-benefits', async (c) => {
         const result = await DB.prepare(`
           SELECT 
             tb.*,
-            ho.name as venue_name,
+            ho.title_en as venue_name,
             ho.offering_type as venue_type
           FROM tier_benefits tb
           LEFT JOIN hotel_offerings ho ON tb.venue_id = ho.offering_id
@@ -23817,9 +23817,23 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           // Use admin's accent color for all icons
           const accentColor = propertyData?.accent_color || '#F59E0B';
           
+          // Debug: Log all benefits to see venue data
+          console.log('🔍 ALL BENEFITS FOR CATEGORY:', category);
+          benefits.forEach(b => {
+            console.log('  - Benefit:', b.benefit_title || b.display_name);
+            console.log('    venue_id:', b.venue_id);
+            console.log('    venue_type:', b.venue_type);
+            console.log('    venue_name:', b.venue_name);
+            console.log('    venue_cta_text:', b.venue_cta_text);
+          });
+          
           // Separate benefits with and without venue links
           const regularBenefits = benefits.filter(b => !b.venue_id || !b.venue_type);
           const linkedVenues = benefits.filter(b => b.venue_id && b.venue_type);
+          
+          console.log('📊 Split results:');
+          console.log('  - Regular benefits:', regularBenefits.length);
+          console.log('  - Linked venues:', linkedVenues.length);
           
           let html = '';
           
