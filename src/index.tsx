@@ -52673,7 +52673,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       // Edit benefit
       window.editBenefit = async function(benefitId) {
-        alert('🚧 Edit Benefit Feature Coming Soon!\n\nCurrently, you can:\n✅ Delete the benefit\n✅ Add a new benefit with updated info\n\n⏳ Full edit functionality (including multi-venue editing) will be added in the next update.');
+        alert('Edit Benefit Feature Coming Soon! Currently you can: Delete the benefit and Add a new benefit with updated info. Full edit functionality (including multi-venue editing) will be added in the next update.');
         // TODO: Implement edit benefit modal with pre-filled data and existing venues
         // Will need to:
         // 1. Fetch benefit details + linked venues
