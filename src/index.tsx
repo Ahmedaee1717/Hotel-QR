@@ -55377,13 +55377,27 @@ app.get('/my-perfect-week', async (c) => {
                             <div class="timeline-item bg-\${item.color}-50 border-l-4 border-\${item.color}-500 p-3 rounded-lg \${item.status === 'completed' ? 'opacity-60' : ''}">
                                 <div class="flex justify-between items-start mb-1">
                                     <span class="text-2xl">\${item.icon}</span>
-                                    \${item.status === 'confirmed' ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
+                                    <div class="flex gap-2">
+                                        \${item.status === 'confirmed' ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
+                                        \${item.status === 'planned' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Needs Booking</span>' : ''}
+                                    </div>
                                 </div>
                                 <h4 class="font-semibold text-gray-800 text-sm mb-1">\${item.title}</h4>
                                 <p class="text-xs text-gray-600">
                                     <i class="fas fa-clock mr-1"></i>\${item.start_time}\${item.end_time ? ' - ' + item.end_time : ''}
                                 </p>
                                 \${item.location ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
+                                
+                                \${item.status === 'planned' && item.reference_id ? \`
+                                    <div class="mt-2 pt-2 border-t border-\${item.color}-200">
+                                        <button onclick="bookTimelineItem(\${item.item_id}, \${item.reference_id}, '\${item.item_type}')" 
+                                                class="w-full py-2 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-2"
+                                                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white;">
+                                            <i class="fas fa-calendar-check"></i>
+                                            Book Now
+                                        </button>
+                                    </div>
+                                \` : ''}
                             </div>
                         \`).join('') : \`
                             <div class="text-center py-8 text-gray-400">
@@ -55422,9 +55436,19 @@ app.get('/my-perfect-week', async (c) => {
                         \${item.description ? '<p class="text-sm text-gray-500 mt-1">' + item.description + '</p>' : ''}
                         \${item.location ? '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
                     </div>
-                    <div class="flex gap-2">
-                        \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Confirmed</span>' : ''}
-                        \${item.status === 'planned' ? '<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">Planned</span>' : ''}
+                    <div class="flex gap-2 items-center">
+                        \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">Confirmed</span>' : ''}
+                        \${item.status === 'planned' ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-semibold">Needs Booking</span>' : ''}
+                        
+                        \${item.status === 'planned' && item.reference_id ? \`
+                            <button onclick="bookTimelineItem(\${item.item_id}, \${item.reference_id}, '\${item.item_type}')" 
+                                    class="px-3 py-1 text-xs font-semibold rounded text-white hover:opacity-90 transition flex items-center gap-1"
+                                    style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                                <i class="fas fa-calendar-check"></i>
+                                Book Now
+                            </button>
+                        \` : ''}
+                        
                         \${item.item_type !== 'booking' ? '<button onclick="deleteItem(' + item.item_id + ')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>' : ''}
                     </div>
                 </div>
@@ -55771,23 +55795,80 @@ app.get('/my-perfect-week', async (c) => {
         
         async function selectOffering(offeringId, presetDate) {
             const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your pass first');
+                return;
+            }
             
-            // Show date/time selection modal
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-            
+            // First, fetch offering details
+            try {
+                const response = await fetch('/api/hotel-offerings/' + propertyId + '?lang=en', {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Failed to load offering details');
+                    return;
+                }
+                
+                const offering = data.offerings.find(o => o.offering_id == offeringId);
+                if (!offering) {
+                    alert('Offering not found');
+                    return;
+                }
+                
+                // Show add to timeline modal with option to book now
+                await showAddToTimelineModal(offering, presetDate);
+            } catch (error) {
+                console.error('Select offering error:', error);
+                alert('Failed to load offering details');
+            }
+        }
+        
+        // Simplified Add to Timeline Modal
+        async function showAddToTimelineModal(offering, presetDate) {
+            const guest = getGuestSession();
             const minDate = timelineData?.stay?.checkin || new Date().toISOString().split('T')[0];
             const maxDate = timelineData?.stay?.checkout || new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
             
+            const modal = document.createElement('div');
+            modal.id = 'addToTimelineModal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            const typeIcons = {
+                activity: '🎯',
+                restaurant: '🍽️',
+                dining: '🍽️',
+                spa: '💆',
+                event: '🎉',
+                room_service: '🛎️'
+            };
+            const icon = typeIcons[offering.offering_type] || '✨';
+            
+            const requiresBooking = offering.requires_booking === 1 || offering.capacity_per_slot > 0;
+            
             modal.innerHTML = \`
                 <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full" onclick="event.stopPropagation()">
+                    <!-- Header -->
                     <div class="p-6 border-b">
-                        <h3 class="text-xl font-bold">Choose Date & Time</h3>
-                        <p class="text-sm text-gray-600 mt-1">When would you like to schedule this?</p>
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <h2 class="text-2xl font-bold flex items-center gap-2">
+                                    <span class="text-3xl">\${icon}</span>
+                                    \${offering.title_en}
+                                </h2>
+                                <p class="text-gray-600 mt-1 text-sm">\${offering.short_description_en || ''}</p>
+                            </div>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 ml-4">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
                     </div>
                     
-                    <form id="scheduleForm" class="p-6 space-y-4">
+                    <!-- Content -->
+                    <form id="addToTimelineForm" class="p-6 space-y-4">
                         <div>
                             <label class="block text-sm font-semibold mb-2 text-gray-700">Date *</label>
                             <input type="date" name="item_date" required 
@@ -55809,15 +55890,17 @@ app.get('/my-perfect-week', async (c) => {
                             </div>
                         </div>
                         
-                        <div class="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg">
-                            <div class="flex items-start gap-2">
-                                <i class="fas fa-info-circle text-yellow-600 mt-1"></i>
-                                <div class="text-sm">
-                                    <p class="font-semibold text-yellow-800 mb-1">Booking Required</p>
-                                    <p class="text-yellow-700">This will be added to your timeline as "planned". You'll need to complete the booking separately to confirm.</p>
+                        \${requiresBooking ? \`
+                            <div class="p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                <div class="flex items-start gap-2">
+                                    <i class="fas fa-info-circle text-blue-600 mt-1"></i>
+                                    <div class="text-sm">
+                                        <p class="font-semibold text-blue-800 mb-1">Booking Required</p>
+                                        <p class="text-blue-700">This will be added to your timeline as "planned". You can complete the booking after reviewing your full schedule.</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        \` : ''}
                         
                         <div class="flex gap-3 pt-4">
                             <button type="button" onclick="this.closest('.fixed').remove()" 
@@ -55826,7 +55909,7 @@ app.get('/my-perfect-week', async (c) => {
                             </button>
                             <button type="submit" 
                                     class="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold">
-                                <i class="fas fa-plus mr-2"></i>Add to Timeline
+                                <i class="fas fa-calendar-plus mr-2"></i>Add to Timeline
                             </button>
                         </div>
                     </form>
@@ -55835,9 +55918,14 @@ app.get('/my-perfect-week', async (c) => {
             
             document.body.appendChild(modal);
             
-            document.getElementById('scheduleForm').onsubmit = async (e) => {
+            document.getElementById('addToTimelineForm').onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
+                
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalHTML = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+                submitButton.disabled = true;
                 
                 try {
                     const response = await fetch('/api/guest/my-week/add-offering', {
@@ -55849,7 +55937,7 @@ app.get('/my-perfect-week', async (c) => {
                         body: JSON.stringify({
                             plan_id: timelineData.plan_id,
                             guest_id: guest.guest_id,
-                            offering_id: offeringId,
+                            offering_id: offering.offering_id,
                             item_date: formData.get('item_date'),
                             start_time: formData.get('start_time'),
                             end_time: formData.get('end_time') || null
@@ -55863,13 +55951,23 @@ app.get('/my-perfect-week', async (c) => {
                         document.getElementById('offeringsModal')?.remove();
                         await loadTimeline();
                         switchTab('timeline');
-                        alert('✅ Added to your timeline! ' + (result.requires_booking ? '⚠️ Remember to complete booking.' : ''));
+                        
+                        // Show success message
+                        if (result.requires_booking) {
+                            alert('✅ Added to your timeline!\\n\\n📅 This is marked as "Planned" - you can book it directly from your timeline.');
+                        } else {
+                            alert('✅ Added to your timeline!');
+                        }
                     } else {
                         alert('Failed: ' + (result.error || 'Unknown error'));
+                        submitButton.innerHTML = originalHTML;
+                        submitButton.disabled = false;
                     }
                 } catch (error) {
                     console.error('Add offering error:', error);
                     alert('Connection error');
+                    submitButton.innerHTML = originalHTML;
+                    submitButton.disabled = false;
                 }
             };
         }
@@ -56020,6 +56118,162 @@ app.get('/my-perfect-week', async (c) => {
                 } catch (error) {
                     console.error('Add item error:', error);
                     alert('Connection error');
+                }
+            };
+        }
+        
+        // Book Timeline Item - Opens booking flow based on offering type
+        async function bookTimelineItem(itemId, offeringId, offeringType) {
+            const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your pass first');
+                return;
+            }
+            
+            // Get the timeline item details
+            const item = weekData.timeline_items.find(i => i.item_id === itemId);
+            if (!item) {
+                alert('Timeline item not found');
+                return;
+            }
+            
+            // Route to appropriate booking page based on offering type
+            const propertySlug = 'paradise-resort'; // TODO: Get from propertyData
+            
+            if (offeringType === 'restaurant' || offeringType === 'dining') {
+                // Open restaurant booking in modal iframe
+                window.open(\`/hotel/\${propertySlug}/restaurant/\${offeringId}/book?date=\${item.item_date}&time=\${item.start_time}\`, '_blank');
+            } else if (offeringType === 'activity') {
+                // Open activity booking in modal iframe
+                window.open(\`/activity?id=\${offeringId}&date=\${item.item_date}\`, '_blank');
+            } else if (offeringType === 'spa') {
+                // Open spa booking
+                window.open(\`/hotel/\${propertySlug}/restaurant/\${offeringId}/book?date=\${item.item_date}&time=\${item.start_time}\`, '_blank');
+            } else {
+                // Generic offering booking
+                showGenericBookingModal(offeringId, item);
+            }
+            
+            // After booking, user can return and the item will be marked as confirmed
+            // We'll add a refresh button or auto-refresh logic
+        }
+        
+        // Generic Booking Modal for events, services, etc.
+        async function showGenericBookingModal(offeringId, timelineItem) {
+            const guest = getGuestSession();
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            modal.innerHTML = \`
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full" onclick="event.stopPropagation()">
+                    <div class="p-6 border-b">
+                        <h3 class="text-xl font-bold">\${timelineItem.icon} Complete Booking</h3>
+                        <p class="text-sm text-gray-600 mt-1">\${timelineItem.title}</p>
+                    </div>
+                    
+                    <form id="genericBookingForm" class="p-6 space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg text-sm space-y-2">
+                            <p><strong>Date:</strong> \${new Date(timelineItem.item_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                            <p><strong>Time:</strong> \${timelineItem.start_time}\${timelineItem.end_time ? ' - ' + timelineItem.end_time : ''}</p>
+                            \${timelineItem.location ? '<p><strong>Location:</strong> ' + timelineItem.location + '</p>' : ''}
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Number of Guests *</label>
+                            <select name="num_guests" required class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500">
+                                <option value="1">1 Guest</option>
+                                <option value="2" selected>2 Guests</option>
+                                <option value="3">3 Guests</option>
+                                <option value="4">4 Guests</option>
+                                <option value="5">5 Guests</option>
+                                <option value="6">6+ Guests</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold mb-2 text-gray-700">Special Requests</label>
+                            <textarea name="special_requests" rows="3" 
+                                      class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                                      placeholder="Any special requirements or dietary restrictions?"></textarea>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="this.closest('.fixed').remove()" 
+                                    class="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold">
+                                Cancel
+                            </button>
+                            <button type="submit" 
+                                    class="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold">
+                                <i class="fas fa-check mr-2"></i>Confirm Booking
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            \`;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('genericBookingForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalHTML = submitButton.innerHTML;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Booking...';
+                submitButton.disabled = true;
+                
+                try {
+                    // Create offering booking
+                    const response = await fetch('/api/offering-booking', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId 
+                        },
+                        body: JSON.stringify({
+                            offering_id: offeringId,
+                            guest_email: guest.email || 'guest@example.com',
+                            guest_name: guest.name || guest.full_name,
+                            guest_phone: guest.phone || '',
+                            property_id: propertyId,
+                            booking_date: timelineItem.item_date,
+                            num_guests: parseInt(formData.get('num_guests')),
+                            total_amount: 0, // Will be calculated by backend
+                            special_requests: formData.get('special_requests') || null
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Update timeline item status to confirmed
+                        await fetch('/api/guest/my-week/items/' + timelineItem.item_id, {
+                            method: 'PUT',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-Property-ID': propertyId 
+                            },
+                            body: JSON.stringify({
+                                ...timelineItem,
+                                status: 'confirmed'
+                            })
+                        });
+                        
+                        modal.remove();
+                        await loadTimeline();
+                        alert('✅ Booking confirmed!\\n\\nReference: ' + (result.booking_reference || 'N/A'));
+                    } else {
+                        alert('Failed: ' + (result.error || 'Unknown error'));
+                        submitButton.innerHTML = originalHTML;
+                        submitButton.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Booking error:', error);
+                    alert('Connection error');
+                    submitButton.innerHTML = originalHTML;
+                    submitButton.disabled = false;
                 }
             };
         }
