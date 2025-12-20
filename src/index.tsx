@@ -18313,6 +18313,419 @@ app.get('/api/guest/tier-benefits', async (c) => {
   }
 })
 
+// ==========================================
+// MY PERFECT WEEK API ENDPOINTS
+// ==========================================
+
+// Get guest's complete timeline for their stay
+app.get('/api/guest/my-week/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  
+  try {
+    // Get guest info
+    const guest = await DB.prepare(`
+      SELECT g.*, r.check_in, r.check_out,
+             JULIANDAY(r.check_out) - JULIANDAY(r.check_in) as nights
+      FROM guests g
+      LEFT JOIN reservations r ON g.guest_id = r.guest_id
+      WHERE g.pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!guest) {
+      return c.json({ error: 'Guest not found' }, 404)
+    }
+    
+    // Get or create stay plan
+    let plan = await DB.prepare(`
+      SELECT * FROM guest_stay_plans 
+      WHERE guest_id = ? AND property_id = ?
+    `).bind(guest.guest_id, guest.property_id).first()
+    
+    if (!plan && guest.check_in && guest.check_out) {
+      // Create new plan
+      const result = await DB.prepare(`
+        INSERT INTO guest_stay_plans (guest_id, property_id, checkin_date, checkout_date, total_nights)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(guest.guest_id, guest.property_id, guest.check_in, guest.check_out, Math.round(guest.nights)).run()
+      
+      plan = { 
+        plan_id: result.meta.last_row_id, 
+        guest_id: guest.guest_id,
+        property_id: guest.property_id,
+        checkin_date: guest.check_in,
+        checkout_date: guest.check_out,
+        total_nights: Math.round(guest.nights)
+      }
+      
+      // Auto-import existing bookings
+      const existingBookings = await DB.prepare(`
+        SELECT b.*, ho.title_en, ho.offering_type, ho.images
+        FROM bookings b
+        JOIN hotel_offerings ho ON b.offering_id = ho.offering_id
+        WHERE b.guest_id = ? AND b.status = 'confirmed'
+      `).bind(guest.guest_id).all()
+      
+      for (const booking of existingBookings.results) {
+        await DB.prepare(`
+          INSERT INTO timeline_items 
+          (plan_id, item_type, reference_id, item_date, start_time, end_time, title, location, icon, color, status)
+          VALUES (?, 'booking', ?, ?, ?, ?, ?, ?, ?, 'green', 'confirmed')
+        `).bind(
+          plan.plan_id,
+          booking.booking_id,
+          booking.booking_date,
+          booking.start_time,
+          booking.end_time,
+          booking.title_en,
+          booking.location,
+          booking.offering_type === 'activity' ? '🎯' : booking.offering_type === 'dining' ? '🍽️' : '🏖️'
+        ).run()
+      }
+    }
+    
+    // Get all timeline items
+    const timelineItems = await DB.prepare(`
+      SELECT * FROM timeline_items 
+      WHERE plan_id = ?
+      ORDER BY item_date ASC, start_time ASC
+    `).bind(plan.plan_id).all()
+    
+    // Get smart suggestions
+    const suggestions = await DB.prepare(`
+      SELECT ts.*, ho.title_en, ho.description_en, ho.offering_type, ho.images, ho.price, ho.currency
+      FROM timeline_suggestions ts
+      JOIN hotel_offerings ho ON ts.offering_id = ho.offering_id
+      WHERE ts.plan_id = ? AND ts.is_dismissed = 0 AND ts.is_accepted = 0
+      ORDER BY ts.relevance_score DESC
+      LIMIT 10
+    `).bind(plan.plan_id).all()
+    
+    // Generate array of days for the stay
+    const days = []
+    if (plan) {
+      const checkin = new Date(plan.checkin_date)
+      const checkout = new Date(plan.checkout_date)
+      const nights = Math.round((checkout - checkin) / (1000 * 60 * 60 * 24))
+      
+      for (let i = 0; i < nights; i++) {
+        const date = new Date(checkin)
+        date.setDate(date.getDate() + i)
+        const dateStr = date.toISOString().split('T')[0]
+        
+        days.push({
+          day_number: i + 1,
+          date: dateStr,
+          day_name: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          is_past: dateStr < new Date().toISOString().split('T')[0],
+          is_today: dateStr === new Date().toISOString().split('T')[0],
+          items: timelineItems.results.filter(item => item.item_date === dateStr)
+        })
+      }
+    }
+    
+    return c.json({
+      success: true,
+      stay: {
+        checkin: plan?.checkin_date,
+        checkout: plan?.checkout_date,
+        nights: plan?.total_nights
+      },
+      days: days,
+      timeline_items: timelineItems.results,
+      suggestions: suggestions.results,
+      guest: {
+        name: guest.full_name,
+        room: guest.room_number,
+        tier: guest.tier_name
+      }
+    })
+    
+  } catch (error) {
+    console.error('My Perfect Week error:', error)
+    return c.json({ error: 'Failed to load timeline' }, 500)
+  }
+})
+
+// Add item to timeline
+app.post('/api/guest/my-week/add-item', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  
+  try {
+    const result = await DB.prepare(`
+      INSERT INTO timeline_items 
+      (plan_id, item_type, reference_id, item_date, start_time, end_time, title, description, location, icon, color, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.plan_id,
+      body.item_type,
+      body.reference_id || null,
+      body.item_date,
+      body.start_time,
+      body.end_time || null,
+      body.title,
+      body.description || null,
+      body.location || null,
+      body.icon || '📅',
+      body.color || 'blue',
+      body.status || 'planned'
+    ).run()
+    
+    // Track analytics
+    await DB.prepare(`
+      INSERT INTO week_planner_analytics (guest_id, action_type, item_type, offering_id)
+      VALUES (?, 'add_item', ?, ?)
+    `).bind(body.guest_id, body.item_type, body.reference_id || null).run()
+    
+    return c.json({ 
+      success: true, 
+      item_id: result.meta.last_row_id,
+      message: 'Item added to your timeline!' 
+    })
+    
+  } catch (error) {
+    console.error('Add timeline item error:', error)
+    return c.json({ error: 'Failed to add item' }, 500)
+  }
+})
+
+// Update timeline item
+app.put('/api/guest/my-week/items/:item_id', async (c) => {
+  const { DB } = c.env
+  const item_id = c.req.param('item_id')
+  const body = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE timeline_items 
+      SET item_date = ?, start_time = ?, end_time = ?, 
+          title = ?, description = ?, location = ?, 
+          icon = ?, color = ?, status = ?
+      WHERE item_id = ?
+    `).bind(
+      body.item_date,
+      body.start_time,
+      body.end_time || null,
+      body.title,
+      body.description || null,
+      body.location || null,
+      body.icon || '📅',
+      body.color || 'blue',
+      body.status || 'planned',
+      item_id
+    ).run()
+    
+    return c.json({ success: true, message: 'Item updated!' })
+    
+  } catch (error) {
+    console.error('Update timeline item error:', error)
+    return c.json({ error: 'Failed to update item' }, 500)
+  }
+})
+
+// Delete timeline item
+app.delete('/api/guest/my-week/items/:item_id', async (c) => {
+  const { DB } = c.env
+  const item_id = c.req.param('item_id')
+  
+  try {
+    await DB.prepare(`DELETE FROM timeline_items WHERE item_id = ?`).bind(item_id).run()
+    
+    return c.json({ success: true, message: 'Item removed!' })
+    
+  } catch (error) {
+    console.error('Delete timeline item error:', error)
+    return c.json({ error: 'Failed to delete item' }, 500)
+  }
+})
+
+// Accept suggestion
+app.post('/api/guest/my-week/suggestions/:suggestion_id/accept', async (c) => {
+  const { DB } = c.env
+  const suggestion_id = c.req.param('suggestion_id')
+  const body = await c.req.json()
+  
+  try {
+    // Get suggestion details
+    const suggestion = await DB.prepare(`
+      SELECT ts.*, ho.title_en, ho.offering_type
+      FROM timeline_suggestions ts
+      JOIN hotel_offerings ho ON ts.offering_id = ho.offering_id
+      WHERE ts.suggestion_id = ?
+    `).bind(suggestion_id).first()
+    
+    if (!suggestion) {
+      return c.json({ error: 'Suggestion not found' }, 404)
+    }
+    
+    // Add to timeline
+    const result = await DB.prepare(`
+      INSERT INTO timeline_items 
+      (plan_id, item_type, reference_id, item_date, start_time, title, icon, color, status, is_suggested)
+      VALUES (?, 'activity', ?, ?, ?, ?, ?, 'purple', 'planned', 1)
+    `).bind(
+      suggestion.plan_id,
+      suggestion.offering_id,
+      body.item_date || suggestion.suggested_date,
+      body.start_time || suggestion.suggested_time,
+      suggestion.title_en,
+      suggestion.offering_type === 'activity' ? '🎯' : suggestion.offering_type === 'dining' ? '🍽️' : '🎪'
+    ).run()
+    
+    // Mark suggestion as accepted
+    await DB.prepare(`
+      UPDATE timeline_suggestions SET is_accepted = 1 WHERE suggestion_id = ?
+    `).bind(suggestion_id).run()
+    
+    // Track analytics
+    await DB.prepare(`
+      INSERT INTO week_planner_analytics (guest_id, action_type, item_type, offering_id)
+      VALUES (?, 'accept_suggestion', ?, ?)
+    `).bind(body.guest_id, suggestion.offering_type, suggestion.offering_id).run()
+    
+    return c.json({ 
+      success: true, 
+      item_id: result.meta.last_row_id,
+      message: 'Added to your timeline!' 
+    })
+    
+  } catch (error) {
+    console.error('Accept suggestion error:', error)
+    return c.json({ error: 'Failed to accept suggestion' }, 500)
+  }
+})
+
+// Dismiss suggestion
+app.post('/api/guest/my-week/suggestions/:suggestion_id/dismiss', async (c) => {
+  const { DB } = c.env
+  const suggestion_id = c.req.param('suggestion_id')
+  
+  try {
+    await DB.prepare(`
+      UPDATE timeline_suggestions SET is_dismissed = 1 WHERE suggestion_id = ?
+    `).bind(suggestion_id).run()
+    
+    return c.json({ success: true, message: 'Suggestion dismissed' })
+    
+  } catch (error) {
+    console.error('Dismiss suggestion error:', error)
+    return c.json({ error: 'Failed to dismiss suggestion' }, 500)
+  }
+})
+
+// Generate smart suggestions for a guest
+app.post('/api/guest/my-week/generate-suggestions', async (c) => {
+  const { DB } = c.env
+  const body = await c.req.json()
+  const { pass_reference } = body
+  
+  try {
+    // Get guest and plan info
+    const guest = await DB.prepare(`
+      SELECT g.*, gsp.plan_id, gsp.checkin_date, gsp.checkout_date, gsp.total_nights
+      FROM guests g
+      LEFT JOIN guest_stay_plans gsp ON g.guest_id = gsp.guest_id
+      WHERE g.pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!guest || !guest.plan_id) {
+      return c.json({ error: 'Guest plan not found' }, 404)
+    }
+    
+    // Get tier benefits
+    const tierBenefits = await DB.prepare(`
+      SELECT DISTINCT tb.benefit_id, ho.offering_id, ho.title_en, ho.description_en, ho.offering_type, ho.price
+      FROM tier_benefits tb
+      LEFT JOIN benefit_venues bv ON tb.benefit_id = bv.benefit_id
+      LEFT JOIN hotel_offerings ho ON bv.venue_id = ho.offering_id
+      WHERE tb.tier_id = ? AND ho.status = 'active'
+    `).bind(guest.tier_id).all()
+    
+    // Get already booked items
+    const bookedOfferings = await DB.prepare(`
+      SELECT DISTINCT reference_id FROM timeline_items WHERE plan_id = ? AND item_type IN ('booking', 'activity')
+    `).bind(guest.plan_id).all()
+    const bookedIds = bookedOfferings.results.map(b => b.reference_id)
+    
+    // Generate suggestions
+    const suggestions = []
+    
+    // 1. Tier-included activities not yet tried
+    for (const benefit of tierBenefits.results) {
+      if (benefit.offering_id && !bookedIds.includes(benefit.offering_id)) {
+        const checkin = new Date(guest.checkin_date)
+        checkin.setDate(checkin.getDate() + 1) // Suggest for day 2
+        
+        suggestions.push({
+          plan_id: guest.plan_id,
+          offering_id: benefit.offering_id,
+          suggested_date: checkin.toISOString().split('T')[0],
+          suggested_time: '10:00',
+          reason_code: 'tier_included',
+          reason_text: `✨ Included in your ${guest.tier_name || 'tier'} (FREE)`,
+          relevance_score: 90
+        })
+      }
+    }
+    
+    // 2. Popular activities (if we have them)
+    const popularActivities = await DB.prepare(`
+      SELECT ho.offering_id, ho.title_en, COUNT(*) as booking_count
+      FROM bookings b
+      JOIN hotel_offerings ho ON b.offering_id = ho.offering_id
+      WHERE ho.property_id = ? AND ho.status = 'active' AND ho.offering_type = 'activity'
+      GROUP BY ho.offering_id
+      ORDER BY booking_count DESC
+      LIMIT 5
+    `).bind(guest.property_id).all()
+    
+    for (const activity of popularActivities.results) {
+      if (!bookedIds.includes(activity.offering_id)) {
+        const checkin = new Date(guest.checkin_date)
+        checkin.setDate(checkin.getDate() + 2) // Suggest for day 3
+        
+        suggestions.push({
+          plan_id: guest.plan_id,
+          offering_id: activity.offering_id,
+          suggested_date: checkin.toISOString().split('T')[0],
+          suggested_time: '14:00',
+          reason_code: 'popular',
+          reason_text: '⭐ Popular with other guests',
+          relevance_score: 75
+        })
+      }
+    }
+    
+    // Insert suggestions into database
+    for (const suggestion of suggestions.slice(0, 10)) { // Limit to 10
+      await DB.prepare(`
+        INSERT INTO timeline_suggestions 
+        (plan_id, offering_id, suggested_date, suggested_time, reason_code, reason_text, relevance_score)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        suggestion.plan_id,
+        suggestion.offering_id,
+        suggestion.suggested_date,
+        suggestion.suggested_time,
+        suggestion.reason_code,
+        suggestion.reason_text,
+        suggestion.relevance_score
+      ).run()
+    }
+    
+    return c.json({ 
+      success: true, 
+      suggestions_count: suggestions.length,
+      message: `Generated ${suggestions.length} personalized suggestions!` 
+    })
+    
+  } catch (error) {
+    console.error('Generate suggestions error:', error)
+    return c.json({ error: 'Failed to generate suggestions' }, 500)
+  }
+})
+
 app.get('/api/guest/pass/:pass_reference', async (c) => {
   const { DB } = c.env
   const pass_reference = c.req.param('pass_reference')
@@ -19572,6 +19985,9 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
+                <a href="/my-perfect-week.html" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors">
+                    <i class="fas fa-calendar-week mr-2"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
+                </a>
                 <a href="#" id="viewPassButton" class="pass-link-button px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
                     <i class="fas fa-id-card mr-2"></i><span class="hidden sm:inline">My Pass</span><span class="sm:hidden">Pass</span>
                 </a>
