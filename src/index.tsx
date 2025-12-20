@@ -55357,9 +55357,41 @@ app.get('/my-perfect-week', async (c) => {
                 return;
             }
             
-            container.innerHTML = weekData.days.map(day => \`
+            // Define hourly slots with meal period suggestions
+            const hourlySlots = [
+                { time: '07:00', label: '7 AM', period: 'breakfast', icon: '☀️', suggestion: 'Breakfast' },
+                { time: '08:00', label: '8 AM', period: 'breakfast', icon: '☀️' },
+                { time: '09:00', label: '9 AM', period: 'morning', icon: '🌅' },
+                { time: '10:00', label: '10 AM', period: 'morning', icon: '🌅' },
+                { time: '11:00', label: '11 AM', period: 'morning', icon: '☀️' },
+                { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch' },
+                { time: '13:00', label: '1 PM', period: 'lunch', icon: '🍽️' },
+                { time: '14:00', label: '2 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '15:00', label: '3 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '16:00', label: '4 PM', period: 'afternoon', icon: '🌤️' },
+                { time: '17:00', label: '5 PM', period: 'evening', icon: '🌆' },
+                { time: '18:00', label: '6 PM', period: 'dinner', icon: '🍴', suggestion: 'Dinner' },
+                { time: '19:00', label: '7 PM', period: 'dinner', icon: '🍴' },
+                { time: '20:00', label: '8 PM', period: 'evening', icon: '🌙' },
+                { time: '21:00', label: '9 PM', period: 'evening', icon: '🌙' },
+                { time: '22:00', label: '10 PM', period: 'night', icon: '🌙' }
+            ];
+            
+            container.innerHTML = weekData.days.map(day => {
+                // Group items by hour for smart placement
+                const itemsByHour = {};
+                day.items.forEach(item => {
+                    const hour = item.start_time ? item.start_time.substring(0, 5) : null;
+                    if (hour) {
+                        if (!itemsByHour[hour]) itemsByHour[hour] = [];
+                        itemsByHour[hour].push(item);
+                    }
+                });
+                
+                return \`
                 <div class="timeline-day bg-white rounded-2xl shadow-lg p-4 \${day.is_today ? 'ring-4 ring-opacity-50' : ''}" style="\${day.is_today ? 'border-color: var(--accent-color); border-width: 4px;' : ''}">
-                    <div class="flex justify-between items-center mb-4">
+                    <!-- Day Header -->
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b">
                         <div>
                             <h3 class="text-lg font-bold \${day.is_past ? 'text-gray-400' : day.is_today ? '' : 'text-gray-800'}" style="\${day.is_today ? 'color: var(--accent-color)' : ''}">
                                 Day \${day.day_number}
@@ -55372,43 +55404,78 @@ app.get('/my-perfect-week', async (c) => {
                         \${day.is_past ? '<i class="fas fa-check-circle text-green-500 text-2xl"></i>' : ''}
                     </div>
                     
-                    <div class="space-y-3 min-h-[200px]">
-                        \${day.items.length > 0 ? day.items.map(item => \`
-                            <div class="timeline-item bg-\${item.color}-50 border-l-4 border-\${item.color}-500 p-3 rounded-lg \${item.status === 'completed' ? 'opacity-60' : ''}">
-                                <div class="flex justify-between items-start mb-1">
-                                    <span class="text-2xl">\${item.icon}</span>
-                                    <div class="flex gap-2">
-                                        \${item.status === 'confirmed' ? '<i class="fas fa-check-circle text-green-500"></i>' : ''}
-                                        \${item.status === 'planned' ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Needs Booking</span>' : ''}
+                    <!-- Hourly Timeline -->
+                    <div class="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+                        \${hourlySlots.map(slot => {
+                            const itemsInSlot = itemsByHour[slot.time] || [];
+                            const hasSuggestion = slot.suggestion && itemsInSlot.length === 0;
+                            
+                            return \`
+                                <div class="flex gap-2 items-start group hover:bg-gray-50 p-2 rounded-lg transition">
+                                    <!-- Time Label -->
+                                    <div class="w-16 flex-shrink-0 text-right">
+                                        <span class="text-xs font-semibold text-gray-600">\${slot.label}</span>
+                                        <span class="ml-1">\${slot.icon}</span>
+                                    </div>
+                                    
+                                    <!-- Slot Content -->
+                                    <div class="flex-1 min-h-[40px] \${hasSuggestion ? 'border-l-2 border-dashed border-gray-300' : 'border-l-2 border-gray-200'} pl-3">
+                                        \${itemsInSlot.length > 0 ? itemsInSlot.map(item => \`
+                                            <div class="bg-\${item.color}-50 border border-\${item.color}-200 rounded-lg p-2 mb-2">
+                                                <div class="flex items-start justify-between gap-2">
+                                                    <div class="flex items-start gap-2 flex-1">
+                                                        <span class="text-lg">\${item.icon}</span>
+                                                        <div class="flex-1 min-w-0">
+                                                            <h4 class="font-semibold text-gray-800 text-sm truncate">\${item.title}</h4>
+                                                            <p class="text-xs text-gray-600">
+                                                                \${item.start_time}\${item.end_time ? ' - ' + item.end_time : ''}
+                                                            </p>
+                                                            \${item.location ? '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1 items-end">
+                                                        \${item.status === 'confirmed' ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap"><i class="fas fa-check-circle mr-1"></i>Booked</span>' : ''}
+                                                        \${item.status === 'planned' ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Needs Booking</span>' : ''}
+                                                    </div>
+                                                </div>
+                                                
+                                                \${item.status === 'planned' && item.reference_id ? \`
+                                                    <button onclick="bookTimelineItem(\${item.item_id}, \${item.reference_id}, '\${item.item_type}')" 
+                                                            class="w-full mt-2 py-1.5 text-xs font-semibold rounded transition flex items-center justify-center gap-1.5"
+                                                            style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white;">
+                                                        <i class="fas fa-calendar-check"></i>
+                                                        Book Now
+                                                    </button>
+                                                \` : ''}
+                                            </div>
+                                        \`).join('') : ''}
+                                        
+                                        \${hasSuggestion ? \`
+                                            <div class="flex items-center justify-between gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span class="text-xs text-gray-500 italic">\${slot.suggestion} time</span>
+                                                <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
+                                                        class="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition flex items-center gap-1">
+                                                    <i class="fas fa-plus"></i>
+                                                    Add \${slot.suggestion}
+                                                </button>
+                                            </div>
+                                        \` : ''}
+                                        
+                                        \${!hasSuggestion && itemsInSlot.length === 0 ? \`
+                                            <button onclick="quickAddToTime('\${day.date}', '\${slot.time}')" 
+                                                    class="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400 hover:text-purple-600 flex items-center gap-1">
+                                                <i class="fas fa-plus-circle"></i>
+                                                Add activity
+                                            </button>
+                                        \` : ''}
                                     </div>
                                 </div>
-                                <h4 class="font-semibold text-gray-800 text-sm mb-1">\${item.title}</h4>
-                                <p class="text-xs text-gray-600">
-                                    <i class="fas fa-clock mr-1"></i>\${item.start_time}\${item.end_time ? ' - ' + item.end_time : ''}
-                                </p>
-                                \${item.location ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-map-marker-alt mr-1"></i>' + item.location + '</p>' : ''}
-                                
-                                \${item.status === 'planned' && item.reference_id ? \`
-                                    <div class="mt-2 pt-2 border-t border-\${item.color}-200">
-                                        <button onclick="bookTimelineItem(\${item.item_id}, \${item.reference_id}, '\${item.item_type}')" 
-                                                class="w-full py-2 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-2"
-                                                style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: white;">
-                                            <i class="fas fa-calendar-check"></i>
-                                            Book Now
-                                        </button>
-                                    </div>
-                                \` : ''}
-                            </div>
-                        \`).join('') : \`
-                            <div class="text-center py-8 text-gray-400">
-                                <i class="fas fa-plus-circle text-3xl mb-2"></i>
-                                <p class="text-sm">Nothing planned yet</p>
-                                <button onclick="quickAddToDay('\${day.date}')" class="mt-2 text-xs hover:underline" style="color: var(--accent-color)">Add activity</button>
-                            </div>
-                        \`}
+                            \`;
+                        }).join('')}
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
         
         function renderList() {
@@ -55601,7 +55668,11 @@ app.get('/my-perfect-week', async (c) => {
             showOfferingsModal('all', date);
         }
         
-        async function showOfferingsModal(type, presetDate = null) {
+        function quickAddToTime(date, time) {
+            showOfferingsModal('all', date, time);
+        }
+        
+        async function showOfferingsModal(type, presetDate = null, presetTime = null) {
             const guest = getGuestSession();
             if (!guest) {
                 alert('Please link your pass first');
@@ -55693,7 +55764,7 @@ app.get('/my-perfect-week', async (c) => {
                 const data = await response.json();
                 
                 if (data.success && data.offerings) {
-                    renderOfferings(data.offerings, presetDate);
+                    renderOfferings(data.offerings, presetDate, presetTime);
                 } else {
                     document.getElementById('offeringsGrid').innerHTML = \`
                         <div class="col-span-full text-center py-8">
@@ -55713,7 +55784,7 @@ app.get('/my-perfect-week', async (c) => {
             }
         }
         
-        function renderOfferings(offerings, presetDate) {
+        function renderOfferings(offerings, presetDate, presetTime) {
             const grid = document.getElementById('offeringsGrid');
             
             if (offerings.length === 0) {
@@ -55744,7 +55815,7 @@ app.get('/my-perfect-week', async (c) => {
                 const displayType = offering.offering_type === 'restaurant' ? 'dining' : offering.offering_type;
                 
                 return \`
-                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${displayType}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}')">
+                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${displayType}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}', '\${presetTime || ''}')">
                         <div class="flex items-start gap-3">
                             <div class="text-3xl flex-shrink-0">\${icon}</div>
                             <div class="flex-1 min-w-0">
@@ -55793,7 +55864,7 @@ app.get('/my-perfect-week', async (c) => {
             });
         }
         
-        async function selectOffering(offeringId, presetDate) {
+        async function selectOffering(offeringId, presetDate, presetTime) {
             const guest = getGuestSession();
             if (!guest) {
                 alert('Please link your pass first');
@@ -55819,7 +55890,7 @@ app.get('/my-perfect-week', async (c) => {
                 }
                 
                 // Show add to timeline modal with option to book now
-                await showAddToTimelineModal(offering, presetDate);
+                await showAddToTimelineModal(offering, presetDate, presetTime);
             } catch (error) {
                 console.error('Select offering error:', error);
                 alert('Failed to load offering details');
@@ -55827,7 +55898,7 @@ app.get('/my-perfect-week', async (c) => {
         }
         
         // Simplified Add to Timeline Modal
-        async function showAddToTimelineModal(offering, presetDate) {
+        async function showAddToTimelineModal(offering, presetDate, presetTime) {
             const guest = getGuestSession();
             const minDate = timelineData?.stay?.checkin || new Date().toISOString().split('T')[0];
             const maxDate = timelineData?.stay?.checkout || new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0];
@@ -55848,6 +55919,17 @@ app.get('/my-perfect-week', async (c) => {
             const icon = typeIcons[offering.offering_type] || '✨';
             
             const requiresBooking = offering.requires_booking === 1 || offering.capacity_per_slot > 0;
+            
+            // Calculate end time based on duration if presetTime is provided
+            let endTime = '';
+            if (presetTime && offering.duration_minutes) {
+                const [hours, minutes] = presetTime.split(':').map(Number);
+                const startMinutes = hours * 60 + minutes;
+                const endMinutes = startMinutes + offering.duration_minutes;
+                const endHours = Math.floor(endMinutes / 60);
+                const endMins = endMinutes % 60;
+                endTime = \`\${String(endHours).padStart(2, '0')}:\${String(endMins).padStart(2, '0')}\`;
+            }
             
             modal.innerHTML = \`
                 <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full" onclick="event.stopPropagation()">
@@ -55880,12 +55962,12 @@ app.get('/my-perfect-week', async (c) => {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold mb-2 text-gray-700">Start Time *</label>
-                                <input type="time" name="start_time" required value="09:00"
+                                <input type="time" name="start_time" required value="\${presetTime || '09:00'}"
                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold mb-2 text-gray-700">End Time</label>
-                                <input type="time" name="end_time"
+                                <input type="time" name="end_time" value="\${endTime}"
                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             </div>
                         </div>
