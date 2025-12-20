@@ -18072,17 +18072,23 @@ app.get('/api/guest/tier-benefits', async (c) => {
         `).bind(pass.tier_id, pass.property_id).all()
         benefits = result.results || []
         
-        // Add default names and descriptions for benefits without them
+        // Add display names and descriptions from database
         for (const benefit of benefits) {
-          // If no venue_name and no description, use defaults
-          if (!benefit.venue_name && !benefit.description) {
+          // ALWAYS use benefit_title from database as primary source
+          benefit.display_name = benefit.benefit_title || benefit.venue_name || benefit.benefit_type
+          
+          // ALWAYS use benefit_description from database as primary source
+          benefit.display_description = benefit.benefit_description || benefit.description || ''
+          
+          // Only use defaults if BOTH title and description are missing (shouldn't happen)
+          if (!benefit.display_name || benefit.display_name === benefit.benefit_type) {
             const defaults = getBenefitDefaults(benefit.benefit_type)
-            benefit.display_name = defaults.name
-            benefit.display_description = defaults.description
-          } else {
-            // Use venue name or benefit type
-            benefit.display_name = benefit.venue_name || benefit.benefit_type
-            benefit.display_description = benefit.description || ''
+            if (!benefit.display_name) {
+              benefit.display_name = defaults.name
+            }
+            if (!benefit.display_description) {
+              benefit.display_description = defaults.description
+            }
           }
         }
       } catch (joinError) {
@@ -18095,11 +18101,20 @@ app.get('/api/guest/tier-benefits', async (c) => {
         `).bind(pass.tier_id, pass.property_id).all()
         benefits = result.results || []
         
-        // Add default names and descriptions
+        // Add display names and descriptions from database
         for (const benefit of benefits) {
-          const defaults = getBenefitDefaults(benefit.benefit_type)
-          benefit.display_name = defaults.name
-          benefit.display_description = defaults.description
+          // ALWAYS use benefit_title from database as primary source
+          benefit.display_name = benefit.benefit_title || benefit.benefit_type
+          benefit.display_description = benefit.benefit_description || ''
+          
+          // Only use defaults if title is missing
+          if (!benefit.display_name) {
+            const defaults = getBenefitDefaults(benefit.benefit_type)
+            benefit.display_name = defaults.name
+            if (!benefit.display_description) {
+              benefit.display_description = defaults.description
+            }
+          }
         }
       }
     }
