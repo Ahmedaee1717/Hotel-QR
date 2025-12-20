@@ -4,10 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://e97f45b4.project-c8738f5c.pages.dev 🚀 **LATEST!**
-**Property Landing Page (6-DIGIT PIN!):** https://e97f45b4.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**My Perfect Week:** https://e97f45b4.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NEW!**
-**Admin Dashboard:** https://e97f45b4.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://4e55db37.project-c8738f5c.pages.dev 🚀 **LATEST with Hourly Timeline!**
+**Property Landing Page (6-DIGIT PIN!):** https://4e55db37.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**My Perfect Week:** https://4e55db37.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ **NEW Hourly Slots!**
+**Admin Dashboard:** https://4e55db37.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -47,7 +47,15 @@ A complete, production-ready resort activity booking platform with QR code entry
 - ✅ **Per-Venue Custom CTA Text** 📝 **NEW!** - Each linked venue gets its own custom button text (e.g., "View Bars", "Explore Spa")
 - ✅ **AI-Powered Benefit Translations** 🔥 **NEW!** - Auto-translate tier benefits to 28+ languages like custom sections
 - ✅ **Chatbot Guest Session Auto-Detection** 🤖 **NEW!** - Chatbot automatically knows guest tier and benefits
-- ✅ **My Perfect Week Timeline Planner** 📅✨ **NEW!** - Interactive week planner with auto-populated bookings and browsable hotel offerings
+- ✅ **My Perfect Week Timeline Planner** 📅✨ **NEW with HOURLY TIMELINE!** - Interactive week planner with:
+  - **Hourly time slots (7 AM - 10 PM)** with visual timeline 🕐
+  - **Smart suggestions** for breakfast (7-8 AM), lunch (12-1 PM), dinner (6-7 PM) 🍽️
+  - **Hover-to-add** functionality on any time slot ✨
+  - **Auto-calculated end times** based on activity duration ⏱️
+  - **Visual meal period indicators** (☀️ breakfast, 🌅 morning, 🍽️ lunch, 🌆 evening, 🌙 night)
+  - **Seamless booking flow** - add to timeline first, book when ready 📋➡️📅
+  - **Activity grouping** - multiple items at same time slot display together
+  - **Real-time status tracking** (Planned/Needs Booking/Confirmed) 🎯
 - ✅ **Browse & Add Hotel Offerings** 🏨 **NEW!** - Seamless dropdown to add activities, restaurants, spa, events from hotel catalog
 
 ### 🏢 Vendor Portal
