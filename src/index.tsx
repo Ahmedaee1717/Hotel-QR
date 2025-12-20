@@ -23547,6 +23547,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             
             if (data.success) {
               tierBenefitsData = data;
+              // Store in localStorage for chatbot access
+              localStorage.setItem('tierBenefitsData', JSON.stringify(data));
+              console.log('✅ Tier benefits loaded and stored:', data);
               displayTierBenefitsCard(data);
             } else {
               console.error('Failed to load tier benefits:', data.error);
@@ -23800,6 +23803,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           if (details && !details.classList.contains('hidden')) {
             toggleTierDetails();
           }
+          // Clear tier benefits from memory and localStorage
+          tierBenefitsData = null;
+          localStorage.removeItem('tierBenefitsData');
+          console.log('🗑️ Tier benefits cleared');
         }
         
         window.toggleTierDetails = function() {
@@ -24454,13 +24461,34 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const guestSession = getGuestSession()
                 let guest_context = null
                 
-                if (guestSession && tierBenefitsData) {
+                // Get tier benefits from variable or localStorage
+                let benefitsData = tierBenefitsData
+                if (!benefitsData) {
+                  const stored = localStorage.getItem('tierBenefitsData')
+                  if (stored) {
+                    try {
+                      benefitsData = JSON.parse(stored)
+                      console.log('📦 Loaded tier benefits from localStorage')
+                    } catch (e) {
+                      console.error('Failed to parse stored tier benefits:', e)
+                    }
+                  }
+                }
+                
+                console.log('🔍 Chatbot Context Check:', {
+                  hasGuestSession: !!guestSession,
+                  hasBenefitsData: !!benefitsData,
+                  guestName: guestSession?.guest_name,
+                  tierName: benefitsData?.tier?.name
+                })
+                
+                if (guestSession && benefitsData) {
                   // Build benefits summary
                   const benefitsSummary = []
                   const categories = ['dining', 'drinks', 'recreation', 'services', 'amenities']
                   
                   categories.forEach(cat => {
-                    const benefits = tierBenefitsData.benefits[cat] || []
+                    const benefits = benefitsData.benefits[cat] || []
                     if (benefits.length > 0) {
                       benefitsSummary.push(cat.toUpperCase() + ':')
                       benefits.forEach(b => {
@@ -24474,10 +24502,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   guest_context = {
                     guest_name: guestSession.guest_name,
                     room_number: guestSession.room_number,
-                    tier_name: tierBenefitsData.tier.name,
-                    tier_color: tierBenefitsData.tier.color,
+                    tier_name: benefitsData.tier.name,
+                    tier_color: benefitsData.tier.color,
                     benefits_summary: benefitsSummary.join('\\n')
                   }
+                  
+                  console.log('✅ Guest context built:', guest_context)
+                } else {
+                  console.log('⚠️ No guest context available - missing:', {
+                    guestSession: !guestSession,
+                    benefitsData: !benefitsData
+                  })
                 }
                 
                 const response = await fetch('/api/chatbot/chat', {
