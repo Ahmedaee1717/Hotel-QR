@@ -15137,12 +15137,12 @@ app.get('/api/admin/all-inclusive/venues/:property_id', async (c) => {
       const result = await DB.prepare(`
         SELECT 
           offering_id as id,
-          name,
+          title_en as name,
           offering_type as type,
-          description
+          short_description_en as description
         FROM hotel_offerings
-        WHERE property_id = ? AND is_active = 1
-        ORDER BY offering_type, name
+        WHERE property_id = ? AND status = 'active'
+        ORDER BY offering_type, title_en
       `).bind(property_id).all()
       venues = result.results || []
     } catch (tableError) {
