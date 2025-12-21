@@ -23365,7 +23365,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const description = await getTranslatedField(r, 'short_description');
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
-                    <div class="relative cursor-pointer" onclick="viewOffering(\${r.offering_id})">
+                    <div class="relative cursor-pointer" onclick="viewOffering('\${r.offering_id}')">
                         <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
                              class="w-full h-48 object-cover">
@@ -23377,14 +23377,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         </div>
                     </div>
                     <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800 cursor-pointer" onclick="viewOffering(\${r.offering_id})">\${title}</h3>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800 cursor-pointer" onclick="viewOffering('\${r.offering_id}')">\${title}</h3>
                         <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
                         <div class="flex items-center text-sm text-gray-500 mb-4">
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
                             <span>\${translateLocation(r.location)}</span>
                         </div>
                         <div class="pt-3 border-t border-gray-100">
-                            <button onclick="viewOffering(\${r.offering_id})" 
+                            <button onclick="viewOffering('\${r.offering_id}')" 
                                     class="w-full bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
                             </button>
@@ -23415,7 +23415,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(e, 'title');
                 const description = await getTranslatedField(e, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${e.offering_id})">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${e.offering_id}')">
                     <div class="relative">
                         <img src="\${e.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
@@ -23464,7 +23464,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${s.offering_id}')">
                     <div class="relative">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
@@ -23510,7 +23510,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${s.offering_id})">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${s.offering_id}')">
                     <div class="relative">
                         <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
@@ -23622,7 +23622,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(o, 'title');
                 const description = await getTranslatedField(o, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering(\${o.offering_id})">
+                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${o.offering_id}')">
                     <div class="relative">
                         <img src="\${o.images[0] || '/static/placeholder.jpg'}" 
                              alt="\${title}" 
@@ -55953,7 +55953,7 @@ app.get('/my-perfect-week', async (c) => {
                 const displayType = offering.offering_type === 'restaurant' ? 'dining' : offering.offering_type;
                 
                 return \`
-                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${displayType}" onclick="selectOffering(\${offering.offering_id}, '\${presetDate || ''}', '\${presetTime || ''}')">
+                    <div class="offering-card border-2 border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-lg transition cursor-pointer" data-type="\${displayType}" onclick="selectOffering('\${offering.offering_id}', '\${presetDate || ''}', '\${presetTime || ''}')">
                         <div class="flex items-start gap-3">
                             <div class="text-3xl flex-shrink-0">\${icon}</div>
                             <div class="flex-1 min-w-0">
