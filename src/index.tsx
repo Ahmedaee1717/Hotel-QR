@@ -26187,7 +26187,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         // Show thank you message based on mood
                         let message = 'Thank you for your feedback!';
                         if (score === 3) {
-                            message = '😊 Thank you! We\'re thrilled you\'re enjoying your stay!';
+                            message = "😊 Thank you! We're thrilled you're enjoying your stay!";
                         } else if (score === 2) {
                             message = '😐 Thank you for sharing your thoughts with us.';
                         } else if (score === 1) {
