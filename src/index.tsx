@@ -26239,12 +26239,21 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         alert(message);
                         closeMoodCheck();
                     } else {
-                        alert('Failed to save your mood check. Please try again.');
+                        // Check if it's a duplicate submission
+                        if (data.details && data.details.includes('UNIQUE constraint')) {
+                            alert('😊 You've already shared your mood today. Thank you!');
+                            // Mark as completed to prevent modal from showing again
+                            const guestMoodKey = MOOD_CHECK_KEY + '_' + guest.pass_reference;
+                            const today = new Date().toISOString().split('T')[0];
+                            localStorage.setItem(guestMoodKey, today);
+                            closeMoodCheck();
+                        } else {
+                            alert('Failed to save your mood check. Please try again.');
+                        }
                     }
                 } catch (error) {
                     console.error('Mood check error:', error);
-                    alert('Failed to save your mood check. Please try again.');
-                    closeMoodCheck();
+                    alert('Failed to save your mood check. Please check your internet connection and try again.');
                 }
             }
             
