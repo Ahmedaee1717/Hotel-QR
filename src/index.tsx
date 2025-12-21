@@ -63210,13 +63210,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           
           const data = await response.json();
           if (data.success) {
-            alert('Table added successfully!');
+            alert('✅ Table added successfully!');
             document.getElementById('addTableForm').reset();
             await loadTables();
+          } else {
+            const errorMsg = data.error || 'Failed to add table';
+            if (response.status === 401 || response.status === 403) {
+              alert('⚠️ Authentication Error: Please login as admin first!\\n\\nGo to: /admin/login');
+            } else {
+              alert('❌ Error: ' + errorMsg);
+            }
           }
         } catch (error) {
           console.error('Add table error:', error);
-          alert('Failed to add table');
+          alert('❌ Failed to add table. Check console for details.');
         }
       });
 
