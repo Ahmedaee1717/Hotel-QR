@@ -18494,7 +18494,7 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       return c.json({ error: 'Pass not found' }, 404)
     }
     
-    // Try to find guest by email first, then by room number
+    // Try to find guest by email
     let guest = null
     if (pass.guest_email) {
       guest = await DB.prepare(`
@@ -18502,19 +18502,12 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       `).bind(pass.guest_email).first()
     }
     
-    // If not found by email, try room number
-    if (!guest && pass.room_number) {
-      guest = await DB.prepare(`
-        SELECT guest_id FROM guests WHERE room_number = ?
-      `).bind(pass.room_number).first()
-    }
-    
     const guestId = guest?.guest_id
     const allBookings = []
     
-    // 1. Fetch Restaurant Reservations
-    if (guestId) {
-      const restaurants = await DB.prepare(`
+    // 1. Fetch Restaurant Reservations (by guest_id OR room_number)
+    if (guestId || pass.room_number) {
+      let query = `
         SELECT 
           tr.reservation_id as id,
           'restaurant' as type,
@@ -18532,6 +18525,12 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
           END as offering_id
         FROM table_reservations tr
         LEFT JOIN dining_sessions ds ON tr.session_id = ds.session_id
+        LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
+        WHERE (tr.guest_id = ? OR tr.room_number = ?) AND tr.status != 'cancelled'
+        ORDER BY tr.reservation_date ASC, tr.reservation_time ASC
+      `
+      
+      const restaurants = await DB.prepare(query).bind(guestId || null, pass.room_number || null).all()
         LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
         WHERE tr.guest_id = ? AND tr.status != 'cancelled'
         ORDER BY tr.reservation_date ASC, tr.reservation_time ASC
