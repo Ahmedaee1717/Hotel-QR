@@ -4,11 +4,12 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://12748082.project-c8738f5c.pages.dev 🚀 **LATEST - My Bookings filters past bookings!**
-**Property Landing Page (6-DIGIT PIN!):** https://12748082.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**My Perfect Week:** https://12748082.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
-**My Bookings:** https://12748082.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **FIXED - Only shows upcoming + toggle!**
-**Admin Dashboard:** https://12748082.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://e1bc9fc6.project-c8738f5c.pages.dev 🚀 **LATEST - Beach bookings in My Bookings + Auto-fill!**
+**Property Landing Page (6-DIGIT PIN!):** https://e1bc9fc6.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**My Perfect Week:** https://e1bc9fc6.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
+**My Bookings:** https://e1bc9fc6.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All booking types show!**
+**Beach Booking:** https://e1bc9fc6.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
+**Admin Dashboard:** https://e1bc9fc6.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
