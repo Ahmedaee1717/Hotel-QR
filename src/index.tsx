@@ -8512,7 +8512,7 @@ app.post('/api/restaurant/reserve', async (c) => {
     
     // Get session details for reservation_time and date
     const session = await DB.prepare(`
-      SELECT session_time, session_date FROM dining_sessions WHERE session_id = ?
+      SELECT session_time, session_date, offering_id FROM dining_sessions WHERE session_id = ?
     `).bind(data.session_id).first()
     
     // Use guest_count or num_guests
