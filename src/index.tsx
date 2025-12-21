@@ -19147,11 +19147,30 @@ app.post('/api/guest/my-week/generate-suggestions', async (c) => {
         const checkin = new Date(guest.checkin_date)
         checkin.setDate(checkin.getDate() + 1) // Suggest for day 2
         
+        let suggestedTime = '10:00' // Default for activities
+        
+        // For restaurants, get actual available time from dining sessions
+        if (benefit.offering_type === 'restaurant') {
+          const sessions = await DB.prepare(`
+            SELECT session_time FROM dining_sessions 
+            WHERE offering_id = ? AND is_active = 1
+            ORDER BY session_time ASC
+            LIMIT 1
+          `).bind(benefit.offering_id).first()
+          
+          if (sessions && sessions.session_time) {
+            suggestedTime = sessions.session_time
+          } else {
+            // Skip this restaurant if no sessions configured
+            continue
+          }
+        }
+        
         suggestions.push({
           plan_id: guest.plan_id,
           offering_id: benefit.offering_id,
           suggested_date: checkin.toISOString().split('T')[0],
-          suggested_time: '10:00',
+          suggested_time: suggestedTime,
           reason_code: 'tier_included',
           reason_text: `✨ Included in your ${guest.tier_name || 'tier'} (FREE)`,
           relevance_score: 90
@@ -19175,11 +19194,34 @@ app.post('/api/guest/my-week/generate-suggestions', async (c) => {
         const checkin = new Date(guest.checkin_date)
         checkin.setDate(checkin.getDate() + 2) // Suggest for day 3
         
+        let suggestedTime = '14:00' // Default for activities
+        
+        // For restaurants, get actual available time from dining sessions
+        const offeringType = await DB.prepare(`
+          SELECT offering_type FROM hotel_offerings WHERE offering_id = ?
+        `).bind(activity.offering_id).first()
+        
+        if (offeringType && offeringType.offering_type === 'restaurant') {
+          const sessions = await DB.prepare(`
+            SELECT session_time FROM dining_sessions 
+            WHERE offering_id = ? AND is_active = 1
+            ORDER BY session_time ASC
+            LIMIT 1
+          `).bind(activity.offering_id).first()
+          
+          if (sessions && sessions.session_time) {
+            suggestedTime = sessions.session_time
+          } else {
+            // Skip this restaurant if no sessions configured
+            continue
+          }
+        }
+        
         suggestions.push({
           plan_id: guest.plan_id,
           offering_id: activity.offering_id,
           suggested_date: checkin.toISOString().split('T')[0],
-          suggested_time: '14:00',
+          suggested_time: suggestedTime,
           reason_code: 'popular',
           reason_text: '⭐ Popular with other guests',
           relevance_score: 75
