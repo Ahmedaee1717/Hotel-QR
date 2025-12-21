@@ -47566,28 +47566,31 @@ app.get('/admin/dashboard', (c) => {
             service: 'bg-gray-100 text-gray-700'
           };
           
+          // Extract original ID (remove 'H' or 'A' prefix)
+          const originalId = o.original_id || String(o.offering_id).replace(/^[HA]/, '');
+          
           return \`
             <div class="border rounded-lg p-4 hover:shadow-md">
               <div class="flex justify-between items-start mb-2">
                 <div>
-                  <h3 class="font-bold text-lg">\${o.title}</h3>
+                  <h3 class="font-bold text-lg">\${o.title_en || o.title || 'Untitled'}</h3>
                   <span class="inline-block px-2 py-1 rounded text-xs \${typeColors[o.offering_type] || typeColors.service}">
-                    \${o.offering_type.toUpperCase()}
+                    \${o.offering_type ? o.offering_type.toUpperCase() : 'ACTIVITY'}
                   </span>
                 </div>
                 <div class="flex gap-2">
-                  \${o.offering_type === 'restaurant' ? \`<a href="/admin/restaurant/\${o.offering_id}" class="text-green-600 hover:text-green-800" title="Manage Tables"><i class="fas fa-chair"></i></a>\` : ''}
-                  <button onclick="editOffering(\${o.offering_id})" class="text-blue-600 hover:text-blue-800">
+                  \${o.offering_type === 'restaurant' ? \`<a href="/admin/restaurant/\${originalId}" class="text-green-600 hover:text-green-800" title="Manage Tables"><i class="fas fa-chair"></i></a>\` : ''}
+                  <button onclick="editOffering('\${originalId}')" class="text-blue-600 hover:text-blue-800">
                     <i class="fas fa-edit"></i>
                   </button>
-                  <button onclick="deleteOffering(\${o.offering_id})" class="text-red-600 hover:text-red-800">
+                  <button onclick="deleteOffering('\${originalId}')" class="text-red-600 hover:text-red-800">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
               </div>
-              <p class="text-sm text-gray-600 mb-2">\${o.short_description}</p>
+              <p class="text-sm text-gray-600 mb-2">\${o.short_description_en || o.short_description || ''}</p>
               <div class="flex flex-wrap gap-3 text-sm text-gray-700">
-                <span><i class="fas fa-dollar-sign mr-1"></i>\${o.currency} \${o.price || 'Free'}</span>
+                <span><i class="fas fa-dollar-sign mr-1"></i>\${o.currency || 'USD'} \${o.price || 'Free'}</span>
                 <span><i class="fas fa-map-marker-alt mr-1"></i>\${o.location ? translateLocation(o.location) : 'N/A'}</span>
                 \${o.duration_minutes ? \`<span><i class="fas fa-clock mr-1"></i>\${o.duration_minutes} min</span>\` : ''}
                 \${o.event_date ? \`<span><i class="fas fa-calendar mr-1"></i>\${o.event_date}</span>\` : ''}
