@@ -18559,29 +18559,31 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       }
     }
     
-    // 3. Fetch Beach Bookings (if exist)
-    if (guestId) {
+    // 3. Fetch Beach Bookings (by guest_id OR room_number)
+    if (guestId || pass.room_number) {
       try {
         const beach = await DB.prepare(`
           SELECT 
-            bb.booking_id as id,
+            bb.beach_booking_id as id,
             'beach' as type,
             bb.booking_date as date,
-            COALESCE(bb.booking_time, '08:00') as start_time,
-            NULL as end_time,
-            'Beach - ' || COALESCE(bb.zone_name, 'Spot') as title,
-            'Spot ' || bb.spot_number as location,
+            COALESCE(bb.start_time, '08:00') as start_time,
+            bb.end_time,
+            'Beach Spot' as title,
+            'Zone ' || COALESCE(bs.zone_name, bb.zone_name, 'General') || ' - Spot #' || COALESCE(bs.spot_number, bb.spot_number, '?') as location,
             bb.status,
-            1 as num_guests,
-            bb.booking_code as reference
+            bb.num_guests,
+            bb.booking_reference as reference
           FROM beach_bookings bb
-          WHERE bb.guest_id = ? AND bb.status != 'cancelled'
+          LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+          WHERE (bb.guest_id = ? OR bb.guest_room_number = ?) AND bb.status != 'cancelled'
           ORDER BY bb.booking_date ASC
-        `).bind(guestId).all()
+        `).bind(guestId || null, pass.room_number || null).all()
         
         allBookings.push(...beach.results)
       } catch (e) {
         // Table might not exist, skip
+        console.log('Beach bookings table not found or error:', e)
       }
     }
     
@@ -33586,6 +33588,45 @@ app.get('/beach-booking/:property_id', async (c) => {
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('bookingDate').min = today;
         document.getElementById('bookingDate').value = today;
+        
+        // Auto-fill guest information from OnePass
+        function autoFillGuestInfo() {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                try {
+                    const data = JSON.parse(session);
+                    if (data.guest) {
+                        if (data.guest.full_name) {
+                            document.getElementById('guestName').value = data.guest.full_name;
+                        }
+                        if (data.guest.room_number) {
+                            document.getElementById('roomNumber').value = data.guest.room_number;
+                        }
+                        console.log('✅ Auto-filled guest information from OnePass');
+                    }
+                } catch (e) {
+                    console.error('Failed to parse guest session:', e);
+                }
+            }
+        }
+        
+        // Auto-fill when form becomes visible
+        document.addEventListener('DOMContentLoaded', () => {
+            autoFillGuestInfo();
+        });
+        
+        // Also auto-fill when guest details section is shown
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.target.id === 'guestDetailsSection' && !mutation.target.classList.contains('hidden')) {
+                    autoFillGuestInfo();
+                }
+            });
+        });
+        const guestSection = document.getElementById('guestDetailsSection');
+        if (guestSection) {
+            observer.observe(guestSection, { attributes: true, attributeFilter: ['class'] });
+        }
         
         // Apply custom colors from settings
         async function loadAndApplySettings() {
