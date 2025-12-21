@@ -8481,15 +8481,8 @@ app.post('/api/restaurant/reserve', async (c) => {
       return c.json({ error: `Table capacity is ${table.capacity} guests` }, 400)
     }
     
-    // Check if table is already booked
-    const existing = await DB.prepare(`
-      SELECT reservation_id FROM table_reservations 
-      WHERE session_id = ? AND table_id = ? AND status != 'cancelled'
-    `).bind(data.session_id, data.table_id).first()
-    
-    if (existing) {
-      return c.json({ error: 'Table is already reserved' }, 400)
-    }
+    // Note: Removed duplicate booking check to allow multiple table bookings
+    // Frontend should handle preventing duplicate submissions
     
     // Create or get guest
     let guest = await DB.prepare(`
@@ -8623,7 +8616,11 @@ app.post('/api/restaurant/reserve', async (c) => {
     })
   } catch (error) {
     console.error('Create reservation error:', error)
-    return c.json({ error: 'Failed to create reservation' }, 500)
+    return c.json({ 
+      error: 'Failed to create reservation', 
+      details: error.message || String(error),
+      stack: error.stack 
+    }, 500)
   }
 })
 
