@@ -18494,10 +18494,20 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       return c.json({ error: 'Pass not found' }, 404)
     }
     
-    // Also check guests table by email
-    const guest = await DB.prepare(`
-      SELECT guest_id FROM guests WHERE email = ?
-    `).bind(pass.guest_email).first()
+    // Try to find guest by email first, then by room number
+    let guest = null
+    if (pass.guest_email) {
+      guest = await DB.prepare(`
+        SELECT guest_id FROM guests WHERE email = ?
+      `).bind(pass.guest_email).first()
+    }
+    
+    // If not found by email, try room number
+    if (!guest && pass.room_number) {
+      guest = await DB.prepare(`
+        SELECT guest_id FROM guests WHERE room_number = ?
+      `).bind(pass.room_number).first()
+    }
     
     const guestId = guest?.guest_id
     const allBookings = []
