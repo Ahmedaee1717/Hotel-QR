@@ -8041,9 +8041,14 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
       success: true,
       table_id: result.meta.last_row_id
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create table error:', error)
-    return c.json({ error: 'Failed to create table' }, 500)
+    const errorMsg = error?.message || error?.cause?.message || 'Failed to create table'
+    return c.json({ 
+      error: 'Failed to create table', 
+      details: errorMsg,
+      hint: errorMsg.includes('FOREIGN KEY') ? 'Restaurant offering does not exist' : undefined
+    }, 500)
   }
 })
 
@@ -63218,10 +63223,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             await loadTables();
           } else {
             const errorMsg = data.error || 'Failed to add table';
+            const details = data.details || '';
+            const hint = data.hint || '';
+            
             if (response.status === 401 || response.status === 403) {
               alert('⚠️ Authentication Error: Please login as admin first!\\n\\nGo to: /admin/login');
             } else {
-              alert('❌ Error: ' + errorMsg);
+              let message = '❌ Error: ' + errorMsg;
+              if (details) message += '\\n\\nDetails: ' + details;
+              if (hint) message += '\\n\\n💡 Hint: ' + hint;
+              alert(message);
             }
           }
         } catch (error) {
