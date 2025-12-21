@@ -18519,10 +18519,7 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
           tr.status,
           tr.num_guests,
           CONCAT('RES', SUBSTR('000000' || tr.reservation_id, -6)) as reference,
-          CASE 
-            WHEN ho.offering_id IS NOT NULL THEN 'H' || ho.original_id
-            ELSE NULL
-          END as offering_id
+          ds.offering_id as offering_id
         FROM table_reservations tr
         LEFT JOIN dining_sessions ds ON tr.session_id = ds.session_id
         LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
@@ -18531,10 +18528,6 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       `
       
       const restaurants = await DB.prepare(query).bind(guestId || null, pass.room_number || null).all()
-        LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
-        WHERE tr.guest_id = ? AND tr.status != 'cancelled'
-        ORDER BY tr.reservation_date ASC, tr.reservation_time ASC
-      `).bind(guestId).all()
       
       allBookings.push(...restaurants.results)
     }
@@ -18603,7 +18596,7 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
     })
   } catch (error) {
     console.error('Get bookings error:', error)
-    return c.json({ error: 'Failed to fetch bookings' }, 500)
+    return c.json({ error: 'Failed to fetch bookings', details: error.message }, 500)
   }
 })
 
