@@ -50432,8 +50432,16 @@ app.get('/admin/dashboard', (c) => {
             // No mood check data yet - show empty state
             document.getElementById('moodCheckSection').style.display = 'block';
           }
-          
-          // Load detailed mood check list
+        } catch (error) {
+          console.error('Load mood stats error:', error);
+          // Don't show error to user - just hide the section if data unavailable
+          document.getElementById('moodCheckSection').style.display = 'none';
+        }
+      }
+      
+      // Load detailed mood checks list
+      async function loadMoodChecks() {
+        try {
           const detailsResponse = await fetch('/api/admin/feedback/mood-checks/' + propertyId);
           const detailsData = await detailsResponse.json();
           
@@ -50444,6 +50452,8 @@ app.get('/admin/dashboard', (c) => {
               const bgClass = check.mood_score === 3 ? 'bg-green-100 text-green-800' :
                               check.mood_score === 2 ? 'bg-blue-100 text-blue-800' :
                               'bg-red-100 text-red-800';
+              const moodLabel = check.mood_score === 3 ? 'Happy' :
+                               check.mood_score === 2 ? 'Okay' : 'Unhappy';
               const timeStr = new Date(check.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
               
               html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">';
@@ -50454,13 +50464,13 @@ app.get('/admin/dashboard', (c) => {
               html += '      <p class="text-sm text-gray-600">';
               html += '        <i class="fas fa-door-open mr-1"></i>Room ' + (check.room_number || 'N/A');
               html += '        <span class="mx-2">•</span>';
-              html += '        <i class="fas fa-calendar-day mr-1"></i>Day ' + check.stay_day + ' of stay';
+              html += '        <i class="fas fa-calendar-day mr-1"></i>Day ' + (check.stay_day || '?') + ' of stay';
               html += '      </p>';
               html += '    </div>';
               html += '  </div>';
               html += '  <div class="text-right">';
               html += '    <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ' + bgClass + '">';
-              html += check.mood_label;
+              html += moodLabel;
               html += '    </span>';
               html += '    <p class="text-xs text-gray-500 mt-1">' + timeStr + '</p>';
               html += '  </div>';
@@ -50471,15 +50481,15 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('moodCheckDetailsList').innerHTML = '<p class="text-center text-gray-500 py-4 text-sm">No mood checks yet today</p>';
           }
         } catch (error) {
-          console.error('Load mood stats error:', error);
-          // Don't show error to user - just hide the section if data unavailable
-          document.getElementById('moodCheckSection').style.display = 'none';
+          console.error('Load mood checks error:', error);
+          document.getElementById('moodCheckDetailsList').innerHTML = '<p class="text-center text-red-500 py-4 text-sm">Unable to load mood checks</p>';
         }
       }
       
       // Refresh mood stats
       async function refreshMoodStats() {
         await loadMoodStats();
+        await loadMoodChecks();
       }
       
       // Load recent mood checks list with guest names and rooms
