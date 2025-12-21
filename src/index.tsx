@@ -26075,13 +26075,16 @@ app.get('/offering-detail', async (c) => {
             if (offeringData && offeringData.offering_type === 'restaurant') {
                 const bookingSection = document.getElementById('bookingSection');
                 if (bookingSection) {
+                    // Use original_id (database ID) instead of prefixed offering_id
+                    const actualId = offeringData.original_id || offeringId.toString().replace(/^[HA]/, '');
+                    
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
                         '<div class="flex gap-3">' +
-                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/menu\\', \\'_blank\\')" ' +
+                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/menu\\', \\'_blank\\')" ' +
                         'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-utensils mr-2"></i>' + t('view-menu') + '</button>' +
-                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + offeringId + '/book\\'" ' +
+                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/book\\'" ' +
                         'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>' +
                         '</div>';
