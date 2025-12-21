@@ -19408,6 +19408,173 @@ app.post('/api/guest/pass/:pass_reference/withdraw-consent', async (c) => {
   }
 })
 
+// ==========================================
+// SAVE MY STAY - MOOD CHECK SYSTEM
+// ==========================================
+
+// Submit daily mood check
+app.post('/api/guest/mood-check', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, pass_reference, primary_guest_name, room_number,
+             valid_from, valid_until
+      FROM digital_passes
+      WHERE pass_reference = ?
+    `).bind(data.pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    const checkInDate = new Date(pass.valid_from)
+    const today = new Date(data.check_date || new Date().toISOString().split('T')[0])
+    const stayDay = Math.floor((today - checkInDate) / (1000 * 60 * 60 * 24)) + 1
+    
+    const moodCheck = await DB.prepare(`
+      INSERT INTO guest_mood_checks (
+        property_id, pass_reference, guest_name, room_number,
+        check_date, stay_day, mood_score, mood_emoji, device_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      pass.property_id, pass.pass_reference, pass.primary_guest_name, pass.room_number,
+      data.check_date || new Date().toISOString().split('T')[0],
+      stayDay, data.mood_score, data.mood_emoji, data.device_info || null
+    ).run()
+    
+    return c.json({ success: true, mood_check_id: moodCheck.meta.last_row_id, stay_day: stayDay })
+  } catch (error) {
+    console.error('Mood check error:', error)
+    return c.json({ error: 'Failed to save mood check', details: error.message }, 500)
+  }
+})
+
+// Submit guest feedback
+app.post('/api/guest/feedback', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    let priority = data.mood_score === 1 ? 'urgent' : (data.mood_score === 2 ? 'high' : 'normal')
+    
+    const feedback = await DB.prepare(`
+      INSERT INTO guest_feedback (
+        mood_check_id, property_id, pass_reference, guest_name, room_number,
+        feedback_type, mood_score, categories, custom_comment, priority, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(
+      data.mood_check_id, data.property_id, data.pass_reference, data.guest_name, data.room_number,
+      data.feedback_type, data.mood_score, JSON.stringify(data.categories || []),
+      data.custom_comment || null, priority
+    ).run()
+    
+    const today = new Date().toISOString().split('T')[0]
+    await DB.prepare(`
+      INSERT INTO feedback_analytics (property_id, date, total_checks, happy_count, okay_count, unhappy_count, pending_count)
+      VALUES (?, ?, 1, ?, ?, ?, 1)
+      ON CONFLICT(property_id, date) DO UPDATE SET
+        total_checks = total_checks + 1,
+        happy_count = happy_count + ?,
+        okay_count = okay_count + ?,
+        unhappy_count = unhappy_count + ?,
+        pending_count = pending_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(
+      data.property_id, today,
+      data.mood_score === 3 ? 1 : 0, data.mood_score === 2 ? 1 : 0, data.mood_score === 1 ? 1 : 0,
+      data.mood_score === 3 ? 1 : 0, data.mood_score === 2 ? 1 : 0, data.mood_score === 1 ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true, feedback_id: feedback.meta.last_row_id, priority: priority })
+  } catch (error) {
+    console.error('Feedback error:', error)
+    return c.json({ error: 'Failed to submit feedback', details: error.message }, 500)
+  }
+})
+
+// Log review request
+app.post('/api/guest/review-request', async (c) => {
+  const { DB } = c.env
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO review_requests (mood_check_id, property_id, pass_reference, guest_name, platform, platform_url, clicked, clicked_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+    `).bind(data.mood_check_id, data.property_id, data.pass_reference, data.guest_name, data.platform, data.platform_url).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to log review request' }, 500)
+  }
+})
+
+// Check if already submitted today
+app.get('/api/guest/mood-check/:pass_reference/today', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const today = new Date().toISOString().split('T')[0]
+  
+  try {
+    const check = await DB.prepare(`
+      SELECT * FROM guest_mood_checks WHERE pass_reference = ? AND check_date = ?
+    `).bind(pass_reference, today).first()
+    
+    return c.json({ already_submitted: !!check, check: check || null })
+  } catch (error) {
+    return c.json({ already_submitted: false })
+  }
+})
+
+// Admin: Get all feedback
+app.get('/api/admin/feedback', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  const status = c.req.query('status') || 'all'
+  
+  try {
+    let query = `
+      SELECT f.*, gm.check_date, gm.stay_day, gm.mood_emoji
+      FROM guest_feedback f
+      LEFT JOIN guest_mood_checks gm ON f.mood_check_id = gm.mood_check_id
+      WHERE f.property_id = ?
+    `
+    
+    if (status !== 'all') {
+      query += ` AND f.status = '${status}'`
+    }
+    
+    query += ` ORDER BY f.created_at DESC LIMIT 100`
+    
+    const feedback = await DB.prepare(query).bind(property_id).all()
+    
+    return c.json({ success: true, feedback: feedback.results })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch feedback' }, 500)
+  }
+})
+
+// Admin: Update feedback status
+app.post('/api/admin/feedback/:id/respond', async (c) => {
+  const { DB } = c.env
+  const feedback_id = c.req.param('id')
+  const data = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      UPDATE guest_feedback 
+      SET status = ?, responded_at = CURRENT_TIMESTAMP, responded_by = ?, response_notes = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE feedback_id = ?
+    `).bind(data.status || 'acknowledged', data.responded_by, data.response_notes, feedback_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to update feedback' }, 500)
+  }
+})
+
 // Guest: Generate Apple Wallet pass
 app.get('/api/guest/pass/:pass_reference/wallet/apple', async (c) => {
   const { DB } = c.env
