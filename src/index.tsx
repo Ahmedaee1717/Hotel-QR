@@ -47571,8 +47571,12 @@ app.get('/admin/dashboard', (c) => {
             service: 'bg-gray-100 text-gray-700'
           };
           
-          // Extract original ID (remove 'H' or 'A' prefix)
-          const originalId = o.original_id || String(o.offering_id).replace(/^[HA]/, '');
+          // Extract original ID (remove 'H' or 'A' prefix) - use original_id field first
+          let originalId = o.original_id;
+          if (!originalId || originalId === null || originalId === undefined) {
+            // Fallback: strip prefix from offering_id
+            originalId = String(o.offering_id).replace(/^[HA]/, '');
+          }
           
           return \`
             <div class="border rounded-lg p-4 hover:shadow-md">
@@ -47584,7 +47588,7 @@ app.get('/admin/dashboard', (c) => {
                   </span>
                 </div>
                 <div class="flex gap-2">
-                  \${o.offering_type === 'restaurant' ? \`<a href="/admin/restaurant/\${originalId}" class="text-green-600 hover:text-green-800" title="Manage Tables"><i class="fas fa-chair"></i></a>\` : ''}
+                  \${o.offering_type === 'restaurant' ? '<a href="/admin/restaurant/' + originalId + '" class="text-green-600 hover:text-green-800" title="Manage Tables"><i class="fas fa-chair"></i></a>' : ''}
                   <button onclick="editOffering('\${originalId}')" class="text-blue-600 hover:text-blue-800">
                     <i class="fas fa-edit"></i>
                   </button>
