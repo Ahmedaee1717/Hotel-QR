@@ -57071,6 +57071,28 @@ app.get('/my-bookings', async (c) => {
             renderBookings();
         }
         
+        function togglePastBookings() {
+            showPastBookings = !showPastBookings;
+            
+            // Update toggle UI
+            const toggle = document.getElementById('pastToggle');
+            const knob = document.getElementById('pastToggleKnob');
+            
+            if (showPastBookings) {
+                toggle.classList.remove('bg-gray-300');
+                toggle.classList.add('bg-green-500');
+                knob.classList.remove('translate-x-1');
+                knob.classList.add('translate-x-6');
+            } else {
+                toggle.classList.add('bg-gray-300');
+                toggle.classList.remove('bg-green-500');
+                knob.classList.add('translate-x-1');
+                knob.classList.remove('translate-x-6');
+            }
+            
+            renderBookings();
+        }
+        
         function viewBookingDetails(offeringId) {
             window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyId + '&lang=en';
         }
