@@ -20341,44 +20341,6 @@ app.get('/api/admin/feedback/mood-stats/:property_id', async (c) => {
 })
 
 // Admin: Get detailed mood check list for today
-app.get('/api/admin/feedback/mood-checks/:property_id/today', async (c) => {
-  const { DB } = c.env
-  const { property_id } = c.req.param()
-  
-  try {
-    const today = new Date().toISOString().split('T')[0]
-    
-    const moodChecks = await DB.prepare(`
-      SELECT 
-        mood_check_id,
-        guest_name,
-        room_number,
-        mood_emoji,
-        mood_score,
-        stay_day,
-        check_date,
-        created_at,
-        CASE 
-          WHEN mood_score = 3 THEN 'Happy'
-          WHEN mood_score = 2 THEN 'Okay'
-          WHEN mood_score = 1 THEN 'Unhappy'
-        END as mood_label
-      FROM guest_mood_checks
-      WHERE property_id = ? AND check_date = ?
-      ORDER BY created_at DESC
-    `).bind(property_id, today).all()
-    
-    return c.json({
-      success: true,
-      date: today,
-      mood_checks: moodChecks.results
-    })
-  } catch (error) {
-    console.error('Get mood checks error:', error)
-    return c.json({ error: 'Failed to get mood checks' }, 500)
-  }
-})
-
 // Admin: Get recent mood checks list with guest details
 app.get('/api/admin/feedback/mood-checks/:property_id', async (c) => {
   const { DB } = c.env
@@ -50472,7 +50434,7 @@ app.get('/admin/dashboard', (c) => {
           }
           
           // Load detailed mood check list
-          const detailsResponse = await fetch('/api/admin/feedback/mood-checks/' + propertyId + '/today');
+          const detailsResponse = await fetch('/api/admin/feedback/mood-checks/' + propertyId);
           const detailsData = await detailsResponse.json();
           
           if (detailsData.success && detailsData.mood_checks && detailsData.mood_checks.length > 0) {
