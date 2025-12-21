@@ -18581,10 +18581,11 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
           ORDER BY bb.booking_date ASC
         `).bind(guestId || null, pass.room_number || null).all()
         
+        console.log('Beach bookings found:', beach.results.length, 'for guest_id:', guestId, 'room:', pass.room_number)
         allBookings.push(...beach.results)
       } catch (e) {
         // Table might not exist, skip
-        console.log('Beach bookings table not found or error:', e)
+        console.log('Beach bookings table error:', e.message)
       }
     }
     
@@ -18595,6 +18596,11 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
         name: pass.primary_guest_name,
         email: pass.guest_email,
         room: pass.room_number
+      },
+      debug: {
+        guest_id: guestId,
+        room_number: pass.room_number,
+        total_bookings: allBookings.length
       }
     })
   } catch (error) {
