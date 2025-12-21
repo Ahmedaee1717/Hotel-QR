@@ -8630,6 +8630,52 @@ app.post('/api/restaurant/reserve', async (c) => {
   }
 })
 
+// Cancel booking (Restaurant, Activity, Beach)
+app.post('/api/booking/cancel/:type/:id', async (c) => {
+  const { DB } = c.env
+  const bookingType = c.req.param('type')
+  const bookingId = c.req.param('id')
+  
+  try {
+    if (bookingType === 'restaurant') {
+      // Cancel restaurant reservation
+      await DB.prepare(`
+        UPDATE table_reservations 
+        SET status = 'cancelled'
+        WHERE reservation_id = ?
+      `).bind(bookingId).run()
+      
+      return c.json({ success: true, message: 'Restaurant reservation cancelled' })
+      
+    } else if (bookingType === 'activity') {
+      // Cancel activity booking
+      await DB.prepare(`
+        UPDATE bookings 
+        SET booking_status = 'cancelled'
+        WHERE booking_id = ?
+      `).bind(bookingId).run()
+      
+      return c.json({ success: true, message: 'Activity booking cancelled' })
+      
+    } else if (bookingType === 'beach') {
+      // Cancel beach booking
+      await DB.prepare(`
+        UPDATE beach_bookings 
+        SET status = 'cancelled'
+        WHERE booking_id = ?
+      `).bind(bookingId).run()
+      
+      return c.json({ success: true, message: 'Beach booking cancelled' })
+      
+    } else {
+      return c.json({ error: 'Invalid booking type' }, 400)
+    }
+  } catch (error) {
+    console.error('Cancel booking error:', error)
+    return c.json({ error: 'Failed to cancel booking' }, 500)
+  }
+})
+
 // Create offering booking (General bookings for restaurants, events, spa)
 app.post('/api/offering-booking', async (c) => {
   const { DB } = c.env
@@ -18430,6 +18476,127 @@ app.get('/api/guest/tier-benefits', async (c) => {
 // ==========================================
 // MY PERFECT WEEK API ENDPOINTS
 // ==========================================
+
+// Get ALL guest bookings (restaurant, activities, beach, spa) - Direct from source tables
+app.get('/api/guest/bookings/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  
+  try {
+    // Get guest from digital pass
+    const pass = await DB.prepare(`
+      SELECT pass_id, property_id, primary_guest_name, guest_email, room_number
+      FROM digital_passes 
+      WHERE pass_reference = ?
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Also check guests table by email
+    const guest = await DB.prepare(`
+      SELECT guest_id FROM guests WHERE email = ?
+    `).bind(pass.guest_email).first()
+    
+    const guestId = guest?.guest_id
+    const allBookings = []
+    
+    // 1. Fetch Restaurant Reservations
+    if (guestId) {
+      const restaurants = await DB.prepare(`
+        SELECT 
+          tr.reservation_id as id,
+          'restaurant' as type,
+          tr.reservation_date as date,
+          tr.reservation_time as start_time,
+          NULL as end_time,
+          COALESCE(ho.title_en, 'Restaurant Reservation') as title,
+          COALESCE(ho.location, 'Resort Dining') as location,
+          tr.status,
+          tr.num_guests,
+          CONCAT('RES', SUBSTR('000000' || tr.reservation_id, -6)) as reference,
+          CASE 
+            WHEN ho.offering_id IS NOT NULL THEN 'H' || ho.original_id
+            ELSE NULL
+          END as offering_id
+        FROM table_reservations tr
+        LEFT JOIN dining_sessions ds ON tr.session_id = ds.session_id
+        LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
+        WHERE tr.guest_id = ? AND tr.status != 'cancelled'
+        ORDER BY tr.reservation_date ASC, tr.reservation_time ASC
+      `).bind(guestId).all()
+      
+      allBookings.push(...restaurants.results)
+    }
+    
+    // 2. Fetch Activity Bookings (if exist)
+    if (guestId) {
+      try {
+        const activities = await DB.prepare(`
+          SELECT 
+            b.booking_id as id,
+            'activity' as type,
+            b.activity_date as date,
+            b.activity_time as start_time,
+            NULL as end_time,
+            a.activity_name as title,
+            COALESCE(a.location, 'Resort Activity') as location,
+            b.booking_status as status,
+            b.num_participants as num_guests,
+            b.booking_reference as reference
+          FROM bookings b
+          LEFT JOIN activities a ON b.activity_id = a.activity_id
+          WHERE b.guest_id = ? AND b.booking_status = 'confirmed'
+          ORDER BY b.activity_date ASC, b.activity_time ASC
+        `).bind(guestId).all()
+        
+        allBookings.push(...activities.results)
+      } catch (e) {
+        // Table might not exist, skip
+      }
+    }
+    
+    // 3. Fetch Beach Bookings (if exist)
+    if (guestId) {
+      try {
+        const beach = await DB.prepare(`
+          SELECT 
+            bb.booking_id as id,
+            'beach' as type,
+            bb.booking_date as date,
+            COALESCE(bb.booking_time, '08:00') as start_time,
+            NULL as end_time,
+            'Beach - ' || COALESCE(bb.zone_name, 'Spot') as title,
+            'Spot ' || bb.spot_number as location,
+            bb.status,
+            1 as num_guests,
+            bb.booking_code as reference
+          FROM beach_bookings bb
+          WHERE bb.guest_id = ? AND bb.status != 'cancelled'
+          ORDER BY bb.booking_date ASC
+        `).bind(guestId).all()
+        
+        allBookings.push(...beach.results)
+      } catch (e) {
+        // Table might not exist, skip
+      }
+    }
+    
+    return c.json({
+      success: true,
+      bookings: allBookings,
+      guest: {
+        name: pass.primary_guest_name,
+        email: pass.guest_email,
+        room: pass.room_number
+      }
+    })
+  } catch (error) {
+    console.error('Get bookings error:', error)
+    return c.json({ error: 'Failed to fetch bookings' }, 500)
+  }
+})
 
 // Get guest's complete timeline for their stay
 app.get('/api/guest/my-week/:pass_reference', async (c) => {
@@ -56707,26 +56874,15 @@ app.get('/my-bookings', async (c) => {
             document.getElementById('guestNameDisplay').textContent = guest.full_name || 'Guest';
             
             try {
-                const response = await fetch('/api/guest/my-week/' + guest.pass_reference, {
+                const response = await fetch('/api/guest/bookings/' + guest.pass_reference, {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Extract all confirmed bookings from timeline
-                    allBookings = [];
-                    data.days.forEach(day => {
-                        day.items.forEach(item => {
-                            if (item.status === 'confirmed') {
-                                allBookings.push({
-                                    ...item,
-                                    date: day.date,
-                                    dayName: day.day_name
-                                });
-                            }
-                        });
-                    });
+                    // Use bookings directly from API
+                    allBookings = data.bookings || [];
                     
                     // Sort by date and time
                     allBookings.sort((a, b) => {
@@ -56767,7 +56923,7 @@ app.get('/my-bookings', async (c) => {
         function renderBookings() {
             const filteredBookings = currentFilter === 'all' 
                 ? allBookings 
-                : allBookings.filter(b => b.offering_type === currentFilter);
+                : allBookings.filter(b => b.type === currentFilter);
             
             const container = document.getElementById('bookingsList');
             const emptyState = document.getElementById('emptyState');
@@ -56810,7 +56966,7 @@ app.get('/my-bookings', async (c) => {
                 const isPast = bookingDate < now;
                 
                 return \`
-                    <div class="booking-card type-\${booking.offering_type} bg-white rounded-xl p-4 shadow-sm \${isPast ? 'opacity-60' : ''}">
+                    <div class="booking-card type-\${booking.type} bg-white rounded-xl p-4 shadow-sm \${isPast ? 'opacity-60' : ''}">
                         <div class="flex items-start justify-between gap-4">
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-2">
@@ -56838,10 +56994,10 @@ app.get('/my-bookings', async (c) => {
                                             <span>\${booking.location}</span>
                                         </div>
                                     \` : ''}
-                                    \${booking.reservation_id ? \`
+                                    \${booking.reference ? \`
                                         <div class="flex items-center gap-2">
                                             <i class="fas fa-hashtag w-4 text-\${typeColor}-600"></i>
-                                            <span class="font-mono text-xs">\${booking.reservation_id}</span>
+                                            <span class="font-mono text-xs">\${booking.reference}</span>
                                         </div>
                                     \` : ''}
                                 </div>
@@ -56851,6 +57007,11 @@ app.get('/my-bookings', async (c) => {
                                 <button onclick="viewBookingDetails('\${booking.offering_id}')" class="text-\${typeColor}-600 hover:bg-\${typeColor}-50 p-2 rounded-lg transition-colors" title="View Details">
                                     <i class="fas fa-info-circle text-lg"></i>
                                 </button>
+                                \${!isPast ? \`
+                                <button onclick="cancelBooking('\${booking.id}', '\${booking.type}')" class="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors" title="Cancel Booking">
+                                    <i class="fas fa-times-circle text-lg"></i>
+                                </button>
+                                \` : ''}
                             </div>
                         </div>
                     </div>
@@ -56877,6 +57038,31 @@ app.get('/my-bookings', async (c) => {
         
         function viewBookingDetails(offeringId) {
             window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyId + '&lang=en';
+        }
+        
+        async function cancelBooking(bookingId, bookingType) {
+            if (!confirm('Are you sure you want to cancel this booking?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(\`/api/booking/cancel/\${bookingType}/\${bookingId}\`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Booking cancelled successfully!');
+                    loadBookings(); // Reload bookings
+                } else {
+                    alert('❌ Failed to cancel: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Cancel error:', error);
+                alert('❌ Connection error');
+            }
         }
         
         function goToMyWeek() {
