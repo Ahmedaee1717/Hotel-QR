@@ -20242,6 +20242,104 @@ app.get('/api/admin/feedback/chat/:property_id', async (c) => {
   }
 })
 
+// Admin: Get daily mood check statistics
+app.get('/api/admin/feedback/mood-stats/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Today's mood breakdown
+    const today = new Date().toISOString().split('T')[0]
+    
+    const todayStats = await DB.prepare(`
+      SELECT 
+        mood_emoji,
+        mood_score,
+        COUNT(*) as count
+      FROM guest_mood_checks
+      WHERE property_id = ? AND check_date = ?
+      GROUP BY mood_emoji, mood_score
+      ORDER BY mood_score DESC
+    `).bind(property_id, today).all()
+    
+    // Calculate overall stats
+    const totalToday = todayStats.results.reduce((sum, row) => sum + row.count, 0)
+    const happyCount = todayStats.results.find(r => r.mood_score === 3)?.count || 0
+    const okayCount = todayStats.results.find(r => r.mood_score === 2)?.count || 0
+    const unhappyCount = todayStats.results.find(r => r.mood_score === 1)?.count || 0
+    
+    // Calculate average mood score (1-3 scale)
+    const avgMoodScore = todayStats.results.reduce((sum, row) => sum + (row.mood_score * row.count), 0) / (totalToday || 1)
+    
+    // Determine top mood
+    let topMood = '😐'
+    let topMoodLabel = 'Okay'
+    if (happyCount >= okayCount && happyCount >= unhappyCount) {
+      topMood = '😊'
+      topMoodLabel = 'Happy'
+    } else if (unhappyCount > okayCount && unhappyCount > happyCount) {
+      topMood = '😟'
+      topMoodLabel = 'Unhappy'
+    }
+    
+    // Calculate sentiment percentage (-1 to 1 scale, where -1 is unhappy, 0 is okay, 1 is happy)
+    // Convert 1-3 scale to -1 to 1: (score - 2) = (1-2=-1, 2-2=0, 3-2=1)
+    const sentimentScore = (avgMoodScore - 2)  // Results in -1 (unhappy), 0 (okay), 1 (happy)
+    
+    // Last 7 days trend
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const weekAgoDate = sevenDaysAgo.toISOString().split('T')[0]
+    
+    const weekTrend = await DB.prepare(`
+      SELECT 
+        check_date,
+        mood_emoji,
+        mood_score,
+        COUNT(*) as count
+      FROM guest_mood_checks
+      WHERE property_id = ? AND check_date >= ?
+      GROUP BY check_date, mood_emoji, mood_score
+      ORDER BY check_date DESC, mood_score DESC
+    `).bind(property_id, weekAgoDate).all()
+    
+    // Get urgent feedback count for today
+    const urgentToday = await DB.prepare(`
+      SELECT COUNT(*) as urgent_count
+      FROM guest_feedback f
+      LEFT JOIN guest_mood_checks gm ON f.mood_check_id = gm.mood_check_id
+      WHERE f.property_id = ? 
+        AND f.feedback_type = 'urgent' 
+        AND gm.check_date = ?
+        AND f.status != 'resolved'
+    `).bind(property_id, today).first()
+    
+    return c.json({
+      success: true,
+      today: {
+        date: today,
+        total: totalToday,
+        happy: happyCount,
+        okay: okayCount,
+        unhappy: unhappyCount,
+        happy_percent: totalToday > 0 ? Math.round((happyCount / totalToday) * 100) : 0,
+        okay_percent: totalToday > 0 ? Math.round((okayCount / totalToday) * 100) : 0,
+        unhappy_percent: totalToday > 0 ? Math.round((unhappyCount / totalToday) * 100) : 0,
+        avg_mood_score: avgMoodScore.toFixed(2),
+        sentiment_score: sentimentScore.toFixed(2),
+        top_mood: topMood,
+        top_mood_label: topMoodLabel,
+        urgent_count: urgentToday.urgent_count || 0
+      },
+      breakdown: todayStats.results,
+      week_trend: weekTrend.results
+    })
+  } catch (error) {
+    console.error('Get mood stats error:', error)
+    return c.json({ error: 'Failed to get mood statistics' }, 500)
+  }
+})
+
 // Admin: Resolve chat feedback
 app.post('/api/admin/feedback/chat/:feedback_id/resolve', async (c) => {
   const { DB } = c.env
@@ -43890,6 +43988,90 @@ app.get('/admin/dashboard', (c) => {
                 Create dynamic feedback forms, generate QR codes, analyze guest sentiment, and get AI-powered insights on urgent issues.
             </p>
             
+            <!-- Daily Mood Check Stats (NEW!) -->
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-purple-200" id="moodCheckSection">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-heart mr-2 text-pink-500"></i>
+                        Today's Guest Mood
+                    </h3>
+                    <button onclick="refreshMoodStats()" class="text-purple-600 hover:text-purple-800 text-sm">
+                        <i class="fas fa-sync-alt mr-1"></i>Refresh
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <!-- Overall Mood Display -->
+                    <div class="col-span-1 md:col-span-1 bg-white rounded-lg p-6 text-center shadow-md">
+                        <p class="text-sm font-semibold text-gray-600 mb-2">Overall Mood</p>
+                        <div class="text-6xl mb-2" id="topMoodEmoji">😐</div>
+                        <p class="text-lg font-bold text-gray-800" id="topMoodLabel">Neutral</p>
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">Sentiment Score</p>
+                            <p class="text-2xl font-bold" id="sentimentScoreDisplay">0.0</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Happy Count -->
+                    <div class="bg-white rounded-lg p-4 shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-3xl">😊</span>
+                            <span class="text-2xl font-bold text-green-600" id="happyCount">0</span>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-600">Happy</p>
+                        <div class="mt-2 bg-green-100 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full transition-all" id="happyBar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1" id="happyPercent">0%</p>
+                    </div>
+                    
+                    <!-- Okay Count -->
+                    <div class="bg-white rounded-lg p-4 shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-3xl">😐</span>
+                            <span class="text-2xl font-bold text-blue-600" id="okayCount">0</span>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-600">Okay</p>
+                        <div class="mt-2 bg-blue-100 rounded-full h-2">
+                            <div class="bg-blue-500 h-2 rounded-full transition-all" id="okayBar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1" id="okayPercent">0%</p>
+                    </div>
+                    
+                    <!-- Unhappy Count -->
+                    <div class="bg-white rounded-lg p-4 shadow-md">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-3xl">😟</span>
+                            <span class="text-2xl font-bold text-red-600" id="unhappyCount">0</span>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-600">Unhappy</p>
+                        <div class="mt-2 bg-red-100 rounded-full h-2">
+                            <div class="bg-red-500 h-2 rounded-full transition-all" id="unhappyBar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1" id="unhappyPercent">0%</p>
+                    </div>
+                    
+                    <!-- Total & Urgent -->
+                    <div class="bg-white rounded-lg p-4 shadow-md">
+                        <div class="mb-3">
+                            <p class="text-sm font-semibold text-gray-600 mb-1">Total Responses</p>
+                            <p class="text-3xl font-bold text-gray-800" id="totalMoodChecks">0</p>
+                        </div>
+                        <div class="pt-3 border-t border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <p class="text-sm font-semibold text-red-600">🚨 Urgent</p>
+                                <p class="text-2xl font-bold text-red-600" id="urgentMoodCount">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 text-center text-xs text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Data updates every 60 seconds • Last updated: <span id="moodLastUpdated">--:--</span>
+                </div>
+            </div>
+            
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" id="feedbackStats">
                 <div class="text-white rounded-lg shadow-lg p-6" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
@@ -50124,9 +50306,69 @@ app.get('/admin/dashboard', (c) => {
       let formQuestions = [];
       let currentQuestionIndex = 0;
 
+      // Load daily mood check statistics
+      async function loadMoodStats() {
+        try {
+          const response = await fetch('/api/admin/feedback/mood-stats/' + propertyId);
+          const data = await response.json();
+          
+          if (data.success && data.today) {
+            const today = data.today;
+            
+            // Update overall mood display
+            document.getElementById('topMoodEmoji').textContent = today.top_mood;
+            document.getElementById('topMoodLabel').textContent = today.top_mood_label;
+            document.getElementById('sentimentScoreDisplay').textContent = today.sentiment_score;
+            
+            // Update counts
+            document.getElementById('happyCount').textContent = today.happy;
+            document.getElementById('okayCount').textContent = today.okay;
+            document.getElementById('unhappyCount').textContent = today.unhappy;
+            document.getElementById('totalMoodChecks').textContent = today.total;
+            document.getElementById('urgentMoodCount').textContent = today.urgent_count;
+            
+            // Update percentages and progress bars
+            document.getElementById('happyPercent').textContent = today.happy_percent + '%';
+            document.getElementById('happyBar').style.width = today.happy_percent + '%';
+            
+            document.getElementById('okayPercent').textContent = today.okay_percent + '%';
+            document.getElementById('okayBar').style.width = today.okay_percent + '%';
+            
+            document.getElementById('unhappyPercent').textContent = today.unhappy_percent + '%';
+            document.getElementById('unhappyBar').style.width = today.unhappy_percent + '%';
+            
+            // Update timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('moodLastUpdated').textContent = timeStr;
+            
+            // Show mood check section
+            document.getElementById('moodCheckSection').style.display = 'block';
+          } else {
+            // No mood check data yet - show empty state
+            document.getElementById('moodCheckSection').style.display = 'block';
+          }
+        } catch (error) {
+          console.error('Load mood stats error:', error);
+          // Don't show error to user - just hide the section if data unavailable
+          document.getElementById('moodCheckSection').style.display = 'none';
+        }
+      }
+      
+      // Refresh mood stats
+      async function refreshMoodStats() {
+        await loadMoodStats();
+      }
+      
+      // Auto-refresh mood stats every 60 seconds
+      setInterval(loadMoodStats, 60000);
+
       // Load feedback stats and forms
       async function loadFeedbackTab() {
         try {
+          // Load daily mood check statistics (NEW!)
+          await loadMoodStats();
+          
           // Load analytics
           const analyticsRes = await fetch('/api/admin/feedback/analytics/' + propertyId);
           const analyticsData = await analyticsRes.json();
