@@ -56882,8 +56882,8 @@ app.get('/my-perfect-week', async (c) => {
             const hourlySlots = [
                 { time: '06:00', label: '6 AM', period: 'early', icon: '🌄' },
                 { time: '06:30', label: '6:30 AM', period: 'early', icon: '🌄' },
-                { time: '07:00', label: '7 AM', period: 'breakfast', icon: '☀️', suggestion: 'Breakfast', restaurant: 'Sunrise Breakfast Buffet' },
-                { time: '07:30', label: '7:30 AM', period: 'breakfast', icon: '☀️', restaurant: 'Le Jardin Fine Dining' },
+                { time: '07:00', label: '7 AM', period: 'breakfast', icon: '☀️', suggestion: 'Breakfast' },
+                { time: '07:30', label: '7:30 AM', period: 'breakfast', icon: '☀️' },
                 { time: '08:00', label: '8 AM', period: 'breakfast', icon: '☀️' },
                 { time: '08:30', label: '8:30 AM', period: 'morning', icon: '☀️' },
                 { time: '09:00', label: '9 AM', period: 'morning', icon: '🌅' },
@@ -56892,7 +56892,7 @@ app.get('/my-perfect-week', async (c) => {
                 { time: '10:30', label: '10:30 AM', period: 'morning', icon: '🌅' },
                 { time: '11:00', label: '11 AM', period: 'morning', icon: '☀️' },
                 { time: '11:30', label: '11:30 AM', period: 'morning', icon: '☀️' },
-                { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch', restaurant: 'Azure Beach Grill' },
+                { time: '12:00', label: '12 PM', period: 'lunch', icon: '🍽️', suggestion: 'Lunch' },
                 { time: '12:30', label: '12:30 PM', period: 'lunch', icon: '🍽️' },
                 { time: '13:00', label: '1 PM', period: 'lunch', icon: '🍽️' },
                 { time: '13:30', label: '1:30 PM', period: 'afternoon', icon: '🍽️' },
@@ -56904,9 +56904,9 @@ app.get('/my-perfect-week', async (c) => {
                 { time: '16:30', label: '4:30 PM', period: 'afternoon', icon: '🌤️' },
                 { time: '17:00', label: '5 PM', period: 'evening', icon: '🌆' },
                 { time: '17:30', label: '5:30 PM', period: 'evening', icon: '🌆' },
-                { time: '18:00', label: '6 PM', period: 'dinner', icon: '🍴', suggestion: 'Dinner', restaurant: 'Azure Beach Grill' },
+                { time: '18:00', label: '6 PM', period: 'dinner', icon: '🍴', suggestion: 'Dinner' },
                 { time: '18:30', label: '6:30 PM', period: 'dinner', icon: '🍴' },
-                { time: '19:00', label: '7 PM', period: 'dinner', icon: '🍴', restaurant: 'Le Jardin Fine Dining' },
+                { time: '19:00', label: '7 PM', period: 'dinner', icon: '🍴' },
                 { time: '19:30', label: '7:30 PM', period: 'dinner', icon: '🍴' },
                 { time: '20:00', label: '8 PM', period: 'evening', icon: '🌙' },
                 { time: '20:30', label: '8:30 PM', period: 'evening', icon: '🌙' },
@@ -57979,7 +57979,16 @@ app.get('/my-perfect-week', async (c) => {
         }
         
         document.addEventListener('DOMContentLoaded', function() {
-            loadTimeline();
+            // Wait for getGuestSession to be available
+            function initTimeline() {
+                if (typeof window.getGuestSession === 'function') {
+                    loadTimeline();
+                } else {
+                    // Retry after 100ms
+                    setTimeout(initTimeline, 100);
+                }
+            }
+            initTimeline();
         });
     </script>
 </body>
