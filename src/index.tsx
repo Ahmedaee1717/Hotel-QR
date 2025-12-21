@@ -18570,7 +18570,7 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
             COALESCE(bb.start_time, '08:00') as start_time,
             bb.end_time,
             'Beach Spot' as title,
-            'Zone ' || COALESCE(bs.zone_name, 'General') || ' - Spot #' || COALESCE(bs.spot_number, bb.spot_number, '?') as location,
+            COALESCE('Spot ' || bs.spot_number, 'Beach Area') as location,
             bb.booking_status as status,
             bb.num_guests,
             bb.booking_reference as reference,
