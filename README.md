@@ -661,6 +661,47 @@ POST   /api/admin/feedback/:id/respond          - Mark feedback as handled
 - 🔄 **Status Management** - Mark as acknowledged, in_progress, resolved
 - 💬 **Response Notes** - Log management actions taken
 - 📅 **Historical Data** - View all feedback by date range
+- 😊 **Daily Mood Statistics** - NEW! Visual dashboard showing today's guest mood breakdown
+- 📊 **Emoji Counts** - See how many guests chose 😊 Happy, 😐 Okay, or 😟 Unhappy
+- 🎯 **Overall Mood Display** - Large emoji showing top chosen mood with sentiment score
+- 📈 **Progress Bars** - Visual percentage breakdown for each mood
+- ⚡ **Auto-Refresh** - Updates every 60 seconds automatically
+- 🔄 **Manual Refresh** - Button to refresh mood stats on demand
+
+**Mood Check Forms Integration:**
+Three default feedback forms automatically created for the mood check system:
+- 📝 **Happy Mood Form (😊)** - Collects positive feedback categories
+- 📝 **Okay Mood Form (😐)** - Collects neutral feedback
+- 📝 **Unhappy Mood Form (😟)** - Creates urgent tickets with issue categories
+
+**Feedback Tab Layout:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📊 Today's Guest Mood (NEW!)                           │
+│ ┌─────────┬─────────┬─────────┬─────────┬─────────┐    │
+│ │ Overall │ 😊 Happy│ 😐 Okay │ 😟 Unhap│ Total & │    │
+│ │  😊     │   15    │    8    │    2    │ 25 resp │    │
+│ │ Happy   │  60%    │  32%    │   8%    │ 2 urgent│    │
+│ │ Score:  │ ▓▓▓▓▓▓▓ │ ▓▓▓▓    │ ▓       │         │    │
+│ │  0.52   │         │         │         │         │    │
+│ └─────────┴─────────┴─────────┴─────────┴─────────┘    │
+│ Updates every 60s • Last: 3:45 PM        [↻ Refresh]   │
+├─────────────────────────────────────────────────────────┤
+│ 📊 Feedback Statistics (Existing)                      │
+│ ┌──────────┬──────────┬──────────┬──────────┐          │
+│ │ Total    │ Positive │ Urgent   │ Avg Sent │          │
+│ │ Responses│    127   │    5     │   0.7    │          │
+│ └──────────┴──────────┴──────────┴──────────┘          │
+├─────────────────────────────────────────────────────────┤
+│ [+ Create New Form] [📊 View Analytics] [💡 AI Insights]│
+├─────────────────────────────────────────────────────────┤
+│ 📋 Your Feedback Forms                                  │
+│ • Daily Mood Check - Happy (😊)      [QR] [View] [Edit]│
+│ • Daily Mood Check - Okay (😐)       [QR] [View] [Edit]│
+│ • Daily Mood Check - Unhappy (😟)    [QR] [View] [Edit]│
+│ • Guest Satisfaction Survey          [QR] [View] [Edit]│
+└─────────────────────────────────────────────────────────┘
+```
 
 **Where It Appears:**
 1. **Guest Landing Page Modal** - Automatic popup (once per day)
@@ -713,10 +754,16 @@ POST   /api/admin/feedback/:id/respond          - Mark feedback as handled
 
 **Setup Steps:**
 
-**1. Database Migration:**
+**1. Database Migrations:**
 ```bash
-# Apply migration (includes 4 new tables)
-npx wrangler d1 migrations apply webapp-production --local
+# Apply migrations (includes 4 new tables + 3 default forms)
+# Run these in order:
+npx wrangler d1 migrations apply webapp-production --local  # For local dev
+npx wrangler d1 migrations apply webapp-production          # For production
+
+# Migrations include:
+# - 20251221_guest_mood_system.sql (mood check tables)
+# - 20251221_mood_check_forms.sql (default forms + integration)
 ```
 
 **2. Enable on Guest Landing:**
