@@ -20294,11 +20294,14 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
-                <a href="#" id="myWeekButton" onclick="goToMyWeek(); return false;" class="text-white px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #8B5CF6;">
-                    <i class="fas fa-calendar-week mr-2"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
+                <a href="#" id="myWeekButton" onclick="goToMyWeek(); return false;" class="text-white px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #8B5CF6;">
+                    <i class="fas fa-calendar-week mr-1"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
                 </a>
-                <a href="#" id="viewPassButton" class="pass-link-button px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
-                    <i class="fas fa-id-card mr-2"></i><span class="hidden sm:inline">My Pass</span><span class="sm:hidden">Pass</span>
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #10B981;">
+                    <i class="fas fa-clipboard-check mr-1"></i><span class="hidden sm:inline">My Bookings</span><span class="sm:hidden">📋</span>
+                </a>
+                <a href="#" id="viewPassButton" class="pass-link-button px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
+                    <i class="fas fa-id-card mr-1"></i><span class="hidden sm:inline">My Pass</span><span class="sm:hidden">Pass</span>
                 </a>
                 <button onclick="unlinkGuestPass()" class="text-white hover:text-gray-200 transition-colors p-2" title="Unlink pass">
                     <i class="fas fa-times text-xl"></i>
@@ -20308,7 +20311,7 @@ app.get('/hotel/:property_slug', async (c) => {
     </div>
 </div>
 <script>
-const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentLoaded',function(){loadPassSession();document.getElementById('passReferenceInput')?.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();linkGuestPass();}});});function loadPassSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.guest){showLinkedState(data.guest);return;}}catch(e){console.error('Invalid session data');}}showUnlinkedState();}async function linkGuestPass(){const input=document.getElementById('passReferenceInput');const button=document.getElementById('linkPassButton');const guestPin=input.value.trim();if(!guestPin){showError('Please enter your 6-digit PIN');return;}if(guestPin.length!==6||!/^[0-9]{6}$/.test(guestPin)){showError('PIN must be exactly 6 digits');return;}const originalHTML=button.innerHTML;button.innerHTML='<i class="fas fa-spinner fa-spin mr-2"></i>Linking...';button.disabled=true;hideError();try{const propertyId=getPropertyId();const response=await fetch('/api/guest/link-pass',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':propertyId},body:JSON.stringify({guest_pin:guestPin})});const data=await response.json();if(data.success&&data.guest){localStorage.setItem(PASS_SESSION_KEY,JSON.stringify({guest:data.guest,timestamp:Date.now()}));showLinkedState(data.guest);if(typeof confetti!=='undefined'){confetti({particleCount:100,spread:70,origin:{y:0.3}});}window.dispatchEvent(new CustomEvent('passLinked',{detail:data.guest}));}else{showError(data.error||'Invalid PIN. Please check and try again.');}}catch(error){console.error('Link pass error:',error);showError('Connection error. Please try again.');}finally{button.innerHTML=originalHTML;button.disabled=false;}}function showLinkedState(guest){document.getElementById('passLinkBarUnlinked').classList.add('hidden');document.getElementById('passLinkBarLinked').classList.remove('hidden');document.getElementById('linkedGuestName').textContent=guest.full_name||'Guest';document.getElementById('linkedRoomNumber').textContent=guest.room_number||'—';const digitalPassLink=\`/guest-pass/\${guest.pass_reference}\`;document.getElementById('viewPassButton').href=digitalPassLink;}function showUnlinkedState(){document.getElementById('passLinkBarUnlinked').classList.remove('hidden');document.getElementById('passLinkBarLinked').classList.add('hidden');}function unlinkGuestPass(){if(confirm('Are you sure you want to unlink your pass?')){localStorage.removeItem(PASS_SESSION_KEY);showUnlinkedState();window.dispatchEvent(new Event('passUnlinked'));document.getElementById('passReferenceInput').value='';}}function togglePassInfo(){document.getElementById('passInfoPanel').classList.toggle('hidden');}function showError(message){document.getElementById('passLinkErrorMessage').textContent=message;document.getElementById('passLinkError').classList.remove('hidden');setTimeout(()=>{hideError();},5000);}function hideError(){document.getElementById('passLinkError').classList.add('hidden');}function getPropertyId(){const urlParams=new URLSearchParams(window.location.search);const propertyParam=urlParams.get('property');if(propertyParam)return propertyParam;const stored=localStorage.getItem('property_id');if(stored)return stored;return'1';}function goToMyWeek(){const propertyId=getPropertyId();window.location.href='/my-perfect-week?property='+propertyId;}function getGuestSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.guest){return data.guest;}}catch(e){return null;}}return null;}window.getGuestSession=getGuestSession;
+const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentLoaded',function(){loadPassSession();document.getElementById('passReferenceInput')?.addEventListener('keypress',function(e){if(e.key==='Enter'){e.preventDefault();linkGuestPass();}});});function loadPassSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.guest){showLinkedState(data.guest);return;}}catch(e){console.error('Invalid session data');}}showUnlinkedState();}async function linkGuestPass(){const input=document.getElementById('passReferenceInput');const button=document.getElementById('linkPassButton');const guestPin=input.value.trim();if(!guestPin){showError('Please enter your 6-digit PIN');return;}if(guestPin.length!==6||!/^[0-9]{6}$/.test(guestPin)){showError('PIN must be exactly 6 digits');return;}const originalHTML=button.innerHTML;button.innerHTML='<i class="fas fa-spinner fa-spin mr-2"></i>Linking...';button.disabled=true;hideError();try{const propertyId=getPropertyId();const response=await fetch('/api/guest/link-pass',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':propertyId},body:JSON.stringify({guest_pin:guestPin})});const data=await response.json();if(data.success&&data.guest){localStorage.setItem(PASS_SESSION_KEY,JSON.stringify({guest:data.guest,timestamp:Date.now()}));showLinkedState(data.guest);if(typeof confetti!=='undefined'){confetti({particleCount:100,spread:70,origin:{y:0.3}});}window.dispatchEvent(new CustomEvent('passLinked',{detail:data.guest}));}else{showError(data.error||'Invalid PIN. Please check and try again.');}}catch(error){console.error('Link pass error:',error);showError('Connection error. Please try again.');}finally{button.innerHTML=originalHTML;button.disabled=false;}}function showLinkedState(guest){document.getElementById('passLinkBarUnlinked').classList.add('hidden');document.getElementById('passLinkBarLinked').classList.remove('hidden');document.getElementById('linkedGuestName').textContent=guest.full_name||'Guest';document.getElementById('linkedRoomNumber').textContent=guest.room_number||'—';const digitalPassLink=\`/guest-pass/\${guest.pass_reference}\`;document.getElementById('viewPassButton').href=digitalPassLink;}function showUnlinkedState(){document.getElementById('passLinkBarUnlinked').classList.remove('hidden');document.getElementById('passLinkBarLinked').classList.add('hidden');}function unlinkGuestPass(){if(confirm('Are you sure you want to unlink your pass?')){localStorage.removeItem(PASS_SESSION_KEY);showUnlinkedState();window.dispatchEvent(new Event('passUnlinked'));document.getElementById('passReferenceInput').value='';}}function togglePassInfo(){document.getElementById('passInfoPanel').classList.toggle('hidden');}function showError(message){document.getElementById('passLinkErrorMessage').textContent=message;document.getElementById('passLinkError').classList.remove('hidden');setTimeout(()=>{hideError();},5000);}function hideError(){document.getElementById('passLinkError').classList.add('hidden');}function getPropertyId(){const urlParams=new URLSearchParams(window.location.search);const propertyParam=urlParams.get('property');if(propertyParam)return propertyParam;const stored=localStorage.getItem('property_id');if(stored)return stored;return'1';}function goToMyWeek(){const propertyId=getPropertyId();window.location.href='/my-perfect-week?property='+propertyId;}function goToMyBookings(){const propertyId=getPropertyId();window.location.href='/my-bookings?property='+propertyId;}function getGuestSession(){const session=localStorage.getItem(PASS_SESSION_KEY);if(session){try{const data=JSON.parse(session);if(data.guest){return data.guest;}}catch(e){return null;}}return null;}window.getGuestSession=getGuestSession;
 </script>
 `;
   
@@ -56533,6 +56536,375 @@ app.get('/my-perfect-week', async (c) => {
     return c.text('Error loading page', 500)
   }
 })
+
+// My Bookings Page - Shows all confirmed bookings
+app.get('/my-bookings', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.query('property') || '1'
+  
+  try {
+    // Get property data for styling
+    const property = await DB.prepare(`
+      SELECT property_id, name as property_name, slug, primary_color, secondary_color, accent_color
+      FROM properties
+      WHERE property_id = ?
+    `).bind(propertyId).first()
+    
+    if (!property) {
+      return c.html(`<html><body><h1>Property not found</h1></body></html>`, 404)
+    }
+    
+    const accentColor = property.accent_color || '#8B5CF6'
+    const primaryColor = property.primary_color || '#016e8f'
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings - ${property.property_name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent-color: ${accentColor};
+            --primary-color: ${primaryColor};
+        }
+        
+        .booking-card {
+            border-left: 4px solid var(--accent-color);
+            transition: all 0.3s;
+        }
+        
+        .booking-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .status-confirmed {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+        
+        .type-activity { border-left-color: #3B82F6; }
+        .type-restaurant { border-left-color: #F59E0B; }
+        .type-beach { border-left-color: #06B6D4; }
+        .type-spa { border-left-color: #EC4899; }
+        .type-event { border-left-color: #8B5CF6; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen pb-20">
+        <!-- Header -->
+        <div class="sticky top-0 z-50" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);">
+            <div class="max-w-6xl mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <button onclick="window.history.back()" class="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
+                            <i class="fas fa-arrow-left text-xl"></i>
+                        </button>
+                        <div>
+                            <h1 class="text-white text-2xl font-bold flex items-center gap-2">
+                                <i class="fas fa-clipboard-check"></i>
+                                My Bookings
+                            </h1>
+                            <p class="text-white/80 text-sm" id="guestNameDisplay">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="max-w-6xl mx-auto px-4 py-8">
+            <div class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-500">Loading your bookings...</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="bookingsContent" class="hidden max-w-6xl mx-auto px-4 py-6">
+            <!-- Stats Cards -->
+            <div id="statsSection" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="text-gray-500 text-sm mb-1">Total Bookings</div>
+                    <div class="text-2xl font-bold text-gray-800" id="totalBookings">0</div>
+                </div>
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="text-gray-500 text-sm mb-1">Activities</div>
+                    <div class="text-2xl font-bold text-blue-600" id="totalActivities">0</div>
+                </div>
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="text-gray-500 text-sm mb-1">Dining</div>
+                    <div class="text-2xl font-bold text-orange-600" id="totalDining">0</div>
+                </div>
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <div class="text-gray-500 text-sm mb-1">Other</div>
+                    <div class="text-2xl font-bold text-purple-600" id="totalOther">0</div>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="bg-white rounded-xl shadow-sm p-2 mb-6 flex gap-2 overflow-x-auto">
+                <button onclick="filterBookings('all')" class="filter-btn active px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors" data-filter="all">
+                    All Bookings
+                </button>
+                <button onclick="filterBookings('activity')" class="filter-btn px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors text-blue-600" data-filter="activity">
+                    🎯 Activities
+                </button>
+                <button onclick="filterBookings('restaurant')" class="filter-btn px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors text-orange-600" data-filter="restaurant">
+                    🍽️ Dining
+                </button>
+                <button onclick="filterBookings('beach')" class="filter-btn px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors text-cyan-600" data-filter="beach">
+                    🏖️ Beach
+                </button>
+                <button onclick="filterBookings('spa')" class="filter-btn px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors text-pink-600" data-filter="spa">
+                    💆 Spa
+                </button>
+            </div>
+
+            <!-- Bookings List -->
+            <div id="bookingsList" class="space-y-4">
+                <!-- Bookings will be inserted here -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <i class="fas fa-calendar-times text-6xl text-gray-300 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">No bookings yet</h3>
+                <p class="text-gray-500 mb-6">Start planning your perfect week!</p>
+                <button onclick="goToMyWeek()" class="px-6 py-3 rounded-xl text-white font-semibold" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);">
+                    <i class="fas fa-calendar-week mr-2"></i>Plan My Week
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const propertyId = '${propertyId}';
+        let allBookings = [];
+        let currentFilter = 'all';
+        
+        async function loadBookings() {
+            const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your pass first');
+                window.location.href = '/hotel/paradise-resort?property=' + propertyId;
+                return;
+            }
+            
+            // Update guest name
+            document.getElementById('guestNameDisplay').textContent = guest.full_name || 'Guest';
+            
+            try {
+                const response = await fetch('/api/guest/my-week/' + guest.pass_reference, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Extract all confirmed bookings from timeline
+                    allBookings = [];
+                    data.days.forEach(day => {
+                        day.items.forEach(item => {
+                            if (item.status === 'confirmed') {
+                                allBookings.push({
+                                    ...item,
+                                    date: day.date,
+                                    dayName: day.day_name
+                                });
+                            }
+                        });
+                    });
+                    
+                    // Sort by date and time
+                    allBookings.sort((a, b) => {
+                        const dateA = new Date(a.date + ' ' + a.start_time);
+                        const dateB = new Date(b.date + ' ' + b.start_time);
+                        return dateA - dateB;
+                    });
+                    
+                    updateStats();
+                    renderBookings();
+                    
+                    document.getElementById('loadingState').classList.add('hidden');
+                    document.getElementById('bookingsContent').classList.remove('hidden');
+                } else {
+                    alert('Failed to load bookings');
+                }
+            } catch (error) {
+                console.error('Load bookings error:', error);
+                alert('Connection error');
+            }
+        }
+        
+        function updateStats() {
+            const stats = {
+                total: allBookings.length,
+                activity: allBookings.filter(b => b.offering_type === 'activity').length,
+                restaurant: allBookings.filter(b => b.offering_type === 'restaurant').length,
+                beach: allBookings.filter(b => b.offering_type === 'beach').length,
+                spa: allBookings.filter(b => b.offering_type === 'spa').length
+            };
+            
+            document.getElementById('totalBookings').textContent = stats.total;
+            document.getElementById('totalActivities').textContent = stats.activity;
+            document.getElementById('totalDining').textContent = stats.restaurant;
+            document.getElementById('totalOther').textContent = stats.beach + stats.spa;
+        }
+        
+        function renderBookings() {
+            const filteredBookings = currentFilter === 'all' 
+                ? allBookings 
+                : allBookings.filter(b => b.offering_type === currentFilter);
+            
+            const container = document.getElementById('bookingsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredBookings.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            container.innerHTML = filteredBookings.map(booking => {
+                const typeIcon = {
+                    activity: '🎯',
+                    restaurant: '🍽️',
+                    beach: '🏖️',
+                    spa: '💆',
+                    event: '🎉'
+                }[booking.offering_type] || '📌';
+                
+                const typeColor = {
+                    activity: 'blue',
+                    restaurant: 'orange',
+                    beach: 'cyan',
+                    spa: 'pink',
+                    event: 'purple'
+                }[booking.offering_type] || 'gray';
+                
+                // Format date
+                const bookingDate = new Date(booking.date);
+                const dateStr = bookingDate.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                
+                // Calculate if upcoming or past
+                const now = new Date();
+                const isPast = bookingDate < now;
+                
+                return \`
+                    <div class="booking-card type-\${booking.offering_type} bg-white rounded-xl p-4 shadow-sm \${isPast ? 'opacity-60' : ''}">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">\${typeIcon}</span>
+                                    <span class="status-confirmed text-white text-xs px-3 py-1 rounded-full font-semibold">
+                                        <i class="fas fa-check-circle mr-1"></i>Confirmed
+                                    </span>
+                                    \${isPast ? '<span class="bg-gray-500 text-white text-xs px-3 py-1 rounded-full font-semibold">Past</span>' : ''}
+                                </div>
+                                
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">\${booking.title}</h3>
+                                
+                                <div class="space-y-1 text-sm text-gray-600">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-calendar-day w-4 text-\${typeColor}-600"></i>
+                                        <span class="font-semibold">\${dateStr}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-clock w-4 text-\${typeColor}-600"></i>
+                                        <span>\${booking.start_time}\${booking.end_time ? ' - ' + booking.end_time : ''}</span>
+                                    </div>
+                                    \${booking.location ? \`
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-map-marker-alt w-4 text-\${typeColor}-600"></i>
+                                            <span>\${booking.location}</span>
+                                        </div>
+                                    \` : ''}
+                                    \${booking.reservation_id ? \`
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-hashtag w-4 text-\${typeColor}-600"></i>
+                                            <span class="font-mono text-xs">\${booking.reservation_id}</span>
+                                        </div>
+                                    \` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col gap-2">
+                                <button onclick="viewBookingDetails('\${booking.offering_id}')" class="text-\${typeColor}-600 hover:bg-\${typeColor}-50 p-2 rounded-lg transition-colors" title="View Details">
+                                    <i class="fas fa-info-circle text-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
+        
+        function filterBookings(type) {
+            currentFilter = type;
+            
+            // Update active state
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.backgroundColor = '';
+            });
+            
+            const activeBtn = document.querySelector(\`[data-filter="\${type}"]\`);
+            activeBtn.classList.add('active');
+            activeBtn.style.backgroundColor = 'var(--accent-color)';
+            activeBtn.style.color = 'white';
+            
+            renderBookings();
+        }
+        
+        function viewBookingDetails(offeringId) {
+            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyId + '&lang=en';
+        }
+        
+        function goToMyWeek() {
+            window.location.href = '/my-perfect-week?property=' + propertyId;
+        }
+        
+        function getGuestSession() {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                try {
+                    const data = JSON.parse(session);
+                    return data.guest;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+        
+        // Initialize filter button styles
+        document.addEventListener('DOMContentLoaded', function() {
+            const activeBtn = document.querySelector('[data-filter="all"]');
+            activeBtn.style.backgroundColor = 'var(--accent-color)';
+            activeBtn.style.color = 'white';
+            
+            loadBookings();
+        });
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('My Bookings error:', error)
+    return c.text('Error loading page', 500)
+  }
+})
+
 app.get('/:property_slug?', async (c) => {
   const { DB } = c.env
   const property_slug = c.req.param('property_slug') || 'paradise-resort'
