@@ -55540,6 +55540,503 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
 })
 
 // ============================================
+// SAVE MY STAY - MOOD CHECK PAGE
+// ============================================
+
+app.get('/mood-check', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.query('property') || '1'
+  
+  try {
+    const property = await DB.prepare(`
+      SELECT property_id, name, slug, primary_color, accent_color
+      FROM properties WHERE property_id = ?
+    `).bind(propertyId).first()
+    
+    if (!property) {
+      return c.html(`<html><body><h1>Property not found</h1></body></html>`, 404)
+    }
+    
+    const primaryColor = property.primary_color || '#016e8f'
+    const accentColor = property.accent_color || '#8B5CF6'
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How's Your Stay? - ${property.name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: ${primaryColor};
+            --accent-color: ${accentColor};
+        }
+        
+        .emoji-button {
+            font-size: 4rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            filter: grayscale(50%);
+        }
+        
+        .emoji-button:hover {
+            transform: scale(1.2);
+            filter: grayscale(0%);
+        }
+        
+        .emoji-button.selected {
+            transform: scale(1.3);
+            filter: grayscale(0%) drop-shadow(0 0 20px rgba(139, 92, 246, 0.6));
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .category-option {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .category-option:hover {
+            transform: translateX(5px);
+        }
+        
+        .category-option.selected {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    <div class="max-w-2xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8 fade-in">
+            <div class="inline-block p-4 bg-white rounded-full shadow-lg mb-4">
+                <i class="fas fa-heart text-5xl" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2" id="greeting">Good evening! 👋</h1>
+            <p class="text-lg text-gray-600" id="stayDay">Loading...</p>
+        </div>
+
+        <!-- Already Submitted Message -->
+        <div id="alreadySubmitted" class="hidden bg-green-50 border-2 border-green-200 rounded-2xl p-8 text-center fade-in">
+            <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Thank You!</h2>
+            <p class="text-gray-600 mb-6">You've already shared your feedback today.</p>
+            <button onclick="window.history.back()" class="px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Home
+            </button>
+        </div>
+
+        <!-- Step 1: Mood Selection -->
+        <div id="step1" class="bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">How was your day today?</h2>
+            
+            <div class="flex justify-center items-center gap-12 mb-8">
+                <div class="text-center">
+                    <button onclick="selectMood(3, '😊')" class="emoji-button" data-mood="3">😊</button>
+                    <p class="text-sm font-semibold text-gray-600 mt-2">Great!</p>
+                </div>
+                <div class="text-center">
+                    <button onclick="selectMood(2, '😐')" class="emoji-button" data-mood="2">😐</button>
+                    <p class="text-sm font-semibold text-gray-600 mt-2">Okay</p>
+                </div>
+                <div class="text-center">
+                    <button onclick="selectMood(1, '😟')" class="emoji-button" data-mood="1">😟</button>
+                    <p class="text-sm font-semibold text-gray-600 mt-2">Not Happy</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Happy Path -->
+        <div id="step2Happy" class="hidden bg-white rounded-3xl shadow-2xl p-8 fade-in">
+            <div class="text-center mb-6">
+                <i class="fas fa-star text-6xl text-yellow-400 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">🎉 Wonderful!</h2>
+                <p class="text-gray-600">What made your day great?</p>
+                <p class="text-sm text-gray-500 mt-2">(Optional - helps us do more of this!)</p>
+            </div>
+            
+            <div class="space-y-3 mb-6">
+                <div class="category-option flex items-center gap-3 p-4 bg-gray-50 rounded-xl" onclick="toggleCategory(this, 'food')">
+                    <i class="fas fa-utensils text-orange-500 text-xl"></i>
+                    <span class="font-semibold">Excellent food</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-gray-50 rounded-xl" onclick="toggleCategory(this, 'beach')">
+                    <i class="fas fa-umbrella-beach text-blue-500 text-xl"></i>
+                    <span class="font-semibold">Amazing beach</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-gray-50 rounded-xl" onclick="toggleCategory(this, 'staff')">
+                    <i class="fas fa-users text-purple-500 text-xl"></i>
+                    <span class="font-semibold">Friendly staff</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-gray-50 rounded-xl" onclick="toggleCategory(this, 'activities')">
+                    <i class="fas fa-swimmer text-cyan-500 text-xl"></i>
+                    <span class="font-semibold">Great activities</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-gray-50 rounded-xl" onclick="toggleCategory(this, 'room')">
+                    <i class="fas fa-bed text-pink-500 text-xl"></i>
+                    <span class="font-semibold">Beautiful room</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="skipFeedback()" class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    Skip
+                </button>
+                <button onclick="submitHappyFeedback()" class="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition">
+                    Share Feedback
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Review Request -->
+        <div id="step3Review" class="hidden bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+            <i class="fas fa-star text-6xl text-yellow-400 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Would you mind leaving us a review?</h2>
+            <p class="text-gray-600 mb-6">Help others discover our hotel!</p>
+            
+            <div class="space-y-3">
+                <a href="https://www.tripadvisor.com" target="_blank" onclick="logReviewClick('tripadvisor', this.href)" class="block w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl font-semibold hover:shadow-lg transition">
+                    <i class="fab fa-tripadvisor mr-2 text-2xl"></i>
+                    Write Review on TripAdvisor 🌟
+                </a>
+                <a href="https://www.google.com/search?q=${encodeURIComponent(property.name)}" target="_blank" onclick="logReviewClick('google', this.href)" class="block w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition">
+                    <i class="fab fa-google mr-2 text-2xl"></i>
+                    Write Review on Google 🌟
+                </a>
+                <button onclick="thankYou()" class="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition">
+                    Maybe Later
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Unhappy Path -->
+        <div id="step2Unhappy" class="hidden bg-white rounded-3xl shadow-2xl p-8 fade-in">
+            <div class="text-center mb-6">
+                <i class="fas fa-heart-broken text-6xl text-red-400 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">😔 We're sorry to hear that.</h2>
+                <p class="text-gray-600 mb-1">We want to fix this <strong>RIGHT NOW</strong>.</p>
+                <p class="text-sm text-gray-500">⚡ Management will respond in 5 minutes</p>
+            </div>
+            
+            <div class="space-y-3 mb-4">
+                <div class="category-option flex items-center gap-3 p-4 bg-red-50 rounded-xl" onclick="toggleCategory(this, 'food_quality')">
+                    <i class="fas fa-utensils text-red-500 text-xl"></i>
+                    <span class="font-semibold">Food quality</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-red-50 rounded-xl" onclick="toggleCategory(this, 'room_cleanliness')">
+                    <i class="fas fa-broom text-red-500 text-xl"></i>
+                    <span class="font-semibold">Room cleanliness</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-red-50 rounded-xl" onclick="toggleCategory(this, 'noise')">
+                    <i class="fas fa-volume-up text-red-500 text-xl"></i>
+                    <span class="font-semibold">Noise</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-red-50 rounded-xl" onclick="toggleCategory(this, 'staff_service')">
+                    <i class="fas fa-user-times text-red-500 text-xl"></i>
+                    <span class="font-semibold">Staff service</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+                <div class="category-option flex items-center gap-3 p-4 bg-red-50 rounded-xl" onclick="toggleCategory(this, 'facilities')">
+                    <i class="fas fa-tools text-red-500 text-xl"></i>
+                    <span class="font-semibold">Facilities</span>
+                    <i class="fas fa-check ml-auto text-green-500 hidden"></i>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Additional details (optional):</label>
+                <textarea id="customComment" rows="3" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500" placeholder="Tell us more..."></textarea>
+            </div>
+            
+            <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4">
+                <div class="flex items-center gap-2 text-red-700">
+                    <i class="fas fa-lock"></i>
+                    <span class="text-sm font-semibold">Private - Only management sees this</span>
+                </div>
+                <div class="flex items-center gap-2 text-red-700 mt-1">
+                    <i class="fas fa-bolt"></i>
+                    <span class="text-sm font-semibold">Immediate response guaranteed</span>
+                </div>
+            </div>
+            
+            <button onclick="submitUnhappyFeedback()" class="w-full px-6 py-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-bold text-lg hover:shadow-lg transition">
+                <i class="fas fa-paper-plane mr-2"></i>Send to Management
+            </button>
+        </div>
+
+        <!-- Thank You Message -->
+        <div id="thankYou" class="hidden bg-white rounded-3xl shadow-2xl p-8 text-center fade-in">
+            <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Thank You!</h2>
+            <p class="text-gray-600 mb-6" id="thankYouMessage">Your feedback helps us improve.</p>
+            <button onclick="window.location.href='/hotel/paradise-resort?property=${propertyId}'" class="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition">
+                <i class="fas fa-home mr-2"></i>Back to Home
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedMood = null;
+        let selectedMoodEmoji = null;
+        let selectedCategories = [];
+        let moodCheckId = null;
+        let guestData = null;
+        const propertyId = '${propertyId}';
+        
+        // Get guest session
+        function getGuestSession() {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                try {
+                    return JSON.parse(session).guest;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+        
+        // Set greeting based on time of day
+        function setGreeting() {
+            const hour = new Date().getHours();
+            let greeting = 'Good evening';
+            if (hour < 12) greeting = 'Good morning';
+            else if (hour < 18) greeting = 'Good afternoon';
+            
+            const guest = getGuestSession();
+            const name = guest ? (guest.full_name || 'Guest') : 'Guest';
+            document.getElementById('greeting').textContent = greeting + ', ' + name.split(' ')[0] + '! 👋';
+        }
+        
+        // Calculate stay day
+        async function calculateStayDay() {
+            const guest = getGuestSession();
+            if (!guest || !guest.pass_reference) {
+                document.getElementById('stayDay').textContent = 'Welcome to your stay';
+                return;
+            }
+            
+            guestData = guest;
+            
+            // Check if already submitted today
+            try {
+                const response = await fetch('/api/guest/mood-check/' + guest.pass_reference + '/today');
+                const data = await response.json();
+                
+                if (data.already_submitted) {
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('alreadySubmitted').classList.remove('hidden');
+                    return;
+                }
+            } catch (e) {
+                console.error('Error checking submission:', e);
+            }
+            
+            // For now, just show a generic message
+            document.getElementById('stayDay').textContent = 'We hope you\\'re having a wonderful stay';
+        }
+        
+        // Select mood
+        async function selectMood(score, emoji) {
+            selectedMood = score;
+            selectedMoodEmoji = emoji;
+            
+            // Visual feedback
+            document.querySelectorAll('.emoji-button').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Submit mood check
+            try {
+                const guest = getGuestSession();
+                if (!guest || !guest.pass_reference) {
+                    alert('Please link your pass first');
+                    window.location.href = '/hotel/paradise-resort?property=' + propertyId;
+                    return;
+                }
+                
+                const response = await fetch('/api/guest/mood-check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pass_reference: guest.pass_reference,
+                        mood_score: score,
+                        mood_emoji: emoji,
+                        check_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    moodCheckId = data.mood_check_id;
+                    
+                    // Navigate to appropriate path
+                    setTimeout(() => {
+                        document.getElementById('step1').classList.add('hidden');
+                        if (score === 3) {
+                            document.getElementById('step2Happy').classList.remove('hidden');
+                        } else if (score === 1) {
+                            document.getElementById('step2Unhappy').classList.remove('hidden');
+                        } else {
+                            // Score 2 (okay) - just thank them
+                            showThankYou('Thank you for your feedback!');
+                        }
+                    }, 300);
+                }
+            } catch (error) {
+                console.error('Error submitting mood:', error);
+                alert('Failed to save your response. Please try again.');
+            }
+        }
+        
+        // Toggle category selection
+        function toggleCategory(element, category) {
+            const isSelected = element.classList.contains('selected');
+            
+            if (isSelected) {
+                element.classList.remove('selected');
+                element.querySelector('.fa-check').classList.add('hidden');
+                selectedCategories = selectedCategories.filter(c => c !== category);
+            } else {
+                element.classList.add('selected');
+                element.querySelector('.fa-check').classList.remove('hidden');
+                selectedCategories.push(category);
+            }
+        }
+        
+        // Skip feedback
+        function skipFeedback() {
+            document.getElementById('step2Happy').classList.add('hidden');
+            document.getElementById('step3Review').classList.remove('hidden');
+        }
+        
+        // Submit happy feedback
+        async function submitHappyFeedback() {
+            try {
+                const response = await fetch('/api/guest/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mood_check_id: moodCheckId,
+                        property_id: propertyId,
+                        pass_reference: guestData.pass_reference,
+                        guest_name: guestData.full_name || 'Guest',
+                        room_number: guestData.room_number,
+                        feedback_type: 'positive',
+                        mood_score: 3,
+                        categories: selectedCategories
+                    })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('step2Happy').classList.add('hidden');
+                    document.getElementById('step3Review').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                document.getElementById('step2Happy').classList.add('hidden');
+                document.getElementById('step3Review').classList.remove('hidden');
+            }
+        }
+        
+        // Submit unhappy feedback
+        async function submitUnhappyFeedback() {
+            if (selectedCategories.length === 0) {
+                alert('Please select at least one issue');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/guest/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mood_check_id: moodCheckId,
+                        property_id: propertyId,
+                        pass_reference: guestData.pass_reference,
+                        guest_name: guestData.full_name || 'Guest',
+                        room_number: guestData.room_number,
+                        feedback_type: 'negative',
+                        mood_score: 1,
+                        categories: selectedCategories,
+                        custom_comment: document.getElementById('customComment').value
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showThankYou('Your feedback has been sent to management. Someone will contact you within 5 minutes.');
+                }
+            } catch (error) {
+                console.error('Error submitting feedback:', error);
+                alert('Failed to send feedback. Please try again or contact the front desk.');
+            }
+        }
+        
+        // Log review click
+        async function logReviewClick(platform, url) {
+            try {
+                await fetch('/api/guest/review-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mood_check_id: moodCheckId,
+                        property_id: propertyId,
+                        pass_reference: guestData.pass_reference,
+                        guest_name: guestData.full_name || 'Guest',
+                        platform: platform,
+                        platform_url: url
+                    })
+                });
+            } catch (error) {
+                console.error('Error logging review click:', error);
+            }
+        }
+        
+        // Show thank you
+        function showThankYou(message) {
+            document.getElementById('thankYouMessage').textContent = message || 'Your feedback helps us improve.';
+            document.querySelectorAll('[id^="step"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('thankYou').classList.remove('hidden');
+        }
+        
+        function thankYou() {
+            showThankYou();
+        }
+        
+        // Initialize
+        setGreeting();
+        calculateStayDay();
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    return c.html(`<html><body><h1>Error loading page</h1></body></html>`, 500)
+  }
+})
+
+// ============================================
 // DEFAULT ROUTE - Guest Landing Page
 // ============================================
 
