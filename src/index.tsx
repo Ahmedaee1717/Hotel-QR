@@ -18570,13 +18570,14 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
             COALESCE(bb.start_time, '08:00') as start_time,
             bb.end_time,
             'Beach Spot' as title,
-            'Zone ' || COALESCE(bs.zone_name, bb.zone_name, 'General') || ' - Spot #' || COALESCE(bs.spot_number, bb.spot_number, '?') as location,
-            bb.status,
+            'Zone ' || COALESCE(bs.zone_name, 'General') || ' - Spot #' || COALESCE(bs.spot_number, bb.spot_number, '?') as location,
+            bb.booking_status as status,
             bb.num_guests,
-            bb.booking_reference as reference
+            bb.booking_reference as reference,
+            NULL as offering_id
           FROM beach_bookings bb
           LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-          WHERE (bb.guest_id = ? OR bb.guest_room_number = ?) AND bb.status != 'cancelled'
+          WHERE (bb.guest_id = ? OR bb.guest_room_number = ?) AND bb.booking_status != 'cancelled'
           ORDER BY bb.booking_date ASC
         `).bind(guestId || null, pass.room_number || null).all()
         
