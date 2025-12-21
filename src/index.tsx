@@ -56842,6 +56842,16 @@ app.get('/my-bookings', async (c) => {
                 </button>
             </div>
 
+            <!-- Show Past Bookings Toggle -->\n            <div class="bg-white rounded-xl shadow-sm p-3 mb-6 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-history text-gray-500"></i>
+                    <span class="text-sm font-medium text-gray-700">Show past bookings</span>
+                </div>
+                <button onclick="togglePastBookings()" id="pastToggle" class="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-300 transition-colors">
+                    <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform translate-x-1" id="pastToggleKnob"></span>
+                </button>
+            </div>
+
             <!-- Bookings List -->
             <div id="bookingsList" class="space-y-4">
                 <!-- Bookings will be inserted here -->
@@ -56863,6 +56873,7 @@ app.get('/my-bookings', async (c) => {
         const propertyId = '${propertyId}';
         let allBookings = [];
         let currentFilter = 'all';
+        let showPastBookings = false; // Default: hide past bookings
         
         async function loadBookings() {
             const guest = getGuestSession();
@@ -56908,12 +56919,21 @@ app.get('/my-bookings', async (c) => {
         }
         
         function updateStats() {
+            // Filter to only upcoming bookings for stats
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const upcomingBookings = allBookings.filter(b => {
+                const bookingDate = new Date(b.date);
+                bookingDate.setHours(0, 0, 0, 0);
+                return bookingDate >= now;
+            });
+            
             const stats = {
-                total: allBookings.length,
-                activity: allBookings.filter(b => b.offering_type === 'activity').length,
-                restaurant: allBookings.filter(b => b.offering_type === 'restaurant').length,
-                beach: allBookings.filter(b => b.offering_type === 'beach').length,
-                spa: allBookings.filter(b => b.offering_type === 'spa').length
+                total: upcomingBookings.length,
+                activity: upcomingBookings.filter(b => b.type === 'activity').length,
+                restaurant: upcomingBookings.filter(b => b.type === 'restaurant').length,
+                beach: upcomingBookings.filter(b => b.type === 'beach').length,
+                spa: upcomingBookings.filter(b => b.type === 'spa').length
             };
             
             document.getElementById('totalBookings').textContent = stats.total;
@@ -56923,9 +56943,21 @@ app.get('/my-bookings', async (c) => {
         }
         
         function renderBookings() {
-            const filteredBookings = currentFilter === 'all' 
+            // First filter by type
+            let filteredBookings = currentFilter === 'all' 
                 ? allBookings 
                 : allBookings.filter(b => b.type === currentFilter);
+            
+            // Then filter out past bookings if toggle is off
+            if (!showPastBookings) {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0); // Set to start of today
+                filteredBookings = filteredBookings.filter(b => {
+                    const bookingDate = new Date(b.date);
+                    bookingDate.setHours(0, 0, 0, 0);
+                    return bookingDate >= now;
+                });
+            }
             
             const container = document.getElementById('bookingsList');
             const emptyState = document.getElementById('emptyState');
@@ -56945,7 +56977,7 @@ app.get('/my-bookings', async (c) => {
                     beach: '🏖️',
                     spa: '💆',
                     event: '🎉'
-                }[booking.offering_type] || '📌';
+                }[booking.type] || '📌';
                 
                 const typeColor = {
                     activity: 'blue',
@@ -56953,7 +56985,7 @@ app.get('/my-bookings', async (c) => {
                     beach: 'cyan',
                     spa: 'pink',
                     event: 'purple'
-                }[booking.offering_type] || 'gray';
+                }[booking.type] || 'gray';
                 
                 // Format date
                 const bookingDate = new Date(booking.date);
@@ -56963,9 +56995,10 @@ app.get('/my-bookings', async (c) => {
                     day: 'numeric' 
                 });
                 
-                // Calculate if upcoming or past
+                // Calculate if upcoming or past (include time!)
                 const now = new Date();
-                const isPast = bookingDate < now;
+                const bookingDateTime = new Date(booking.date + ' ' + booking.start_time);
+                const isPast = bookingDateTime < now;
                 
                 return \`
                     <div class="booking-card type-\${booking.type} bg-white rounded-xl p-4 shadow-sm \${isPast ? 'opacity-60' : ''}">
