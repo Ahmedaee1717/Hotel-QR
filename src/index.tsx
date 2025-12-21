@@ -8661,8 +8661,8 @@ app.post('/api/booking/cancel/:type/:id', async (c) => {
       // Cancel beach booking
       await DB.prepare(`
         UPDATE beach_bookings 
-        SET status = 'cancelled'
-        WHERE booking_id = ?
+        SET booking_status = 'cancelled'
+        WHERE beach_booking_id = ?
       `).bind(bookingId).run()
       
       return c.json({ success: true, message: 'Beach booking cancelled' })
