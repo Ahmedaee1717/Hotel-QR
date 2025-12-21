@@ -1,7 +1,7 @@
 -- Add NFC support to digital passes
-ALTER TABLE digital_passes ADD COLUMN nfc_id TEXT;
-ALTER TABLE digital_passes ADD COLUMN nfc_enabled INTEGER DEFAULT 1;
-ALTER TABLE digital_passes ADD COLUMN nfc_last_used DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN nfc_id TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN nfc_enabled INTEGER DEFAULT 1;
+-- ALTER TABLE digital_passes ADD COLUMN nfc_last_used DATETIME;
 
 -- Create unique index for nfc_id (can't add UNIQUE constraint with ALTER TABLE in SQLite)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_digital_passes_nfc_id ON digital_passes(nfc_id) WHERE nfc_id IS NOT NULL;

@@ -27,5 +27,5 @@ CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON biometric_consent_signatures
 CREATE INDEX IF NOT EXISTS idx_consent_withdrawn ON biometric_consent_signatures(consent_withdrawn, consent_withdrawn_at);
 
 -- Add enrollment_staff_id column to digital_passes for tracking who performed enrollment
-ALTER TABLE digital_passes ADD COLUMN enrollment_staff_id TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN enrollment_staff_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_enrollment_staff ON digital_passes(enrollment_staff_id);

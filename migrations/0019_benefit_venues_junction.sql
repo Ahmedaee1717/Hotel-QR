@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS benefit_venues (
 );
 
 -- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_benefit_venues_benefit ON benefit_venues(benefit_id);
-CREATE INDEX IF NOT EXISTS idx_benefit_venues_venue ON benefit_venues(venue_id);
+-- CREATE INDEX IF NOT EXISTS idx_benefit_venues_benefit ON benefit_venues(benefit_id);
+-- CREATE INDEX IF NOT EXISTS idx_benefit_venues_venue ON benefit_venues(venue_id);

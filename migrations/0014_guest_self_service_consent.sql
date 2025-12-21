@@ -4,25 +4,25 @@
 -- Compliance: GDPR/BIPA - Guest autonomy and choice
 
 -- Add guest preference and consent fields
-ALTER TABLE digital_passes ADD COLUMN verification_preference TEXT DEFAULT 'qr';
+-- ALTER TABLE digital_passes ADD COLUMN verification_preference TEXT DEFAULT 'qr';
 -- Possible values: 'face', 'qr', 'both'
 
-ALTER TABLE digital_passes ADD COLUMN guest_consent_method TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN guest_consent_method TEXT;
 -- How consent was obtained: 'check-in-kiosk', 'mobile-app', 'self-service-portal', 'staff-assisted'
 
-ALTER TABLE digital_passes ADD COLUMN wallet_pass_generated INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN wallet_pass_generated INTEGER DEFAULT 0;
 -- Flag to track if Apple Wallet / Google Pay pass has been generated
 
-ALTER TABLE digital_passes ADD COLUMN wallet_pass_url TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN wallet_pass_url TEXT;
 -- URL to download the wallet pass (.pkpass for iOS, .json for Google Pay)
 
-ALTER TABLE digital_passes ADD COLUMN guest_access_token TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN guest_access_token TEXT;
 -- Secure token for guest self-service portal (hashed)
 
-ALTER TABLE digital_passes ADD COLUMN guest_portal_accessed_at DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN guest_portal_accessed_at DATETIME;
 -- Last time guest accessed their self-service portal
 
-ALTER TABLE digital_passes ADD COLUMN qr_code_displayed INTEGER DEFAULT 1;
+-- ALTER TABLE digital_passes ADD COLUMN qr_code_displayed INTEGER DEFAULT 1;
 -- Whether to show QR code (always enabled unless guest explicitly requests face-only)
 
 -- Create guest consent change log

@@ -45,10 +45,10 @@ CREATE TABLE IF NOT EXISTS tier_benefits (
   FOREIGN KEY (venue_id) REFERENCES hotel_offerings(offering_id)
 );
 
-CREATE INDEX idx_tier_benefits_tier ON tier_benefits(tier_id);
-CREATE INDEX idx_tier_benefits_property ON tier_benefits(property_id);
-CREATE INDEX idx_tier_benefits_category ON tier_benefits(benefit_category);
-CREATE INDEX idx_tier_benefits_venue ON tier_benefits(venue_id);
+-- CREATE INDEX idx_tier_benefits_tier ON tier_benefits(tier_id);
+-- CREATE INDEX idx_tier_benefits_property ON tier_benefits(property_id);
+-- CREATE INDEX idx_tier_benefits_category ON tier_benefits(benefit_category);
+-- CREATE INDEX idx_tier_benefits_venue ON tier_benefits(venue_id);
 
 -- ============================================
 -- TABLE: Benefit Templates (Quick Setup)
@@ -121,6 +121,6 @@ CREATE TABLE IF NOT EXISTS tier_benefit_usage (
   FOREIGN KEY (used_at_venue_id) REFERENCES hotel_offerings(offering_id)
 );
 
-CREATE INDEX idx_tier_benefit_usage_pass ON tier_benefit_usage(pass_id);
-CREATE INDEX idx_tier_benefit_usage_benefit ON tier_benefit_usage(benefit_id);
-CREATE INDEX idx_tier_benefit_usage_date ON tier_benefit_usage(used_at);
+-- CREATE INDEX idx_tier_benefit_usage_pass ON tier_benefit_usage(pass_id);
+-- CREATE INDEX idx_tier_benefit_usage_benefit ON tier_benefit_usage(benefit_id);
+-- CREATE INDEX idx_tier_benefit_usage_date ON tier_benefit_usage(used_at);

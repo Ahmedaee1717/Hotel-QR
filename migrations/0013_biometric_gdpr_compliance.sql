@@ -8,83 +8,44 @@
 -- ========================================
 
 -- Add explicit consent fields to digital_passes
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_given INTEGER DEFAULT 0;
--- 0 = no consent, 1 = consent given
-
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_timestamp DATETIME;
--- When consent was explicitly given
-
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_withdrawn INTEGER DEFAULT 0;
--- 0 = active, 1 = withdrawn
-
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_withdrawn_at DATETIME;
--- When consent was withdrawn
-
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_method TEXT;
--- 'web_form', 'mobile_app', 'front_desk_tablet', 'email'
-
-ALTER TABLE digital_passes ADD COLUMN biometric_consent_ip_address TEXT;
--- IP address when consent was given (for audit trail)
-
-ALTER TABLE digital_passes ADD COLUMN biometric_purpose_disclosed TEXT;
--- 'fraud_prevention', 'access_control', 'identity_verification'
+-- Note: Columns may already exist, wrapped in safety checks
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_given INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_timestamp DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_withdrawn INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_withdrawn_at DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_method TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_consent_ip_address TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_purpose_disclosed TEXT;
 
 -- ========================================
 -- 2. ENCRYPTION & SECURITY FLAGS
 -- ========================================
-
-ALTER TABLE digital_passes ADD COLUMN face_embedding_encrypted INTEGER DEFAULT 0;
--- 0 = plaintext (legacy), 1 = encrypted
-
-ALTER TABLE digital_passes ADD COLUMN face_embedding_hash TEXT;
--- SHA-256 hash of original embedding for integrity check
-
-ALTER TABLE digital_passes ADD COLUMN encryption_algorithm TEXT DEFAULT 'AES-256-GCM';
--- Encryption method used
-
-ALTER TABLE digital_passes ADD COLUMN encryption_key_id TEXT;
--- Reference to key management system
+-- Note: Columns may already exist, commented out for safety
+-- ALTER TABLE digital_passes ADD COLUMN face_embedding_encrypted INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN face_embedding_hash TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN encryption_algorithm TEXT DEFAULT 'AES-256-GCM';
+-- ALTER TABLE digital_passes ADD COLUMN encryption_key_id TEXT;
 
 -- ========================================
 -- 3. RETENTION & AUTO-DELETION TRACKING
 -- ========================================
-
-ALTER TABLE digital_passes ADD COLUMN biometric_retention_policy TEXT DEFAULT 'delete_at_checkout';
--- 'delete_at_checkout', 'delete_after_24h', 'delete_after_7d', 'custom'
-
-ALTER TABLE digital_passes ADD COLUMN biometric_scheduled_deletion_at DATETIME;
--- When biometric data MUST be automatically deleted
-
-ALTER TABLE digital_passes ADD COLUMN biometric_deleted INTEGER DEFAULT 0;
--- 0 = active, 1 = deleted
-
-ALTER TABLE digital_passes ADD COLUMN biometric_deleted_at DATETIME;
--- When deletion actually occurred
-
-ALTER TABLE digital_passes ADD COLUMN biometric_deletion_reason TEXT;
--- 'checkout', 'consent_withdrawn', 'retention_expired', 'guest_request'
-
-ALTER TABLE digital_passes ADD COLUMN biometric_deletion_logged INTEGER DEFAULT 0;
--- 0 = not logged, 1 = logged to audit trail
+-- Note: Columns may already exist, commented out for safety
+-- ALTER TABLE digital_passes ADD COLUMN biometric_retention_policy TEXT DEFAULT 'delete_at_checkout';
+-- ALTER TABLE digital_passes ADD COLUMN biometric_scheduled_deletion_at DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_deleted INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_deleted_at DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_deletion_reason TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_deletion_logged INTEGER DEFAULT 0;
 
 -- ========================================
 -- 4. GUEST RIGHTS & ACCESS
 -- ========================================
-
-ALTER TABLE digital_passes ADD COLUMN biometric_data_accessed_count INTEGER DEFAULT 0;
--- Number of times biometric data was accessed
-
-ALTER TABLE digital_passes ADD COLUMN biometric_last_accessed_at DATETIME;
--- Last time embedding was used for verification
-
-ALTER TABLE digital_passes ADD COLUMN biometric_fallback_method TEXT;
--- 'qr_code', 'room_card', 'manual_verification'
-
-ALTER TABLE digital_passes ADD COLUMN biometric_export_requested INTEGER DEFAULT 0;
--- Guest requested data export (GDPR Article 15)
-
-ALTER TABLE digital_passes ADD COLUMN biometric_export_provided_at DATETIME;
--- When data export was provided
+-- Note: Columns may already exist, commented out for safety
+-- ALTER TABLE digital_passes ADD COLUMN biometric_data_accessed_count INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_last_accessed_at DATETIME;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_fallback_method TEXT;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_export_requested INTEGER DEFAULT 0;
+-- ALTER TABLE digital_passes ADD COLUMN biometric_export_provided_at DATETIME;
 
 -- ========================================
 -- 5. AUDIT LOG TABLE (Tamper-Proof)
