@@ -10939,11 +10939,14 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
   
   try {
     // UNION query to merge hotel_offerings AND activities tables
+    // CRITICAL FIX: Prefix IDs with 'H' or 'A' to avoid collisions
     let query = `
       SELECT * FROM (
         -- Hotel offerings (restaurants, spa, events, room_service)
         SELECT 
-          ho.offering_id,
+          'H' || ho.offering_id as offering_id,
+          ho.offering_id as original_id,
+          'hotel' as source_table,
           ho.property_id,
           ho.offering_type,
           CASE 
@@ -10982,7 +10985,9 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
         
         -- Activities from activities table
         SELECT 
-          a.activity_id as offering_id,
+          'A' || a.activity_id as offering_id,
+          a.activity_id as original_id,
+          'activity' as source_table,
           ? as property_id,
           'activity' as offering_type,
           CASE 
@@ -55794,8 +55799,11 @@ app.get('/my-perfect-week', async (c) => {
                     return;
                 }
                 
+                // Use original_id for the actual database ID (without H/A prefix)
+                const actualId = restaurant.original_id || restaurant.offering_id.replace(/^[HA]/, '');
+                
                 // Redirect to restaurant booking page
-                window.location.href = '/hotel/${propertySlug}/restaurant/' + restaurant.offering_id + '/book?date=' + date + '&time=' + time;
+                window.location.href = '/hotel/${propertySlug}/restaurant/' + actualId + '/book?date=' + date + '&time=' + time;
             } catch (error) {
                 console.error('Reserve restaurant error:', error);
                 alert('Failed to load restaurant details');
