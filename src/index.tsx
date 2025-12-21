@@ -18708,8 +18708,8 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
           'restaurant' as booking_type
         FROM table_reservations tr
         LEFT JOIN hotel_offerings ho ON tr.offering_id = ho.offering_id
-        WHERE tr.guest_id = ? AND tr.status = 'confirmed'
-      `).bind(guest.guest_id).all()
+        WHERE (tr.guest_id = ? OR tr.room_number = ?) AND tr.status = 'confirmed'
+      `).bind(guest.guest_id, guest.room_number).all()
       
       for (const booking of restaurantBookings.results) {
         await DB.prepare(`
@@ -18741,8 +18741,8 @@ app.get('/api/guest/my-week/:pass_reference', async (c) => {
           bb.spot_number,
           'beach' as booking_type
         FROM beach_bookings bb
-        WHERE bb.guest_id = ? AND bb.status = 'confirmed'
-      `).bind(guest.guest_id).all()
+        WHERE (bb.guest_id = ? OR bb.guest_room_number = ?) AND bb.status = 'confirmed'
+      `).bind(guest.guest_id, guest.room_number).all()
       
       for (const booking of beachBookings.results) {
         await DB.prepare(`
@@ -57301,7 +57301,7 @@ app.get('/my-perfect-week', async (c) => {
             await loadOfferings(config.offeringType, presetDate);
         }
         
-        async function loadOfferings(type = 'all', presetDate = null) {
+        async function loadOfferings(type = 'all', presetDate = null, presetTime = null) {
             try {
                 const typeParam = type !== 'all' ? '&type=' + type : '';
                 const response = await fetch('/api/hotel-offerings/' + propertyId + '?lang=en' + typeParam, {
