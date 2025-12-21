@@ -4,12 +4,13 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🌐 Live Application
 
-**Production:** https://67fcc733.project-c8738f5c.pages.dev 🚀 **LATEST - Beach booking cancel works!**
-**Property Landing Page (6-DIGIT PIN!):** https://67fcc733.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**My Perfect Week:** https://67fcc733.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
-**My Bookings:** https://67fcc733.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
-**Beach Booking:** https://67fcc733.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
-**Admin Dashboard:** https://67fcc733.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://713ccc9a.project-c8738f5c.pages.dev 🚀 **NEW: Save My Stay mood check system!**
+**Property Landing Page (6-DIGIT PIN!):** https://713ccc9a.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**My Perfect Week:** https://713ccc9a.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
+**My Bookings:** https://713ccc9a.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
+**Mood Check:** https://713ccc9a.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
+**Beach Booking:** https://713ccc9a.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
+**Admin Dashboard:** https://713ccc9a.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
