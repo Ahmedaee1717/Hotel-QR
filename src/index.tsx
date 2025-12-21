@@ -25923,6 +25923,145 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             }
           });
         </script>
+
+        <!-- Daily Mood Check Modal -->
+        <div id="moodCheckModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="backdrop-filter: blur(4px);">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative animate-fadeIn">
+                <button onclick="closeMoodCheck()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+                
+                <!-- Header -->
+                <div class="text-center mb-6">
+                    <div class="inline-block p-4 bg-gradient-to-br from-orange-400 to-red-500 rounded-full mb-4">
+                        <i class="fas fa-heart text-4xl text-white"></i>
+                    </div>
+                    <h2 id="moodGreeting" class="text-2xl font-bold text-gray-800 mb-2">Good morning!</h2>
+                    <p class="text-gray-600">How was your day today?</p>
+                </div>
+                
+                <!-- Mood Selection -->
+                <div class="flex justify-center gap-8 mb-6">
+                    <button onclick="submitMood(3, '😊')" class="flex flex-col items-center group">
+                        <div class="text-6xl mb-2 transition-transform group-hover:scale-125">😊</div>
+                        <span class="text-sm font-semibold text-gray-600">Great!</span>
+                    </button>
+                    <button onclick="submitMood(2, '😐')" class="flex flex-col items-center group">
+                        <div class="text-6xl mb-2 transition-transform group-hover:scale-125">😐</div>
+                        <span class="text-sm font-semibold text-gray-600">Okay</span>
+                    </button>
+                    <button onclick="submitMood(1, '😟')" class="flex flex-col items-center group">
+                        <div class="text-6xl mb-2 transition-transform group-hover:scale-125">😟</div>
+                        <span class="text-sm font-semibold text-gray-600">Not Happy</span>
+                    </button>
+                </div>
+                
+                <p class="text-xs text-center text-gray-500">
+                    <i class="fas fa-clock mr-1"></i>Takes just 10 seconds
+                </p>
+            </div>
+        </div>
+
+        <style>
+            @keyframes fadeIn {
+                from { opacity: 0; transform: scale(0.9); }
+                to { opacity: 1; transform: scale(1); }
+            }
+            .animate-fadeIn {
+                animation: fadeIn 0.3s ease-out;
+            }
+            #moodCheckModal:not(.hidden) {
+                animation: fadeIn 0.3s ease-out;
+            }
+        </style>
+
+        <script>
+            // Mood Check Modal Functions
+            const MOOD_CHECK_KEY = 'lastMoodCheckDate';
+            const propertyId = new URLSearchParams(window.location.search).get('property') || '1';
+            
+            function setMoodGreeting() {
+                const hour = new Date().getHours();
+                let greeting = 'Good evening';
+                if (hour < 12) greeting = 'Good morning';
+                else if (hour < 18) greeting = 'Good afternoon';
+                
+                const guest = window.getGuestSession?.();
+                const name = guest ? (guest.full_name || 'Guest').split(' ')[0] : '';
+                document.getElementById('moodGreeting').textContent = greeting + (name ? ', ' + name : '') + '! 👋';
+            }
+            
+            function shouldShowMoodCheck() {
+                const guest = window.getGuestSession?.();
+                if (!guest || !guest.pass_reference) return false;
+                
+                const lastCheck = localStorage.getItem(MOOD_CHECK_KEY);
+                const today = new Date().toISOString().split('T')[0];
+                
+                return lastCheck !== today;
+            }
+            
+            function showMoodCheckModal() {
+                if (shouldShowMoodCheck()) {
+                    setTimeout(() => {
+                        setMoodGreeting();
+                        document.getElementById('moodCheckModal').classList.remove('hidden');
+                    }, 2000); // Show after 2 seconds
+                }
+            }
+            
+            function closeMoodCheck() {
+                document.getElementById('moodCheckModal').classList.add('hidden');
+                // Mark as dismissed for today
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem(MOOD_CHECK_KEY, today);
+            }
+            
+            async function submitMood(score, emoji) {
+                const guest = window.getGuestSession?.();
+                if (!guest || !guest.pass_reference) {
+                    alert('Please link your pass first');
+                    closeMoodCheck();
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/guest/mood-check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            pass_reference: guest.pass_reference,
+                            mood_score: score,
+                            mood_emoji: emoji,
+                            check_date: new Date().toISOString().split('T')[0]
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        // Mark as completed for today
+                        const today = new Date().toISOString().split('T')[0];
+                        localStorage.setItem(MOOD_CHECK_KEY, today);
+                        
+                        // Redirect to full mood check page for detailed feedback
+                        window.location.href = '/mood-check?property=' + propertyId + '&mood=' + score;
+                    }
+                } catch (error) {
+                    console.error('Mood check error:', error);
+                    closeMoodCheck();
+                }
+            }
+            
+            // Show modal when page loads and pass is linked
+            window.addEventListener('load', () => {
+                showMoodCheckModal();
+            });
+            
+            // Also show after pass is linked
+            window.addEventListener('passLinked', () => {
+                setTimeout(showMoodCheckModal, 1000);
+            });
+        </script>
     </body>
     </html>
   `)
