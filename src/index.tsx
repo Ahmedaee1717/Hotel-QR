@@ -20340,6 +20340,45 @@ app.get('/api/admin/feedback/mood-stats/:property_id', async (c) => {
   }
 })
 
+// Admin: Get detailed mood check list for today
+app.get('/api/admin/feedback/mood-checks/:property_id/today', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const moodChecks = await DB.prepare(`
+      SELECT 
+        mood_check_id,
+        guest_name,
+        room_number,
+        mood_emoji,
+        mood_score,
+        stay_day,
+        check_date,
+        created_at,
+        CASE 
+          WHEN mood_score = 3 THEN 'Happy'
+          WHEN mood_score = 2 THEN 'Okay'
+          WHEN mood_score = 1 THEN 'Unhappy'
+        END as mood_label
+      FROM guest_mood_checks
+      WHERE property_id = ? AND check_date = ?
+      ORDER BY created_at DESC
+    `).bind(property_id, today).all()
+    
+    return c.json({
+      success: true,
+      date: today,
+      mood_checks: moodChecks.results
+    })
+  } catch (error) {
+    console.error('Get mood checks error:', error)
+    return c.json({ error: 'Failed to get mood checks' }, 500)
+  }
+})
+
 // Admin: Resolve chat feedback
 app.post('/api/admin/feedback/chat/:feedback_id/resolve', async (c) => {
   const { DB } = c.env
@@ -26141,11 +26180,24 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         const today = new Date().toISOString().split('T')[0];
                         localStorage.setItem(MOOD_CHECK_KEY, today);
                         
-                        // Redirect to full mood check page for detailed feedback
-                        window.location.href = '/mood-check?property=' + propertyId + '&mood=' + score;
+                        // Show thank you message based on mood
+                        let message = 'Thank you for your feedback!';
+                        if (score === 3) {
+                            message = '😊 Thank you! We\'re thrilled you\'re enjoying your stay!';
+                        } else if (score === 2) {
+                            message = '😐 Thank you for sharing your thoughts with us.';
+                        } else if (score === 1) {
+                            message = '😟 Thank you for letting us know. A manager will contact you shortly to make things right!';
+                        }
+                        
+                        alert(message);
+                        closeMoodCheck();
+                    } else {
+                        alert('Failed to save your mood check. Please try again.');
                     }
                 } catch (error) {
                     console.error('Mood check error:', error);
+                    alert('Failed to save your mood check. Please try again.');
                     closeMoodCheck();
                 }
             }
@@ -44070,6 +44122,21 @@ app.get('/admin/dashboard', (c) => {
                     <i class="fas fa-info-circle mr-1"></i>
                     Data updates every 60 seconds • Last updated: <span id="moodLastUpdated">--:--</span>
                 </div>
+                
+                <!-- Detailed Mood Check List -->
+                <div class="mt-6 bg-white rounded-lg p-4 border-2 border-purple-100">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-bold text-gray-800">
+                            <i class="fas fa-list mr-2 text-purple-600"></i>Today's Guest Responses
+                        </h4>
+                        <button onclick="loadMoodStats()" class="text-sm text-purple-600 hover:text-purple-800">
+                            <i class="fas fa-sync-alt mr-1"></i>Refresh
+                        </button>
+                    </div>
+                    <div id="moodCheckDetailsList" class="space-y-2">
+                        <p class="text-center text-gray-500 py-4 text-sm">No mood checks yet today</p>
+                    </div>
+                </div>
             </div>
             
             <!-- Stats Cards -->
@@ -44152,6 +44219,25 @@ app.get('/admin/dashboard', (c) => {
                 Urgent Issues Requiring Attention
             </h3>
             <div id="urgentAlertsList" class="space-y-3">
+            </div>
+        </div>
+
+        <!-- Recent Mood Checks (NEW!) -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold">
+                    <i class="fas fa-heart mr-2 text-pink-500"></i>
+                    Today's Mood Checks
+                </h3>
+                <button onclick="refreshMoodChecks()" class="text-purple-600 hover:text-purple-800 text-sm">
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                </button>
+            </div>
+            <div id="recentMoodChecksList" class="space-y-3">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-heart text-5xl mb-3 text-gray-300"></i>
+                    <p>No mood checks yet today. Guests will see the mood check modal when they link their pass.</p>
+                </div>
             </div>
         </div>
 
@@ -50348,6 +50434,44 @@ app.get('/admin/dashboard', (c) => {
             // No mood check data yet - show empty state
             document.getElementById('moodCheckSection').style.display = 'block';
           }
+          
+          // Load detailed mood check list
+          const detailsResponse = await fetch('/api/admin/feedback/mood-checks/' + propertyId + '/today');
+          const detailsData = await detailsResponse.json();
+          
+          if (detailsData.success && detailsData.mood_checks && detailsData.mood_checks.length > 0) {
+            const detailsList = document.getElementById('moodCheckDetailsList');
+            let html = '';
+            detailsData.mood_checks.forEach(check => {
+              const bgClass = check.mood_score === 3 ? 'bg-green-100 text-green-800' :
+                              check.mood_score === 2 ? 'bg-blue-100 text-blue-800' :
+                              'bg-red-100 text-red-800';
+              const timeStr = new Date(check.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+              
+              html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">';
+              html += '  <div class="flex items-center gap-3">';
+              html += '    <span class="text-3xl">' + check.mood_emoji + '</span>';
+              html += '    <div>';
+              html += '      <p class="font-semibold text-gray-800">' + (check.guest_name || 'Guest') + '</p>';
+              html += '      <p class="text-sm text-gray-600">';
+              html += '        <i class="fas fa-door-open mr-1"></i>Room ' + (check.room_number || 'N/A');
+              html += '        <span class="mx-2">•</span>';
+              html += '        <i class="fas fa-calendar-day mr-1"></i>Day ' + check.stay_day + ' of stay';
+              html += '      </p>';
+              html += '    </div>';
+              html += '  </div>';
+              html += '  <div class="text-right">';
+              html += '    <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold ' + bgClass + '">';
+              html += check.mood_label;
+              html += '    </span>';
+              html += '    <p class="text-xs text-gray-500 mt-1">' + timeStr + '</p>';
+              html += '  </div>';
+              html += '</div>';
+            });
+            detailsList.innerHTML = html;
+          } else {
+            document.getElementById('moodCheckDetailsList').innerHTML = '<p class="text-center text-gray-500 py-4 text-sm">No mood checks yet today</p>';
+          }
         } catch (error) {
           console.error('Load mood stats error:', error);
           // Don't show error to user - just hide the section if data unavailable
@@ -50358,6 +50482,65 @@ app.get('/admin/dashboard', (c) => {
       // Refresh mood stats
       async function refreshMoodStats() {
         await loadMoodStats();
+      }
+      
+      // Load recent mood checks list with guest names and rooms
+      async function loadMoodChecks() {
+        try {
+          const response = await fetch('/api/admin/feedback/mood-checks/' + propertyId);
+          const data = await response.json();
+          
+          if (data.success && data.mood_checks && data.mood_checks.length > 0) {
+            const list = document.getElementById('recentMoodChecksList');
+            list.innerHTML = data.mood_checks.map(check => {
+              const moodLabel = check.mood_score === 3 ? 'Happy' : check.mood_score === 2 ? 'Okay' : 'Unhappy';
+              const moodColor = check.mood_score === 3 ? 'green' : check.mood_score === 2 ? 'blue' : 'red';
+              const dateStr = new Date(check.check_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              const timeStr = new Date(check.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+              
+              return `
+                <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-${moodColor}-500 hover:shadow-md transition-all">
+                  <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-3 mb-2">
+                        <span class="text-3xl">${check.mood_emoji}</span>
+                        <div>
+                          <h4 class="font-bold text-gray-800">${check.guest_name || 'Guest'}</h4>
+                          <p class="text-sm text-gray-600">
+                            Room ${check.room_number || 'N/A'} • Day ${check.stay_day || '?'} of stay
+                          </p>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-4 text-sm text-gray-600">
+                        <span><i class="fas fa-calendar mr-1"></i>${dateStr}</span>
+                        <span><i class="fas fa-clock mr-1"></i>${timeStr}</span>
+                        <span class="px-3 py-1 bg-${moodColor}-100 text-${moodColor}-800 text-xs font-semibold rounded-full">
+                          ${moodLabel.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('');
+          } else {
+            // Show empty state
+            const list = document.getElementById('recentMoodChecksList');
+            list.innerHTML = `
+              <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-heart text-5xl mb-3 text-gray-300"></i>
+                <p>No mood checks yet today. Guests will see the mood check modal when they link their pass.</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error('Load mood checks error:', error);
+        }
+      }
+      
+      // Refresh mood checks list
+      async function refreshMoodChecks() {
+        await loadMoodChecks();
       }
       
       // Auto-refresh mood stats every 60 seconds
