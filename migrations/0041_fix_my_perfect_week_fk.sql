@@ -7,7 +7,8 @@
 ALTER TABLE guest_stay_plans RENAME TO guest_stay_plans_old;
 
 -- Create new table with correct foreign key
-CREATE TABLE guest_stay_plans (\n  plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE guest_stay_plans (
+  plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
   guest_id INTEGER NOT NULL,
   property_id INTEGER NOT NULL,
   checkin_date DATE NOT NULL,

@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS beach_bookings (
   
   -- Timestamps
   checked_in_at DATETIME,
+  checked_in_by TEXT,
   checked_out_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

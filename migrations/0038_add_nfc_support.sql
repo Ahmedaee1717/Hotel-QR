@@ -1,7 +1,10 @@
 -- Add NFC support to digital passes
-ALTER TABLE digital_passes ADD COLUMN nfc_id TEXT UNIQUE;
+ALTER TABLE digital_passes ADD COLUMN nfc_id TEXT;
 ALTER TABLE digital_passes ADD COLUMN nfc_enabled INTEGER DEFAULT 1;
 ALTER TABLE digital_passes ADD COLUMN nfc_last_used DATETIME;
+
+-- Create unique index for nfc_id (can't add UNIQUE constraint with ALTER TABLE in SQLite)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_digital_passes_nfc_id ON digital_passes(nfc_id) WHERE nfc_id IS NOT NULL;
 
 -- Create NFC verification log table
 CREATE TABLE IF NOT EXISTS nfc_verifications (
@@ -21,6 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_nfc_verifications_pass ON nfc_verifications(pass_
 CREATE INDEX IF NOT EXISTS idx_nfc_verifications_nfc_id ON nfc_verifications(nfc_id);
 CREATE INDEX IF NOT EXISTS idx_nfc_verifications_date ON nfc_verifications(verified_at);
 
--- Add NFC to pass_verifications table for unified tracking
-ALTER TABLE pass_verifications ADD COLUMN verification_method TEXT DEFAULT 'qr';
+-- Add NFC to pass_verifications table for unified tracking (if not exists)
 -- verification_method can be: 'qr', 'face', 'nfc', 'manual'
+-- Note: Column may already exist from previous migrations

@@ -20359,7 +20359,7 @@ app.get('/api/admin/feedback/mood-checks/:property_id', async (c) => {
         gm.stay_day,
         gm.created_at,
         p.room_number,
-        p.guest_full_name as guest_name
+        p.primary_guest_name as guest_name
       FROM guest_mood_checks gm
       LEFT JOIN digital_passes p ON gm.pass_reference = p.pass_reference
       WHERE gm.property_id = ? AND gm.check_date = ?
