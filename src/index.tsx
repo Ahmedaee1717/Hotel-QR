@@ -26241,7 +26241,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     } else {
                         // Check if it's a duplicate submission
                         if (data.details && data.details.includes('UNIQUE constraint')) {
-                            alert('😊 You've already shared your mood today. Thank you!');
+                            alert("😊 You've already shared your mood today. Thank you!");
                             // Mark as completed to prevent modal from showing again
                             const guestMoodKey = MOOD_CHECK_KEY + '_' + guest.pass_reference;
                             const today = new Date().toISOString().split('T')[0];
