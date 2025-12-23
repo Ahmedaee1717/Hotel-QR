@@ -63,7 +63,7 @@
             </div>
 
             <!-- Stats -->
-            <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="grid grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-xl shadow-lg p-6">
                     <div class="flex items-center gap-4">
                         <div class="w-12 h-12 rounded-full flex items-center justify-center bg-green-500">
@@ -99,6 +99,18 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, #7c3aed, #5b21b6);">
+                            <i class="fas fa-wifi text-white text-xl" style="transform: rotate(-45deg);"></i>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" id="nfc-count">0</div>
+                            <div class="text-xs text-gray-600">NFC Scans</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Main Scanner - Side by Side Layout -->
@@ -126,18 +138,22 @@
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-2 gap-2">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
-                                class="py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600">
-                            <i class="fas fa-qrcode"></i>
+                                class="py-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 flex items-center justify-center gap-2">
+                            <i class="fas fa-qrcode"></i> QR
                         </button>
                         <button onclick="switchMode('face')" id="face-mode-btn"
-                                class="py-2 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600">
-                            <i class="fas fa-user"></i>
+                                class="py-3 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600 flex items-center justify-center gap-2">
+                            <i class="fas fa-user"></i> Face
+                        </button>
+                        <button onclick="switchMode('nfc')" id="nfc-mode-btn"
+                                class="py-3 text-white rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #7c3aed, #5b21b6);">
+                            <i class="fas fa-wifi" style="transform: rotate(-45deg);"></i> NFC
                         </button>
                         <button onclick="switchMode('auto')" id="auto-mode-btn"
-                                class="py-2 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 ring-4 ring-offset-2">
-                            <i class="fas fa-magic"></i>
+                                class="py-3 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 ring-4 ring-green-200 ring-offset-2 flex items-center justify-center gap-2">
+                            <i class="fas fa-magic"></i> Auto
                         </button>
                     </div>
                 </div>
@@ -189,7 +205,7 @@
         const VERIFY_COOLDOWN = 3000; // 3 seconds between scans
         
         // Stats
-        let stats = { verified: 0, qr: 0, face: 0 };
+        let stats = { verified: 0, qr: 0, face: 0, nfc: 0 };
         
         // Auth helper
         function fetchWithAuth(url, options = {}) {
@@ -834,16 +850,32 @@
         function switchMode(mode) {
             scannerMode = mode;
             document.querySelectorAll('[id$="-mode-btn"]').forEach(btn => {
-                btn.classList.remove('ring-4', 'ring-offset-2');
+                btn.classList.remove('ring-4', 'ring-offset-2', 'ring-green-200', 'ring-blue-200', 'ring-purple-200');
             });
-            document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2');
+            
+            const ringColors = {
+                'auto': 'ring-green-200',
+                'qr': 'ring-blue-200',
+                'face': 'ring-purple-200',
+                'nfc': 'ring-purple-200'
+            };
+            
+            document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2', ringColors[mode]);
             
             const modeText = {
                 'auto': 'Auto Mode - Scans QR or Face',
                 'qr': 'QR Mode - Scans QR codes only',
-                'face': 'Face Mode - Scans faces only'
+                'face': 'Face Mode - Scans faces only',
+                'nfc': 'NFC Mode - Tap wristband to reader'
             };
             document.getElementById('scanner-mode').textContent = modeText[mode];
+            
+            // If NFC mode, start NFC scanning
+            if (mode === 'nfc') {
+                startNFCScanning();
+            } else {
+                stopNFCScanning();
+            }
         }
         
         function updateStatus(message, type = 'info') {
@@ -861,6 +893,93 @@
             document.getElementById('verified-count').textContent = stats.verified;
             document.getElementById('qr-count').textContent = stats.qr;
             document.getElementById('face-count').textContent = stats.face;
+            document.getElementById('nfc-count').textContent = stats.nfc || 0;
+        }
+        
+        // ========== NFC SCANNING ==========
+        let nfcReader = null;
+        
+        async function startNFCScanning() {
+            if (!('NDEFReader' in window)) {
+                updateStatus('NFC not supported. Use Chrome with USB NFC reader.', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('Starting NFC scanner...', 'loading');
+                
+                nfcReader = new NDEFReader();
+                await nfcReader.scan();
+                
+                console.log('✅ NFC scanning started');
+                updateStatus('Tap wristband to NFC reader', 'success');
+                
+                nfcReader.onreading = async event => {
+                    console.log('📲 NFC tag detected');
+                    const message = event.message;
+                    
+                    let nfcId = null;
+                    for (const record of message.records) {
+                        if (record.recordType === 'text') {
+                            const textDecoder = new TextDecoder(record.encoding || 'utf-8');
+                            nfcId = textDecoder.decode(record.data);
+                            break;
+                        }
+                    }
+                    
+                    if (!nfcId) {
+                        nfcId = event.serialNumber;
+                    }
+                    
+                    console.log('🔷 NFC ID:', nfcId);
+                    await verifyByNFC(nfcId);
+                };
+                
+                nfcReader.onerror = error => {
+                    console.error('❌ NFC error:', error);
+                    updateStatus('NFC scan failed', 'error');
+                };
+            } catch (error) {
+                console.error('❌ Failed to start NFC scan:', error);
+                updateStatus('Failed to start NFC: ' + error.message, 'error');
+            }
+        }
+        
+        function stopNFCScanning() {
+            if (nfcReader) {
+                nfcReader = null;
+                console.log('🛑 NFC scanning stopped');
+            }
+        }
+        
+        async function verifyByNFC(nfcId) {
+            try {
+                updateStatus('Verifying NFC...', 'loading');
+                
+                const response = await fetchWithAuth('/api/staff/verify-pass', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        nfc_id: nfcId,
+                        verification_method: 'nfc',
+                        staff_name: staffName,
+                        location: 'Unified Scanner'
+                    })
+                });
+                
+                if (response.success) {
+                    stats.verified++;
+                    stats.nfc++;
+                    updateStats();
+                    displayVerificationResult(response.pass, 'success', 'nfc');
+                    updateStatus('NFC verified! Tap next wristband', 'success');
+                } else {
+                    displayVerificationResult(null, 'error', 'nfc', response.message || 'Verification failed');
+                    updateStatus('Verification failed', 'error');
+                }
+            } catch (error) {
+                console.error('NFC verification error:', error);
+                updateStatus('NFC verification failed', 'error');
+            }
         }
         
         function logout() {
