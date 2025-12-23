@@ -44073,7 +44073,7 @@ app.get('/admin/dashboard', (c) => {
                     <p class="opacity-90 text-sm">Unified QR + Face recognition scanner</p>
                 </a>
 
-                <a href="/unified-scanner.html" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #10b981, #059669);">
+                <a href="/staff-unified-scanner.html" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #10b981, #059669);">
                     <i class="fas fa-shield-alt text-3xl mb-3"></i>
                     <h4 class="font-bold text-lg mb-1">🆕 Unified Scanner</h4>
                     <p class="opacity-90 text-sm">Face • QR • NFC - All in One</p>
