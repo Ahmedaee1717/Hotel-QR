@@ -437,17 +437,28 @@
                 // Disable button
                 encodeButton.disabled = true;
                 encodeButton.classList.add('opacity-50', 'cursor-not-allowed');
-                encodeButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Waiting for wristband...';
+                encodeButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing to write...';
                 
                 // Update status
                 encodingIcon.classList.add('encoding-active');
-                encodingTitle.textContent = 'Tap Wristband Now';
-                encodingMessage.textContent = 'Hold the blank NFC wristband to the back of your device';
+                encodingTitle.textContent = 'Preparing NFC Writer';
+                encodingMessage.textContent = 'Initializing... please wait';
 
                 console.log('🔷 Starting NFC write for:', currentPass.nfc_id);
 
                 // Create NDEF writer
                 const ndef = new NDEFReader();
+                
+                // IMPORTANT: Add delay to prevent Android auto-scan interference
+                // This gives time for any pending scan operations to complete
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Now update UI to show we're ready
+                encodeButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Hold wristband to device...';
+                encodingTitle.textContent = '📱 Tap & HOLD Wristband';
+                encodingMessage.textContent = 'Place wristband on back of phone and keep it there for 2-3 seconds';
+                
+                console.log('📡 NFC writer ready, waiting for tag presentation...');
                 
                 // Write NFC ID to tag
                 await ndef.write({
