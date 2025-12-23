@@ -350,17 +350,70 @@
         }
 
         // Show Encoding Card
-        function showEncodingCard() {
-            if (!currentPass || !currentPass.nfc_id) {
-                alert('❌ This pass does not have an NFC ID generated. Cannot encode.');
+        async function showEncodingCard() {
+            if (!currentPass) {
+                alert('❌ No pass loaded');
                 return;
             }
             
-            if (!currentPass.nfc_enabled) {
-                alert('⚠️ Warning: NFC is disabled for this pass. It can still be encoded, but verification may fail.');
+            // If no NFC ID, offer to generate one
+            if (!currentPass.nfc_id) {
+                const generate = confirm('⚠️ This pass does not have an NFC ID yet.\n\nWould you like to generate one now?');
+                if (!generate) {
+                    return;
+                }
+                
+                // Generate NFC ID
+                const success = await generateNFCId();
+                if (!success) {
+                    alert('❌ Failed to generate NFC ID. Please try again.');
+                    return;
+                }
             }
             
             document.getElementById('encodingCard').classList.remove('hidden');
+        }
+        
+        // Generate NFC ID for pass
+        async function generateNFCId() {
+            try {
+                console.log('🔷 Generating NFC ID for pass:', currentPass.pass_id);
+                
+                const nfcId = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase();
+                
+                const response = await fetch('/api/staff/all-inclusive/generate-nfc-id', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId,
+                        'X-User-ID': userId || '0'
+                    },
+                    body: JSON.stringify({
+                        pass_id: currentPass.pass_id,
+                        nfc_id: nfcId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    console.error('❌ Generate NFC ID failed:', data.error);
+                    return false;
+                }
+                
+                // Update current pass
+                currentPass.nfc_id = nfcId;
+                
+                // Refresh display
+                displayPassDetails(currentPass);
+                
+                alert('✅ NFC ID generated successfully!');
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Generate NFC ID error:', error);
+                return false;
+            }
         }
 
         // Start Encoding Process
