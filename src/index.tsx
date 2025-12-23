@@ -52320,7 +52320,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const data = await response.json();
           const roomService = data.offerings.find(o => o.offering_type === 'room_service');
           
+          // Store room service offering but extract numeric ID
           roomServiceOffering = roomService;
+          if (roomServiceOffering) {
+            // Add numeric_id property for API calls
+            roomServiceOffering.numeric_id = roomServiceOffering.original_id || String(roomServiceOffering.offering_id).replace(/^[HA]/, '');
+          }
           
           const enabledCheckbox = document.getElementById('roomServiceEnabled');
           const statusDiv = document.getElementById('roomServiceStatus');
@@ -52477,10 +52482,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             document.getElementById('roomServiceEnabled').checked = false;
           }
         } else if (!isEnabled && roomServiceOffering) {
-          // Delete room service offering
+          // Delete room service offering using numeric ID
           if (confirm('Are you sure you want to disable Room Service? This will remove the menu from guest access.')) {
             try {
-              const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+              const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.numeric_id, {
                 method: 'DELETE'
               });
 
@@ -52522,8 +52527,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
         
         try {
-          // Save room service offering info
-          const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.offering_id, {
+          // Save room service offering info using numeric ID
+          const response = await fetchWithAuth('/api/admin/offerings/' + roomServiceOffering.numeric_id, {
             method: 'PUT',
             body: JSON.stringify({
               title_en: title,
@@ -52567,7 +52572,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               icon_class: cardIcon,
               color_class: cardColor,
               is_visible: cardVisible,
-              link_url: '/room-service/' + roomServiceOffering.offering_id
+              link_url: '/room-service/' + roomServiceOffering.numeric_id
             })
           });
           
