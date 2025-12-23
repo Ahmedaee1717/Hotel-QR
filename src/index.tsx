@@ -17661,6 +17661,43 @@ app.get('/api/staff/all-inclusive/pass-by-reference/:pass_reference', async (c) 
   }
 })
 
+// SIMPLE ENDPOINT: Just get NFC ID by pass reference (no HTML, just JSON)
+app.get('/api/nfc-id/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  
+  try {
+    const pass = await DB.prepare(`
+      SELECT nfc_id, primary_guest_name, room_number, pass_reference
+      FROM digital_passes
+      WHERE pass_reference = ?
+      LIMIT 1
+    `).bind(pass_reference).first()
+    
+    if (!pass) {
+      return c.json({ success: false, error: 'Pass not found' }, 404)
+    }
+    
+    // Generate NFC ID if missing
+    if (!pass.nfc_id) {
+      const nfc_id = 'NFC' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 10).toUpperCase()
+      await DB.prepare(`UPDATE digital_passes SET nfc_id = ? WHERE pass_reference = ?`).bind(nfc_id, pass_reference).run()
+      pass.nfc_id = nfc_id
+    }
+    
+    return c.json({ 
+      success: true, 
+      nfc_id: pass.nfc_id,
+      guest_name: pass.primary_guest_name,
+      room_number: pass.room_number,
+      pass_reference: pass.pass_reference
+    })
+  } catch (error) {
+    console.error('Get NFC ID error:', error)
+    return c.json({ success: false, error: 'Database error' }, 500)
+  }
+})
+
 // Log NFC encoding activity
 app.post('/api/staff/all-inclusive/log-encoding', async (c) => {
   const { DB } = c.env
