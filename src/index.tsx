@@ -24519,25 +24519,28 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             spotDescs[3].style.setProperty('color', textColor, 'important');
                         }
                         
-                        // Apply traffic light text color
+                        // Apply traffic light text color to BOTH mobile and desktop versions
                         const trafficLightTextColor = s.traffic_light_text_color || '#ffffff';
-                        const trafficLightText = section.querySelector('#traffic-light-text');
-                        const trafficLightRate = section.querySelector('#traffic-occupancy-rate');
-                        const trafficLightTime = section.querySelector('#traffic-live-time');
-                        const trafficLightIcon = section.querySelector('#beach-traffic-light i');
                         
-                        if (trafficLightText) {
-                            trafficLightText.style.setProperty('color', trafficLightTextColor, 'important');
-                        }
-                        if (trafficLightRate) {
-                            trafficLightRate.style.setProperty('color', trafficLightTextColor, 'important');
-                        }
-                        if (trafficLightTime) {
-                            trafficLightTime.style.setProperty('color', trafficLightTextColor, 'important');
-                        }
-                        if (trafficLightIcon) {
-                            trafficLightIcon.style.setProperty('color', trafficLightTextColor, 'important');
-                        }
+                        // Use querySelectorAll to target both mobile and desktop traffic lights
+                        const trafficLightTexts = section.querySelectorAll('.traffic-light-text');
+                        const trafficLightRates = section.querySelectorAll('.traffic-occupancy-rate');
+                        const trafficLightTimes = section.querySelectorAll('.traffic-live-time');
+                        const trafficLightIcons = section.querySelectorAll('#beach-traffic-light-desktop i, #beach-traffic-light-mobile i');
+                        
+                        // Apply color to all instances
+                        trafficLightTexts.forEach(el => {
+                            el.style.setProperty('color', trafficLightTextColor, 'important');
+                        });
+                        trafficLightRates.forEach(el => {
+                            el.style.setProperty('color', trafficLightTextColor, 'important');
+                        });
+                        trafficLightTimes.forEach(el => {
+                            el.style.setProperty('color', trafficLightTextColor, 'important');
+                        });
+                        trafficLightIcons.forEach(el => {
+                            el.style.setProperty('color', trafficLightTextColor, 'important');
+                        });
                         
                         section.classList.remove('hidden');
                         console.log('Beach booking section shown with custom styling!');
