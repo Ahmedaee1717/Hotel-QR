@@ -30,12 +30,21 @@
             <h2 class="text-xl font-bold mb-4">
                 <i class="fas fa-search mr-2 text-blue-600"></i>Step 1: Load Guest Pass
             </h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2">Property ID:</label>
+                <input type="text" id="propertyIdInput" value="1" 
+                       class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg"
+                       placeholder="1">
+                <p class="text-xs text-gray-500 mt-1">Usually '1' - change if you have multiple properties</p>
+            </div>
+            
             <div class="mb-4">
                 <label class="block text-sm font-semibold mb-2">Pass Reference:</label>
                 <div class="flex gap-2">
                     <input type="text" id="passReference" placeholder="PASS-1234567890-ABC12" 
                            class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg font-mono">
-                    <button onclick="loadPass()" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+                    <button onclick="loadPassWithPropertyId()" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
                         <i class="fas fa-download mr-2"></i>Load
                     </button>
                 </div>
@@ -100,8 +109,27 @@
 
     <script>
         let currentPass = null;
-        const propertyId = localStorage.getItem('property_id') || '1';
-        const userId = localStorage.getItem('user_id');
+        // Try to get property_id from localStorage, URL params, or default to 1
+        const urlParams = new URLSearchParams(window.location.search);
+        const propertyId = urlParams.get('property_id') || localStorage.getItem('property_id') || '1';
+        const userId = urlParams.get('user_id') || localStorage.getItem('user_id') || '1';
+        
+        console.log('🏨 Using property_id:', propertyId);
+        console.log('👤 Using user_id:', userId);
+        
+        // Set the input field
+        if (document.getElementById('propertyIdInput')) {
+            document.getElementById('propertyIdInput').value = propertyId;
+        }
+
+        function loadPassWithPropertyId() {
+            // Update property_id from input
+            const newPropertyId = document.getElementById('propertyIdInput').value.trim() || '1';
+            window.propertyId = newPropertyId;
+            localStorage.setItem('property_id', newPropertyId);
+            console.log('🏨 Updated property_id to:', newPropertyId);
+            loadPass();
+        }
 
         async function loadPass() {
             const passRef = document.getElementById('passReference').value.trim().toUpperCase();
@@ -112,16 +140,24 @@
             }
 
             try {
+                console.log('🔍 Loading pass:', passRef);
+                
+                const currentPropertyId = window.propertyId || propertyId;
+                console.log('📡 Property ID:', currentPropertyId);
+                
                 const response = await fetch(`/api/staff/all-inclusive/pass-by-reference/${passRef}`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Property-ID': propertyId,
-                        'X-User-ID': userId || '0'
+                        'X-Property-ID': currentPropertyId,
+                        'X-User-ID': userId
                     }
                 });
 
+                console.log('📥 Response status:', response.status);
+                
                 const data = await response.json();
+                console.log('📦 Response data:', data);
 
                 if (!response.ok || !data.success) {
                     alert('❌ Pass not found: ' + (data.error || 'Invalid pass reference'));
@@ -133,7 +169,7 @@
                 displayNfcId();
                 
             } catch (error) {
-                console.error('Load error:', error);
+                console.error('❌ Load error:', error);
                 alert('Error loading pass: ' + error.message);
             }
         }
