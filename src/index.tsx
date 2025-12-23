@@ -47649,8 +47649,11 @@ app.get('/admin/dashboard', (c) => {
         
         console.log('Attempting to delete offering:', offeringId);
         
+        // offeringId might have 'H' prefix, extract numeric ID
+        const numericId = String(offeringId).replace(/^[HA]/, '');
+        
         try {
-          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
+          const response = await fetchWithAuth('/api/admin/offerings/' + numericId, {
             method: 'DELETE'
           });
           
@@ -47753,8 +47756,16 @@ app.get('/admin/dashboard', (c) => {
       }
       
       async function editOffering(offeringId) {
-        const offering = allOfferings.find(o => o.offering_id === offeringId);
-        if (!offering) return;
+        // offeringId is the numeric ID (without prefix), but allOfferings has 'H' prefix
+        // Search by original_id (numeric) OR offering_id (with prefix)
+        const offering = allOfferings.find(o => o.original_id == offeringId || o.offering_id == offeringId);
+        if (!offering) {
+          console.error('Offering not found:', offeringId, 'Available offerings:', allOfferings.map(o => ({id: o.offering_id, original: o.original_id})));
+          return;
+        }
+        
+        // Use original_id (numeric) for API calls
+        const numericId = offering.original_id || String(offering.offering_id).replace(/^[HA]/, '');
         
         // Populate form with existing data
         document.getElementById('offeringType').value = offering.offering_type;
@@ -47779,8 +47790,8 @@ app.get('/admin/dashboard', (c) => {
         if (offering.offering_type === 'restaurant') {
           document.getElementById('restaurantFields').classList.remove('hidden');
           
-          // Load existing menus
-          fetch('/api/offerings/' + offeringId + '/menus')
+          // Load existing menus using numeric ID
+          fetch('/api/offerings/' + numericId + '/menus')
             .then(res => res.json())
             .then(data => {
               if (data.success && data.menus) {
@@ -47811,7 +47822,7 @@ app.get('/admin/dashboard', (c) => {
           }
           
           try {
-            const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
+            const response = await fetchWithAuth('/api/admin/offerings/' + numericId, {
               method: 'PUT',
               body: JSON.stringify({
                 offering_type: offeringType,
