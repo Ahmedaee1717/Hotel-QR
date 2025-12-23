@@ -434,33 +434,39 @@
                 const encodingTitle = document.getElementById('encodingTitle');
                 const encodingMessage = document.getElementById('encodingMessage');
                 
-                // Disable button
+                // Step 1: Prepare - show warning first
                 encodeButton.disabled = true;
                 encodeButton.classList.add('opacity-50', 'cursor-not-allowed');
-                encodeButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing to write...';
+                encodeButton.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>KEEP WRISTBAND AWAY!';
                 
-                // Update status
                 encodingIcon.classList.add('encoding-active');
-                encodingTitle.textContent = 'Preparing NFC Writer';
-                encodingMessage.textContent = 'Initializing... please wait';
+                encodingTitle.textContent = '⚠️ IMPORTANT';
+                encodingMessage.innerHTML = '<strong style="color: red; font-size: 1.2em;">Remove wristband from phone NOW!</strong><br>Keep it at least 10cm away until next step.';
 
-                console.log('🔷 Starting NFC write for:', currentPass.nfc_id);
+                console.log('🔷 Preparing NFC write for:', currentPass.nfc_id);
+
+                // Wait 2 seconds for user to move wristband away
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Step 2: Show countdown
+                for (let i = 3; i > 0; i--) {
+                    encodeButton.innerHTML = `<i class="fas fa-hourglass-half mr-2"></i>Get ready... ${i}`;
+                    encodingTitle.textContent = `Starting in ${i}...`;
+                    encodingMessage.textContent = 'Keep wristband away! Do NOT place it yet!';
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                // Step 3: NOW ready for wristband
+                encodeButton.innerHTML = '<i class="fas fa-wifi mr-2 animate-pulse"></i>PLACE WRISTBAND NOW!';
+                encodingTitle.textContent = '📱 NOW! Tap & HOLD';
+                encodingMessage.innerHTML = '<strong style="color: green; font-size: 1.2em;">Place wristband on back of phone NOW and HOLD for 3 seconds!</strong>';
+                
+                console.log('📡 NFC writer ready, waiting for tag...');
 
                 // Create NDEF writer
                 const ndef = new NDEFReader();
                 
-                // IMPORTANT: Add delay to prevent Android auto-scan interference
-                // This gives time for any pending scan operations to complete
-                await new Promise(resolve => setTimeout(resolve, 800));
-                
-                // Now update UI to show we're ready
-                encodeButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Hold wristband to device...';
-                encodingTitle.textContent = '📱 Tap & HOLD Wristband';
-                encodingMessage.textContent = 'Place wristband on back of phone and keep it there for 2-3 seconds';
-                
-                console.log('📡 NFC writer ready, waiting for tag presentation...');
-                
-                // Write NFC ID to tag
+                // Write NFC ID to tag (will wait for tag)
                 await ndef.write({
                     records: [
                         {
