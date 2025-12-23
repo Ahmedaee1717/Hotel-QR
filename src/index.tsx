@@ -43287,12 +43287,24 @@ app.get('/admin/dashboard', (c) => {
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
                                     <i class="fas fa-palette mr-2 text-purple-600"></i>Card Color
                                 </label>
-                                <div class="flex gap-2">
-                                    <input type="color" id="roomServiceCardColor" value="#6366f1" class="w-20 h-12 border-2 border-gray-200 rounded-lg cursor-pointer">
-                                    <input type="text" id="roomServiceCardColorText" value="#6366f1" placeholder="#6366f1" class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none font-mono">
+                                <div class="space-y-2">
+                                    <div>
+                                        <label class="text-xs text-gray-600 mb-1 block">Start Color</label>
+                                        <div class="flex gap-2">
+                                            <input type="color" id="roomServiceCardColor" value="#6366f1" class="w-20 h-12 border-2 border-gray-200 rounded-lg cursor-pointer">
+                                            <input type="text" id="roomServiceCardColorText" value="#6366f1" placeholder="#6366f1" class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none font-mono text-sm">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-xs text-gray-600 mb-1 block">End Color</label>
+                                        <div class="flex gap-2">
+                                            <input type="color" id="roomServiceCardColorEnd" value="#8b5cf6" class="w-20 h-12 border-2 border-gray-200 rounded-lg cursor-pointer">
+                                            <input type="text" id="roomServiceCardColorEndText" value="#8b5cf6" placeholder="#8b5cf6" class="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none font-mono text-sm">
+                                        </div>
+                                    </div>
                                 </div>
                                 <div id="roomServiceCardColorPreview" class="mt-2 p-4 rounded-lg text-white font-semibold text-center" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
-                                    Preview Color
+                                    Preview Gradient
                                 </div>
                             </div>
                             <div>
@@ -52367,9 +52379,19 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             
             // Handle color - check if it's a hex color or old color name
             const cardColor = roomServiceSection.color_class || '#6366f1';
+            let startColor = '#6366f1';
+            let endColor = '#8b5cf6';
+            
             if (cardColor.startsWith('#')) {
-              document.getElementById('roomServiceCardColor').value = cardColor;
-              document.getElementById('roomServiceCardColorText').value = cardColor;
+              startColor = cardColor;
+              // Auto-generate end color (lighter version)
+              const r = parseInt(startColor.slice(1, 3), 16);
+              const g = parseInt(startColor.slice(3, 5), 16);
+              const b = parseInt(startColor.slice(5, 7), 16);
+              endColor = '#' + 
+                Math.min(255, r + 40).toString(16).padStart(2, '0') +
+                Math.min(255, g + 40).toString(16).padStart(2, '0') +
+                Math.min(255, b + 40).toString(16).padStart(2, '0');
             } else {
               // Convert old color names to hex
               const colorMap = {
@@ -52382,10 +52404,21 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 'green': '#10b981',
                 'teal': '#14b8a6'
               };
-              const hexColor = colorMap[cardColor] || '#6366f1';
-              document.getElementById('roomServiceCardColor').value = hexColor;
-              document.getElementById('roomServiceCardColorText').value = hexColor;
+              startColor = colorMap[cardColor] || '#6366f1';
+              // Auto-generate end color
+              const r = parseInt(startColor.slice(1, 3), 16);
+              const g = parseInt(startColor.slice(3, 5), 16);
+              const b = parseInt(startColor.slice(5, 7), 16);
+              endColor = '#' + 
+                Math.min(255, r + 40).toString(16).padStart(2, '0') +
+                Math.min(255, g + 40).toString(16).padStart(2, '0') +
+                Math.min(255, b + 40).toString(16).padStart(2, '0');
             }
+            
+            document.getElementById('roomServiceCardColor').value = startColor;
+            document.getElementById('roomServiceCardColorText').value = startColor;
+            document.getElementById('roomServiceCardColorEnd').value = endColor;
+            document.getElementById('roomServiceCardColorEndText').value = endColor;
             
             document.getElementById('roomServiceCardVisible').checked = roomServiceSection.is_visible === 1;
           }
@@ -52396,6 +52429,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           
           // Add event listeners for real-time preview
           document.getElementById('roomServiceCardIcon').addEventListener('change', updateRoomServiceIconPreview);
+          
+          // Start color listeners
           document.getElementById('roomServiceCardColor').addEventListener('input', function(e) {
             document.getElementById('roomServiceCardColorText').value = e.target.value;
             updateRoomServiceColorPreview();
@@ -52403,6 +52438,18 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           document.getElementById('roomServiceCardColorText').addEventListener('input', function(e) {
             if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
               document.getElementById('roomServiceCardColor').value = e.target.value;
+              updateRoomServiceColorPreview();
+            }
+          });
+          
+          // End color listeners
+          document.getElementById('roomServiceCardColorEnd').addEventListener('input', function(e) {
+            document.getElementById('roomServiceCardColorEndText').value = e.target.value;
+            updateRoomServiceColorPreview();
+          });
+          document.getElementById('roomServiceCardColorEndText').addEventListener('input', function(e) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+              document.getElementById('roomServiceCardColorEnd').value = e.target.value;
               updateRoomServiceColorPreview();
             }
           });
@@ -52421,18 +52468,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       function updateRoomServiceColorPreview() {
         const colorPicker = document.getElementById('roomServiceCardColor');
+        const colorPickerEnd = document.getElementById('roomServiceCardColorEnd');
         const colorPreview = document.getElementById('roomServiceCardColorPreview');
-        if (colorPicker && colorPreview) {
-          const color = colorPicker.value;
-          // Create a lighter version for gradient
-          const r = parseInt(color.slice(1, 3), 16);
-          const g = parseInt(color.slice(3, 5), 16);
-          const b = parseInt(color.slice(5, 7), 16);
-          const lighterColor = '#' + 
-            Math.min(255, r + 40).toString(16).padStart(2, '0') +
-            Math.min(255, g + 40).toString(16).padStart(2, '0') +
-            Math.min(255, b + 40).toString(16).padStart(2, '0');
-          colorPreview.style.background = 'linear-gradient(135deg, ' + color + ' 0%, ' + lighterColor + ' 100%)';
+        if (colorPicker && colorPickerEnd && colorPreview) {
+          const startColor = colorPicker.value;
+          const endColor = colorPickerEnd.value;
+          colorPreview.style.background = 'linear-gradient(135deg, ' + startColor + ' 0%, ' + endColor + ' 100%)';
         }
       }
       
