@@ -138,7 +138,7 @@
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-3 gap-2">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
                                 class="py-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 flex items-center justify-center gap-2">
                             <i class="fas fa-qrcode"></i> QR
@@ -147,15 +147,14 @@
                                 class="py-3 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600 flex items-center justify-center gap-2">
                             <i class="fas fa-user"></i> Face
                         </button>
-                        <button onclick="switchMode('nfc')" id="nfc-mode-btn"
-                                class="py-3 text-white rounded-lg text-sm font-semibold hover:opacity-90 flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #7c3aed, #5b21b6);">
-                            <i class="fas fa-wifi" style="transform: rotate(-45deg);"></i> NFC
-                        </button>
                         <button onclick="switchMode('auto')" id="auto-mode-btn"
                                 class="py-3 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 ring-4 ring-green-200 ring-offset-2 flex items-center justify-center gap-2">
                             <i class="fas fa-magic"></i> Auto
                         </button>
                     </div>
+                    <p class="text-xs text-gray-500 text-center mt-2">
+                        <i class="fas fa-wifi" style="transform: rotate(-45deg);"></i> NFC scanning active in background
+                    </p>
                 </div>
 
                 <!-- Verification Status Card -->
@@ -266,6 +265,9 @@
             
             // Refresh checked-in list every 30 seconds
             setInterval(loadCheckedInGuests, 30000);
+            
+            // Auto-start NFC scanning in background
+            startNFCScanning();
         }
         
         async function loadFaceAPI() {
@@ -856,26 +858,19 @@
             const ringColors = {
                 'auto': 'ring-green-200',
                 'qr': 'ring-blue-200',
-                'face': 'ring-purple-200',
-                'nfc': 'ring-purple-200'
+                'face': 'ring-purple-200'
             };
             
             document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2', ringColors[mode]);
             
             const modeText = {
-                'auto': 'Auto Mode - Scans QR or Face',
-                'qr': 'QR Mode - Scans QR codes only',
-                'face': 'Face Mode - Scans faces only',
-                'nfc': 'NFC Mode - Tap wristband to reader'
+                'auto': 'Auto Mode - Scans QR or Face (NFC always active)',
+                'qr': 'QR Mode - Scans QR codes only (NFC always active)',
+                'face': 'Face Mode - Scans faces only (NFC always active)'
             };
             document.getElementById('scanner-mode').textContent = modeText[mode];
             
-            // If NFC mode, start NFC scanning
-            if (mode === 'nfc') {
-                startNFCScanning();
-            } else {
-                stopNFCScanning();
-            }
+            // NFC is always running in the background - no need to stop/start
         }
         
         function updateStatus(message, type = 'info') {
