@@ -457,24 +457,38 @@
                 }
 
                 // Step 3: NOW ready for wristband
-                encodeButton.innerHTML = '<i class="fas fa-wifi mr-2 animate-pulse"></i>PLACE WRISTBAND NOW!';
-                encodingTitle.textContent = '📱 NOW! Tap & HOLD';
-                encodingMessage.innerHTML = '<strong style="color: green; font-size: 1.2em;">Place wristband on back of phone NOW and HOLD for 3 seconds!</strong>';
+                encodeButton.innerHTML = '<i class="fas fa-wifi mr-2 animate-pulse"></i>Writer ready - waiting...';
+                encodingTitle.textContent = '⚡ Writer Active';
+                encodingMessage.innerHTML = '<strong style="color: orange; font-size: 1.2em;">DO NOT place wristband yet! Activating writer first...</strong>';
                 
-                console.log('📡 NFC writer ready, waiting for tag...');
+                console.log('📡 Pre-loading NFC writer...');
 
                 // Create NDEF writer
                 const ndef = new NDEFReader();
                 
-                // Write NFC ID to tag (will wait for tag)
-                await ndef.write({
+                // Start the write operation NOW (it will wait for a tag)
+                const writePromise = ndef.write({
                     records: [
                         {
                             recordType: "text",
                             data: currentPass.nfc_id
                         }
-                    ]
+                    ],
+                    overwrite: true
                 });
+                
+                // Give it 500ms to enter write mode
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // NOW tell user to place wristband
+                encodeButton.innerHTML = '<i class="fas fa-wifi mr-2 animate-pulse"></i>✅ PLACE WRISTBAND NOW!';
+                encodingTitle.textContent = '📱 NOW! Tap & HOLD';
+                encodingMessage.innerHTML = '<strong style="color: green; font-size: 1.4em;">🎯 Place wristband NOW and HOLD for 3 seconds!</strong><br><span style="color: #666;">Writer is active and waiting for tag...</span>';
+                
+                console.log('✅ Write mode active, waiting for tag presentation...');
+                
+                // Wait for the write to complete
+                await writePromise;
 
                 console.log('✅ NFC write successful!');
 

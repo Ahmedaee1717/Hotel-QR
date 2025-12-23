@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual NFC Encoder - Get NFC IDs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 p-4">
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold mb-4 text-purple-600">
+                <i class="fas fa-id-card mr-2"></i>Manual NFC Encoder
+            </h1>
+            <p class="text-gray-600 mb-4">
+                Get the NFC ID to manually write using "NFC Tools" app on your phone.
+            </p>
+            
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
+                <p class="text-sm text-yellow-800">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    <strong>Web NFC is not working?</strong> Use this manual method instead.
+                </p>
+            </div>
+        </div>
+
+        <!-- Load Pass -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fas fa-search mr-2 text-blue-600"></i>Step 1: Load Guest Pass
+            </h2>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2">Pass Reference:</label>
+                <div class="flex gap-2">
+                    <input type="text" id="passReference" placeholder="PASS-1234567890-ABC12" 
+                           class="flex-1 px-4 py-2 border-2 border-gray-300 rounded-lg font-mono">
+                    <button onclick="loadPass()" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+                        <i class="fas fa-download mr-2"></i>Load
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pass Details -->
+        <div id="passDetails" class="bg-white rounded-xl shadow-lg p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fas fa-user mr-2 text-green-600"></i>Guest Details
+            </h2>
+            <div id="passDetailsContent"></div>
+        </div>
+
+        <!-- NFC ID Display -->
+        <div id="nfcIdCard" class="bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-2xl p-8 mb-6 hidden">
+            <h2 class="text-2xl font-bold mb-4 text-white">
+                <i class="fas fa-wifi mr-2"></i>NFC ID to Write
+            </h2>
+            <div class="bg-white rounded-lg p-6 mb-4">
+                <p class="text-sm text-gray-600 mb-2 font-semibold">Copy this exact text:</p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="nfcIdText" readonly 
+                           class="flex-1 px-4 py-3 bg-gray-100 border-2 border-purple-300 rounded-lg font-mono text-2xl font-bold text-center select-all"
+                           onclick="this.select()">
+                    <button onclick="copyNfcId()" class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Instructions -->
+            <div class="bg-white/10 backdrop-blur rounded-lg p-4 text-white">
+                <h3 class="font-bold mb-2 flex items-center gap-2">
+                    <i class="fas fa-mobile-alt"></i>Next Steps:
+                </h3>
+                <ol class="list-decimal list-inside space-y-2 text-sm">
+                    <li>Download <strong>"NFC Tools"</strong> app from Play Store</li>
+                    <li>Open app → Go to <strong>"Write"</strong> tab</li>
+                    <li>Tap <strong>"Add a record"</strong></li>
+                    <li>Select <strong>"Text"</strong></li>
+                    <li>Paste the NFC ID above</li>
+                    <li>Tap <strong>"Write"</strong></li>
+                    <li>Hold wristband to phone - Done! ✅</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Manual Entry (if no pass reference) -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fas fa-question-circle mr-2 text-orange-600"></i>No Pass Reference?
+            </h2>
+            <p class="text-gray-600 mb-4">
+                You need to create the pass first in the admin dashboard:
+            </p>
+            <a href="/admin/dashboard" class="inline-block px-6 py-3 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700">
+                <i class="fas fa-arrow-right mr-2"></i>Go to Admin Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let currentPass = null;
+        const propertyId = localStorage.getItem('property_id') || '1';
+        const userId = localStorage.getItem('user_id');
+
+        async function loadPass() {
+            const passRef = document.getElementById('passReference').value.trim().toUpperCase();
+            
+            if (!passRef) {
+                alert('Please enter a pass reference');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/staff/all-inclusive/pass-by-reference/${passRef}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId,
+                        'X-User-ID': userId || '0'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    alert('❌ Pass not found: ' + (data.error || 'Invalid pass reference'));
+                    return;
+                }
+
+                currentPass = data.pass;
+                displayPassDetails();
+                displayNfcId();
+                
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Error loading pass: ' + error.message);
+            }
+        }
+
+        function displayPassDetails() {
+            const content = document.getElementById('passDetailsContent');
+            content.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-gray-600 font-semibold">Guest Name</p>
+                        <p class="text-lg font-bold">${currentPass.primary_guest_name}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600 font-semibold">Room Number</p>
+                        <p class="text-lg font-bold">${currentPass.room_number || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600 font-semibold">Tier</p>
+                        <p class="text-lg font-bold">${currentPass.tier_display_name || 'Standard'}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600 font-semibold">Valid Until</p>
+                        <p class="text-lg font-bold">${new Date(currentPass.valid_until).toLocaleDateString()}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('passDetails').classList.remove('hidden');
+        }
+
+        function displayNfcId() {
+            if (!currentPass.nfc_id) {
+                alert('⚠️ This pass does not have an NFC ID generated. Please contact admin.');
+                return;
+            }
+
+            document.getElementById('nfcIdText').value = currentPass.nfc_id;
+            document.getElementById('nfcIdCard').classList.remove('hidden');
+            
+            // Scroll to NFC card
+            document.getElementById('nfcIdCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function copyNfcId() {
+            const input = document.getElementById('nfcIdText');
+            input.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            btn.classList.add('bg-green-600');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('bg-green-600');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
