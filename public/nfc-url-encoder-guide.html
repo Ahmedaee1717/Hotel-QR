@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Encode NFC Wristbands - OnePass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-indigo-900 to-blue-900 min-h-screen p-4">
+    <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-id-card-alt text-blue-600 mr-3"></i>
+                NFC Wristband Encoding Guide
+            </h1>
+            <p class="text-gray-600">Encode wristbands to automatically open the verification scanner when tapped</p>
+        </div>
+
+        <!-- Step 1: Get Guest Info -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <div class="flex items-start gap-4">
+                <div class="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0">1</div>
+                <div class="flex-1">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Get Guest NFC ID</h2>
+                    
+                    <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Pass Reference:</label>
+                        <input type="text" id="passReference" placeholder="PASS-1766180312424-DY6KK" 
+                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 mb-3">
+                        <button onclick="loadPassInfo()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 w-full font-semibold">
+                            <i class="fas fa-search mr-2"></i>Load Guest Details
+                        </button>
+                    </div>
+
+                    <div id="guestInfo" class="hidden bg-green-50 border-2 border-green-300 rounded-lg p-6">
+                        <h3 class="font-bold text-green-800 text-lg mb-4">✅ Guest Found</h3>
+                        <div class="space-y-2 mb-4">
+                            <p class="text-gray-700"><strong>Name:</strong> <span id="guestName" class="font-semibold"></span></p>
+                            <p class="text-gray-700"><strong>Room:</strong> <span id="roomNumber" class="font-semibold"></span></p>
+                            <p class="text-gray-700"><strong>NFC ID:</strong> <code id="nfcId" class="bg-white px-2 py-1 rounded border"></code></p>
+                        </div>
+                        <div class="bg-white border-2 border-blue-300 rounded-lg p-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">URL to encode in NFC Tools:</p>
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="nfcUrl" readonly class="flex-1 text-sm font-mono bg-gray-50 px-3 py-2 rounded border">
+                                <button onclick="copyUrl()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex-shrink-0">
+                                    <i class="fas fa-copy"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Install NFC Tools -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <div class="flex items-start gap-4">
+                <div class="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0">2</div>
+                <div class="flex-1">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Install NFC Tools App</h2>
+                    <p class="text-gray-600 mb-4">Download <strong>NFC Tools</strong> by wakdev (FREE app)</p>
+                    <a href="https://play.google.com/store/apps/details?id=com.wakdev.wdnfc" 
+                       target="_blank"
+                       class="inline-block bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-semibold">
+                        <i class="fab fa-google-play mr-2"></i>Download from Play Store
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Encode NFC Tag -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <div class="flex items-start gap-4">
+                <div class="bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0">3</div>
+                <div class="flex-1">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Write to Wristband</h2>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+                            <p class="font-bold text-yellow-800 mb-2">⚠️ CRITICAL: Use URL, NOT Text!</p>
+                            <p class="text-sm text-gray-700">If you use "Text" record, the phone will just show text. Use "URL" record so it opens the scanner automatically!</p>
+                        </div>
+
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <p class="font-semibold text-gray-800">3.1 Open NFC Tools</p>
+                            <p class="text-gray-600">Tap the <strong>WRITE</strong> tab</p>
+                        </div>
+
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <p class="font-semibold text-gray-800">3.2 Add a URL Record</p>
+                            <p class="text-gray-600">Tap <strong>"Add a record"</strong> → Select <strong>"URL / URI"</strong></p>
+                            <p class="text-sm text-red-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i><strong>NOT "Text"! Use "URL / URI"!</strong></p>
+                        </div>
+
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <p class="font-semibold text-gray-800">3.3 Paste the URL</p>
+                            <p class="text-gray-600">Paste the URL you copied from Step 1</p>
+                            <p class="text-sm text-gray-500 mt-1 font-mono break-all">Example: https://...pages.dev/staff-nfc-scanner.html?nfc=NFCMJDE...</p>
+                        </div>
+
+                        <div class="border-l-4 border-blue-600 pl-4">
+                            <p class="font-semibold text-gray-800">3.4 Write to Wristband</p>
+                            <p class="text-gray-600">Tap <strong>"Write"</strong>, then hold wristband to phone for 2-3 seconds</p>
+                        </div>
+
+                        <div class="border-l-4 border-green-600 pl-4">
+                            <p class="font-semibold text-green-800"><i class="fas fa-check-circle mr-2"></i>Done!</p>
+                            <p class="text-gray-600">When staff tap the wristband, it will automatically open the scanner page and verify the guest</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = window.location.origin;
+
+        async function loadPassInfo() {
+            const passRef = document.getElementById('passReference').value.trim();
+            if (!passRef) {
+                alert('Please enter a pass reference');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/nfc-id/${passRef}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('guestName').textContent = data.guest_name;
+                    document.getElementById('roomNumber').textContent = data.room_number;
+                    document.getElementById('nfcId').textContent = data.nfc_id;
+                    
+                    // Generate scanner URL with NFC ID as query parameter
+                    const scannerUrl = `${BASE_URL}/staff-nfc-scanner.html?nfc=${data.nfc_id}`;
+                    document.getElementById('nfcUrl').value = scannerUrl;
+                    
+                    document.getElementById('guestInfo').classList.remove('hidden');
+                    
+                    console.log('✅ Loaded:', data);
+                } else {
+                    alert('Pass not found: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to load pass');
+            }
+        }
+
+        function copyUrl() {
+            const urlInput = document.getElementById('nfcUrl');
+            urlInput.select();
+            navigator.clipboard.writeText(urlInput.value).then(() => {
+                alert('✅ URL copied!\n\nNow:\n1. Open NFC Tools app\n2. Go to WRITE tab\n3. Add "URL / URI" record (NOT text!)\n4. Paste this URL\n5. Write to wristband');
+            }).catch(() => {
+                alert('Failed to copy. Please select and copy manually.');
+            });
+        }
+    </script>
+</body>
+</html>

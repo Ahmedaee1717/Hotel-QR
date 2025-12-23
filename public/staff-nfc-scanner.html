@@ -136,6 +136,21 @@
             window.history.back();
         }
 
+        // Check if NFC ID is in URL query parameter (from NFC tag tap)
+        function checkUrlNfcId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const nfcId = urlParams.get('nfc');
+            
+            if (nfcId) {
+                console.log('🔷 NFC ID from URL:', nfcId);
+                document.getElementById('statusTitle').textContent = 'Verifying...';
+                document.getElementById('statusMessage').textContent = 'Please wait';
+                verifyNFC(nfcId);
+                return true;
+            }
+            return false;
+        }
+
         // Check NFC Support
         async function checkNFCSupport() {
             if ('NDEFReader' in window) {
@@ -399,7 +414,11 @@
 
         // Initialize on page load
         window.onload = async () => {
-            await checkNFCSupport();
+            // Check if NFC ID is in URL (from tapping NFC tag)
+            if (!checkUrlNfcId()) {
+                // No URL parameter, show normal scan interface
+                await checkNFCSupport();
+            }
         };
     </script>
 </body>
