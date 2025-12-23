@@ -21182,28 +21182,44 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 <section id="beach-booking-section" class="mb-12 hidden">
                     <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 shadow-xl">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div class="flex-1">
-                                <div class="flex items-center justify-between mb-3 gap-4">
+                            <div class="flex-1 w-full">
+                                <!-- Title and traffic light container - desktop: inline, mobile: stacked -->
+                                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-3 gap-3">
                                     <h2 class="text-3xl font-bold flex items-center flex-shrink-0">
                                         <i class="fas fa-umbrella-beach mr-3"></i>
                                         Beach Booking
                                     </h2>
-                                    <!-- Live Occupancy Traffic Light -->
-                                    <div id="beach-traffic-light" class="flex flex-col items-end gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 ml-auto">
+                                    <!-- Live Occupancy Traffic Light - hidden on mobile, shown on desktop inline -->
+                                    <div id="beach-traffic-light-desktop" class="hidden md:flex flex-col items-end gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 w-fit">
                                         <div class="flex items-center gap-2">
-                                            <div id="traffic-light-indicator" class="w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
-                                            <span id="traffic-light-text" class="text-sm font-semibold">Loading...</span>
+                                            <div class="traffic-light-indicator w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
+                                            <span class="traffic-light-text text-sm font-semibold">Loading...</span>
                                         </div>
                                         <div class="flex items-center gap-2 text-xs opacity-90">
                                             <i class="fas fa-clock"></i>
-                                            <span id="traffic-live-time">--:--</span>
+                                            <span class="traffic-live-time">--:--</span>
                                             <span>•</span>
-                                            <span id="traffic-occupancy-rate"></span>
+                                            <span class="traffic-occupancy-rate"></span>
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Mobile traffic light - shown only on mobile, positioned after title -->
+                                <div id="beach-traffic-light-mobile" class="flex md:hidden flex-col items-start gap-1 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 w-fit mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="traffic-light-indicator w-3 h-3 rounded-full animate-pulse" style="background-color: #10b981;"></div>
+                                        <span class="traffic-light-text text-sm font-semibold">Loading...</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs opacity-90">
+                                        <i class="fas fa-clock"></i>
+                                        <span class="traffic-live-time">--:--</span>
+                                        <span>•</span>
+                                        <span class="traffic-occupancy-rate"></span>
+                                    </div>
+                                </div>
+                                
                                 <p class="mb-4">
-                                    Reserve your perfect spot by the sea! Select from umbrellas, cabanas, and premium locations.
+                                    Reserve your perfect spot by the sea! Select from umberllas, cabanas, and premium locations.
                                 </p>
                                 <div class="flex flex-wrap gap-3 text-sm">
                                     <div class="flex items-center gap-2">
@@ -24551,35 +24567,39 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 if (data.success && data.occupancy) {
                     const { status, statusText, occupancyRate, available } = data.occupancy;
                     
-                    const indicator = document.getElementById('traffic-light-indicator');
-                    const text = document.getElementById('traffic-light-text');
-                    const rateEl = document.getElementById('traffic-occupancy-rate');
-                    const timeEl = document.getElementById('traffic-live-time');
+                    // Update both desktop and mobile traffic lights using class selectors
+                    const indicators = document.querySelectorAll('.traffic-light-indicator');
+                    const textElements = document.querySelectorAll('.traffic-light-text');
+                    const rateElements = document.querySelectorAll('.traffic-occupancy-rate');
+                    const timeElements = document.querySelectorAll('.traffic-live-time');
                     
                     // Set traffic light color (indicator dot)
                     let color = '#10b981'; // green
                     if (status === 'yellow') color = '#eab308';
                     if (status === 'red') color = '#ef4444';
                     
-                    if (indicator) {
+                    // Update all indicators (both mobile and desktop)
+                    indicators.forEach(indicator => {
                         indicator.style.backgroundColor = color;
-                    }
+                    });
                     
-                    if (text) {
+                    // Update all text elements
+                    textElements.forEach(text => {
                         text.textContent = statusText;
-                    }
+                    });
                     
-                    if (rateEl) {
+                    // Update all occupancy rate displays
+                    rateElements.forEach(rateEl => {
                         rateEl.textContent = available + ' spots • ' + occupancyRate + '%';
-                    }
+                    });
                     
                     // Update live time from user's device
-                    if (timeEl) {
-                        const now = new Date();
-                        const hours = now.getHours().toString().padStart(2, '0');
-                        const minutes = now.getMinutes().toString().padStart(2, '0');
+                    const now = new Date();
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    timeElements.forEach(timeEl => {
                         timeEl.textContent = hours + ':' + minutes;
-                    }
+                    });
                     
                     // Refresh every 60 seconds
                     setTimeout(loadBeachOccupancy, 60000);
