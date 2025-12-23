@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Wristband Encoder - OnePass</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-blue-900 to-indigo-900 min-h-screen p-4">
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-id-card text-blue-600 mr-3"></i>
+                NFC Wristband Encoder
+            </h1>
+            <p class="text-gray-600">Encode guest wristbands with OnePass digital pass data</p>
+        </div>
+
+        <!-- Load Pass Section -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">1. Load Guest Pass</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Pass Reference:</label>
+                <input type="text" id="passReference" placeholder="PASS-1766180312424-DY6KK" 
+                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            </div>
+
+            <button onclick="loadPass()" id="loadBtn" 
+                    class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                <i class="fas fa-download mr-2"></i>Load Pass Details
+            </button>
+
+            <div id="passDetails" class="hidden mt-6 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                <h3 class="font-bold text-green-800 mb-2">Pass Loaded Successfully:</h3>
+                <p class="text-gray-700"><strong>Guest:</strong> <span id="guestName"></span></p>
+                <p class="text-gray-700"><strong>Room:</strong> <span id="roomNumber"></span></p>
+                <p class="text-gray-700"><strong>NFC ID:</strong> <code id="nfcId" class="bg-green-100 px-2 py-1 rounded"></code></p>
+            </div>
+        </div>
+
+        <!-- Encode Section -->
+        <div id="encodeSection" class="hidden bg-white rounded-2xl shadow-2xl p-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">2. Encode Wristband</h2>
+            
+            <div id="encodeStatus" class="mb-6 p-6 bg-blue-50 border-2 border-blue-300 rounded-lg text-center">
+                <div class="text-6xl mb-4">
+                    <i id="encodeIcon" class="fas fa-wave-square text-blue-600"></i>
+                </div>
+                <h3 id="encodeTitle" class="text-xl font-bold text-gray-800 mb-2">Ready to Encode</h3>
+                <p id="encodeMessage" class="text-gray-600">Click the button below to start</p>
+            </div>
+
+            <button onclick="startEncoding()" id="encodeBtn" 
+                    class="w-full bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 font-bold text-lg">
+                <i class="fas fa-broadcast-tower mr-2"></i>START ENCODING
+            </button>
+
+            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg">
+                <p class="text-sm text-gray-700">
+                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                    <strong>After clicking "START ENCODING":</strong><br>
+                    Wait for "PLACE WRISTBAND NOW" message, then hold wristband to the back of your phone for 3 seconds.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPass = null;
+        let nfcWriter = null;
+
+        async function loadPass() {
+            const passRef = document.getElementById('passReference').value.trim();
+            if (!passRef) {
+                alert('Please enter a pass reference');
+                return;
+            }
+
+            const loadBtn = document.getElementById('loadBtn');
+            loadBtn.disabled = true;
+            loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading...';
+
+            try {
+                const response = await fetch(`/api/nfc-id/${passRef}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentPass = data;
+                    document.getElementById('guestName').textContent = data.guest_name;
+                    document.getElementById('roomNumber').textContent = data.room_number;
+                    document.getElementById('nfcId').textContent = data.nfc_id;
+                    document.getElementById('passDetails').classList.remove('hidden');
+                    document.getElementById('encodeSection').classList.remove('hidden');
+                    
+                    console.log('✅ Pass loaded:', data);
+                } else {
+                    alert('Pass not found: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('❌ Error loading pass:', error);
+                alert('Failed to load pass. Check console for details.');
+            } finally {
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Load Pass Details';
+            }
+        }
+
+        async function startEncoding() {
+            if (!currentPass || !currentPass.nfc_id) {
+                alert('Please load a pass first');
+                return;
+            }
+
+            if (!('NDEFReader' in window)) {
+                alert('NFC is not supported on this device/browser. Use Chrome on Android.');
+                return;
+            }
+
+            const encodeBtn = document.getElementById('encodeBtn');
+            encodeBtn.disabled = true;
+            
+            try {
+                // Update UI
+                document.getElementById('encodeIcon').className = 'fas fa-hourglass-half text-yellow-600';
+                document.getElementById('encodeTitle').textContent = 'Preparing NFC Writer...';
+                document.getElementById('encodeMessage').textContent = 'Please wait, do NOT place wristband yet';
+
+                // Small delay to let user read the message
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Initialize NDEFReader
+                nfcWriter = new NDEFReader();
+
+                // Update UI - ready to write
+                document.getElementById('encodeIcon').className = 'fas fa-broadcast-tower text-blue-600 animate-pulse';
+                document.getElementById('encodeTitle').textContent = 'PLACE WRISTBAND NOW!';
+                document.getElementById('encodeMessage').textContent = 'Hold wristband to back of phone for 3 seconds';
+
+                console.log('🔷 Writing NFC ID:', currentPass.nfc_id);
+
+                // Write to NFC tag
+                await nfcWriter.write({
+                    records: [
+                        { 
+                            recordType: "text", 
+                            data: currentPass.nfc_id 
+                        }
+                    ]
+                });
+
+                // Success!
+                document.getElementById('encodeIcon').className = 'fas fa-check-circle text-green-600';
+                document.getElementById('encodeTitle').textContent = '✅ Encoding Successful!';
+                document.getElementById('encodeMessage').textContent = `Wristband encoded for ${currentPass.guest_name}`;
+                
+                console.log('✅ NFC write successful!');
+
+                // Log to backend
+                await logEncoding(currentPass.pass_id || 0, currentPass.nfc_id, 'success', null);
+
+            } catch (error) {
+                console.error('❌ NFC write error:', error);
+                
+                document.getElementById('encodeIcon').className = 'fas fa-exclamation-triangle text-red-600';
+                document.getElementById('encodeTitle').textContent = 'Encoding Failed';
+                document.getElementById('encodeMessage').textContent = error.message || 'Unknown error';
+                
+                await logEncoding(currentPass.pass_id || 0, currentPass.nfc_id, 'failed', error.message);
+            } finally {
+                encodeBtn.disabled = false;
+            }
+        }
+
+        async function logEncoding(passId, nfcId, result, error) {
+            try {
+                await fetch('/api/staff/all-inclusive/log-encoding', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': '1',
+                        'X-User-ID': '0'
+                    },
+                    body: JSON.stringify({
+                        pass_id: passId,
+                        nfc_id: nfcId,
+                        staff_name: 'Web Encoder',
+                        device_info: navigator.userAgent,
+                        encoding_result: result,
+                        error_message: error
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to log encoding:', e);
+            }
+        }
+    </script>
+</body>
+</html>
