@@ -52137,8 +52137,12 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             return;
           }
           
+          // Use original_id (numeric) for dropdown values, NOT offering_id with H prefix
           selector.innerHTML = '<option value="">-- Select a Restaurant --</option>' + 
-            restaurants.map(r => '<option value="' + r.offering_id + '">' + (r.title_en || r.title) + '</option>').join('');
+            restaurants.map(r => {
+              const numericId = r.original_id || String(r.offering_id).replace(/^[HA]/, '');
+              return '<option value="' + numericId + '">' + (r.title_en || r.title) + '</option>';
+            }).join('');
           
           selector.addEventListener('change', async function() {
             selectedRestaurantId = this.value;
