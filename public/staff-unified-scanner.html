@@ -1249,11 +1249,12 @@
             try {
                 updateStatus('Verifying NFC...', 'loading');
                 
-                const response = await fetchWithAuth('/api/staff/verify-pass', {
+                const response = await fetchWithAuth('/api/staff/all-inclusive/verify-nfc', {
                     method: 'POST',
                     body: JSON.stringify({
                         nfc_id: nfcId,
-                        verification_method: 'nfc'
+                        staff_name: 'Staff',
+                        location: 'Unified Scanner'
                     })
                 });
                 
@@ -1265,16 +1266,14 @@
                     data: data
                 });
                 
-                // Handle both response formats (response.ok or data.success)
-                if (response.ok || data.success) {
+                if (response.ok && data.success) {
                     stats.verified++;
                     stats.nfc++;
                     updateStats();
                     
-                    // API might return pass_details or pass
-                    const passDetails = data.pass_details || data.pass;
-                    if (passDetails) {
-                        showSuccess(passDetails);
+                    // API returns pass_details
+                    if (data.pass_details) {
+                        showSuccess(data.pass_details);
                         loadCheckedInGuests(); // Refresh the list
                         updateStatus('NFC verified! Tap next wristband', 'success');
                         
@@ -1289,12 +1288,6 @@
                             resetScanner();
                         }, 3000);
                     }
-                } else if (response.status === 409 && data.already_checked_in) {
-                    // DUPLICATE CHECK-IN
-                    showDuplicateAlert(data);
-                    setTimeout(() => {
-                        resetScanner();
-                    }, 5000);
                 } else {
                     console.error('❌ Verification failed:', data);
                     showError(data.error || data.message || 'Verification failed');
