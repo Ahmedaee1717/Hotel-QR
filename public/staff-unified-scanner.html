@@ -404,7 +404,7 @@
             startPulsedScanning();
         }
         
-        // 🔥 NEW: Pulsed scanning - scan briefly, LONG pause for NFC
+        // 🔥 NEW: Interval-based scanning - camera captures ONLY when needed
         function startPulsedScanning() {
             if (cameraPulseInterval) {
                 clearInterval(cameraPulseInterval);
@@ -412,26 +412,53 @@
             
             let pulseCount = 0;
             
-            // AGGRESSIVE NFC PRIORITY: Short scan, LONG pause
-            // Pattern: 200ms scan, 1000ms pause = NFC gets 83% hardware time!
-            cameraPulseInterval = setInterval(() => {
+            // 🔥 NUCLEAR OPTION: Completely close camera between scans
+            // This gives NFC 100% hardware access during gaps
+            cameraPulseInterval = setInterval(async () => {
                 if (!isScanning) {
                     clearInterval(cameraPulseInterval);
                     return;
                 }
                 
-                // SCAN PULSE (quick burst)
-                scanOnce();
                 pulseCount++;
+                console.log(`━━━ Scan cycle #${pulseCount} ━━━`);
+                console.log('📷 Opening camera...');
                 
-                // Log every 3 pulses to show it's working
-                if (pulseCount % 3 === 0) {
-                    console.log(`📹 Camera pulse #${pulseCount} | Next NFC window: 1000ms`);
+                // 1. Open camera if closed
+                const video = document.getElementById('unified-video');
+                if (!cameraStream || !cameraStream.active) {
+                    try {
+                        cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { 
+                                facingMode: 'environment',
+                                width: { ideal: 640 }, // Lower resolution for faster startup
+                                height: { ideal: 480 }
+                            } 
+                        });
+                        video.srcObject = cameraStream;
+                        
+                        // Wait for ready
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    } catch (error) {
+                        console.error('❌ Camera error:', error);
+                        return;
+                    }
                 }
                 
-                // After scan, give NFC a FULL SECOND of hardware access
+                // 2. Scan
+                console.log('🔍 Scanning...');
+                await scanOnce();
                 
-            }, 1200); // Total 1200ms cycle = 1 scan per 1.2 seconds
+                // 3. CLOSE camera completely
+                console.log('🛑 Closing camera → NFC window opens');
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                    video.srcObject = null;
+                }
+                console.log('✅ NFC has 100% hardware for 3 seconds');
+                
+            }, 4000); // 4sec cycle: 1sec camera + 3sec NFC
         }
         
         async function scanOnce() {
