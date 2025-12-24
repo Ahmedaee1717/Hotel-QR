@@ -179,7 +179,22 @@
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-4 gap-2">
+                    <!-- 🔥 BIG NFC MODE SHORTCUT -->
+                    <div class="mt-4 p-4 bg-gradient-to-r from-teal-900 to-teal-700 rounded-xl border-2 border-teal-400 shadow-xl">
+                        <div class="text-center mb-3">
+                            <p class="text-white text-sm font-bold">
+                                ⚡ FOR WRISTBANDS: Auto mode doesn't work reliably
+                            </p>
+                        </div>
+                        <button onclick="switchMode('nfc')" 
+                                class="w-full py-6 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-2xl font-extrabold shadow-lg transform hover:scale-105 transition-all">
+                            <i class="fas fa-wifi mr-3 text-3xl" style="transform: rotate(-45deg);"></i>
+                            TAP FOR NFC-ONLY MODE
+                            <div class="text-sm font-normal mt-1">Camera OFF • 100% NFC Detection</div>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-2 mt-4">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
                                 class="py-4 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-qrcode"></i> QR
@@ -1009,10 +1024,10 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - Touch screen = Camera pauses 3sec for NFC!',
-                'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera pulsing for QR codes',
-                'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera pulsing for face recognition',
-                'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for best NFC detection'
+                'auto': '<i class="fas fa-exclamation-triangle mr-2 text-yellow-400"></i> Auto Mode - QR/Face work. NFC unreliable (use NFC button above!)',
+                'qr': '<i class="fas fa-qrcode mr-2"></i> QR Mode - Camera ON for QR codes',
+                'face': '<i class="fas fa-user mr-2"></i> Face Mode - Camera ON for face recognition',
+                'nfc': '<i class="fas fa-check-circle mr-2 text-green-400"></i> NFC Mode - Camera OFF • 100% Detection • Best for wristbands!'
             };
             document.getElementById('mode-description').innerHTML = `
                 <p class="text-cyan-300 text-sm font-bold">${modeDescriptions[mode]}</p>
