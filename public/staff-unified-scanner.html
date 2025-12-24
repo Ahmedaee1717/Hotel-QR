@@ -1005,16 +1005,7 @@
                 
                 nfcReader = new NDEFReader();
                 
-                // Request permission and start scanning
-                await nfcReader.scan();
-                
-                console.log('✅ NFC scanning started successfully');
-                console.log('👂 Listening for NFC tags...');
-                nfcActive = true;
-                updateNFCStatus('✅ NFC ACTIVE - Tap wristband!', 'active');
-                updateStatus('✅ NFC Active - Tap wristband now', 'success');
-                
-                // Set up reading handler
+                // CRITICAL: Set up reading handler BEFORE calling scan()
                 nfcReader.addEventListener("reading", async (event) => {
                     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                     console.log('📲 NFC TAG DETECTED!');
@@ -1103,6 +1094,15 @@
                     updateNFCStatus('NFC read error', 'error');
                     updateStatus('NFC scan error: ' + error, 'error');
                 });
+                
+                // NOW start scanning AFTER listeners are attached
+                await nfcReader.scan();
+                
+                console.log('✅ NFC scanning started successfully');
+                console.log('👂 Listening for NFC tags...');
+                nfcActive = true;
+                updateNFCStatus('✅ NFC ACTIVE - Tap wristband!', 'active');
+                updateStatus('✅ NFC Active - Tap wristband now', 'success');
                 
             } catch (error) {
                 console.error('❌ FAILED TO START NFC SCAN:', error);
