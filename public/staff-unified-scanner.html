@@ -917,7 +917,7 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - Scans QR, Face, and NFC together',
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC together (camera auto-pauses for NFC)',
                 'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera active for QR codes',
                 'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera active for face recognition',
                 'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for better NFC detection'
@@ -1084,6 +1084,12 @@
                     console.log('Message:', event.message);
                     console.log('Message records:', event.message.records.length);
                     
+                    // 🔥 SMART AUTO-PAUSE: Temporarily pause camera when NFC detected
+                    console.log('⏸️ Auto-pausing camera for NFC processing...');
+                    const wasCameraActive = isScanning;
+                    isScanning = false; // Pause scanning loop
+                    
+                    updateStatus('📲 NFC detected - Camera paused for processing', 'loading');
                     updateNFCStatus('📲 Tag detected! Verifying...', 'loading');
                     
                     const message = event.message;
@@ -1153,9 +1159,15 @@
                     // Verify the NFC ID
                     await verifyByNFC(nfcId);
                     
-                    // Reset status after verification
+                    // 🔥 SMART AUTO-RESUME: Resume camera scanning after NFC verification
                     setTimeout(() => {
-                        updateNFCStatus('✅ NFC ACTIVE - Tap next wristband!', 'active');
+                        if (wasCameraActive && (scannerMode === 'auto' || scannerMode === 'qr' || scannerMode === 'face')) {
+                            console.log('▶️ Auto-resuming camera scanning...');
+                            isScanning = true;
+                            requestAnimationFrame(scanLoop);
+                            updateStatus('▶️ Camera resumed - Ready for QR/Face/NFC', 'success');
+                        }
+                        updateNFCStatus('✅ NFC ACTIVE - Ready for next tap!', 'active');
                     }, 2000);
                 });
                 
