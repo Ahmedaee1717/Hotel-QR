@@ -8,12 +8,28 @@
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);
+            background: #0a1929;
             min-height: 100vh;
+            font-size: 18px;
         }
         
         .nfc-scanner-card {
             animation: fadeIn 0.3s ease-in;
+            background: #132f4c !important;
+            border: 2px solid #016e8f;
+        }
+        
+        .dark-card {
+            background: #1e3a52 !important;
+            color: white !important;
+        }
+        
+        .dark-text {
+            color: #ffffff !important;
+        }
+        
+        .dark-subtext {
+            color: #b0bec5 !important;
         }
         
         @keyframes fadeIn {
@@ -38,88 +54,104 @@
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
+        
+        .stat-text {
+            font-size: 2.5rem;
+            font-weight: 900;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+        
+        .status-box {
+            background: #014a5e;
+            border: 3px solid #00d4ff;
+            padding: 1.5rem;
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
     </style>
 </head>
 <body class="p-4">
     <div class="max-w-2xl mx-auto">
         <!-- Header -->
-        <div class="bg-white rounded-xl shadow-2xl p-6 mb-4 nfc-scanner-card">
+        <div class="nfc-scanner-card dark-card rounded-xl shadow-2xl p-6 mb-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-4">
-                    <img src="/onepass-logo.png" alt="OnePass" class="h-12">
+                    <div class="w-12 h-12 bg-gradient-to-br from-teal-500 to-teal-700 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-wifi text-white text-2xl" style="transform: rotate(-45deg);"></i>
+                    </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-800">NFC Pass Scanner</h1>
-                        <p class="text-sm text-gray-600">Tap NFC card to verify access</p>
+                        <h1 class="text-3xl font-extrabold dark-text">NFC Pass Scanner</h1>
+                        <p class="text-lg dark-subtext">Tap NFC wristband to verify</p>
                     </div>
                 </div>
-                <button onclick="goBack()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                <button onclick="goBack()" class="px-6 py-3 text-lg font-bold bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
             </div>
         </div>
 
         <!-- NFC Status Card -->
-        <div class="bg-white rounded-xl shadow-2xl p-8 mb-4 nfc-scanner-card" id="nfcStatusCard">
+        <div class="nfc-scanner-card dark-card rounded-xl shadow-2xl p-8 mb-4" id="nfcStatusCard">
             <div class="text-center">
-                <div class="w-32 h-32 mx-auto mb-6 relative">
+                <div class="w-40 h-40 mx-auto mb-6 relative">
                     <div id="nfcIcon" class="nfc-pulse">
-                        <i class="fas fa-wifi text-8xl" style="color: #016e8f; transform: rotate(-45deg);"></i>
+                        <i class="fas fa-wifi stat-text" style="color: #00d4ff; transform: rotate(-45deg);"></i>
                     </div>
                 </div>
-                <h2 class="text-2xl font-bold mb-2" id="statusTitle">Ready to Scan</h2>
-                <p class="text-gray-600 mb-6" id="statusMessage">Tap or bring NFC card near your device</p>
+                <h2 class="text-4xl font-extrabold mb-4 dark-text" id="statusTitle">Ready to Scan</h2>
+                <p class="text-2xl dark-subtext mb-8" id="statusMessage">Tap or bring NFC wristband near device</p>
                 
                 <button 
                     id="scanButton" 
                     onclick="startNFCScan()"
-                    class="w-full py-4 text-xl font-bold rounded-xl shadow-lg transition-all transform hover:scale-105"
-                    style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%); color: white;">
-                    <i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>
-                    Start NFC Scan
+                    class="w-full py-6 text-2xl font-extrabold rounded-xl shadow-lg transition-all transform hover:scale-105"
+                    style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%); color: white; border: 3px solid #00d4ff;">
+                    <i class="fas fa-wifi mr-3 text-3xl" style="transform: rotate(-45deg);"></i>
+                    START NFC SCAN
                 </button>
                 
-                <div class="mt-6 flex items-center justify-center gap-4 text-sm" id="nfcSupport">
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-circle text-gray-400 text-xs"></i>
-                        <span class="text-gray-600">Checking NFC support...</span>
+                <div class="mt-8 flex items-center justify-center gap-4 text-lg status-box rounded-xl" id="nfcSupport">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-circle text-gray-400"></i>
+                        <span class="dark-subtext font-bold">Checking NFC support...</span>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Verification Result Card (Hidden by default) -->
-        <div id="resultCard" class="bg-white rounded-xl shadow-2xl p-6 mb-4 hidden nfc-scanner-card">
+        <div id="resultCard" class="nfc-scanner-card dark-card rounded-xl shadow-2xl p-6 mb-4 hidden">
             <div id="resultContent"></div>
         </div>
 
         <!-- Instructions -->
-        <div class="bg-white/10 backdrop-blur-sm rounded-xl p-6 text-white nfc-scanner-card">
-            <h3 class="text-lg font-bold mb-3 flex items-center gap-2">
-                <i class="fas fa-info-circle"></i>
+        <div class="nfc-scanner-card dark-card rounded-xl p-8">
+            <h3 class="text-2xl font-extrabold mb-6 flex items-center gap-3 dark-text">
+                <i class="fas fa-info-circle text-teal-400"></i>
                 How to Use NFC Scanner
             </h3>
-            <ul class="space-y-2 text-sm">
-                <li class="flex items-start gap-2">
-                    <i class="fas fa-check text-green-400 mt-1"></i>
-                    <span>Ensure your device has NFC enabled in settings</span>
+            <ul class="space-y-4 text-lg">
+                <li class="flex items-start gap-3">
+                    <i class="fas fa-check text-green-400 mt-1 text-xl"></i>
+                    <span class="dark-subtext font-semibold">Ensure your device has NFC enabled in settings</span>
                 </li>
-                <li class="flex items-start gap-2">
-                    <i class="fas fa-check text-green-400 mt-1"></i>
-                    <span>Click "Start NFC Scan" button above</span>
+                <li class="flex items-start gap-3">
+                    <i class="fas fa-check text-green-400 mt-1 text-xl"></i>
+                    <span class="dark-subtext font-semibold">Click "START NFC SCAN" button above</span>
                 </li>
-                <li class="flex items-start gap-2">
-                    <i class="fas fa-check text-green-400 mt-1"></i>
-                    <span>Hold guest's NFC card close to your device (usually back of phone)</span>
+                <li class="flex items-start gap-3">
+                    <i class="fas fa-check text-green-400 mt-1 text-xl"></i>
+                    <span class="dark-subtext font-semibold">Hold guest's NFC wristband close to device back</span>
                 </li>
-                <li class="flex items-start gap-2">
-                    <i class="fas fa-check text-green-400 mt-1"></i>
-                    <span>Wait for verification confirmation</span>
+                <li class="flex items-start gap-3">
+                    <i class="fas fa-check text-green-400 mt-1 text-xl"></i>
+                    <span class="dark-subtext font-semibold">Wait for verification confirmation</span>
                 </li>
             </ul>
             
-            <div class="mt-4 p-3 bg-white/20 rounded-lg">
-                <p class="text-xs flex items-start gap-2">
-                    <i class="fas fa-exclamation-triangle text-yellow-300"></i>
+            <div class="mt-6 p-5 bg-yellow-900/30 border-2 border-yellow-600 rounded-lg">
+                <p class="text-base flex items-start gap-3 dark-text font-semibold">
+                    <i class="fas fa-exclamation-triangle text-yellow-300 text-xl mt-1"></i>
                     <span><strong>Note:</strong> Web NFC API is supported on Android devices with Chrome/Edge browsers. iOS devices require native NFC app.</span>
                 </p>
             </div>
@@ -155,17 +187,17 @@
         async function checkNFCSupport() {
             if ('NDEFReader' in window) {
                 document.getElementById('nfcSupport').innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-circle text-green-500 text-xs"></i>
-                        <span class="text-green-600 font-semibold">NFC Supported</span>
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-circle text-green-500 text-xl"></i>
+                        <span class="text-green-400 font-extrabold text-xl">✅ NFC SUPPORTED - READY TO SCAN</span>
                     </div>
                 `;
                 return true;
             } else {
                 document.getElementById('nfcSupport').innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-circle text-red-500 text-xs"></i>
-                        <span class="text-red-600">NFC Not Supported</span>
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-circle text-red-500 text-xl"></i>
+                        <span class="text-red-400 font-extrabold text-xl">❌ NFC NOT SUPPORTED</span>
                     </div>
                 `;
                 document.getElementById('scanButton').disabled = true;
@@ -182,10 +214,10 @@
                 if ('NDEFReader' in window) {
                     const scanButton = document.getElementById('scanButton');
                     scanButton.disabled = true;
-                    scanButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Scanning...';
+                    scanButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-3 text-3xl"></i>SCANNING...';
                     
-                    document.getElementById('statusTitle').textContent = 'Scanning...';
-                    document.getElementById('statusMessage').textContent = 'Hold NFC card near your device';
+                    document.getElementById('statusTitle').textContent = 'SCANNING...';
+                    document.getElementById('statusMessage').textContent = 'Hold NFC wristband near your device';
                     document.getElementById('nfcIcon').classList.add('nfc-pulse');
 
                     nfcReader = new NDEFReader();
@@ -248,7 +280,7 @@
                 document.getElementById('statusTitle').textContent = 'Verifying...';
                 document.getElementById('statusMessage').textContent = 'Checking pass validity';
                 
-                const response = await fetch('/api/staff/all-inclusive/verify-nfc', {
+                const response = await fetch('/api/staff/verify-pass', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -402,12 +434,12 @@
             }
             
             document.getElementById('statusTitle').textContent = 'Ready to Scan';
-            document.getElementById('statusMessage').textContent = 'Tap or bring NFC card near your device';
+            document.getElementById('statusMessage').textContent = 'Tap or bring NFC wristband near device';
             document.getElementById('nfcIcon').classList.remove('nfc-pulse');
             
             const scanButton = document.getElementById('scanButton');
             scanButton.disabled = false;
-            scanButton.innerHTML = '<i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>Start NFC Scan';
+            scanButton.innerHTML = '<i class="fas fa-wifi mr-3 text-3xl" style="transform: rotate(-45deg);"></i>START NFC SCAN';
             
             document.getElementById('resultCard').classList.add('hidden');
         }
