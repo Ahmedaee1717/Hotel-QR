@@ -179,23 +179,27 @@
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-4 gap-2">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
-                                class="py-4 bg-blue-600 text-white rounded-xl text-base font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg">
+                                class="py-4 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-qrcode"></i> QR
                         </button>
                         <button onclick="switchMode('face')" id="face-mode-btn"
-                                class="py-4 bg-purple-600 text-white rounded-xl text-base font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg">
+                                class="py-4 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-user"></i> Face
                         </button>
+                        <button onclick="switchMode('nfc')" id="nfc-mode-btn"
+                                class="py-4 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 flex items-center justify-center gap-2 shadow-lg">
+                            <i class="fas fa-wifi" style="transform: rotate(-45deg);"></i> NFC
+                        </button>
                         <button onclick="switchMode('auto')" id="auto-mode-btn"
-                                class="py-4 brand-gradient text-white rounded-xl text-base font-bold hover:opacity-90 ring-4 ring-cyan-400 ring-offset-2 ring-offset-gray-900 flex items-center justify-center gap-2 shadow-lg">
+                                class="py-4 brand-gradient text-white rounded-xl text-sm font-bold hover:opacity-90 ring-4 ring-cyan-400 ring-offset-2 ring-offset-gray-900 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-magic"></i> Auto
                         </button>
                     </div>
-                    <div class="text-center mt-3 p-3 bg-cyan-900 bg-opacity-30 rounded-lg border border-cyan-600">
+                    <div id="mode-description" class="text-center mt-3 p-3 bg-cyan-900 bg-opacity-30 rounded-lg border border-cyan-600">
                         <p class="text-cyan-300 text-sm font-bold">
-                            <i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Auto-Scanning Active
+                            <i class="fas fa-magic mr-2"></i> Auto Mode - Scans QR, Face, and NFC together
                         </p>
                     </div>
                 </div>
@@ -240,7 +244,8 @@
     <script>
         let video, canvas, ctx;
         let faceApiLoaded = false;
-        let scannerMode = 'auto'; // 'auto', 'qr', 'face'
+        let scannerMode = 'auto'; // 'auto', 'qr', 'face', 'nfc'
+        let cameraStream = null; // Track camera stream for stopping/starting
         let isScanning = false;
         let qrCodeReader;
         let lastVerifyTime = 0;
@@ -279,14 +284,14 @@
             
             // Start camera
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
                         width: { ideal: 1280 },
                         height: { ideal: 720 }
                     } 
                 });
-                video.srcObject = stream;
+                video.srcObject = cameraStream;
                 
                 video.addEventListener('loadedmetadata', () => {
                     canvas.width = video.videoWidth;
@@ -892,28 +897,94 @@
             updateStatus('Ready to scan - Point at QR or Face', 'info');
         }
         
-        function switchMode(mode) {
+        async function switchMode(mode) {
+            console.log(`🔄 Switching to ${mode} mode`);
             scannerMode = mode;
+            
+            // Update button styling
             document.querySelectorAll('[id$="-mode-btn"]').forEach(btn => {
-                btn.classList.remove('ring-4', 'ring-offset-2', 'ring-offset-gray-900', 'ring-cyan-400', 'ring-blue-400', 'ring-purple-400');
+                btn.classList.remove('ring-4', 'ring-offset-2', 'ring-offset-gray-900', 'ring-cyan-400', 'ring-blue-400', 'ring-purple-400', 'ring-teal-400');
             });
             
             const ringColors = {
                 'auto': 'ring-cyan-400',
                 'qr': 'ring-blue-400',
-                'face': 'ring-purple-400'
+                'face': 'ring-purple-400',
+                'nfc': 'ring-teal-400'
             };
             
             document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2', 'ring-offset-gray-900', ringColors[mode]);
             
-            const modeText = {
-                'auto': '🤖 Auto Mode - QR + Face (NFC Active)',
-                'qr': '📱 QR Only Mode (NFC Active)',
-                'face': '👤 Face Only Mode (NFC Active)'
+            // Update mode description
+            const modeDescriptions = {
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - Scans QR, Face, and NFC together',
+                'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera active for QR codes',
+                'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera active for face recognition',
+                'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for better NFC detection'
             };
-            document.getElementById('scanner-mode').textContent = modeText[mode];
+            document.getElementById('mode-description').innerHTML = `
+                <p class="text-cyan-300 text-sm font-bold">${modeDescriptions[mode]}</p>
+            `;
             
-            // NFC is always running in the background - no need to stop/start
+            // CRITICAL: Handle camera based on mode
+            if (mode === 'nfc') {
+                // NFC-ONLY MODE: Stop camera to free hardware resources
+                console.log('📷 Stopping camera for NFC-only mode');
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => {
+                        track.stop();
+                        console.log('🛑 Camera track stopped:', track.kind);
+                    });
+                    cameraStream = null;
+                }
+                const video = document.getElementById('unified-video');
+                if (video) {
+                    video.srcObject = null;
+                }
+                isScanning = false; // Stop QR/Face scanning loop
+                
+                // Show NFC-only UI
+                updateStatus('NFC-ONLY MODE: Camera stopped - Tap wristband now!', 'success');
+                
+                // Make sure NFC is active
+                if (!nfcReader || !nfcActive) {
+                    await activateNFCScanning();
+                }
+            } else {
+                // QR/FACE/AUTO MODE: Start camera if not running
+                if (!cameraStream) {
+                    console.log('📷 Starting camera for QR/Face mode');
+                    try {
+                        const video = document.getElementById('unified-video');
+                        cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { 
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            } 
+                        });
+                        video.srcObject = cameraStream;
+                        
+                        video.addEventListener('loadedmetadata', () => {
+                            const canvas = document.getElementById('face-overlay');
+                            canvas.width = video.videoWidth;
+                            canvas.height = video.videoHeight;
+                            isScanning = true;
+                            requestAnimationFrame(scanLoop);
+                        });
+                        
+                        updateStatus('Camera active - Ready to scan', 'success');
+                    } catch (error) {
+                        console.error('❌ Camera start error:', error);
+                        updateStatus('Camera access denied', 'error');
+                    }
+                } else {
+                    // Camera already running, just resume scanning
+                    isScanning = true;
+                    requestAnimationFrame(scanLoop);
+                    updateStatus('Ready to scan - Point at QR or Face', 'info');
+                }
+            }
         }
         
         function updateStatus(message, type = 'info') {
