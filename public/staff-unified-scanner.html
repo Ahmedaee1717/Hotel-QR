@@ -344,7 +344,7 @@
         }
         
         // 🔥 NEW: Pause camera on ANY touch (user preparing to tap NFC)
-        function handleTouchForNFC(event) {
+        async function handleTouchForNFC(event) {
             // Only if in auto mode and camera is running
             if (scannerMode !== 'auto' || !isScanning) return;
             
@@ -365,7 +365,13 @@
                     cameraPulseInterval = null;
                 }
                 
-                updateStatus('👆 Camera paused - Ready for NFC tap!', 'info');
+                // 🔥 CRITICAL FIX: Make sure NFC is actually listening!
+                if (!nfcReader || !nfcActive) {
+                    console.log('🔵 Starting NFC scanner for Auto mode...');
+                    await startNFCScanning();
+                }
+                
+                updateStatus('👆 Camera paused - NFC ready! Tap now!', 'info');
             }
             
             // Resume after 3 seconds if no NFC detected
