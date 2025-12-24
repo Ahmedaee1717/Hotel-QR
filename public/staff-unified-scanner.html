@@ -159,6 +159,14 @@
                             <span id="status-text">Ready to scan...</span>
                         </p>
                     </div>
+                    
+                    <!-- NFC Status Indicator -->
+                    <div id="nfc-status-indicator" class="text-center p-3 mb-4 rounded-lg border-2 bg-gray-800 border-gray-600">
+                        <p class="text-gray-400 text-sm font-medium">
+                            <i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i>
+                            <span id="nfc-status-text">NFC Initializing...</span>
+                        </p>
+                    </div>
 
                     <div class="grid grid-cols-3 gap-3">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
@@ -915,52 +923,122 @@
             document.getElementById('nfc-count').textContent = stats.nfc || 0;
         }
         
+        function updateNFCStatus(message, type = 'info') {
+            const statusEl = document.getElementById('nfc-status-text');
+            const containerEl = document.getElementById('nfc-status-indicator');
+            
+            if (!statusEl || !containerEl) return;
+            
+            const styles = {
+                'active': 'bg-green-900 border-green-500 text-green-300',
+                'error': 'bg-red-900 border-red-500 text-red-300',
+                'loading': 'bg-yellow-900 border-yellow-500 text-yellow-300',
+                'info': 'bg-gray-800 border-gray-600 text-gray-400'
+            };
+            
+            const icons = {
+                'active': 'fa-wifi text-green-400',
+                'error': 'fa-exclamation-triangle text-red-400',
+                'loading': 'fa-spinner fa-spin text-yellow-400',
+                'info': 'fa-wifi text-gray-400'
+            };
+            
+            containerEl.className = `text-center p-3 mb-4 rounded-lg border-2 ${styles[type]}`;
+            statusEl.innerHTML = `<i class="fas ${icons[type]} mr-2" style="transform: rotate(-45deg);"></i>${message}`;
+        }
+        
         // ========== NFC SCANNING ==========
         let nfcReader = null;
         
         async function startNFCScanning() {
             if (!('NDEFReader' in window)) {
-                updateStatus('NFC not supported. Use Chrome with USB NFC reader.', 'error');
+                console.error('❌ NDEFReader not available');
+                updateNFCStatus('NFC not supported on this device', 'error');
+                updateStatus('NFC not supported. Use Android Chrome browser.', 'error');
                 return;
             }
 
             try {
+                console.log('🔵 Starting NFC scanner...');
+                updateNFCStatus('Starting NFC...', 'loading');
                 updateStatus('Starting NFC scanner...', 'loading');
                 
                 nfcReader = new NDEFReader();
+                
+                // Request permission and start scanning
                 await nfcReader.scan();
                 
-                console.log('✅ NFC scanning started');
-                updateStatus('Tap wristband to NFC reader', 'success');
+                console.log('✅ NFC scanning started successfully');
+                console.log('👂 Listening for NFC tags...');
+                updateNFCStatus('✅ NFC ACTIVE - Tap wristband!', 'active');
+                updateStatus('✅ NFC Active - Tap wristband now', 'success');
                 
+                // Set up reading handler
                 nfcReader.onreading = async event => {
-                    console.log('📲 NFC tag detected');
-                    const message = event.message;
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    console.log('📲 NFC TAG DETECTED!');
+                    console.log('Serial Number:', event.serialNumber);
+                    console.log('Message records:', event.message.records.length);
                     
+                    updateNFCStatus('📲 Tag detected! Verifying...', 'loading');
+                    
+                    const message = event.message;
                     let nfcId = null;
+                    
+                    // Try to read text record
                     for (const record of message.records) {
+                        console.log('Record type:', record.recordType);
+                        console.log('Record data:', record.data);
+                        
                         if (record.recordType === 'text') {
                             const textDecoder = new TextDecoder(record.encoding || 'utf-8');
                             nfcId = textDecoder.decode(record.data);
+                            console.log('✅ Text record found:', nfcId);
                             break;
                         }
                     }
                     
+                    // Fallback to serial number if no text found
                     if (!nfcId) {
                         nfcId = event.serialNumber;
+                        console.log('⚠️ No text record, using serial:', nfcId);
                     }
                     
-                    console.log('🔷 NFC ID:', nfcId);
+                    console.log('🔷 Final NFC ID:', nfcId);
+                    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    
+                    // Verify the NFC ID
                     await verifyByNFC(nfcId);
+                    
+                    // Reset status after verification
+                    setTimeout(() => {
+                        updateNFCStatus('✅ NFC ACTIVE - Tap next wristband!', 'active');
+                    }, 2000);
                 };
                 
+                // Error handler
                 nfcReader.onerror = error => {
-                    console.error('❌ NFC error:', error);
-                    updateStatus('NFC scan failed', 'error');
+                    console.error('❌ NFC READ ERROR:', error);
+                    updateNFCStatus('NFC read error', 'error');
+                    updateStatus('NFC scan error: ' + error, 'error');
                 };
+                
             } catch (error) {
-                console.error('❌ Failed to start NFC scan:', error);
-                updateStatus('Failed to start NFC: ' + error.message, 'error');
+                console.error('❌ FAILED TO START NFC SCAN:', error);
+                console.error('Error name:', error.name);
+                console.error('Error message:', error.message);
+                
+                let errorMsg = 'Failed to start NFC';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg = 'NFC permission denied. Please allow NFC access.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMsg = 'NFC not supported on this device.';
+                } else {
+                    errorMsg = `NFC error: ${error.message}`;
+                }
+                
+                updateNFCStatus('❌ ' + errorMsg, 'error');
+                updateStatus(errorMsg, 'error');
             }
         }
         
