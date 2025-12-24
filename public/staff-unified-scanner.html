@@ -160,8 +160,15 @@
                         </p>
                     </div>
                     
-                    <!-- NFC Status Indicator -->
-                    <div id="nfc-status-indicator" class="text-center p-3 mb-4 rounded-lg border-2 bg-gray-800 border-gray-600">
+                    <!-- NFC Activation Button -->
+                    <button id="nfc-activate-btn" onclick="activateNFC()" 
+                            class="w-full p-4 mb-4 rounded-lg border-2 bg-gradient-to-r from-cyan-600 to-blue-600 border-cyan-400 text-white font-bold text-lg shadow-lg hover:opacity-90">
+                        <i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i>
+                        CLICK TO ACTIVATE NFC SCANNING
+                    </button>
+                    
+                    <!-- NFC Status Indicator (hidden initially) -->
+                    <div id="nfc-status-indicator" class="hidden text-center p-3 mb-4 rounded-lg border-2 bg-gray-800 border-gray-600">
                         <p class="text-gray-400 text-sm font-medium">
                             <i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i>
                             <span id="nfc-status-text">NFC Initializing...</span>
@@ -298,8 +305,8 @@
             // Refresh checked-in list every 30 seconds
             setInterval(loadCheckedInGuests, 30000);
             
-            // Auto-start NFC scanning in background
-            startNFCScanning();
+            // NFC will be activated manually by user clicking the button
+            updateNFCStatus('Click button above to activate NFC', 'info');
         }
         
         async function loadFaceAPI() {
@@ -949,12 +956,41 @@
         
         // ========== NFC SCANNING ==========
         let nfcReader = null;
+        let nfcActive = false;
+        
+        async function activateNFC() {
+            if (nfcActive) {
+                console.log('⚠️ NFC already active');
+                return;
+            }
+            
+            const activateBtn = document.getElementById('nfc-activate-btn');
+            const statusIndicator = document.getElementById('nfc-status-indicator');
+            
+            activateBtn.disabled = true;
+            activateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>ACTIVATING NFC...';
+            
+            // Show status indicator
+            statusIndicator.classList.remove('hidden');
+            
+            // Start NFC scanning
+            await startNFCScanning();
+            
+            // If successful, hide button and keep status indicator
+            if (nfcActive) {
+                activateBtn.classList.add('hidden');
+            } else {
+                activateBtn.disabled = false;
+                activateBtn.innerHTML = '<i class="fas fa-redo mr-2"></i>TRY AGAIN - ACTIVATE NFC';
+            }
+        }
         
         async function startNFCScanning() {
             if (!('NDEFReader' in window)) {
                 console.error('❌ NDEFReader not available');
                 updateNFCStatus('NFC not supported on this device', 'error');
                 updateStatus('NFC not supported. Use Android Chrome browser.', 'error');
+                nfcActive = false;
                 return;
             }
 
@@ -970,6 +1006,7 @@
                 
                 console.log('✅ NFC scanning started successfully');
                 console.log('👂 Listening for NFC tags...');
+                nfcActive = true;
                 updateNFCStatus('✅ NFC ACTIVE - Tap wristband!', 'active');
                 updateStatus('✅ NFC Active - Tap wristband now', 'success');
                 
@@ -1028,11 +1065,13 @@
                 console.error('Error name:', error.name);
                 console.error('Error message:', error.message);
                 
+                nfcActive = false;
+                
                 let errorMsg = 'Failed to start NFC';
                 if (error.name === 'NotAllowedError') {
-                    errorMsg = 'NFC permission denied. Please allow NFC access.';
+                    errorMsg = 'NFC permission denied - Click button again and ALLOW permission';
                 } else if (error.name === 'NotSupportedError') {
-                    errorMsg = 'NFC not supported on this device.';
+                    errorMsg = 'NFC not supported on this device';
                 } else {
                     errorMsg = `NFC error: ${error.message}`;
                 }
