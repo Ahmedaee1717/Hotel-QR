@@ -168,60 +168,90 @@
 
             const encodeBtn = document.getElementById('encode-btn');
             encodeBtn.disabled = true;
-            encodeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i>INITIALIZING...';
+            encodeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-3"></i>REQUESTING PERMISSION...';
 
             try {
-                updateEncodingStatus('Initializing NFC writer...', 'loading');
-
-                // Create NDEF writer
+                // CRITICAL: Start scanning FIRST to take control away from Android system
+                updateEncodingStatus('🔐 Requesting NFC permission...', 'loading');
+                
                 const ndef = new NDEFReader();
                 
-                updateEncodingStatus('🔵 READY TO WRITE - Hold wristband to device now!', 'info');
-                encodeBtn.innerHTML = '<i class="fas fa-wifi fa-pulse mr-3" style="transform: rotate(-45deg);"></i>PLACE WRISTBAND NOW';
+                // Start scan to claim NFC control from Android
+                await ndef.scan();
+                
+                console.log('✅ NFC scan started - browser has control');
+                
+                // NOW we have control, show instructions
+                updateEncodingStatus('⚠️ KEEP WRISTBAND AWAY! Click button when ready...', 'info');
+                encodeBtn.innerHTML = '<i class="fas fa-hand-paper mr-3"></i>CLICK WHEN READY TO WRITE';
+                encodeBtn.disabled = false;
+                
+                // Change button to trigger write
+                encodeBtn.onclick = async function() {
+                    encodeBtn.disabled = true;
+                    encodeBtn.innerHTML = '<i class="fas fa-wifi fa-pulse mr-3" style="transform: rotate(-45deg);"></i>PLACE WRISTBAND NOW!';
+                    updateEncodingStatus('🔵 HOLD WRISTBAND TO DEVICE FOR 3 SECONDS!', 'loading');
+                    
+                    try {
+                        // Write NFC ID as plain text record
+                        await ndef.write({
+                            records: [{
+                                recordType: "text",
+                                data: currentNfcId
+                            }]
+                        });
 
-                // Write NFC ID as plain text record
-                await ndef.write({
-                    records: [{
-                        recordType: "text",
-                        data: currentNfcId
-                    }]
-                });
+                        updateEncodingStatus('✅ ENCODING SUCCESSFUL!', 'success');
+                        encodeBtn.innerHTML = '<i class="fas fa-check-circle mr-3"></i>ENCODING COMPLETE!';
+                        encodeBtn.classList.remove('brand-gradient');
+                        encodeBtn.classList.add('bg-green-600');
 
-                updateEncodingStatus('✅ ENCODING SUCCESSFUL!', 'success');
-                encodeBtn.innerHTML = '<i class="fas fa-check-circle mr-3"></i>ENCODING COMPLETE!';
-                encodeBtn.classList.remove('brand-gradient');
-                encodeBtn.classList.add('bg-green-600');
+                        // Play success sound
+                        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIHGe76+ebRgMNT6Lh7bhkGQU7k9TxzHgrBSh+xvLaijgKE1yu4+6nVxEJS6Hf87xqIAQ=');
+                        audio.play().catch(() => {});
 
-                // Play success sound (if possible)
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIHGe76+ebRgMNT6Lh7bhkGQU7k9TxzHgrBSh+xvLaijgKE1yu4+6nVxEJS6Hf87xqIAQ=');
-                audio.play().catch(() => {});
-
-                setTimeout(() => {
-                    updateEncodingStatus('Ready to encode another wristband', 'success');
-                    encodeBtn.disabled = false;
-                    encodeBtn.classList.remove('bg-green-600');
-                    encodeBtn.classList.add('brand-gradient');
-                    encodeBtn.innerHTML = '<i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>START ENCODING';
-                }, 3000);
+                        setTimeout(() => {
+                            updateEncodingStatus('Ready to encode another wristband', 'success');
+                            encodeBtn.disabled = false;
+                            encodeBtn.classList.remove('bg-green-600');
+                            encodeBtn.classList.add('brand-gradient');
+                            encodeBtn.innerHTML = '<i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>START ENCODING';
+                            encodeBtn.onclick = startEncoding;
+                        }, 3000);
+                        
+                    } catch (writeError) {
+                        console.error('NFC Write Error:', writeError);
+                        handleWriteError(writeError, encodeBtn);
+                    }
+                };
 
             } catch (error) {
-                console.error('NFC Write Error:', error);
-                let errorMsg = 'Encoding failed';
-                
-                if (error.name === 'NotAllowedError') {
-                    errorMsg = 'NFC permission denied. Please allow NFC access.';
-                } else if (error.name === 'NotSupportedError') {
-                    errorMsg = 'NFC not supported on this device';
-                } else if (error.name === 'AbortError') {
-                    errorMsg = 'Encoding cancelled or wristband removed too soon';
-                } else {
-                    errorMsg = `Error: ${error.message}`;
-                }
-
-                updateEncodingStatus('❌ ' + errorMsg, 'error');
-                encodeBtn.disabled = false;
-                encodeBtn.innerHTML = '<i class="fas fa-wifi mr-3" style="transform: rotate(-45deg);"></i>TRY AGAIN';
+                console.error('NFC Scan Error:', error);
+                handleWriteError(error, encodeBtn);
             }
+        }
+        
+        function handleWriteError(error, encodeBtn) {
+            let errorMsg = 'Encoding failed';
+            
+            if (error.name === 'NotAllowedError') {
+                errorMsg = '❌ NFC permission denied. Please allow NFC in browser settings.';
+            } else if (error.name === 'NotSupportedError') {
+                errorMsg = '❌ NFC not supported on this device. Use Android with Chrome.';
+            } else if (error.name === 'AbortError') {
+                errorMsg = '❌ Encoding cancelled. Tag removed too soon - hold for 3 seconds!';
+            } else if (error.name === 'NetworkError') {
+                errorMsg = '❌ NFC hardware error. Try restarting your device.';
+            } else {
+                errorMsg = `❌ Error: ${error.message}`;
+            }
+
+            updateEncodingStatus(errorMsg, 'error');
+            encodeBtn.disabled = false;
+            encodeBtn.classList.remove('bg-green-600');
+            encodeBtn.classList.add('brand-gradient');
+            encodeBtn.innerHTML = '<i class="fas fa-redo mr-3"></i>TRY AGAIN';
+            encodeBtn.onclick = startEncoding;
         }
 
         function resetForm() {
