@@ -961,8 +961,6 @@
         // ========== NFC SCANNING ==========
         let nfcReader = null;
         let nfcActive = false;
-        let nfcLastReadTime = 0;
-        let nfcWatchdogInterval = null;
         
         async function activateNFC() {
             if (nfcActive) {
@@ -1013,28 +1011,16 @@
                 console.log('✅ NFC scanning started successfully');
                 console.log('👂 Listening for NFC tags...');
                 nfcActive = true;
-                nfcLastReadTime = Date.now();
                 updateNFCStatus('✅ NFC ACTIVE - Tap wristband!', 'active');
                 updateStatus('✅ NFC Active - Tap wristband now', 'success');
                 
-                // Start watchdog to monitor NFC health
-                startNFCWatchdog();
-                
                 // Set up reading handler
-                nfcReader.onreading = async event => {
-                    nfcLastReadTime = Date.now();
-                    
+                nfcReader.addEventListener("reading", async (event) => {
                     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                     console.log('📲 NFC TAG DETECTED!');
-                    console.log('Timestamp:', new Date().toISOString());
                     console.log('Serial Number:', event.serialNumber);
                     console.log('Message:', event.message);
                     console.log('Message records:', event.message.records.length);
-                    
-                    // Visual feedback - vibrate if supported
-                    if (navigator.vibrate) {
-                        navigator.vibrate(200);
-                    }
                     
                     updateNFCStatus('📲 Tag detected! Verifying...', 'loading');
                     
@@ -1109,14 +1095,14 @@
                     setTimeout(() => {
                         updateNFCStatus('✅ NFC ACTIVE - Tap next wristband!', 'active');
                     }, 2000);
-                };
+                });
                 
                 // Error handler
-                nfcReader.onerror = error => {
+                nfcReader.addEventListener("readingerror", (error) => {
                     console.error('❌ NFC READ ERROR:', error);
                     updateNFCStatus('NFC read error', 'error');
                     updateStatus('NFC scan error: ' + error, 'error');
-                };
+                });
                 
             } catch (error) {
                 console.error('❌ FAILED TO START NFC SCAN:', error);
@@ -1140,38 +1126,10 @@
         }
         
         function stopNFCScanning() {
-            if (nfcWatchdogInterval) {
-                clearInterval(nfcWatchdogInterval);
-                nfcWatchdogInterval = null;
-            }
             if (nfcReader) {
                 nfcReader = null;
-                nfcActive = false;
                 console.log('🛑 NFC scanning stopped');
             }
-        }
-        
-        function startNFCWatchdog() {
-            // Clear any existing watchdog
-            if (nfcWatchdogInterval) {
-                clearInterval(nfcWatchdogInterval);
-            }
-            
-            console.log('🐕 NFC watchdog started');
-            
-            // Check every 30 seconds if NFC is still active
-            nfcWatchdogInterval = setInterval(() => {
-                const now = Date.now();
-                const timeSinceLastRead = now - nfcLastReadTime;
-                
-                console.log(`🐕 Watchdog check - Time since init/last read: ${Math.floor(timeSinceLastRead/1000)}s`);
-                
-                // Log that we're still listening (helps with debugging)
-                if (nfcActive && nfcReader) {
-                    console.log('👂 Still listening for NFC tags...');
-                    updateNFCStatus(`✅ NFC ACTIVE (${Math.floor(timeSinceLastRead/1000)}s)`, 'active');
-                }
-            }, 30000); // Every 30 seconds
         }
         
         async function verifyByNFC(nfcId) {
