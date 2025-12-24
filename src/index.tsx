@@ -17250,6 +17250,60 @@ app.post('/api/staff/verify-pass', async (c) => {
   }
 })
 
+// Staff: Manual checkout guest
+app.post('/api/staff/checkout-guest', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+
+  try {
+    const { pass_reference } = await c.req.json()
+    
+    if (!pass_reference) {
+      return c.json({ error: 'Pass reference required' }, 400)
+    }
+
+    // Get pass details
+    const pass = await DB.prepare(`
+      SELECT pass_id, pass_reference, primary_guest_name, room_number
+      FROM digital_passes
+      WHERE pass_reference = ? AND property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+
+    // Delete today's check-in records for this pass
+    const today = new Date().toISOString().split('T')[0]
+    const todayStart = `${today} 00:00:00`
+    const todayEnd = `${today} 23:59:59`
+    
+    const result = await DB.prepare(`
+      DELETE FROM pass_verifications
+      WHERE pass_id = ? 
+        AND property_id = ?
+        AND verification_result = 'allowed'
+        AND verification_timestamp BETWEEN ? AND ?
+    `).bind(pass.pass_id, property_id, todayStart, todayEnd).run()
+
+    return c.json({
+      success: true,
+      message: 'Guest checked out successfully',
+      pass_reference: pass.pass_reference,
+      guest_name: pass.primary_guest_name,
+      room_number: pass.room_number,
+      records_deleted: result.meta.changes || 0
+    })
+  } catch (error) {
+    console.error('Checkout guest error:', error)
+    return c.json({ error: 'Failed to checkout guest' }, 500)
+  }
+})
+
 // Staff: Verify face during pass verification
 app.post('/api/staff/all-inclusive/verify-face', async (c) => {
   const { DB } = c.env
