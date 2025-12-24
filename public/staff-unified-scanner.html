@@ -1015,6 +1015,7 @@
                     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                     console.log('📲 NFC TAG DETECTED!');
                     console.log('Serial Number:', event.serialNumber);
+                    console.log('Message:', event.message);
                     console.log('Message records:', event.message.records.length);
                     
                     updateNFCStatus('📲 Tag detected! Verifying...', 'loading');
@@ -1022,23 +1023,62 @@
                     const message = event.message;
                     let nfcId = null;
                     
-                    // Try to read text record
+                    // Try to read text record - WITH BETTER PARSING
                     for (const record of message.records) {
+                        console.log('━━━ Record Details ━━━');
                         console.log('Record type:', record.recordType);
-                        console.log('Record data:', record.data);
+                        console.log('Record mediaType:', record.mediaType);
+                        console.log('Record id:', record.id);
+                        console.log('Record data (raw):', record.data);
                         
+                        // Check if it's a text record
                         if (record.recordType === 'text') {
-                            const textDecoder = new TextDecoder(record.encoding || 'utf-8');
-                            nfcId = textDecoder.decode(record.data);
-                            console.log('✅ Text record found:', nfcId);
-                            break;
+                            try {
+                                // Try UTF-8 first
+                                const textDecoder = new TextDecoder('utf-8');
+                                nfcId = textDecoder.decode(record.data);
+                                console.log('✅ Text record decoded (UTF-8):', nfcId);
+                                
+                                // Clean up any null bytes or extra whitespace
+                                nfcId = nfcId.replace(/\0/g, '').trim();
+                                console.log('✅ Cleaned NFC ID:', nfcId);
+                                break;
+                            } catch (e) {
+                                console.error('Failed to decode text record:', e);
+                            }
+                        }
+                        
+                        // Also try if recordType contains 'text' (some formats vary)
+                        if (record.recordType.includes('text')) {
+                            try {
+                                const textDecoder = new TextDecoder('utf-8');
+                                nfcId = textDecoder.decode(record.data);
+                                console.log('✅ Text-like record found:', nfcId);
+                                nfcId = nfcId.replace(/\0/g, '').trim();
+                                break;
+                            } catch (e) {
+                                console.error('Failed to decode text-like record:', e);
+                            }
                         }
                     }
                     
-                    // Fallback to serial number if no text found
-                    if (!nfcId) {
+                    // If still no ID found, try reading ALL records as text
+                    if (!nfcId && message.records.length > 0) {
+                        console.log('⚠️ No standard text record, trying first record as text...');
+                        try {
+                            const textDecoder = new TextDecoder('utf-8');
+                            nfcId = textDecoder.decode(message.records[0].data);
+                            nfcId = nfcId.replace(/\0/g, '').trim();
+                            console.log('✅ First record as text:', nfcId);
+                        } catch (e) {
+                            console.error('Failed to decode first record:', e);
+                        }
+                    }
+                    
+                    // Fallback to serial number if still nothing
+                    if (!nfcId || nfcId.length === 0) {
                         nfcId = event.serialNumber;
-                        console.log('⚠️ No text record, using serial:', nfcId);
+                        console.log('⚠️ No readable text, using serial number:', nfcId);
                     }
                     
                     console.log('🔷 Final NFC ID:', nfcId);
