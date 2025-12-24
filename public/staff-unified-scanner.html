@@ -253,6 +253,10 @@
         let lastVerifyTime = 0;
         const VERIFY_COOLDOWN = 3000; // 3 seconds between scans
         
+        // 🔥 NEW: Touch-based NFC priority
+        let touchPauseTimeout = null;
+        let cameraWasPaused = false;
+        
         // Stats
         let stats = { verified: 0, qr: 0, face: 0, nfc: 0 };
         
@@ -316,8 +320,49 @@
             // Refresh checked-in list every 30 seconds
             setInterval(loadCheckedInGuests, 30000);
             
+            // 🔥 NEW: Add touch/click listener for NFC priority
+            document.addEventListener('touchstart', handleTouchForNFC);
+            document.addEventListener('click', handleTouchForNFC);
+            
             // NFC will be activated manually by user clicking the button
             updateNFCStatus('Click button above to activate NFC', 'info');
+        }
+        
+        // 🔥 NEW: Pause camera on ANY touch (user preparing to tap NFC)
+        function handleTouchForNFC(event) {
+            // Only if in auto mode and camera is running
+            if (scannerMode !== 'auto' || !isScanning) return;
+            
+            // Clear any existing timeout
+            if (touchPauseTimeout) {
+                clearTimeout(touchPauseTimeout);
+            }
+            
+            // IMMEDIATELY pause camera scanning
+            if (isScanning && !cameraWasPaused) {
+                console.log('👆 TOUCH DETECTED - Pausing camera for NFC (3 seconds)');
+                cameraWasPaused = true;
+                isScanning = false;
+                
+                // Stop pulse interval
+                if (cameraPulseInterval) {
+                    clearInterval(cameraPulseInterval);
+                    cameraPulseInterval = null;
+                }
+                
+                updateStatus('👆 Camera paused - Ready for NFC tap!', 'info');
+            }
+            
+            // Resume after 3 seconds if no NFC detected
+            touchPauseTimeout = setTimeout(() => {
+                if (cameraWasPaused && scannerMode === 'auto') {
+                    console.log('▶️ Resuming camera - No NFC tap detected');
+                    cameraWasPaused = false;
+                    isScanning = true;
+                    startPulsedScanning();
+                    updateStatus('▶️ Camera resumed - Ready to scan', 'success');
+                }
+            }, 3000);
         }
         
         async function loadFaceAPI() {
@@ -964,7 +1009,7 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC (camera: 1 scan/sec, NFC: 1000ms windows)',
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - Touch screen = Camera pauses 3sec for NFC!',
                 'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera pulsing for QR codes',
                 'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera pulsing for face recognition',
                 'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for best NFC detection'
@@ -1137,6 +1182,13 @@
                     console.log('Serial Number:', event.serialNumber);
                     console.log('Message:', event.message);
                     console.log('Message records:', event.message.records.length);
+                    
+                    // 🔥 Clear touch pause timeout since NFC was detected
+                    if (touchPauseTimeout) {
+                        clearTimeout(touchPauseTimeout);
+                        touchPauseTimeout = null;
+                    }
+                    cameraWasPaused = false;
                     
                     // 🔥 SMART AUTO-PAUSE: Temporarily pause camera when NFC detected
                     console.log('⏸️ Auto-pausing camera for NFC processing...');
