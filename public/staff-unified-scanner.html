@@ -338,37 +338,34 @@
             startPulsedScanning();
         }
         
-        // 🔥 NEW: Pulsed scanning - scan briefly, pause for NFC
+        // 🔥 NEW: Pulsed scanning - scan briefly, LONG pause for NFC
         function startPulsedScanning() {
             if (cameraPulseInterval) {
                 clearInterval(cameraPulseInterval);
             }
             
-            let scanActive = true;
             let pulseCount = 0;
             
-            // Pulse pattern: 100ms scan, 300ms pause (allows NFC to get hardware)
+            // AGGRESSIVE NFC PRIORITY: Short scan, LONG pause
+            // Pattern: 200ms scan, 1000ms pause = NFC gets 83% hardware time!
             cameraPulseInterval = setInterval(() => {
                 if (!isScanning) {
                     clearInterval(cameraPulseInterval);
                     return;
                 }
                 
-                if (scanActive) {
-                    // SCAN PULSE (100ms)
-                    scanOnce();
-                    scanActive = false;
-                    pulseCount++;
-                    
-                    // Log every 10 pulses to avoid spam
-                    if (pulseCount % 10 === 0) {
-                        console.log(`📹 Camera pulse #${pulseCount} (NFC priority active)`);
-                    }
-                } else {
-                    // PAUSE (300ms for NFC)
-                    scanActive = true;
+                // SCAN PULSE (quick burst)
+                scanOnce();
+                pulseCount++;
+                
+                // Log every 3 pulses to show it's working
+                if (pulseCount % 3 === 0) {
+                    console.log(`📹 Camera pulse #${pulseCount} | Next NFC window: 1000ms`);
                 }
-            }, 200); // 200ms total cycle (100ms scan + 100ms pause)
+                
+                // After scan, give NFC a FULL SECOND of hardware access
+                
+            }, 1200); // Total 1200ms cycle = 1 scan per 1.2 seconds
         }
         
         async function scanOnce() {
@@ -967,7 +964,7 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC (camera pulses to allow NFC)',
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC (camera: 1 scan/sec, NFC: 1000ms windows)',
                 'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera pulsing for QR codes',
                 'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera pulsing for face recognition',
                 'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for best NFC detection'
