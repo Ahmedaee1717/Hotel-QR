@@ -266,6 +266,8 @@
         let qrCodeReader;
         let lastVerifyTime = 0;
         const VERIFY_COOLDOWN = 3000; // 3 seconds between scans
+        let autoResetTimer = null; // Track auto-reset timer
+        let isPaused = false; // Track if display is paused
         
         // 🔥 NEW: Touch-based NFC priority
         let touchPauseTimeout = null;
@@ -460,10 +462,8 @@
                     showSuccess(data.pass_details);
                     loadCheckedInGuests(); // Refresh the list
                     
-                    // Auto-reset after 2 seconds for QR codes too
-                    setTimeout(() => {
-                        resetScanner();
-                    }, 2000);
+                    // Auto-reset after 2 seconds with countdown
+                    startAutoResetCountdown(2);
                 } else if (response.status === 409 && data.already_checked_in) {
                     // DUPLICATE CHECK-IN
                     showDuplicateAlert(data);
@@ -573,11 +573,28 @@
                             <span class="text-gray-600">Room:</span>
                             <span class="font-semibold">${passDetails.room_number || 'N/A'}</span>
                         </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Adults:</span>
+                            <span class="font-semibold">${passDetails.num_adults || 0}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Children:</span>
+                            <span class="font-semibold">${passDetails.num_children || 0}</span>
+                        </div>
                     </div>
-                    <button onclick="resetScanner()" 
-                            class="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
-                        <i class="fas fa-redo mr-2"></i>Scan Next
-                    </button>
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button onclick="pauseDisplay()" id="pause-btn"
+                                class="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700">
+                            <i class="fas fa-pause mr-2"></i>Pause
+                        </button>
+                        <button onclick="resetScanner()" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
+                            <i class="fas fa-redo mr-2"></i>Next
+                        </button>
+                    </div>
+                    <div id="auto-reset-countdown" class="mt-2 text-center text-sm text-gray-500">
+                        Auto-resetting in <span id="countdown-seconds">2</span>s...
+                    </div>
                 </div>
             `;
         }
@@ -893,7 +910,88 @@
             }
         }
         
+        function pauseDisplay() {
+            isPaused = true;
+            
+            // Clear any auto-reset timers
+            if (autoResetTimer) {
+                clearTimeout(autoResetTimer);
+                autoResetTimer = null;
+            }
+            
+            // Update buttons
+            const pauseBtn = document.getElementById('pause-btn');
+            if (pauseBtn) {
+                pauseBtn.outerHTML = `
+                    <button onclick="resumeDisplay()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">
+                        <i class="fas fa-play mr-2"></i>Resume
+                    </button>
+                `;
+            }
+            
+            // Hide countdown
+            const countdown = document.getElementById('auto-reset-countdown');
+            if (countdown) {
+                countdown.innerHTML = '<span class="text-blue-600 font-semibold">⏸ Paused - Review details</span>';
+            }
+            
+            console.log('⏸ Display paused - auto-reset cancelled');
+        }
+        
+        function resumeDisplay() {
+            isPaused = false;
+            
+            // Update countdown display
+            const countdown = document.getElementById('auto-reset-countdown');
+            if (countdown) {
+                countdown.innerHTML = 'Resetting now...';
+            }
+            
+            // Immediately reset
+            resetScanner();
+            
+            console.log('▶ Display resumed - resetting scanner');
+        }
+        
+        function startAutoResetCountdown(seconds = 2) {
+            // Clear any existing timer
+            if (autoResetTimer) {
+                clearTimeout(autoResetTimer);
+            }
+            
+            let remaining = seconds;
+            const countdownEl = document.getElementById('countdown-seconds');
+            
+            // Update countdown every second
+            const countdownInterval = setInterval(() => {
+                remaining--;
+                if (countdownEl) {
+                    countdownEl.textContent = remaining;
+                }
+                
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // Set auto-reset timer
+            autoResetTimer = setTimeout(() => {
+                if (!isPaused) {
+                    clearInterval(countdownInterval);
+                    resetScanner();
+                }
+            }, seconds * 1000);
+        }
+        
         function resetScanner() {
+            // Clear any timers
+            if (autoResetTimer) {
+                clearTimeout(autoResetTimer);
+                autoResetTimer = null;
+            }
+            isPaused = false;
+            
             const resultDiv = document.getElementById('verification-result');
             resultDiv.innerHTML = `
                 <div class="text-center py-12">
@@ -1277,10 +1375,8 @@
                         loadCheckedInGuests(); // Refresh the list
                         updateStatus('NFC verified! Tap next wristband', 'success');
                         
-                        // Auto-reset after 2 seconds
-                        setTimeout(() => {
-                            resetScanner();
-                        }, 2000);
+                        // Auto-reset after 2 seconds with countdown
+                        startAutoResetCountdown(2);
                     } else {
                         console.error('❌ No pass details in response:', data);
                         showError('Pass data missing from server response');
