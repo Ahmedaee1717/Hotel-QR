@@ -262,7 +262,6 @@
         let scannerMode = 'auto'; // 'auto', 'qr', 'face', 'nfc'
         let cameraStream = null; // Track camera stream for stopping/starting
         let nfcPriority = true; // Always prioritize NFC over camera
-        let cameraPulseInterval = null; // For pulsed camera scanning
         let isScanning = false;
         let qrCodeReader;
         let lastVerifyTime = 0;
@@ -335,55 +334,8 @@
             // Refresh checked-in list every 30 seconds
             setInterval(loadCheckedInGuests, 30000);
             
-            // 🔥 NEW: Add touch/click listener for NFC priority
-            document.addEventListener('touchstart', handleTouchForNFC);
-            document.addEventListener('click', handleTouchForNFC);
-            
             // NFC will be activated manually by user clicking the button
             updateNFCStatus('Click button above to activate NFC', 'info');
-        }
-        
-        // 🔥 NEW: Pause camera on ANY touch (user preparing to tap NFC)
-        async function handleTouchForNFC(event) {
-            // Only if in auto mode and camera is running
-            if (scannerMode !== 'auto' || !isScanning) return;
-            
-            // Clear any existing timeout
-            if (touchPauseTimeout) {
-                clearTimeout(touchPauseTimeout);
-            }
-            
-            // IMMEDIATELY pause camera scanning
-            if (isScanning && !cameraWasPaused) {
-                console.log('👆 TOUCH DETECTED - Pausing camera for NFC (3 seconds)');
-                cameraWasPaused = true;
-                isScanning = false;
-                
-                // Stop pulse interval
-                if (cameraPulseInterval) {
-                    clearInterval(cameraPulseInterval);
-                    cameraPulseInterval = null;
-                }
-                
-                // 🔥 CRITICAL FIX: Make sure NFC is actually listening!
-                if (!nfcReader || !nfcActive) {
-                    console.log('🔵 Starting NFC scanner for Auto mode...');
-                    await startNFCScanning();
-                }
-                
-                updateStatus('👆 Camera paused - NFC ready! Tap now!', 'info');
-            }
-            
-            // Resume after 3 seconds if no NFC detected
-            touchPauseTimeout = setTimeout(() => {
-                if (cameraWasPaused && scannerMode === 'auto') {
-                    console.log('▶️ Resuming camera - No NFC tap detected');
-                    cameraWasPaused = false;
-                    isScanning = true;
-                    startPulsedScanning();
-                    updateStatus('▶️ Camera resumed - Ready to scan', 'success');
-                }
-            }, 3000);
         }
         
         async function loadFaceAPI() {
@@ -401,82 +353,12 @@
         // Unified scanning loop - PULSED MODE for NFC compatibility
         function startScanning() {
             isScanning = true;
-            startPulsedScanning();
+            scanLoop();
         }
         
-        // 🔥 NEW: Interval-based scanning - camera captures ONLY when needed
-        function startPulsedScanning() {
-            if (cameraPulseInterval) {
-                clearInterval(cameraPulseInterval);
-            }
-            
-            let pulseCount = 0;
-            
-            // 🔥 NUCLEAR OPTION: Completely close camera between scans
-            // This gives NFC 100% hardware access during gaps
-            cameraPulseInterval = setInterval(async () => {
-                if (!isScanning) {
-                    clearInterval(cameraPulseInterval);
-                    return;
-                }
-                
-                pulseCount++;
-                console.log(`━━━ Scan cycle #${pulseCount} ━━━`);
-                console.log('📷 Opening camera...');
-                
-                // 1. Open camera if closed
-                const video = document.getElementById('unified-video');
-                if (!cameraStream || !cameraStream.active) {
-                    try {
-                        cameraStream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { 
-                                facingMode: 'environment',
-                                width: { ideal: 640 }, // Lower resolution for faster startup
-                                height: { ideal: 480 }
-                            } 
-                        });
-                        video.srcObject = cameraStream;
-                        
-                        // Wait for ready
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    } catch (error) {
-                        console.error('❌ Camera error:', error);
-                        return;
-                    }
-                }
-                
-                // 2. Scan
-                console.log('🔍 Scanning...');
-                await scanOnce();
-                
-                // 3. CLOSE camera completely
-                console.log('🛑 Closing camera → NFC window opens');
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                    cameraStream = null;
-                    video.srcObject = null;
-                }
-                console.log('✅ NFC has 100% hardware for 3 seconds');
-                
-            }, 4000); // 4sec cycle: 1sec camera + 3sec NFC
-        }
-        
-        async function scanOnce() {
-            if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
-            
-            // Quick QR scan (if mode allows)
-            if (scannerMode === 'auto' || scannerMode === 'qr') {
-                await scanQRCode();
-            }
-            
-            // Quick face scan (if mode allows and face-api loaded)
-            if ((scannerMode === 'auto' || scannerMode === 'face') && faceApiLoaded) {
-                await scanFace();
-            }
-        }
+        // Removed pulsed scanning - back to continuous for smooth QR/Face detection
         
         async function scanLoop() {
-            // DEPRECATED: Old continuous scanning - replaced by pulsed scanning
             if (!isScanning) return;
             
             // Scan QR Code (if mode allows)
@@ -1032,7 +914,7 @@
             
             // CRITICAL: Restart the scan loop with pulsed mode
             console.log('🔄 Resetting scanner - restarting pulsed scanning');
-            startPulsedScanning();
+            requestAnimationFrame(scanLoop);
             
             updateStatus('Ready to scan - Point at QR or Face', 'info');
         }
@@ -1057,10 +939,10 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-exclamation-triangle mr-2 text-yellow-400"></i> Auto Mode - QR/Face work. NFC unreliable (use NFC button above!)',
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR and Face scanning (Use NFC button for wristbands)',
                 'qr': '<i class="fas fa-qrcode mr-2"></i> QR Mode - Camera ON for QR codes',
                 'face': '<i class="fas fa-user mr-2"></i> Face Mode - Camera ON for face recognition',
-                'nfc': '<i class="fas fa-check-circle mr-2 text-green-400"></i> NFC Mode - Camera OFF • 100% Detection • Best for wristbands!'
+                'nfc': '<i class="fas fa-check-circle mr-2 text-green-400"></i> NFC Mode - Camera OFF • 100% reliable wristband detection!'
             };
             document.getElementById('mode-description').innerHTML = `
                 <p class="text-cyan-300 text-sm font-bold">${modeDescriptions[mode]}</p>
@@ -1070,12 +952,6 @@
             if (mode === 'nfc') {
                 // NFC-ONLY MODE: Stop camera to free hardware resources
                 console.log('📷 Stopping camera for NFC-only mode');
-                
-                // Stop pulsed scanning
-                if (cameraPulseInterval) {
-                    clearInterval(cameraPulseInterval);
-                    cameraPulseInterval = null;
-                }
                 
                 if (cameraStream) {
                     cameraStream.getTracks().forEach(track => {
@@ -1117,7 +993,7 @@
                             canvas.width = video.videoWidth;
                             canvas.height = video.videoHeight;
                             isScanning = true;
-                            startPulsedScanning(); // Use pulsed scanning
+                            requestAnimationFrame(scanLoop); // Use pulsed scanning
                         });
                         
                         updateStatus('Camera active - Ready to scan', 'success');
@@ -1128,7 +1004,7 @@
                 } else {
                     // Camera already running, just resume pulsed scanning
                     isScanning = true;
-                    startPulsedScanning();
+                    requestAnimationFrame(scanLoop);
                     updateStatus('Ready to scan - Point at QR or Face (NFC active)', 'info');
                 }
             }
@@ -1318,7 +1194,7 @@
                         if (wasCameraActive && (scannerMode === 'auto' || scannerMode === 'qr' || scannerMode === 'face')) {
                             console.log('▶️ Auto-resuming pulsed camera scanning...');
                             isScanning = true;
-                            startPulsedScanning(); // Use pulsed scanning
+                            requestAnimationFrame(scanLoop); // Use pulsed scanning
                             updateStatus('▶️ Camera resumed - Ready for QR/Face/NFC', 'success');
                         }
                         updateNFCStatus('✅ NFC ACTIVE - Ready for next tap!', 'active');
