@@ -14,6 +14,10 @@
     <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     
     <style>
+        body {
+            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%);
+        }
+        
         #unified-video {
             width: 100%;
             max-width: 640px;
@@ -38,25 +42,43 @@
         }
         
         .scanner-border {
-            border: 4px solid #10b981;
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+            border: 4px solid #016e8f;
+            box-shadow: 0 0 30px rgba(1, 110, 143, 0.6);
+        }
+        
+        .brand-gradient {
+            background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);
+        }
+        
+        .brand-text {
+            color: #00d4ff;
+        }
+        
+        .dark-card {
+            background: rgba(20, 30, 48, 0.95);
+            border: 2px solid rgba(1, 110, 143, 0.3);
+        }
+        
+        .stat-card {
+            background: rgba(1, 110, 143, 0.15);
+            border: 2px solid rgba(1, 110, 143, 0.4);
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <div class="min-h-screen p-4">
         <div class="max-w-4xl mx-auto">
             <!-- Header -->
-            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="dark-card rounded-xl shadow-2xl p-6 mb-6">
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-bold flex items-center gap-3" style="color: #016e8f;">
+                        <h1 class="text-4xl font-bold flex items-center gap-3 brand-text">
                             <i class="fas fa-shield-alt"></i>
-                            Unified Verification Scanner
+                            GuestConnect Scanner
                         </h1>
-                        <p class="text-gray-600 mt-2">One Camera - Scans QR Code OR Face</p>
+                        <p class="text-gray-300 mt-2 text-lg font-medium">Multi-Method Verification System</p>
                     </div>
-                    <button onclick="logout()" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">
+                    <button onclick="logout()" class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold text-lg shadow-lg">
                         <i class="fas fa-sign-out-alt mr-2"></i>Logout
                     </button>
                 </div>
@@ -64,50 +86,50 @@
 
             <!-- Stats -->
             <div class="grid grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="stat-card rounded-xl shadow-xl p-6">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-green-500">
-                            <i class="fas fa-check text-white text-xl"></i>
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center brand-gradient shadow-lg">
+                            <i class="fas fa-check text-white text-2xl"></i>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold" id="verified-count">0</div>
-                            <div class="text-xs text-gray-600">Verified</div>
+                            <div class="text-3xl font-bold text-white" id="verified-count">0</div>
+                            <div class="text-sm text-gray-300 font-medium">Verified</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="stat-card rounded-xl shadow-xl p-6">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-blue-500">
-                            <i class="fas fa-qrcode text-white text-xl"></i>
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-600 shadow-lg">
+                            <i class="fas fa-qrcode text-white text-2xl"></i>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold" id="qr-count">0</div>
-                            <div class="text-xs text-gray-600">QR Scans</div>
+                            <div class="text-3xl font-bold text-white" id="qr-count">0</div>
+                            <div class="text-sm text-gray-300 font-medium">QR Scans</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="stat-card rounded-xl shadow-xl p-6">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full flex items-center justify-center bg-purple-500">
-                            <i class="fas fa-user-check text-white text-xl"></i>
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-purple-600 shadow-lg">
+                            <i class="fas fa-user-check text-white text-2xl"></i>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold" id="face-count">0</div>
-                            <div class="text-xs text-gray-600">Face Scans</div>
+                            <div class="text-3xl font-bold text-white" id="face-count">0</div>
+                            <div class="text-sm text-gray-300 font-medium">Face Scans</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="stat-card rounded-xl shadow-xl p-6">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, #7c3aed, #5b21b6);">
-                            <i class="fas fa-wifi text-white text-xl" style="transform: rotate(-45deg);"></i>
+                        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
+                            <i class="fas fa-wifi text-white text-2xl" style="transform: rotate(-45deg);"></i>
                         </div>
                         <div>
-                            <div class="text-2xl font-bold" id="nfc-count">0</div>
-                            <div class="text-xs text-gray-600">NFC Scans</div>
+                            <div class="text-3xl font-bold text-white" id="nfc-count">0</div>
+                            <div class="text-sm text-gray-300 font-medium">NFC Scans</div>
                         </div>
                     </div>
                 </div>
@@ -116,9 +138,9 @@
             <!-- Main Scanner - Side by Side Layout -->
             <div class="grid md:grid-cols-2 gap-6 mb-6">
                 <!-- Camera Section -->
-                <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="dark-card rounded-xl shadow-2xl p-6">
                     <div class="text-center mb-4">
-                        <div class="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-full font-semibold text-sm">
+                        <div class="inline-flex items-center gap-3 px-6 py-3 brand-gradient text-white rounded-full font-bold text-base shadow-lg">
                             <i class="fas fa-camera scan-indicator"></i>
                             <span id="scanner-mode">Camera Ready</span>
                         </div>
@@ -131,52 +153,54 @@
                         </div>
                     </div>
 
-                    <div id="detection-status" class="text-center p-3 bg-gray-50 rounded-lg mb-4">
-                        <p class="text-gray-600 text-sm">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            <span id="status-text">Waiting for QR code or face...</span>
+                    <div id="detection-status" class="text-center p-4 bg-gray-900 rounded-lg mb-4 border-2 border-cyan-600">
+                        <p class="text-white text-base font-medium">
+                            <i class="fas fa-info-circle mr-2 brand-text"></i>
+                            <span id="status-text">Ready to scan...</span>
                         </p>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-3 gap-3">
                         <button onclick="switchMode('qr')" id="qr-mode-btn" 
-                                class="py-3 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 flex items-center justify-center gap-2">
+                                class="py-4 bg-blue-600 text-white rounded-xl text-base font-bold hover:bg-blue-700 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-qrcode"></i> QR
                         </button>
                         <button onclick="switchMode('face')" id="face-mode-btn"
-                                class="py-3 bg-purple-500 text-white rounded-lg text-sm font-semibold hover:bg-purple-600 flex items-center justify-center gap-2">
+                                class="py-4 bg-purple-600 text-white rounded-xl text-base font-bold hover:bg-purple-700 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-user"></i> Face
                         </button>
                         <button onclick="switchMode('auto')" id="auto-mode-btn"
-                                class="py-3 bg-green-500 text-white rounded-lg text-sm font-semibold hover:bg-green-600 ring-4 ring-green-200 ring-offset-2 flex items-center justify-center gap-2">
+                                class="py-4 brand-gradient text-white rounded-xl text-base font-bold hover:opacity-90 ring-4 ring-cyan-400 ring-offset-2 ring-offset-gray-900 flex items-center justify-center gap-2 shadow-lg">
                             <i class="fas fa-magic"></i> Auto
                         </button>
                     </div>
-                    <p class="text-xs text-gray-500 text-center mt-2">
-                        <i class="fas fa-wifi" style="transform: rotate(-45deg);"></i> NFC scanning active in background
-                    </p>
+                    <div class="text-center mt-3 p-3 bg-cyan-900 bg-opacity-30 rounded-lg border border-cyan-600">
+                        <p class="text-cyan-300 text-sm font-bold">
+                            <i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Auto-Scanning Active
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Verification Status Card -->
-                <div id="verification-card" class="bg-white rounded-xl shadow-lg p-6">
-                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2" style="color: #016e8f;">
+                <div id="verification-card" class="dark-card rounded-xl shadow-2xl p-6">
+                    <h2 class="text-2xl font-bold mb-4 flex items-center gap-2 brand-text">
                         <i class="fas fa-clipboard-check"></i>
                         Verification Status
                     </h2>
                     <div id="verification-result">
                         <div class="text-center py-12">
-                            <i class="fas fa-qrcode text-6xl text-gray-300 mb-4"></i>
-                            <p class="text-gray-500">Scan QR code or guest face to verify</p>
-                            <p class="text-sm text-gray-400 mt-2">Results will appear here</p>
+                            <i class="fas fa-qrcode text-7xl text-cyan-600 mb-4"></i>
+                            <p class="text-gray-300 text-lg font-medium">Scan QR, Face, or Tap NFC</p>
+                            <p class="text-gray-400 mt-2">Results will appear here</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Checked-In Guests List -->
-            <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="dark-card rounded-xl shadow-2xl p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-bold flex items-center gap-2" style="color: #016e8f;">
+                    <h2 class="text-2xl font-bold flex items-center gap-2 brand-text">
                         <i class="fas fa-list-check"></i>
                         Checked-In Today
                     </h2>
@@ -852,21 +876,21 @@
         function switchMode(mode) {
             scannerMode = mode;
             document.querySelectorAll('[id$="-mode-btn"]').forEach(btn => {
-                btn.classList.remove('ring-4', 'ring-offset-2', 'ring-green-200', 'ring-blue-200', 'ring-purple-200');
+                btn.classList.remove('ring-4', 'ring-offset-2', 'ring-offset-gray-900', 'ring-cyan-400', 'ring-blue-400', 'ring-purple-400');
             });
             
             const ringColors = {
-                'auto': 'ring-green-200',
-                'qr': 'ring-blue-200',
-                'face': 'ring-purple-200'
+                'auto': 'ring-cyan-400',
+                'qr': 'ring-blue-400',
+                'face': 'ring-purple-400'
             };
             
-            document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2', ringColors[mode]);
+            document.getElementById(`${mode}-mode-btn`).classList.add('ring-4', 'ring-offset-2', 'ring-offset-gray-900', ringColors[mode]);
             
             const modeText = {
-                'auto': 'Auto Mode - Scans QR or Face (NFC always active)',
-                'qr': 'QR Mode - Scans QR codes only (NFC always active)',
-                'face': 'Face Mode - Scans faces only (NFC always active)'
+                'auto': '🤖 Auto Mode - QR + Face (NFC Active)',
+                'qr': '📱 QR Only Mode (NFC Active)',
+                'face': '👤 Face Only Mode (NFC Active)'
             };
             document.getElementById('scanner-mode').textContent = modeText[mode];
             
