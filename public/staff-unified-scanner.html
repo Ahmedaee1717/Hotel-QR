@@ -246,6 +246,8 @@
         let faceApiLoaded = false;
         let scannerMode = 'auto'; // 'auto', 'qr', 'face', 'nfc'
         let cameraStream = null; // Track camera stream for stopping/starting
+        let nfcPriority = true; // Always prioritize NFC over camera
+        let cameraPulseInterval = null; // For pulsed camera scanning
         let isScanning = false;
         let qrCodeReader;
         let lastVerifyTime = 0;
@@ -330,13 +332,61 @@
             }
         }
         
-        // Unified scanning loop
+        // Unified scanning loop - PULSED MODE for NFC compatibility
         function startScanning() {
             isScanning = true;
-            scanLoop();
+            startPulsedScanning();
+        }
+        
+        // 🔥 NEW: Pulsed scanning - scan briefly, pause for NFC
+        function startPulsedScanning() {
+            if (cameraPulseInterval) {
+                clearInterval(cameraPulseInterval);
+            }
+            
+            let scanActive = true;
+            let pulseCount = 0;
+            
+            // Pulse pattern: 100ms scan, 300ms pause (allows NFC to get hardware)
+            cameraPulseInterval = setInterval(() => {
+                if (!isScanning) {
+                    clearInterval(cameraPulseInterval);
+                    return;
+                }
+                
+                if (scanActive) {
+                    // SCAN PULSE (100ms)
+                    scanOnce();
+                    scanActive = false;
+                    pulseCount++;
+                    
+                    // Log every 10 pulses to avoid spam
+                    if (pulseCount % 10 === 0) {
+                        console.log(`📹 Camera pulse #${pulseCount} (NFC priority active)`);
+                    }
+                } else {
+                    // PAUSE (300ms for NFC)
+                    scanActive = true;
+                }
+            }, 200); // 200ms total cycle (100ms scan + 100ms pause)
+        }
+        
+        async function scanOnce() {
+            if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+            
+            // Quick QR scan (if mode allows)
+            if (scannerMode === 'auto' || scannerMode === 'qr') {
+                await scanQRCode();
+            }
+            
+            // Quick face scan (if mode allows and face-api loaded)
+            if ((scannerMode === 'auto' || scannerMode === 'face') && faceApiLoaded) {
+                await scanFace();
+            }
         }
         
         async function scanLoop() {
+            // DEPRECATED: Old continuous scanning - replaced by pulsed scanning
             if (!isScanning) return;
             
             // Scan QR Code (if mode allows)
@@ -890,9 +940,9 @@
             lastVerifyTime = 0; // Reset cooldown
             isScanning = true; // Enable scanning
             
-            // CRITICAL: Restart the scan loop
-            console.log('🔄 Resetting scanner - restarting scan loop');
-            requestAnimationFrame(scanLoop);
+            // CRITICAL: Restart the scan loop with pulsed mode
+            console.log('🔄 Resetting scanner - restarting pulsed scanning');
+            startPulsedScanning();
             
             updateStatus('Ready to scan - Point at QR or Face', 'info');
         }
@@ -917,10 +967,10 @@
             
             // Update mode description
             const modeDescriptions = {
-                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC together (camera auto-pauses for NFC)',
-                'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera active for QR codes',
-                'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera active for face recognition',
-                'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for better NFC detection'
+                'auto': '<i class="fas fa-magic mr-2"></i> Auto Mode - QR/Face/NFC (camera pulses to allow NFC)',
+                'qr': '<i class="fas fa-qrcode mr-2"></i> QR Only Mode - Camera pulsing for QR codes',
+                'face': '<i class="fas fa-user mr-2"></i> Face Only Mode - Camera pulsing for face recognition',
+                'nfc': '<i class="fas fa-wifi mr-2" style="transform: rotate(-45deg);"></i> NFC Only Mode - Camera OFF for best NFC detection'
             };
             document.getElementById('mode-description').innerHTML = `
                 <p class="text-cyan-300 text-sm font-bold">${modeDescriptions[mode]}</p>
@@ -930,6 +980,13 @@
             if (mode === 'nfc') {
                 // NFC-ONLY MODE: Stop camera to free hardware resources
                 console.log('📷 Stopping camera for NFC-only mode');
+                
+                // Stop pulsed scanning
+                if (cameraPulseInterval) {
+                    clearInterval(cameraPulseInterval);
+                    cameraPulseInterval = null;
+                }
+                
                 if (cameraStream) {
                     cameraStream.getTracks().forEach(track => {
                         track.stop();
@@ -970,7 +1027,7 @@
                             canvas.width = video.videoWidth;
                             canvas.height = video.videoHeight;
                             isScanning = true;
-                            requestAnimationFrame(scanLoop);
+                            startPulsedScanning(); // Use pulsed scanning
                         });
                         
                         updateStatus('Camera active - Ready to scan', 'success');
@@ -979,10 +1036,10 @@
                         updateStatus('Camera access denied', 'error');
                     }
                 } else {
-                    // Camera already running, just resume scanning
+                    // Camera already running, just resume pulsed scanning
                     isScanning = true;
-                    requestAnimationFrame(scanLoop);
-                    updateStatus('Ready to scan - Point at QR or Face', 'info');
+                    startPulsedScanning();
+                    updateStatus('Ready to scan - Point at QR or Face (NFC active)', 'info');
                 }
             }
         }
@@ -1162,9 +1219,9 @@
                     // 🔥 SMART AUTO-RESUME: Resume camera scanning after NFC verification
                     setTimeout(() => {
                         if (wasCameraActive && (scannerMode === 'auto' || scannerMode === 'qr' || scannerMode === 'face')) {
-                            console.log('▶️ Auto-resuming camera scanning...');
+                            console.log('▶️ Auto-resuming pulsed camera scanning...');
                             isScanning = true;
-                            requestAnimationFrame(scanLoop);
+                            startPulsedScanning(); // Use pulsed scanning
                             updateStatus('▶️ Camera resumed - Ready for QR/Face/NFC', 'success');
                         }
                         updateNFCStatus('✅ NFC ACTIVE - Ready for next tap!', 'active');
