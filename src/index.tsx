@@ -13820,6 +13820,7 @@ app.get('/api/admin/beach/spots', async (c) => {
       SELECT 
         s.*,
         z.zone_name,
+        z.description as zone_description,
         bb.booking_status,
         bb.booking_reference,
         bb.guest_name
@@ -13867,6 +13868,7 @@ app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), asyn
       price_full_day,
       price_half_day,
       price_hourly,
+      spot_description,
       zone_name
     } = body
     
@@ -13892,8 +13894,8 @@ app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), asyn
       INSERT INTO beach_spots (
         property_id, zone_id, spot_number, spot_type,
         position_x, position_y, max_capacity,
-        price_full_day, price_half_day, price_hourly
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        price_full_day, price_half_day, price_hourly, spot_description
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       property_id,
       zoneIdToUse,
@@ -13904,7 +13906,8 @@ app.post('/api/admin/beach/spots', requirePermission('beach_zones_manage'), asyn
       max_capacity || 2,
       price_full_day || 0,
       price_half_day || 0,
-      price_hourly || 0
+      price_hourly || 0,
+      body.spot_description || null
     ).run()
     
     return c.json({ success: true })
@@ -34157,6 +34160,7 @@ app.get('/beach-booking/:property_id', async (c) => {
                             <p><i class="fas fa-users mr-2"></i>Capacity: <span id="selectedSpotCapacity" class="font-semibold"></span> guests</p>
                             <p id="selectedSpotZone" class="hidden"><i class="fas fa-map-marker-alt mr-2 text-purple-600"></i>Zone: <span id="selectedSpotZoneName" class="font-semibold"></span></p>
                             <p><i class="fas fa-dollar-sign mr-2"></i>Price: <span id="selectedSpotPrice" class="font-semibold"></span></p>
+                            <p id="selectedSpotDescription" class="hidden text-xs italic text-gray-600 mt-2 pl-6" style="line-height: 1.4;"><span id="selectedSpotDescriptionText"></span></p>
                         </div>
                     </div>
 
@@ -34523,11 +34527,23 @@ app.get('/beach-booking/:property_id', async (c) => {
             // Show zone if spot has one
             const zoneEl = document.getElementById('selectedSpotZone');
             const zoneNameEl = document.getElementById('selectedSpotZoneName');
-            if (spot.zone_name) {
+            console.log('🏖️ Spot zone_name:', spot.zone_name); // Debug log
+            if (spot.zone_name && spot.zone_name !== 'null' && spot.zone_name.trim() !== '') {
                 zoneNameEl.textContent = spot.zone_name;
                 zoneEl.classList.remove('hidden');
             } else {
                 zoneEl.classList.add('hidden');
+            }
+            
+            // Show description (zone description or spot description)
+            const descEl = document.getElementById('selectedSpotDescription');
+            const descTextEl = document.getElementById('selectedSpotDescriptionText');
+            const description = spot.zone_description || spot.spot_description;
+            if (description && description.trim() !== '' && description !== 'null') {
+                descTextEl.textContent = description;
+                descEl.classList.remove('hidden');
+            } else {
+                descEl.classList.add('hidden');
             }
             
             // Show price (zones can have different pricing)
