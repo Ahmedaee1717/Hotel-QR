@@ -20,7 +20,9 @@ export default defineConfig({
         '/welcome.html',
         '/guestconnect-logo.png',
         '/guestconnect-logo-small.png',
-        '/guestconnect-logo-horizontal.png'
+        '/guestconnect-logo-horizontal.png',
+        '/guestconnect-logo-transparent.png',
+        '/onepass-logo.png'
       ]
     }),
     devServer({
