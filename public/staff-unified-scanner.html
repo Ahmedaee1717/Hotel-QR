@@ -460,7 +460,7 @@
                     stats.verified++;
                     stats.qr++;
                     updateStats();
-                    showSuccess(data.pass_details);
+                    showSuccess(data.pass_details, null, data.beach_booking);
                     loadCheckedInGuests(); // Refresh the list
                     
                     // Auto-reset after 2 seconds with countdown
@@ -510,7 +510,7 @@
                         stats.verified++;
                         stats.face++;
                         updateStats();
-                        showAutoApproved(data.pass_details, data.match_score);
+                        showAutoApproved(data.pass_details, data.match_score, data.beach_booking);
                         loadCheckedInGuests(); // Refresh the list
                         
                         // Auto-reset after 2 seconds with countdown
@@ -542,7 +542,7 @@
             }
         }
         
-        function showSuccess(passDetails, matchScore = null) {
+        function showSuccess(passDetails, matchScore = null, beachBooking = null) {
             const resultDiv = document.getElementById('verification-result');
             resultDiv.innerHTML = `
                 <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-lg">
@@ -580,6 +580,32 @@
                             <span class="text-gray-600">Children:</span>
                             <span class="font-semibold">${passDetails.num_children || 0}</span>
                         </div>
+                        ${beachBooking ? `
+                        <div class="border-t pt-2 mt-2">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-umbrella-beach text-blue-500"></i>
+                                <span class="font-semibold text-blue-700">Beach Booking Today</span>
+                            </div>
+                            <div class="pl-6 space-y-1 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Spot:</span>
+                                    <span class="font-semibold">${beachBooking.spot_number} (${beachBooking.spot_type})</span>
+                                </div>
+                                ${beachBooking.zone_name ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Zone:</span>
+                                    <span class="font-semibold">${beachBooking.zone_name}</span>
+                                </div>` : ''}
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Time:</span>
+                                    <span class="font-semibold">${beachBooking.slot_type === 'full_day' ? 'Full Day' : beachBooking.slot_type === 'morning' ? 'Morning' : 'Afternoon'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Ref:</span>
+                                    <span class="font-semibold text-xs">${beachBooking.booking_reference}</span>
+                                </div>
+                            </div>
+                        </div>` : ''}
                     </div>
                     <div class="grid grid-cols-2 gap-2 mt-4">
                         <button onclick="pauseDisplay()" id="pause-btn"
@@ -598,7 +624,7 @@
             `;
         }
         
-        function showAutoApproved(passDetails, matchScore) {
+        function showAutoApproved(passDetails, matchScore, beachBooking = null) {
             const resultDiv = document.getElementById('verification-result');
             const confidence = (matchScore * 100).toFixed(1);
             resultDiv.innerHTML = `
@@ -622,6 +648,62 @@
                         <div class="flex justify-between">
                             <span class="text-gray-600">Tier:</span>
                             <span class="font-semibold">${passDetails.tier || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Room:</span>
+                            <span class="font-semibold">${passDetails.room_number || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Adults:</span>
+                            <span class="font-semibold">${passDetails.num_adults || 0}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Children:</span>
+                            <span class="font-semibold">${passDetails.num_children || 0}</span>
+                        </div>
+                        ${beachBooking ? `
+                        <div class="border-t pt-2 mt-2">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fas fa-umbrella-beach text-blue-500"></i>
+                                <span class="font-semibold text-blue-700">Beach Booking Today</span>
+                            </div>
+                            <div class="pl-6 space-y-1 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Spot:</span>
+                                    <span class="font-semibold">${beachBooking.spot_number} (${beachBooking.spot_type})</span>
+                                </div>
+                                ${beachBooking.zone_name ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Zone:</span>
+                                    <span class="font-semibold">${beachBooking.zone_name}</span>
+                                </div>` : ''}
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Time:</span>
+                                    <span class="font-semibold">${beachBooking.slot_type === 'full_day' ? 'Full Day' : beachBooking.slot_type === 'morning' ? 'Morning' : 'Afternoon'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Ref:</span>
+                                    <span class="font-semibold text-xs">${beachBooking.booking_reference}</span>
+                                </div>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button onclick="pauseDisplay()" id="pause-btn"
+                                class="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700">
+                            <i class="fas fa-pause mr-2"></i>Pause
+                        </button>
+                        <button onclick="resetScanner()" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
+                            <i class="fas fa-redo mr-2"></i>Next
+                        </button>
+                    </div>
+                    <div id="auto-reset-countdown" class="mt-2 text-center text-sm text-gray-500">
+                        Auto-resetting in <span id="countdown-seconds">2</span>s...
+                    </div>
+                </div>
+            `;
+        }
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-600">Room:</span>
@@ -858,7 +940,7 @@
                     stats.verified++;
                     stats.qr++;
                     updateStats();
-                    showSuccess(data.pass_details);
+                    showSuccess(data.pass_details, null, data.beach_booking);
                     loadCheckedInGuests();
                     
                     setTimeout(() => {
@@ -1456,7 +1538,7 @@
                     
                     // API returns pass_details
                     if (data.pass_details) {
-                        showSuccess(data.pass_details);
+                        showSuccess(data.pass_details, null, data.beach_booking);
                         loadCheckedInGuests(); // Refresh the list
                         updateStatus('NFC verified! Tap next wristband', 'success');
                         

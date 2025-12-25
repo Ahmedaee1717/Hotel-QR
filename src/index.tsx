@@ -17209,6 +17209,33 @@ app.post('/api/staff/verify-pass', async (c) => {
       }
     }
 
+    // Check for beach bookings today
+    const beachBooking = await DB.prepare(`
+      SELECT 
+        bb.booking_reference,
+        bb.booking_date,
+        bb.slot_type,
+        bb.spot_id,
+        bs.spot_number,
+        bs.spot_type,
+        bz.zone_name
+      FROM beach_bookings bb
+      LEFT JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      LEFT JOIN beach_zones bz ON bs.zone_id = bz.zone_id
+      WHERE bb.property_id = ?
+        AND (bb.guest_email = ? OR bb.guest_phone = ? OR bb.room_number = ?)
+        AND bb.booking_date = ?
+        AND bb.booking_status IN ('confirmed', 'checked_in')
+      ORDER BY bb.created_at DESC
+      LIMIT 1
+    `).bind(
+      property_id,
+      pass.primary_guest_email || '',
+      pass.primary_guest_phone || '',
+      pass.room_number || '',
+      today
+    ).first()
+
     // Record the check-in
     await DB.prepare(`
       INSERT INTO pass_verifications (
@@ -17232,6 +17259,14 @@ app.post('/api/staff/verify-pass', async (c) => {
       pass_reference: pass.pass_reference,
       face_enrolled: !!pass.face_embedding,
       face_embedding: pass.face_embedding,
+      beach_booking: beachBooking ? {
+        booking_reference: beachBooking.booking_reference,
+        booking_date: beachBooking.booking_date,
+        slot_type: beachBooking.slot_type,
+        spot_number: beachBooking.spot_number,
+        spot_type: beachBooking.spot_type,
+        zone_name: beachBooking.zone_name
+      } : null,
       pass_details: {
         pass_reference: pass.pass_reference,
         guest_name: pass.primary_guest_name,
