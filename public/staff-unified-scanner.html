@@ -704,36 +704,6 @@
                 </div>
             `;
         }
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Room:</span>
-                            <span class="font-semibold">${passDetails.room_number || 'N/A'}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Adults:</span>
-                            <span class="font-semibold">${passDetails.num_adults || 0}</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-600">Children:</span>
-                            <span class="font-semibold">${passDetails.num_children || 0}</span>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 mt-4">
-                        <button onclick="pauseDisplay()" id="pause-btn"
-                                class="px-4 py-2 bg-yellow-600 text-white rounded-lg font-semibold hover:bg-yellow-700">
-                            <i class="fas fa-pause mr-2"></i>Pause
-                        </button>
-                        <button onclick="resetScanner()" 
-                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
-                            <i class="fas fa-redo mr-2"></i>Next
-                        </button>
-                    </div>
-                    <div id="auto-reset-countdown" class="mt-2 text-center text-sm text-gray-500">
-                        Auto-resetting in <span id="countdown-seconds">2</span>s...
-                    </div>
-                </div>
-            `;
-        }
         
         function showManualReview(passDetails, matchScore) {
             const resultDiv = document.getElementById('verification-result');
