@@ -267,6 +267,7 @@
         let lastVerifyTime = 0;
         const VERIFY_COOLDOWN = 3000; // 3 seconds between scans
         let autoResetTimer = null; // Track auto-reset timer
+        let countdownInterval = null; // Track countdown interval
         let isPaused = false; // Track if display is paused
         
         // 🔥 NEW: Touch-based NFC priority
@@ -988,6 +989,12 @@
                 autoResetTimer = null;
             }
             
+            // Clear countdown interval
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            
             // Update buttons
             const pauseBtn = document.getElementById('pause-btn');
             if (pauseBtn) {
@@ -1024,16 +1031,19 @@
         }
         
         function startAutoResetCountdown(seconds = 2) {
-            // Clear any existing timer
+            // Clear any existing timers
             if (autoResetTimer) {
                 clearTimeout(autoResetTimer);
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
             }
             
             let remaining = seconds;
             const countdownEl = document.getElementById('countdown-seconds');
             
             // Update countdown every second
-            const countdownInterval = setInterval(() => {
+            countdownInterval = setInterval(() => {
                 remaining--;
                 if (countdownEl) {
                     countdownEl.textContent = remaining;
@@ -1041,6 +1051,7 @@
                 
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
+                    countdownInterval = null;
                 }
             }, 1000);
             
@@ -1048,6 +1059,7 @@
             autoResetTimer = setTimeout(() => {
                 if (!isPaused) {
                     clearInterval(countdownInterval);
+                    countdownInterval = null;
                     resetScanner();
                 }
             }, seconds * 1000);
@@ -1058,6 +1070,10 @@
             if (autoResetTimer) {
                 clearTimeout(autoResetTimer);
                 autoResetTimer = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
             }
             isPaused = false;
             
