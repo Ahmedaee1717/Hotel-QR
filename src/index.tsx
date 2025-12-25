@@ -34092,18 +34092,38 @@ app.get('/beach-booking/:property_id', async (c) => {
                     </div>
                     
                     <!-- Legend -->
-                    <div class="mt-4 flex flex-wrap gap-4 text-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="text-2xl">✅</span>
-                            <span class="text-gray-600">Available</span>
+                    <div class="mt-4 space-y-3">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🔵</span>
+                                <span class="text-gray-600">Umbrella</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🟢</span>
+                                <span class="text-gray-600">Cabana</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🟡</span>
+                                <span class="text-gray-600">Lounger</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🟣</span>
+                                <span class="text-gray-600">Daybed</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-2xl opacity-30 grayscale">🏖️</span>
-                            <span class="text-gray-600">Booked</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-2xl">⭐</span>
-                            <span class="text-gray-600">Premium Location</span>
+                        <div class="flex flex-wrap gap-4 text-sm pt-2 border-t">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🔵</span>
+                                <span class="text-gray-600 font-semibold">Available</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl opacity-30 grayscale">🔵</span>
+                                <span class="text-gray-600">Booked</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">⭐</span>
+                                <span class="text-gray-600">Premium Location</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -34409,12 +34429,14 @@ app.get('/beach-booking/:property_id', async (c) => {
             const legendContainer = document.getElementById('zoneLegend');
             const legendItems = document.getElementById('zoneLegendItems');
             
+            // Always show zone legend if zones exist, including BEACHFRONT
             if (zones.length === 0) {
                 legendContainer.style.display = 'none';
                 return;
             }
             
             legendContainer.style.display = 'block';
+            console.log('📍 Displaying zone legend with', zones.length, 'zones');
             legendItems.innerHTML = '';
             
             zones.forEach(zone => {
