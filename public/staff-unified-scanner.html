@@ -512,10 +512,8 @@
                         showAutoApproved(data.pass_details, data.match_score);
                         loadCheckedInGuests(); // Refresh the list
                         
-                        // Auto-reset after 2 seconds
-                        setTimeout(() => {
-                            resetScanner();
-                        }, 2000);
+                        // Auto-reset after 2 seconds with countdown
+                        startAutoResetCountdown(2);
                     } else if (confidence >= 50) {
                         // MEDIUM CONFIDENCE - Require manual review
                         stats.face++;
