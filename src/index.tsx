@@ -34113,16 +34113,8 @@ app.get('/beach-booking/:property_id', async (c) => {
                         </div>
                         <div class="flex flex-wrap gap-4 text-sm pt-2 border-t">
                             <div class="flex items-center gap-2">
-                                <span class="text-2xl">🔵</span>
-                                <span class="text-gray-600 font-semibold">Available</span>
-                            </div>
-                            <div class="flex items-center gap-2">
                                 <span class="text-2xl opacity-30 grayscale">🔵</span>
                                 <span class="text-gray-600">Booked</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-2xl">⭐</span>
-                                <span class="text-gray-600">Premium Location</span>
                             </div>
                         </div>
                     </div>
@@ -34163,8 +34155,8 @@ app.get('/beach-booking/:property_id', async (c) => {
                         </h3>
                         <div class="space-y-1 text-sm text-gray-700">
                             <p><i class="fas fa-users mr-2"></i>Capacity: <span id="selectedSpotCapacity" class="font-semibold"></span> guests</p>
+                            <p id="selectedSpotZone" class="hidden"><i class="fas fa-map-marker-alt mr-2 text-purple-600"></i>Zone: <span id="selectedSpotZoneName" class="font-semibold"></span></p>
                             <p><i class="fas fa-dollar-sign mr-2"></i>Price: <span id="selectedSpotPrice" class="font-semibold"></span></p>
-                            <p id="premiumBadge" class="hidden"><i class="fas fa-star mr-2 text-yellow-500"></i><span class="font-semibold text-yellow-600">Premium Location</span></p>
                         </div>
                     </div>
 
@@ -34527,8 +34519,20 @@ app.get('/beach-booking/:property_id', async (c) => {
             document.getElementById('selectedSpotIcon').textContent = getSpotIcon(spot.spot_type);
             document.getElementById('selectedSpotNumber').textContent = 'Spot ' + spot.spot_number;
             document.getElementById('selectedSpotCapacity').textContent = spot.max_capacity;
+            
+            // Show zone if spot has one
+            const zoneEl = document.getElementById('selectedSpotZone');
+            const zoneNameEl = document.getElementById('selectedSpotZoneName');
+            if (spot.zone_name) {
+                zoneNameEl.textContent = spot.zone_name;
+                zoneEl.classList.remove('hidden');
+            } else {
+                zoneEl.classList.add('hidden');
+            }
+            
+            // Show price (zones can have different pricing)
             document.getElementById('selectedSpotPrice').textContent = spot.price_full_day > 0 ? spot.price_full_day + ' USD' : 'FREE for guests';
-            document.getElementById('premiumBadge').classList.toggle('hidden', !spot.is_premium);
+            
             document.getElementById('selectedSpotInfo').classList.remove('hidden');
             document.getElementById('timeSlotSection').classList.remove('hidden');
             
