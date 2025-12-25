@@ -15,6 +15,7 @@ export default defineConfig({
         '/admin-login.html',
         '/staff-face-scanner.html',
         '/staff-pass-scanner.html',
+        '/staff-unified-scanner.html',
         '/vendor-dashboard.html',
         '/vendor-login.html',
         '/welcome.html',
@@ -22,7 +23,14 @@ export default defineConfig({
         '/guestconnect-logo-small.png',
         '/guestconnect-logo-horizontal.png',
         '/guestconnect-logo-transparent.png',
-        '/onepass-logo.png'
+        '/onepass-logo.png',
+        '/*.png',
+        '/*.jpg',
+        '/*.jpeg',
+        '/*.gif',
+        '/*.svg',
+        '/*.ico',
+        '/*.webp'
       ]
     }),
     devServer({
