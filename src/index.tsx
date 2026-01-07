@@ -67137,6 +67137,353 @@ app.get('/api/alacarte/menu/:restaurant_id', async (c) => {
   }
 })
 
+// Check guest voucher eligibility
+app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    // Get digital pass and tier info
+    const passInfo = await DB.prepare(`
+      SELECT 
+        dp.pass_id,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        dp.room_id,
+        dp.valid_from,
+        dp.valid_until,
+        t.tier_id,
+        t.tier_code,
+        t.tier_display_name,
+        t.tier_color,
+        t.alacarte_meals_per_stay,
+        t.alacarte_eligible_restaurants,
+        t.alacarte_premium_surcharge
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
+      WHERE dp.pass_reference = ? AND dp.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!passInfo) {
+      return c.json({ success: false, error: 'Pass not found' }, 404)
+    }
+
+    // Check if tier is eligible
+    const mealsAllowed = passInfo.alacarte_meals_per_stay || 0
+    if (mealsAllowed === 0) {
+      return c.json({
+        success: true,
+        eligible: false,
+        reason: 'Tier not eligible for à la carte dining',
+        tier: {
+          tier_code: passInfo.tier_code,
+          tier_name: passInfo.tier_display_name,
+          tier_color: passInfo.tier_color
+        }
+      })
+    }
+
+    // Count used vouchers for this pass
+    const usedVouchers = await DB.prepare(`
+      SELECT COUNT(*) as used_count
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(passInfo.pass_id).first()
+
+    const mealsUsed = usedVouchers?.used_count || 0
+    const mealsRemaining = mealsAllowed - mealsUsed
+
+    // Parse eligible restaurants
+    let eligibleRestaurants = []
+    try {
+      if (passInfo.alacarte_eligible_restaurants) {
+        eligibleRestaurants = JSON.parse(passInfo.alacarte_eligible_restaurants)
+      }
+    } catch (e) {
+      console.error('Parse eligible restaurants error:', e)
+    }
+
+    // Get restaurant details if specific restaurants are set
+    let restaurantDetails = []
+    if (eligibleRestaurants.length > 0) {
+      const restaurantList = await DB.prepare(`
+        SELECT offering_id, title_en, location
+        FROM hotel_offerings
+        WHERE offering_id IN (${eligibleRestaurants.map(() => '?').join(',')})
+          AND property_id = ?
+          AND offering_type = 'restaurant'
+          AND status = 'active'
+      `).bind(...eligibleRestaurants, property_id).all()
+      restaurantDetails = restaurantList.results
+    } else {
+      // All à la carte restaurants are eligible
+      const allRestaurants = await DB.prepare(`
+        SELECT offering_id, title_en, location
+        FROM hotel_offerings
+        WHERE property_id = ?
+          AND offering_type = 'restaurant'
+          AND status = 'active'
+        ORDER BY display_order, title_en
+      `).bind(property_id).all()
+      restaurantDetails = allRestaurants.results
+    }
+
+    return c.json({
+      success: true,
+      eligible: mealsRemaining > 0,
+      guest_name: passInfo.primary_guest_name,
+      tier: {
+        tier_code: passInfo.tier_code,
+        tier_name: passInfo.tier_display_name,
+        tier_color: passInfo.tier_color
+      },
+      vouchers: {
+        total_allowed: mealsAllowed,
+        used: mealsUsed,
+        remaining: mealsRemaining
+      },
+      eligible_restaurants: restaurantDetails,
+      premium_surcharge: passInfo.alacarte_premium_surcharge || 0
+    })
+  } catch (error) {
+    console.error('Check voucher eligibility error:', error)
+    return c.json({ success: false, error: 'Failed to check eligibility' }, 500)
+  }
+})
+
+// Create à la carte voucher
+app.post('/api/alacarte/voucher', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const {
+      pass_reference,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size_adults,
+      party_size_children,
+      preorder_salad,
+      preorder_starter,
+      preorder_main,
+      preorder_dessert,
+      special_requests
+    } = body
+
+    // Verify pass eligibility
+    const passInfo = await DB.prepare(`
+      SELECT 
+        dp.pass_id,
+        dp.property_id,
+        t.alacarte_meals_per_stay,
+        t.alacarte_eligible_restaurants
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
+      WHERE dp.pass_reference = ? AND dp.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!passInfo) {
+      return c.json({ success: false, error: 'Pass not found' }, 404)
+    }
+
+    // Check remaining vouchers
+    const usedCount = await DB.prepare(`
+      SELECT COUNT(*) as used
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(passInfo.pass_id).first()
+
+    const mealsUsed = usedCount?.used || 0
+    const mealsAllowed = passInfo.alacarte_meals_per_stay || 0
+    
+    if (mealsUsed >= mealsAllowed) {
+      return c.json({ 
+        success: false, 
+        error: 'No vouchers remaining',
+        used: mealsUsed,
+        allowed: mealsAllowed
+      }, 400)
+    }
+
+    // Check restaurant eligibility
+    let eligibleRestaurants = []
+    try {
+      if (passInfo.alacarte_eligible_restaurants) {
+        eligibleRestaurants = JSON.parse(passInfo.alacarte_eligible_restaurants)
+        if (eligibleRestaurants.length > 0 && !eligibleRestaurants.includes(restaurant_id.toString())) {
+          return c.json({ success: false, error: 'Restaurant not eligible for your tier' }, 400)
+        }
+      }
+    } catch (e) {
+      console.error('Parse restaurants error:', e)
+    }
+
+    // Calculate total cost
+    const items = [preorder_salad, preorder_starter, preorder_main, preorder_dessert].filter(Boolean)
+    let totalCost = 0
+    
+    for (const itemId of items) {
+      const item = await DB.prepare(`
+        SELECT cost_to_hotel FROM alacarte_menu_items WHERE item_id = ?
+      `).bind(itemId).first()
+      
+      if (item) {
+        totalCost += item.cost_to_hotel || 0
+      }
+    }
+
+    // Generate voucher code
+    const dateStr = reservation_date.replace(/-/g, '')
+    const randomNum = Math.floor(1000 + Math.random() * 9000)
+    const voucherCode = `MEAL-${dateStr}-${randomNum}`
+
+    // Insert voucher
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_vouchers (
+        property_id,
+        pass_id,
+        voucher_code,
+        restaurant_id,
+        reservation_date,
+        reservation_time,
+        party_size_adults,
+        party_size_children,
+        preorder_salad_id,
+        preorder_starter_id,
+        preorder_main_id,
+        preorder_dessert_id,
+        special_requests,
+        total_cost,
+        status,
+        tier_meal_number
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+    `).bind(
+      property_id,
+      passInfo.pass_id,
+      voucherCode,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size_adults || 1,
+      party_size_children || 0,
+      preorder_salad || null,
+      preorder_starter || null,
+      preorder_main || null,
+      preorder_dessert || null,
+      special_requests || null,
+      totalCost,
+      mealsUsed + 1
+    ).run()
+
+    return c.json({
+      success: true,
+      voucher_code: voucherCode,
+      voucher_id: result.meta.last_row_id,
+      total_cost: totalCost,
+      meals_used: mealsUsed + 1,
+      meals_allowed: mealsAllowed,
+      meals_remaining: mealsAllowed - (mealsUsed + 1)
+    })
+  } catch (error) {
+    console.error('Create voucher error:', error)
+    return c.json({ success: false, error: 'Failed to create voucher' }, 500)
+  }
+})
+
+// Get voucher details
+app.get('/api/alacarte/voucher/:voucher_code', async (c) => {
+  const { DB } = c.env
+  const voucher_code = c.req.param('voucher_code')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const voucher = await DB.prepare(`
+      SELECT 
+        v.*,
+        r.title_en as restaurant_name,
+        r.location as restaurant_location,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        salad.item_name as salad_name,
+        starter.item_name as starter_name,
+        main.item_name as main_name,
+        dessert.item_name as dessert_name
+      FROM alacarte_vouchers v
+      JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
+      JOIN digital_passes dp ON v.pass_id = dp.pass_id
+      LEFT JOIN alacarte_menu_items salad ON v.preorder_salad_id = salad.item_id
+      LEFT JOIN alacarte_menu_items starter ON v.preorder_starter_id = starter.item_id
+      LEFT JOIN alacarte_menu_items main ON v.preorder_main_id = main.item_id
+      LEFT JOIN alacarte_menu_items dessert ON v.preorder_dessert_id = dessert.item_id
+      WHERE v.voucher_code = ? AND v.property_id = ?
+    `).bind(voucher_code, property_id).first()
+
+    if (!voucher) {
+      return c.json({ success: false, error: 'Voucher not found' }, 404)
+    }
+
+    return c.json({
+      success: true,
+      voucher
+    })
+  } catch (error) {
+    console.error('Get voucher error:', error)
+    return c.json({ success: false, error: 'Failed to fetch voucher' }, 500)
+  }
+})
+
+// Mark voucher as used
+app.post('/api/alacarte/voucher/:voucher_code/redeem', async (c) => {
+  const { DB } = c.env
+  const voucher_code = c.req.param('voucher_code')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const body = await c.req.json()
+    const { staff_id, staff_name } = body
+
+    // Get voucher
+    const voucher = await DB.prepare(`
+      SELECT voucher_id, status
+      FROM alacarte_vouchers
+      WHERE voucher_code = ? AND property_id = ?
+    `).bind(voucher_code, property_id).first()
+
+    if (!voucher) {
+      return c.json({ success: false, error: 'Voucher not found' }, 404)
+    }
+
+    if (voucher.status === 'used') {
+      return c.json({ success: false, error: 'Voucher already used' }, 400)
+    }
+
+    if (voucher.status === 'cancelled') {
+      return c.json({ success: false, error: 'Voucher cancelled' }, 400)
+    }
+
+    // Mark as used
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET 
+        status = 'used',
+        checked_in_at = CURRENT_TIMESTAMP,
+        checked_in_by = ?
+      WHERE voucher_id = ?
+    `).bind(staff_name || 'Staff', voucher.voucher_id).run()
+
+    return c.json({
+      success: true,
+      message: 'Voucher redeemed successfully'
+    })
+  } catch (error) {
+    console.error('Redeem voucher error:', error)
+    return c.json({ success: false, error: 'Failed to redeem voucher' }, 500)
+  }
+})
+
 // Admin: View all menu items (for testing)
 app.get('/api/admin/alacarte/menu-items', async (c) => {
   const { DB } = c.env
@@ -67248,6 +67595,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
   const { DB } = c.env
   const restaurant_id = c.req.param('restaurant_id')
   const property_id = c.req.query('property') || '1'
+  const pass_reference = c.req.query('pass') || null
   
   try {
     // Get restaurant info
@@ -67301,6 +67649,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             ${restaurant.location ? `<p class="text-purple-200 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${restaurant.location}</p>` : ''}
         </div>
     </div>
+
+    <!-- Voucher Status (if applicable) -->
+    <div id="voucherStatus" class="hidden max-w-4xl mx-auto px-4 pt-6"></div>
 
     <div class="max-w-4xl mx-auto px-4 py-8">
         <!-- Booking Details -->
@@ -67372,7 +67723,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Kitchen cost estimate - not guest charge</p>
             </div>
-            <button onclick="confirmBooking()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold text-lg transition-colors">
+            <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold text-lg transition-colors">
                 <i class="fas fa-check-circle mr-2"></i>Confirm Reservation
             </button>
         </div>
@@ -67382,7 +67733,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const menuData = ${JSON.stringify(menu.results)};
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
+        const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
         let selectedItems = {};
+        let voucherEligibility = null;
         
         // Group menu by category
         const menuByCategory = {};
@@ -67392,6 +67745,67 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             menuByCategory[item.category].push(item);
         });
+        
+        // Check voucher eligibility on load
+        async function checkVoucherEligibility() {
+            if (!passReference) return;
+            
+            try {
+                const response = await axios.get(\`/api/alacarte/voucher-eligibility/\${passReference}\`, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                if (response.data.success && response.data.eligible) {
+                    voucherEligibility = response.data;
+                    displayVoucherStatus();
+                }
+            } catch (error) {
+                console.error('Check eligibility error:', error);
+            }
+        }
+        
+        function displayVoucherStatus() {
+            if (!voucherEligibility) return;
+            
+            const statusDiv = document.getElementById('voucherStatus');
+            statusDiv.classList.remove('hidden');
+            
+            const { guest_name, tier, vouchers } = voucherEligibility;
+            
+            statusDiv.innerHTML = \`
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-lg p-6">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-ticket-alt text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-green-900 mb-2">
+                                <i class="fas fa-check-circle mr-2"></i>Voucher Eligible!
+                            </h3>
+                            <div class="space-y-1 text-sm">
+                                <p class="text-gray-700"><strong>Guest:</strong> \${guest_name}</p>
+                                <p class="text-gray-700"><strong>Tier:</strong> 
+                                    <span class="px-2 py-1 rounded text-white text-xs font-semibold" style="background-color: \${tier.tier_color}">\${tier.tier_name}</span>
+                                </p>
+                                <p class="text-gray-700 text-lg font-bold mt-2">
+                                    <i class="fas fa-utensils mr-2 text-green-600"></i>
+                                    \${vouchers.remaining} of \${vouchers.total_allowed} meals remaining
+                                </p>
+                            </div>
+                            <div class="mt-3 bg-green-100 border border-green-300 rounded p-3">
+                                <p class="text-green-900 font-semibold text-sm">
+                                    <i class="fas fa-gift mr-2"></i>This meal is INCLUDED in your all-inclusive package!
+                                </p>
+                                <p class="text-green-700 text-xs mt-1">Premium items may have additional charges based on your tier.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`;
+            
+            // Update button text
+            document.getElementById('confirmButton').innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Use Voucher & Confirm';
+        }
         
         function showMenuCategory(category) {
             // Update tabs
@@ -67488,7 +67902,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             summary.innerHTML = html;
         }
         
-        function confirmBooking() {
+        async function confirmBooking() {
             const date = document.getElementById('bookingDate').value;
             const time = document.getElementById('bookingTime').value;
             const adults = document.getElementById('numAdults').value;
@@ -67504,8 +67918,44 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 return;
             }
             
-            // TODO: Create voucher via API
-            alert(\`Booking confirmed!\\nDate: \${date}\\nTime: \${time}\\nParty: \${adults} adults, \${children} children\\nItems: \${Object.keys(selectedItems).length}\\n\\nVoucher system coming soon!\`);
+            if (!passReference || !voucherEligibility) {
+                alert('Booking without voucher not yet implemented. Please access through your digital pass.');
+                return;
+            }
+            
+            // Build preorder data
+            const preorder = {};
+            Object.keys(selectedItems).forEach(itemId => {
+                const item = selectedItems[itemId];
+                preorder[\`preorder_\${item.category}\`] = parseInt(itemId);
+            });
+            
+            try {
+                const response = await axios.post('/api/alacarte/voucher', {
+                    pass_reference: passReference,
+                    restaurant_id: restaurantId,
+                    reservation_date: date,
+                    reservation_time: time,
+                    party_size_adults: parseInt(adults),
+                    party_size_children: parseInt(children),
+                    ...preorder
+                }, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                if (response.data.success) {
+                    const { voucher_code, meals_remaining, total_cost } = response.data;
+                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nYour reservation is confirmed. Show this voucher code when you arrive at the restaurant.\`);
+                    
+                    // Redirect to voucher view (we'll create this next)
+                    window.location.href = \`/alacarte/voucher/\${voucher_code}?property=\${propertyId}\`;
+                } else {
+                    alert('Booking failed: ' + (response.data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to create voucher: ' + (error.response?.data?.error || 'Network error'));
+            }
         }
         
         // Set minimum date to today
@@ -67513,6 +67963,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         // Show first category
         showMenuCategory('salad');
+        
+        // Check eligibility on page load
+        checkVoucherEligibility();
     </script>
 </body>
 </html>
