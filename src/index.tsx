@@ -14996,7 +14996,10 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
       access_locations,
       daily_upgrade_price,
       is_active,
-      display_order
+      display_order,
+      alacarte_meals_per_stay,
+      alacarte_eligible_restaurants,
+      alacarte_premium_surcharge
     } = body
     
     // Verify tier belongs to property
@@ -15019,6 +15022,9 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
           daily_upgrade_price = ?,
           is_active = ?,
           display_order = ?,
+          alacarte_meals_per_stay = ?,
+          alacarte_eligible_restaurants = ?,
+          alacarte_premium_surcharge = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE tier_id = ? AND property_id = ?
     `).bind(
@@ -15031,6 +15037,9 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
       daily_upgrade_price !== undefined ? daily_upgrade_price : tier.daily_upgrade_price,
       is_active !== undefined ? is_active : tier.is_active,
       display_order !== undefined ? display_order : tier.display_order,
+      alacarte_meals_per_stay !== undefined ? alacarte_meals_per_stay : (tier.alacarte_meals_per_stay || 0),
+      alacarte_eligible_restaurants !== undefined ? alacarte_eligible_restaurants : tier.alacarte_eligible_restaurants,
+      alacarte_premium_surcharge !== undefined ? alacarte_premium_surcharge : (tier.alacarte_premium_surcharge || 0),
       tier_id,
       property_id
     ).run()
@@ -54522,6 +54531,31 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<input type="number" name="daily_upgrade_price" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + tier.daily_upgrade_price + '"></div>';
         html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Description</label>';
         html += '<textarea name="tier_description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2">' + (tier.tier_description || '') + '</textarea></div>';
+        
+        // À La Carte Settings
+        html += '<div class="md:col-span-2 mt-6 p-4 bg-purple-50 border-2 border-purple-200 rounded-lg">';
+        html += '<h4 class="font-bold text-lg mb-3 text-purple-900 flex items-center gap-2">';
+        html += '<i class="fas fa-utensils"></i>À La Carte Dining Settings';
+        html += '</h4>';
+        html += '<div class="grid md:grid-cols-2 gap-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Meals Per Stay</label>';
+        html += '<input type="number" name="alacarte_meals_per_stay" min="0" max="99" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + (tier.alacarte_meals_per_stay || 0) + '" placeholder="0 = Not Eligible">';
+        html += '<p class="text-xs text-gray-500 mt-1">How many à la carte meals are included (0 = not eligible)</p>';
+        html += '</div>';
+        html += '<div><label class="block text-sm font-semibold mb-1">Premium Surcharge ($)</label>';
+        html += '<input type="number" name="alacarte_premium_surcharge" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + (tier.alacarte_premium_surcharge || 0) + '" placeholder="0.00">';
+        html += '<p class="text-xs text-gray-500 mt-1">Extra charge for premium menu items</p>';
+        html += '</div>';
+        html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Eligible Restaurants</label>';
+        html += '<div class="space-y-2 mt-2">';
+        
+        // Load restaurants for checkboxes - we'll need to fetch them
+        // For now, add a placeholder that will be populated
+        html += '<div id="alacarte-restaurants-checkboxes"></div>';
+        html += '<p class="text-xs text-gray-500 mt-2">Leave empty to allow all restaurants</p>';
+        html += '</div></div>';
+        html += '</div></div>';
+        
         html += '</div>';
         html += '<div class="flex gap-3 justify-end">';
         html += '<button type="button" onclick="closeEditTierModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
@@ -54614,6 +54648,39 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         modal.innerHTML = html;
         document.body.appendChild(modal);
         
+        // Load and populate restaurants for à la carte settings
+        (async () => {
+          try {
+            const response = await fetchWithAuth('/api/alacarte/restaurants', {
+              headers: { 'X-Property-ID': propertyId }
+            });
+            const data = await response.json();
+            
+            if (data.success && data.restaurants) {
+              const container = document.getElementById('alacarte-restaurants-checkboxes');
+              let eligibleRestaurants = [];
+              try {
+                if (tier.alacarte_eligible_restaurants) {
+                  eligibleRestaurants = JSON.parse(tier.alacarte_eligible_restaurants);
+                }
+              } catch (e) {
+                console.error('Parse eligible restaurants error:', e);
+              }
+              
+              container.innerHTML = data.restaurants.map(restaurant => {
+                const isChecked = eligibleRestaurants.includes(restaurant.offering_id.toString());
+                return '<label class="flex items-center gap-2 p-2 hover:bg-purple-50 rounded cursor-pointer">' +
+                  '<input type="checkbox" name="alacarte_restaurants" value="' + restaurant.offering_id + '" ' + (isChecked ? 'checked' : '') + ' class="w-4 h-4 text-purple-600 rounded">' +
+                  '<span class="text-sm font-medium">' + restaurant.title_en + '</span>' +
+                  (restaurant.location ? '<span class="text-xs text-gray-500">(' + restaurant.location + ')</span>' : '') +
+                  '</label>';
+              }).join('');
+            }
+          } catch (error) {
+            console.error('Load restaurants for tier settings error:', error);
+          }
+        })();
+        
         // Store venues for add benefit modal
         window.currentTierVenues = venues;
       };
@@ -54654,6 +54721,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         data.daily_upgrade_price = parseFloat(data.daily_upgrade_price) || 0;
         
+        // Collect à la carte settings
+        data.alacarte_meals_per_stay = parseInt(data.alacarte_meals_per_stay) || 0;
+        data.alacarte_premium_surcharge = parseFloat(data.alacarte_premium_surcharge) || 0;
+        
+        // Collect selected restaurants
+        const selectedRestaurants = Array.from(form.querySelectorAll('input[name="alacarte_restaurants"]:checked'))
+          .map(cb => cb.value);
+        data.alacarte_eligible_restaurants = selectedRestaurants.length > 0 ? JSON.stringify(selectedRestaurants) : null;
+        
         try {
           const response = await fetchWithAuth(\`/api/admin/all-inclusive/tiers/\${tierId}\`, {
             method: 'PUT',
@@ -54664,6 +54740,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           
           if (result.success) {
             alert('✅ Tier updated successfully!');
+            closeEditTierModal();
             loadTiers();
           } else {
             alert('❌ Failed to update tier: ' + result.error);
@@ -67150,7 +67227,7 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
         dp.pass_id,
         dp.pass_reference,
         dp.primary_guest_name,
-        dp.room_id,
+        dp.room_number,
         dp.valid_from,
         dp.valid_until,
         t.tier_id,
@@ -67248,7 +67325,12 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
     })
   } catch (error) {
     console.error('Check voucher eligibility error:', error)
-    return c.json({ success: false, error: 'Failed to check eligibility' }, 500)
+    console.error('Error details:', error.message, error.stack)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to check eligibility',
+      debug: error.message 
+    }, 500)
   }
 })
 
