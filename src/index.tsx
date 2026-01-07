@@ -42039,26 +42039,14 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Item Name (English)</label>
-                            <input type="text" id="menuItemName" placeholder="e.g., Caesar Salad" required class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Item Name (Arabic)</label>
-                            <input type="text" id="menuItemNameAr" placeholder="سلطة السيزر" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Item Name</label>
+                        <input type="text" id="menuItemName" placeholder="e.g., Caesar Salad" required class="w-full px-4 py-2 border rounded-lg">
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Description (English)</label>
-                            <textarea id="menuDescription" placeholder="Crisp romaine lettuce..." class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Description (Arabic)</label>
-                            <textarea id="menuDescriptionAr" placeholder="..." class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
-                        </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Description</label>
+                        <textarea id="menuDescription" placeholder="Crisp romaine lettuce with parmesan and croutons..." class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -47851,9 +47839,9 @@ app.get('/admin/dashboard', (c) => {
           restaurant_id: document.getElementById('menuRestaurantId').value,
           category: document.getElementById('menuCategory').value,
           item_name: document.getElementById('menuItemName').value,
-          item_name_ar: document.getElementById('menuItemNameAr').value || null,
+          item_name_ar: null,
           description: document.getElementById('menuDescription').value || null,
-          description_ar: document.getElementById('menuDescriptionAr').value || null,
+          description_ar: null,
           cost_to_hotel: parseFloat(document.getElementById('menuCost').value),
           is_premium: document.getElementById('menuIsPremium').checked ? 1 : 0,
           display_order: parseInt(document.getElementById('menuDisplayOrder').value),
