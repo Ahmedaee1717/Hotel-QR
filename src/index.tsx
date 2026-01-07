@@ -66685,6 +66685,155 @@ app.get('/room-service/:property_id', (c) => {
   `)
 })
 
+// ============================================
+// À LA CARTE VOUCHER SYSTEM API
+// ============================================
+
+// Get all restaurants with à la carte menus
+app.get('/api/alacarte/restaurants', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const restaurants = await DB.prepare(`
+      SELECT 
+        offering_id,
+        title_en,
+        title_ar,
+        short_description_en,
+        short_description_ar,
+        full_description_en,
+        full_description_ar,
+        location,
+        capacity_per_slot,
+        requires_booking
+      FROM hotel_offerings
+      WHERE property_id = ?
+        AND offering_type = 'restaurant'
+        AND status = 'active'
+      ORDER BY display_order, title_en
+    `).bind(property_id).all()
+
+    return c.json({
+      success: true,
+      restaurants: restaurants.results
+    })
+  } catch (error) {
+    console.error('Get restaurants error:', error)
+    return c.json({ success: false, error: 'Failed to fetch restaurants' }, 500)
+  }
+})
+
+// Get menu for a specific restaurant
+app.get('/api/alacarte/menu/:restaurant_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const restaurant_id = c.req.param('restaurant_id')
+
+  try {
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar
+      FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ? AND offering_type = 'restaurant'
+    `).bind(restaurant_id, property_id).first()
+
+    if (!restaurant) {
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+
+    const menu = await DB.prepare(`
+      SELECT 
+        item_id,
+        category,
+        item_name,
+        item_name_ar,
+        description,
+        description_ar,
+        cost_to_hotel,
+        is_premium,
+        allergens,
+        display_order
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+          ELSE 5
+        END,
+        display_order,
+        item_name
+    `).bind(restaurant_id, property_id).all()
+
+    // Group by category
+    const menuByCategory: Record<string, any[]> = {}
+    for (const item of menu.results) {
+      const cat = item.category as string
+      if (!menuByCategory[cat]) {
+        menuByCategory[cat] = []
+      }
+      menuByCategory[cat].push(item)
+    }
+
+    return c.json({
+      success: true,
+      restaurant,
+      menu: menuByCategory,
+      categories: ['salad', 'starter', 'main', 'dessert']
+    })
+  } catch (error) {
+    console.error('Get menu error:', error)
+    return c.json({ success: false, error: 'Failed to fetch menu' }, 500)
+  }
+})
+
+// Admin: View all menu items (for testing)
+app.get('/api/admin/alacarte/menu-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const items = await DB.prepare(`
+      SELECT 
+        m.item_id,
+        m.restaurant_id,
+        r.title_en as restaurant_name,
+        m.category,
+        m.item_name,
+        m.item_name_ar,
+        m.description,
+        m.cost_to_hotel,
+        m.is_premium,
+        m.is_available,
+        m.display_order
+      FROM alacarte_menu_items m
+      JOIN hotel_offerings r ON m.restaurant_id = r.offering_id
+      WHERE m.property_id = ?
+      ORDER BY m.restaurant_id, 
+        CASE m.category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+          ELSE 5
+        END,
+        m.display_order,
+        m.item_name
+    `).bind(property_id).all()
+
+    return c.json({
+      success: true,
+      total: items.results.length,
+      items: items.results
+    })
+  } catch (error) {
+    console.error('Get menu items error:', error)
+    return c.json({ success: false, error: 'Failed to fetch menu items' }, 500)
+  }
+})
+
 // GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
 // This runs every hour (configured in wrangler.jsonc)
 export default {
