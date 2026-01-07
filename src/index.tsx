@@ -42050,19 +42050,20 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Kitchen Cost (€)</label>
-                            <input type="number" id="menuCost" placeholder="8.50" step="0.01" min="0" required class="w-full px-4 py-2 border rounded-lg">
+                        <div class="flex items-center">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="menuIsPremium" class="mr-2 w-5 h-5" onchange="togglePremiumCost()">
+                                <span class="font-semibold">Premium Item (Extra Charge)</span>
+                            </label>
+                        </div>
+                        <div id="premiumCostField" class="hidden">
+                            <label class="block text-sm font-semibold mb-2">Premium Surcharge (€)</label>
+                            <input type="number" id="menuCost" placeholder="5.00" step="0.01" min="0" class="w-full px-4 py-2 border rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Extra cost for this premium item</p>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-2">Display Order</label>
                             <input type="number" id="menuDisplayOrder" placeholder="1" value="1" min="0" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div class="flex items-center pt-8">
-                            <label class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="menuIsPremium" class="mr-2 w-5 h-5">
-                                <span class="font-semibold">Premium Item</span>
-                            </label>
                         </div>
                     </div>
                     
@@ -47806,6 +47807,18 @@ app.get('/admin/dashboard', (c) => {
       
       window.resetMenuForm = function() {
         document.getElementById('addMenuItemForm').reset();
+        document.getElementById('premiumCostField').classList.add('hidden');
+      }
+      
+      window.togglePremiumCost = function() {
+        const isPremium = document.getElementById('menuIsPremium').checked;
+        const costField = document.getElementById('premiumCostField');
+        if (isPremium) {
+          costField.classList.remove('hidden');
+        } else {
+          costField.classList.add('hidden');
+          document.getElementById('menuCost').value = '';
+        }
       }
       
       window.deleteMenuItem = async function(itemId, itemName, restaurantName) {
@@ -47834,6 +47847,8 @@ app.get('/admin/dashboard', (c) => {
       document.getElementById('addMenuItemForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        const isPremium = document.getElementById('menuIsPremium').checked;
+        
         const formData = {
           property_id: propertyId,
           restaurant_id: document.getElementById('menuRestaurantId').value,
@@ -47842,8 +47857,8 @@ app.get('/admin/dashboard', (c) => {
           item_name_ar: null,
           description: document.getElementById('menuDescription').value || null,
           description_ar: null,
-          cost_to_hotel: parseFloat(document.getElementById('menuCost').value),
-          is_premium: document.getElementById('menuIsPremium').checked ? 1 : 0,
+          cost_to_hotel: isPremium ? parseFloat(document.getElementById('menuCost').value || 0) : 0,
+          is_premium: isPremium ? 1 : 0,
           display_order: parseInt(document.getElementById('menuDisplayOrder').value),
           is_available: 1
         };
