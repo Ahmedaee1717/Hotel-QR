@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>À La Carte Menu Viewer - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-8">
+            <div class="max-w-7xl mx-auto px-4">
+                <h1 class="text-4xl font-bold mb-2">
+                    <i class="fas fa-utensils mr-3"></i>
+                    À La Carte Menu System
+                </h1>
+                <p class="text-purple-200">Admin Viewer - Production Database</p>
+            </div>
+        </div>
+
+        <!-- Restaurant Selection -->
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Select Restaurant</h2>
+                <div id="restaurantList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Restaurants will load here -->
+                </div>
+            </div>
+
+            <!-- Menu Display -->
+            <div id="menuContainer" class="hidden">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 id="restaurantName" class="text-3xl font-bold"></h2>
+                            <p id="restaurantDescription" class="text-gray-600 mt-1"></p>
+                        </div>
+                        <button onclick="showRestaurants()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-arrow-left mr-2"></i>
+                            Back
+                        </button>
+                    </div>
+
+                    <!-- Category Tabs -->
+                    <div class="flex space-x-2 mb-6 border-b">
+                        <button onclick="showCategory('salad')" class="category-tab px-6 py-3 font-semibold text-gray-600 border-b-2 border-transparent hover:text-purple-600 hover:border-purple-600">
+                            🥗 Salads
+                        </button>
+                        <button onclick="showCategory('starter')" class="category-tab px-6 py-3 font-semibold text-gray-600 border-b-2 border-transparent hover:text-purple-600 hover:border-purple-600">
+                            🍤 Starters
+                        </button>
+                        <button onclick="showCategory('main')" class="category-tab px-6 py-3 font-semibold text-gray-600 border-b-2 border-transparent hover:text-purple-600 hover:border-purple-600">
+                            🥩 Mains
+                        </button>
+                        <button onclick="showCategory('dessert')" class="category-tab px-6 py-3 font-semibold text-gray-600 border-b-2 border-transparent hover:text-purple-600 hover:border-purple-600">
+                            🍰 Desserts
+                        </button>
+                    </div>
+
+                    <!-- Menu Items -->
+                    <div id="menuItems" class="space-y-6">
+                        <!-- Items will load here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMenu = null;
+
+        async function loadRestaurants() {
+            try {
+                const response = await fetch('/api/alacarte/restaurants', {
+                    headers: {'X-Property-ID': '1'}
+                });
+                const data = await response.json();
+                
+                const container = document.getElementById('restaurantList');
+                container.innerHTML = data.restaurants
+                    .filter(r => r.title_en !== 'Main Restaurant' && r.title_en !== 'Sunrise Breakfast Buffet')
+                    .map(r => `
+                        <div onclick="loadMenu(${r.offering_id}, '${r.title_en.replace(/'/g, "\\'")}', '${r.short_description_en?.replace(/'/g, "\\'") || ''}')" 
+                             class="cursor-pointer bg-gradient-to-br from-purple-50 to-white border-2 border-purple-200 hover:border-purple-500 rounded-lg p-6 transition-all hover:shadow-lg">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">${r.title_en}</h3>
+                            <p class="text-gray-600 text-sm mb-3">${r.short_description_en || ''}</p>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-purple-600">
+                                    <i class="fas fa-chair mr-1"></i>
+                                    ${r.capacity_per_slot || 'N/A'} seats
+                                </span>
+                                <span class="text-purple-600">
+                                    ${r.requires_booking ? '<i class="fas fa-calendar-check mr-1"></i>Booking Required' : '<i class="fas fa-walking mr-1"></i>Walk-in'}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('');
+            } catch (error) {
+                console.error('Load restaurants error:', error);
+            }
+        }
+
+        async function loadMenu(restaurantId, name, description) {
+            try {
+                const response = await fetch(`/api/alacarte/menu/${restaurantId}`, {
+                    headers: {'X-Property-ID': '1'}
+                });
+                const data = await response.json();
+                
+                currentMenu = data.menu;
+                document.getElementById('restaurantName').textContent = name;
+                document.getElementById('restaurantDescription').textContent = description;
+                document.getElementById('menuContainer').classList.remove('hidden');
+                document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6.mb-6').classList.add('hidden');
+                
+                // Show first category with items
+                const firstCategory = data.categories.find(cat => data.menu[cat] && data.menu[cat].length > 0);
+                if (firstCategory) {
+                    showCategory(firstCategory);
+                }
+            } catch (error) {
+                console.error('Load menu error:', error);
+            }
+        }
+
+        function showCategory(category) {
+            // Update active tab
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.classList.remove('text-purple-600', 'border-purple-600');
+                tab.classList.add('text-gray-600', 'border-transparent');
+            });
+            event.target.classList.remove('text-gray-600', 'border-transparent');
+            event.target.classList.add('text-purple-600', 'border-purple-600');
+
+            // Show items
+            const items = currentMenu[category] || [];
+            const container = document.getElementById('menuItems');
+            
+            if (items.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No items in this category</p>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <div class="border rounded-lg p-6 hover:shadow-md transition-shadow ${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h3 class="text-xl font-bold text-gray-800">${item.item_name}</h3>
+                                ${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-1 rounded-full font-semibold">PREMIUM</span>' : ''}
+                            </div>
+                            <p class="text-gray-700 mb-2">${item.description || ''}</p>
+                            ${item.description_ar ? `<p class="text-gray-600 text-sm mb-2" dir="rtl">${item.description_ar}</p>` : ''}
+                        </div>
+                        <div class="ml-6 text-right">
+                            <div class="text-2xl font-bold text-purple-600">€${item.cost_to_hotel.toFixed(2)}</div>
+                            <div class="text-xs text-gray-500">Kitchen Cost</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showRestaurants() {
+            document.getElementById('menuContainer').classList.add('hidden');
+            document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6.mb-6').classList.remove('hidden');
+        }
+
+        // Load on page load
+        loadRestaurants();
+    </script>
+</body>
+</html>
