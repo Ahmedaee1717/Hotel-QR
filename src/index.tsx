@@ -42014,6 +42014,81 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </div>
             
+            <!-- Add/Edit Menu Item -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-bold mb-4">
+                    <i class="fas fa-plus-circle mr-2 text-purple-600"></i>
+                    Add New Menu Item
+                </h3>
+                <form id="addMenuItemForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Restaurant</label>
+                            <select id="menuRestaurantId" required class="w-full px-4 py-2 border rounded-lg">
+                                <option value="">Select Restaurant</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Category</label>
+                            <select id="menuCategory" required class="w-full px-4 py-2 border rounded-lg">
+                                <option value="salad">Salad</option>
+                                <option value="starter">Starter</option>
+                                <option value="main">Main Course</option>
+                                <option value="dessert">Dessert</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Item Name (English)</label>
+                            <input type="text" id="menuItemName" placeholder="e.g., Caesar Salad" required class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Item Name (Arabic)</label>
+                            <input type="text" id="menuItemNameAr" placeholder="سلطة السيزر" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Description (English)</label>
+                            <textarea id="menuDescription" placeholder="Crisp romaine lettuce..." class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Description (Arabic)</label>
+                            <textarea id="menuDescriptionAr" placeholder="..." class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Kitchen Cost (€)</label>
+                            <input type="number" id="menuCost" placeholder="8.50" step="0.01" min="0" required class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Display Order</label>
+                            <input type="number" id="menuDisplayOrder" placeholder="1" value="1" min="0" class="w-full px-4 py-2 border rounded-lg">
+                        </div>
+                        <div class="flex items-center pt-8">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="menuIsPremium" class="mr-2 w-5 h-5">
+                                <span class="font-semibold">Premium Item</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-plus mr-2"></i>Add Menu Item
+                        </button>
+                        <button type="button" onclick="resetMenuForm()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-times mr-2"></i>Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
             <!-- Menu Items by Restaurant -->
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h3 class="text-xl font-bold mb-4">Menu Items by Restaurant</h3>
@@ -47713,10 +47788,102 @@ app.get('/admin/dashboard', (c) => {
           if (data.success) {
             displayMenuItems(data.items);
           }
+          
+          // Also load restaurant dropdown
+          await loadRestaurantsDropdown();
         } catch (error) {
           console.error('Load menu items error:', error);
         }
       }
+      
+      async function loadRestaurantsDropdown() {
+        try {
+          const response = await fetch('/api/alacarte/restaurants', {
+            headers: {'X-Property-ID': propertyId}
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            const select = document.getElementById('menuRestaurantId');
+            select.innerHTML = '<option value="">Select Restaurant</option>' + 
+              data.restaurants
+                .filter(r => r.title_en !== 'Main Restaurant' && r.title_en !== 'Sunrise Breakfast Buffet')
+                .map(r => \`<option value="\${r.offering_id}">\${r.title_en}</option>\`)
+                .join('');
+          }
+        } catch (error) {
+          console.error('Load restaurants dropdown error:', error);
+        }
+      }
+      
+      window.resetMenuForm = function() {
+        document.getElementById('addMenuItemForm').reset();
+      }
+      
+      window.deleteMenuItem = async function(itemId, itemName, restaurantName) {
+        if (!confirm(\`Delete "\${itemName}" from \${restaurantName}?\\n\\nThis action cannot be undone.\`)) return;
+        
+        try {
+          const response = await fetchWithAuth(\`/api/admin/alacarte/menu-items/\${itemId}\`, {
+            method: 'DELETE',
+            headers: {'X-Property-ID': propertyId}
+          });
+          
+          if (response.ok) {
+            alert('Menu item deleted successfully!');
+            await refreshALaCarteStats();
+            await loadMenuItems();
+          } else {
+            const error = await response.json();
+            alert('Failed to delete: ' + (error.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete menu item error:', error);
+          alert('Failed to delete menu item');
+        }
+      }
+      
+      document.getElementById('addMenuItemForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = {
+          property_id: propertyId,
+          restaurant_id: document.getElementById('menuRestaurantId').value,
+          category: document.getElementById('menuCategory').value,
+          item_name: document.getElementById('menuItemName').value,
+          item_name_ar: document.getElementById('menuItemNameAr').value || null,
+          description: document.getElementById('menuDescription').value || null,
+          description_ar: document.getElementById('menuDescriptionAr').value || null,
+          cost_to_hotel: parseFloat(document.getElementById('menuCost').value),
+          is_premium: document.getElementById('menuIsPremium').checked ? 1 : 0,
+          display_order: parseInt(document.getElementById('menuDisplayOrder').value),
+          is_available: 1
+        };
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/alacarte/menu-items', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify(formData)
+          });
+          
+          if (response.ok) {
+            alert('Menu item added successfully!');
+            document.getElementById('addMenuItemForm').reset();
+            await refreshALaCarteStats();
+            await loadMenuItems();
+          } else {
+            const error = await response.json();
+            alert('Failed to add menu item: ' + (error.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Add menu item error:', error);
+          alert('Failed to add menu item');
+        }
+      });
       
       function displayMenuItems(items) {
         const container = document.getElementById('menuItemsList');
@@ -47764,9 +47931,15 @@ app.get('/admin/dashboard', (c) => {
                       <div class="font-semibold text-gray-800">\${item.item_name}</div>
                       <div class="text-xs text-gray-600">\${item.description?.substring(0, 50) || ''}...</div>
                     </div>
-                    <div class="ml-3 text-right">
-                      <div class="text-lg font-bold text-purple-600">€\${item.cost_to_hotel.toFixed(2)}</div>
-                      \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
+                    <div class="ml-3 flex items-center gap-3">
+                      <div class="text-right">
+                        <div class="text-lg font-bold text-purple-600">€\${item.cost_to_hotel.toFixed(2)}</div>
+                        \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
+                      </div>
+                      <button onclick="deleteMenuItem(\${item.item_id}, '\${item.item_name.replace(/'/g, "\\'")}', '\${item.restaurant_name.replace(/'/g, "\\'")}' )" 
+                              class="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition-colors text-sm">
+                        <i class="fas fa-trash"></i>
+                      </button>
                     </div>
                   </div>
                 \`;
@@ -67006,6 +67179,63 @@ app.get('/api/admin/alacarte/menu-items', async (c) => {
   }
 })
 
+// Admin: Create menu item
+app.post('/api/admin/alacarte/menu-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_menu_items (
+        property_id, restaurant_id, category, item_name, item_name_ar,
+        description, description_ar, cost_to_hotel, is_premium,
+        display_order, is_available
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      body.restaurant_id,
+      body.category,
+      body.item_name,
+      body.item_name_ar,
+      body.description,
+      body.description_ar,
+      body.cost_to_hotel,
+      body.is_premium ? 1 : 0,
+      body.display_order || 0,
+      body.is_available !== undefined ? body.is_available : 1
+    ).run()
+    
+    return c.json({
+      success: true,
+      item_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Create menu item error:', error)
+    return c.json({ success: false, error: 'Failed to create menu item' }, 500)
+  }
+})
+
+// Admin: Delete menu item
+app.delete('/api/admin/alacarte/menu-items/:item_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const item_id = c.req.param('item_id')
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM alacarte_menu_items
+      WHERE item_id = ? AND property_id = ?
+    `).bind(item_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete menu item error:', error)
+    return c.json({ success: false, error: 'Failed to delete menu item' }, 500)
+  }
+})
+
 // ============================================
 // À LA CARTE GUEST BOOKING FLOW
 // ============================================
@@ -67200,11 +67430,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         }
         
         function toggleItem(itemId, category, itemName, cost) {
-            if (selectedItems[itemId]) {
-                delete selectedItems[itemId];
-            } else {
-                selectedItems[itemId] = { category, name: itemName, cost };
-            }
+            // Remove any existing selection in this category (ONE per category rule)
+            Object.keys(selectedItems).forEach(id => {
+                if (selectedItems[id].category === category) {
+                    delete selectedItems[id];
+                }
+            });
+            
+            // Add the new selection
+            selectedItems[itemId] = { category, name: itemName, cost };
+            
             updateOrderSummary();
             showMenuCategory(category); // Refresh to update button states
         }
@@ -67222,14 +67457,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const total = Object.values(selectedItems).reduce((sum, item) => sum + item.cost, 0);
             totalCost.textContent = '€' + total.toFixed(2);
             
-            summary.innerHTML = Object.entries(selectedItems).map(([id, item]) => \`
-                <div class="flex justify-between items-center">
-                    <span>\${item.name}</span>
-                    <button onclick="toggleItem(\${id}, '\${item.category}', '\${item.name.replace(/'/g, "\\'")}', \${item.cost})" class="text-red-600 hover:text-red-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            \`).join('');
+            // Group by category for display
+            const categories = ['salad', 'starter', 'main', 'dessert'];
+            const categoryLabels = {
+                'salad': '🥗 Salad',
+                'starter': '🍤 Starter', 
+                'main': '🥩 Main Course',
+                'dessert': '🍰 Dessert'
+            };
+            
+            let html = '';
+            categories.forEach(cat => {
+                const item = Object.values(selectedItems).find(i => i.category === cat);
+                if (item) {
+                    html += \`
+                        <div class="border-b pb-2 mb-2">
+                            <div class="text-xs text-gray-500 mb-1">\${categoryLabels[cat]}</div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">\${item.name}</span>
+                                <span class="text-purple-600">€\${item.cost.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    \`;
+                }
+            });
+            
+            summary.innerHTML = html;
         }
         
         function confirmBooking() {
