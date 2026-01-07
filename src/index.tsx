@@ -67006,6 +67006,267 @@ app.get('/api/admin/alacarte/menu-items', async (c) => {
   }
 })
 
+// ============================================
+// À LA CARTE GUEST BOOKING FLOW
+// ============================================
+
+// À La Carte Restaurant Selection & Booking
+app.get('/alacarte/book/:restaurant_id', async (c) => {
+  const { DB } = c.env
+  const restaurant_id = c.req.param('restaurant_id')
+  const property_id = c.req.query('property') || '1'
+  
+  try {
+    // Get restaurant info
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar,
+             full_description_en, location, capacity_per_slot
+      FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.html('<h1>Restaurant not found</h1>', 404)
+    }
+    
+    // Get menu
+    const menu = await DB.prepare(`
+      SELECT item_id, category, item_name, item_name_ar, description, description_ar,
+             cost_to_hotel, is_premium, allergens, display_order
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+        END,
+        display_order, item_name
+    `).bind(restaurant_id, property_id).all()
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book ${restaurant.title_en}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-6">
+        <div class="max-w-4xl mx-auto px-4">
+            <button onclick="window.history.back()" class="mb-4 text-white hover:text-gray-200">
+                <i class="fas fa-arrow-left mr-2"></i>Back
+            </button>
+            <h1 class="text-3xl font-bold">${restaurant.title_en}</h1>
+            <p class="text-purple-200 mt-1">${restaurant.short_description_en || ''}</p>
+            ${restaurant.location ? `<p class="text-purple-200 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${restaurant.location}</p>` : ''}
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Booking Details -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-purple-600"></i>Reservation Details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
+                    <input type="date" id="bookingDate" class="w-full px-4 py-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Time</label>
+                    <select id="bookingTime" class="w-full px-4 py-2 border rounded-lg" required>
+                        <option value="18:00">6:00 PM</option>
+                        <option value="18:30">6:30 PM</option>
+                        <option value="19:00">7:00 PM</option>
+                        <option value="19:30">7:30 PM</option>
+                        <option value="20:00">8:00 PM</option>
+                        <option value="20:30">8:30 PM</option>
+                        <option value="21:00">9:00 PM</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adults</label>
+                    <input type="number" id="numAdults" value="2" min="1" max="10" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Children</label>
+                    <input type="number" id="numChildren" value="0" min="0" max="10" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu Selection -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-purple-600"></i>Pre-Order Your Meal</h2>
+            <p class="text-gray-600 mb-6">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
+            
+            <!-- Category Tabs -->
+            <div class="flex space-x-2 mb-6 border-b overflow-x-auto">
+                <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-purple-600 text-purple-600">
+                    🥗 Salads
+                </button>
+                <button onclick="showMenuCategory('starter')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🍤 Starters
+                </button>
+                <button onclick="showMenuCategory('main')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🥩 Mains
+                </button>
+                <button onclick="showMenuCategory('dessert')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🍰 Desserts
+                </button>
+            </div>
+
+            <!-- Menu Items -->
+            <div id="menuContainer"></div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="bg-white rounded-lg shadow-lg p-6 sticky bottom-4">
+            <h3 class="text-xl font-bold mb-4">Your Pre-Order</h3>
+            <div id="orderSummary" class="space-y-2 mb-4">
+                <p class="text-gray-500 text-center py-4">No items selected yet</p>
+            </div>
+            <div class="border-t pt-4 mb-4">
+                <div class="flex justify-between text-lg font-bold">
+                    <span>Estimated Cost:</span>
+                    <span id="totalCost" class="text-purple-600">€0.00</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Kitchen cost estimate - not guest charge</p>
+            </div>
+            <button onclick="confirmBooking()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold text-lg transition-colors">
+                <i class="fas fa-check-circle mr-2"></i>Confirm Reservation
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const menuData = ${JSON.stringify(menu.results)};
+        const restaurantId = ${restaurant_id};
+        const propertyId = ${property_id};
+        let selectedItems = {};
+        
+        // Group menu by category
+        const menuByCategory = {};
+        menuData.forEach(item => {
+            if (!menuByCategory[item.category]) {
+                menuByCategory[item.category] = [];
+            }
+            menuByCategory[item.category].push(item);
+        });
+        
+        function showMenuCategory(category) {
+            // Update tabs
+            document.querySelectorAll('.menu-tab').forEach(tab => {
+                tab.classList.remove('border-purple-600', 'text-purple-600');
+                tab.classList.add('border-transparent', 'text-gray-600');
+            });
+            event.target.classList.remove('border-transparent', 'text-gray-600');
+            event.target.classList.add('border-purple-600', 'text-purple-600');
+            
+            // Render items
+            const container = document.getElementById('menuContainer');
+            const items = menuByCategory[category] || [];
+            
+            if (items.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No items in this category</p>';
+                return;
+            }
+            
+            container.innerHTML = items.map(item => \`
+                <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h4 class="font-bold text-lg">\${item.item_name}</h4>
+                                \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
+                            </div>
+                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
+                            <div class="text-purple-600 font-semibold">€\${item.cost_to_hotel.toFixed(2)}</div>
+                        </div>
+                        <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
+                                id="btn-\${item.item_id}"
+                                class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}">
+                            \${selectedItems[item.item_id] ? '<i class="fas fa-check mr-1"></i>Selected' : '<i class="fas fa-plus mr-1"></i>Add'}
+                        </button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function toggleItem(itemId, category, itemName, cost) {
+            if (selectedItems[itemId]) {
+                delete selectedItems[itemId];
+            } else {
+                selectedItems[itemId] = { category, name: itemName, cost };
+            }
+            updateOrderSummary();
+            showMenuCategory(category); // Refresh to update button states
+        }
+        
+        function updateOrderSummary() {
+            const summary = document.getElementById('orderSummary');
+            const totalCost = document.getElementById('totalCost');
+            
+            if (Object.keys(selectedItems).length === 0) {
+                summary.innerHTML = '<p class="text-gray-500 text-center py-4">No items selected yet</p>';
+                totalCost.textContent = '€0.00';
+                return;
+            }
+            
+            const total = Object.values(selectedItems).reduce((sum, item) => sum + item.cost, 0);
+            totalCost.textContent = '€' + total.toFixed(2);
+            
+            summary.innerHTML = Object.entries(selectedItems).map(([id, item]) => \`
+                <div class="flex justify-between items-center">
+                    <span>\${item.name}</span>
+                    <button onclick="toggleItem(\${id}, '\${item.category}', '\${item.name.replace(/'/g, "\\'")}', \${item.cost})" class="text-red-600 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            \`).join('');
+        }
+        
+        function confirmBooking() {
+            const date = document.getElementById('bookingDate').value;
+            const time = document.getElementById('bookingTime').value;
+            const adults = document.getElementById('numAdults').value;
+            const children = document.getElementById('numChildren').value;
+            
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            
+            if (Object.keys(selectedItems).length === 0) {
+                alert('Please select at least one dish');
+                return;
+            }
+            
+            // TODO: Create voucher via API
+            alert(\`Booking confirmed!\\nDate: \${date}\\nTime: \${time}\\nParty: \${adults} adults, \${children} children\\nItems: \${Object.keys(selectedItems).length}\\n\\nVoucher system coming soon!\`);
+        }
+        
+        // Set minimum date to today
+        document.getElementById('bookingDate').min = new Date().toISOString().split('T')[0];
+        
+        // Show first category
+        showMenuCategory('salad');
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('À la carte booking error:', error)
+    return c.html('<h1>Error loading booking page</h1>', 500)
+  }
+})
+
 // GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
 // This runs every hour (configured in wrangler.jsonc)
 export default {
