@@ -40043,6 +40043,9 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="offerings" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-utensils w-5"></i><span>Offerings</span>
                     </button>
+                    <button data-tab="alacarte" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-receipt w-5"></i><span>À La Carte Vouchers</span>
+                    </button>
                     <button data-tab="customsections" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-layer-group w-5"></i><span>Sections</span>
                     </button>
@@ -41966,6 +41969,60 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="filterOfferings('spa')" class="offering-filter-btn px-4 py-2 rounded bg-gray-200" data-type="spa"><span id="admin-pill-spa">Spa</span></button>
                 </div>
                 <div id="offeringsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- À La Carte Vouchers Tab -->
+        <div id="alacarteTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-receipt mr-2 text-purple-600"></i>
+                    À La Carte Voucher System
+                </h2>
+                <p class="text-gray-600 mb-4">Manage digital meal vouchers, view menu items, and track kitchen costs</p>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                        <div class="text-purple-600 text-sm font-semibold">Total Menu Items</div>
+                        <div id="statTotalItems" class="text-3xl font-bold text-purple-800">0</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                        <div class="text-yellow-600 text-sm font-semibold">Premium Items</div>
+                        <div id="statPremiumItems" class="text-3xl font-bold text-yellow-800">0</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                        <div class="text-blue-600 text-sm font-semibold">Restaurants</div>
+                        <div id="statRestaurants" class="text-3xl font-bold text-blue-800">0</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                        <div class="text-green-600 text-sm font-semibold">Active Vouchers</div>
+                        <div id="statActiveVouchers" class="text-3xl font-bold text-green-800">0</div>
+                    </div>
+                </div>
+                
+                <!-- View Menu Button -->
+                <div class="flex gap-4 mb-6">
+                    <a href="/admin-alacarte-viewer.html" target="_blank" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <i class="fas fa-book-open"></i>
+                        View Full Menu
+                    </a>
+                    <button onclick="refreshALaCarteStats()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Menu Items by Restaurant -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4">Menu Items by Restaurant</h3>
+                <div id="menuItemsList">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p>Loading menu data...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -45310,6 +45367,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'vendors') loadVendors();
         if (tab === 'regcode') loadRegCode();
         if (tab === 'offerings') loadOfferings();
+        if (tab === 'alacarte') loadALaCarteVouchers();
         if (tab === 'customsections') loadCustomSections();
         if (tab === 'infopages') loadInfoPages();
         if (tab === 'activities') loadActivities();
@@ -47614,6 +47672,120 @@ app.get('/admin/dashboard', (c) => {
           console.error('Deactivate activity error:', error);
           alert('Failed to deactivate activity');
         }
+      }
+
+      // À La Carte Vouchers Management
+      async function loadALaCarteVouchers() {
+        await refreshALaCarteStats();
+        await loadMenuItems();
+      }
+      
+      async function refreshALaCarteStats() {
+        try {
+          const response = await fetch('/api/admin/alacarte/menu-items', {
+            headers: {'X-Property-ID': propertyId}
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            const premiumCount = data.items.filter(item => item.is_premium).length;
+            const restaurants = [...new Set(data.items.map(item => item.restaurant_id))].length;
+            
+            document.getElementById('statTotalItems').textContent = data.total || 0;
+            document.getElementById('statPremiumItems').textContent = premiumCount;
+            document.getElementById('statRestaurants').textContent = restaurants;
+            document.getElementById('statActiveVouchers').textContent = '0'; // TODO: implement voucher tracking
+          }
+        } catch (error) {
+          console.error('Load à la carte stats error:', error);
+        }
+      }
+      
+      window.refreshALaCarteStats = refreshALaCarteStats;
+      
+      async function loadMenuItems() {
+        try {
+          const response = await fetch('/api/admin/alacarte/menu-items', {
+            headers: {'X-Property-ID': propertyId}
+          });
+          const data = await response.json();
+          
+          if (data.success) {
+            displayMenuItems(data.items);
+          }
+        } catch (error) {
+          console.error('Load menu items error:', error);
+        }
+      }
+      
+      function displayMenuItems(items) {
+        const container = document.getElementById('menuItemsList');
+        
+        // Group by restaurant
+        const byRestaurant = {};
+        items.forEach(item => {
+          if (!byRestaurant[item.restaurant_name]) {
+            byRestaurant[item.restaurant_name] = {
+              salad: [],
+              starter: [],
+              main: [],
+              dessert: []
+            };
+          }
+          byRestaurant[item.restaurant_name][item.category].push(item);
+        });
+        
+        let html = '';
+        for (const [restaurant, categories] of Object.entries(byRestaurant)) {
+          const totalItems = Object.values(categories).flat().length;
+          const premiumItems = Object.values(categories).flat().filter(i => i.is_premium).length;
+          
+          html += \`
+            <div class="mb-6 border rounded-lg overflow-hidden">
+              <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">
+                <h4 class="text-xl font-bold">\${restaurant}</h4>
+                <div class="text-sm text-purple-200 mt-1">\${totalItems} items • \${premiumItems} premium</div>
+              </div>
+              <div class="p-4 space-y-4">
+          \`;
+          
+          ['salad', 'starter', 'main', 'dessert'].forEach(category => {
+            if (categories[category].length > 0) {
+              html += \`
+                <div>
+                  <h5 class="font-bold text-gray-700 mb-2 capitalize border-b pb-1">\${category === 'main' ? 'Mains' : category + 's'} (\${categories[category].length})</h5>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              \`;
+              
+              categories[category].forEach(item => {
+                html += \`
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg \${item.is_premium ? 'border-2 border-yellow-300' : 'border border-gray-200'}">
+                    <div class="flex-1">
+                      <div class="font-semibold text-gray-800">\${item.item_name}</div>
+                      <div class="text-xs text-gray-600">\${item.description?.substring(0, 50) || ''}...</div>
+                    </div>
+                    <div class="ml-3 text-right">
+                      <div class="text-lg font-bold text-purple-600">€\${item.cost_to_hotel.toFixed(2)}</div>
+                      \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
+                    </div>
+                  </div>
+                \`;
+              });
+              
+              html += \`
+                  </div>
+                </div>
+              \`;
+            }
+          });
+          
+          html += \`
+              </div>
+            </div>
+          \`;
+        }
+        
+        container.innerHTML = html;
       }
 
       // Custom Sections Management
