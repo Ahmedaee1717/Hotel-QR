@@ -68528,15 +68528,22 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </style>
 </head>
 <body class="bg-gray-50">
+    <!-- Language Selector (Fixed Top Right) -->
+    <div class="fixed top-4 right-4 z-50">
+        <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
+            <option value="en">English</option>
+        </select>
+    </div>
+
     <!-- Header -->
     <div class="bg-primary text-white py-6">
         <div class="max-w-4xl mx-auto px-4">
             <button onclick="window.history.back()" class="mb-4 text-white hover:text-gray-200">
-                <i class="fas fa-arrow-left mr-2"></i>Back
+                <i class="fas fa-arrow-left mr-2"></i><span data-i18n="back">Back</span>
             </button>
-            <h1 class="text-3xl font-bold">${restaurant.title_en}</h1>
-            <p class="text-white/80 mt-1">${restaurant.short_description_en || ''}</p>
-            ${restaurant.location ? `<p class="text-white/80 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${restaurant.location}</p>` : ''}
+            <h1 class="text-3xl font-bold" data-i18n-key="restaurant-title">${restaurant.title_en}</h1>
+            <p class="text-white/80 mt-1" data-i18n-key="restaurant-desc">${restaurant.short_description_en || ''}</p>
+            ${restaurant.location ? `<p class="text-white/80 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i><span data-i18n-key="restaurant-location">${restaurant.location}</span></p>` : ''}
         </div>
     </div>
 
@@ -68546,17 +68553,17 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     <div class="max-w-4xl mx-auto px-4 py-8">
         <!-- Booking Details -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-primary"></i>Reservation Details</h2>
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-primary"></i><span data-i18n="reservation-details">Reservation Details</span></h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-semibold text-gray-700 mb-3">Select Your Date</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-3" data-i18n="select-date">Select Your Date</label>
                     <div id="customDatePicker" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
                         <!-- Date buttons will be generated here -->
                     </div>
                     <input type="hidden" id="bookingDate" required>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Time</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="time">Time</label>
                     <select id="bookingTime" class="w-full px-4 py-2 border rounded-lg" required>
                         <option value="18:00">6:00 PM</option>
                         <option value="18:30">6:30 PM</option>
@@ -68568,11 +68575,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Adults</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="adults">Adults</label>
                     <input type="number" id="numAdults" value="2" min="1" max="10" class="w-full px-4 py-2 border rounded-lg">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Children</label>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="children">Children</label>
                     <input type="number" id="numChildren" value="0" min="0" max="10" class="w-full px-4 py-2 border rounded-lg">
                 </div>
             </div>
@@ -68580,22 +68587,22 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
         <!-- Menu Selection -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i>Pre-Order Your Meal</h2>
-            <p class="text-gray-600 mb-6">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
+            <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
             
             <!-- Category Tabs -->
             <div class="flex space-x-2 mb-6 border-b overflow-x-auto">
                 <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-primary text-primary">
-                    🥗 Salads
+                    🥗 <span data-i18n="salads">Salads</span>
                 </button>
                 <button onclick="showMenuCategory('starter')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🍤 Starters
+                    🍤 <span data-i18n="starters">Starters</span>
                 </button>
                 <button onclick="showMenuCategory('main')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🥩 Mains
+                    🥩 <span data-i18n="mains">Mains</span>
                 </button>
                 <button onclick="showMenuCategory('dessert')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🍰 Desserts
+                    🍰 <span data-i18n="desserts">Desserts</span>
                 </button>
             </div>
 
@@ -68605,12 +68612,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
         <!-- Order Summary -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-            <h3 class="text-xl font-bold mb-4">Your Pre-Order</h3>
+            <h3 class="text-xl font-bold mb-4" data-i18n="your-preorder">Your Pre-Order</h3>
             <div id="orderSummary" class="space-y-2 mb-4">
-                <p class="text-gray-500 text-center py-4">No items selected yet</p>
+                <p class="text-gray-500 text-center py-4" data-i18n="no-items-selected">No items selected yet</p>
             </div>
             <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-lg font-bold text-lg transition-colors">
-                <i class="fas fa-check-circle mr-2"></i>Confirm Reservation
+                <i class="fas fa-check-circle mr-2"></i><span data-i18n="confirm-reservation">Confirm Reservation</span>
             </button>
         </div>
     </div>
@@ -68812,38 +68819,61 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             document.getElementById('confirmButton').innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Use Voucher & Confirm';
         }
         
-        function showMenuCategory(category) {
+        async function showMenuCategory(category) {
             // Update tabs
             document.querySelectorAll('.menu-tab').forEach(tab => {
                 tab.classList.remove('border-primary', 'text-primary');
                 tab.classList.add('border-transparent', 'text-gray-600');
             });
-            event.target.classList.remove('border-transparent', 'text-gray-600');
-            event.target.classList.add('border-primary', 'text-primary');
+            
+            // Find and update the clicked tab
+            const tabs = document.querySelectorAll('.menu-tab');
+            tabs.forEach(tab => {
+                if (tab.getAttribute('onclick').includes(category)) {
+                    tab.classList.remove('border-transparent', 'text-gray-600');
+                    tab.classList.add('border-primary', 'text-primary');
+                }
+            });
             
             // Render items
             const container = document.getElementById('menuContainer');
             const items = menuByCategory[category] || [];
             
             if (items.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">No items in this category</p>';
+                const noItemsText = currentLanguage === 'en' ? 'No items in this category' : await translateText('No items in this category', currentLanguage);
+                container.innerHTML = \`<p class="text-gray-500 text-center py-8">\${noItemsText}</p>\`;
                 return;
             }
             
-            container.innerHTML = items.map(item => \`
+            // Translate items if needed
+            const translatedItems = await Promise.all(items.map(async item => {
+                if (currentLanguage === 'en') return item;
+                
+                return {
+                    ...item,
+                    item_name: await translateText(item.item_name, currentLanguage),
+                    description: item.description ? await translateText(item.description, currentLanguage) : ''
+                };
+            }));
+            
+            const selectedText = currentLanguage === 'en' ? 'Selected' : await translateText('Selected', currentLanguage);
+            const addText = currentLanguage === 'en' ? 'Add' : await translateText('Add', currentLanguage);
+            const premiumText = currentLanguage === 'en' ? 'PREMIUM' : await translateText('PREMIUM', currentLanguage);
+            
+            container.innerHTML = translatedItems.map(item => \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
-                                \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
+                                \${item.is_premium ? \`<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">\${premiumText}</span>\` : ''}
                             </div>
                             <p class="text-gray-600 text-sm">\${item.description || ''}</p>
                         </div>
                         <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
                                 id="btn-\${item.item_id}"
                                 class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
-                            \${selectedItems[item.item_id] ? '<i class="fas fa-check mr-1"></i>Selected' : '<i class="fas fa-plus mr-1"></i>Add'}
+                            \${selectedItems[item.item_id] ? \`<i class="fas fa-check mr-1"></i>\${selectedText}\` : \`<i class="fas fa-plus mr-1"></i>\${addText}\`}
                         </button>
                     </div>
                 </div>
@@ -68972,6 +69002,143 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         // Check eligibility on page load
         checkVoucherEligibility();
+        
+        // ============= TRANSLATION SYSTEM =============
+        const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
+        
+        const languageNames = {
+            'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
+            'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
+            'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
+            'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
+            'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+            'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
+            'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
+            'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
+            'ms': 'Malay'
+        };
+        
+        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        const translationCache = new Map();
+        
+        // Populate language selector
+        function populateLanguageSelector() {
+            const selector = document.getElementById('languageSelector');
+            if (!selector) return;
+            
+            selector.innerHTML = '<option value="en">English</option>';
+            ALL_LANGUAGES.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang;
+                option.textContent = languageNames[lang] || lang;
+                selector.appendChild(option);
+            });
+            selector.value = currentLanguage;
+        }
+        
+        // Change language
+        window.changeLanguage = function() {
+            const selector = document.getElementById('languageSelector');
+            const newLang = selector.value;
+            console.log('🌐 Changing language to:', newLang);
+            localStorage.setItem('preferredLanguage', newLang);
+            window.location.reload();
+        }
+        
+        // Translate text using API
+        async function translateText(text, targetLanguage) {
+            if (!text || targetLanguage === 'en') return text;
+            
+            const cacheKey = \`\${targetLanguage}:\${text}\`;
+            if (translationCache.has(cacheKey)) {
+                return translationCache.get(cacheKey);
+            }
+            
+            try {
+                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: [
+                            {
+                                role: 'system',
+                                content: \`You are a professional translator. Translate the given text to \${targetLangName}. Return ONLY the translation, no explanations or additional text.\`
+                            },
+                            {
+                                role: 'user',
+                                content: text
+                            }
+                        ],
+                        property_id: propertyId
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const translated = data.message || text;
+                    translationCache.set(cacheKey, translated);
+                    return translated;
+                }
+            } catch (error) {
+                console.warn('Translation failed:', error);
+            }
+            
+            return text;
+        }
+        
+        // Translate page
+        async function translatePage() {
+            if (currentLanguage === 'en') return;
+            
+            console.log('🌐 Translating page to:', currentLanguage);
+            
+            // Translate all elements with data-i18n
+            const elements = document.querySelectorAll('[data-i18n]');
+            for (const el of elements) {
+                const originalText = el.textContent.trim();
+                if (originalText) {
+                    const translated = await translateText(originalText, currentLanguage);
+                    el.textContent = translated;
+                }
+            }
+            
+            // Translate elements with data-i18n-key (restaurant title, description, location)
+            const keyElements = document.querySelectorAll('[data-i18n-key]');
+            for (const el of keyElements) {
+                const originalText = el.textContent.trim();
+                if (originalText) {
+                    const translated = await translateText(originalText, currentLanguage);
+                    el.textContent = translated;
+                }
+            }
+            
+            // Translate menu items
+            translateMenuItems();
+            
+            console.log('✅ Page translation complete');
+        }
+        
+        // Translate menu items (re-render with translated text)
+        async function translateMenuItems() {
+            if (currentLanguage === 'en') return;
+            
+            // Get current category
+            const activeTab = document.querySelector('.menu-tab.border-primary');
+            if (!activeTab) return;
+            
+            const category = activeTab.getAttribute('onclick').match(/'(.+?)'/)[1];
+            
+            // Re-render menu with translations
+            await showMenuCategory(category);
+        }
+        
+        // Initialize translation
+        populateLanguageSelector();
+        if (currentLanguage !== 'en') {
+            translatePage();
+        }
     </script>
 </body>
 </html>
