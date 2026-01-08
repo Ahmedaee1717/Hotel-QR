@@ -21145,6 +21145,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
                                             <p class="text-sm text-white/90 mt-1 font-medium" id="tierDescription"></p>
                                             
+                                            <!-- À La Carte Voucher Info -->
+                                            <div id="alacarteVoucherInfo" class="hidden mt-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg px-4 py-2"></div>
+                                            
                                             <!-- Ask About Benefits Button -->
                                             <button onclick="openChatbotWithBenefitsPrompt()" class="mt-4 bg-white/20 backdrop-blur-lg hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center gap-3 border border-white/30">
                                                 <i class="fas fa-comments text-xl"></i>
@@ -24062,17 +24065,24 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             // Check voucher eligibility if guest has a pass
             let voucherData = null;
             if (linkedPassReference) {
+                console.log('🎫 Checking voucher eligibility for:', linkedPassReference);
                 try {
                     const response = await fetch('/api/alacarte/voucher-eligibility/' + linkedPassReference, {
                         headers: { 'X-Property-ID': propertyId }
                     });
                     const data = await response.json();
+                    console.log('🎫 Voucher eligibility response:', data);
                     if (data.success && data.eligible) {
                         voucherData = data;
+                        console.log('✅ Guest is eligible! Remaining meals:', data.vouchers.remaining);
+                    } else {
+                        console.log('❌ Guest not eligible:', data.reason || data.error);
                     }
                 } catch (error) {
                     console.error('Check voucher eligibility error:', error);
                 }
+            } else {
+                console.log('ℹ️ No pass linked, skipping voucher check');
             }
             
             const bookTableText = t('book-table');
@@ -25258,6 +25268,36 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           
           if (tierDesc && data.tier.description) {
             tierDesc.textContent = data.tier.description;
+          }
+          
+          // Add à la carte voucher info if eligible
+          const voucherInfo = document.getElementById('alacarteVoucherInfo');
+          if (voucherInfo) {
+            // Check if tier has à la carte meals
+            if (data.tier.alacarte_meals_per_stay && data.tier.alacarte_meals_per_stay > 0) {
+              // Fetch current voucher status
+              fetch('/api/alacarte/voucher-eligibility/' + passReference, {
+                headers: { 'X-Property-ID': propertyId }
+              })
+              .then(res => res.json())
+              .then(voucherData => {
+                if (voucherData.success && voucherData.eligible) {
+                  voucherInfo.classList.remove('hidden');
+                  voucherInfo.innerHTML = '<div class="flex items-center gap-2 text-white/90 text-sm">' +
+                    '<i class="fas fa-ticket-alt text-lg"></i>' +
+                    '<span><strong>' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + '</strong> à la carte meals remaining</span>' +
+                    '</div>';
+                } else {
+                  voucherInfo.classList.add('hidden');
+                }
+              })
+              .catch(err => {
+                console.error('Load voucher status error:', err);
+                voucherInfo.classList.add('hidden');
+              });
+            } else {
+              voucherInfo.classList.add('hidden');
+            }
           }
           
           // Display benefits by category (already translated by API)
