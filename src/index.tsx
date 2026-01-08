@@ -24065,6 +24065,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             const restaurants = allOfferings.filter(o => o.offering_type === 'restaurant');
             const grid = document.getElementById('restaurants-grid');
             
+            console.log('🍽️ renderRestaurants called. allOfferings:', allOfferings.length, 'restaurants:', restaurants.length);
+            console.log('🍽️ Restaurant offering_ids:', restaurants.map(r => r.offering_id));
+            
             if (!grid) {
                 console.error('restaurants-grid element not found');
                 return;
@@ -24108,20 +24111,41 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 
                 // Get offering ID - strip any non-numeric prefix (e.g., "H3" -> 3)
                 const offeringIdRaw = r.offering_id;
-                const offeringIdStr = String(offeringIdRaw);
-                // Extract numeric portion
-                const numbersOnly = offeringIdStr.match(/\d+/);
-                const offeringId = numbersOnly ? parseInt(numbersOnly[0], 10) : null;
+                const offeringIdStr = String(offeringIdRaw || '');
+                
+                // Extract numeric portion - use simple loop instead of regex (regex fails in Workers)
+                let numStr = '';
+                for (let i = 0; i < offeringIdStr.length; i++) {
+                    const char = offeringIdStr[i];
+                    if (char >= '0' && char <= '9') {
+                        numStr += char;
+                    }
+                }
+                const offeringId = numStr ? parseInt(numStr, 10) : null;
                 
                 // Check if this restaurant is eligible for vouchers
                 // Extract numeric IDs from both the restaurant card AND the eligible list
                 const isEligible = voucherData && voucherData.vouchers.remaining > 0 && offeringId !== null && (
                     voucherData.eligible_restaurants.length === 0 || 
                     voucherData.eligible_restaurants.some(rest => {
-                        // Extract numeric portion from eligible restaurant ID
-                        const restIdStr = String(rest.offering_id);
-                        const restNumMatch = restIdStr.match(/\d+/);
-                        const restNumId = restNumMatch ? parseInt(restNumMatch[0], 10) : null;
+                        // Extract numeric portion from eligible restaurant ID (handle both int and string)
+                        const restId = rest.offering_id;
+                        let restNumId = null;
+                        
+                        if (typeof restId === 'number') {
+                            restNumId = restId;
+                        } else {
+                            const restIdStr = String(restId || '');
+                            let restNumStr = '';
+                            for (let i = 0; i < restIdStr.length; i++) {
+                                const char = restIdStr[i];
+                                if (char >= '0' && char <= '9') {
+                                    restNumStr += char;
+                                }
+                            }
+                            restNumId = restNumStr ? parseInt(restNumStr, 10) : null;
+                        }
+                        
                         return restNumId === offeringId;
                     })
                 );
@@ -24131,7 +24155,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     extracted: offeringId,
                     voucherData: !!voucherData,
                     remaining: voucherData?.vouchers.remaining,
-                    eligibleList: voucherData?.eligible_restaurants.map(rest => rest.offering_id + ' -> ' + (String(rest.offering_id).match(/\d+/)?.[0] || 'null'))
+                    eligibleListRaw: voucherData?.eligible_restaurants.map(rest => rest.offering_id),
+                    eligibleListTypes: voucherData?.eligible_restaurants.map(rest => typeof rest.offering_id)
                 });
                 
 
