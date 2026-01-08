@@ -4,9 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://6e051dbd.project-c8738f5c.pages.dev 🚀 **NEW: Table selection in voucher flow!**
-**Property Landing Page (6-DIGIT PIN!):** https://08a476de.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**À La Carte Booking:** https://08a476de.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️🌍 **33 Languages!**
+**Production:** https://d2f2a794.project-c8738f5c.pages.dev 🚀 **NEW: Kitchen View for orders!**
+**Property Landing Page (6-DIGIT PIN!):** https://d2f2a794.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**À La Carte Booking:** https://d2f2a794.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️🌍 **33 Languages!**
+**Kitchen View:** https://d2f2a794.project-c8738f5c.pages.dev/kitchen/alacarte/3?property=1 👨‍🍳📋 **NEW: Real-time order management!**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
