@@ -48104,16 +48104,133 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           if (data.success) {
+            // Populate manual form dropdown
             const select = document.getElementById('menuRestaurantId');
             // Show ALL restaurants (removed hardcoded filter)
             select.innerHTML = '<option value="">Select Restaurant</option>' + 
               data.restaurants
                 .map(r => '<option value="' + r.offering_id + '">' + r.title_en + '</option>')
                 .join('');
+            
+            // Also populate AI form dropdown
+            const aiSelect = document.getElementById('aiMenuRestaurantId');
+            if (aiSelect) {
+              aiSelect.innerHTML = '<option value="">Select Restaurant</option>' + 
+                data.restaurants
+                  .map(r => '<option value="' + r.offering_id + '">' + r.title_en + '</option>')
+                  .join('');
+            }
           }
         } catch (error) {
           console.error('Load restaurants dropdown error:', error);
         }
+      }
+      
+      // AI Menu Upload - Image Preview
+      document.getElementById('aiMenuImages')?.addEventListener('change', function(e) {
+        const files = e.target.files;
+        const preview = document.getElementById('aiMenuPreview');
+        const previews = document.getElementById('aiMenuImagePreviews');
+        
+        if (files && files.length > 0) {
+          preview.classList.remove('hidden');
+          previews.innerHTML = '';
+          
+          Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              const img = document.createElement('img');
+              img.src = e.target.result;
+              img.className = 'w-full h-24 object-cover rounded-lg border-2 border-gray-200';
+              previews.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+          });
+        } else {
+          preview.classList.add('hidden');
+        }
+      });
+      
+      // AI Menu Upload - Form Submission
+      document.getElementById('aiMenuUploadForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const restaurantId = document.getElementById('aiMenuRestaurantId').value;
+        const files = document.getElementById('aiMenuImages').files;
+        
+        if (!restaurantId || !files || files.length === 0) {
+          alert('Please select a restaurant and upload at least one menu image.');
+          return;
+        }
+        
+        // Show progress
+        const btn = document.getElementById('aiMenuUploadBtn');
+        const progress = document.getElementById('aiMenuProgress');
+        const progressSteps = document.getElementById('aiMenuProgressSteps');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+        progress.classList.remove('hidden');
+        
+        try {
+          // Convert images to base64
+          const imageDataArray = [];
+          for (let file of files) {
+            const base64 = await fileToBase64(file);
+            imageDataArray.push(base64);
+          }
+          
+          progressSteps.innerHTML = '<div><i class="fas fa-check text-green-500 mr-2"></i>Images uploaded</div>' +
+            '<div><i class="fas fa-spinner fa-spin text-purple-600 mr-2"></i>AI extracting menu items...</div>';
+          
+          // Call AI menu processing API
+          const response = await fetchWithAuth('/api/admin/alacarte/ai-menu-upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({
+              restaurant_id: restaurantId,
+              images: imageDataArray
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            progressSteps.innerHTML = '<div><i class="fas fa-check text-green-500 mr-2"></i>Images uploaded</div>' +
+              '<div><i class="fas fa-check text-green-500 mr-2"></i>AI extraction complete</div>' +
+              '<div><i class="fas fa-check text-green-500 mr-2"></i>' + result.items_created + ' menu items created!</div>';
+            
+            setTimeout(() => {
+              alert('Success! Created ' + result.items_created + ' menu items\\nCategories: ' + result.categories.join(', '));
+              document.getElementById('aiMenuUploadForm').reset();
+              document.getElementById('aiMenuPreview').classList.add('hidden');
+              progress.classList.add('hidden');
+              loadMenuItems(); // Refresh the menu list
+            }, 2000);
+          } else {
+            throw new Error(result.error || 'AI processing failed');
+          }
+        } catch (error) {
+          console.error('AI menu upload error:', error);
+          alert('Error: ' + error.message);
+          progressSteps.innerHTML = '<div><i class="fas fa-times text-red-500 mr-2"></i>Error: ' + error.message + '</div>';
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i><span>Extract Menu with AI</span>';
+        }
+      });
+      
+      // Helper: Convert file to base64
+      function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
       }
       
       window.resetMenuForm = function() {
@@ -67975,6 +68092,148 @@ app.delete('/api/admin/alacarte/menu-items/:item_id', async (c) => {
   } catch (error) {
     console.error('Delete menu item error:', error)
     return c.json({ success: false, error: 'Failed to delete menu item' }, 500)
+  }
+})
+
+// Admin: AI Menu Upload - Process menu images with OpenAI Vision
+app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
+  const { DB, OPENAI_API_KEY } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { restaurant_id, images } = body
+    
+    if (!images || images.length === 0) {
+      return c.json({ success: false, error: 'No images provided' }, 400)
+    }
+    
+    if (!OPENAI_API_KEY) {
+      return c.json({ success: false, error: 'OpenAI API key not configured' }, 500)
+    }
+    
+    // Get restaurant name for context
+    const restaurant = await DB.prepare(`
+      SELECT title_en FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+    
+    // Process each image with OpenAI Vision API
+    let allExtractedText = [];
+    
+    for (let imageData of images) {
+      // Call OpenAI Vision API
+      const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + OPENAI_API_KEY
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract ALL menu items from this image. For each item, provide: item name, description (if any), category (salad/starter/main/dessert/drink/side), and if it appears to be a premium item. Format as JSON array: [{"name": "...", "description": "...", "category": "...", "is_premium": false}]. If you see a new category not in the list, use it. Be thorough and extract every single item you can see.'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageData }
+              }
+            ]
+          }],
+          max_tokens: 2000,
+          temperature: 0.2
+        })
+      });
+      
+      if (!visionResponse.ok) {
+        console.error('OpenAI API error:', await visionResponse.text());
+        continue;
+      }
+      
+      const visionResult = await visionResponse.json();
+      const extractedText = visionResult.choices[0].message.content;
+      allExtractedText.push(extractedText);
+    }
+    
+    // Combine all extracted text
+    const combinedText = allExtractedText.join('\\n\\n');
+    
+    // Parse the JSON arrays from the extracted text
+    let allItems = [];
+    const jsonMatches = combinedText.match(/\\[\\s\\S]*?\\]/g);
+    
+    if (jsonMatches) {
+      for (let jsonStr of jsonMatches) {
+        try {
+          const items = JSON.parse(jsonStr);
+          if (Array.isArray(items)) {
+            allItems = allItems.concat(items);
+          }
+        } catch (e) {
+          console.error('JSON parse error:', e);
+        }
+      }
+    }
+    
+    if (allItems.length === 0) {
+      return c.json({ success: false, error: 'No menu items could be extracted from the images' }, 400)
+    }
+    
+    // Track created categories
+    const categoriesSet = new Set();
+    let itemsCreated = 0;
+    
+    // Insert each item into database
+    for (let item of allItems) {
+      try {
+        const category = (item.category || 'main').toLowerCase();
+        categoriesSet.add(category);
+        
+        await DB.prepare(`
+          INSERT INTO alacarte_menu_items (
+            property_id, restaurant_id, category, item_name,
+            description, cost_to_hotel, is_premium, display_order, is_available
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          property_id,
+          restaurant_id,
+          category,
+          item.name || 'Unnamed Item',
+          item.description || '',
+          0, // Cost will be set by admin later
+          item.is_premium ? 1 : 0,
+          itemsCreated,
+          1
+        ).run();
+        
+        itemsCreated++;
+      } catch (error) {
+        console.error('Insert menu item error:', error);
+        // Continue with next item
+      }
+    }
+    
+    return c.json({
+      success: true,
+      items_created: itemsCreated,
+      categories: Array.from(categoriesSet),
+      restaurant: restaurant.title_en
+    })
+    
+  } catch (error) {
+    console.error('AI menu upload error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'AI processing failed: ' + error.message 
+    }, 500)
   }
 })
 
