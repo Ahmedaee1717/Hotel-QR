@@ -24109,30 +24109,32 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 // Get offering ID - strip any non-numeric prefix (e.g., "H3" -> 3)
                 const offeringIdRaw = r.offering_id;
                 const offeringIdStr = String(offeringIdRaw);
-                // Use a simple approach: extract numbers only
+                // Extract numeric portion
                 const numbersOnly = offeringIdStr.match(/\d+/);
-                const offeringId = numbersOnly ? parseInt(numbersOnly[0], 10) : NaN;
-                
-                console.log('🔍 DEBUG offering_id parsing:', {
-                    raw: offeringIdRaw,
-                    asString: offeringIdStr,
-                    numbersOnly: numbersOnly,
-                    final: offeringId
-                });
+                const offeringId = numbersOnly ? parseInt(numbersOnly[0], 10) : null;
                 
                 // Check if this restaurant is eligible for vouchers
-                const isEligible = voucherData && voucherData.vouchers.remaining > 0 && (
+                // Extract numeric IDs from both the restaurant card AND the eligible list
+                const isEligible = voucherData && voucherData.vouchers.remaining > 0 && offeringId !== null && (
                     voucherData.eligible_restaurants.length === 0 || 
-                    voucherData.eligible_restaurants.some(rest => parseInt(rest.offering_id, 10) === offeringId)
+                    voucherData.eligible_restaurants.some(rest => {
+                        // Extract numeric portion from eligible restaurant ID
+                        const restIdStr = String(rest.offering_id);
+                        const restNumMatch = restIdStr.match(/\d+/);
+                        const restNumId = restNumMatch ? parseInt(restNumMatch[0], 10) : null;
+                        return restNumId === offeringId;
+                    })
                 );
                 
-                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id}) - Eligible: \${isEligible}\`, {
-                    hasVoucherData: !!voucherData,
-                    voucherRemaining: voucherData?.vouchers.remaining,
-                    eligibleRestaurantIds: voucherData?.eligible_restaurants.map(rest => rest.offering_id),
-                    thisRestaurantId: offeringId,
-                    matches: voucherData?.eligible_restaurants.some(rest => parseInt(rest.offering_id, 10) === offeringId)
+                console.log('DEBUG Restaurant: ' + r.offering_id + ' -> numeric: ' + offeringId + ', eligible: ' + isEligible, {
+                    raw: offeringIdRaw,
+                    extracted: offeringId,
+                    voucherData: !!voucherData,
+                    remaining: voucherData?.vouchers.remaining,
+                    eligibleList: voucherData?.eligible_restaurants.map(rest => rest.offering_id + ' -> ' + (String(rest.offering_id).match(/\d+/)?.[0] || 'null'))
                 });
+                
+
                 
                 // Build the booking URL with pass parameter if eligible
                 const bookingUrl = isEligible 
