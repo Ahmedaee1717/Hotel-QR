@@ -65891,6 +65891,41 @@ app.post('/api/alacarte/voucher/:voucher_code/redeem', async (c) => {
   }
 })
 
+// API: Get restaurant tables (for booking)
+app.get('/api/admin/restaurant/:restaurant_id/tables', async (c) => {
+  const { DB } = c.env
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const tables = await DB.prepare(`
+      SELECT 
+        table_id,
+        table_number,
+        capacity,
+        shape,
+        position_x,
+        position_y,
+        width,
+        height
+      FROM restaurant_tables
+      WHERE offering_id = ?
+      ORDER BY table_number ASC
+    `).bind(restaurant_id).all()
+    
+    return c.json({
+      success: true,
+      tables: tables.results
+    })
+  } catch (error) {
+    console.error('Get restaurant tables error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to load tables'
+    }, 500)
+  }
+})
+
 // Admin: View all menu items (for testing)
 app.get('/api/admin/alacarte/menu-items', async (c) => {
   const { DB } = c.env
