@@ -24106,8 +24106,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(r, 'title');
                 const description = await getTranslatedField(r, 'short_description');
                 
-                // Get offering ID (should already be numeric from database)
-                const offeringId = parseInt(r.offering_id, 10);
+                // Get offering ID - strip any non-numeric prefix (e.g., "H3" -> 3)
+                const offeringId = parseInt(String(r.offering_id).replace(/\D/g, ''), 10);
                 
                 // Check if this restaurant is eligible for vouchers
                 const isEligible = voucherData && voucherData.vouchers.remaining > 0 && (
