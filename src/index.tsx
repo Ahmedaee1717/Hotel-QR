@@ -67842,7 +67842,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     <title>Book ${restaurant.title_en}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
@@ -67955,19 +67954,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         // Check voucher eligibility on load
         async function checkVoucherEligibility() {
-            if (!passReference) return;
+            if (!passReference) {
+                console.log('❌ No pass reference provided');
+                return;
+            }
+            
+            console.log('🎫 Checking voucher eligibility for pass:', passReference);
             
             try {
-                const response = await axios.get(\`/api/alacarte/voucher-eligibility/\${passReference}\`, {
+                const response = await fetch(\`/api/alacarte/voucher-eligibility/\${passReference}\`, {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 
-                if (response.data.success && response.data.eligible) {
-                    voucherEligibility = response.data;
+                const data = await response.json();
+                console.log('📋 Eligibility response:', data);
+                
+                if (data.success && data.eligible) {
+                    voucherEligibility = data;
+                    console.log('✅ Guest is eligible! Displaying voucher status...');
                     displayVoucherStatus();
+                } else if (data.success && !data.eligible) {
+                    console.log('❌ Guest not eligible:', data.reason);
+                } else {
+                    console.error('❌ API error:', data.error);
                 }
             } catch (error) {
-                console.error('Check eligibility error:', error);
+                console.error('❌ Check eligibility error:', error);
             }
         }
         
@@ -68138,30 +68150,37 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             });
             
             try {
-                const response = await axios.post('/api/alacarte/voucher', {
-                    pass_reference: passReference,
-                    restaurant_id: restaurantId,
-                    reservation_date: date,
-                    reservation_time: time,
-                    party_size_adults: parseInt(adults),
-                    party_size_children: parseInt(children),
-                    ...preorder
-                }, {
-                    headers: { 'X-Property-ID': propertyId }
+                const response = await fetch('/api/alacarte/voucher', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify({
+                        pass_reference: passReference,
+                        restaurant_id: restaurantId,
+                        reservation_date: date,
+                        reservation_time: time,
+                        party_size_adults: parseInt(adults),
+                        party_size_children: parseInt(children),
+                        ...preorder
+                    })
                 });
                 
-                if (response.data.success) {
-                    const { voucher_code, meals_remaining, total_cost } = response.data;
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { voucher_code, meals_remaining, total_cost } = data;
                     alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nYour reservation is confirmed. Show this voucher code when you arrive at the restaurant.\`);
                     
                     // Redirect to voucher view (we'll create this next)
                     window.location.href = \`/alacarte/voucher/\${voucher_code}?property=\${propertyId}\`;
                 } else {
-                    alert('Booking failed: ' + (response.data.error || 'Unknown error'));
+                    alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Booking error:', error);
-                alert('Failed to create voucher: ' + (error.response?.data?.error || 'Network error'));
+                alert('Failed to create voucher. Please try again.');
             }
         }
         
