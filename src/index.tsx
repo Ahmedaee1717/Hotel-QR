@@ -42399,7 +42399,21 @@ app.get('/admin/dashboard', (c) => {
             
             <!-- Menu Items by Restaurant -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-xl font-bold mb-4">Menu Items by Restaurant</h3>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold">Menu Items by Restaurant</h3>
+                    <div class="flex gap-2">
+                        <button id="bulkDeleteBtn" onclick="bulkDeleteMenuItems()" 
+                            class="hidden bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            <i class="fas fa-trash-alt mr-2"></i>
+                            Delete Selected (<span id="selectedCount">0</span>)
+                        </button>
+                        <button onclick="deleteAllMenuItems()" 
+                            class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">
+                            <i class="fas fa-trash mr-2"></i>
+                            Delete All Menu Items
+                        </button>
+                    </div>
+                </div>
                 <div id="menuItemsList">
                     <div class="text-center py-8 text-gray-500">
                         <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
@@ -48312,6 +48326,103 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
+      window.toggleRestaurantSelect = function(checkbox) {
+        const restaurantId = checkbox.dataset.restaurant;
+        const itemCheckboxes = document.querySelectorAll(\`.menu-item-checkbox[data-restaurant="\${restaurantId}"]\`);
+        itemCheckboxes.forEach(cb => cb.checked = checkbox.checked);
+        updateBulkDeleteButton();
+      }
+      
+      window.updateBulkDeleteButton = function() {
+        const checkboxes = document.querySelectorAll('.menu-item-checkbox:checked');
+        const btn = document.getElementById('bulkDeleteBtn');
+        const count = document.getElementById('selectedCount');
+        
+        if (checkboxes.length > 0) {
+          btn.classList.remove('hidden');
+          count.textContent = checkboxes.length;
+        } else {
+          btn.classList.add('hidden');
+        }
+      }
+      
+      window.bulkDeleteMenuItems = async function() {
+        const checkboxes = document.querySelectorAll('.menu-item-checkbox:checked');
+        const itemIds = Array.from(checkboxes).map(cb => cb.dataset.itemId);
+        
+        if (itemIds.length === 0) {
+          alert('No items selected');
+          return;
+        }
+        
+        if (!confirm(\`Delete \${itemIds.length} menu items?\\n\\nThis action cannot be undone.\`)) return;
+        
+        try {
+          let deleted = 0;
+          let failed = 0;
+          
+          for (const itemId of itemIds) {
+            try {
+              const response = await fetchWithAuth(\`/api/admin/alacarte/menu-items/\${itemId}\`, {
+                method: 'DELETE',
+                headers: {'X-Property-ID': propertyId}
+              });
+              
+              if (response.ok) {
+                deleted++;
+              } else {
+                failed++;
+              }
+            } catch (error) {
+              failed++;
+              console.error('Delete item error:', error);
+            }
+          }
+          
+          alert(\`Deleted \${deleted} items successfully!\${failed > 0 ? '\\n' + failed + ' items failed to delete.' : ''}\`);
+          await refreshALaCarteStats();
+          await loadMenuItems();
+        } catch (error) {
+          console.error('Bulk delete error:', error);
+          alert('Failed to delete items');
+        }
+      }
+      
+      window.deleteAllMenuItems = async function() {
+        if (!confirm('⚠️ DELETE ALL MENU ITEMS?\\n\\nThis will permanently delete ALL menu items from ALL restaurants!\\n\\nThis action CANNOT be undone.\\n\\nAre you absolutely sure?')) return;
+        
+        // Double confirmation
+        const confirmation = prompt('Type "DELETE ALL" to confirm:', '');
+        if (confirmation !== 'DELETE ALL') {
+          alert('Deletion cancelled');
+          return;
+        }
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/alacarte/menu-items/bulk-delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({ delete_all: true })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert(\`Successfully deleted \${data.deleted_count} menu items!\`);
+            await refreshALaCarteStats();
+            await loadMenuItems();
+          } else {
+            alert('Failed to delete: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Delete all menu items error:', error);
+          alert('Failed to delete all menu items');
+        }
+      }
+      
       document.getElementById('addMenuItemForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -48376,11 +48487,20 @@ app.get('/admin/dashboard', (c) => {
         for (const [restaurant, categories] of Object.entries(byRestaurant)) {
           const totalItems = Object.values(categories).flat().length;
           const premiumItems = Object.values(categories).flat().filter(i => i.is_premium).length;
+          const restaurantId = 'restaurant-' + restaurant.replace(/[^a-z0-9]/gi, '-').toLowerCase();
           
           html += '<div class="mb-6 border rounded-lg overflow-hidden">' +
             '<div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">' +
+            '<div class="flex items-center justify-between">' +
+            '<div>' +
             '<h4 class="text-xl font-bold">' + restaurant + '</h4>' +
             '<div class="text-sm text-purple-200 mt-1">' + totalItems + ' items • ' + premiumItems + ' premium</div>' +
+            '</div>' +
+            '<label class="flex items-center gap-2 cursor-pointer">' +
+            '<input type="checkbox" class="restaurant-checkbox w-5 h-5" data-restaurant="' + restaurantId + '" onchange="toggleRestaurantSelect(this)">' +
+            '<span class="text-sm">Select All</span>' +
+            '</label>' +
+            '</div>' +
             '</div>' +
             '<div class="p-4 space-y-4">';
           
@@ -48399,7 +48519,9 @@ app.get('/admin/dashboard', (c) => {
                 const itemDesc = ((item.description || '').substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                 const restaurantName = (item.restaurant_name || '').replace(/'/g, '&#39;');
                 
-                html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg ' + borderClass + '">' +
+                html += '<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg ' + borderClass + '">' +
+                  '<input type="checkbox" class="menu-item-checkbox w-5 h-5" data-restaurant="' + restaurantId + '" data-item-id="' + item.item_id + '" onchange="updateBulkDeleteButton()">' +
+                  '<div class="flex-1 flex items-center justify-between">' +
                   '<div class="flex-1">' +
                   '<div class="font-semibold text-gray-800">' + itemName + '</div>' +
                   '<div class="text-xs text-gray-600">' + itemDesc + '...</div>' +
@@ -48413,6 +48535,7 @@ app.get('/admin/dashboard', (c) => {
                   'class="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition-colors text-sm">' +
                   '<i class="fas fa-trash"></i>' +
                   '</button>' +
+                  '</div>' +
                   '</div>' +
                   '</div>';
               });
@@ -68127,6 +68250,34 @@ app.delete('/api/admin/alacarte/menu-items/:item_id', async (c) => {
   } catch (error) {
     console.error('Delete menu item error:', error)
     return c.json({ success: false, error: 'Failed to delete menu item' }, 500)
+  }
+})
+
+// Admin: Bulk Delete Menu Items
+app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    
+    if (body.delete_all) {
+      // Delete all menu items for this property
+      const result = await DB.prepare(`
+        DELETE FROM alacarte_menu_items
+        WHERE property_id = ?
+      `).bind(property_id).run()
+      
+      return c.json({ 
+        success: true, 
+        deleted_count: result.meta.changes || 0 
+      })
+    }
+    
+    return c.json({ success: false, error: 'Invalid request' }, 400)
+  } catch (error) {
+    console.error('Bulk delete menu items error:', error)
+    return c.json({ success: false, error: 'Failed to delete menu items' }, 500)
   }
 })
 
