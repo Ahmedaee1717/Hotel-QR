@@ -65724,12 +65724,16 @@ app.post('/api/alacarte/voucher', async (c) => {
       reservation_time,
       party_size_adults,
       party_size_children,
+      table_id,
       preorder_salad,
       preorder_starter,
       preorder_main,
       preorder_dessert,
       special_requests
     } = body
+
+    // Calculate total party size
+    const party_size = (party_size_adults || 1) + (party_size_children || 0)
 
     // Verify pass eligibility
     const passInfo = await DB.prepare(`
@@ -65779,8 +65783,9 @@ app.post('/api/alacarte/voucher', async (c) => {
       console.error('Parse restaurants error:', e)
     }
 
-    // Calculate total cost
+    // Calculate total cost and build item IDs array
     const items = [preorder_salad, preorder_starter, preorder_main, preorder_dessert].filter(Boolean)
+    const preorder_item_ids = items
     let totalCost = 0
     
     for (const itemId of items) {
@@ -65798,42 +65803,43 @@ app.post('/api/alacarte/voucher', async (c) => {
     const randomNum = Math.floor(1000 + Math.random() * 9000)
     const voucherCode = `MEAL-${dateStr}-${randomNum}`
 
+    // Get tier_id for the voucher
+    const passWithTier = await DB.prepare(`
+      SELECT tier_id FROM digital_passes WHERE pass_id = ?
+    `).bind(passInfo.pass_id).first()
+
     // Insert voucher
     const result = await DB.prepare(`
       INSERT INTO alacarte_vouchers (
         property_id,
         pass_id,
         voucher_code,
+        tier_id,
+        meal_number,
         restaurant_id,
         reservation_date,
         reservation_time,
-        party_size_adults,
-        party_size_children,
-        preorder_salad_id,
-        preorder_starter_id,
-        preorder_main_id,
-        preorder_dessert_id,
+        party_size,
+        table_id,
+        preorder_item_ids,
         special_requests,
         total_cost,
-        status,
-        tier_meal_number
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+        status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
     `).bind(
       property_id,
       passInfo.pass_id,
       voucherCode,
+      passWithTier?.tier_id || 1,
+      mealsUsed + 1,
       restaurant_id,
       reservation_date,
       reservation_time,
-      party_size_adults || 1,
-      party_size_children || 0,
-      preorder_salad || null,
-      preorder_starter || null,
-      preorder_main || null,
-      preorder_dessert || null,
+      party_size,
+      table_id || null,
+      JSON.stringify(preorder_item_ids),
       special_requests || null,
-      totalCost,
-      mealsUsed + 1
+      totalCost
     ).run()
 
     return c.json({
@@ -66729,7 +66735,7 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         v.voucher_code,
         v.reservation_date,
         v.reservation_time,
-        v.party_size_adults + v.party_size_children as party_size,
+        v.party_size,
         v.table_id,
         v.preorder_item_ids,
         v.special_requests,
