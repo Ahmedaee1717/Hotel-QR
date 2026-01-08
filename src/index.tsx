@@ -18222,7 +18222,10 @@ app.get('/api/guest/tier-benefits', async (c) => {
         t.tier_color,
         t.tier_icon,
         t.tier_description,
-        t.daily_upgrade_price
+        t.daily_upgrade_price,
+        t.alacarte_meals_per_stay,
+        t.alacarte_eligible_restaurants,
+        t.alacarte_premium_surcharge
       FROM digital_passes p
       LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
       WHERE p.pass_reference = ? AND p.property_id = ? AND p.pass_status = 'active'
@@ -18605,7 +18608,10 @@ app.get('/api/guest/tier-benefits', async (c) => {
         color: pass.tier_color,
         icon: pass.tier_icon,
         description: tierDescription,
-        upgrade_price: pass.daily_upgrade_price
+        upgrade_price: pass.daily_upgrade_price,
+        alacarte_meals_per_stay: pass.alacarte_meals_per_stay,
+        alacarte_eligible_restaurants: pass.alacarte_eligible_restaurants,
+        alacarte_premium_surcharge: pass.alacarte_premium_surcharge
       },
       benefits: groupedBenefits,
       total_benefits: uniqueBenefits.length
@@ -25274,7 +25280,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               // Store in localStorage for chatbot access
               localStorage.setItem('tierBenefitsData', JSON.stringify(data));
               console.log('✅ Tier benefits loaded and stored:', data);
-              displayTierBenefitsCard(data);
+              displayTierBenefitsCard(data, passReference, propertyId);
             } else {
               console.error('Failed to load tier benefits:', data.error);
             }
@@ -25283,7 +25289,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
-        function displayTierBenefitsCard(data) {
+        function displayTierBenefitsCard(data, passReference, propertyId) {
           const card = document.getElementById('tierBenefitsCard');
           if (!card) return;
           
@@ -25338,22 +25344,27 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           // Add à la carte voucher info if eligible
           const voucherInfo = document.getElementById('alacarteVoucherInfo');
           if (voucherInfo) {
+            console.log('🎫 Checking à la carte eligibility. Meals per stay:', data.tier.alacarte_meals_per_stay);
             // Check if tier has à la carte meals
             if (data.tier.alacarte_meals_per_stay && data.tier.alacarte_meals_per_stay > 0) {
+              console.log('🎫 Tier is eligible for à la carte! Fetching voucher status...');
               // Fetch current voucher status
               fetch('/api/alacarte/voucher-eligibility/' + passReference, {
                 headers: { 'X-Property-ID': propertyId }
               })
               .then(res => res.json())
               .then(voucherData => {
+                console.log('🎫 Voucher status loaded:', voucherData);
                 if (voucherData.success && voucherData.eligible) {
                   voucherInfo.classList.remove('hidden');
                   voucherInfo.innerHTML = '<div class="flex items-center gap-2 text-white/90 text-sm">' +
                     '<i class="fas fa-ticket-alt text-lg"></i>' +
                     '<span><strong>' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + '</strong> à la carte meals remaining</span>' +
                     '</div>';
+                  console.log('✅ À la carte voucher info displayed!');
                 } else {
                   voucherInfo.classList.add('hidden');
+                  console.log('❌ Guest not eligible for vouchers:', voucherData.reason || voucherData.error);
                 }
               })
               .catch(err => {
@@ -25362,6 +25373,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               });
             } else {
               voucherInfo.classList.add('hidden');
+              console.log('ℹ️ Tier does not include à la carte meals');
             }
           }
           
