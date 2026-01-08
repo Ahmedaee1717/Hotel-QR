@@ -68997,12 +68997,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         // Set minimum date to today
         document.getElementById('bookingDate').min = new Date().toISOString().split('T')[0];
         
-        // Show first category
-        showMenuCategory('salad');
-        
-        // Check eligibility on page load
-        checkVoucherEligibility();
-        
         // ============= TRANSLATION SYSTEM =============
         const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
         
@@ -69114,31 +69108,28 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
             }
             
-            // Translate menu items
-            translateMenuItems();
-            
             console.log('✅ Page translation complete');
         }
         
-        // Translate menu items (re-render with translated text)
-        async function translateMenuItems() {
-            if (currentLanguage === 'en') return;
+        // Initialize translation and menu
+        async function initializePage() {
+            // Populate language selector
+            populateLanguageSelector();
             
-            // Get current category
-            const activeTab = document.querySelector('.menu-tab.border-primary');
-            if (!activeTab) return;
+            // Translate page if not English
+            if (currentLanguage !== 'en') {
+                await translatePage();
+            }
             
-            const category = activeTab.getAttribute('onclick').match(/'(.+?)'/)[1];
+            // Show first category AFTER translation
+            await showMenuCategory('salad');
             
-            // Re-render menu with translations
-            await showMenuCategory(category);
+            // Check eligibility
+            checkVoucherEligibility();
         }
         
-        // Initialize translation
-        populateLanguageSelector();
-        if (currentLanguage !== 'en') {
-            translatePage();
-        }
+        // Start initialization
+        initializePage();
     </script>
 </body>
 </html>
