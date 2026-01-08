@@ -68140,7 +68140,7 @@ app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
             content: [
               {
                 type: 'text',
-                text: 'Extract ALL menu items from this image. For each item, provide: item name, description (if any), category (salad/starter/main/dessert/drink/side), and if it appears to be a premium item. Format as JSON array: [{"name": "...", "description": "...", "category": "...", "is_premium": false}]. If you see a new category not in the list, use it. Be thorough and extract every single item you can see.'
+                text: 'You are a menu extraction expert. Extract ALL menu items from this restaurant menu image.\\n\\nFor each item, return:\\n- name: the dish name\\n- description: brief description (empty string if none)\\n- category: one of (salad, starter, main, dessert, drink, side, appetizer, soup, pasta, seafood, or other)\\n- is_premium: true if marked as premium/special, else false\\n\\nIMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no explanations.\\n\\nExample format:\\n[{"name":"Caesar Salad","description":"Crisp romaine with parmesan","category":"salad","is_premium":false}]\\n\\nExtract every item you can see:'
               },
               {
                 type: 'image_url',
@@ -68165,26 +68165,53 @@ app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
     
     // Combine all extracted text
     const combinedText = allExtractedText.join('\\n\\n');
+    console.log('🤖 AI Response:', combinedText);
     
-    // Parse the JSON arrays from the extracted text
+    // Parse the JSON from the extracted text (handle markdown code blocks)
     let allItems = [];
-    const jsonMatches = combinedText.match(/\\[\\s\\S]*?\\]/g);
     
-    if (jsonMatches) {
-      for (let jsonStr of jsonMatches) {
+    // Try to extract JSON from markdown code blocks first
+    const codeBlockMatches = combinedText.match(/```(?:json)?\\s*([\\s\\S]*?)```/g);
+    if (codeBlockMatches) {
+      for (let block of codeBlockMatches) {
+        const jsonStr = block.replace(/```(?:json)?\\s*/, '').replace(/```$/, '').trim();
         try {
           const items = JSON.parse(jsonStr);
           if (Array.isArray(items)) {
             allItems = allItems.concat(items);
           }
         } catch (e) {
-          console.error('JSON parse error:', e);
+          console.error('JSON parse error from code block:', e);
         }
       }
     }
     
+    // If no code blocks, try to find JSON arrays directly
     if (allItems.length === 0) {
-      return c.json({ success: false, error: 'No menu items could be extracted from the images' }, 400)
+      const jsonMatches = combinedText.match(/\\[\\s\\S]*?\\]/g);
+      if (jsonMatches) {
+        for (let jsonStr of jsonMatches) {
+          try {
+            const items = JSON.parse(jsonStr);
+            if (Array.isArray(items)) {
+              allItems = allItems.concat(items);
+            }
+          } catch (e) {
+            console.error('JSON parse error:', e);
+          }
+        }
+      }
+    }
+    
+    console.log('📋 Parsed items:', allItems.length);
+    
+    if (allItems.length === 0) {
+      // Return the AI response for debugging
+      return c.json({ 
+        success: false, 
+        error: 'No menu items could be extracted. AI response: ' + combinedText.substring(0, 500),
+        debug: combinedText
+      }, 400)
     }
     
     // Track created categories
