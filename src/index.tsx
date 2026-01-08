@@ -42270,11 +42270,66 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </div>
             
+            <!-- AI Menu Image Upload (ONE-STEP) -->
+            <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-lg p-6 mb-6 border-2 border-purple-200">
+                <h3 class="text-xl font-bold mb-2 flex items-center gap-2">
+                    <i class="fas fa-wand-magic-sparkles text-purple-600"></i>
+                    <span>AI-Powered Menu Upload</span>
+                    <span class="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">NEW</span>
+                </h3>
+                <p class="text-gray-600 mb-4 text-sm">
+                    <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
+                    Upload menu images and AI will automatically extract all items, create categories, and populate your menu!
+                </p>
+                
+                <form id="aiMenuUploadForm" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Select Restaurant</label>
+                            <select id="aiMenuRestaurantId" required class="w-full px-4 py-2 border rounded-lg bg-white">
+                                <option value="">Select Restaurant</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">
+                                Upload Menu Images
+                                <span class="text-xs text-gray-500">(Multiple images supported)</span>
+                            </label>
+                            <input type="file" id="aiMenuImages" multiple accept="image/*" required 
+                                   class="w-full px-4 py-2 border rounded-lg bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100">
+                        </div>
+                    </div>
+                    
+                    <div id="aiMenuPreview" class="hidden">
+                        <label class="block text-sm font-semibold mb-2">Selected Images:</label>
+                        <div id="aiMenuImagePreviews" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+                    </div>
+                    
+                    <button type="submit" id="aiMenuUploadBtn" class="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all flex items-center gap-2 shadow-lg">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        <span>Extract Menu with AI</span>
+                    </button>
+                    
+                    <div id="aiMenuProgress" class="hidden">
+                        <div class="bg-white rounded-lg p-4 border-2 border-purple-200">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                                <span class="font-semibold text-gray-700">AI is processing your menu...</span>
+                            </div>
+                            <div class="text-sm text-gray-600 space-y-1" id="aiMenuProgressSteps">
+                                <div><i class="fas fa-check text-green-500 mr-2"></i>Images uploaded</div>
+                                <div><i class="fas fa-spinner fa-spin text-purple-600 mr-2"></i>Extracting text from images...</div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
             <!-- Add/Edit Menu Item -->
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h3 class="text-xl font-bold mb-4">
                     <i class="fas fa-plus-circle mr-2 text-purple-600"></i>
-                    Add New Menu Item
+                    Add New Menu Item (Manual)
                 </h3>
                 <form id="addMenuItemForm" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -48050,10 +48105,10 @@ app.get('/admin/dashboard', (c) => {
           
           if (data.success) {
             const select = document.getElementById('menuRestaurantId');
+            // Show ALL restaurants (removed hardcoded filter)
             select.innerHTML = '<option value="">Select Restaurant</option>' + 
               data.restaurants
-                .filter(r => r.title_en !== 'Main Restaurant' && r.title_en !== 'Sunrise Breakfast Buffet')
-                .map(r => \`<option value="\${r.offering_id}">\${r.title_en}</option>\`)
+                .map(r => '<option value="' + r.offering_id + '">' + r.title_en + '</option>')
                 .join('');
           }
         } catch (error) {
