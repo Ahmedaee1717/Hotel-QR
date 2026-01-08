@@ -42343,10 +42343,18 @@ app.get('/admin/dashboard', (c) => {
                             <label class="block text-sm font-semibold mb-2">Category</label>
                             <select id="menuCategory" required class="w-full px-4 py-2 border rounded-lg">
                                 <option value="salad">Salad</option>
+                                <option value="soup">Soup</option>
+                                <option value="appetizer">Appetizer</option>
                                 <option value="starter">Starter</option>
                                 <option value="main">Main Course</option>
+                                <option value="pasta">Pasta</option>
+                                <option value="seafood">Seafood</option>
                                 <option value="dessert">Dessert</option>
+                                <option value="drink">Drink</option>
+                                <option value="side">Side Dish</option>
+                                <option value="other">Other</option>
                             </select>
+                            <p class="text-xs text-gray-500 mt-1">AI can create custom categories automatically</p>
                         </div>
                     </div>
                     
@@ -48089,8 +48097,9 @@ app.get('/admin/dashboard', (c) => {
             displayMenuItems(data.items);
           }
           
-          // Also load restaurant dropdown
+          // Also load restaurant dropdown and categories
           await loadRestaurantsDropdown();
+          await loadMenuCategories();
         } catch (error) {
           console.error('Load menu items error:', error);
         }
@@ -48123,6 +48132,37 @@ app.get('/admin/dashboard', (c) => {
           }
         } catch (error) {
           console.error('Load restaurants dropdown error:', error);
+        }
+      }
+      
+      async function loadMenuCategories() {
+        try {
+          const response = await fetch('/api/alacarte/menu-items?property_id=' + propertyId);
+          const data = await response.json();
+          
+          if (data.success && data.items) {
+            // Get all unique categories from existing menu items
+            const categories = [...new Set(data.items.map(item => item.category))].sort();
+            
+            // Always include standard categories
+            const standardCategories = ['salad', 'starter', 'main', 'dessert', 'drink', 'side'];
+            const allCategories = [...new Set([...standardCategories, ...categories])].sort();
+            
+            // Populate category dropdown
+            const select = document.getElementById('menuCategory');
+            if (select) {
+              select.innerHTML = allCategories
+                .map(cat => {
+                  const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+                  return '<option value="' + cat + '">' + label + '</option>';
+                })
+                .join('');
+            }
+            
+            console.log('✅ Loaded ' + allCategories.length + ' menu categories:', allCategories);
+          }
+        } catch (error) {
+          console.error('Load menu categories error:', error);
         }
       }
       
@@ -48323,12 +48363,11 @@ app.get('/admin/dashboard', (c) => {
         const byRestaurant = {};
         items.forEach(item => {
           if (!byRestaurant[item.restaurant_name]) {
-            byRestaurant[item.restaurant_name] = {
-              salad: [],
-              starter: [],
-              main: [],
-              dessert: []
-            };
+            byRestaurant[item.restaurant_name] = {};
+          }
+          // Create category array if it doesn't exist
+          if (!byRestaurant[item.restaurant_name][item.category]) {
+            byRestaurant[item.restaurant_name][item.category] = [];
           }
           byRestaurant[item.restaurant_name][item.category].push(item);
         });
@@ -48338,55 +48377,47 @@ app.get('/admin/dashboard', (c) => {
           const totalItems = Object.values(categories).flat().length;
           const premiumItems = Object.values(categories).flat().filter(i => i.is_premium).length;
           
-          html += \`
-            <div class="mb-6 border rounded-lg overflow-hidden">
-              <div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">
-                <h4 class="text-xl font-bold">\${restaurant}</h4>
-                <div class="text-sm text-purple-200 mt-1">\${totalItems} items • \${premiumItems} premium</div>
-              </div>
-              <div class="p-4 space-y-4">
-          \`;
+          html += '<div class="mb-6 border rounded-lg overflow-hidden">' +
+            '<div class="bg-gradient-to-r from-purple-600 to-purple-700 text-white p-4">' +
+            '<h4 class="text-xl font-bold">' + restaurant + '</h4>' +
+            '<div class="text-sm text-purple-200 mt-1">' + totalItems + ' items • ' + premiumItems + ' premium</div>' +
+            '</div>' +
+            '<div class="p-4 space-y-4">';
           
-          ['salad', 'starter', 'main', 'dessert'].forEach(category => {
+          // Display all categories dynamically (not just hardcoded 4)
+          Object.keys(categories).sort().forEach(category => {
             if (categories[category].length > 0) {
-              html += \`
-                <div>
-                  <h5 class="font-bold text-gray-700 mb-2 capitalize border-b pb-1">\${category === 'main' ? 'Mains' : category + 's'} (\${categories[category].length})</h5>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-              \`;
+              const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+              html += '<div>' +
+                '<h5 class="font-bold text-gray-700 mb-2 capitalize border-b pb-1">' + categoryName + ' (' + categories[category].length + ')</h5>' +
+                '<div class="grid grid-cols-1 md:grid-cols-2 gap-2">';
               
               categories[category].forEach(item => {
-                html += \`
-                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg \${item.is_premium ? 'border-2 border-yellow-300' : 'border border-gray-200'}">
-                    <div class="flex-1">
-                      <div class="font-semibold text-gray-800">\${item.item_name}</div>
-                      <div class="text-xs text-gray-600">\${item.description?.substring(0, 50) || ''}...</div>
-                    </div>
-                    <div class="ml-3 flex items-center gap-3">
-                      <div class="text-right">
-                        <div class="text-lg font-bold text-purple-600">€\${item.cost_to_hotel.toFixed(2)}</div>
-                        \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
-                      </div>
-                      <button onclick="deleteMenuItem(\${item.item_id}, '\${item.item_name.replace(/'/g, "\\'")}', '\${item.restaurant_name.replace(/'/g, "\\'")}' )" 
-                              class="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition-colors text-sm">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </div>
-                  </div>
-                \`;
+                const borderClass = item.is_premium ? 'border-2 border-yellow-300' : 'border border-gray-200';
+                const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : '';
+                html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg ' + borderClass + '">' +
+                  '<div class="flex-1">' +
+                  '<div class="font-semibold text-gray-800">' + item.item_name + '</div>' +
+                  '<div class="text-xs text-gray-600">' + (item.description?.substring(0, 50) || '') + '...</div>' +
+                  '</div>' +
+                  '<div class="ml-3 flex items-center gap-3">' +
+                  '<div class="text-right">' +
+                  '<div class="text-lg font-bold text-purple-600">€' + item.cost_to_hotel.toFixed(2) + '</div>' +
+                  premiumBadge +
+                  '</div>' +
+                  '<button onclick="deleteMenuItem(' + item.item_id + ', \'' + item.item_name.replace(/'/g, "\\'") + '\', \'' + item.restaurant_name.replace(/'/g, "\\'") + '\' )" ' +
+                  'class="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition-colors text-sm">' +
+                  '<i class="fas fa-trash"></i>' +
+                  '</button>' +
+                  '</div>' +
+                  '</div>';
               });
               
-              html += \`
-                  </div>
-                </div>
-              \`;
+              html += '</div></div>';
             }
           });
           
-          html += \`
-              </div>
-            </div>
-          \`;
+          html += '</div></div>';
         }
         
         container.innerHTML = html;
