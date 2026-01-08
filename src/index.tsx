@@ -65138,45 +65138,96 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         async function loadTables() {
             console.log('📋 Loading tables for restaurant:', restaurantId);
             try {
-                const response = await fetch('/api/admin/restaurant/' + restaurantId + '/tables');
-                const data = await response.json();
+                // Load all tables
+                const tablesResponse = await fetch('/api/restaurant/' + restaurantId + '/tables');
+                const tablesData = await tablesResponse.json();
+                availableTables = tablesData.tables || [];
                 
-                if (data.success && data.tables) {
-                    availableTables = data.tables;
-                    renderTables();
-                    document.getElementById('tableLoadingMessage').classList.add('hidden');
-                    document.getElementById('tableSelectionArea').classList.remove('hidden');
-                } else {
+                if (availableTables.length === 0) {
                     document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>No tables configured for this restaurant</p>';
+                    return;
                 }
+                
+                // Hide loading, show table area
+                document.getElementById('tableLoadingMessage').classList.add('hidden');
+                document.getElementById('tableSelectionArea').classList.remove('hidden');
+                
+                // Render tables on floor plan
+                renderFloorPlan();
             } catch (error) {
                 console.error('Load tables error:', error);
                 document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>Failed to load tables</p>';
             }
         }
         
-        function renderTables() {
-            const container = document.getElementById('tablesListMobile');
-            if (!container) return;
+        function renderFloorPlan() {
+            const canvas = document.getElementById('tablesListMobile');
+            if (!canvas) return;
+            
+            canvas.innerHTML = '';
+            canvas.style.position = 'relative';
+            canvas.style.background = '#F3F4F6';
+            canvas.style.minHeight = '500px';
+            canvas.style.width = '100%';
+            canvas.style.borderRadius = '0.5rem';
+            canvas.style.overflow = 'auto';
             
             const adults = parseInt(document.getElementById('numAdults').value) || 0;
             const children = parseInt(document.getElementById('numChildren').value) || 0;
             const totalGuests = adults + children;
             
-            container.innerHTML = availableTables.map(table => {
+            // Calculate canvas height based on tables
+            const maxY = Math.max(...availableTables.map(t => t.position_y + t.height));
+            const canvasHeight = (maxY + 50) * 0.8;
+            canvas.style.height = canvasHeight + 'px';
+            
+            // Render each table
+            availableTables.forEach(table => {
                 const isSelected = selectedTableId === table.table_id;
                 const canFit = totalGuests === 0 || table.capacity >= totalGuests;
-                const bgColor = isSelected ? 'bg-green-100 border-green-500' : (canFit ? 'bg-white border-gray-300' : 'bg-red-50 border-red-300');
-                const textColor = isSelected ? 'text-green-700' : (canFit ? 'text-gray-700' : 'text-red-500');
-                const cursor = canFit ? 'cursor-pointer hover:border-primary hover:shadow-lg' : 'cursor-not-allowed opacity-60';
                 
-                return '<div onclick="' + (canFit ? 'selectTable(' + table.table_id + ', ' + table.table_number + ', ' + table.capacity + ')' : '') + '" class="border-2 rounded-lg p-4 text-center transition-all ' + bgColor + ' ' + cursor + '">' +
-                    '<div class="text-3xl mb-2">' + (isSelected ? '✓' : '🪑') + '</div>' +
-                    '<div class="font-bold ' + textColor + '">Table ' + table.table_number + '</div>' +
-                    '<div class="text-sm text-gray-500">Capacity: ' + table.capacity + '</div>' +
-                    (canFit ? '' : '<div class="text-xs text-red-600 mt-1">Too small</div>') +
-                '</div>';
-            }).join('');
+                const tableDiv = document.createElement('div');
+                tableDiv.style.position = 'absolute';
+                tableDiv.style.left = (table.position_x * 0.8) + 'px';
+                tableDiv.style.top = (table.position_y * 0.8) + 'px';
+                tableDiv.style.width = (table.width * 0.8) + 'px';
+                tableDiv.style.height = (table.height * 0.8) + 'px';
+                tableDiv.style.border = isSelected ? '3px solid #10B981' : '2px solid #D1D5DB';
+                tableDiv.style.borderRadius = table.shape === 'circle' ? '50%' : '8px';
+                tableDiv.style.background = isSelected ? '#D1FAE5' : (canFit ? '#FFFFFF' : '#FEE2E2');
+                tableDiv.style.display = 'flex';
+                tableDiv.style.flexDirection = 'column';
+                tableDiv.style.alignItems = 'center';
+                tableDiv.style.justifyContent = 'center';
+                tableDiv.style.cursor = canFit ? 'pointer' : 'not-allowed';
+                tableDiv.style.opacity = canFit ? '1' : '0.6';
+                tableDiv.style.transition = 'all 0.3s';
+                
+                tableDiv.innerHTML = '<div style="font-size: 1.5rem; font-weight: bold;">' + table.table_number + '</div>' +
+                    '<div style="font-size: 0.75rem; color: #6B7280; margin-top: 0.25rem;">' +
+                    '<i class="fas fa-users" style="margin-right: 0.25rem;"></i>' + table.capacity +
+                    '</div>';
+                
+                if (canFit) {
+                    tableDiv.onclick = function() {
+                        selectTable(table.table_id, table.table_number, table.capacity);
+                    };
+                    tableDiv.onmouseover = function() {
+                        if (!isSelected) {
+                            this.style.transform = 'scale(1.05)';
+                            this.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                        }
+                    };
+                    tableDiv.onmouseout = function() {
+                        if (!isSelected) {
+                            this.style.transform = 'scale(1)';
+                            this.style.boxShadow = 'none';
+                        }
+                    };
+                }
+                
+                canvas.appendChild(tableDiv);
+            });
         }
         
         function selectTable(tableId, tableNumber, capacity) {
@@ -65188,8 +65239,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             document.getElementById('selectedTableCapacity').textContent = capacity;
             document.getElementById('selectedTableDisplay').classList.remove('hidden');
             
-            // Re-render tables to show selection
-            renderTables();
+            // Re-render floor plan to show selection
+            renderFloorPlan();
             
             console.log('✅ Selected table:', tableNumber);
         }
@@ -65198,7 +65249,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             selectedTableId = null;
             selectedTableNumber = null;
             document.getElementById('selectedTableDisplay').classList.add('hidden');
-            renderTables();
+            renderFloorPlan();
         }
         
         async function confirmBooking() {
@@ -65413,9 +65464,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             checkVoucherEligibility();
         }
         
-        // Re-render tables when guest count changes
-        document.getElementById('numAdults').addEventListener('change', renderTables);
-        document.getElementById('numChildren').addEventListener('change', renderTables);
+        // Re-render floor plan when guest count changes
+        document.getElementById('numAdults').addEventListener('change', renderFloorPlan);
+        document.getElementById('numChildren').addEventListener('change', renderFloorPlan);
         
         // Start initialization
         initializePage();
