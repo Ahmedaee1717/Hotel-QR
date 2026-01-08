@@ -64744,6 +64744,37 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             <div id="menuContainer"></div>
         </div>
 
+        <!-- Table Selection -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-chair mr-2 text-primary"></i><span data-i18n="select-table">Select Your Table</span></h3>
+            <p class="text-gray-600 mb-4" data-i18n="table-desc">Choose your preferred table from our floor plan</p>
+            
+            <div id="tableLoadingMessage" class="text-center py-8 text-gray-500">
+                <i class="fas fa-spinner fa-spin mr-2"></i><span data-i18n="loading-tables">Loading tables...</span>
+            </div>
+            
+            <div id="tableSelectionArea" class="hidden">
+                <div id="selectedTableDisplay" class="hidden bg-green-50 border-2 border-green-500 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Selected Table</p>
+                            <p class="text-2xl font-bold text-green-700">
+                                <i class="fas fa-check-circle mr-2"></i>Table <span id="selectedTableNumber">-</span>
+                            </p>
+                            <p class="text-sm text-gray-500">Capacity: <span id="selectedTableCapacity">-</span> guests</p>
+                        </div>
+                        <button onclick="clearTableSelection()" class="text-red-600 hover:text-red-700 font-semibold">
+                            <i class="fas fa-times-circle mr-1"></i>Change
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="tablesListMobile" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <!-- Tables will be rendered here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Order Summary -->
         <div class="bg-white rounded-lg shadow-lg p-6">
             <h3 class="text-xl font-bold mb-4" data-i18n="your-preorder">Your Pre-Order</h3>
@@ -64765,6 +64796,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let selectedItems = {};
         let voucherEligibility = null;
         let selectedDate = null;
+        let selectedTableId = null;
+        let selectedTableNumber = null;
+        let availableTables = [];
         
         // Load voucher eligibility from localStorage if available
         const storageKey = 'voucherEligibility_' + (passReference || 'guest');
@@ -65100,6 +65134,73 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             summary.innerHTML = html;
         }
         
+        // Table selection functions
+        async function loadTables() {
+            console.log('📋 Loading tables for restaurant:', restaurantId);
+            try {
+                const response = await fetch('/api/admin/restaurant/' + restaurantId + '/tables');
+                const data = await response.json();
+                
+                if (data.success && data.tables) {
+                    availableTables = data.tables;
+                    renderTables();
+                    document.getElementById('tableLoadingMessage').classList.add('hidden');
+                    document.getElementById('tableSelectionArea').classList.remove('hidden');
+                } else {
+                    document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>No tables configured for this restaurant</p>';
+                }
+            } catch (error) {
+                console.error('Load tables error:', error);
+                document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>Failed to load tables</p>';
+            }
+        }
+        
+        function renderTables() {
+            const container = document.getElementById('tablesListMobile');
+            if (!container) return;
+            
+            const adults = parseInt(document.getElementById('numAdults').value) || 0;
+            const children = parseInt(document.getElementById('numChildren').value) || 0;
+            const totalGuests = adults + children;
+            
+            container.innerHTML = availableTables.map(table => {
+                const isSelected = selectedTableId === table.table_id;
+                const canFit = totalGuests === 0 || table.capacity >= totalGuests;
+                const bgColor = isSelected ? 'bg-green-100 border-green-500' : (canFit ? 'bg-white border-gray-300' : 'bg-red-50 border-red-300');
+                const textColor = isSelected ? 'text-green-700' : (canFit ? 'text-gray-700' : 'text-red-500');
+                const cursor = canFit ? 'cursor-pointer hover:border-primary hover:shadow-lg' : 'cursor-not-allowed opacity-60';
+                
+                return '<div onclick="' + (canFit ? 'selectTable(' + table.table_id + ', ' + table.table_number + ', ' + table.capacity + ')' : '') + '" class="border-2 rounded-lg p-4 text-center transition-all ' + bgColor + ' ' + cursor + '">' +
+                    '<div class="text-3xl mb-2">' + (isSelected ? '✓' : '🪑') + '</div>' +
+                    '<div class="font-bold ' + textColor + '">Table ' + table.table_number + '</div>' +
+                    '<div class="text-sm text-gray-500">Capacity: ' + table.capacity + '</div>' +
+                    (canFit ? '' : '<div class="text-xs text-red-600 mt-1">Too small</div>') +
+                '</div>';
+            }).join('');
+        }
+        
+        function selectTable(tableId, tableNumber, capacity) {
+            selectedTableId = tableId;
+            selectedTableNumber = tableNumber;
+            
+            // Update display
+            document.getElementById('selectedTableNumber').textContent = tableNumber;
+            document.getElementById('selectedTableCapacity').textContent = capacity;
+            document.getElementById('selectedTableDisplay').classList.remove('hidden');
+            
+            // Re-render tables to show selection
+            renderTables();
+            
+            console.log('✅ Selected table:', tableNumber);
+        }
+        
+        function clearTableSelection() {
+            selectedTableId = null;
+            selectedTableNumber = null;
+            document.getElementById('selectedTableDisplay').classList.add('hidden');
+            renderTables();
+        }
+        
         async function confirmBooking() {
             const date = document.getElementById('bookingDate').value;
             const time = document.getElementById('bookingTime').value;
@@ -65113,6 +65214,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             if (Object.keys(selectedItems).length === 0) {
                 alert('Please select at least one dish');
+                return;
+            }
+            
+            if (!selectedTableId) {
+                alert('Please select a table for your reservation');
                 return;
             }
             
@@ -65142,6 +65248,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         reservation_time: time,
                         party_size_adults: parseInt(adults),
                         party_size_children: parseInt(children),
+                        table_id: selectedTableId,
                         ...preorder
                     })
                 });
@@ -65299,9 +65406,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             // Show first category AFTER translation
             await showMenuCategory('salad');
             
+            // Load tables
+            await loadTables();
+            
             // Check eligibility (will fetch fresh data if not in cache)
             checkVoucherEligibility();
         }
+        
+        // Re-render tables when guest count changes
+        document.getElementById('numAdults').addEventListener('change', renderTables);
+        document.getElementById('numChildren').addEventListener('change', renderTables);
         
         // Start initialization
         initializePage();
