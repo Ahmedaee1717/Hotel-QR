@@ -4,14 +4,14 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://75dbd7d7.project-c8738f5c.pages.dev 🚀 **NEW: Instant 33-language translation on à la carte booking!**
-**Property Landing Page (6-DIGIT PIN!):** https://75dbd7d7.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
-**À La Carte Booking:** https://75dbd7d7.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️🌍 **33 Languages!**
-**My Perfect Week:** https://75dbd7d7.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
-**My Bookings:** https://75dbd7d7.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
-**Mood Check:** https://75dbd7d7.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
-**Beach Booking:** https://75dbd7d7.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
-**Admin Dashboard:** https://75dbd7d7.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Production:** https://b06e3373.project-c8738f5c.pages.dev 🚀 **NEW: Instant 33-language translation on à la carte booking!**
+**Property Landing Page (6-DIGIT PIN!):** https://b06e3373.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
+**À La Carte Booking:** https://b06e3373.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️🌍 **33 Languages!**
+**My Perfect Week:** https://b06e3373.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
+**My Bookings:** https://b06e3373.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
+**Mood Check:** https://b06e3373.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
+**Beach Booking:** https://b06e3373.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
+**Admin Dashboard:** https://b06e3373.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
