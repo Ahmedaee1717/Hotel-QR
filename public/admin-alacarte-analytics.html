@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>À La Carte Analytics - Paradise Resort</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-6 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold mb-2">
+                        <i class="fas fa-chart-line mr-3"></i>
+                        À La Carte Analytics & Reports
+                    </h1>
+                    <p class="text-blue-200">Real-time insights and AI-powered recommendations</p>
+                </div>
+                <div class="flex gap-3">
+                    <a href="/admin-alacarte-viewer.html" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-utensils mr-2"></i>Menu Manager
+                    </a>
+                    <a href="/kitchen/alacarte/3" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-fire mr-2"></i>Kitchen View
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <button onclick="loadReport('today')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
+                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-day"></i></div>
+                <div class="font-bold text-gray-900">Today's Report</div>
+                <div class="text-sm text-gray-600">Current day analytics</div>
+            </button>
+            <button onclick="loadReport('week')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
+                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-week"></i></div>
+                <div class="font-bold text-gray-900">Weekly Report</div>
+                <div class="text-sm text-gray-600">Last 7 days</div>
+            </button>
+            <button onclick="loadReport('month')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
+                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-alt"></i></div>
+                <div class="font-bold text-gray-900">Monthly Report</div>
+                <div class="text-sm text-gray-600">Last 30 days</div>
+            </button>
+            <button onclick="generateAIInsights()" class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg p-4 text-left transition-all shadow-lg">
+                <div class="text-3xl mb-2"><i class="fas fa-brain"></i></div>
+                <div class="font-bold">AI Insights</div>
+                <div class="text-sm text-emerald-100">Get recommendations</div>
+            </button>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-medium">Total Orders</span>
+                    <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
+                </div>
+                <div id="totalOrders" class="text-4xl font-bold text-gray-900">-</div>
+                <div class="text-sm text-gray-500 mt-2">
+                    <span id="ordersChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-medium">Total Revenue</span>
+                    <i class="fas fa-euro-sign text-emerald-600 text-xl"></i>
+                </div>
+                <div id="totalRevenue" class="text-4xl font-bold text-gray-900">-</div>
+                <div class="text-sm text-gray-500 mt-2">
+                    <span id="revenueChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-medium">Avg Order Value</span>
+                    <i class="fas fa-receipt text-amber-600 text-xl"></i>
+                </div>
+                <div id="avgOrderValue" class="text-4xl font-bold text-gray-900">-</div>
+                <div class="text-sm text-gray-500 mt-2">
+                    <span id="avgChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-gray-600 text-sm font-medium">Most Popular Time</span>
+                    <i class="fas fa-clock text-slate-600 text-xl"></i>
+                </div>
+                <div id="popularTime" class="text-4xl font-bold text-gray-900">-</div>
+                <div class="text-sm text-gray-500 mt-2" id="popularTimeDetail">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Most Sold Items -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">
+                    <i class="fas fa-trophy text-amber-500 mr-2"></i>
+                    Top Selling Items
+                </h3>
+                <canvas id="topItemsChart" height="300"></canvas>
+            </div>
+
+            <!-- Revenue Trend -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-4">
+                    <i class="fas fa-chart-area text-blue-600 mr-2"></i>
+                    Revenue Trend
+                </h3>
+                <canvas id="revenueTrendChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Orders by Time Chart -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">
+                <i class="fas fa-clock text-slate-600 mr-2"></i>
+                Orders by Time of Day
+            </h3>
+            <canvas id="ordersByTimeChart" height="100"></canvas>
+        </div>
+
+        <!-- AI Insights Panel -->
+        <div id="aiInsightsPanel" class="hidden">
+            <div class="bg-gradient-to-br from-emerald-50 to-blue-50 border-2 border-emerald-300 rounded-lg p-6 mb-8">
+                <div class="flex items-start gap-4">
+                    <div class="bg-emerald-600 text-white rounded-full p-4 text-2xl">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">AI-Powered Insights & Recommendations</h3>
+                        <div id="aiInsightsContent" class="space-y-4">
+                            <p class="text-gray-600">Generating insights...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Reports Table -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-4">
+                <i class="fas fa-table text-gray-600 mr-2"></i>
+                Detailed Order History
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Voucher Code</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Guest</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Items</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Cost</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ordersTableBody" class="divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>
+                                Loading orders...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPeriod = 'today';
+        let analytics = null;
+
+        async function loadReport(period) {
+            currentPeriod = period;
+            // TODO: Implement API call to get analytics data
+            // For now, show placeholder
+            document.getElementById('totalOrders').textContent = '-';
+            document.getElementById('totalRevenue').textContent = '-';
+            document.getElementById('avgOrderValue').textContent = '-';
+            document.getElementById('popularTime').textContent = '-';
+            
+            alert(`Analytics API not yet implemented. Period: ${period}\n\nNext steps:\n1. Create /api/analytics/alacarte endpoint\n2. Fetch real data from database\n3. Generate charts with Chart.js\n4. Implement AI insights using OpenAI API`);
+        }
+
+        async function generateAIInsights() {
+            document.getElementById('aiInsightsPanel').classList.remove('hidden');
+            document.getElementById('aiInsightsContent').innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing data and generating insights...</p>';
+            
+            // TODO: Implement AI analysis
+            setTimeout(() => {
+                document.getElementById('aiInsightsContent').innerHTML = `
+                    <div class="bg-white rounded-lg p-4 border-l-4 border-emerald-500">
+                        <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Revenue Optimization</h4>
+                        <p class="text-gray-700">Consider promoting premium items during peak hours (19:00-21:00) when order volume is highest.</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 border-l-4 border-blue-500">
+                        <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-chart-line text-blue-500 mr-2"></i>Trend Analysis</h4>
+                        <p class="text-gray-700">Steak orders increased 23% this week. Ensure adequate inventory.</p>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 border-l-4 border-amber-500">
+                        <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-clock text-amber-500 mr-2"></i>Staffing Recommendation</h4>
+                        <p class="text-gray-700">Add 1 additional kitchen staff during dinner service to reduce preparation time.</p>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-4"><i class="fas fa-info-circle mr-1"></i>Note: AI insights require OpenAI API integration</p>
+                `;
+            }, 2000);
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Analytics dashboard loaded');
+            // Auto-load today's report
+            // loadReport('today');
+        });
+    </script>
+</body>
+</html>
