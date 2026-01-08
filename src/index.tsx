@@ -5,12 +5,16 @@ import { serveStatic } from 'hono/cloudflare-workers'
 // Type definitions for Cloudflare bindings
 type Bindings = {
   DB: D1Database
+  ASSETS: Fetcher
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS for API routes
 app.use('/api/*', cors())
+
+// Serve static HTML files from public directory
+app.use('*.html', serveStatic({ root: './' }))
 
 // ============================================
 // GUEST DIGITAL PASS ROUTES (Priority routes - must be first)
@@ -59742,12 +59746,36 @@ app.get('/my-bookings', async (c) => {
   }
 })
 
+// Serve admin HTML files as static assets
+app.get('/admin-alacarte-analytics.html', async (c) => {
+  try {
+    const response = await c.env.ASSETS.fetch(c.req.url)
+    return response
+  } catch {
+    return c.notFound()
+  }
+})
+
+app.get('/admin-alacarte-viewer.html', async (c) => {
+  try {
+    const response = await c.env.ASSETS.fetch(c.req.url)
+    return response
+  } catch {
+    return c.notFound()
+  }
+})
+
 app.get('/:property_slug?', async (c) => {
   const { DB } = c.env
   const property_slug = c.req.param('property_slug') || 'paradise-resort'
   
-  // Skip if this matches a specific route pattern
-  if (property_slug && (property_slug.startsWith('guest-pass') || property_slug === 'guest-portal.html')) {
+  // Skip if this matches a specific route pattern or is an admin HTML file
+  if (property_slug && (
+    property_slug.startsWith('guest-pass') || 
+    property_slug === 'guest-portal.html' ||
+    property_slug.startsWith('admin-') ||
+    property_slug.endsWith('.html')
+  )) {
     return c.notFound()
   }
   
