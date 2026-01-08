@@ -4,13 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://9e27e393.project-c8738f5c.pages.dev 🚀 **ANALYTICS READY!**
-**Property Landing Page (6-DIGIT PIN!):** https://9e27e393.project-c8738f5c.pages.dev/hotel/paradise-resort?qr=PASS-1767791192596-5QBRD 🔢✅
-**À La Carte Booking:** https://9e27e393.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️ **WORKING**
-**Kitchen View:** https://9e27e393.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳📋 **FILTERS + ITEMS**
-**My Bookings:** https://9e27e393.project-c8738f5c.pages.dev/my-bookings?property=1 📋 **ALL RESERVATIONS**
-**Admin À La Carte:** https://9e27e393.project-c8738f5c.pages.dev/admin-alacarte-viewer.html 🔧 **KITCHEN + ANALYTICS**
-**Analytics Dashboard:** https://9e27e393.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **NEW: REPORTS & AI**
+**Production:** https://da5c3d32.project-c8738f5c.pages.dev 🚀 **BUTTONS FIXED!**
+**Admin Dashboard:** https://da5c3d32.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **KITCHEN + ANALYTICS BUTTONS**
+**À La Carte Section:** Click "À La Carte Vouchers" tab → See Kitchen View & Analytics buttons 🔥📊
+**Kitchen View:** Auto-opens first restaurant with filters & items view 👨‍🍳
+**Analytics Dashboard:** https://da5c3d32.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **READY FOR DATA**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
