@@ -21161,11 +21161,15 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             </button>
                                         </div>
                                     </div>
-                                    <button onclick="toggleTierDetails()" class="w-full sm:w-auto bg-white/30 hover:bg-white/40 text-white font-bold py-3 px-4 sm:px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 border-2 border-white/50">
-                                        <span id="tierToggleText" class="text-sm font-bold uppercase tracking-wide">View Details</span>
-                                        <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
-                                    </button>
                                 </div>
+                            </div>
+                            
+                            <!-- View Details Button (Below Header) -->
+                            <div class="relative z-10 -mt-2">
+                                <button onclick="toggleTierDetails()" class="w-full bg-white/30 backdrop-blur-lg hover:bg-white/40 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 border-2 border-white/50">
+                                    <span id="tierToggleText" class="text-base font-bold uppercase tracking-wide">View Full Benefits</span>
+                                    <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
+                                </button>
                             </div>
                             
                             <!-- Gamification Stats (Future Phase) -->
@@ -25891,12 +25895,12 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
-          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-50" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-[100]" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
             <i class="fas fa-comments"></i>
           </button>
           
           <!-- Chat Window -->
-          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
+          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-[100] border border-gray-200">
             <!-- Header -->
             <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
