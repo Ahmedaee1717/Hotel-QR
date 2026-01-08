@@ -7839,54 +7839,42 @@ app.post('/api/admin/property/:property_id/translate-tagline', async (c) => {
 // Real-time translation API for guest-facing pages (no auth required)
 app.post('/api/translate', async (c) => {
   try {
-    const { text, target_lang, context, persona } = await c.req.json()
+    const body = await c.req.json()
+    const { text, target_lang, target_language, context, persona } = body
     
-    if (!text || !target_lang) {
+    // Support both parameter names
+    const targetLang = target_language || target_lang
+    
+    console.log('🌐 Translation API request:', { text: text?.substring(0, 50), targetLang })
+    
+    // Return empty if text is empty
+    if (!text || text.trim() === '') {
+      console.log('⚠️ Empty text, returning as-is')
+      return c.json({ translation: text || '', translated_text: text || '' })
+    }
+    
+    if (!targetLang) {
       return c.json({ error: 'Missing text or target_lang' }, 400)
     }
     
     // For English, return as-is
-    if (target_lang === 'en') {
-      return c.json({ translated_text: text })
+    if (targetLang === 'en' || targetLang === 'English') {
+      return c.json({ translation: text, translated_text: text })
     }
     
-    // Get OpenAI API key from environment variable if configured
-    // For now, return original text (hotel admin should use batch translation)
-    // This is a fallback - ideally translations should be pre-stored in DB
+    // Get OpenAI API key from environment variable
     const apiKey = c.env.OPENAI_API_KEY
     
     if (!apiKey) {
-      // No API key, return original text
-      return c.json({ translated_text: text })
+      console.log('⚠️ No OpenAI API key, returning original text')
+      return c.json({ translation: text, translated_text: text })
     }
     
-    const languageNames: Record<string, string> = {
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'ru': 'Russian',
-      'ar': 'Modern Standard Arabic',
-      'zh': 'Simplified Chinese'
-    }
+    // Use target language name if it looks like a full name (e.g., "Arabic", "Spanish")
+    // Otherwise treat it as a language code (e.g., "ar", "es")
+    const languageTarget = targetLang.length > 3 ? targetLang : targetLang
     
-    const contextPrompts: Record<string, string> = {
-      'hotel_offering_description': 'You are translating hotel offering descriptions (restaurants, spa, events, services). Maintain luxury hospitality tone.',
-      'luxury_hospitality': 'You are translating luxury hotel content. Use elegant, professional language appropriate for high-end hospitality.'
-    }
-    
-    const systemPrompt = `You are a professional hospitality translator.
-${contextPrompts[context] || contextPrompts['luxury_hospitality']}
-
-CRITICAL REQUIREMENTS:
-- Translate with 100% accuracy to ${languageNames[target_lang] || target_lang}
-- Maintain tourism marketing tone and appeal
-- Preserve formatting, punctuation, and special characters  
-- Keep proper nouns (hotel names, locations) unchanged
-- Use appropriate formality level for luxury hospitality
-- Ensure cultural appropriateness for ${languageNames[target_lang] || target_lang} speakers
-- Output ONLY the translation, NO explanations or notes`
+    const systemPrompt = `You are a professional translator. Translate the given text to ${languageTarget}. Return ONLY the translation, no explanations or additional text.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -7895,28 +7883,32 @@ CRITICAL REQUIREMENTS:
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text }
         ],
-        temperature: 0.2,
-        max_tokens: 1000
+        temperature: 0.3,
+        max_tokens: 500
       })
     })
     
     if (!response.ok) {
-      console.error('Translation API error:', await response.text())
-      return c.json({ translated_text: text }) // Fallback
+      const errorText = await response.text()
+      console.error('❌ OpenAI API error:', errorText)
+      return c.json({ translation: text, translated_text: text })
     }
     
     const data: any = await response.json()
-    const translatedText = data.choices?.[0]?.message?.content?.trim()
+    const translatedText = data.choices?.[0]?.message?.content?.trim() || text
     
-    return c.json({ translated_text: translatedText || text })
+    console.log('✅ Translated:', text.substring(0, 30), '→', translatedText.substring(0, 30))
+    
+    // Return both formats for compatibility
+    return c.json({ translation: translatedText, translated_text: translatedText })
   } catch (error) {
-    console.error('Translation error:', error)
-    return c.json({ translated_text: text }, 200) // Fallback to original
+    console.error('❌ Translation error:', error)
+    return c.json({ translation: text || '', translated_text: text || '' }, 200)
   }
 })
 
@@ -68286,69 +68278,6 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
   } catch (error) {
     console.error('Bulk delete menu items error:', error)
     return c.json({ success: false, error: 'Failed to delete menu items' }, 500)
-  }
-})
-
-// Guest: Simple Translation API (for instant translation in booking pages)
-app.post('/api/translate', async (c) => {
-  const { OPENAI_API_KEY } = c.env
-  
-  try {
-    const body = await c.req.json()
-    const { text, target_language } = body
-    
-    console.log('🌐 Translation request:', { text: text?.substring(0, 50), target_language })
-    
-    // Return original text if empty or target is English
-    if (!text || text.trim() === '') {
-      console.log('⚠️ Empty text, returning as-is')
-      return c.json({ translation: text || '' })
-    }
-    
-    if (!target_language || target_language === 'English') {
-      console.log('⚠️ No target language or English, returning original')
-      return c.json({ translation: text })
-    }
-    
-    // Simple OpenAI translation
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a professional translator. Translate the given text to ${target_language}. Return ONLY the translation, no explanations or additional text.`
-          },
-          {
-            role: 'user',
-            content: text
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 500
-      })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('OpenAI API error:', errorText)
-      return c.json({ translation: text }) // Fallback to original text
-    }
-    
-    const data = await response.json()
-    const translation = data.choices[0]?.message?.content || text
-    
-    console.log('✅ Translated:', text.substring(0, 30), '→', translation.substring(0, 30))
-    
-    return c.json({ translation })
-  } catch (error) {
-    console.error('Translation error:', error)
-    return c.json({ translation: text || '' }) // Fallback to original
   }
 })
 
