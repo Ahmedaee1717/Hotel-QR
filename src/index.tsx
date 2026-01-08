@@ -65808,6 +65808,15 @@ app.post('/api/alacarte/voucher', async (c) => {
       SELECT tier_id FROM digital_passes WHERE pass_id = ?
     `).bind(passInfo.pass_id).first()
 
+    // Get table number if table_id provided
+    let tableNumber = null
+    if (table_id) {
+      const table = await DB.prepare(`
+        SELECT table_number FROM restaurant_tables WHERE table_id = ?
+      `).bind(table_id).first()
+      tableNumber = table?.table_number || null
+    }
+
     // Insert voucher
     const result = await DB.prepare(`
       INSERT INTO alacarte_vouchers (
@@ -65820,7 +65829,7 @@ app.post('/api/alacarte/voucher', async (c) => {
         reservation_date,
         reservation_time,
         party_size,
-        table_id,
+        table_number,
         preorder_item_ids,
         special_requests,
         total_cost,
@@ -65836,7 +65845,7 @@ app.post('/api/alacarte/voucher', async (c) => {
       reservation_date,
       reservation_time,
       party_size,
-      table_id || null,
+      tableNumber,
       JSON.stringify(preorder_item_ids),
       special_requests || null,
       totalCost
@@ -66736,16 +66745,14 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         v.reservation_date,
         v.reservation_time,
         v.party_size,
-        v.table_id,
+        v.table_number,
         v.preorder_item_ids,
         v.special_requests,
         v.status,
         v.created_at,
-        dp.primary_guest_name as guest_name,
-        t.table_number
+        dp.primary_guest_name as guest_name
       FROM alacarte_vouchers v
       LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
-      LEFT JOIN restaurant_tables t ON v.table_id = t.table_id
       WHERE v.restaurant_id = ?
         AND v.property_id = ?
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
@@ -66759,6 +66766,14 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         END,
         v.reservation_time ASC
     `).bind(restaurant_id, property_id).all()
+    
+    // Handle empty results
+    if (!orders || !orders.results) {
+      return c.json({
+        success: true,
+        orders: []
+      })
+    }
     
     // For each order, get the dish details
     const ordersWithDishes = await Promise.all(orders.results.map(async (order) => {
@@ -66801,7 +66816,8 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
     console.error('Get kitchen orders error:', error)
     return c.json({
       success: false,
-      error: 'Failed to get orders'
+      error: 'Failed to get orders',
+      details: error.message || String(error)
     }, 500)
   }
 })
