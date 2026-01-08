@@ -25895,12 +25895,12 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
-          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-[100]" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-[1001]" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
             <i class="fas fa-comments"></i>
           </button>
           
           <!-- Chat Window -->
-          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-[100] border border-gray-200">
+          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-[1001] border border-gray-200">
             <!-- Header -->
             <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
