@@ -65318,6 +65318,765 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
 
 // Admin API: Get all menu items for à la carte
+app.get('/api/alacarte/restaurants', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const restaurants = await DB.prepare(`
+      SELECT 
+        offering_id,
+        title_en,
+        title_ar,
+        short_description_en,
+        short_description_ar,
+        full_description_en,
+        full_description_ar,
+        location,
+        capacity_per_slot,
+        requires_booking
+      FROM hotel_offerings
+      WHERE property_id = ?
+        AND offering_type = 'restaurant'
+        AND status = 'active'
+      ORDER BY display_order, title_en
+    `).bind(property_id).all()
+
+    return c.json({
+      success: true,
+      restaurants: restaurants.results
+    })
+  } catch (error) {
+    console.error('Get restaurants error:', error)
+    return c.json({ success: false, error: 'Failed to fetch restaurants' }, 500)
+  }
+})
+
+// Get menu for a specific restaurant
+app.get('/api/alacarte/menu/:restaurant_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const restaurant_id = c.req.param('restaurant_id')
+
+  try {
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar
+      FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ? AND offering_type = 'restaurant'
+    `).bind(restaurant_id, property_id).first()
+
+    if (!restaurant) {
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+
+    const menu = await DB.prepare(`
+      SELECT 
+        item_id,
+        category,
+        item_name,
+        item_name_ar,
+        description,
+        description_ar,
+        cost_to_hotel,
+        is_premium,
+        allergens,
+        display_order
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+          ELSE 5
+        END,
+        display_order,
+        item_name
+    `).bind(restaurant_id, property_id).all()
+
+    // Group by category
+    const menuByCategory: Record<string, any[]> = {}
+    for (const item of menu.results) {
+      const cat = item.category as string
+      if (!menuByCategory[cat]) {
+        menuByCategory[cat] = []
+      }
+      menuByCategory[cat].push(item)
+    }
+
+    return c.json({
+      success: true,
+      restaurant,
+      menu: menuByCategory,
+      categories: ['salad', 'starter', 'main', 'dessert']
+    })
+  } catch (error) {
+    console.error('Get menu error:', error)
+    return c.json({ success: false, error: 'Failed to fetch menu' }, 500)
+  }
+})
+
+// Check guest voucher eligibility
+app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
+  const { DB } = c.env
+  const pass_reference = c.req.param('pass_reference')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    // Get digital pass and tier info
+    const passInfo = await DB.prepare(`
+      SELECT 
+        dp.pass_id,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        dp.room_number,
+        dp.valid_from,
+        dp.valid_until,
+        t.tier_id,
+        t.tier_code,
+        t.tier_display_name,
+        t.tier_color,
+        t.alacarte_meals_per_stay,
+        t.alacarte_eligible_restaurants,
+        t.alacarte_premium_surcharge
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
+      WHERE dp.pass_reference = ? AND dp.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!passInfo) {
+      return c.json({ success: false, error: 'Pass not found' }, 404)
+    }
+
+    // Check if tier is eligible
+    const mealsAllowed = passInfo.alacarte_meals_per_stay || 0
+    if (mealsAllowed === 0) {
+      return c.json({
+        success: true,
+        eligible: false,
+        reason: 'Tier not eligible for à la carte dining',
+        tier: {
+          tier_code: passInfo.tier_code,
+          tier_name: passInfo.tier_display_name,
+          tier_color: passInfo.tier_color
+        }
+      })
+    }
+
+    // Count used vouchers for this pass
+    const usedVouchers = await DB.prepare(`
+      SELECT COUNT(*) as used_count
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(passInfo.pass_id).first()
+
+    const mealsUsed = usedVouchers?.used_count || 0
+    const mealsRemaining = mealsAllowed - mealsUsed
+
+    // Parse eligible restaurants
+    let eligibleRestaurants = []
+    try {
+      if (passInfo.alacarte_eligible_restaurants) {
+        eligibleRestaurants = JSON.parse(passInfo.alacarte_eligible_restaurants)
+      }
+    } catch (e) {
+      console.error('Parse eligible restaurants error:', e)
+    }
+
+    // Get restaurant details if specific restaurants are set
+    let restaurantDetails = []
+    if (eligibleRestaurants.length > 0) {
+      const restaurantList = await DB.prepare(`
+        SELECT offering_id, title_en, location, images
+        FROM hotel_offerings
+        WHERE offering_id IN (${eligibleRestaurants.map(() => '?').join(',')})
+          AND property_id = ?
+          AND offering_type = 'restaurant'
+          AND status = 'active'
+      `).bind(...eligibleRestaurants, property_id).all()
+      // Parse images JSON for each restaurant
+      restaurantDetails = restaurantList.results.map(r => ({
+        ...r,
+        images: r.images ? JSON.parse(r.images) : []
+      }))
+    } else {
+      // All à la carte restaurants are eligible
+      const allRestaurants = await DB.prepare(`
+        SELECT offering_id, title_en, location, images
+        FROM hotel_offerings
+        WHERE property_id = ?
+          AND offering_type = 'restaurant'
+          AND status = 'active'
+        ORDER BY display_order, title_en
+      `).bind(property_id).all()
+      // Parse images JSON for each restaurant
+      restaurantDetails = allRestaurants.results.map(r => ({
+        ...r,
+        images: r.images ? JSON.parse(r.images) : []
+      }))
+    }
+
+    return c.json({
+      success: true,
+      eligible: mealsRemaining > 0,
+      guest_name: passInfo.primary_guest_name,
+      tier: {
+        tier_code: passInfo.tier_code,
+        tier_name: passInfo.tier_display_name,
+        tier_color: passInfo.tier_color
+      },
+      vouchers: {
+        total_allowed: mealsAllowed,
+        used: mealsUsed,
+        remaining: mealsRemaining
+      },
+      eligible_restaurants: restaurantDetails,
+      premium_surcharge: passInfo.alacarte_premium_surcharge || 0
+    })
+  } catch (error) {
+    console.error('Check voucher eligibility error:', error)
+    console.error('Error details:', error.message, error.stack)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to check eligibility',
+      debug: error.message 
+    }, 500)
+  }
+})
+
+// Create à la carte voucher
+app.post('/api/alacarte/voucher', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const {
+      pass_reference,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size_adults,
+      party_size_children,
+      preorder_salad,
+      preorder_starter,
+      preorder_main,
+      preorder_dessert,
+      special_requests
+    } = body
+
+    // Verify pass eligibility
+    const passInfo = await DB.prepare(`
+      SELECT 
+        dp.pass_id,
+        dp.property_id,
+        t.alacarte_meals_per_stay,
+        t.alacarte_eligible_restaurants
+      FROM digital_passes dp
+      JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
+      WHERE dp.pass_reference = ? AND dp.property_id = ?
+    `).bind(pass_reference, property_id).first()
+
+    if (!passInfo) {
+      return c.json({ success: false, error: 'Pass not found' }, 404)
+    }
+
+    // Check remaining vouchers
+    const usedCount = await DB.prepare(`
+      SELECT COUNT(*) as used
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(passInfo.pass_id).first()
+
+    const mealsUsed = usedCount?.used || 0
+    const mealsAllowed = passInfo.alacarte_meals_per_stay || 0
+    
+    if (mealsUsed >= mealsAllowed) {
+      return c.json({ 
+        success: false, 
+        error: 'No vouchers remaining',
+        used: mealsUsed,
+        allowed: mealsAllowed
+      }, 400)
+    }
+
+    // Check restaurant eligibility
+    let eligibleRestaurants = []
+    try {
+      if (passInfo.alacarte_eligible_restaurants) {
+        eligibleRestaurants = JSON.parse(passInfo.alacarte_eligible_restaurants)
+        if (eligibleRestaurants.length > 0 && !eligibleRestaurants.includes(restaurant_id.toString())) {
+          return c.json({ success: false, error: 'Restaurant not eligible for your tier' }, 400)
+        }
+      }
+    } catch (e) {
+      console.error('Parse restaurants error:', e)
+    }
+
+    // Calculate total cost
+    const items = [preorder_salad, preorder_starter, preorder_main, preorder_dessert].filter(Boolean)
+    let totalCost = 0
+    
+    for (const itemId of items) {
+      const item = await DB.prepare(`
+        SELECT cost_to_hotel FROM alacarte_menu_items WHERE item_id = ?
+      `).bind(itemId).first()
+      
+      if (item) {
+        totalCost += item.cost_to_hotel || 0
+      }
+    }
+
+    // Generate voucher code
+    const dateStr = reservation_date.replace(/-/g, '')
+    const randomNum = Math.floor(1000 + Math.random() * 9000)
+    const voucherCode = `MEAL-${dateStr}-${randomNum}`
+
+    // Insert voucher
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_vouchers (
+        property_id,
+        pass_id,
+        voucher_code,
+        restaurant_id,
+        reservation_date,
+        reservation_time,
+        party_size_adults,
+        party_size_children,
+        preorder_salad_id,
+        preorder_starter_id,
+        preorder_main_id,
+        preorder_dessert_id,
+        special_requests,
+        total_cost,
+        status,
+        tier_meal_number
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)
+    `).bind(
+      property_id,
+      passInfo.pass_id,
+      voucherCode,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size_adults || 1,
+      party_size_children || 0,
+      preorder_salad || null,
+      preorder_starter || null,
+      preorder_main || null,
+      preorder_dessert || null,
+      special_requests || null,
+      totalCost,
+      mealsUsed + 1
+    ).run()
+
+    return c.json({
+      success: true,
+      voucher_code: voucherCode,
+      voucher_id: result.meta.last_row_id,
+      total_cost: totalCost,
+      meals_used: mealsUsed + 1,
+      meals_allowed: mealsAllowed,
+      meals_remaining: mealsAllowed - (mealsUsed + 1)
+    })
+  } catch (error) {
+    console.error('Create voucher error:', error)
+    return c.json({ success: false, error: 'Failed to create voucher' }, 500)
+  }
+})
+
+// Get voucher details
+app.get('/api/alacarte/voucher/:voucher_code', async (c) => {
+  const { DB } = c.env
+  const voucher_code = c.req.param('voucher_code')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const voucher = await DB.prepare(`
+      SELECT 
+        v.*,
+        r.title_en as restaurant_name,
+        r.location as restaurant_location,
+        dp.pass_reference,
+        dp.primary_guest_name,
+        salad.item_name as salad_name,
+        starter.item_name as starter_name,
+        main.item_name as main_name,
+        dessert.item_name as dessert_name
+      FROM alacarte_vouchers v
+      JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
+      JOIN digital_passes dp ON v.pass_id = dp.pass_id
+      LEFT JOIN alacarte_menu_items salad ON v.preorder_salad_id = salad.item_id
+      LEFT JOIN alacarte_menu_items starter ON v.preorder_starter_id = starter.item_id
+      LEFT JOIN alacarte_menu_items main ON v.preorder_main_id = main.item_id
+      LEFT JOIN alacarte_menu_items dessert ON v.preorder_dessert_id = dessert.item_id
+      WHERE v.voucher_code = ? AND v.property_id = ?
+    `).bind(voucher_code, property_id).first()
+
+    if (!voucher) {
+      return c.json({ success: false, error: 'Voucher not found' }, 404)
+    }
+
+    return c.json({
+      success: true,
+      voucher
+    })
+  } catch (error) {
+    console.error('Get voucher error:', error)
+    return c.json({ success: false, error: 'Failed to fetch voucher' }, 500)
+  }
+})
+
+// Mark voucher as used
+app.post('/api/alacarte/voucher/:voucher_code/redeem', async (c) => {
+  const { DB } = c.env
+  const voucher_code = c.req.param('voucher_code')
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const body = await c.req.json()
+    const { staff_id, staff_name } = body
+
+    // Get voucher
+    const voucher = await DB.prepare(`
+      SELECT voucher_id, status
+      FROM alacarte_vouchers
+      WHERE voucher_code = ? AND property_id = ?
+    `).bind(voucher_code, property_id).first()
+
+    if (!voucher) {
+      return c.json({ success: false, error: 'Voucher not found' }, 404)
+    }
+
+    if (voucher.status === 'used') {
+      return c.json({ success: false, error: 'Voucher already used' }, 400)
+    }
+
+    if (voucher.status === 'cancelled') {
+      return c.json({ success: false, error: 'Voucher cancelled' }, 400)
+    }
+
+    // Mark as used
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET 
+        status = 'used',
+        checked_in_at = CURRENT_TIMESTAMP,
+        checked_in_by = ?
+      WHERE voucher_id = ?
+    `).bind(staff_name || 'Staff', voucher.voucher_id).run()
+
+    return c.json({
+      success: true,
+      message: 'Voucher redeemed successfully'
+    })
+  } catch (error) {
+    console.error('Redeem voucher error:', error)
+    return c.json({ success: false, error: 'Failed to redeem voucher' }, 500)
+  }
+})
+
+// Admin: View all menu items (for testing)
+app.get('/api/admin/alacarte/menu-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+
+  try {
+    const items = await DB.prepare(`
+      SELECT 
+        m.item_id,
+        m.restaurant_id,
+        r.title_en as restaurant_name,
+        m.category,
+        m.item_name,
+        m.item_name_ar,
+        m.description,
+        m.cost_to_hotel,
+        m.is_premium,
+        m.is_available,
+        m.display_order
+      FROM alacarte_menu_items m
+      JOIN hotel_offerings r ON m.restaurant_id = r.offering_id
+      WHERE m.property_id = ?
+      ORDER BY m.restaurant_id, 
+        CASE m.category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+          ELSE 5
+        END,
+        m.display_order,
+        m.item_name
+    `).bind(property_id).all()
+
+    return c.json({
+      success: true,
+      total: items.results.length,
+      items: items.results
+    })
+  } catch (error) {
+    console.error('Get menu items error:', error)
+    return c.json({ success: false, error: 'Failed to fetch menu items' }, 500)
+  }
+})
+
+// Admin: Create menu item
+app.post('/api/admin/alacarte/menu-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_menu_items (
+        property_id, restaurant_id, category, item_name, item_name_ar,
+        description, description_ar, cost_to_hotel, is_premium,
+        display_order, is_available
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      body.restaurant_id,
+      body.category,
+      body.item_name,
+      body.item_name_ar,
+      body.description,
+      body.description_ar,
+      body.cost_to_hotel,
+      body.is_premium ? 1 : 0,
+      body.display_order || 0,
+      body.is_available !== undefined ? body.is_available : 1
+    ).run()
+    
+    return c.json({
+      success: true,
+      item_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Create menu item error:', error)
+    return c.json({ success: false, error: 'Failed to create menu item' }, 500)
+  }
+})
+
+// Admin: Delete menu item
+app.delete('/api/admin/alacarte/menu-items/:item_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const item_id = c.req.param('item_id')
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM alacarte_menu_items
+      WHERE item_id = ? AND property_id = ?
+    `).bind(item_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete menu item error:', error)
+    return c.json({ success: false, error: 'Failed to delete menu item' }, 500)
+  }
+})
+
+// Admin: Bulk Delete Menu Items
+app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    
+    if (body.delete_all) {
+      // Delete all menu items for this property
+      const result = await DB.prepare(`
+        DELETE FROM alacarte_menu_items
+        WHERE property_id = ?
+      `).bind(property_id).run()
+      
+      return c.json({ 
+        success: true, 
+        deleted_count: result.meta.changes || 0 
+      })
+    }
+    
+    return c.json({ success: false, error: 'Invalid request' }, 400)
+  } catch (error) {
+    console.error('Bulk delete menu items error:', error)
+    return c.json({ success: false, error: 'Failed to delete menu items' }, 500)
+  }
+})
+
+// Admin: AI Menu Upload - Process menu images with OpenAI Vision
+app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
+  const { DB, OPENAI_API_KEY } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { restaurant_id, images } = body
+    
+    if (!images || images.length === 0) {
+      return c.json({ success: false, error: 'No images provided' }, 400)
+    }
+    
+    if (!OPENAI_API_KEY) {
+      return c.json({ success: false, error: 'OpenAI API key not configured' }, 500)
+    }
+    
+    // Get restaurant name for context
+    const restaurant = await DB.prepare(`
+      SELECT title_en FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+    
+    // Process each image with OpenAI Vision API
+    let allExtractedText = [];
+    
+    for (let imageData of images) {
+      // Call OpenAI Vision API
+      const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + OPENAI_API_KEY
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'You are a menu extraction expert. Extract ALL menu items from this restaurant menu image.\\n\\nFor each item, return:\\n- name: the dish name\\n- description: brief description (empty string if none)\\n- category: one of (salad, starter, main, dessert, drink, side, appetizer, soup, pasta, seafood, or other)\\n- is_premium: true if marked as premium/special, else false\\n\\nIMPORTANT: Return ONLY a valid JSON array, nothing else. No markdown, no explanations.\\n\\nExample format:\\n[{"name":"Caesar Salad","description":"Crisp romaine with parmesan","category":"salad","is_premium":false}]\\n\\nExtract every item you can see:'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageData }
+              }
+            ]
+          }],
+          max_tokens: 2000,
+          temperature: 0.2
+        })
+      });
+      
+      if (!visionResponse.ok) {
+        console.error('OpenAI API error:', await visionResponse.text());
+        continue;
+      }
+      
+      const visionResult = await visionResponse.json();
+      const extractedText = visionResult.choices[0].message.content;
+      allExtractedText.push(extractedText);
+    }
+    
+    // Combine all extracted text
+    const combinedText = allExtractedText.join('\\n\\n');
+    console.log('🤖 AI Response:', combinedText);
+    
+    // Parse the JSON from the extracted text (handle markdown code blocks)
+    let allItems = [];
+    
+    // Try to extract JSON from markdown code blocks first
+    // Remove markdown code blocks if present
+    let cleanedText = combinedText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    // Try to parse as JSON array directly
+    try {
+      const parsed = JSON.parse(cleanedText);
+      if (Array.isArray(parsed)) {
+        allItems = parsed;
+      }
+    } catch (e) {
+      // If direct parse fails, try to find JSON arrays in the text
+      const jsonMatches = cleanedText.match(/\[[\s\S]*?\]/g);
+      if (jsonMatches) {
+        for (let jsonStr of jsonMatches) {
+          try {
+            const items = JSON.parse(jsonStr);
+            if (Array.isArray(items)) {
+              allItems = allItems.concat(items);
+            }
+          } catch (parseErr) {
+            console.error('JSON parse error:', parseErr);
+          }
+        }
+      }
+    }
+    
+    console.log('📋 Parsed items:', allItems.length);
+    
+    if (allItems.length === 0) {
+      // Return the AI response for debugging
+      return c.json({ 
+        success: false, 
+        error: 'No menu items could be extracted. AI response: ' + combinedText.substring(0, 500),
+        debug: combinedText
+      }, 400)
+    }
+    
+    // Track created categories
+    const categoriesSet = new Set();
+    let itemsCreated = 0;
+    
+    // Insert each item into database
+    for (let item of allItems) {
+      try {
+        const category = (item.category || 'main').toLowerCase();
+        categoriesSet.add(category);
+        
+        await DB.prepare(`
+          INSERT INTO alacarte_menu_items (
+            property_id, restaurant_id, category, item_name,
+            description, cost_to_hotel, is_premium, display_order, is_available
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          property_id,
+          restaurant_id,
+          category,
+          item.name || 'Unnamed Item',
+          item.description || '',
+          0, // Cost will be set by admin later
+          item.is_premium ? 1 : 0,
+          itemsCreated,
+          1
+        ).run();
+        
+        itemsCreated++;
+      } catch (error) {
+        console.error('Insert menu item error:', error);
+        // Continue with next item
+      }
+    }
+    
+    return c.json({
+      success: true,
+      items_created: itemsCreated,
+      categories: Array.from(categoriesSet),
+      restaurant: restaurant.title_en
+    })
+    
+  } catch (error) {
+    console.error('AI menu upload error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'AI processing failed: ' + error.message 
+    }, 500)
+  }
+})
+
+// ============================================
+// À LA CARTE GUEST BOOKING FLOW
+// ============================================
+
+// À La Carte Restaurant Selection & Booking
+
+
 app.get('/api/admin/alacarte/menu-items', async (c) => {
   const property_id = c.req.header('X-Property-ID') || '1'
   const { DB } = c.env
