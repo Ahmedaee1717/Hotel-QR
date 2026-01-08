@@ -68289,8 +68289,17 @@ app.post('/api/translate', async (c) => {
     const body = await c.req.json()
     const { text, target_language } = body
     
-    if (!text || !target_language) {
-      return c.json({ error: 'Missing text or target_language' }, 400)
+    console.log('🌐 Translation request:', { text: text?.substring(0, 50), target_language })
+    
+    // Return original text if empty or target is English
+    if (!text || text.trim() === '') {
+      console.log('⚠️ Empty text, returning as-is')
+      return c.json({ translation: text || '' })
+    }
+    
+    if (!target_language || target_language === 'English') {
+      console.log('⚠️ No target language or English, returning original')
+      return c.json({ translation: text })
     }
     
     // Simple OpenAI translation
@@ -68318,17 +68327,20 @@ app.post('/api/translate', async (c) => {
     })
     
     if (!response.ok) {
-      console.error('OpenAI API error:', await response.text())
-      return c.json({ error: 'Translation failed' }, 500)
+      const errorText = await response.text()
+      console.error('OpenAI API error:', errorText)
+      return c.json({ translation: text }) // Fallback to original text
     }
     
     const data = await response.json()
     const translation = data.choices[0]?.message?.content || text
     
+    console.log('✅ Translated:', text.substring(0, 30), '→', translation.substring(0, 30))
+    
     return c.json({ translation })
   } catch (error) {
     console.error('Translation error:', error)
-    return c.json({ error: 'Translation failed' }, 500)
+    return c.json({ translation: text || '' }) // Fallback to original
   }
 })
 
@@ -69102,6 +69114,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             try {
                 const targetLangName = languageNames[targetLanguage] || targetLanguage;
                 
+                console.log('🔄 Translating:', text.substring(0, 30), '→', targetLangName);
+                
                 const response = await fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -69115,7 +69129,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     const data = await response.json();
                     const translated = data.translation || text;
                     translationCache.set(cacheKey, translated);
+                    console.log('✅ Got translation:', translated.substring(0, 30));
                     return translated;
+                } else {
+                    console.error('❌ Translation failed:', response.status, await response.text());
                 }
             } catch (error) {
                 console.warn('Translation failed:', error);
