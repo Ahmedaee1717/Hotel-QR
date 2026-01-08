@@ -68281,6 +68281,57 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
   }
 })
 
+// Guest: Simple Translation API (for instant translation in booking pages)
+app.post('/api/translate', async (c) => {
+  const { OPENAI_API_KEY } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const { text, target_language } = body
+    
+    if (!text || !target_language) {
+      return c.json({ error: 'Missing text or target_language' }, 400)
+    }
+    
+    // Simple OpenAI translation
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional translator. Translate the given text to ${target_language}. Return ONLY the translation, no explanations or additional text.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('OpenAI API error:', await response.text())
+      return c.json({ error: 'Translation failed' }, 500)
+    }
+    
+    const data = await response.json()
+    const translation = data.choices[0]?.message?.content || text
+    
+    return c.json({ translation })
+  } catch (error) {
+    console.error('Translation error:', error)
+    return c.json({ error: 'Translation failed' }, 500)
+  }
+})
+
 // Admin: AI Menu Upload - Process menu images with OpenAI Vision
 app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
   const { DB, OPENAI_API_KEY } = c.env
@@ -69051,27 +69102,18 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             try {
                 const targetLangName = languageNames[targetLanguage] || targetLanguage;
                 
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        messages: [
-                            {
-                                role: 'system',
-                                content: \`You are a professional translator. Translate the given text to \${targetLangName}. Return ONLY the translation, no explanations or additional text.\`
-                            },
-                            {
-                                role: 'user',
-                                content: text
-                            }
-                        ],
-                        property_id: propertyId
+                        text: text,
+                        target_language: targetLangName
                     })
                 });
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const translated = data.message || text;
+                    const translated = data.translation || text;
                     translationCache.set(cacheKey, translated);
                     return translated;
                 }
