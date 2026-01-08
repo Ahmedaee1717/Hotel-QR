@@ -10,13 +10,13 @@
 <body class="bg-gray-50">
     <div class="min-h-screen">
         <!-- Header -->
-        <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-8">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-8">
             <div class="max-w-7xl mx-auto px-4">
                 <h1 class="text-4xl font-bold mb-2">
                     <i class="fas fa-utensils mr-3"></i>
                     À La Carte Menu System
                 </h1>
-                <p class="text-purple-200">Admin Viewer - Production Database</p>
+                <p class="text-blue-200">Admin Viewer - Production Database</p>
             </div>
         </div>
 
@@ -82,18 +82,27 @@
                 container.innerHTML = data.restaurants
                     .filter(r => r.title_en !== 'Main Restaurant' && r.title_en !== 'Sunrise Breakfast Buffet')
                     .map(r => `
-                        <div onclick="loadMenu(${r.offering_id}, '${r.title_en.replace(/'/g, "\\'")}', '${r.short_description_en?.replace(/'/g, "\\'") || ''}')" 
-                             class="cursor-pointer bg-gradient-to-br from-purple-50 to-white border-2 border-purple-200 hover:border-purple-500 rounded-lg p-6 transition-all hover:shadow-lg">
+                        <div class="bg-gradient-to-br from-blue-50 to-white border-2 border-blue-200 hover:border-blue-500 rounded-lg p-6 transition-all hover:shadow-lg">
                             <h3 class="text-xl font-bold text-gray-800 mb-2">${r.title_en}</h3>
                             <p class="text-gray-600 text-sm mb-3">${r.short_description_en || ''}</p>
-                            <div class="flex items-center justify-between text-sm">
-                                <span class="text-purple-600">
+                            <div class="flex items-center justify-between text-sm mb-4">
+                                <span class="text-blue-600">
                                     <i class="fas fa-chair mr-1"></i>
                                     ${r.capacity_per_slot || 'N/A'} seats
                                 </span>
-                                <span class="text-purple-600">
+                                <span class="text-blue-600">
                                     ${r.requires_booking ? '<i class="fas fa-calendar-check mr-1"></i>Booking Required' : '<i class="fas fa-walking mr-1"></i>Walk-in'}
                                 </span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="loadMenu(${r.offering_id}, '${r.title_en.replace(/'/g, "\\'")}', '${r.short_description_en?.replace(/'/g, "\\'") || ''}')" 
+                                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                                    <i class="fas fa-utensils mr-2"></i>View Menu
+                                </button>
+                                <a href="/kitchen/alacarte/${r.offering_id}?property=1" target="_blank"
+                                   class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-center">
+                                    <i class="fas fa-fire mr-2"></i>Kitchen View
+                                </a>
                             </div>
                         </div>
                     `).join('');
