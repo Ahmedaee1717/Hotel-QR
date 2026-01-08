@@ -64410,10 +64410,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 
                 if (data.success) {
                     const { voucher_code, meals_remaining, total_cost } = data;
-                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nYour reservation is confirmed. Show this voucher code when you arrive at the restaurant.\`);
+                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nRedirecting to your bookings...\`);
                     
-                    // Redirect to voucher view (we'll create this next)
-                    window.location.href = \`/alacarte/voucher/\${voucher_code}?property=\${propertyId}\`;
+                    // Redirect to my bookings page
+                    window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
@@ -65308,10 +65308,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 if (data.success) {
                     const { voucher_code, meals_remaining, total_cost } = data;
-                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nYour reservation is confirmed. Show this voucher code when you arrive at the restaurant.\`);
+                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nRedirecting to your bookings...\`);
                     
-                    // Redirect to voucher view (we'll create this next)
-                    window.location.href = \`/alacarte/voucher/\${voucher_code}?property=\${propertyId}\`;
+                    // Redirect to my bookings page
+                    window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
