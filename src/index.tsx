@@ -42259,10 +42259,18 @@ app.get('/admin/dashboard', (c) => {
                 
                 <!-- View Menu Button -->
                 <div class="flex gap-4 mb-6">
-                    <a href="/admin-alacarte-viewer.html" target="_blank" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                    <a href="/admin-alacarte-viewer.html" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
                         <i class="fas fa-book-open"></i>
                         View Full Menu
                     </a>
+                    <a href="/admin-alacarte-analytics.html" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <i class="fas fa-chart-line"></i>
+                        Analytics & Reports
+                    </a>
+                    <button onclick="openKitchenView()" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <i class="fas fa-fire"></i>
+                        Kitchen View
+                    </button>
                     <button onclick="refreshALaCarteStats()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
                         <i class="fas fa-sync-alt"></i>
                         Refresh
@@ -48075,6 +48083,23 @@ app.get('/admin/dashboard', (c) => {
       async function loadALaCarteVouchers() {
         await refreshALaCarteStats();
         await loadMenuItems();
+      }
+      
+      async function openKitchenView() {
+        // Get first restaurant from the list
+        try {
+          const response = await fetch('/api/alacarte/restaurants?property=' + propertyId);
+          const data = await response.json();
+          if (data.success && data.restaurants && data.restaurants.length > 0) {
+            const firstRestaurant = data.restaurants[0];
+            window.open('/kitchen/alacarte/' + firstRestaurant.offering_id + '?property=' + propertyId, '_blank');
+          } else {
+            alert('No restaurants found');
+          }
+        } catch (error) {
+          console.error('Error loading restaurants:', error);
+          alert('Failed to open kitchen view');
+        }
       }
       
       async function refreshALaCarteStats() {
