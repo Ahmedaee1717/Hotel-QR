@@ -21450,7 +21450,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         let customSections = [];
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        let linkedPassReference = localStorage.getItem('linkedPassReference') || null;
         console.log('🌐 Current language loaded:', currentLanguage);
+        console.log('🎫 Linked pass reference:', linkedPassReference);
         
         // Expose propertyData to window so chatbot and other functions can access it
         Object.defineProperty(window, 'propertyData', {
@@ -24043,6 +24045,22 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 return;
             }
             
+            // Check voucher eligibility if guest has a pass
+            let voucherData = null;
+            if (linkedPassReference) {
+                try {
+                    const response = await fetch('/api/alacarte/voucher-eligibility/' + linkedPassReference, {
+                        headers: { 'X-Property-ID': propertyId }
+                    });
+                    const data = await response.json();
+                    if (data.success && data.eligible) {
+                        voucherData = data;
+                    }
+                } catch (error) {
+                    console.error('Check voucher eligibility error:', error);
+                }
+            }
+            
             const bookTableText = t('book-table');
             const reservationsText = t('reservations');
             const viewDetailsText = t('view-details');
@@ -24050,6 +24068,18 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             const cardsHtml = await Promise.all(restaurants.map(async r => {
                 const title = await getTranslatedField(r, 'title');
                 const description = await getTranslatedField(r, 'short_description');
+                
+                // Check if this restaurant is eligible for vouchers
+                const isEligible = voucherData && (
+                    voucherData.eligible_restaurants.length === 0 || 
+                    voucherData.eligible_restaurants.some(rest => rest.offering_id === r.offering_id)
+                );
+                
+                // Build the booking URL with pass parameter if eligible
+                const bookingUrl = isEligible 
+                    ? \`/alacarte/book/\${r.offering_id}?property=\${propertyId}&pass=\${linkedPassReference}\`
+                    : \`javascript:viewOffering('\${r.offering_id}')\`;
+                
                 return \`
                 <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
                     <div class="relative cursor-pointer" onclick="viewOffering('\${r.offering_id}')">
@@ -24058,7 +24088,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                              class="w-full h-48 object-cover">
                         <div class="absolute top-3 left-3 right-3 flex items-start justify-between gap-2">
                             \${generateOccupancyBadge(r.occupancy_status)}
-                            <div class="flex-shrink-0">
+                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
+                                \${isEligible ? '<span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse"><i class="fas fa-ticket-alt mr-1"></i>' + voucherData.vouchers.remaining + ' VOUCHERS</span>' : ''}
                                 \${r.requires_booking ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
                             </div>
                         </div>
@@ -24070,9 +24101,15 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
                             <span>\${translateLocation(r.location)}</span>
                         </div>
-                        <div class="pt-3 border-t border-gray-100">
+                        <div class="pt-3 border-t border-gray-100 space-y-2">
+                            \${isEligible ? \`
+                            <button onclick="window.location.href='\${bookingUrl}'" 
+                                    class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg hover:opacity-90 font-bold text-sm transition-all shadow-md">
+                                <i class="fas fa-ticket-alt mr-2"></i>Use Voucher (\${voucherData.vouchers.remaining} Left)
+                            </button>
+                            \` : ''}
                             <button onclick="viewOffering('\${r.offering_id}')" 
-                                    class="w-full bg-secondary text-white py-2.5 rounded-lg hover:opacity-90 font-semibold text-sm transition-all">
+                                    class="w-full \${isEligible ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-secondary text-white hover:opacity-90'} py-2.5 rounded-lg font-semibold text-sm transition-all">
                                 <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
                             </button>
                         </div>
