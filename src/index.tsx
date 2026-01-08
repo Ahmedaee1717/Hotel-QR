@@ -21456,17 +21456,30 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         
         // Get linked pass reference from guestPassSession
         let linkedPassReference = null;
-        try {
-            const session = localStorage.getItem('guestPassSession');
-            if (session) {
-                const data = JSON.parse(session);
-                if (data.guest && data.guest.pass_reference) {
-                    linkedPassReference = data.guest.pass_reference;
+        function updateLinkedPassReference() {
+            try {
+                const session = localStorage.getItem('guestPassSession');
+                console.log('📦 Raw session from localStorage:', session);
+                if (session) {
+                    const data = JSON.parse(session);
+                    console.log('📦 Parsed session data:', data);
+                    if (data.guest && data.guest.pass_reference) {
+                        linkedPassReference = data.guest.pass_reference;
+                        console.log('✅ Pass reference found:', linkedPassReference);
+                    } else {
+                        console.log('❌ No pass_reference in session data');
+                    }
+                } else {
+                    console.log('ℹ️ No guestPassSession in localStorage');
                 }
+            } catch (e) {
+                console.error('❌ Error reading pass session:', e);
             }
-        } catch (e) {
-            console.error('Error reading pass session:', e);
+            return linkedPassReference;
         }
+        
+        // Initial load
+        updateLinkedPassReference();
         
         console.log('🌐 Current language loaded:', currentLanguage);
         console.log('🎫 Linked pass reference:', linkedPassReference);
@@ -25166,12 +25179,15 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         // Listen for pass linked event
         window.addEventListener('passLinked', function(e) {
           const guest = e.detail;
+          console.log('🎫 passLinked event received with guest:', guest);
           if (guest && guest.pass_reference) {
             loadTierBenefits(guest.pass_reference);
             // Update linkedPassReference and re-render restaurants to show voucher badges
-            linkedPassReference = guest.pass_reference;
-            console.log('🎫 Pass linked, updating voucher display:', linkedPassReference);
+            updateLinkedPassReference(); // Re-read from localStorage to ensure sync
+            console.log('🎫 Pass linked, voucher display updated. Reference:', linkedPassReference);
             renderRestaurants(); // Re-render to show voucher badges
+          } else {
+            console.error('❌ passLinked event received but no pass_reference in guest data');
           }
         });
         
