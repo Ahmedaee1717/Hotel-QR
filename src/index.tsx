@@ -68456,15 +68456,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
   const pass_reference = c.req.query('pass') || null
   
   try {
-    // Get property colors
+    // Get property colors and slug
     const property = await DB.prepare(`
-      SELECT primary_color, accent_color
+      SELECT primary_color, accent_color, slug
       FROM properties
       WHERE property_id = ?
     `).bind(property_id).first()
     
     const primaryColor = property?.primary_color || '#9333ea'
     const accentColor = property?.accent_color || '#f59e0b'
+    const propertySlug = property?.slug || 'paradise-resort'
     
     // Get digital pass dates if pass_reference provided
     let passData = null
@@ -68538,9 +68539,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     <!-- Header -->
     <div class="bg-primary text-white py-6">
         <div class="max-w-4xl mx-auto px-4">
-            <button onclick="window.history.back()" class="mb-4 text-white hover:text-gray-200">
+            <a href="/hotel/${propertySlug}?qr=${pass_reference || ''}" class="inline-block mb-4 text-white hover:text-gray-200 transition">
                 <i class="fas fa-arrow-left mr-2"></i><span data-i18n="back">Back</span>
-            </button>
+            </a>
             <h1 class="text-3xl font-bold" data-i18n-key="restaurant-title">${restaurant.title_en}</h1>
             <p class="text-white/80 mt-1" data-i18n-key="restaurant-desc">${restaurant.short_description_en || ''}</p>
             ${restaurant.location ? `<p class="text-white/80 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i><span data-i18n-key="restaurant-location">${restaurant.location}</span></p>` : ''}
