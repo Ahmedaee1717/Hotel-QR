@@ -66549,6 +66549,51 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     <span class="font-medium">Completed</span>
                 </div>
             </div>
+
+        <!-- Filters and View Tabs -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div class="flex flex-wrap items-center gap-4 mb-4">
+                <!-- Date Filter -->
+                <div class="flex items-center gap-2">
+                    <label class="font-medium text-gray-700">Date:</label>
+                    <input type="date" id="filterDate" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                </div>
+                
+                <!-- Restaurant Selector -->
+                <div class="flex items-center gap-2">
+                    <label class="font-medium text-gray-700">Restaurant:</label>
+                    <select id="restaurantSelector" onchange="switchRestaurant()" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="${restaurant_id}" selected>${restaurant.title_en}</option>
+                    </select>
+                </div>
+                
+                <!-- Refresh Button -->
+                <button onclick="loadOrders()" class="ml-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+            </div>
+            
+            <!-- View Tabs -->
+            <div class="flex gap-2 border-b border-gray-200">
+                <button onclick="switchView('orders')" id="tabOrders" class="px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600">
+                    <i class="fas fa-list mr-2"></i>Orders by Guest
+                </button>
+                <button onclick="switchView('items')" id="tabItems" class="px-6 py-3 font-semibold text-gray-600 hover:text-blue-600">
+                    <i class="fas fa-utensils mr-2"></i>Items Summary
+                </button>
+            </div>
+        </div>
+
+        <!-- Items Summary View (hidden by default) -->
+        <div id="itemsSummaryView" class="hidden bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                <i class="fas fa-clipboard-list mr-2"></i>Items to Prepare
+            </h2>
+            <div id="itemsSummary" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Items will be rendered here -->
+            </div>
+        </div>
+
         </div>
 
         <!-- Orders Grid -->
@@ -66568,15 +66613,81 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         const restaurantId = '${restaurant_id}';
         const propertyId = '${property_id}';
         let orders = [];
+        let currentView = 'orders'; // 'orders' or 'items'
+        let selectedDate = new Date().toISOString().split('T')[0]; // Today
+
+        // Initialize date filter to today
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('filterDate').value = selectedDate;
+            document.getElementById('filterDate').addEventListener('change', (e) => {
+                selectedDate = e.target.value;
+                loadOrders();
+            });
+            loadRestaurants();
+        });
+
+        async function loadRestaurants() {
+            try {
+                const response = await fetch('/api/alacarte/restaurants?property=' + propertyId);
+                const data = await response.json();
+                if (data.success && data.restaurants) {
+                    const selector = document.getElementById('restaurantSelector');
+                    selector.innerHTML = data.restaurants.map(r => 
+                        \`<option value="\${r.offering_id}" \${r.offering_id == restaurantId ? 'selected' : ''}>\${r.title_en}</option>\`
+                    ).join('');
+                }
+            } catch (error) {
+                console.error('Load restaurants error:', error);
+            }
+        }
+
+        function switchRestaurant() {
+            const newRestaurantId = document.getElementById('restaurantSelector').value;
+            if (newRestaurantId != restaurantId) {
+                window.location.href = '/kitchen/alacarte/' + newRestaurantId + '?property=' + propertyId;
+            }
+        }
+
+        function switchView(view) {
+            currentView = view;
+            const ordersView = document.getElementById('ordersGrid');
+            const itemsView = document.getElementById('itemsSummaryView');
+            const emptyState = document.getElementById('emptyState');
+            const tabOrders = document.getElementById('tabOrders');
+            const tabItems = document.getElementById('tabItems');
+            
+            if (view === 'orders') {
+                ordersView.classList.remove('hidden');
+                itemsView.classList.add('hidden');
+                tabOrders.className = 'px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600';
+                tabItems.className = 'px-6 py-3 font-semibold text-gray-600 hover:text-blue-600';
+                if (orders.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                }
+            } else {
+                ordersView.classList.add('hidden');
+                itemsView.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+                tabOrders.className = 'px-6 py-3 font-semibold text-gray-600 hover:text-blue-600';
+                tabItems.className = 'px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600';
+                renderItemsSummary();
+            }
+        }
 
         async function loadOrders() {
             try {
-                const response = await fetch('/api/kitchen/orders/' + restaurantId + '?property=' + propertyId);
+                const response = await fetch('/api/kitchen/orders/' + restaurantId + '?property=' + propertyId + '&date=' + selectedDate);
                 const data = await response.json();
                 
                 if (data.success) {
                     orders = data.orders;
-                    renderOrders();
+                    if (currentView === 'orders') {
+                        renderOrders();
+                    } else {
+                        renderItemsSummary();
+                    }
                     updateTimestamp();
                 }
             } catch (error) {
@@ -66716,6 +66827,56 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             }
         }
 
+
+        function renderItemsSummary() {
+            const container = document.getElementById('itemsSummary');
+            
+            // Aggregate items across all orders
+            const itemCounts = {};
+            orders.forEach(order => {
+                order.dishes.forEach(dish => {
+                    const key = dish.item_name;
+                    if (!itemCounts[key]) {
+                        itemCounts[key] = {
+                            name: dish.item_name,
+                            category: dish.category,
+                            is_premium: dish.is_premium,
+                            count: 0
+                        };
+                    }
+                    itemCounts[key].count++;
+                });
+            });
+            
+            // Sort by category and count
+            const items = Object.values(itemCounts).sort((a, b) => {
+                const categoryOrder = {salad: 1, starter: 2, main: 3, dessert: 4};
+                const orderA = categoryOrder[a.category] || 5;
+                const orderB = categoryOrder[b.category] || 5;
+                if (orderA !== orderB) return orderA - orderB;
+                return b.count - a.count;
+            });
+            
+            if (items.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center col-span-full py-8">No items to prepare</p>';
+                return;
+            }
+            
+            container.innerHTML = items.map(item => 
+                '<div class="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">' +
+                    '<div class="flex items-center justify-between mb-2">' +
+                        '<span class="text-xs font-semibold text-gray-500 uppercase">' + item.category + '</span>' +
+                        (item.is_premium ? '<span class="text-xs text-amber-600 font-semibold"><i class="fas fa-star mr-1"></i>Premium</span>' : '') +
+                    '</div>' +
+                    '<h3 class="text-xl font-bold text-gray-900 mb-3">' + item.name + '</h3>' +
+                    '<div class="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg p-4 text-center">' +
+                        '<div class="text-4xl font-bold">' + item.count + '</div>' +
+                        '<div class="text-sm font-medium mt-1">to prepare</div>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+        }
+
         // Auto-refresh every 10 seconds
         setInterval(loadOrders, 10000);
 
@@ -66734,10 +66895,11 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
 app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
   const { restaurant_id } = c.req.param()
   const property_id = c.req.query('property') || '1'
+  const filterDate = c.req.query('date') || new Date().toISOString().split('T')[0] // Default to today
   const { DB } = c.env
   
   try {
-    // Get all active orders (confirmed, preparing, ready)
+    // Get all active orders (confirmed, preparing, ready, served)
     const orders = await DB.prepare(`
       SELECT 
         v.voucher_id,
@@ -66756,7 +66918,7 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       WHERE v.restaurant_id = ?
         AND v.property_id = ?
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
-        AND v.reservation_date = date('now')
+        AND v.reservation_date = ?
       ORDER BY 
         CASE v.status 
           WHEN 'confirmed' THEN 1
@@ -66765,7 +66927,7 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
           WHEN 'served' THEN 4
         END,
         v.reservation_time ASC
-    `).bind(restaurant_id, property_id).all()
+    `).bind(restaurant_id, property_id, filterDate).all()
     
     // Handle empty results
     if (!orders || !orders.results) {
