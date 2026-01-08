@@ -25401,8 +25401,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       '</div>' +
                       '<div class="p-3">' +
                         '<h4 class="font-bold text-sm mb-2" style="color: #1f2937 !important;">' + restaurant.title_en + '</h4>' +
-                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90" style="background: var(--primary-color); color: white !important;">' +
-                          '<i class="fas fa-calendar-check mr-1"></i>Book Now' +
+                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90" style="background: var(--primary-color); color: #ffffff !important; text-decoration: none !important;">' +
+                          '<i class="fas fa-calendar-check mr-1" style="color: #ffffff !important;"></i><span style="color: #ffffff !important;">Book Now</span>' +
                         '</a>' +
                       '</div>' +
                     '</div>';
