@@ -68113,17 +68113,24 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 // Parse check-in and check-out dates
                 const checkIn = new Date(passData.valid_from);
                 const checkOut = new Date(passData.valid_until);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Reset time to midnight for comparison
                 
-                // Generate date buttons for each day of stay
+                // Generate date buttons for each day of stay (from TODAY onwards only)
                 const dates = [];
                 let currentDate = new Date(checkIn);
+                
+                // Start from today if check-in is in the past
+                if (currentDate < today) {
+                    currentDate = new Date(today);
+                }
                 
                 while (currentDate <= checkOut) {
                     dates.push(new Date(currentDate));
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
                 
-                // Build chic date buttons
+                // Build chic date buttons (smaller size)
                 datePickerContainer.innerHTML = dates.map((date, index) => {
                     const dateStr = date.toISOString().split('T')[0];
                     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
@@ -68134,12 +68141,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     return \`
                         <button type="button" onclick="selectDate('\${dateStr}')" 
                                 data-date="\${dateStr}"
-                                class="date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
-                                style="min-height: 80px;">
+                                class="date-btn p-2 rounded-lg border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 60px;">
                             <div class="text-xs font-semibold opacity-70">\${dayName}</div>
-                            <div class="text-2xl font-bold my-1">\${dayNum}</div>
+                            <div class="text-xl font-bold">\${dayNum}</div>
                             <div class="text-xs opacity-70">\${monthName}</div>
-                            \${isToday ? '<div class="text-xs mt-1 font-bold">Today</div>' : ''}
+                            \${isToday ? '<div class="text-xs font-bold">Today</div>' : ''}
                         </button>
                     \`;
                 }).join('');
@@ -68148,7 +68155,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 selectedDate = dates[0].toISOString().split('T')[0];
                 dateInput.value = selectedDate;
                 
-                console.log(\`📅 Custom date picker created with \${dates.length} dates\`);
+                console.log(\`📅 Custom date picker created with \${dates.length} dates (from today onwards)\`);
             } else {
                 // Fallback: show today and next 7 days
                 const dates = [];
@@ -68167,10 +68174,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     return \`
                         <button type="button" onclick="selectDate('\${dateStr}')" 
                                 data-date="\${dateStr}"
-                                class="date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
-                                style="min-height: 80px;">
+                                class="date-btn p-2 rounded-lg border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 60px;">
                             <div class="text-xs font-semibold opacity-70">\${dayName}</div>
-                            <div class="text-2xl font-bold my-1">\${dayNum}</div>
+                            <div class="text-xl font-bold">\${dayNum}</div>
                             <div class="text-xs opacity-70">\${monthName}</div>
                         </button>
                     \`;
