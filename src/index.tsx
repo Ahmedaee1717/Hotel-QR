@@ -67968,17 +67968,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         </div>
 
         <!-- Order Summary -->
-        <div class="bg-white rounded-lg shadow-lg p-6 sticky bottom-4">
+        <div class="bg-white rounded-lg shadow-lg p-6">
             <h3 class="text-xl font-bold mb-4">Your Pre-Order</h3>
             <div id="orderSummary" class="space-y-2 mb-4">
                 <p class="text-gray-500 text-center py-4">No items selected yet</p>
-            </div>
-            <div class="border-t pt-4 mb-4">
-                <div class="flex justify-between text-lg font-bold">
-                    <span>Estimated Cost:</span>
-                    <span id="totalCost" class="text-purple-600">€0.00</span>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Kitchen cost estimate - not guest charge</p>
             </div>
             <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold text-lg transition-colors">
                 <i class="fas fa-check-circle mr-2"></i>Confirm Reservation
@@ -68103,8 +68096,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
                                 \${item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : ''}
                             </div>
-                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
-                            <div class="text-purple-600 font-semibold">€\${item.cost_to_hotel.toFixed(2)}</div>
+                            <p class="text-gray-600 text-sm">\${item.description || ''}</p>
                         </div>
                         <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
                                 id="btn-\${item.item_id}"
@@ -68133,16 +68125,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         function updateOrderSummary() {
             const summary = document.getElementById('orderSummary');
-            const totalCost = document.getElementById('totalCost');
             
             if (Object.keys(selectedItems).length === 0) {
                 summary.innerHTML = '<p class="text-gray-500 text-center py-4">No items selected yet</p>';
-                totalCost.textContent = '€0.00';
                 return;
             }
-            
-            const total = Object.values(selectedItems).reduce((sum, item) => sum + item.cost, 0);
-            totalCost.textContent = '€' + total.toFixed(2);
             
             // Group by category for display
             const categories = ['salad', 'starter', 'main', 'dessert'];
