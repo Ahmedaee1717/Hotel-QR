@@ -64583,6 +64583,392 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     `)
 })
 
+// Kitchen View for À La Carte Orders
+app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    // Get restaurant info
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, location
+      FROM alacarte_restaurants
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.html('<h1>Restaurant not found</h1>', 404)
+    }
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen View - ${restaurant.title_en}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-new { animation: pulse-green 2s infinite; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-lg shadow-lg mb-6">
+            <h1 class="text-3xl font-bold flex items-center gap-3">
+                <i class="fas fa-utensils"></i>
+                Kitchen View - ${restaurant.title_en}
+            </h1>
+            <p class="mt-2 text-purple-100">
+                <i class="fas fa-map-marker-alt mr-2"></i>${restaurant.location}
+            </p>
+            <div class="mt-4 flex gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-yellow-400 rounded-full status-new"></div>
+                    <span>New Orders</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-orange-400 rounded-full"></div>
+                    <span>Preparing</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span>Ready</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
+                    <span>Served</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Grid -->
+        <div id="ordersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Orders will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <i class="fas fa-clipboard-list text-6xl text-gray-300 mb-4"></i>
+            <p class="text-xl text-gray-500">No active orders</p>
+        </div>
+    </div>
+
+    <script>
+        const restaurantId = '${restaurant_id}';
+        const propertyId = '${property_id}';
+        let orders = [];
+
+        // Load orders
+        async function loadOrders() {
+            try {
+                const response = await fetch('/api/kitchen/orders/' + restaurantId + '?property=' + propertyId);
+                const data = await response.json();
+                
+                if (data.success) {
+                    orders = data.orders;
+                    renderOrders();
+                }
+            } catch (error) {
+                console.error('Load orders error:', error);
+            }
+        }
+
+        // Render orders
+        function renderOrders() {
+            const grid = document.getElementById('ordersGrid');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (orders.length === 0) {
+                grid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            grid.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            
+            grid.innerHTML = orders.map(order => {
+                const statusColors = {
+                    'confirmed': 'bg-yellow-100 border-yellow-400',
+                    'preparing': 'bg-orange-100 border-orange-400',
+                    'ready': 'bg-green-100 border-green-400',
+                    'served': 'bg-gray-100 border-gray-400'
+                };
+                
+                const statusBadgeColors = {
+                    'confirmed': 'bg-yellow-400 text-yellow-900',
+                    'preparing': 'bg-orange-400 text-orange-900',
+                    'ready': 'bg-green-400 text-green-900',
+                    'served': 'bg-gray-400 text-gray-900'
+                };
+                
+                const statusLabels = {
+                    'confirmed': 'New Order',
+                    'preparing': 'Preparing',
+                    'ready': 'Ready',
+                    'served': 'Served'
+                };
+                
+                const statusClass = statusColors[order.status] || 'bg-white border-gray-200';
+                const badgeClass = statusBadgeColors[order.status] || 'bg-gray-400';
+                const isNew = order.status === 'confirmed';
+                
+                return '<div class="' + statusClass + ' border-l-4 rounded-lg shadow-md p-4 ' + (isNew ? 'status-new' : '') + '">' +
+                    '<!-- Header -->' +
+                    '<div class="flex items-start justify-between mb-3">' +
+                        '<div>' +
+                            '<h3 class="text-lg font-bold text-gray-800">' +
+                                '<i class="fas fa-ticket-alt mr-2"></i>' + order.voucher_code +
+                            '</h3>' +
+                            '<p class="text-sm text-gray-600 mt-1">' +
+                                '<i class="fas fa-user mr-1"></i>' + order.guest_name +
+                                ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + order.party_size + ' guests</span>' +
+                            '</p>' +
+                        '</div>' +
+                        '<span class="' + badgeClass + ' px-3 py-1 rounded-full text-xs font-semibold">' +
+                            statusLabels[order.status] +
+                        '</span>' +
+                    '</div>' +
+                    
+                    '<!-- Table Info -->' +
+                    '<div class="bg-white rounded p-2 mb-3 text-center">' +
+                        '<p class="text-2xl font-bold text-purple-600">' +
+                            '<i class="fas fa-chair mr-2"></i>Table ' + (order.table_number || 'TBD') +
+                        '</p>' +
+                    '</div>' +
+                    
+                    '<!-- Time Info -->' +
+                    '<div class="text-sm text-gray-600 mb-3">' +
+                        '<i class="fas fa-clock mr-1"></i>' + order.reservation_time +
+                        ' <span class="ml-2"><i class="fas fa-calendar mr-1"></i>' + order.reservation_date + '</span>' +
+                    '</div>' +
+                    
+                    '<!-- Dishes -->' +
+                    '<div class="space-y-2 mb-4">' +
+                        order.dishes.map(dish => 
+                            '<div class="bg-white rounded p-2 flex items-start gap-2">' +
+                                '<div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">' +
+                                    '<i class="fas fa-utensils text-purple-600 text-xs"></i>' +
+                                '</div>' +
+                                '<div class="flex-1">' +
+                                    '<p class="font-semibold text-gray-800">' + dish.item_name + '</p>' +
+                                    (dish.is_premium ? '<span class="text-xs text-orange-600"><i class="fas fa-star mr-1"></i>Premium</span>' : '') +
+                                    '<p class="text-xs text-gray-500">' + dish.category + '</p>' +
+                                '</div>' +
+                            '</div>'
+                        ).join('') +
+                    '</div>' +
+                    
+                    '<!-- Special Requests -->' +
+                    (order.special_requests ? 
+                        '<div class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-3">' +
+                            '<p class="text-xs font-semibold text-yellow-800 mb-1"><i class="fas fa-sticky-note mr-1"></i>Special Requests:</p>' +
+                            '<p class="text-sm text-yellow-900">' + order.special_requests + '</p>' +
+                        '</div>'
+                    : '') +
+                    
+                    '<!-- Action Buttons -->' +
+                    '<div class="grid grid-cols-3 gap-2">' +
+                        (order.status === 'confirmed' ?
+                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'preparing\')" class="col-span-3 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-semibold">' +
+                                '<i class="fas fa-fire mr-2"></i>Start Preparing' +
+                            '</button>'
+                        : '') +
+                        (order.status === 'preparing' ?
+                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'ready\')" class="col-span-3 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">' +
+                                '<i class="fas fa-check-circle mr-2"></i>Mark as Ready' +
+                            '</button>'
+                        : '') +
+                        (order.status === 'ready' ?
+                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'served\')" class="col-span-3 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold">' +
+                                '<i class="fas fa-utensils mr-2"></i>Mark as Served' +
+                            '</button>'
+                        : '') +
+                        (order.status === 'served' ?
+                            '<div class="col-span-3 text-center text-gray-500 py-2">' +
+                                '<i class="fas fa-check-double mr-2"></i>Completed' +
+                            '</div>'
+                        : '') +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Update order status
+        async function updateOrderStatus(voucherId, newStatus) {
+            try {
+                const response = await fetch('/api/kitchen/order-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify({
+                        voucher_id: voucherId,
+                        status: newStatus
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Reload orders
+                    await loadOrders();
+                } else {
+                    alert('Failed to update status: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Update status error:', error);
+                alert('Error updating status');
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        setInterval(loadOrders, 10000);
+
+        // Initial load
+        loadOrders();
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('Kitchen view error:', error)
+    return c.html('<h1>Error loading kitchen view</h1>', 500)
+  }
+})
+
+// API: Get kitchen orders
+app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.query('property') || '1'
+  const { DB } = c.env
+  
+  try {
+    // Get all active orders (confirmed, preparing, ready)
+    const orders = await DB.prepare(`
+      SELECT 
+        v.voucher_id,
+        v.voucher_code,
+        v.reservation_date,
+        v.reservation_time,
+        v.party_size_adults + v.party_size_children as party_size,
+        v.table_id,
+        v.preorder_item_ids,
+        v.special_requests,
+        v.status,
+        v.created_at,
+        dp.primary_guest_name as guest_name,
+        t.table_number
+      FROM alacarte_vouchers v
+      LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
+      LEFT JOIN restaurant_tables t ON v.table_id = t.table_id
+      WHERE v.restaurant_id = ?
+        AND v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+        AND v.reservation_date = date('now')
+      ORDER BY 
+        CASE v.status 
+          WHEN 'confirmed' THEN 1
+          WHEN 'preparing' THEN 2
+          WHEN 'ready' THEN 3
+          WHEN 'served' THEN 4
+        END,
+        v.reservation_time ASC
+    `).bind(restaurant_id, property_id).all()
+    
+    // For each order, get the dish details
+    const ordersWithDishes = await Promise.all(orders.results.map(async (order) => {
+      const itemIds = JSON.parse(order.preorder_item_ids || '[]')
+      
+      if (itemIds.length === 0) {
+        return {
+          ...order,
+          dishes: []
+        }
+      }
+      
+      // Get dish details
+      const placeholders = itemIds.map(() => '?').join(',')
+      const dishes = await DB.prepare(
+        'SELECT item_id, category, item_name_en as item_name, is_premium ' +
+        'FROM alacarte_menu_items ' +
+        'WHERE item_id IN (' + placeholders + ') ' +
+        'ORDER BY ' +
+        "  CASE category " +
+        "    WHEN 'salad' THEN 1 " +
+        "    WHEN 'starter' THEN 2 " +
+        "    WHEN 'main' THEN 3 " +
+        "    WHEN 'dessert' THEN 4 " +
+        "    ELSE 5 " +
+        "  END"
+      ).bind(...itemIds).all()
+      
+      return {
+        ...order,
+        dishes: dishes.results
+      }
+    }))
+    
+    return c.json({
+      success: true,
+      orders: ordersWithDishes
+    })
+  } catch (error) {
+    console.error('Get kitchen orders error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to get orders'
+    }, 500)
+  }
+})
+
+// API: Update order status
+app.post('/api/kitchen/order-status', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const { voucher_id, status } = await c.req.json()
+    
+    // Validate status
+    const validStatuses = ['confirmed', 'preparing', 'ready', 'served']
+    if (!validStatuses.includes(status)) {
+      return c.json({
+        success: false,
+        error: 'Invalid status'
+      }, 400)
+    }
+    
+    // Update status
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET status = ?,
+          completed_at = CASE WHEN ? = 'served' THEN datetime('now') ELSE completed_at END
+      WHERE voucher_id = ?
+        AND property_id = ?
+    `).bind(status, status, voucher_id, property_id).run()
+    
+    return c.json({
+      success: true
+    })
+  } catch (error) {
+    console.error('Update order status error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to update status'
+    }, 500)
+  }
+})
+
 // GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
 // This runs every hour (configured in wrangler.jsonc)
 export default {
