@@ -21161,7 +21161,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             </button>
                                         </div>
                                     </div>
-                                    <button onclick="toggleTierDetails()" class="bg-white/30 hover:bg-white/40 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all flex items-center gap-2 border-2 border-white/50">
+                                    <button onclick="toggleTierDetails()" class="w-full sm:w-auto bg-white/30 hover:bg-white/40 text-white font-bold py-3 px-4 sm:px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 border-2 border-white/50">
                                         <span id="tierToggleText" class="text-sm font-bold uppercase tracking-wide">View Details</span>
                                         <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
                                     </button>
@@ -25391,17 +25391,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     const bookingUrl = '/alacarte/book/' + restaurant.offering_id + '?property=' + propertyId + '&pass=' + passReference;
                     
                     return '<div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all">' +
-                      '<div class="aspect-video bg-gray-100 relative overflow-hidden">' +
+                      '<div class="h-32 bg-gray-100 relative overflow-hidden">' +
                         '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover">' +
-                        '<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>' +
+                        '<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>' +
                         '<div class="absolute bottom-2 left-2 text-white text-xs flex items-center gap-1">' +
                           '<i class="fas fa-map-marker-alt"></i>' +
                           '<span>' + restaurant.location + '</span>' +
                         '</div>' +
                       '</div>' +
-                      '<div class="p-4">' +
-                        '<h4 class="font-bold text-gray-800 mb-2">' + restaurant.title_en + '</h4>' +
-                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2.5 rounded-lg text-sm font-semibold transition-all" style="background: var(--primary-color); color: white;">' +
+                      '<div class="p-3">' +
+                        '<h4 class="font-bold text-gray-800 text-sm mb-2">' + restaurant.title_en + '</h4>' +
+                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2 rounded-lg text-xs font-bold transition-all text-white hover:opacity-90" style="background: var(--primary-color);">' +
                           '<i class="fas fa-calendar-check mr-1"></i>Book Now' +
                         '</a>' +
                       '</div>' +
