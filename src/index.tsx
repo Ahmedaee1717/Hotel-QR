@@ -21152,7 +21152,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             <p class="text-sm text-white/90 mt-1 font-medium" id="tierDescription"></p>
                                             
                                             <!-- À La Carte Voucher Info -->
-                                            <div id="alacarteVoucherInfo" class="hidden mt-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg px-4 py-2"></div>
+                                            <div id="alacarteVoucherInfo" class="hidden mt-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4"></div>
                                             
                                             <!-- Ask About Benefits Button -->
                                             <button onclick="openChatbotWithBenefitsPrompt()" class="mt-4 bg-white/20 backdrop-blur-lg hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center gap-3 border border-white/30">
@@ -21161,7 +21161,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             </button>
                                         </div>
                                     </div>
-                                    <button onclick="toggleTierDetails()" class="text-white/80 hover:text-white transition p-3 hover:bg-white/10 rounded-xl">
+                                    <button onclick="toggleTierDetails()" class="bg-white/30 hover:bg-white/40 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all flex items-center gap-2 border-2 border-white/50">
+                                        <span id="tierToggleText" class="text-sm font-bold uppercase tracking-wide">View Details</span>
                                         <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
                                     </button>
                                 </div>
@@ -25357,9 +25358,46 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 console.log('🎫 Voucher status loaded:', voucherData);
                 if (voucherData.success && voucherData.eligible) {
                   voucherInfo.classList.remove('hidden');
-                  voucherInfo.innerHTML = '<div class="flex items-center gap-2 text-white/90 text-sm">' +
-                    '<i class="fas fa-ticket-alt text-lg"></i>' +
-                    '<span><strong>' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + '</strong> à la carte meals remaining</span>' +
+                  
+                  // Build restaurant cards
+                  const restaurantCards = voucherData.eligible_restaurants.map(restaurant => {
+                    const restaurantImage = '/static/placeholder.jpg'; // Default image
+                    const bookingUrl = '/alacarte/book/' + restaurant.offering_id + '?property=' + propertyId + '&pass=' + passReference;
+                    
+                    return '<div class="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">' +
+                      '<div class="aspect-video bg-white/20 relative overflow-hidden">' +
+                        '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\'">' +
+                        '<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>' +
+                        '<div class="absolute bottom-2 left-2 text-white text-xs">' +
+                          '<i class="fas fa-map-marker-alt mr-1"></i>' + restaurant.location +
+                        '</div>' +
+                      '</div>' +
+                      '<div class="p-3">' +
+                        '<h4 class="font-bold text-white text-sm mb-1">' + restaurant.title_en + '</h4>' +
+                        '<a href="' + bookingUrl + '" class="block w-full bg-white/20 hover:bg-white/30 text-white text-center py-2 rounded-lg text-sm font-semibold transition-all mt-2">' +
+                          '<i class="fas fa-calendar-check mr-1"></i>Book Now' +
+                        '</a>' +
+                      '</div>' +
+                    '</div>';
+                  }).join('');
+                  
+                  voucherInfo.innerHTML = 
+                    '<div class="space-y-3">' +
+                      '<div class="flex items-center justify-between">' +
+                        '<div class="flex items-center gap-2">' +
+                          '<i class="fas fa-ticket-alt text-white text-xl"></i>' +
+                          '<div class="text-white">' +
+                            '<div class="text-lg font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
+                            '<div class="text-xs text-white/70">À la carte dining included</div>' +
+                          '</div>' +
+                        '</div>' +
+                      '</div>' +
+                      '<div class="text-white/90 text-sm mb-2">' +
+                        '<i class="fas fa-info-circle mr-1"></i>Choose from these exclusive restaurants:' +
+                      '</div>' +
+                      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' +
+                        restaurantCards +
+                      '</div>' +
                     '</div>';
                   console.log('✅ À la carte voucher info displayed!');
                 } else {
@@ -25671,10 +25709,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         window.toggleTierDetails = function() {
           const panel = document.getElementById('tierDetailsPanel');
           const icon = document.getElementById('tierToggleIcon');
+          const text = document.getElementById('tierToggleText');
           
           if (panel && icon) {
+            const isHidden = panel.classList.contains('hidden');
             panel.classList.toggle('hidden');
             icon.classList.toggle('rotate-180');
+            
+            // Update button text
+            if (text) {
+              text.textContent = isHidden ? 'Hide Details' : 'View Details';
+            }
           }
         }
         
@@ -25822,7 +25867,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           </button>
           
           <!-- Chat Window -->
-          <div id="chatWindow" class="hidden fixed bottom-24 left-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
+          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200">
             <!-- Header -->
             <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
@@ -25834,7 +25879,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   <p class="text-xs opacity-90">Always here to help</p>
                 </div>
               </div>
-              <button id="closeChatBtn" class="text-white/80 hover:text-white transition">
+              <button id="closeChatBtn" class="bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-all border border-white/40 flex items-center gap-2">
+                <span class="text-sm hidden sm:inline">Close</span>
                 <i class="fas fa-times text-xl"></i>
               </button>
             </div>
