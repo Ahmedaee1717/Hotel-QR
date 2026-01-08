@@ -66466,10 +66466,10 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
   const { DB } = c.env
   
   try {
-    // Get restaurant info
+    // Get restaurant info from hotel_offerings
     const restaurant = await DB.prepare(`
       SELECT offering_id, title_en, location
-      FROM alacarte_restaurants
+      FROM hotel_offerings
       WHERE offering_id = ? AND property_id = ?
     `).bind(restaurant_id, property_id).first()
     
@@ -66775,7 +66775,7 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       // Get dish details
       const placeholders = itemIds.map(() => '?').join(',')
       const dishes = await DB.prepare(
-        'SELECT item_id, category, item_name_en as item_name, is_premium ' +
+        'SELECT item_id, category, item_name, is_premium ' +
         'FROM alacarte_menu_items ' +
         'WHERE item_id IN (' + placeholders + ') ' +
         'ORDER BY ' +
