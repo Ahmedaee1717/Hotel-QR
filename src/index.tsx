@@ -68027,9 +68027,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-primary"></i>Reservation Details</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-                    <input type="date" id="bookingDate" class="w-full px-4 py-2 border rounded-lg" required>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">Select Your Date</label>
+                    <div id="customDatePicker" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                        <!-- Date buttons will be generated here -->
+                    </div>
+                    <input type="hidden" id="bookingDate" required>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Time</label>
@@ -68099,23 +68102,104 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const passData = ${passData ? JSON.stringify(passData) : 'null'};
         let selectedItems = {};
         let voucherEligibility = null;
+        let selectedDate = null;
         
-        // Setup date picker with check-in/check-out dates
-        const dateInput = document.getElementById('bookingDate');
-        if (passData && passData.valid_from && passData.valid_until) {
-            // Set min date to valid_from (check-in)
-            dateInput.min = passData.valid_from;
-            // Set max date to valid_until (check-out)
-            dateInput.max = passData.valid_until;
-            // Default to check-in date
-            dateInput.value = passData.valid_from;
-            console.log('📅 Date range set:', passData.valid_from, 'to', passData.valid_until);
-        } else {
-            // No pass data, set min to today
-            const today = new Date().toISOString().split('T')[0];
-            dateInput.min = today;
-            dateInput.value = today;
+        // Setup CHIC custom date picker
+        function initCustomDatePicker() {
+            const datePickerContainer = document.getElementById('customDatePicker');
+            const dateInput = document.getElementById('bookingDate');
+            
+            if (passData && passData.valid_from && passData.valid_until) {
+                // Parse check-in and check-out dates
+                const checkIn = new Date(passData.valid_from);
+                const checkOut = new Date(passData.valid_until);
+                
+                // Generate date buttons for each day of stay
+                const dates = [];
+                let currentDate = new Date(checkIn);
+                
+                while (currentDate <= checkOut) {
+                    dates.push(new Date(currentDate));
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                // Build chic date buttons
+                datePickerContainer.innerHTML = dates.map((date, index) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = date.getDate();
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    
+                    return \`
+                        <button type="button" onclick="selectDate('\${dateStr}')" 
+                                data-date="\${dateStr}"
+                                class="date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 80px;">
+                            <div class="text-xs font-semibold opacity-70">\${dayName}</div>
+                            <div class="text-2xl font-bold my-1">\${dayNum}</div>
+                            <div class="text-xs opacity-70">\${monthName}</div>
+                            \${isToday ? '<div class="text-xs mt-1 font-bold">Today</div>' : ''}
+                        </button>
+                    \`;
+                }).join('');
+                
+                // Select first date by default
+                selectedDate = dates[0].toISOString().split('T')[0];
+                dateInput.value = selectedDate;
+                
+                console.log(\`📅 Custom date picker created with \${dates.length} dates\`);
+            } else {
+                // Fallback: show today and next 7 days
+                const dates = [];
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() + i);
+                    dates.push(date);
+                }
+                
+                datePickerContainer.innerHTML = dates.map((date, index) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = date.getDate();
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                    
+                    return \`
+                        <button type="button" onclick="selectDate('\${dateStr}')" 
+                                data-date="\${dateStr}"
+                                class="date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 80px;">
+                            <div class="text-xs font-semibold opacity-70">\${dayName}</div>
+                            <div class="text-2xl font-bold my-1">\${dayNum}</div>
+                            <div class="text-xs opacity-70">\${monthName}</div>
+                        </button>
+                    \`;
+                }).join('');
+                
+                selectedDate = dates[0].toISOString().split('T')[0];
+                dateInput.value = selectedDate;
+            }
         }
+        
+        // Date selection handler
+        window.selectDate = function(dateStr) {
+            selectedDate = dateStr;
+            document.getElementById('bookingDate').value = dateStr;
+            
+            // Update button styles
+            document.querySelectorAll('.date-btn').forEach(btn => {
+                if (btn.dataset.date === dateStr) {
+                    btn.className = 'date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 border-primary bg-primary text-white';
+                } else {
+                    btn.className = 'date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 border-gray-200 hover:border-primary';
+                }
+            });
+            
+            console.log('📅 Date selected:', dateStr);
+        }
+        
+        // Initialize date picker on load
+        initCustomDatePicker();
         
         // Group menu by category
         const menuByCategory = {};
