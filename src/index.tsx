@@ -68632,6 +68632,17 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let voucherEligibility = null;
         let selectedDate = null;
         
+        // Load voucher eligibility from localStorage if available
+        const storedVoucherData = localStorage.getItem('voucherEligibility_${passReference || 'guest'}');
+        if (storedVoucherData) {
+            try {
+                voucherEligibility = JSON.parse(storedVoucherData);
+                console.log('📦 Loaded voucher eligibility from cache');
+            } catch (e) {
+                console.error('Failed to parse stored voucher data:', e);
+            }
+        }
+        
         // Setup CHIC custom date picker
         function initCustomDatePicker() {
             const datePickerContainer = document.getElementById('customDatePicker');
@@ -68764,6 +68775,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 if (data.success && data.eligible) {
                     voucherEligibility = data;
+                    // Save to localStorage for language changes
+                    localStorage.setItem('voucherEligibility_${passReference || 'guest'}', JSON.stringify(data));
                     console.log('✅ Guest is eligible! Displaying voucher status...');
                     displayVoucherStatus();
                 } else if (data.success && !data.eligible) {
@@ -69142,10 +69155,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 await translatePage();
             }
             
+            // Display voucher card if we have cached data (from previous page load or API call)
+            if (voucherEligibility) {
+                await displayVoucherStatus();
+            }
+            
             // Show first category AFTER translation
             await showMenuCategory('salad');
             
-            // Check eligibility
+            // Check eligibility (will fetch fresh data if not in cache)
             checkVoucherEligibility();
         }
         
