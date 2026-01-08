@@ -68171,24 +68171,18 @@ app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
     let allItems = [];
     
     // Try to extract JSON from markdown code blocks first
-    const codeBlockMatches = combinedText.match(/```(?:json)?\\s*([\\s\\S]*?)```/g);
-    if (codeBlockMatches) {
-      for (let block of codeBlockMatches) {
-        const jsonStr = block.replace(/```(?:json)?\\s*/, '').replace(/```$/, '').trim();
-        try {
-          const items = JSON.parse(jsonStr);
-          if (Array.isArray(items)) {
-            allItems = allItems.concat(items);
-          }
-        } catch (e) {
-          console.error('JSON parse error from code block:', e);
-        }
-      }
-    }
+    // Remove markdown code blocks if present
+    let cleanedText = combinedText.replace(/```json/g, '').replace(/```/g, '').trim();
     
-    // If no code blocks, try to find JSON arrays directly
-    if (allItems.length === 0) {
-      const jsonMatches = combinedText.match(/\\[\\s\\S]*?\\]/g);
+    // Try to parse as JSON array directly
+    try {
+      const parsed = JSON.parse(cleanedText);
+      if (Array.isArray(parsed)) {
+        allItems = parsed;
+      }
+    } catch (e) {
+      // If direct parse fails, try to find JSON arrays in the text
+      const jsonMatches = cleanedText.match(/\[[\s\S]*?\]/g);
       if (jsonMatches) {
         for (let jsonStr of jsonMatches) {
           try {
@@ -68196,8 +68190,8 @@ app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
             if (Array.isArray(items)) {
               allItems = allItems.concat(items);
             }
-          } catch (e) {
-            console.error('JSON parse error:', e);
+          } catch (parseErr) {
+            console.error('JSON parse error:', parseErr);
           }
         }
       }
