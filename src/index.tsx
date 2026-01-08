@@ -24106,21 +24106,25 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(r, 'title');
                 const description = await getTranslatedField(r, 'short_description');
                 
+                // Extract numeric ID from offering_id (e.g., "H3" -> 3)
+                const numericId = parseInt(r.offering_id.replace(/\D/g, ''), 10);
+                
                 // Check if this restaurant is eligible for vouchers
                 const isEligible = voucherData && (
                     voucherData.eligible_restaurants.length === 0 || 
-                    voucherData.eligible_restaurants.some(rest => rest.offering_id === r.offering_id)
+                    voucherData.eligible_restaurants.some(rest => rest.offering_id === numericId)
                 );
                 
-                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id}) - Eligible: \${isEligible}\`, {
+                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id} / Numeric: \${numericId}) - Eligible: \${isEligible}\`, {
                     hasVoucherData: !!voucherData,
                     eligibleRestaurants: voucherData?.eligible_restaurants,
-                    restaurantId: r.offering_id
+                    restaurantId: r.offering_id,
+                    numericId: numericId
                 });
                 
                 // Build the booking URL with pass parameter if eligible
                 const bookingUrl = isEligible 
-                    ? \`/alacarte/book/\${r.offering_id}?property=\${propertyId}&pass=\${linkedPassReference}\`
+                    ? \`/alacarte/book/\${numericId}?property=\${propertyId}&pass=\${linkedPassReference}\`
                     : \`javascript:viewOffering('\${r.offering_id}')\`;
                 
                 return \`
