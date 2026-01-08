@@ -25366,7 +25366,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     
                     return '<div class="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">' +
                       '<div class="aspect-video bg-white/20 relative overflow-hidden">' +
-                        '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover" onerror="this.style.display=\'none\'">' +
+                        '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover">' +
                         '<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>' +
                         '<div class="absolute bottom-2 left-2 text-white text-xs">' +
                           '<i class="fas fa-map-marker-alt mr-1"></i>' + restaurant.location +
