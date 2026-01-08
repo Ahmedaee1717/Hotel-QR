@@ -24107,7 +24107,18 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const description = await getTranslatedField(r, 'short_description');
                 
                 // Get offering ID - strip any non-numeric prefix (e.g., "H3" -> 3)
-                const offeringId = parseInt(String(r.offering_id).replace(/\D/g, ''), 10);
+                const offeringIdRaw = r.offering_id;
+                const offeringIdStr = String(offeringIdRaw);
+                // Use a simple approach: extract numbers only
+                const numbersOnly = offeringIdStr.match(/\d+/);
+                const offeringId = numbersOnly ? parseInt(numbersOnly[0], 10) : NaN;
+                
+                console.log('🔍 DEBUG offering_id parsing:', {
+                    raw: offeringIdRaw,
+                    asString: offeringIdStr,
+                    numbersOnly: numbersOnly,
+                    final: offeringId
+                });
                 
                 // Check if this restaurant is eligible for vouchers
                 const isEligible = voucherData && voucherData.vouchers.remaining > 0 && (
