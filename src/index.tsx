@@ -68633,7 +68633,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let selectedDate = null;
         
         // Load voucher eligibility from localStorage if available
-        const storedVoucherData = localStorage.getItem('voucherEligibility_${passReference || 'guest'}');
+        const storageKey = 'voucherEligibility_' + (passReference || 'guest');
+        const storedVoucherData = localStorage.getItem(storageKey);
         if (storedVoucherData) {
             try {
                 voucherEligibility = JSON.parse(storedVoucherData);
@@ -68776,7 +68777,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 if (data.success && data.eligible) {
                     voucherEligibility = data;
                     // Save to localStorage for language changes
-                    localStorage.setItem('voucherEligibility_${passReference || 'guest'}', JSON.stringify(data));
+                    const storageKey = 'voucherEligibility_' + (passReference || 'guest');
+                    localStorage.setItem(storageKey, JSON.stringify(data));
                     console.log('✅ Guest is eligible! Displaying voucher status...');
                     displayVoucherStatus();
                 } else if (data.success && !data.eligible) {
