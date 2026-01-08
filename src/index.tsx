@@ -64582,6 +64582,923 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 </html>
     `)
 })
+app.get('/alacarte/book/:restaurant_id', async (c) => {
+  const { DB } = c.env
+  const restaurant_id = c.req.param('restaurant_id')
+  const property_id = c.req.query('property') || '1'
+  const pass_reference = c.req.query('pass') || null
+  
+  try {
+    // Get property colors and slug
+    const property = await DB.prepare(`
+      SELECT primary_color, accent_color, slug
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    const primaryColor = property?.primary_color || '#9333ea'
+    const accentColor = property?.accent_color || '#f59e0b'
+    const propertySlug = property?.slug || 'paradise-resort'
+    
+    // Get digital pass dates if pass_reference provided
+    let passData = null
+    if (pass_reference) {
+      passData = await DB.prepare(`
+        SELECT valid_from, valid_until, primary_guest_name, room_number
+        FROM digital_passes
+        WHERE pass_reference = ? AND property_id = ?
+      `).bind(pass_reference, property_id).first()
+    }
+    
+    // Get restaurant info
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar,
+             full_description_en, location, capacity_per_slot
+      FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.html('<h1>Restaurant not found</h1>', 404)
+    }
+    
+    // Get menu
+    const menu = await DB.prepare(`
+      SELECT item_id, category, item_name, item_name_ar, description, description_ar,
+             cost_to_hotel, is_premium, allergens, display_order
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'main' THEN 3
+          WHEN 'dessert' THEN 4
+        END,
+        display_order, item_name
+    `).bind(restaurant_id, property_id).all()
+    
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book ${restaurant.title_en}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: ${primaryColor};
+            --accent-color: ${accentColor};
+        }
+        .bg-primary { background-color: var(--primary-color) !important; }
+        .text-primary { color: var(--primary-color) !important; }
+        .border-primary { border-color: var(--primary-color) !important; }
+        .hover\\:bg-primary-dark:hover { 
+            filter: brightness(0.9);
+            background-color: var(--primary-color) !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Language Selector (Fixed Top Right) -->
+    <div class="fixed top-4 right-4 z-50">
+        <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
+            <option value="en">English</option>
+        </select>
+    </div>
+
+    <!-- Header -->
+    <div class="bg-primary text-white py-6">
+        <div class="max-w-4xl mx-auto px-4">
+            <a href="/hotel/${propertySlug}?qr=${pass_reference || ''}" class="inline-block mb-4 text-white hover:text-gray-200 transition">
+                <i class="fas fa-arrow-left mr-2"></i><span data-i18n="back">Back</span>
+            </a>
+            <h1 class="text-3xl font-bold" data-i18n-key="restaurant-title">${restaurant.title_en}</h1>
+            <p class="text-white/80 mt-1" data-i18n-key="restaurant-desc">${restaurant.short_description_en || ''}</p>
+            ${restaurant.location ? `<p class="text-white/80 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i><span data-i18n-key="restaurant-location">${restaurant.location}</span></p>` : ''}
+        </div>
+    </div>
+
+    <!-- Voucher Status (if applicable) -->
+    <div id="voucherStatus" class="hidden max-w-4xl mx-auto px-4 pt-6"></div>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Booking Details -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-primary"></i><span data-i18n="reservation-details">Reservation Details</span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3" data-i18n="select-date">Select Your Date</label>
+                    <div id="customDatePicker" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                        <!-- Date buttons will be generated here -->
+                    </div>
+                    <input type="hidden" id="bookingDate" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="time">Time</label>
+                    <select id="bookingTime" class="w-full px-4 py-2 border rounded-lg" required>
+                        <option value="18:00">6:00 PM</option>
+                        <option value="18:30">6:30 PM</option>
+                        <option value="19:00">7:00 PM</option>
+                        <option value="19:30">7:30 PM</option>
+                        <option value="20:00">8:00 PM</option>
+                        <option value="20:30">8:30 PM</option>
+                        <option value="21:00">9:00 PM</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="adults">Adults</label>
+                    <input type="number" id="numAdults" value="2" min="1" max="10" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="children">Children</label>
+                    <input type="number" id="numChildren" value="0" min="0" max="10" class="w-full px-4 py-2 border rounded-lg">
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu Selection -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
+            <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
+            
+            <!-- Category Tabs -->
+            <div class="flex space-x-2 mb-6 border-b overflow-x-auto">
+                <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-primary text-primary">
+                    🥗 <span data-i18n="salads">Salads</span>
+                </button>
+                <button onclick="showMenuCategory('starter')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🍤 <span data-i18n="starters">Starters</span>
+                </button>
+                <button onclick="showMenuCategory('main')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🥩 <span data-i18n="mains">Mains</span>
+                </button>
+                <button onclick="showMenuCategory('dessert')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
+                    🍰 <span data-i18n="desserts">Desserts</span>
+                </button>
+            </div>
+
+            <!-- Menu Items -->
+            <div id="menuContainer"></div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4" data-i18n="your-preorder">Your Pre-Order</h3>
+            <div id="orderSummary" class="space-y-2 mb-4">
+                <p class="text-gray-500 text-center py-4" data-i18n="no-items-selected">No items selected yet</p>
+            </div>
+            <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-lg font-bold text-lg transition-colors">
+                <i class="fas fa-check-circle mr-2"></i><span data-i18n="confirm-reservation">Confirm Reservation</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const menuData = ${JSON.stringify(menu.results)};
+        const restaurantId = ${restaurant_id};
+        const propertyId = ${property_id};
+        const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
+        const passData = ${passData ? JSON.stringify(passData) : 'null'};
+        let selectedItems = {};
+        let voucherEligibility = null;
+        let selectedDate = null;
+        
+        // Load voucher eligibility from localStorage if available
+        const storageKey = 'voucherEligibility_' + (passReference || 'guest');
+        const storedVoucherData = localStorage.getItem(storageKey);
+        if (storedVoucherData) {
+            try {
+                voucherEligibility = JSON.parse(storedVoucherData);
+                console.log('📦 Loaded voucher eligibility from cache');
+            } catch (e) {
+                console.error('Failed to parse stored voucher data:', e);
+            }
+        }
+        
+        // Setup CHIC custom date picker
+        function initCustomDatePicker() {
+            const datePickerContainer = document.getElementById('customDatePicker');
+            const dateInput = document.getElementById('bookingDate');
+            
+            if (passData && passData.valid_from && passData.valid_until) {
+                // Parse check-in and check-out dates
+                const checkIn = new Date(passData.valid_from);
+                const checkOut = new Date(passData.valid_until);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Reset time to midnight for comparison
+                
+                // Generate date buttons for each day of stay (from TODAY onwards only)
+                const dates = [];
+                let currentDate = new Date(checkIn);
+                
+                // Start from today if check-in is in the past
+                if (currentDate < today) {
+                    currentDate = new Date(today);
+                }
+                
+                while (currentDate <= checkOut) {
+                    dates.push(new Date(currentDate));
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                // Build chic date buttons (smaller size)
+                datePickerContainer.innerHTML = dates.map((date, index) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = date.getDate();
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    
+                    return \`
+                        <button type="button" onclick="selectDate('\${dateStr}')" 
+                                data-date="\${dateStr}"
+                                class="date-btn p-2 rounded-lg border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 60px;">
+                            <div class="text-xs font-semibold opacity-70">\${dayName}</div>
+                            <div class="text-xl font-bold">\${dayNum}</div>
+                            <div class="text-xs opacity-70">\${monthName}</div>
+                            \${isToday ? '<div class="text-xs font-bold">Today</div>' : ''}
+                        </button>
+                    \`;
+                }).join('');
+                
+                // Select first date by default
+                selectedDate = dates[0].toISOString().split('T')[0];
+                dateInput.value = selectedDate;
+                
+                console.log(\`📅 Custom date picker created with \${dates.length} dates (from today onwards)\`);
+            } else {
+                // Fallback: show today and next 7 days
+                const dates = [];
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() + i);
+                    dates.push(date);
+                }
+                
+                datePickerContainer.innerHTML = dates.map((date, index) => {
+                    const dateStr = date.toISOString().split('T')[0];
+                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const dayNum = date.getDate();
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+                    
+                    return \`
+                        <button type="button" onclick="selectDate('\${dateStr}')" 
+                                data-date="\${dateStr}"
+                                class="date-btn p-2 rounded-lg border-2 transition-all hover:scale-105 \${index === 0 ? 'border-primary bg-primary text-white' : 'border-gray-200 hover:border-primary'}"
+                                style="min-height: 60px;">
+                            <div class="text-xs font-semibold opacity-70">\${dayName}</div>
+                            <div class="text-xl font-bold">\${dayNum}</div>
+                            <div class="text-xs opacity-70">\${monthName}</div>
+                        </button>
+                    \`;
+                }).join('');
+                
+                selectedDate = dates[0].toISOString().split('T')[0];
+                dateInput.value = selectedDate;
+            }
+        }
+        
+        // Date selection handler
+        window.selectDate = function(dateStr) {
+            selectedDate = dateStr;
+            document.getElementById('bookingDate').value = dateStr;
+            
+            // Update button styles
+            document.querySelectorAll('.date-btn').forEach(btn => {
+                if (btn.dataset.date === dateStr) {
+                    btn.className = 'date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 border-primary bg-primary text-white';
+                } else {
+                    btn.className = 'date-btn p-3 rounded-xl border-2 transition-all hover:scale-105 border-gray-200 hover:border-primary';
+                }
+            });
+            
+            console.log('📅 Date selected:', dateStr);
+        }
+        
+        // Initialize date picker on load
+        initCustomDatePicker();
+        
+        // Group menu by category
+        const menuByCategory = {};
+        menuData.forEach(item => {
+            if (!menuByCategory[item.category]) {
+                menuByCategory[item.category] = [];
+            }
+            menuByCategory[item.category].push(item);
+        });
+        
+        // Check voucher eligibility on load
+        async function checkVoucherEligibility() {
+            if (!passReference) {
+                console.log('❌ No pass reference provided');
+                return;
+            }
+            
+            console.log('🎫 Checking voucher eligibility for pass:', passReference);
+            
+            try {
+                const response = await fetch(\`/api/alacarte/voucher-eligibility/\${passReference}\`, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                console.log('📋 Eligibility response:', data);
+                
+                if (data.success && data.eligible) {
+                    voucherEligibility = data;
+                    // Save to localStorage for language changes
+                    const storageKey = 'voucherEligibility_' + (passReference || 'guest');
+                    localStorage.setItem(storageKey, JSON.stringify(data));
+                    console.log('✅ Guest is eligible! Displaying voucher status...');
+                    displayVoucherStatus();
+                } else if (data.success && !data.eligible) {
+                    console.log('❌ Guest not eligible:', data.reason);
+                } else {
+                    console.error('❌ API error:', data.error);
+                }
+            } catch (error) {
+                console.error('❌ Check eligibility error:', error);
+            }
+        }
+        
+        async function displayVoucherStatus() {
+            if (!voucherEligibility) return;
+            
+            const statusDiv = document.getElementById('voucherStatus');
+            if (!statusDiv) return;
+            
+            const { guest_name, tier, vouchers } = voucherEligibility;
+            
+            // Show the status card with margin
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.add('mb-6');
+            
+            statusDiv.innerHTML = \`
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6 shadow-lg">
+                    <div class="flex items-start gap-4">
+                        <div class="bg-green-500 text-white rounded-full w-14 h-14 flex items-center justify-center flex-shrink-0 shadow-md">
+                            <i class="fas fa-ticket-alt text-2xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-green-900 mb-3 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i><span data-i18n="voucher-title">Voucher Eligible!</span>
+                            </h3>
+                            <div class="space-y-2 text-sm mb-4">
+                                <p class="text-gray-700"><strong>Guest:</strong> \${guest_name}</p>
+                                <p class="text-gray-700 flex items-center gap-2">
+                                    <strong>Tier:</strong> 
+                                    <span class="px-3 py-1 rounded-full text-white text-xs font-bold uppercase tracking-wide shadow" style="background-color: \${tier.tier_color}">\${tier.tier_name}</span>
+                                </p>
+                                <p class="text-gray-900 text-lg font-bold mt-3 flex items-center gap-2">
+                                    <i class="fas fa-utensils text-green-600"></i>
+                                    <span>\${vouchers.remaining} of \${vouchers.total_allowed} meals remaining</span>
+                                </p>
+                            </div>
+                            <div class="bg-white border-2 border-green-400 rounded-lg p-4 shadow-sm">
+                                <p class="text-green-900 font-bold text-sm flex items-center gap-2">
+                                    <i class="fas fa-gift"></i>
+                                    <span data-i18n="voucher-message">This meal is INCLUDED in your all-inclusive package!</span>
+                                </p>
+                                <p class="text-green-700 text-xs mt-2" data-i18n="voucher-disclaimer">Premium items may have additional charges based on your tier.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`;
+            
+            // Translate if needed
+            if (currentLanguage !== 'en') {
+                const titleEl = statusDiv.querySelector('[data-i18n="voucher-title"]');
+                const messageEl = statusDiv.querySelector('[data-i18n="voucher-message"]');
+                const disclaimerEl = statusDiv.querySelector('[data-i18n="voucher-disclaimer"]');
+                
+                if (titleEl) titleEl.textContent = await translateText('Voucher Eligible!', currentLanguage);
+                if (messageEl) messageEl.textContent = await translateText('This meal is INCLUDED in your all-inclusive package!', currentLanguage);
+                if (disclaimerEl) disclaimerEl.textContent = await translateText('Premium items may have additional charges based on your tier.', currentLanguage);
+            }
+            
+            // Update button text
+            const confirmButton = document.getElementById('confirmButton');
+            if (confirmButton) {
+                const buttonText = currentLanguage === 'en' ? 'Use Voucher & Confirm' : await translateText('Use Voucher & Confirm', currentLanguage);
+                confirmButton.innerHTML = \`<i class="fas fa-ticket-alt mr-2"></i>\${buttonText}\`;
+            }
+        }
+        async function showMenuCategory(category) {
+            // Update tabs
+            document.querySelectorAll('.menu-tab').forEach(tab => {
+                tab.classList.remove('border-primary', 'text-primary');
+                tab.classList.add('border-transparent', 'text-gray-600');
+            });
+            
+            // Find and update the clicked tab
+            const tabs = document.querySelectorAll('.menu-tab');
+            tabs.forEach(tab => {
+                if (tab.getAttribute('onclick').includes(category)) {
+                    tab.classList.remove('border-transparent', 'text-gray-600');
+                    tab.classList.add('border-primary', 'text-primary');
+                }
+            });
+            
+            // Render items
+            const container = document.getElementById('menuContainer');
+            const items = menuByCategory[category] || [];
+            
+            if (items.length === 0) {
+                const noItemsText = currentLanguage === 'en' ? 'No items in this category' : await translateText('No items in this category', currentLanguage);
+                container.innerHTML = \`<p class="text-gray-500 text-center py-8">\${noItemsText}</p>\`;
+                return;
+            }
+            
+            // Translate items if needed
+            const translatedItems = await Promise.all(items.map(async item => {
+                if (currentLanguage === 'en') return item;
+                
+                return {
+                    ...item,
+                    item_name: await translateText(item.item_name, currentLanguage),
+                    description: item.description ? await translateText(item.description, currentLanguage) : ''
+                };
+            }));
+            
+            const selectedText = currentLanguage === 'en' ? 'Selected' : await translateText('Selected', currentLanguage);
+            const addText = currentLanguage === 'en' ? 'Add' : await translateText('Add', currentLanguage);
+            const premiumText = currentLanguage === 'en' ? 'PREMIUM' : await translateText('PREMIUM', currentLanguage);
+            
+            container.innerHTML = translatedItems.map(item => \`
+                <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h4 class="font-bold text-lg">\${item.item_name}</h4>
+                                \${item.is_premium ? \`<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">\${premiumText}</span>\` : ''}
+                            </div>
+                            <p class="text-gray-600 text-sm">\${item.description || ''}</p>
+                        </div>
+                        <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
+                                id="btn-\${item.item_id}"
+                                class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
+                            \${selectedItems[item.item_id] ? \`<i class="fas fa-check mr-1"></i>\${selectedText}\` : \`<i class="fas fa-plus mr-1"></i>\${addText}\`}
+                        </button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function toggleItem(itemId, category, itemName, cost) {
+            // Remove any existing selection in this category (ONE per category rule)
+            Object.keys(selectedItems).forEach(id => {
+                if (selectedItems[id].category === category) {
+                    delete selectedItems[id];
+                }
+            });
+            
+            // Add the new selection
+            selectedItems[itemId] = { category, name: itemName, cost };
+            
+            updateOrderSummary();
+            showMenuCategory(category); // Refresh to update button states
+        }
+        
+        function updateOrderSummary() {
+            const summary = document.getElementById('orderSummary');
+            
+            if (Object.keys(selectedItems).length === 0) {
+                summary.innerHTML = '<p class="text-gray-500 text-center py-4">No items selected yet</p>';
+                return;
+            }
+            
+            // Group by category for display
+            const categories = ['salad', 'starter', 'main', 'dessert'];
+            const categoryLabels = {
+                'salad': '🥗 Salad',
+                'starter': '🍤 Starter', 
+                'main': '🥩 Main Course',
+                'dessert': '🍰 Dessert'
+            };
+            
+            let html = '';
+            categories.forEach(cat => {
+                const item = Object.values(selectedItems).find(i => i.category === cat);
+                if (item) {
+                    html += \`
+                        <div class="border-b pb-2 mb-2">
+                            <div class="text-xs text-gray-500 mb-1">\${categoryLabels[cat]}</div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-semibold">\${item.name}</span>
+                                <span class="text-purple-600">€\${item.cost.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    \`;
+                }
+            });
+            
+            summary.innerHTML = html;
+        }
+        
+        async function confirmBooking() {
+            const date = document.getElementById('bookingDate').value;
+            const time = document.getElementById('bookingTime').value;
+            const adults = document.getElementById('numAdults').value;
+            const children = document.getElementById('numChildren').value;
+            
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            
+            if (Object.keys(selectedItems).length === 0) {
+                alert('Please select at least one dish');
+                return;
+            }
+            
+            if (!passReference || !voucherEligibility) {
+                alert('Booking without voucher not yet implemented. Please access through your digital pass.');
+                return;
+            }
+            
+            // Build preorder data
+            const preorder = {};
+            Object.keys(selectedItems).forEach(itemId => {
+                const item = selectedItems[itemId];
+                preorder[\`preorder_\${item.category}\`] = parseInt(itemId);
+            });
+            
+            try {
+                const response = await fetch('/api/alacarte/voucher', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify({
+                        pass_reference: passReference,
+                        restaurant_id: restaurantId,
+                        reservation_date: date,
+                        reservation_time: time,
+                        party_size_adults: parseInt(adults),
+                        party_size_children: parseInt(children),
+                        ...preorder
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const { voucher_code, meals_remaining, total_cost } = data;
+                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nYour reservation is confirmed. Show this voucher code when you arrive at the restaurant.\`);
+                    
+                    // Redirect to voucher view (we'll create this next)
+                    window.location.href = \`/alacarte/voucher/\${voucher_code}?property=\${propertyId}\`;
+                } else {
+                    alert('Booking failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to create voucher. Please try again.');
+            }
+        }
+        
+        // Set minimum date to today
+        document.getElementById('bookingDate').min = new Date().toISOString().split('T')[0];
+        
+        // ============= TRANSLATION SYSTEM =============
+        const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
+        
+        const languageNames = {
+            'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
+            'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
+            'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
+            'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
+            'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+            'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
+            'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
+            'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
+            'ms': 'Malay'
+        };
+        
+        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        const translationCache = new Map();
+        
+        // Populate language selector
+        function populateLanguageSelector() {
+            const selector = document.getElementById('languageSelector');
+            if (!selector) return;
+            
+            selector.innerHTML = '<option value="en">English</option>';
+            ALL_LANGUAGES.forEach(lang => {
+                const option = document.createElement('option');
+                option.value = lang;
+                option.textContent = languageNames[lang] || lang;
+                selector.appendChild(option);
+            });
+            selector.value = currentLanguage;
+        }
+        
+        // Change language
+        window.changeLanguage = function() {
+            const selector = document.getElementById('languageSelector');
+            const newLang = selector.value;
+            console.log('🌐 Changing language to:', newLang);
+            localStorage.setItem('preferredLanguage', newLang);
+            window.location.reload();
+        }
+        
+        // Translate text using API
+        async function translateText(text, targetLanguage) {
+            // Skip if no text, English, or whitespace-only
+            if (!text || targetLanguage === 'en') return text;
+            
+            const trimmedText = text.trim();
+            if (!trimmedText) return text; // Skip whitespace-only
+            
+            const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
+            if (translationCache.has(cacheKey)) {
+                return translationCache.get(cacheKey);
+            }
+            
+            try {
+                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                
+                console.log('🔄 Translating:', trimmedText.substring(0, 40), '→', targetLangName);
+                
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: trimmedText,
+                        target_language: targetLangName
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const translated = data.translation || trimmedText;
+                    translationCache.set(cacheKey, translated);
+                    console.log('✅ Got translation:', translated.substring(0, 40));
+                    return translated;
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Translation failed:', response.status, errorText);
+                }
+            } catch (error) {
+                console.warn('⚠️ Translation error:', error.message);
+            }
+            
+            return trimmedText;
+        }
+        
+        // Translate page
+        async function translatePage() {
+            if (currentLanguage === 'en') return;
+            
+            console.log('🌐 Translating page to:', currentLanguage);
+            
+            // Translate all elements with data-i18n
+            const elements = document.querySelectorAll('[data-i18n]');
+            for (const el of elements) {
+                const originalText = el.textContent.trim();
+                if (originalText) {
+                    const translated = await translateText(originalText, currentLanguage);
+                    el.textContent = translated;
+                }
+            }
+            
+            // Translate elements with data-i18n-key (restaurant title, description, location)
+            const keyElements = document.querySelectorAll('[data-i18n-key]');
+            for (const el of keyElements) {
+                const originalText = el.textContent.trim();
+                if (originalText) {
+                    const translated = await translateText(originalText, currentLanguage);
+                    el.textContent = translated;
+                }
+            }
+            
+            console.log('✅ Page translation complete');
+        }
+        
+        // Initialize translation and menu
+        async function initializePage() {
+            // Populate language selector
+            populateLanguageSelector();
+            
+            // Translate page if not English
+            if (currentLanguage !== 'en') {
+                await translatePage();
+            }
+            
+            // Display voucher card if we have cached data (from previous page load or API call)
+            if (voucherEligibility) {
+                await displayVoucherStatus();
+            }
+            
+            // Show first category AFTER translation
+            await showMenuCategory('salad');
+            
+            // Check eligibility (will fetch fresh data if not in cache)
+            checkVoucherEligibility();
+        }
+        
+        // Start initialization
+        initializePage();
+    </script>
+</body>
+</html>
+    `)
+  } catch (error) {
+    console.error('À la carte booking error:', error)
+    return c.html('<h1>Error loading booking page</h1>', 500)
+  }
+})
+
+
+
+// Admin API: Get all menu items for à la carte
+app.get('/api/admin/alacarte/menu-items', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const items = await DB.prepare(`
+      SELECT 
+        ami.item_id,
+        ami.restaurant_id,
+        ami.category,
+        ami.item_name_en,
+        ami.item_name_ar,
+        ami.description_en,
+        ami.description_ar,
+        ami.cost_to_hotel,
+        ami.is_premium,
+        ami.allergens,
+        ami.is_available,
+        ami.display_order,
+        ar.title_en as restaurant_name
+      FROM alacarte_menu_items ami
+      LEFT JOIN alacarte_restaurants ar ON ami.restaurant_id = ar.offering_id
+      WHERE ami.property_id = ?
+      ORDER BY ar.title_en, ami.category, ami.display_order, ami.item_name_en
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      items: items.results
+    })
+  } catch (error) {
+    console.error('Get menu items error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to get menu items'
+    }, 500)
+  }
+})
+
+// Admin API: Add menu item
+app.post('/api/admin/alacarte/menu-items', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const data = await c.req.json()
+    
+    const result = await DB.prepare(`
+      INSERT INTO alacarte_menu_items (
+        property_id, restaurant_id, category, item_name_en, item_name_ar,
+        description_en, description_ar, cost_to_hotel, is_premium, allergens,
+        is_available, display_order
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      property_id,
+      data.restaurant_id,
+      data.category,
+      data.item_name_en,
+      data.item_name_ar || '',
+      data.description_en || '',
+      data.description_ar || '',
+      data.cost_to_hotel,
+      data.is_premium ? 1 : 0,
+      data.allergens || '',
+      data.is_available !== false ? 1 : 0,
+      data.display_order || 0
+    ).run()
+    
+    return c.json({
+      success: true,
+      item_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('Add menu item error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to add menu item'
+    }, 500)
+  }
+})
+
+// Admin API: Update menu item
+app.put('/api/admin/alacarte/menu-items/:item_id', async (c) => {
+  const { item_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const data = await c.req.json()
+    
+    await DB.prepare(`
+      UPDATE alacarte_menu_items
+      SET restaurant_id = ?,
+          category = ?,
+          item_name_en = ?,
+          item_name_ar = ?,
+          description_en = ?,
+          description_ar = ?,
+          cost_to_hotel = ?,
+          is_premium = ?,
+          allergens = ?,
+          is_available = ?,
+          display_order = ?
+      WHERE item_id = ? AND property_id = ?
+    `).bind(
+      data.restaurant_id,
+      data.category,
+      data.item_name_en,
+      data.item_name_ar || '',
+      data.description_en || '',
+      data.description_ar || '',
+      data.cost_to_hotel,
+      data.is_premium ? 1 : 0,
+      data.allergens || '',
+      data.is_available !== false ? 1 : 0,
+      data.display_order || 0,
+      item_id,
+      property_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Update menu item error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to update menu item'
+    }, 500)
+  }
+})
+
+// Admin API: Delete menu item
+app.delete('/api/admin/alacarte/menu-items/:item_id', async (c) => {
+  const { item_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM alacarte_menu_items
+      WHERE item_id = ? AND property_id = ?
+    `).bind(item_id, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Delete menu item error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to delete menu item'
+    }, 500)
+  }
+})
+
+// Admin API: Bulk delete menu items
+app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const { item_ids } = await c.req.json()
+    
+    if (!item_ids || item_ids.length === 0) {
+      return c.json({
+        success: false,
+        error: 'No items to delete'
+      }, 400)
+    }
+    
+    const placeholders = item_ids.map(() => '?').join(',')
+    await DB.prepare(
+      `DELETE FROM alacarte_menu_items WHERE item_id IN (${placeholders}) AND property_id = ?`
+    ).bind(...item_ids, property_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Bulk delete error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to delete items'
+    }, 500)
+  }
+})
 
 // Kitchen View for À La Carte Orders
 app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
