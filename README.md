@@ -4,7 +4,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://08a476de.project-c8738f5c.pages.dev 🚀 **NEW: Instant 33-language translation on à la carte booking!**
+**Production:** https://748afd8f.project-c8738f5c.pages.dev 🚀 **NEW: Instant 33-language translation on à la carte booking!**
 **Property Landing Page (6-DIGIT PIN!):** https://08a476de.project-c8738f5c.pages.dev/hotel/paradise-resort 🔢✅
 **À La Carte Booking:** https://08a476de.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD 🍽️🌍 **33 Languages!**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
