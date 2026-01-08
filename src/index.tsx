@@ -67856,6 +67856,26 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
   const pass_reference = c.req.query('pass') || null
   
   try {
+    // Get property colors
+    const property = await DB.prepare(`
+      SELECT primary_color, accent_color
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    const primaryColor = property?.primary_color || '#9333ea'
+    const accentColor = property?.accent_color || '#f59e0b'
+    
+    // Get digital pass dates if pass_reference provided
+    let passData = null
+    if (pass_reference) {
+      passData = await DB.prepare(`
+        SELECT valid_from, valid_until, primary_guest_name, room_number
+        FROM digital_passes
+        WHERE pass_reference = ? AND property_id = ?
+      `).bind(pass_reference, property_id).first()
+    }
+    
     // Get restaurant info
     const restaurant = await DB.prepare(`
       SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar,
@@ -67893,17 +67913,30 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     <title>Book ${restaurant.title_en}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: ${primaryColor};
+            --accent-color: ${accentColor};
+        }
+        .bg-primary { background-color: var(--primary-color) !important; }
+        .text-primary { color: var(--primary-color) !important; }
+        .border-primary { border-color: var(--primary-color) !important; }
+        .hover\\:bg-primary-dark:hover { 
+            filter: brightness(0.9);
+            background-color: var(--primary-color) !important;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white py-6">
+    <div class="bg-primary text-white py-6">
         <div class="max-w-4xl mx-auto px-4">
             <button onclick="window.history.back()" class="mb-4 text-white hover:text-gray-200">
                 <i class="fas fa-arrow-left mr-2"></i>Back
             </button>
             <h1 class="text-3xl font-bold">${restaurant.title_en}</h1>
-            <p class="text-purple-200 mt-1">${restaurant.short_description_en || ''}</p>
-            ${restaurant.location ? `<p class="text-purple-200 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${restaurant.location}</p>` : ''}
+            <p class="text-white/80 mt-1">${restaurant.short_description_en || ''}</p>
+            ${restaurant.location ? `<p class="text-white/80 text-sm mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${restaurant.location}</p>` : ''}
         </div>
     </div>
 
@@ -67913,7 +67946,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     <div class="max-w-4xl mx-auto px-4 py-8">
         <!-- Booking Details -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-purple-600"></i>Reservation Details</h2>
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-calendar-alt mr-2 text-primary"></i>Reservation Details</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">Date</label>
@@ -67944,12 +67977,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
         <!-- Menu Selection -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-purple-600"></i>Pre-Order Your Meal</h2>
+            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i>Pre-Order Your Meal</h2>
             <p class="text-gray-600 mb-6">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
             
             <!-- Category Tabs -->
             <div class="flex space-x-2 mb-6 border-b overflow-x-auto">
-                <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-purple-600 text-purple-600">
+                <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-primary text-primary">
                     🥗 Salads
                 </button>
                 <button onclick="showMenuCategory('starter')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
@@ -67973,7 +68006,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             <div id="orderSummary" class="space-y-2 mb-4">
                 <p class="text-gray-500 text-center py-4">No items selected yet</p>
             </div>
-            <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold text-lg transition-colors">
+            <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-lg font-bold text-lg transition-colors">
                 <i class="fas fa-check-circle mr-2"></i>Confirm Reservation
             </button>
         </div>
@@ -67984,8 +68017,26 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
         const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
+        const passData = ${passData ? JSON.stringify(passData) : 'null'};
         let selectedItems = {};
         let voucherEligibility = null;
+        
+        // Setup date picker with check-in/check-out dates
+        const dateInput = document.getElementById('bookingDate');
+        if (passData && passData.valid_from && passData.valid_until) {
+            // Set min date to valid_from (check-in)
+            dateInput.min = passData.valid_from;
+            // Set max date to valid_until (check-out)
+            dateInput.max = passData.valid_until;
+            // Default to check-in date
+            dateInput.value = passData.valid_from;
+            console.log('📅 Date range set:', passData.valid_from, 'to', passData.valid_until);
+        } else {
+            // No pass data, set min to today
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.min = today;
+            dateInput.value = today;
+        }
         
         // Group menu by category
         const menuByCategory = {};
@@ -68073,11 +68124,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         function showMenuCategory(category) {
             // Update tabs
             document.querySelectorAll('.menu-tab').forEach(tab => {
-                tab.classList.remove('border-purple-600', 'text-purple-600');
+                tab.classList.remove('border-primary', 'text-primary');
                 tab.classList.add('border-transparent', 'text-gray-600');
             });
             event.target.classList.remove('border-transparent', 'text-gray-600');
-            event.target.classList.add('border-purple-600', 'text-purple-600');
+            event.target.classList.add('border-primary', 'text-primary');
             
             // Render items
             const container = document.getElementById('menuContainer');
@@ -68100,7 +68151,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         </div>
                         <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
                                 id="btn-\${item.item_id}"
-                                class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}">
+                                class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
                             \${selectedItems[item.item_id] ? '<i class="fas fa-check mr-1"></i>Selected' : '<i class="fas fa-plus mr-1"></i>Add'}
                         </button>
                     </div>
