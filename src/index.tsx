@@ -24106,25 +24106,26 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const title = await getTranslatedField(r, 'title');
                 const description = await getTranslatedField(r, 'short_description');
                 
-                // Extract numeric ID from offering_id (e.g., "H3" -> 3)
-                const numericId = parseInt(r.offering_id.replace(/\D/g, ''), 10);
+                // Get offering ID (should already be numeric from database)
+                const offeringId = parseInt(r.offering_id, 10);
                 
                 // Check if this restaurant is eligible for vouchers
-                const isEligible = voucherData && (
+                const isEligible = voucherData && voucherData.vouchers.remaining > 0 && (
                     voucherData.eligible_restaurants.length === 0 || 
-                    voucherData.eligible_restaurants.some(rest => rest.offering_id === numericId)
+                    voucherData.eligible_restaurants.some(rest => parseInt(rest.offering_id, 10) === offeringId)
                 );
                 
-                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id} / Numeric: \${numericId}) - Eligible: \${isEligible}\`, {
+                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id}) - Eligible: \${isEligible}\`, {
                     hasVoucherData: !!voucherData,
-                    eligibleRestaurants: voucherData?.eligible_restaurants,
-                    restaurantId: r.offering_id,
-                    numericId: numericId
+                    voucherRemaining: voucherData?.vouchers.remaining,
+                    eligibleRestaurantIds: voucherData?.eligible_restaurants.map(rest => rest.offering_id),
+                    thisRestaurantId: offeringId,
+                    matches: voucherData?.eligible_restaurants.some(rest => parseInt(rest.offering_id, 10) === offeringId)
                 });
                 
                 // Build the booking URL with pass parameter if eligible
                 const bookingUrl = isEligible 
-                    ? \`/alacarte/book/\${numericId}?property=\${propertyId}&pass=\${linkedPassReference}\`
+                    ? \`/alacarte/book/\${offeringId}?property=\${propertyId}&pass=\${linkedPassReference}\`
                     : \`javascript:viewOffering('\${r.offering_id}')\`;
                 
                 return \`
