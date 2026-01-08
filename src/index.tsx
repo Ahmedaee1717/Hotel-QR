@@ -22264,13 +22264,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         
         // Helper function to translate text using AI
         async function translateText(text, targetLanguage) {
+            // Skip if no text, English, or whitespace-only
             if (!text || targetLanguage === 'en') return text;
+            
+            const trimmedText = text.trim();
+            if (!trimmedText) return text; // Skip whitespace-only
             
             // Get property ID from propertyData
             const propId = propertyData?.property_id || '1';
             
             // Check cache first - CRITICAL: Include property_id for multi-tenancy isolation
-            const cacheKey = propId + '__' + text + '__' + targetLanguage;
+            const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
             if (translationCache.has(cacheKey)) {
                 return translationCache.get(cacheKey);
             }
@@ -22315,7 +22319,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     return translated;
                 }
             } catch (error) {
-                console.warn('Translation failed:', error);
+                console.warn('⚠️ Translation error:', error.message);
             }
             
             return text; // Fallback to original text
@@ -27206,7 +27210,7 @@ app.get('/offering-detail', async (c) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text: text,
+                        text: trimmedText,
                         target_lang: targetLang,
                         context: 'hotel_offering_description',
                         persona: 'luxury_hospitality'
@@ -36944,7 +36948,7 @@ app.get('/activity', (c) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              text: text,
+                        text: trimmedText,
               target_lang: targetLang,
               context: 'activity_description',
               persona: 'adventure_travel'
@@ -69104,9 +69108,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         // Translate text using API
         async function translateText(text, targetLanguage) {
+            // Skip if no text, English, or whitespace-only
             if (!text || targetLanguage === 'en') return text;
             
-            const cacheKey = \`\${targetLanguage}:\${text}\`;
+            const trimmedText = text.trim();
+            if (!trimmedText) return text; // Skip whitespace-only
+            
+            const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
             if (translationCache.has(cacheKey)) {
                 return translationCache.get(cacheKey);
             }
@@ -69114,31 +69122,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             try {
                 const targetLangName = languageNames[targetLanguage] || targetLanguage;
                 
-                console.log('🔄 Translating:', text.substring(0, 30), '→', targetLangName);
+                console.log('🔄 Translating:', trimmedText.substring(0, 40), '→', targetLangName);
                 
                 const response = await fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text: text,
+                        text: trimmedText,
                         target_language: targetLangName
                     })
                 });
                 
                 if (response.ok) {
                     const data = await response.json();
-                    const translated = data.translation || text;
+                    const translated = data.translation || trimmedText;
                     translationCache.set(cacheKey, translated);
-                    console.log('✅ Got translation:', translated.substring(0, 30));
+                    console.log('✅ Got translation:', translated.substring(0, 40));
                     return translated;
                 } else {
-                    console.error('❌ Translation failed:', response.status, await response.text());
+                    const errorText = await response.text();
+                    console.error('❌ Translation failed:', response.status, errorText);
                 }
             } catch (error) {
-                console.warn('Translation failed:', error);
+                console.warn('⚠️ Translation error:', error.message);
             }
             
-            return text;
+            return trimmedText;
         }
         
         // Translate page
