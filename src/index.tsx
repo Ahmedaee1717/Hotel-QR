@@ -66483,57 +66483,69 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitchen View - ${restaurant.title_en}</title>
+    <title>Kitchen - ${restaurant.title_en}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        @keyframes pulse-green {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        @keyframes pulse-badge {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
         }
-        .status-new { animation: pulse-green 2s infinite; }
+        .status-new { animation: pulse-badge 1.5s infinite; }
+        
+        /* Tablet optimized */
+        .order-card { min-height: 320px; }
+        .action-btn { min-height: 64px; font-size: 1.125rem; }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50">
     <div class="max-w-7xl mx-auto p-4">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-lg shadow-lg mb-6">
-            <h1 class="text-3xl font-bold flex items-center gap-3">
-                <i class="fas fa-utensils"></i>
-                Kitchen View - ${restaurant.title_en}
-            </h1>
-            <p class="mt-2 text-purple-100">
-                <i class="fas fa-map-marker-alt mr-2"></i>${restaurant.location}
-            </p>
-            <div class="mt-4 flex gap-4 text-sm">
+        <!-- Professional Header -->
+        <div class="bg-white border-b-4 border-blue-600 shadow-sm p-6 mb-6 rounded-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">${restaurant.title_en}</h1>
+                    <p class="text-gray-600 mt-1">${restaurant.location} • Kitchen Display</p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm text-gray-500">Last Updated</div>
+                    <div id="lastUpdate" class="text-lg font-semibold text-gray-900">--:--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Legend -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div class="flex flex-wrap gap-6 text-sm">
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-yellow-400 rounded-full status-new"></div>
-                    <span>New Orders</span>
+                    <div class="w-4 h-4 bg-yellow-400 rounded"></div>
+                    <span class="font-medium">New Orders</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-orange-400 rounded-full"></div>
-                    <span>Preparing</span>
+                    <div class="w-4 h-4 bg-orange-500 rounded"></div>
+                    <span class="font-medium">Preparing</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <span>Ready</span>
+                    <div class="w-4 h-4 bg-green-500 rounded"></div>
+                    <span class="font-medium">Ready to Serve</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
-                    <span>Served</span>
+                    <div class="w-4 h-4 bg-gray-400 rounded"></div>
+                    <span class="font-medium">Completed</span>
                 </div>
             </div>
         </div>
 
         <!-- Orders Grid -->
-        <div id="ordersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div id="ordersGrid" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             <!-- Orders will be loaded here -->
         </div>
 
         <!-- Empty State -->
-        <div id="emptyState" class="hidden text-center py-12">
+        <div id="emptyState" class="hidden text-center py-16">
             <i class="fas fa-clipboard-list text-6xl text-gray-300 mb-4"></i>
-            <p class="text-xl text-gray-500">No active orders</p>
+            <p class="text-xl text-gray-500 font-medium">No Active Orders</p>
+            <p class="text-gray-400 mt-2">New orders will appear here automatically</p>
         </div>
     </div>
 
@@ -66542,7 +66554,6 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         const propertyId = '${property_id}';
         let orders = [];
 
-        // Load orders
         async function loadOrders() {
             try {
                 const response = await fetch('/api/kitchen/orders/' + restaurantId + '?property=' + propertyId);
@@ -66551,13 +66562,18 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 if (data.success) {
                     orders = data.orders;
                     renderOrders();
+                    updateTimestamp();
                 }
             } catch (error) {
                 console.error('Load orders error:', error);
             }
         }
 
-        // Render orders
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        }
+
         function renderOrders() {
             const grid = document.getElementById('ordersGrid');
             const emptyState = document.getElementById('emptyState');
@@ -66571,114 +66587,93 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             grid.classList.remove('hidden');
             emptyState.classList.add('hidden');
             
-            grid.innerHTML = orders.map(order => {
-                const statusColors = {
-                    'confirmed': 'bg-yellow-100 border-yellow-400',
-                    'preparing': 'bg-orange-100 border-orange-400',
-                    'ready': 'bg-green-100 border-green-400',
-                    'served': 'bg-gray-100 border-gray-400'
+            const html = orders.map(order => {
+                const statusInfo = {
+                    confirmed: { bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-400 text-yellow-900', label: 'NEW ORDER' },
+                    preparing: { bg: 'bg-orange-50', border: 'border-orange-500', badge: 'bg-orange-500 text-white', label: 'PREPARING' },
+                    ready: { bg: 'bg-green-50', border: 'border-green-500', badge: 'bg-green-500 text-white', label: 'READY' },
+                    served: { bg: 'bg-gray-50', border: 'border-gray-400', badge: 'bg-gray-400 text-white', label: 'SERVED' }
                 };
                 
-                const statusBadgeColors = {
-                    'confirmed': 'bg-yellow-400 text-yellow-900',
-                    'preparing': 'bg-orange-400 text-orange-900',
-                    'ready': 'bg-green-400 text-green-900',
-                    'served': 'bg-gray-400 text-gray-900'
-                };
-                
-                const statusLabels = {
-                    'confirmed': 'New Order',
-                    'preparing': 'Preparing',
-                    'ready': 'Ready',
-                    'served': 'Served'
-                };
-                
-                const statusClass = statusColors[order.status] || 'bg-white border-gray-200';
-                const badgeClass = statusBadgeColors[order.status] || 'bg-gray-400';
+                const info = statusInfo[order.status] || statusInfo.confirmed;
                 const isNew = order.status === 'confirmed';
                 
-                return '<div class="' + statusClass + ' border-l-4 rounded-lg shadow-md p-4 ' + (isNew ? 'status-new' : '') + '">' +
-                    '<!-- Header -->' +
-                    '<div class="flex items-start justify-between mb-3">' +
-                        '<div>' +
-                            '<h3 class="text-lg font-bold text-gray-800">' +
-                                '<i class="fas fa-ticket-alt mr-2"></i>' + order.voucher_code +
-                            '</h3>' +
-                            '<p class="text-sm text-gray-600 mt-1">' +
-                                '<i class="fas fa-user mr-1"></i>' + order.guest_name +
-                                ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + order.party_size + ' guests</span>' +
-                            '</p>' +
+                let dishesHtml = '';
+                if (order.dishes && order.dishes.length > 0) {
+                    dishesHtml = order.dishes.map(dish => 
+                        '<div class="bg-white rounded-lg p-3 border border-gray-200">' +
+                            '<div class="flex items-start gap-2">' +
+                                '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">' +
+                                    '<i class="fas fa-utensils text-blue-600"></i>' +
+                                '</div>' +
+                                '<div class="flex-1 min-w-0">' +
+                                    '<p class="font-bold text-gray-900 truncate">' + (dish.item_name || 'Unknown Item') + '</p>' +
+                                    '<p class="text-sm text-gray-500">' + (dish.category || '') + 
+                                    (dish.is_premium ? ' <span class="text-orange-600"><i class="fas fa-star"></i> Premium</span>' : '') +
+                                    '</p>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>'
+                    ).join('');
+                }
+                
+                let actionButton = '';
+                if (order.status === 'confirmed') {
+                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'preparing\\\')" class="action-btn w-full bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">' +
+                        '<i class="fas fa-fire mr-2"></i>START PREPARING' +
+                        '</button>';
+                } else if (order.status === 'preparing') {
+                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'ready\\\')" class="action-btn w-full bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors">' +
+                        '<i class="fas fa-check-circle mr-2"></i>MARK AS READY' +
+                        '</button>';
+                } else if (order.status === 'ready') {
+                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'served\\\')" class="action-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">' +
+                        '<i class="fas fa-check-double mr-2"></i>MARK AS SERVED' +
+                        '</button>';
+                } else {
+                    actionButton = '<div class="action-btn w-full bg-gray-200 text-gray-600 font-bold rounded-lg flex items-center justify-center">' +
+                        '<i class="fas fa-check-double mr-2"></i>COMPLETED' +
+                        '</div>';
+                }
+                
+                return '<div class="order-card ' + info.bg + ' border-l-4 ' + info.border + ' rounded-lg shadow-md p-5">' +
+                    '<div class="flex items-start justify-between mb-4">' +
+                        '<div class="flex-1">' +
+                            '<div class="text-xs text-gray-500 mb-1">Order #</div>' +
+                            '<h3 class="text-lg font-bold text-gray-900">' + (order.voucher_code || 'N/A') + '</h3>' +
                         '</div>' +
-                        '<span class="' + badgeClass + ' px-3 py-1 rounded-full text-xs font-semibold">' +
-                            statusLabels[order.status] +
+                        '<span class="' + info.badge + ' px-4 py-2 rounded-lg text-sm font-bold ' + (isNew ? 'status-new' : '') + '">' +
+                            info.label +
                         '</span>' +
                     '</div>' +
                     
-                    '<!-- Table Info -->' +
-                    '<div class="bg-white rounded p-2 mb-3 text-center">' +
-                        '<p class="text-2xl font-bold text-purple-600">' +
-                            '<i class="fas fa-chair mr-2"></i>Table ' + (order.table_number || 'TBD') +
-                        '</p>' +
+                    '<div class="bg-white rounded-lg p-4 mb-4 text-center border-2 border-blue-600">' +
+                        '<div class="text-4xl font-black text-blue-600 mb-1">TABLE ' + (order.table_number || '?') + '</div>' +
+                        '<div class="text-sm text-gray-600">' +
+                            '<i class="fas fa-user mr-1"></i>' + (order.guest_name || 'Guest') +
+                            ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.party_size || 0) + ' guests</span>' +
+                        '</div>' +
+                        '<div class="text-sm text-gray-600 mt-1">' +
+                            '<i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') +
+                        '</div>' +
                     '</div>' +
                     
-                    '<!-- Time Info -->' +
-                    '<div class="text-sm text-gray-600 mb-3">' +
-                        '<i class="fas fa-clock mr-1"></i>' + order.reservation_time +
-                        ' <span class="ml-2"><i class="fas fa-calendar mr-1"></i>' + order.reservation_date + '</span>' +
-                    '</div>' +
+                    '<div class="space-y-2 mb-4">' + dishesHtml + '</div>' +
                     
-                    '<!-- Dishes -->' +
-                    '<div class="space-y-2 mb-4">' +
-                        order.dishes.map(dish => 
-                            '<div class="bg-white rounded p-2 flex items-start gap-2">' +
-                                '<div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">' +
-                                    '<i class="fas fa-utensils text-purple-600 text-xs"></i>' +
-                                '</div>' +
-                                '<div class="flex-1">' +
-                                    '<p class="font-semibold text-gray-800">' + dish.item_name + '</p>' +
-                                    (dish.is_premium ? '<span class="text-xs text-orange-600"><i class="fas fa-star mr-1"></i>Premium</span>' : '') +
-                                    '<p class="text-xs text-gray-500">' + dish.category + '</p>' +
-                                '</div>' +
-                            '</div>'
-                        ).join('') +
-                    '</div>' +
-                    
-                    '<!-- Special Requests -->' +
                     (order.special_requests ? 
-                        '<div class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-3">' +
-                            '<p class="text-xs font-semibold text-yellow-800 mb-1"><i class="fas fa-sticky-note mr-1"></i>Special Requests:</p>' +
-                            '<p class="text-sm text-yellow-900">' + order.special_requests + '</p>' +
+                        '<div class="bg-yellow-100 border-l-4 border-yellow-500 rounded p-3 mb-4">' +
+                            '<p class="text-xs font-bold text-yellow-900 mb-1"><i class="fas fa-exclamation-circle mr-1"></i>SPECIAL REQUESTS</p>' +
+                            '<p class="text-sm text-yellow-900 font-medium">' + order.special_requests + '</p>' +
                         '</div>'
                     : '') +
                     
-                    '<!-- Action Buttons -->' +
-                    '<div class="grid grid-cols-3 gap-2">' +
-                        (order.status === 'confirmed' ?
-                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'preparing\')" class="col-span-3 bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-semibold">' +
-                                '<i class="fas fa-fire mr-2"></i>Start Preparing' +
-                            '</button>'
-                        : '') +
-                        (order.status === 'preparing' ?
-                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'ready\')" class="col-span-3 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">' +
-                                '<i class="fas fa-check-circle mr-2"></i>Mark as Ready' +
-                            '</button>'
-                        : '') +
-                        (order.status === 'ready' ?
-                            '<button onclick="updateOrderStatus(' + order.voucher_id + ', \'served\')" class="col-span-3 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg font-semibold">' +
-                                '<i class="fas fa-utensils mr-2"></i>Mark as Served' +
-                            '</button>'
-                        : '') +
-                        (order.status === 'served' ?
-                            '<div class="col-span-3 text-center text-gray-500 py-2">' +
-                                '<i class="fas fa-check-double mr-2"></i>Completed' +
-                            '</div>'
-                        : '') +
-                    '</div>' +
+                    actionButton +
                 '</div>';
             }).join('');
+            
+            grid.innerHTML = html;
         }
 
-        // Update order status
         async function updateOrderStatus(voucherId, newStatus) {
             try {
                 const response = await fetch('/api/kitchen/order-status', {
@@ -66696,10 +66691,9 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Reload orders
                     await loadOrders();
                 } else {
-                    alert('Failed to update status: ' + data.error);
+                    alert('Failed to update status: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Update status error:', error);
@@ -66721,130 +66715,6 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
     return c.html('<h1>Error loading kitchen view</h1>', 500)
   }
 })
-
-// API: Get kitchen orders
-app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
-  const { restaurant_id } = c.req.param()
-  const property_id = c.req.query('property') || '1'
-  const { DB } = c.env
-  
-  try {
-    // Get all active orders (confirmed, preparing, ready)
-    const orders = await DB.prepare(`
-      SELECT 
-        v.voucher_id,
-        v.voucher_code,
-        v.reservation_date,
-        v.reservation_time,
-        v.party_size_adults + v.party_size_children as party_size,
-        v.table_id,
-        v.preorder_item_ids,
-        v.special_requests,
-        v.status,
-        v.created_at,
-        dp.primary_guest_name as guest_name,
-        t.table_number
-      FROM alacarte_vouchers v
-      LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
-      LEFT JOIN restaurant_tables t ON v.table_id = t.table_id
-      WHERE v.restaurant_id = ?
-        AND v.property_id = ?
-        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
-        AND v.reservation_date = date('now')
-      ORDER BY 
-        CASE v.status 
-          WHEN 'confirmed' THEN 1
-          WHEN 'preparing' THEN 2
-          WHEN 'ready' THEN 3
-          WHEN 'served' THEN 4
-        END,
-        v.reservation_time ASC
-    `).bind(restaurant_id, property_id).all()
-    
-    // For each order, get the dish details
-    const ordersWithDishes = await Promise.all(orders.results.map(async (order) => {
-      const itemIds = JSON.parse(order.preorder_item_ids || '[]')
-      
-      if (itemIds.length === 0) {
-        return {
-          ...order,
-          dishes: []
-        }
-      }
-      
-      // Get dish details
-      const placeholders = itemIds.map(() => '?').join(',')
-      const dishes = await DB.prepare(
-        'SELECT item_id, category, item_name, is_premium ' +
-        'FROM alacarte_menu_items ' +
-        'WHERE item_id IN (' + placeholders + ') ' +
-        'ORDER BY ' +
-        "  CASE category " +
-        "    WHEN 'salad' THEN 1 " +
-        "    WHEN 'starter' THEN 2 " +
-        "    WHEN 'main' THEN 3 " +
-        "    WHEN 'dessert' THEN 4 " +
-        "    ELSE 5 " +
-        "  END"
-      ).bind(...itemIds).all()
-      
-      return {
-        ...order,
-        dishes: dishes.results
-      }
-    }))
-    
-    return c.json({
-      success: true,
-      orders: ordersWithDishes
-    })
-  } catch (error) {
-    console.error('Get kitchen orders error:', error)
-    return c.json({
-      success: false,
-      error: 'Failed to get orders'
-    }, 500)
-  }
-})
-
-// API: Update order status
-app.post('/api/kitchen/order-status', async (c) => {
-  const property_id = c.req.header('X-Property-ID') || '1'
-  const { DB } = c.env
-  
-  try {
-    const { voucher_id, status } = await c.req.json()
-    
-    // Validate status
-    const validStatuses = ['confirmed', 'preparing', 'ready', 'served']
-    if (!validStatuses.includes(status)) {
-      return c.json({
-        success: false,
-        error: 'Invalid status'
-      }, 400)
-    }
-    
-    // Update status
-    await DB.prepare(`
-      UPDATE alacarte_vouchers
-      SET status = ?,
-          completed_at = CASE WHEN ? = 'served' THEN datetime('now') ELSE completed_at END
-      WHERE voucher_id = ?
-        AND property_id = ?
-    `).bind(status, status, voucher_id, property_id).run()
-    
-    return c.json({
-      success: true
-    })
-  } catch (error) {
-    console.error('Update order status error:', error)
-    return c.json({
-      success: false,
-      error: 'Failed to update status'
-    }, 500)
-  }
-})
-
 // GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
 // This runs every hour (configured in wrangler.jsonc)
 export default {
