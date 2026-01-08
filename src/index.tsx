@@ -66715,8 +66715,128 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
     return c.html('<h1>Error loading kitchen view</h1>', 500)
   }
 })
-// GDPR/BIPA Compliance: Scheduled event handler for automated biometric data deletion
-// This runs every hour (configured in wrangler.jsonc)
+
+app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.query('property') || '1'
+  const { DB } = c.env
+  
+  try {
+    // Get all active orders (confirmed, preparing, ready)
+    const orders = await DB.prepare(`
+      SELECT 
+        v.voucher_id,
+        v.voucher_code,
+        v.reservation_date,
+        v.reservation_time,
+        v.party_size_adults + v.party_size_children as party_size,
+        v.table_id,
+        v.preorder_item_ids,
+        v.special_requests,
+        v.status,
+        v.created_at,
+        dp.primary_guest_name as guest_name,
+        t.table_number
+      FROM alacarte_vouchers v
+      LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
+      LEFT JOIN restaurant_tables t ON v.table_id = t.table_id
+      WHERE v.restaurant_id = ?
+        AND v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+        AND v.reservation_date = date('now')
+      ORDER BY 
+        CASE v.status 
+          WHEN 'confirmed' THEN 1
+          WHEN 'preparing' THEN 2
+          WHEN 'ready' THEN 3
+          WHEN 'served' THEN 4
+        END,
+        v.reservation_time ASC
+    `).bind(restaurant_id, property_id).all()
+    
+    // For each order, get the dish details
+    const ordersWithDishes = await Promise.all(orders.results.map(async (order) => {
+      const itemIds = JSON.parse(order.preorder_item_ids || '[]')
+      
+      if (itemIds.length === 0) {
+        return {
+          ...order,
+          dishes: []
+        }
+      }
+      
+      // Get dish details
+      const placeholders = itemIds.map(() => '?').join(',')
+      const dishes = await DB.prepare(
+        'SELECT item_id, category, item_name, is_premium ' +
+        'FROM alacarte_menu_items ' +
+        'WHERE item_id IN (' + placeholders + ') ' +
+        'ORDER BY ' +
+        "  CASE category " +
+        "    WHEN 'salad' THEN 1 " +
+        "    WHEN 'starter' THEN 2 " +
+        "    WHEN 'main' THEN 3 " +
+        "    WHEN 'dessert' THEN 4 " +
+        "    ELSE 5 " +
+        "  END"
+      ).bind(...itemIds).all()
+      
+      return {
+        ...order,
+        dishes: dishes.results
+      }
+    }))
+    
+    return c.json({
+      success: true,
+      orders: ordersWithDishes
+    })
+  } catch (error) {
+    console.error('Get kitchen orders error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to get orders'
+    }, 500)
+  }
+})
+
+// API: Update order status
+app.post('/api/kitchen/order-status', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const { voucher_id, status } = await c.req.json()
+    
+    // Validate status
+    const validStatuses = ['confirmed', 'preparing', 'ready', 'served']
+    if (!validStatuses.includes(status)) {
+      return c.json({
+        success: false,
+        error: 'Invalid status'
+      }, 400)
+    }
+    
+    // Update status
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET status = ?,
+          completed_at = CASE WHEN ? = 'served' THEN datetime('now') ELSE completed_at END
+      WHERE voucher_id = ?
+        AND property_id = ?
+    `).bind(status, status, voucher_id, property_id).run()
+    
+    return c.json({
+      success: true
+    })
+  } catch (error) {
+    console.error('Update order status error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to update status'
+    }, 500)
+  }
+})
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
