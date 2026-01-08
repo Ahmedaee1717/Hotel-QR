@@ -21190,6 +21190,19 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         <!-- Collapsible Benefits Details -->
                         <div class="hidden" id="tierDetailsPanel">
                             <div class="bg-white px-8 pb-8 pt-6">
+                                <!-- À La Carte Restaurants (ONLY visible when expanded) -->
+                                <div id="alacarteRestaurantsSection" class="hidden mb-8">
+                                    <h4 class="text-base font-black text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-3 pb-2 border-b-2" style="border-color: var(--primary-color);">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg" style="background: var(--primary-color);">
+                                            <i class="fas fa-ticket-alt"></i>
+                                        </div>
+                                        <span>Eligible Restaurants</span>
+                                    </h4>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="alacarteRestaurantsList">
+                                        <!-- Restaurant cards will be inserted here by JavaScript -->
+                                    </div>
+                                </div>
+                                
                                 <!-- Benefits by Category -->
                                 <div class="space-y-6">
                                     <!-- Dining Benefits -->
@@ -25359,46 +25372,44 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 if (voucherData.success && voucherData.eligible) {
                   voucherInfo.classList.remove('hidden');
                   
-                  // Build restaurant cards
+                  // Show ONLY meal count in the summary card (always visible)
+                  voucherInfo.innerHTML = 
+                    '<div class="flex items-center gap-3">' +
+                      '<i class="fas fa-ticket-alt text-white text-2xl"></i>' +
+                      '<div class="text-white">' +
+                        '<div class="text-xl font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
+                        '<div class="text-xs text-white/80">À la carte dining included</div>' +
+                      '</div>' +
+                    '</div>';
+                  
+                  // Build restaurant cards for the EXPANDED panel
                   const restaurantCards = voucherData.eligible_restaurants.map(restaurant => {
-                    const restaurantImage = '/static/placeholder.jpg'; // Default image
+                    // Get the first image from the restaurant, or use placeholder
+                    const restaurantImage = (restaurant.images && restaurant.images.length > 0) 
+                      ? restaurant.images[0] 
+                      : '/static/placeholder.jpg';
                     const bookingUrl = '/alacarte/book/' + restaurant.offering_id + '?property=' + propertyId + '&pass=' + passReference;
                     
-                    return '<div class="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden hover:bg-white/20 transition-all">' +
-                      '<div class="aspect-video bg-white/20 relative overflow-hidden">' +
+                    return '<div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all">' +
+                      '<div class="aspect-video bg-gray-100 relative overflow-hidden">' +
                         '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover">' +
-                        '<div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>' +
-                        '<div class="absolute bottom-2 left-2 text-white text-xs">' +
-                          '<i class="fas fa-map-marker-alt mr-1"></i>' + restaurant.location +
+                        '<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>' +
+                        '<div class="absolute bottom-2 left-2 text-white text-xs flex items-center gap-1">' +
+                          '<i class="fas fa-map-marker-alt"></i>' +
+                          '<span>' + restaurant.location + '</span>' +
                         '</div>' +
                       '</div>' +
-                      '<div class="p-3">' +
-                        '<h4 class="font-bold text-white text-sm mb-1">' + restaurant.title_en + '</h4>' +
-                        '<a href="' + bookingUrl + '" class="block w-full bg-white/20 hover:bg-white/30 text-white text-center py-2 rounded-lg text-sm font-semibold transition-all mt-2">' +
+                      '<div class="p-4">' +
+                        '<h4 class="font-bold text-gray-800 mb-2">' + restaurant.title_en + '</h4>' +
+                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2.5 rounded-lg text-sm font-semibold transition-all" style="background: var(--primary-color); color: white;">' +
                           '<i class="fas fa-calendar-check mr-1"></i>Book Now' +
                         '</a>' +
                       '</div>' +
                     '</div>';
                   }).join('');
                   
-                  voucherInfo.innerHTML = 
-                    '<div class="space-y-3">' +
-                      '<div class="flex items-center justify-between">' +
-                        '<div class="flex items-center gap-2">' +
-                          '<i class="fas fa-ticket-alt text-white text-xl"></i>' +
-                          '<div class="text-white">' +
-                            '<div class="text-lg font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
-                            '<div class="text-xs text-white/70">À la carte dining included</div>' +
-                          '</div>' +
-                        '</div>' +
-                      '</div>' +
-                      '<div class="text-white/90 text-sm mb-2">' +
-                        '<i class="fas fa-info-circle mr-1"></i>Choose from these exclusive restaurants:' +
-                      '</div>' +
-                      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">' +
-                        restaurantCards +
-                      '</div>' +
-                    '</div>';
+                  // Store restaurant cards for when panel expands
+                  window.alacarteRestaurantCards = restaurantCards;
                   console.log('✅ À la carte voucher info displayed!');
                 } else {
                   voucherInfo.classList.add('hidden');
@@ -25719,6 +25730,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             // Update button text
             if (text) {
               text.textContent = isHidden ? 'Hide Details' : 'View Details';
+            }
+            
+            // If opening the panel AND we have restaurant cards, inject them
+            if (isHidden && window.alacarteRestaurantCards) {
+              const alacarteSection = document.getElementById('alacarteRestaurantsSection');
+              const alacarteList = document.getElementById('alacarteRestaurantsList');
+              
+              if (alacarteSection && alacarteList) {
+                alacarteList.innerHTML = window.alacarteRestaurantCards;
+                alacarteSection.classList.remove('hidden');
+              }
             }
           }
         }
@@ -67507,25 +67529,33 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
     let restaurantDetails = []
     if (eligibleRestaurants.length > 0) {
       const restaurantList = await DB.prepare(`
-        SELECT offering_id, title_en, location
+        SELECT offering_id, title_en, location, images
         FROM hotel_offerings
         WHERE offering_id IN (${eligibleRestaurants.map(() => '?').join(',')})
           AND property_id = ?
           AND offering_type = 'restaurant'
           AND status = 'active'
       `).bind(...eligibleRestaurants, property_id).all()
-      restaurantDetails = restaurantList.results
+      // Parse images JSON for each restaurant
+      restaurantDetails = restaurantList.results.map(r => ({
+        ...r,
+        images: r.images ? JSON.parse(r.images) : []
+      }))
     } else {
       // All à la carte restaurants are eligible
       const allRestaurants = await DB.prepare(`
-        SELECT offering_id, title_en, location
+        SELECT offering_id, title_en, location, images
         FROM hotel_offerings
         WHERE property_id = ?
           AND offering_type = 'restaurant'
           AND status = 'active'
         ORDER BY display_order, title_en
       `).bind(property_id).all()
-      restaurantDetails = allRestaurants.results
+      // Parse images JSON for each restaurant
+      restaurantDetails = allRestaurants.results.map(r => ({
+        ...r,
+        images: r.images ? JSON.parse(r.images) : []
+      }))
     }
 
     return c.json({
