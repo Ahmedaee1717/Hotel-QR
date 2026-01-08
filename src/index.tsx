@@ -48395,17 +48395,21 @@ app.get('/admin/dashboard', (c) => {
               categories[category].forEach(item => {
                 const borderClass = item.is_premium ? 'border-2 border-yellow-300' : 'border border-gray-200';
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">PREMIUM</span>' : '';
+                const itemName = (item.item_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
+                const itemDesc = ((item.description || '').substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+                const restaurantName = (item.restaurant_name || '').replace(/'/g, '&#39;');
+                
                 html += '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg ' + borderClass + '">' +
                   '<div class="flex-1">' +
-                  '<div class="font-semibold text-gray-800">' + (item.item_name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
-                  '<div class="text-xs text-gray-600">' + ((item.description || '').substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;')) + '...</div>' +
+                  '<div class="font-semibold text-gray-800">' + itemName + '</div>' +
+                  '<div class="text-xs text-gray-600">' + itemDesc + '...</div>' +
                   '</div>' +
                   '<div class="ml-3 flex items-center gap-3">' +
                   '<div class="text-right">' +
                   '<div class="text-lg font-bold text-purple-600">€' + item.cost_to_hotel.toFixed(2) + '</div>' +
                   premiumBadge +
                   '</div>' +
-                  '<button onclick="deleteMenuItem(' + item.item_id + ', \'' + item.item_name.replace(/'/g, "\\'") + '\', \'' + item.restaurant_name.replace(/'/g, "\\'") + '\')" ' +
+                  '<button onclick="window.deleteMenuItem(' + item.item_id + ', ' + "'" + itemName + "'" + ', ' + "'" + restaurantName + "'" + ')" ' +
                   'class="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 transition-colors text-sm">' +
                   '<i class="fas fa-trash"></i>' +
                   '</button>' +
