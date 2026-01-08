@@ -68776,49 +68776,69 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
         }
         
-        function displayVoucherStatus() {
+        async function displayVoucherStatus() {
             if (!voucherEligibility) return;
             
             const statusDiv = document.getElementById('voucherStatus');
-            statusDiv.classList.remove('hidden');
+            if (!statusDiv) return;
             
             const { guest_name, tier, vouchers } = voucherEligibility;
             
+            // Show the status card with margin
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.add('mb-6');
+            
             statusDiv.innerHTML = \`
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-lg p-6">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-6 shadow-lg">
                     <div class="flex items-start gap-4">
-                        <div class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0">
-                            <i class="fas fa-ticket-alt text-xl"></i>
+                        <div class="bg-green-500 text-white rounded-full w-14 h-14 flex items-center justify-center flex-shrink-0 shadow-md">
+                            <i class="fas fa-ticket-alt text-2xl"></i>
                         </div>
                         <div class="flex-1">
-                            <h3 class="text-xl font-bold text-green-900 mb-2">
-                                <i class="fas fa-check-circle mr-2"></i>Voucher Eligible!
+                            <h3 class="text-xl font-bold text-green-900 mb-3 flex items-center gap-2">
+                                <i class="fas fa-check-circle"></i><span data-i18n="voucher-title">Voucher Eligible!</span>
                             </h3>
-                            <div class="space-y-1 text-sm">
+                            <div class="space-y-2 text-sm mb-4">
                                 <p class="text-gray-700"><strong>Guest:</strong> \${guest_name}</p>
-                                <p class="text-gray-700"><strong>Tier:</strong> 
-                                    <span class="px-2 py-1 rounded text-white text-xs font-semibold" style="background-color: \${tier.tier_color}">\${tier.tier_name}</span>
+                                <p class="text-gray-700 flex items-center gap-2">
+                                    <strong>Tier:</strong> 
+                                    <span class="px-3 py-1 rounded-full text-white text-xs font-bold uppercase tracking-wide shadow" style="background-color: \${tier.tier_color}">\${tier.tier_name}</span>
                                 </p>
-                                <p class="text-gray-700 text-lg font-bold mt-2">
-                                    <i class="fas fa-utensils mr-2 text-green-600"></i>
-                                    \${vouchers.remaining} of \${vouchers.total_allowed} meals remaining
+                                <p class="text-gray-900 text-lg font-bold mt-3 flex items-center gap-2">
+                                    <i class="fas fa-utensils text-green-600"></i>
+                                    <span>\${vouchers.remaining} of \${vouchers.total_allowed} meals remaining</span>
                                 </p>
                             </div>
-                            <div class="mt-3 bg-green-100 border border-green-300 rounded p-3">
-                                <p class="text-green-900 font-semibold text-sm">
-                                    <i class="fas fa-gift mr-2"></i>This meal is INCLUDED in your all-inclusive package!
+                            <div class="bg-white border-2 border-green-400 rounded-lg p-4 shadow-sm">
+                                <p class="text-green-900 font-bold text-sm flex items-center gap-2">
+                                    <i class="fas fa-gift"></i>
+                                    <span data-i18n="voucher-message">This meal is INCLUDED in your all-inclusive package!</span>
                                 </p>
-                                <p class="text-green-700 text-xs mt-1">Premium items may have additional charges based on your tier.</p>
+                                <p class="text-green-700 text-xs mt-2" data-i18n="voucher-disclaimer">Premium items may have additional charges based on your tier.</p>
                             </div>
                         </div>
                     </div>
                 </div>
             \`;
             
+            // Translate if needed
+            if (currentLanguage !== 'en') {
+                const titleEl = statusDiv.querySelector('[data-i18n="voucher-title"]');
+                const messageEl = statusDiv.querySelector('[data-i18n="voucher-message"]');
+                const disclaimerEl = statusDiv.querySelector('[data-i18n="voucher-disclaimer"]');
+                
+                if (titleEl) titleEl.textContent = await translateText('Voucher Eligible!', currentLanguage);
+                if (messageEl) messageEl.textContent = await translateText('This meal is INCLUDED in your all-inclusive package!', currentLanguage);
+                if (disclaimerEl) disclaimerEl.textContent = await translateText('Premium items may have additional charges based on your tier.', currentLanguage);
+            }
+            
             // Update button text
-            document.getElementById('confirmButton').innerHTML = '<i class="fas fa-ticket-alt mr-2"></i>Use Voucher & Confirm';
+            const confirmButton = document.getElementById('confirmButton');
+            if (confirmButton) {
+                const buttonText = currentLanguage === 'en' ? 'Use Voucher & Confirm' : await translateText('Use Voucher & Confirm', currentLanguage);
+                confirmButton.innerHTML = \`<i class="fas fa-ticket-alt mr-2"></i>\${buttonText}\`;
+            }
         }
-        
         async function showMenuCategory(category) {
             // Update tabs
             document.querySelectorAll('.menu-tab').forEach(tab => {
