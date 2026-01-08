@@ -21450,7 +21450,21 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         let customSections = [];
         let currentFilter = 'all';
         let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        let linkedPassReference = localStorage.getItem('linkedPassReference') || null;
+        
+        // Get linked pass reference from guestPassSession
+        let linkedPassReference = null;
+        try {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                const data = JSON.parse(session);
+                if (data.guest && data.guest.pass_reference) {
+                    linkedPassReference = data.guest.pass_reference;
+                }
+            }
+        } catch (e) {
+            console.error('Error reading pass session:', e);
+        }
+        
         console.log('🌐 Current language loaded:', currentLanguage);
         console.log('🎫 Linked pass reference:', linkedPassReference);
         
@@ -25144,6 +25158,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           const guest = e.detail;
           if (guest && guest.pass_reference) {
             loadTierBenefits(guest.pass_reference);
+            // Update linkedPassReference and re-render restaurants to show voucher badges
+            linkedPassReference = guest.pass_reference;
+            console.log('🎫 Pass linked, updating voucher display:', linkedPassReference);
+            renderRestaurants(); // Re-render to show voucher badges
           }
         });
         
@@ -25158,6 +25176,10 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         // Listen for pass unlinked event
         window.addEventListener('passUnlinked', function() {
           hideTierBenefitsCard();
+          // Clear linkedPassReference and re-render restaurants
+          linkedPassReference = null;
+          console.log('🎫 Pass unlinked, removing voucher display');
+          renderRestaurants(); // Re-render to hide voucher badges
         });
         
         async function loadTierBenefits(passReference) {
