@@ -24112,6 +24112,12 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     voucherData.eligible_restaurants.some(rest => rest.offering_id === r.offering_id)
                 );
                 
+                console.log(\`🍽️ Restaurant "\${title}" (ID: \${r.offering_id}) - Eligible: \${isEligible}\`, {
+                    hasVoucherData: !!voucherData,
+                    eligibleRestaurants: voucherData?.eligible_restaurants,
+                    restaurantId: r.offering_id
+                });
+                
                 // Build the booking URL with pass parameter if eligible
                 const bookingUrl = isEligible 
                     ? \`/alacarte/book/\${r.offering_id}?property=\${propertyId}&pass=\${linkedPassReference}\`
