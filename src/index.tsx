@@ -20995,7 +20995,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self';">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net;">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="mobile-web-app-capable" content="yes">
         <title>Welcome</title>
@@ -25420,8 +25420,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     const mealText = voucherData.vouchers.remaining === 1 ? 'remaining dining experience' : 'remaining dining experiences';
                     
                     // Use custom message from tier settings or fallback to default
-                    const defaultMessage = 'As a valued {tierName} member, you have {remaining} {mealText} included in your stay.\n\nSimply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.';
-                    const customMessage = voucherData.tier.alacarte_privileges_message || defaultMessage;
+                    const defaultMessage = 'As a valued {tierName} member, you have {remaining} {mealText} included in your stay.\\n\\nSimply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.';
+                    const customMessage = voucherData.tier.privileges_message || voucherData.tier.alacarte_privileges_message || defaultMessage;
                     
                     // Replace placeholders
                     const processedMessage = customMessage
@@ -25429,8 +25429,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       .replace(/{tierName}/g, voucherData.tier.tier_name)
                       .replace(/{mealText}/g, mealText);
                     
-                    // Split into paragraphs
-                    const paragraphs = processedMessage.split('\n\n').filter(p => p.trim());
+                    // Split into paragraphs (handle both literal \\n and actual newlines)
+                    const paragraphs = processedMessage.split(/\\n\\n|\\n\\n/).filter(p => p.trim());
                     const paragraphsHtml = paragraphs.map(p => 
                       '<p class="text-gray-700 leading-relaxed mb-3">' + 
                         p.replace(new RegExp(voucherData.vouchers.remaining + ' ' + mealText, 'g'), 
