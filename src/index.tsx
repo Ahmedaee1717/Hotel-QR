@@ -25436,15 +25436,9 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       .replace(/{tierName}/g, voucherData.tier.tier_name)
                       .replace(/{mealText}/g, mealText);
                     
-                    // Split into paragraphs - handle both actual newlines and literal backslash-n from database
-                    let paragraphs;
-                    if (processedMessage.includes('\\n\\n')) {
-                      // Database stored with escaped newlines
-                      paragraphs = processedMessage.split('\\n\\n').filter(p => p.trim());
-                    } else {
-                      // Actual newlines from textarea
-                      paragraphs = processedMessage.split(/\n\n/).filter(p => p.trim());
-                    }
+                    // Split into paragraphs by double newline
+                    // JSON returns actual newlines, so split by newline character
+                    const paragraphs = processedMessage.split('\\n\\n').filter(p => p.trim());
                     
                     const paragraphsHtml = paragraphs.map(p => 
                       '<p class="text-gray-700 leading-relaxed mb-3">' + 
