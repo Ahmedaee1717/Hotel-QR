@@ -64798,14 +64798,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const hint = document.getElementById('wallDrawingHint');
         
         if (isDrawingWall) {
-          btn.textContent = '🛑 Stop Drawing';
+          btn.textContent = 'Stop Drawing';
           btn.classList.add('bg-red-600');
           btn.classList.remove('bg-gray-600');
           hint.classList.remove('hidden');
           wallStartPoint = null;
-          console.log('🖊️ Wall drawing mode: ON');
+          console.log('Wall drawing mode: ON');
         } else {
-          btn.innerHTML = '<i class="fas fa-pen mr-2"></i>Start Drawing Walls';
+          btn.innerHTML = '<i class=\"fas fa-pen mr-2\"></i>Start Drawing Walls';
           btn.classList.remove('bg-red-600');
           btn.classList.add('bg-gray-600');
           hint.classList.add('hidden');
@@ -64814,7 +64814,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             wallPreviewLine = null;
           }
           wallStartPoint = null;
-          console.log('🖊️ Wall drawing mode: OFF');
+          console.log('Wall drawing mode: OFF');
         }
       };
       
