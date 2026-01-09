@@ -23894,10 +23894,22 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 const offeringsData = await offeringsResponse.json();
                 allOfferings = offeringsData.offerings || [];
                 
+                // Parse images JSON for each offering
+                allOfferings = allOfferings.map(o => ({
+                  ...o,
+                  images: o.images ? (typeof o.images === 'string' ? JSON.parse(o.images) : o.images) : []
+                }));
+                
                 // Load vendor activities with language
                 const activitiesResponse = await fetch(\`/api/property-vendor-activities/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const activitiesData = await activitiesResponse.json();
                 allActivities = activitiesData.activities || [];
+                
+                // Parse images JSON for each activity
+                allActivities = allActivities.map(a => ({
+                  ...a,
+                  images: a.images ? (typeof a.images === 'string' ? JSON.parse(a.images) : a.images) : []
+                }));
                 
                 // Load custom sections with language support
                 const customSectionsResponse = await fetch(\`/api/custom-sections/\${propertyData.property_id}?language=\${currentLanguage}\`);
@@ -25424,8 +25436,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       .replace(/{tierName}/g, voucherData.tier.tier_name)
                       .replace(/{mealText}/g, mealText);
                     
-                    // Split into paragraphs - handle both actual newlines and literal \\n from database
-                    // Check if message contains literal \n or actual newlines
+                    // Split into paragraphs - handle both actual newlines and literal backslash-n from database
                     let paragraphs;
                     if (processedMessage.includes('\\n\\n')) {
                       // Database stored with escaped newlines
