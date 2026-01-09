@@ -20953,34 +20953,29 @@ app.get('/hotel/:property_slug', async (c) => {
 </div>
 <div id="passLinkBarLinked" class="hidden pass-link-bar py-3">
     <div class="max-w-7xl mx-auto px-4">
-        <div class="flex flex-col gap-3 py-3">
-            <!-- Top Row: Welcome Message -->
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-user text-lg" style="color: #016e8f;"></i>
-                    </div>
-                    <div>
-                        <p class="text-white text-base font-medium">Welcome back,</p>
-                        <p class="text-white font-bold text-xl" id="linkedGuestName">Guest</p>
-                    </div>
+        <div class="flex items-center justify-between py-2">
+            <!-- Left: Welcome Message (Compact) -->
+            <div class="flex items-center gap-2">
+                <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-user text-base" style="color: #016e8f;"></i>
                 </div>
-                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-3 rounded-lg" title="Sign out">
-                    <i class="fas fa-sign-out-alt text-xl"></i>
-                </button>
+                <div>
+                    <p class="text-white text-sm font-medium leading-tight">Welcome back,</p>
+                    <p class="text-white font-bold text-lg leading-tight" id="linkedGuestName">Guest</p>
+                </div>
+                <span class="text-white text-sm font-medium bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm ml-2">
+                    <i class="fas fa-door-open mr-1.5 text-xs"></i>Room <strong id="linkedRoomNumber">—</strong>
+                </span>
             </div>
             
-            <!-- Bottom Row: Action Buttons -->
-            <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-white text-base font-medium bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
-                    <i class="fas fa-door-open mr-2"></i>Room <strong id="linkedRoomNumber" class="text-lg">—</strong>
-                </span>
-                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-lg font-bold text-base whitespace-nowrap transition-all shadow-md">
-                    <i class="fas fa-clipboard-list mr-2"></i>My Bookings
+            <!-- Right: Action Buttons -->
+            <div class="flex items-center gap-2">
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all">
+                    <i class="fas fa-clipboard-list mr-1.5"></i>My Bookings
                 </a>
-                <a href="#" id="viewPassButton" class="pass-link-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-base whitespace-nowrap transition-all shadow-md">
-                    <i class="fas fa-id-card mr-2"></i>My Pass
-                </a>
+                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-2 rounded-lg" title="Sign out">
+                    <i class="fas fa-sign-out-alt text-lg"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -21168,6 +21163,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                     <i class="fas fa-comments text-lg"></i>
                                     <span class="text-sm">Questions About Your Benefits?</span>
                                 </button>
+                            </div>
+                            
+                            <!-- My Pass Button -->
+                            <div class="relative z-10 mt-2">
+                                <a href="#" id="viewPassButton" class="pass-link-button w-full bg-white hover:bg-gray-50 text-gray-800 font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-3 border-2 border-white/50">
+                                    <i class="fas fa-id-card text-lg"></i>
+                                    <span class="text-sm">View My Digital Pass</span>
+                                </a>
                             </div>
                             
                             <!-- Gamification Stats (Future Phase) -->
