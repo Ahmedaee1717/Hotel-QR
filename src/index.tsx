@@ -67089,6 +67089,156 @@ app.post('/api/kitchen/order-status', async (c) => {
     }, 500)
   }
 })
+
+// ============================================
+// À LA CARTE ANALYTICS API
+// ============================================
+
+app.get('/api/analytics/alacarte', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const period = c.req.query('period') || 'today' // today, week, month
+  const restaurant_id = c.req.query('restaurant_id') // optional filter
+  
+  try {
+    // Calculate date range based on period
+    let dateFilter = ''
+    if (period === 'today') {
+      dateFilter = "date('now')"
+    } else if (period === 'week') {
+      dateFilter = "date('now', '-7 days')"
+    } else if (period === 'month') {
+      dateFilter = "date('now', '-30 days')"
+    }
+    
+    // Build restaurant filter
+    let restaurantFilter = ''
+    if (restaurant_id) {
+      restaurantFilter = `AND v.restaurant_id = ${restaurant_id}`
+    }
+    
+    // Get key metrics
+    const metrics = await DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT v.voucher_id) as total_orders,
+        SUM(v.total_cost) as total_revenue,
+        AVG(v.total_cost) as avg_order_value,
+        COUNT(DISTINCT v.pass_id) as unique_guests
+      FROM alacarte_vouchers v
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        ${restaurantFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+    `).bind(property_id).first()
+    
+    // Get orders by time of day
+    const ordersByTime = await DB.prepare(`
+      SELECT 
+        CAST(substr(v.reservation_time, 1, 2) AS INTEGER) as hour,
+        COUNT(*) as order_count
+      FROM alacarte_vouchers v
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        ${restaurantFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+      GROUP BY hour
+      ORDER BY hour
+    `).bind(property_id).all()
+    
+    // Get top selling items
+    const topItems = await DB.prepare(`
+      SELECT 
+        m.item_name,
+        m.category,
+        m.cost_to_hotel as price,
+        m.is_premium,
+        COUNT(*) as order_count,
+        SUM(m.cost_to_hotel) as total_revenue
+      FROM alacarte_vouchers v,
+           json_each(v.preorder_item_ids) je
+      JOIN alacarte_menu_items m ON m.item_id = je.value
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        ${restaurantFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+      GROUP BY m.item_id
+      ORDER BY order_count DESC
+      LIMIT 10
+    `).bind(property_id).all()
+    
+    // Get revenue trend (daily)
+    const revenueTrend = await DB.prepare(`
+      SELECT 
+        v.reservation_date as date,
+        COUNT(*) as order_count,
+        SUM(v.total_cost) as revenue
+      FROM alacarte_vouchers v
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        ${restaurantFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+      GROUP BY v.reservation_date
+      ORDER BY v.reservation_date
+    `).bind(property_id).all()
+    
+    // Get popular time slots
+    const popularTime = await DB.prepare(`
+      SELECT 
+        v.reservation_time,
+        COUNT(*) as booking_count
+      FROM alacarte_vouchers v
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        ${restaurantFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+      GROUP BY v.reservation_time
+      ORDER BY booking_count DESC
+      LIMIT 1
+    `).bind(property_id).first()
+    
+    // Get restaurant breakdown
+    const restaurantStats = await DB.prepare(`
+      SELECT 
+        ho.offering_id,
+        ho.title_en as restaurant_name,
+        COUNT(*) as order_count,
+        SUM(v.total_cost) as revenue
+      FROM alacarte_vouchers v
+      JOIN hotel_offerings ho ON v.restaurant_id = ho.offering_id
+      WHERE v.property_id = ?
+        AND v.reservation_date >= ${dateFilter}
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+      GROUP BY v.restaurant_id
+      ORDER BY order_count DESC
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      period,
+      metrics: {
+        total_orders: metrics?.total_orders || 0,
+        total_revenue: metrics?.total_revenue || 0,
+        avg_order_value: metrics?.avg_order_value || 0,
+        unique_guests: metrics?.unique_guests || 0,
+        popular_time: popularTime?.reservation_time || 'N/A'
+      },
+      charts: {
+        top_items: topItems.results || [],
+        revenue_trend: revenueTrend.results || [],
+        orders_by_time: ordersByTime.results || []
+      },
+      restaurants: restaurantStats.results || []
+    })
+  } catch (error) {
+    console.error('Analytics error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to load analytics',
+      details: error.message
+    }, 500)
+  }
+})
+
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
