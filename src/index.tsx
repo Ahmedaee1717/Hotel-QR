@@ -18693,8 +18693,8 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
           COALESCE(ho.title_en, 'Restaurant Reservation') as title,
           COALESCE(ho.location, 'Resort Dining') as location,
           tr.status,
-          tr.party_size_adults + COALESCE(tr.party_size_children, 0) as num_guests,
-          tr.reservation_reference as reference,
+          tr.num_guests,
+          'RES' || SUBSTR('000000' || tr.reservation_id, -6) as reference,
           ho.offering_id as offering_id
         FROM table_reservations tr
         LEFT JOIN dining_sessions ds ON tr.session_id = ds.session_id
