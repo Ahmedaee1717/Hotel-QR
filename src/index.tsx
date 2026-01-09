@@ -64737,7 +64737,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           });
           
           if (response.ok) {
-            console.log('✅ Table deleted');
+            console.log('Table deleted');
             // Remove from local array
             tables = tables.filter(t => t.table_id !== selectedTable.table_id);
             selectedTable = null;
@@ -64765,7 +64765,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             canvas.removeChild(selectedElement);
             floorElements = floorElements.filter(el => el !== selectedElement);
             selectedElement = null;
-            console.log('✅ Floor element deleted');
+            console.log('Floor element deleted');
           }
         } else {
           alert('Please select an element first');
@@ -64783,7 +64783,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         canvas.removeChild(selectedElement);
         floorElements = floorElements.filter(el => el !== selectedElement);
         selectedElement = null;
-        console.log('✅ Wall deleted');
+        console.log('Wall deleted');
       };
       
       // Wall drawing state
@@ -64822,7 +64822,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       window.saveLayout = async function() {
         try {
           // Save all table positions (already saved individually on drag)
-          console.log('✅ Layout saved (table positions auto-saved on drag)');
+          console.log('Layout saved (table positions auto-saved on drag)');
           alert('Layout saved successfully!');
         } catch (error) {
           console.error('❌ Error saving layout:', error);
@@ -64844,7 +64844,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         });
         floorElements = [];
         selectedElement = null;
-        console.log('✅ Canvas cleared (tables preserved)');
+        console.log('Canvas cleared (tables preserved)');
       };
       
       // Add floor element form handler
@@ -64868,7 +64868,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           
           // Reset form
           addElementForm.reset();
-          console.log('✅ Floor element added');
+          console.log('Floor element added');
         });
       }
       
@@ -64945,13 +64945,13 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           }
           selectedElement = element;
           element.style.outline = '3px solid #10B981';
-          console.log('📦 Floor element selected:', label);
+          console.log('Floor element selected:', label);
         };
         
         canvas.appendChild(element);
         floorElements.push(element);
         
-        console.log('✅ Added floor element:', type, label);
+        console.log('Added floor element:', type, label);
       }
       
       // Add keyboard shortcuts for delete
@@ -64977,7 +64977,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           if (!wallStartPoint) {
             // First click - set start point
             wallStartPoint = { x, y };
-            console.log('📍 Wall start point:', wallStartPoint);
+            console.log('Wall start point:', wallStartPoint);
           } else {
             // Second click - draw wall
             const wallStyle = document.getElementById('wallStyle').value;
@@ -65063,13 +65063,13 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           }
           selectedElement = wall;
           wall.style.outline = '2px solid #10B981';
-          console.log('🧱 Wall selected');
+          console.log('Wall selected');
         };
         
         canvas.appendChild(wall);
         floorElements.push(wall);
         
-        console.log('✅ Wall drawn');
+        console.log('Wall drawn');
       }
 
       function renderTables() {
