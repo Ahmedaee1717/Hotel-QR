@@ -64229,10 +64229,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               '</div>' +
               (res.status === 'pending' ? 
                 '<div class="mt-3 flex gap-2">' +
-                  '<button onclick="confirmReservation(\'' + res.reference + '\')" class="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">' +
+                  '<button onclick="confirmReservation(&quot;' + res.reference + '&quot;)" class="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">' +
                     '<i class="fas fa-check mr-1"></i>Confirm' +
                   '</button>' +
-                  '<button onclick="cancelReservation(\'' + res.reference + '\')" class="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700">' +
+                  '<button onclick="cancelReservation(&quot;' + res.reference + '&quot;)" class="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700">' +
                     '<i class="fas fa-times mr-1"></i>Cancel' +
                   '</button>' +
                 '</div>'
@@ -64898,20 +64898,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         element.style.border = '2px solid rgba(255,255,255,0.3)';
         element.style.zIndex = '1';
         
-        // Add emoji based on type
-        const emojis = {
-          buffet: '🍽️',
-          bar: '🍷',
-          kitchen: '🔥',
-          entrance: '🚪',
-          exit: '⬅️',
-          restroom: '🚻',
-          window: '🪟',
-          plant: '🌿',
-          stage: '🎤'
+        // Add icon based on type
+        const icons = {
+          buffet: '[Buffet]',
+          bar: '[Bar]',
+          kitchen: '[Kitchen]',
+          entrance: '[Entrance]',
+          exit: '[Exit]',
+          restroom: '[Restroom]',
+          window: '[Window]',
+          plant: '[Plant]',
+          stage: '[Stage]'
         };
         
-        element.innerHTML = '<div>' + (emojis[type] || '') + '<br>' + label + '</div>';
+        element.innerHTML = '<div>' + (icons[type] || '') + ' ' + label + '</div>';
         
         // Make draggable
         element.onmousedown = function(e) {
