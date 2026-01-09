@@ -67207,6 +67207,13 @@ app.get('/admin/room-service/:offering_id', (c) => {
         const propertyId = localStorage.getItem('property_id') || '1';
         const offeringId = '${offering_id}';
         
+        // Convert H8 to 8 for API calls (database uses numeric IDs)
+        const numericOfferingId = /^[A-Z]/i.test(offeringId) 
+            ? offeringId.substring(1) 
+            : offeringId;
+        
+        console.log('Room Service Menu Management - offeringId:', offeringId, 'numeric:', numericOfferingId);
+        
         // Helper: Convert file to base64
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
@@ -67293,7 +67300,7 @@ app.get('/admin/room-service/:offering_id', (c) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        restaurant_id: offeringId,
+                        restaurant_id: numericOfferingId,
                         images: imageDataArray
                     })
                 });
@@ -67331,7 +67338,7 @@ app.get('/admin/room-service/:offering_id', (c) => {
             list.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-3xl mb-4"></i><p>Loading...</p></div>';
             
             try {
-                const response = await fetchWithAuth('/api/alacarte/menu/' + offeringId);
+                const response = await fetchWithAuth('/api/alacarte/menu/' + numericOfferingId);
                 const data = await response.json();
                 
                 if (data.success && data.menu && data.menu.length > 0) {
