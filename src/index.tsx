@@ -64174,8 +64174,121 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         await loadRestaurant();
         await loadOccupancyStatus();
         await loadTables();  // Load tables for floor plan
+        await loadReservations();  // Load reservations
         console.log('✅ Restaurant Admin init() complete!');
       }
+      
+      // Load reservations for admin
+      window.loadReservations = async function() {
+        try {
+          const filterDate = document.getElementById('filterReservationDate')?.value || '';
+          const filterStatus = document.getElementById('filterStatus')?.value || '';
+          const filterGuest = document.getElementById('filterGuest')?.value || '';
+          
+          let url = '/api/admin/restaurant/reservations?property_id=' + propertyId + '&restaurant_id=' + numericOfferingId;
+          
+          if (filterDate) url += '&date=' + filterDate;
+          if (filterStatus) url += '&status=' + filterStatus;
+          if (filterGuest) url += '&search=' + encodeURIComponent(filterGuest);
+          
+          const response = await fetchWithAuth(url);
+          const data = await response.json();
+          
+          const reservationsList = document.getElementById('reservationsList');
+          if (!reservationsList) return;
+          
+          if (!data.reservations || data.reservations.length === 0) {
+            reservationsList.innerHTML = '<div class="text-center text-gray-500 py-8">No reservations found</div>';
+            return;
+          }
+          
+          reservationsList.innerHTML = data.reservations.map(res => 
+            '<div class="border rounded-lg p-4 hover:bg-gray-50">' +
+              '<div class="flex justify-between items-start mb-2">' +
+                '<div>' +
+                  '<div class="font-bold text-lg">' + (res.guest_name || 'Guest') + '</div>' +
+                  '<div class="text-sm text-gray-600">' + (res.guest_email || '') + '</div>' +
+                '</div>' +
+                '<div class="text-right">' +
+                  '<div class="text-sm font-semibold">' + res.reservation_date + '</div>' +
+                  '<div class="text-sm text-gray-600">' + (res.reservation_time || '') + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="grid grid-cols-2 gap-2 text-sm mt-3">' +
+                '<div><i class="fas fa-users mr-1 text-gray-500"></i>' + (res.party_size_adults || 0) + ' adults' + (res.party_size_children > 0 ? ', ' + res.party_size_children + ' children' : '') + '</div>' +
+                '<div><i class="fas fa-chair mr-1 text-gray-500"></i>Table ' + (res.table_number || res.table_id || 'TBD') + '</div>' +
+              '</div>' +
+              '<div class="mt-3 flex gap-2">' +
+                '<span class="px-3 py-1 text-xs rounded-full ' + (
+                  res.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                  res.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  res.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
+                ) + '">' + (res.status || 'pending') + '</span>' +
+                (res.voucher_reference ? '<span class="px-3 py-1 text-xs rounded-full bg-purple-100 text-purple-800"><i class="fas fa-ticket-alt mr-1"></i>Voucher</span>' : '') +
+              '</div>' +
+              (res.status === 'pending' ? 
+                '<div class="mt-3 flex gap-2">' +
+                  '<button onclick="confirmReservation(\'' + res.reference + '\')" class="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">' +
+                    '<i class="fas fa-check mr-1"></i>Confirm' +
+                  '</button>' +
+                  '<button onclick="cancelReservation(\'' + res.reference + '\')" class="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700">' +
+                    '<i class="fas fa-times mr-1"></i>Cancel' +
+                  '</button>' +
+                '</div>'
+              : '') +
+            '</div>'
+          ).join('');
+          
+          console.log('✅ Loaded', data.reservations.length, 'reservations');
+        } catch (error) {
+          console.error('❌ Error loading reservations:', error);
+          const reservationsList = document.getElementById('reservationsList');
+          if (reservationsList) {
+            reservationsList.innerHTML = '<div class="text-center text-red-500 py-8">Error loading reservations</div>';
+          }
+        }
+      };
+      
+      // Confirm reservation
+      window.confirmReservation = async function(reference) {
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/reservation/' + reference + '/confirm', {
+            method: 'POST'
+          });
+          
+          if (response.ok) {
+            alert('Reservation confirmed!');
+            await loadReservations();
+          } else {
+            alert('Failed to confirm reservation');
+          }
+        } catch (error) {
+          console.error('❌ Error confirming reservation:', error);
+          alert('Error confirming reservation');
+        }
+      };
+      
+      // Cancel reservation
+      window.cancelReservation = async function(reference) {
+        if (!confirm('Cancel this reservation?')) return;
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/reservation/' + reference + '/cancel', {
+            method: 'POST'
+          });
+          
+          if (response.ok) {
+            alert('Reservation cancelled');
+            await loadReservations();
+          } else {
+            alert('Failed to cancel reservation');
+          }
+        } catch (error) {
+          console.error('❌ Error cancelling reservation:', error);
+          alert('Error cancelling reservation');
+        }
+      };
 
       let currentRestaurantData = null;
       
@@ -65213,6 +65326,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         // Initialize translation and menu
         async function initializePage() {
+            // Generate dynamic time slots (30-minute intervals from 6 PM to 10 PM)
+            generateTimeSlots();
+            
             // Populate language selector
             populateLanguageSelector();
             
@@ -65234,6 +65350,43 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             
             // Check eligibility (will fetch fresh data if not in cache)
             checkVoucherEligibility();
+        }
+        
+        // Generate time slots dynamically
+        function generateTimeSlots() {
+            const bookingTimeSelect = document.getElementById('bookingTime');
+            if (!bookingTimeSelect) return;
+            
+            // Clear existing options
+            bookingTimeSelect.innerHTML = '';
+            
+            // Generate time slots from 6 PM (18:00) to 10 PM (22:00) in 30-minute intervals
+            const startHour = 18;
+            const endHour = 22;
+            
+            for (let hour = startHour; hour <= endHour; hour++) {
+                for (let minute of [0, 30]) {
+                    // Skip 22:30 (after 10 PM)
+                    if (hour === endHour && minute === 30) continue;
+                    
+                    const timeValue = hour.toString().padStart(2, '0') + ':' + minute.toString().padStart(2, '0');
+                    const hour12 = hour > 12 ? hour - 12 : hour;
+                    const ampm = hour >= 12 ? 'PM' : 'AM';
+                    const timeLabel = hour12 + ':' + minute.toString().padStart(2, '0') + ' ' + ampm;
+                    
+                    const option = document.createElement('option');
+                    option.value = timeValue;
+                    option.textContent = timeLabel;
+                    bookingTimeSelect.appendChild(option);
+                }
+            }
+            
+            // Set default to 8:00 PM if available
+            if (bookingTimeSelect.querySelector('option[value="20:00"]')) {
+                bookingTimeSelect.value = '20:00';
+            }
+            
+            console.log('✅ Generated time slots');
         }
         
         // Reload tables when date/time/guests change
