@@ -14995,7 +14995,8 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
       display_order,
       alacarte_meals_per_stay,
       alacarte_eligible_restaurants,
-      alacarte_premium_surcharge
+      alacarte_premium_surcharge,
+      alacarte_privileges_message
     } = body
     
     // Verify tier belongs to property
@@ -15021,6 +15022,7 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
           alacarte_meals_per_stay = ?,
           alacarte_eligible_restaurants = ?,
           alacarte_premium_surcharge = ?,
+          alacarte_privileges_message = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE tier_id = ? AND property_id = ?
     `).bind(
@@ -15036,6 +15038,7 @@ app.put('/api/admin/all-inclusive/tiers/:tier_id', async (c) => {
       alacarte_meals_per_stay !== undefined ? alacarte_meals_per_stay : (tier.alacarte_meals_per_stay || 0),
       alacarte_eligible_restaurants !== undefined ? alacarte_eligible_restaurants : tier.alacarte_eligible_restaurants,
       alacarte_premium_surcharge !== undefined ? alacarte_premium_surcharge : (tier.alacarte_premium_surcharge || 0),
+      alacarte_privileges_message !== undefined ? alacarte_privileges_message : tier.alacarte_privileges_message,
       tier_id,
       property_id
     ).run()
@@ -18221,7 +18224,8 @@ app.get('/api/guest/tier-benefits', async (c) => {
         t.daily_upgrade_price,
         t.alacarte_meals_per_stay,
         t.alacarte_eligible_restaurants,
-        t.alacarte_premium_surcharge
+        t.alacarte_premium_surcharge,
+        t.alacarte_privileges_message
       FROM digital_passes p
       LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
       WHERE p.pass_reference = ? AND p.property_id = ? AND p.pass_status = 'active'
@@ -21149,12 +21153,6 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             
                                             <!-- À La Carte Voucher Info -->
                                             <div id="alacarteVoucherInfo" class="hidden mt-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4"></div>
-                                            
-                                            <!-- Ask About Benefits Button -->
-                                            <button onclick="openChatbotWithBenefitsPrompt()" class="mt-4 bg-white/20 backdrop-blur-lg hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center gap-3 border border-white/30">
-                                                <i class="fas fa-comments text-xl"></i>
-                                                <span>Questions About Your Benefits?</span>
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -21165,6 +21163,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                 <button onclick="toggleTierDetails()" class="w-full bg-white/30 backdrop-blur-lg hover:bg-white/40 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 border-2 border-white/50">
                                     <span id="tierToggleText" class="text-base font-bold uppercase tracking-wide">View Full Benefits</span>
                                     <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Ask About Benefits Button (moved below View Details) -->
+                            <div class="relative z-10 mt-3">
+                                <button onclick="openChatbotWithBenefitsPrompt()" class="w-full bg-white/20 backdrop-blur-lg hover:bg-white/30 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition flex items-center justify-center gap-3 border border-white/30">
+                                    <i class="fas fa-comments text-lg"></i>
+                                    <span class="text-sm">Questions About Your Benefits?</span>
                                 </button>
                             </div>
                             
@@ -25410,8 +25416,28 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       '</div>';
                     }).join('');
                     
-                    // Build elegant introduction text for expanded panel
+                    // Build elegant introduction text for expanded panel using custom message
                     const mealText = voucherData.vouchers.remaining === 1 ? 'remaining dining experience' : 'remaining dining experiences';
+                    
+                    // Use custom message from tier settings or fallback to default
+                    const defaultMessage = 'As a valued {tierName} member, you have {remaining} {mealText} included in your stay.\n\nSimply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.';
+                    const customMessage = voucherData.tier.alacarte_privileges_message || defaultMessage;
+                    
+                    // Replace placeholders
+                    const processedMessage = customMessage
+                      .replace(/{remaining}/g, voucherData.vouchers.remaining + ' ' + mealText)
+                      .replace(/{tierName}/g, voucherData.tier.tier_name)
+                      .replace(/{mealText}/g, mealText);
+                    
+                    // Split into paragraphs
+                    const paragraphs = processedMessage.split('\n\n').filter(p => p.trim());
+                    const paragraphsHtml = paragraphs.map(p => 
+                      '<p class="text-gray-700 leading-relaxed mb-3">' + 
+                        p.replace(new RegExp(voucherData.vouchers.remaining + ' ' + mealText, 'g'), 
+                                 '<span class="font-bold text-amber-700">' + voucherData.vouchers.remaining + ' ' + mealText + '</span>') + 
+                      '</p>'
+                    ).join('');
+                    
                     const introText = 
                       '<div class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-6 mb-6 shadow-sm">' +
                         '<div class="flex items-start gap-4">' +
@@ -25420,8 +25446,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                           '</div>' +
                           '<div class="flex-1">' +
                             '<h5 class="text-xl font-bold text-gray-900 mb-2">Your À La Carte Dining Privileges</h5>' +
-                            '<p class="text-gray-700 leading-relaxed mb-3">As a valued ' + voucherData.tier.tier_name + ' member, you have <span class="font-bold text-amber-700">' + voucherData.vouchers.remaining + ' ' + mealText + '</span> included in your stay.</p>' +
-                            '<p class="text-gray-600 text-sm">Simply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.</p>' +
+                            paragraphsHtml +
                           '</div>' +
                         '</div>' +
                       '</div>';
@@ -55184,6 +55209,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<input type="number" name="alacarte_premium_surcharge" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + (tier.alacarte_premium_surcharge || 0) + '" placeholder="0.00">';
         html += '<p class="text-xs text-gray-500 mt-1">Extra charge for premium menu items</p>';
         html += '</div>';
+        html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Custom Dining Privileges Message</label>';
+        html += '<textarea name="alacarte_privileges_message" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="As a valued {tier_name} member, you have {remaining_meals} {meal_text} included in your stay...">' + (tier.alacarte_privileges_message || '') + '</textarea>';
+        html += '<p class="text-xs text-gray-500 mt-1">Use {tier_name}, {remaining_meals}, and {meal_text} as placeholders</p>';
+        html += '</div>';
         html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Eligible Restaurants</label>';
         html += '<div class="space-y-2 mt-2">';
         
@@ -65689,7 +65718,8 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
         t.tier_color,
         t.alacarte_meals_per_stay,
         t.alacarte_eligible_restaurants,
-        t.alacarte_premium_surcharge
+        t.alacarte_premium_surcharge,
+        t.alacarte_privileges_message
       FROM digital_passes dp
       JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
       WHERE dp.pass_reference = ? AND dp.property_id = ?
@@ -65774,7 +65804,8 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
       tier: {
         tier_code: passInfo.tier_code,
         tier_name: passInfo.tier_display_name,
-        tier_color: passInfo.tier_color
+        tier_color: passInfo.tier_color,
+        privileges_message: passInfo.alacarte_privileges_message
       },
       vouchers: {
         total_allowed: mealsAllowed,
