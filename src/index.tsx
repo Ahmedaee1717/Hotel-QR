@@ -64194,7 +64194,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           if (restaurant) {
             currentRestaurantData = restaurant;
             document.getElementById('restaurantName').textContent = restaurant.title_en || restaurant.title;
-            document.title = \`\${restaurant.title_en || restaurant.title} - Restaurant Management\`;
+            document.title = (restaurant.title_en || restaurant.title) + ' - Restaurant Management';
             
             // Populate info form
             document.getElementById('infoTitleEn').value = restaurant.title_en || '';
@@ -64209,7 +64209,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           // Populate restaurant selector
           const selector = document.getElementById('restaurantSelectorHeader');
           selector.innerHTML = restaurants.map(r => 
-            \`<option value="\${r.offering_id}" \${r.offering_id == offeringId ? 'selected' : ''}>\${r.title_en || r.title}</option>\`
+            '<option value="' + r.offering_id + '" ' + (r.offering_id == offeringId ? 'selected' : '') + '>' + (r.title_en || r.title) + '</option>'
           ).join('');
         } catch (error) {
           console.error('Load restaurant error:', error);
@@ -64230,12 +64230,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         images.forEach((img, index) => {
           const div = document.createElement('div');
           div.className = 'relative';
-          div.innerHTML = \`
-            <img src="\${img}" class="w-full h-32 object-cover rounded-lg">
-            <button onclick="removeRestaurantImage(\${index})" class="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs hover:bg-red-700">
-              ×
-            </button>
-          \`;
+          div.innerHTML = '<img src="' + img + '" class="w-full h-32 object-cover rounded-lg">' +
+            '<button onclick="removeRestaurantImage(' + index + ')" class="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs hover:bg-red-700">×</button>';
           container.appendChild(div);
         });
       }
