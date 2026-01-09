@@ -64189,7 +64189,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
-          const restaurant = restaurants.find(o => o.offering_id == offeringId);
+          const restaurant = restaurants.find(o => String(o.offering_id).toUpperCase() == String(offeringId).toUpperCase());
           
           if (restaurant) {
             currentRestaurantData = restaurant;
@@ -64209,7 +64209,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           // Populate restaurant selector
           const selector = document.getElementById('restaurantSelectorHeader');
           selector.innerHTML = restaurants.map(r => 
-            '<option value="' + r.offering_id + '" ' + (r.offering_id == offeringId ? 'selected' : '') + '>' + (r.title_en || r.title) + '</option>'
+            '<option value="' + r.offering_id + '" ' + (String(r.offering_id).toUpperCase() == String(offeringId).toUpperCase() ? 'selected' : '') + '>' + (r.title_en || r.title) + '</option>'
           ).join('');
         } catch (error) {
           console.error('Load restaurant error:', error);
@@ -64394,7 +64394,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         try {
           const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
-          const restaurant = data.offerings?.find(o => o.offering_id == offeringId);
+          const restaurant = data.offerings?.find(o => String(o.offering_id).toUpperCase() == String(offeringId).toUpperCase());
           
           if (restaurant && restaurant.occupancy_status) {
             updateOccupancyUI(restaurant.occupancy_status);
