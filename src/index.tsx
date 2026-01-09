@@ -67105,6 +67105,17 @@ app.get('/room-service/:property_id', async (c) => {
   const { property_id } = c.req.param()
   
   try {
+    // Get property settings for colors
+    const settings = await DB.prepare(`
+      SELECT primary_color, secondary_color, accent_color
+      FROM properties
+      WHERE property_id = ?
+    `).bind(property_id).first()
+    
+    const primaryColor = settings?.primary_color || '#972626';
+    const secondaryColor = settings?.secondary_color || '#6B1529';
+    const accentColor = settings?.accent_color || '#D4AF37';
+    
     // Get room service offering
     const roomService = await DB.prepare(`
       SELECT offering_id, title_en, short_description_en, full_description_en, location, images
@@ -67157,8 +67168,8 @@ app.get('/room-service/:property_id', async (c) => {
     if (Object.keys(grouped).length > 0) {
       Object.keys(grouped).forEach(category => {
         menuHTML += '<div class="bg-white rounded-xl shadow-lg p-6 mb-6">';
-        menuHTML += '<h2 class="text-2xl font-bold text-gray-800 mb-4 capitalize border-b-2 border-purple-200 pb-2">';
-        menuHTML += '<i class="fas fa-utensils text-purple-600 mr-2"></i>' + category + '</h2>';
+        menuHTML += '<h2 class="text-2xl font-bold text-gray-800 mb-4 capitalize pb-2" style="border-bottom: 2px solid ' + accentColor + ';">';
+        menuHTML += '<i class="fas fa-utensils mr-2" style="color: ' + accentColor + ';"></i>' + category + '</h2>';
         menuHTML += '<div class="space-y-4">';
         
         grouped[category].forEach((item: any) => {
@@ -67166,7 +67177,7 @@ app.get('/room-service/:property_id', async (c) => {
           menuHTML += '<div class="flex justify-between items-start mb-2">';
           menuHTML += '<h3 class="text-lg font-semibold text-gray-800">' + item.item_name + '</h3>';
           if (item.is_premium) {
-            menuHTML += '<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold"><i class="fas fa-star mr-1"></i>Premium</span>';
+            menuHTML += '<span class="px-2 py-1 rounded-full text-xs font-semibold" style="background-color: ' + accentColor + '20; color: ' + accentColor + ';"><i class="fas fa-star mr-1"></i>Premium</span>';
           }
           menuHTML += '</div>';
           if (item.description) {
@@ -67198,9 +67209,16 @@ app.get('/room-service/:property_id', async (c) => {
     <title>${roomService.title_en} - Menu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: ${primaryColor};
+            --secondary-color: ${secondaryColor};
+            --accent-color: ${accentColor};
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
-    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-8 px-4">
+    <div class="text-white py-8 px-4" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);">
         <div class="max-w-4xl mx-auto">
             <div class="flex items-center gap-4 mb-4">
                 <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -67221,7 +67239,7 @@ app.get('/room-service/:property_id', async (c) => {
     <div class="max-w-4xl mx-auto px-4 py-8">
         ${menuHTML}
         
-        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-8 text-white text-center mt-8">
+        <div class="rounded-xl shadow-lg p-8 text-white text-center mt-8" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);">
             <h3 class="text-2xl font-bold mb-3">
                 <i class="fas fa-phone-alt mr-2"></i>Ready to Order?
             </h3>
