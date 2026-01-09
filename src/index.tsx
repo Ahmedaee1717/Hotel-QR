@@ -20956,15 +20956,12 @@ app.get('/hotel/:property_slug', async (c) => {
         <div class="flex items-center justify-between gap-6 py-3.5">
             <!-- Left: Welcome Message -->
             <div class="flex items-center gap-3">
-                <div class="w-11 h-11 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                    <i class="fas fa-user text-lg" style="color: #016e8f;"></i>
-                </div>
                 <div class="leading-relaxed">
                     <p class="text-white text-sm font-medium opacity-90">Welcome back,</p>
                     <p class="text-white font-bold text-lg" id="linkedGuestName">Guest</p>
                 </div>
-                <span class="text-white text-sm font-semibold bg-white/25 px-4 py-2 rounded-xl backdrop-blur-sm ml-4 shadow-sm">
-                    <i class="fas fa-door-open mr-2"></i>Room <strong id="linkedRoomNumber" class="text-base">—</strong>
+                <span class="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm ml-3">
+                    <i class="fas fa-door-open mr-1.5 text-xs"></i>Room <strong id="linkedRoomNumber" class="text-xs">—</strong>
                 </span>
             </div>
             
