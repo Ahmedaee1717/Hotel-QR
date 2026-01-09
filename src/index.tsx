@@ -67215,42 +67215,330 @@ app.get('/room-service/:property_id', async (c) => {
             --secondary-color: ${secondaryColor};
             --accent-color: ${accentColor};
         }
+        .translate-item { transition: opacity 0.3s ease; }
+        .translating { opacity: 0.6; }
     </style>
 </head>
 <body class="bg-gray-50">
     <div class="text-white py-8 px-4" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);">
         <div class="max-w-4xl mx-auto">
+            <!-- Back Button + Language Selector -->
+            <div class="flex justify-between items-center mb-4">
+                <a href="/hotel/paradise-resort" class="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg hover:bg-white/30 transition">
+                    <i class="fas fa-arrow-left"></i>
+                    <span class="hidden sm:inline" data-i18n="back">Back to Hotel</span>
+                </a>
+                <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
+                    <!-- Language options will be populated dynamically -->
+                </select>
+            </div>
+            
             <div class="flex items-center gap-4 mb-4">
                 <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                     <i class="fas fa-concierge-bell text-3xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-3xl font-bold">${roomService.title_en}</h1>
-                    <p class="text-white/90">${roomService.short_description_en || 'Order from your room'}</p>
+                    <h1 class="text-3xl font-bold" id="pageTitle">${roomService.title_en}</h1>
+                    <p class="text-white/90" id="pageSubtitle">${roomService.short_description_en || 'Order from your room'}</p>
                 </div>
             </div>
             <div class="flex items-center gap-2 text-white/90">
                 <i class="fas fa-clock"></i>
-                <span>${roomService.full_description_en || '24/7 Service'}</span>
+                <span id="pageHours">${roomService.full_description_en || '24/7 Service'}</span>
             </div>
         </div>
     </div>
 
-    <div class="max-w-4xl mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto px-4 py-8" id="menu-container">
         ${menuHTML}
-        
+    </div>
+    
+    <div class="max-w-4xl mx-auto px-4 pb-8">
         <div class="rounded-xl shadow-lg p-8 text-white text-center mt-8" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);">
             <h3 class="text-2xl font-bold mb-3">
-                <i class="fas fa-phone-alt mr-2"></i>Ready to Order?
+                <i class="fas fa-phone-alt mr-2"></i><span data-i18n="ready-to-order">Ready to Order?</span>
             </h3>
-            <p class="text-lg mb-4">Call us to place your order</p>
+            <p class="text-lg mb-4" data-i18n="call-to-order">Call us to place your order</p>
             <div class="inline-block bg-white/20 backdrop-blur-sm px-8 py-4 rounded-lg">
-                <p class="text-sm text-white/80 mb-1">Dial from your room phone:</p>
+                <p class="text-sm text-white/80 mb-1" data-i18n="dial-from-room">Dial from your room phone:</p>
                 <p class="text-3xl font-bold">0</p>
-                <p class="text-sm text-white/80 mt-1">or call the front desk</p>
+                <p class="text-sm text-white/80 mt-1" data-i18n="or-call-desk">or call the front desk</p>
             </div>
         </div>
     </div>
+    
+    <script>
+        // SUPPORTED_LANGUAGES constant (33 languages)
+        const SUPPORTED_LANGUAGES = {
+          'en': { name: 'English', native: 'English', flag: '🇬🇧' },
+          'ar': { name: 'Arabic', native: 'العربية', flag: '🇸🇦' },
+          'de': { name: 'German', native: 'Deutsch', flag: '🇩🇪' },
+          'ru': { name: 'Russian', native: 'Русский', flag: '🇷🇺' },
+          'pl': { name: 'Polish', native: 'Polski', flag: '🇵🇱' },
+          'it': { name: 'Italian', native: 'Italiano', flag: '🇮🇹' },
+          'fr': { name: 'French', native: 'Français', flag: '🇫🇷' },
+          'cs': { name: 'Czech', native: 'Čeština', flag: '🇨🇿' },
+          'uk': { name: 'Ukrainian', native: 'Українська', flag: '🇺🇦' },
+          'zh': { name: 'Chinese (Simplified)', native: '简体中文', flag: '🇨🇳' },
+          'es': { name: 'Spanish', native: 'Español', flag: '🇪🇸' },
+          'ja': { name: 'Japanese', native: '日本語', flag: '🇯🇵' },
+          'pt': { name: 'Portuguese', native: 'Português', flag: '🇵🇹' },
+          'ko': { name: 'Korean', native: '한국어', flag: '🇰🇷' },
+          'hi': { name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
+          'tr': { name: 'Turkish', native: 'Türkçe', flag: '🇹🇷' },
+          'el': { name: 'Greek', native: 'Ελληνικά', flag: '🇬🇷' },
+          'sv': { name: 'Swedish', native: 'Svenska', flag: '🇸🇪' },
+          'no': { name: 'Norwegian', native: 'Norsk', flag: '🇳🇴' },
+          'da': { name: 'Danish', native: 'Dansk', flag: '🇩🇰' },
+          'ro': { name: 'Romanian', native: 'Română', flag: '🇷🇴' },
+          'hu': { name: 'Hungarian', native: 'Magyar', flag: '🇭🇺' },
+          'fi': { name: 'Finnish', native: 'Suomi', flag: '🇫🇮' },
+          'hr': { name: 'Croatian', native: 'Hrvatski', flag: '🇭🇷' },
+          'sk': { name: 'Slovak', native: 'Slovenčina', flag: '🇸🇰' },
+          'bg': { name: 'Bulgarian', native: 'Български', flag: '🇧🇬' },
+          'sr': { name: 'Serbian', native: 'Српски', flag: '🇷🇸' },
+          'sl': { name: 'Slovenian', native: 'Slovenščina', flag: '🇸🇮' },
+          'th': { name: 'Thai', native: 'ไทย', flag: '🇹🇭' },
+          'id': { name: 'Indonesian', native: 'Bahasa Indonesia', flag: '🇮🇩' },
+          'vi': { name: 'Vietnamese', native: 'Tiếng Việt', flag: '🇻🇳' },
+          'tl': { name: 'Filipino', native: 'Tagalog', flag: '🇵🇭' },
+          'ms': { name: 'Malay', native: 'Bahasa Melayu', flag: '🇲🇾' }
+        };
+        
+        // Static translations for UI elements
+        const TRANSLATIONS = {
+          'back': {
+            'en': 'Back to Hotel',
+            'ar': 'العودة إلى الفندق',
+            'de': 'Zurück zum Hotel',
+            'ru': 'Вернуться в отель',
+            'es': 'Volver al Hotel',
+            'fr': 'Retour à l\\'hôtel',
+            'zh': '返回酒店',
+            'ja': 'ホテルに戻る',
+            'it': 'Torna all\\'hotel',
+            'pt': 'Voltar ao Hotel',
+            'ko': '호텔로 돌아가기'
+          },
+          'ready-to-order': {
+            'en': 'Ready to Order?',
+            'ar': 'هل أنت جاهز للطلب؟',
+            'de': 'Bereit zu bestellen?',
+            'ru': 'Готовы заказать?',
+            'es': '¿Listo para ordenar?',
+            'fr': 'Prêt à commander?',
+            'zh': '准备点餐了吗？',
+            'ja': '注文の準備はできましたか？',
+            'it': 'Pronto per ordinare?',
+            'pt': 'Pronto para pedir?',
+            'ko': '주문할 준비가 되셨나요?'
+          },
+          'call-to-order': {
+            'en': 'Call us to place your order',
+            'ar': 'اتصل بنا لتقديم طلبك',
+            'de': 'Rufen Sie uns an, um zu bestellen',
+            'ru': 'Позвоните нам, чтобы сделать заказ',
+            'es': 'Llámenos para hacer su pedido',
+            'fr': 'Appelez-nous pour passer votre commande',
+            'zh': '致电我们下单',
+            'ja': 'ご注文は電話でお願いします',
+            'it': 'Chiamaci per effettuare l\\'ordine',
+            'pt': 'Ligue para fazer seu pedido',
+            'ko': '주문하려면 전화하세요'
+          },
+          'dial-from-room': {
+            'en': 'Dial from your room phone:',
+            'ar': 'اتصل من هاتف الغرفة:',
+            'de': 'Wählen Sie vom Zimmertelefon:',
+            'ru': 'Наберите с телефона в номере:',
+            'es': 'Marque desde el teléfono de su habitación:',
+            'fr': 'Composez depuis le téléphone de votre chambre:',
+            'zh': '从房间电话拨打：',
+            'ja': '客室の電話からダイヤル：',
+            'it': 'Componi dal telefono della camera:',
+            'pt': 'Disque do telefone do quarto:',
+            'ko': '객실 전화에서 다이얼：'
+          },
+          'or-call-desk': {
+            'en': 'or call the front desk',
+            'ar': 'أو اتصل بمكتب الاستقبال',
+            'de': 'oder rufen Sie die Rezeption an',
+            'ru': 'или позвоните на ресепшн',
+            'es': 'o llame a la recepción',
+            'fr': 'ou appelez la réception',
+            'zh': '或致电前台',
+            'ja': 'またはフロントに電話',
+            'it': 'o chiama la reception',
+            'pt': 'ou ligue para a recepção',
+            'ko': '또는 프런트 데스크로 전화하세요'
+          }
+        };
+        
+        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        let menuItems = ${JSON.stringify(menuItems.results || [])};
+        
+        // Populate language selector
+        function populateLanguageSelector() {
+            const selector = document.getElementById('languageSelector');
+            if (!selector) return;
+            
+            selector.innerHTML = '';
+            Object.keys(SUPPORTED_LANGUAGES).forEach(code => {
+                const lang = SUPPORTED_LANGUAGES[code];
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = lang.flag + ' ' + lang.native;
+                selector.appendChild(option);
+            });
+            selector.value = currentLanguage;
+        }
+        
+        // Change language handler
+        function changeLanguage() {
+            const selector = document.getElementById('languageSelector');
+            const newLang = selector.value;
+            
+            console.log('🌐 Changing language to:', newLang);
+            localStorage.setItem('preferredLanguage', newLang);
+            currentLanguage = newLang;
+            
+            // Translate static UI elements
+            translateStaticUI(newLang);
+            
+            // Translate menu items dynamically
+            translateMenuItems(newLang);
+        }
+        
+        // Translate static UI elements using predefined translations
+        function translateStaticUI(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (TRANSLATIONS[key] && TRANSLATIONS[key][lang]) {
+                    element.textContent = TRANSLATIONS[key][lang];
+                }
+            });
+        }
+        
+        // Translate menu items using Google Translate API (client-side)
+        async function translateMenuItems(targetLang) {
+            if (targetLang === 'en') {
+                // Reset to original English
+                renderMenuItems(menuItems);
+                return;
+            }
+            
+            console.log('🔄 Translating menu items to:', targetLang);
+            
+            // Show loading state
+            document.querySelectorAll('.translate-item').forEach(el => {
+                el.classList.add('translating');
+            });
+            
+            try {
+                // Collect all texts to translate
+                const textsToTranslate = [];
+                menuItems.forEach(item => {
+                    textsToTranslate.push(item.item_name);
+                    if (item.description) textsToTranslate.push(item.description);
+                });
+                
+                // Call translation API
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        texts: textsToTranslate,
+                        targetLang: targetLang
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Translation failed');
+                }
+                
+                const data = await response.json();
+                const translated = data.translations;
+                
+                // Map translations back to menu items
+                let index = 0;
+                const translatedItems = menuItems.map(item => {
+                    const translatedItem = { ...item };
+                    translatedItem.item_name = translated[index++] || item.item_name;
+                    if (item.description) {
+                        translatedItem.description = translated[index++] || item.description;
+                    }
+                    return translatedItem;
+                });
+                
+                // Re-render menu with translated items
+                renderMenuItems(translatedItems);
+                
+            } catch (error) {
+                console.error('Translation error:', error);
+                alert('Translation service temporarily unavailable');
+            } finally {
+                // Remove loading state
+                document.querySelectorAll('.translate-item').forEach(el => {
+                    el.classList.remove('translating');
+                });
+            }
+        }
+        
+        // Render menu items
+        function renderMenuItems(items) {
+            const container = document.getElementById('menu-container');
+            if (!container) return;
+            
+            // Group by category
+            const grouped = {};
+            items.forEach(item => {
+                if (!grouped[item.category]) grouped[item.category] = [];
+                grouped[item.category].push(item);
+            });
+            
+            let html = '';
+            Object.keys(grouped).forEach(category => {
+                html += '<div class="bg-white rounded-xl shadow-lg p-6 mb-6 translate-item">';
+                html += '<h2 class="text-2xl font-bold text-gray-800 mb-4 capitalize pb-2" style="border-bottom: 2px solid var(--accent-color);">';
+                html += '<i class="fas fa-utensils mr-2" style="color: var(--accent-color);"></i>' + category + '</h2>';
+                html += '<div class="space-y-4">';
+                
+                grouped[category].forEach(item => {
+                    html += '<div class="border-b border-gray-100 pb-4 last:border-0">';
+                    html += '<div class="flex justify-between items-start mb-2">';
+                    html += '<h3 class="text-lg font-semibold text-gray-800">' + item.item_name + '</h3>';
+                    if (item.is_premium) {
+                        html += '<span class="px-2 py-1 rounded-full text-xs font-semibold" style="background-color: var(--accent-color); opacity: 0.2;"><i class="fas fa-star mr-1"></i>Premium</span>';
+                    }
+                    html += '</div>';
+                    if (item.description) {
+                        html += '<p class="text-gray-600 text-sm mb-2">' + item.description + '</p>';
+                    }
+                    if (item.allergens) {
+                        html += '<p class="text-xs text-orange-600"><i class="fas fa-exclamation-triangle mr-1"></i>Allergens: ' + item.allergens + '</p>';
+                    }
+                    html += '</div>';
+                });
+                
+                html += '</div></div>';
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            populateLanguageSelector();
+            translateStaticUI(currentLanguage);
+            
+            if (currentLanguage !== 'en') {
+                translateMenuItems(currentLanguage);
+            }
+        });
+        
+        // Make changeLanguage globally available
+        window.changeLanguage = changeLanguage;
+    </script>
 </body>
 </html>
     `;
