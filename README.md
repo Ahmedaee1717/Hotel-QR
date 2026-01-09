@@ -4,12 +4,12 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://222f4961.project-c8738f5c.pages.dev 🚀 **SENIOR-FRIENDLY UI!**
-**Admin Dashboard:** https://222f4961.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
+**Production:** https://ab56c171.project-c8738f5c.pages.dev 🚀 **COMPACT + CLEAR!**
+**Admin Dashboard:** https://ab56c171.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
-**Analytics Dashboard:** https://222f4961.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
-**Kitchen View:** https://222f4961.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
-**Test Guest Page:** https://222f4961.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **✅ BIG TEXT - EASY TO READ**
+**Analytics Dashboard:** https://ab56c171.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
+**Kitchen View:** https://ab56c171.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
+**Test Guest Page:** https://ab56c171.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **✅ 50% SMALLER HEADER**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
