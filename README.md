@@ -4,10 +4,10 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://9d1fc604.project-c8738f5c.pages.dev ✅ **ALL FEATURES WORKING!**
-**Admin Dashboard:** https://9d1fc604.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️
-**Restaurant Admin (LA Cucina):** https://9d1fc604.project-c8738f5c.pages.dev/admin/restaurant/h2 🍽️ ✅ **COMPLETE FLOOR PLAN EDITOR!**
-**Guest Booking (LA Cucina):** https://9d1fc604.project-c8738f5c.pages.dev/alacarte/book/2?property=1 📋 ✅ **DYNAMIC TIMES + MENUS!**
+**Production:** https://b297a794.project-c8738f5c.pages.dev ✅ **ALL FEATURES WORKING!**
+**Admin Dashboard:** https://b297a794.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️
+**Restaurant Admin (LA Cucina):** https://b297a794.project-c8738f5c.pages.dev/admin/restaurant/h2 🍽️ ✅ **FLOOR PLAN + RESERVATIONS WORKING!**
+**Guest Booking (LA Cucina):** https://b297a794.project-c8738f5c.pages.dev/alacarte/book/2?property=1 📋 ✅ **DYNAMIC TIMES + MENUS!**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
 **Analytics Dashboard:** https://db7cd5dc.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
 **Kitchen View:** https://db7cd5dc.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
