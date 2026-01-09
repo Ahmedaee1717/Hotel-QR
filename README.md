@@ -4,17 +4,17 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://82528de2.project-c8738f5c.pages.dev 🚀 **BRACES BALANCED - NO SYNTAX ERRORS**
-**Admin Dashboard:** https://74e8f0a1.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
+**Production:** https://db7cd5dc.project-c8738f5c.pages.dev 🚀 **BRACES BALANCED - NO SYNTAX ERRORS**
+**Admin Dashboard:** https://db7cd5dc.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
-**Analytics Dashboard:** https://74e8f0a1.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
-**Kitchen View:** https://74e8f0a1.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
-**Test Guest Page:** https://74e8f0a1.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **✅ HARMONIOUS SPACING**
-**My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
-**My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
-**Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
-**Beach Booking:** https://08a476de.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
-**Admin Dashboard:** https://08a476de.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
+**Analytics Dashboard:** https://db7cd5dc.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
+**Kitchen View:** https://db7cd5dc.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
+**Test Guest Page:** https://db7cd5dc.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **✅ HARMONIOUS SPACING**
+**My Perfect Week:** https://db7cd5dc.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
+**My Bookings:** https://db7cd5dc.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
+**Mood Check:** https://db7cd5dc.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
+**Beach Booking:** https://db7cd5dc.project-c8738f5c.pages.dev/beach-booking/1 🏖️ **Auto-fills from OnePass!**
+**Admin Dashboard:** https://db7cd5dc.project-c8738f5c.pages.dev/admin-login.html (admin@paradiseresort.com / paradise2024)
 
 ### Quick Test Links
 
@@ -210,7 +210,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 7. **Gamification Ready** - Foundation for future gamified tiers and rewards
 
 **Marketing Page:**
-- ✅ **Stunning Tri-Method Showcase** - https://6f3a72cd.project-c8738f5c.pages.dev/face-scan-feature
+- ✅ **Stunning Tri-Method Showcase** - https://db7cd5dc.project-c8738f5c.pages.dev/face-scan-feature
 - ✅ **Professional Enterprise Design** - Clean navy-teal palette, subtle animations, B2B messaging
 - ✅ **"The Last Wristband You'll Ever Buy"** - Genius headline for management-focused messaging
 - Features: Animated hero section, 3D card effects, gradient backgrounds, floating elements
@@ -423,7 +423,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 **THE SOLUTION:** A comprehensive, mobile-friendly page showing ALL confirmed bookings in one place with filtering, stats, and beautiful design!
 
-**Live URL:** https://25363714.project-c8738f5c.pages.dev/my-bookings?property=1
+**Live URL:** https://db7cd5dc.project-c8738f5c.pages.dev/my-bookings?property=1
 
 **Key Features:**
 - ✅ **Shows ALL Bookings** - Activities, restaurants, beach, spa, events in one dashboard
@@ -544,7 +544,7 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 **THE GAME-CHANGER:** Catch unhappy guests BEFORE they check out and leave negative reviews - saving ~$15,000/month per prevented bad review!
 
-**Live URL:** https://bbcea11e.project-c8738f5c.pages.dev/mood-check?property=1
+**Live URL:** https://db7cd5dc.project-c8738f5c.pages.dev/mood-check?property=1
 
 **Core Problem:**
 - **Negative reviews cost hotels $15,494 per review per month** (average across 30-50 room properties)
@@ -784,7 +784,7 @@ npx wrangler d1 migrations apply webapp-production          # For production
 
 **Testing Instructions:**
 ```
-1. Go to: https://bbcea11e.project-c8738f5c.pages.dev/hotel/paradise-resort
+1. Go to: https://db7cd5dc.project-c8738f5c.pages.dev/hotel/paradise-resort
 2. Enter PIN: 123456 (Alia's pass, Room 12)
 3. Wait 2 seconds → Mood check modal appears
 4. Click 😊 Great! → See positive feedback flow
@@ -1037,7 +1037,7 @@ GET  /api/hotel-offerings/:property_id        - Browse all offerings
 - **From Booking**: "Add to My Week" button (future)
 
 **Test It Now:**
-1. Go to: https://6f3a72cd.project-c8738f5c.pages.dev/hotel/paradise-resort
+1. Go to: https://db7cd5dc.project-c8738f5c.pages.dev/hotel/paradise-resort
 2. Enter PIN: `123456`
 3. Click "My Week" button
 4. Click any "Quick Add" button or "Add activity"
@@ -1375,7 +1375,7 @@ Enable staff to verify digital passes using NFC technology for contactless, inst
 
 **For users with iPhones or without NFC hardware**, we provide a complete NFC testing simulator:
 
-**Access:** `https://6f3a72cd.project-c8738f5c.pages.dev/nfc-test-simulator`
+**Access:** `https://db7cd5dc.project-c8738f5c.pages.dev/nfc-test-simulator`
 
 **Features:**
 - ✅ **Works on ANY device** - iPhone, iPad, Mac, PC, Android
