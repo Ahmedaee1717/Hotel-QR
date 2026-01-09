@@ -64975,14 +64975,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             tabsContainer.innerHTML = sortedCategories.map((category, index) => {
                 const config = categoryConfig[category];
                 const isFirst = index === 0;
-                return `
-                    <button 
-                        onclick="showMenuCategory('${category}')" 
-                        class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ${isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600'}"
-                    >
-                        ${config.emoji} <span data-i18n="${config.i18n}">${config.label}</span>
-                    </button>
-                `;
+                const activeClass = isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600';
+                return '<button onclick="showMenuCategory(\\'' + category + '\\')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span data-i18n="' + config.i18n + '">' + config.label + '</span></button>';
             }).join('');
             
             // Show first category by default
