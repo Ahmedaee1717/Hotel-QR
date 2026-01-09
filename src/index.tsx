@@ -59836,6 +59836,18 @@ app.get('/admin-alacarte-viewer.html', async (c) => {
   }
 })
 
+// Feedback form page route
+app.get('/feedback/:form_id', async (c) => {
+  try {
+    const url = new URL(c.req.url)
+    url.pathname = '/feedback.html'
+    const response = await c.env.ASSETS.fetch(url.toString())
+    return response
+  } catch {
+    return c.notFound()
+  }
+})
+
 app.get('/:property_slug?', async (c) => {
   const { DB } = c.env
   const property_slug = c.req.param('property_slug') || 'paradise-resort'
