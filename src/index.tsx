@@ -64185,7 +64185,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const filterStatus = document.getElementById('filterStatus')?.value || '';
           const filterGuest = document.getElementById('filterGuest')?.value || '';
           
-          let url = '/api/admin/restaurant/reservations?property_id=' + propertyId + '&restaurant_id=' + numericOfferingId;
+          let url = '/api/admin/restaurant/reservations?property_id=' + propertyId + '&offering_id=' + numericOfferingId;
           
           if (filterDate) url += '&date=' + filterDate;
           if (filterStatus) url += '&status=' + filterStatus;
