@@ -20953,30 +20953,34 @@ app.get('/hotel/:property_slug', async (c) => {
 </div>
 <div id="passLinkBarLinked" class="hidden pass-link-bar py-3">
     <div class="max-w-7xl mx-auto px-4">
-        <div class="flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-check text-sm" style="color: #016e8f;"></i>
+        <div class="flex flex-col gap-3 py-3">
+            <!-- Top Row: Welcome Message -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-user text-lg" style="color: #016e8f;"></i>
+                    </div>
+                    <div>
+                        <p class="text-white text-base font-medium">Welcome back,</p>
+                        <p class="text-white font-bold text-xl" id="linkedGuestName">Guest</p>
+                    </div>
                 </div>
-                <div class="min-w-0">
-                    <p class="text-white text-sm opacity-80">Welcome back,</p>
-                    <p class="text-white font-bold text-lg truncate" id="linkedGuestName">Guest</p>
-                </div>
-                <div class="pass-linked-badge px-3 py-1 rounded-full text-white text-xs font-semibold flex items-center gap-1 flex-shrink-0">
-                    <i class="fas fa-check-circle"></i><span class="hidden sm:inline">Pass Linked</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
-                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #10B981;">
-                    <i class="fas fa-clipboard-check mr-1"></i><span class="hidden sm:inline">My Bookings</span><span class="sm:hidden">📋</span>
-                </a>
-                <a href="#" id="viewPassButton" class="pass-link-button px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap">
-                    <i class="fas fa-id-card mr-1"></i><span class="hidden sm:inline">My Pass</span><span class="sm:hidden">Pass</span>
-                </a>
-                <button onclick="unlinkGuestPass()" class="text-white hover:text-gray-200 transition-colors p-2" title="Unlink pass">
-                    <i class="fas fa-times text-xl"></i>
+                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-3 rounded-lg" title="Sign out">
+                    <i class="fas fa-sign-out-alt text-xl"></i>
                 </button>
+            </div>
+            
+            <!-- Bottom Row: Action Buttons -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-white text-base font-medium bg-white/20 px-4 py-2 rounded-lg backdrop-blur-sm">
+                    <i class="fas fa-door-open mr-2"></i>Room <strong id="linkedRoomNumber" class="text-lg">—</strong>
+                </span>
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-lg font-bold text-base whitespace-nowrap transition-all shadow-md">
+                    <i class="fas fa-clipboard-list mr-2"></i>My Bookings
+                </a>
+                <a href="#" id="viewPassButton" class="pass-link-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-base whitespace-nowrap transition-all shadow-md">
+                    <i class="fas fa-id-card mr-2"></i>My Pass
+                </a>
             </div>
         </div>
     </div>
