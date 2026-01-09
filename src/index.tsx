@@ -66502,7 +66502,7 @@ app.get('/api/alacarte/menu/:restaurant_id', async (c) => {
     const restaurant = await DB.prepare(`
       SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar
       FROM hotel_offerings
-      WHERE offering_id = ? AND property_id = ? AND offering_type = 'restaurant'
+      WHERE offering_id = ? AND property_id = ? AND offering_type IN ('restaurant', 'room_service')
     `).bind(restaurant_id, property_id).first()
 
     if (!restaurant) {
