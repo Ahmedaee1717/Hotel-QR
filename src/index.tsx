@@ -20968,9 +20968,6 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span class="text-white text-sm hidden md:inline opacity-80">Room <strong id="linkedRoomNumber">—</strong></span>
-                <a href="#" id="myWeekButton" onclick="goToMyWeek(); return false;" class="text-white px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #8B5CF6;">
-                    <i class="fas fa-calendar-week mr-1"></i><span class="hidden sm:inline">My Week</span><span class="sm:hidden">🗓️</span>
-                </a>
                 <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-colors" style="background-color: #10B981;">
                     <i class="fas fa-clipboard-check mr-1"></i><span class="hidden sm:inline">My Bookings</span><span class="sm:hidden">📋</span>
                 </a>
