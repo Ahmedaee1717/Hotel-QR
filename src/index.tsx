@@ -25378,15 +25378,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   
                   // Check if guest has remaining meals
                   if (voucherData.eligible && voucherData.vouchers.remaining > 0) {
-                    // Show ONLY meal count in the summary card (always visible)
-                    voucherInfo.innerHTML = 
-                      '<div class="flex items-center gap-3">' +
-                        '<i class="fas fa-ticket-alt text-white text-2xl"></i>' +
-                        '<div class="text-white">' +
-                          '<div class="text-xl font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
-                          '<div class="text-xs text-white/80">À la carte dining included</div>' +
-                        '</div>' +
-                      '</div>';
+                    // Hide the voucher info box - we'll show the info in the expanded panel instead
+                    voucherInfo.classList.add('hidden');
                     
                     // Build restaurant cards for the EXPANDED panel
                     // Get property primary color for button
@@ -25417,20 +25410,44 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       '</div>';
                     }).join('');
                     
-                    // Store restaurant cards for when panel expands
-                    window.alacarteRestaurantCards = restaurantCards;
-                    console.log('✅ À la carte voucher info displayed!');
-                  } else {
-                    // Show "All meals used" message
-                    voucherInfo.innerHTML = 
-                      '<div class="flex items-center gap-3">' +
-                        '<i class="fas fa-utensils text-white/60 text-2xl"></i>' +
-                        '<div class="text-white">' +
-                          '<div class="text-xl font-bold">' + voucherData.vouchers.used + ' of ' + voucherData.vouchers.total_allowed + ' Meals Used</div>' +
-                          '<div class="text-xs text-white/80">All à la carte meals used this stay</div>' +
+                    // Build elegant introduction text for expanded panel
+                    const mealText = voucherData.vouchers.remaining === 1 ? 'remaining dining experience' : 'remaining dining experiences';
+                    const introText = 
+                      '<div class="bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-amber-400 rounded-lg p-6 mb-6 shadow-sm">' +
+                        '<div class="flex items-start gap-4">' +
+                          '<div class="bg-amber-500 text-white rounded-full p-3 text-2xl">' +
+                            '<i class="fas fa-concierge-bell"></i>' +
+                          '</div>' +
+                          '<div class="flex-1">' +
+                            '<h5 class="text-xl font-bold text-gray-900 mb-2">Your À La Carte Dining Privileges</h5>' +
+                            '<p class="text-gray-700 leading-relaxed mb-3">As a valued ' + voucherData.tier.tier_name + ' member, you have <span class="font-bold text-amber-700">' + voucherData.vouchers.remaining + ' ' + mealText + '</span> included in your stay.</p>' +
+                            '<p class="text-gray-600 text-sm">Simply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.</p>' +
+                          '</div>' +
                         '</div>' +
                       '</div>';
-                    window.alacarteRestaurantCards = '';
+                    
+                    // Store intro + restaurant cards for when panel expands
+                    window.alacarteRestaurantCards = introText + restaurantCards;
+                    console.log('✅ À la carte voucher info displayed!');
+                  } else {
+                    // All meals used - show elegant message in expanded panel
+                    voucherInfo.classList.add('hidden');
+                    
+                    const allUsedText = 
+                      '<div class="bg-gradient-to-br from-slate-50 to-gray-50 border-l-4 border-slate-400 rounded-lg p-6 mb-6 shadow-sm">' +
+                        '<div class="flex items-start gap-4">' +
+                          '<div class="bg-slate-400 text-white rounded-full p-3 text-2xl">' +
+                            '<i class="fas fa-check-circle"></i>' +
+                          '</div>' +
+                          '<div class="flex-1">' +
+                            '<h5 class="text-xl font-bold text-gray-900 mb-2">À La Carte Dining</h5>' +
+                            '<p class="text-gray-700 leading-relaxed mb-2">You have enjoyed all <span class="font-bold text-slate-700">' + voucherData.vouchers.total_allowed + ' dining experiences</span> included in your ' + voucherData.tier.tier_name + ' package.</p>' +
+                            '<p class="text-gray-600 text-sm">We hope you savored every moment. Additional reservations can be made at standard rates.</p>' +
+                          '</div>' +
+                        '</div>' +
+                      '</div>';
+                    
+                    window.alacarteRestaurantCards = allUsedText;
                     console.log('ℹ️ All meals used: ' + voucherData.vouchers.used + ' of ' + voucherData.vouchers.total_allowed);
                   }
                 } else {
