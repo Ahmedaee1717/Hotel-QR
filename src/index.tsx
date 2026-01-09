@@ -64138,9 +64138,17 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     </div>
 
     <script>
-      const offeringId = '${offering_id}';
+      const offeringId = '${offering_id}';  // Can be 'h2', 'H2', or '2'
       const propertyId = localStorage.getItem('property_id') || '1';
       const userId = localStorage.getItem('user_id') || '1';
+      
+      // Convert offering_id to numeric for API calls
+      // h2 -> 2, H10 -> 10, 2 -> 2
+      const numericOfferingId = /^[hH]/.test(offeringId) 
+        ? offeringId.substring(1) 
+        : offeringId;
+      
+      console.log('Admin page: offeringId=' + offeringId + ', numeric=' + numericOfferingId);
       
       // Authenticated fetch helper
       async function fetchWithAuth(url, options = {}) {
@@ -64421,8 +64429,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadTables() {
         try {
-          const actualOfferingId = currentRestaurantData?.offering_id || offeringId.toUpperCase();
-          const response = await fetchWithAuth('/api/restaurant/' + actualOfferingId + '/tables');
+          // Use numeric offering ID for API calls
+          const response = await fetchWithAuth('/api/restaurant/' + numericOfferingId + '/tables');
           const data = await response.json();
           tables = data.tables || [];
           renderTables();
@@ -64731,9 +64739,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 })
 app.get('/alacarte/book/:restaurant_id', async (c) => {
   const { DB } = c.env
-  const restaurant_id = c.req.param('restaurant_id')
+  const restaurant_id_param = c.req.param('restaurant_id')
   const property_id = c.req.query('property') || '1'
   const pass_reference = c.req.query('pass') || null
+  
+  // Handle both prefixed (H2, H10) and numeric (2, 10) restaurant IDs
+  const isNumeric = /^\d+$/.test(restaurant_id_param)
+  const offering_id = isNumeric ? parseInt(restaurant_id_param, 10) : parseInt(restaurant_id_param.substring(1), 10)
+  const restaurant_id = offering_id  // For menu queries (always numeric)
+  
+  console.log(`🍽️ Booking route: param=${restaurant_id_param}, offering_id=${offering_id}, restaurant_id=${restaurant_id}`)
   
   try {
     // Get property colors and slug
@@ -64757,13 +64772,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
       `).bind(pass_reference, property_id).first()
     }
     
-    // Get restaurant info
+    // Get restaurant info using numeric offering_id
     const restaurant = await DB.prepare(`
       SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar,
              full_description_en, location, capacity_per_slot
       FROM hotel_offerings
       WHERE offering_id = ? AND property_id = ?
-    `).bind(restaurant_id, property_id).first()
+    `).bind(offering_id, property_id).first()
     
     if (!restaurant) {
       return c.html('<h1>Restaurant not found</h1>', 404)
@@ -64871,20 +64886,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
             <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
             
-            <!-- Category Tabs -->
-            <div class="flex space-x-2 mb-6 border-b overflow-x-auto">
-                <button onclick="showMenuCategory('salad')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-primary text-primary">
-                    🥗 <span data-i18n="salads">Salads</span>
-                </button>
-                <button onclick="showMenuCategory('starter')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🍤 <span data-i18n="starters">Starters</span>
-                </button>
-                <button onclick="showMenuCategory('main')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🥩 <span data-i18n="mains">Mains</span>
-                </button>
-                <button onclick="showMenuCategory('dessert')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 border-transparent text-gray-600">
-                    🍰 <span data-i18n="desserts">Desserts</span>
-                </button>
+            <!-- Category Tabs (Dynamic) -->
+            <div id="menuTabs" class="flex space-x-2 mb-6 border-b overflow-x-auto">
+                <!-- Tabs will be dynamically generated from actual menu data -->
             </div>
 
             <!-- Menu Items -->
@@ -64946,6 +64950,46 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let selectedTableId = null;
         let selectedTableNumber = null;
         let availableTables = [];
+        
+        // Get unique categories from actual menu data
+        const availableCategories = [...new Set(menuData.map(item => item.category))].filter(Boolean);
+        console.log('🍽️ Available menu categories:', availableCategories);
+        
+        // Category display configuration
+        const categoryConfig = {
+            'salad': { emoji: '🥗', label: 'Salads', i18n: 'salads', order: 1 },
+            'starter': { emoji: '🍤', label: 'Starters', i18n: 'starters', order: 2 },
+            'main': { emoji: '🥩', label: 'Mains', i18n: 'mains', order: 3 },
+            'dessert': { emoji: '🍰', label: 'Desserts', i18n: 'desserts', order: 4 }
+        };
+        
+        // Generate dynamic category tabs
+        function generateMenuTabs() {
+            const tabsContainer = document.getElementById('menuTabs');
+            if (!tabsContainer) return;
+            
+            const sortedCategories = availableCategories
+                .filter(cat => categoryConfig[cat])
+                .sort((a, b) => (categoryConfig[a]?.order || 999) - (categoryConfig[b]?.order || 999));
+            
+            tabsContainer.innerHTML = sortedCategories.map((category, index) => {
+                const config = categoryConfig[category];
+                const isFirst = index === 0;
+                return `
+                    <button 
+                        onclick="showMenuCategory('${category}')" 
+                        class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ${isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600'}"
+                    >
+                        ${config.emoji} <span data-i18n="${config.i18n}">${config.label}</span>
+                    </button>
+                `;
+            }).join('');
+            
+            // Show first category by default
+            if (sortedCategories.length > 0) {
+                showMenuCategory(sortedCategories[0]);
+            }
+        }
         
         // Load voucher eligibility from localStorage if available
         const storageKey = 'voucherEligibility_' + (passReference || 'guest');
@@ -65601,8 +65645,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 await displayVoucherStatus();
             }
             
-            // Show first category AFTER translation
-            await showMenuCategory('salad');
+            // Generate dynamic menu tabs based on actual menu data
+            generateMenuTabs();
             
             // Load tables
             await loadTables();
