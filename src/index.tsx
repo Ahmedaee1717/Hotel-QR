@@ -7345,54 +7345,63 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     
+    // Convert property_id to integer for database query
+    const propertyIdInt = parseInt(property_id, 10);
+    
     // Extract source table and original ID from prefixed offering_id
-    // Format: H10 -> hotel table, ID 10 | A5 -> activity table, ID 5
+    // Format: H10 -> hotel_offerings ID 10 | A5 -> activity ID 5
     const prefix = offering_id.charAt(0).toUpperCase();
-    const originalId = parseInt(offering_id.substring(1), 10); // Convert to integer
+    const originalId = parseInt(offering_id.substring(1), 10);
+    const sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activity';
     
-    console.log(`UPDATE request for ${offering_id} -> prefix: ${prefix}, originalId: ${originalId} (int), property: ${property_id}`);
+    console.log(`PUT ${offering_id}: table=${sourceTable}, id=${originalId}, property=${propertyIdInt}`);
     
-    // Query hotel_offerings table (restaurants are stored there)
-    const offering = await DB.prepare(`
-      SELECT offering_id, property_id, title_en FROM hotel_offerings WHERE offering_id = ?
+    // Validate offering exists and belongs to property
+    // First try without property filter to see if record exists
+    const offeringTest = await DB.prepare(`
+      SELECT offering_id, property_id, title_en FROM ${sourceTable} WHERE offering_id = ?
     `).bind(originalId).first()
     
-    // DEBUG: Return what we found
-    return c.json({ 
-      debug: true,
-      searchedFor: originalId,
-      searchedForType: typeof originalId,
-      property_id_from_header: property_id,
-      offering: offering,
-      message: offering ? 'Found' : 'Not found'
-    });
+    console.log(`Test query (no property filter): offering_id=${originalId}, result:`, offeringTest);
     
-    // Update restaurant menus if provided
-    if (data.offering_type === 'restaurant' && data.menu_urls !== undefined) {
-      // Delete existing menus
-      await DB.prepare(`
-        DELETE FROM restaurant_menus WHERE offering_id = ?
-      `).bind(offering_id).run()
-      
-      // Insert new menus
-      if (data.menu_urls && data.menu_urls.length > 0) {
-        for (let i = 0; i < data.menu_urls.length; i++) {
-          const menuUrl = data.menu_urls[i].trim()
-          if (menuUrl) {
-            await DB.prepare(`
-              INSERT INTO restaurant_menus (
-                offering_id, menu_name, menu_url, menu_type, display_order, is_active
-              ) VALUES (?, ?, ?, 'full', ?, 1)
-            `).bind(offering_id, 'Menu ' + (i + 1), menuUrl, i).run()
-          }
-        }
-      }
+    // Now with property filter
+    const offering = await DB.prepare(`
+      SELECT offering_id, property_id FROM ${sourceTable} 
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(originalId, propertyIdInt).first()
+    
+    console.log(`Query result:`, offering, `| Types: id=${typeof originalId}, prop=${typeof propertyIdInt}`);
+    
+    if (!offering) {
+      console.error(`Not found: ${sourceTable} id=${originalId} property=${propertyIdInt}`);
+      return c.json({ error: 'Offering not found' }, 404)
     }
     
+    // Update the offering
+    await DB.prepare(`
+      UPDATE ${sourceTable} SET
+        title_en = ?,
+        short_description_en = ?,
+        full_description_en = ?,
+        enable_booking = ?,
+        images = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(
+      data.title_en || '',
+      data.short_description_en || '',
+      data.full_description_en || '',
+      data.enable_booking ? 1 : 0,
+      data.images || '[]',
+      originalId,
+      propertyIdInt
+    ).run()
+    
+    console.log(`Updated ${sourceTable} id=${originalId} successfully`);
     return c.json({ success: true })
   } catch (error) {
-    console.error('Update offering error:', error)
-    return c.json({ error: 'Failed to update offering' }, 500)
+    console.error('Update error:', error)
+    return c.json({ error: 'Failed to update offering', details: error.message }, 500)
   }
 })
 
