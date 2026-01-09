@@ -21139,21 +21139,16 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
                             <div class="relative z-10">
                                 <div class="flex items-start justify-between">
-                                    <div class="flex items-center gap-5">
-                                        <div class="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-3xl shadow-2xl backdrop-blur-xl bg-white/20" id="tierIconBadge">
-                                            <i class="fas fa-crown"></i>
+                                    <div class="w-full">
+                                        <div class="text-xs font-bold text-white/80 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                            <i class="fas fa-badge-check"></i>
+                                            <span data-i18n="tier-your-membership">Your Membership</span>
                                         </div>
-                                        <div>
-                                            <div class="text-xs font-bold text-white/80 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                <i class="fas fa-badge-check"></i>
-                                                <span data-i18n="tier-your-membership">Your Membership</span>
-                                            </div>
-                                            <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
-                                            <p class="text-sm text-white/90 mt-1 font-medium" id="tierDescription"></p>
-                                            
-                                            <!-- À La Carte Voucher Info -->
-                                            <div id="alacarteVoucherInfo" class="hidden mt-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4"></div>
-                                        </div>
+                                        <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
+                                        <p class="text-sm text-white/90 mt-2 font-medium" id="tierDescription"></p>
+                                        
+                                        <!-- À La Carte Voucher Info -->
+                                        <div id="alacarteVoucherInfo" class="hidden mt-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4"></div>
                                     </div>
                                 </div>
                             </div>
@@ -25421,7 +25416,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     
                     // Use custom message from tier settings or fallback to default
                     const defaultMessage = 'As a valued {tierName} member, you have {remaining} {mealText} included in your stay.\\n\\nSimply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.';
-                    const customMessage = voucherData.tier.privileges_message || voucherData.tier.alacarte_privileges_message || defaultMessage;
+                    let customMessage = voucherData.tier.privileges_message || voucherData.tier.alacarte_privileges_message || defaultMessage;
                     
                     // Replace placeholders
                     const processedMessage = customMessage
@@ -25429,8 +25424,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                       .replace(/{tierName}/g, voucherData.tier.tier_name)
                       .replace(/{mealText}/g, mealText);
                     
-                    // Split into paragraphs (handle both literal \\n and actual newlines)
-                    const paragraphs = processedMessage.split(/\\n\\n|\\n\\n/).filter(p => p.trim());
+                    // Split into paragraphs - handle both actual newlines and literal \\n from database
+                    // Check if message contains literal \n or actual newlines
+                    let paragraphs;
+                    if (processedMessage.includes('\\n\\n')) {
+                      // Database stored with escaped newlines
+                      paragraphs = processedMessage.split('\\n\\n').filter(p => p.trim());
+                    } else {
+                      // Actual newlines from textarea
+                      paragraphs = processedMessage.split(/\n\n/).filter(p => p.trim());
+                    }
+                    
                     const paragraphsHtml = paragraphs.map(p => 
                       '<p class="text-gray-700 leading-relaxed mb-3">' + 
                         p.replace(new RegExp(voucherData.vouchers.remaining + ' ' + mealText, 'g'), 
@@ -55210,8 +55214,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<p class="text-xs text-gray-500 mt-1">Extra charge for premium menu items</p>';
         html += '</div>';
         html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Custom Dining Privileges Message</label>';
-        html += '<textarea name="alacarte_privileges_message" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="As a valued {tier_name} member, you have {remaining_meals} {meal_text} included in your stay...">' + (tier.alacarte_privileges_message || '') + '</textarea>';
-        html += '<p class="text-xs text-gray-500 mt-1">Use {tier_name}, {remaining_meals}, and {meal_text} as placeholders</p>';
+        html += '<textarea name="alacarte_privileges_message" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="As a valued {tierName} member, you have {remaining} {mealText} included in your stay.&#10;&#10;Simply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.">' + (tier.alacarte_privileges_message || '') + '</textarea>';
+        html += '<p class="text-xs text-gray-500 mt-1">Use {tierName}, {remaining}, and {mealText} as placeholders. Use two line breaks for paragraph separation.</p>';
         html += '</div>';
         html += '<div class="md:col-span-2"><label class="block text-sm font-semibold mb-1">Eligible Restaurants</label>';
         html += '<div class="space-y-2 mt-2">';
