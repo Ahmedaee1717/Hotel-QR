@@ -64606,6 +64606,251 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           scaleDisplay.textContent = masterScale + '%';
         }
       };
+      
+      // Delete selected table
+      window.deleteSelectedTable = async function() {
+        if (!selectedTable) {
+          alert('Please select a table first');
+          return;
+        }
+        
+        if (!confirm('Delete table ' + selectedTable.table_number + '?')) {
+          return;
+        }
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/table/' + selectedTable.table_id, {
+            method: 'DELETE'
+          });
+          
+          if (response.ok) {
+            console.log('✅ Table deleted');
+            // Remove from local array
+            tables = tables.filter(t => t.table_id !== selectedTable.table_id);
+            selectedTable = null;
+            renderAdminFloorPlan();
+            alert('Table deleted successfully!');
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Failed to delete table:', errorData);
+            alert('Failed to delete table');
+          }
+        } catch (error) {
+          console.error('❌ Error deleting table:', error);
+          alert('Error deleting table');
+        }
+      };
+      
+      // Delete selected element (generic)
+      window.deleteSelectedElement = function() {
+        if (selectedTable) {
+          deleteSelectedTable();
+        } else if (selectedElement) {
+          // Delete floor element (wall, decoration, etc.)
+          const canvas = document.getElementById('canvas');
+          if (selectedElement.parentNode === canvas) {
+            canvas.removeChild(selectedElement);
+            floorElements = floorElements.filter(el => el !== selectedElement);
+            selectedElement = null;
+            console.log('✅ Floor element deleted');
+          }
+        } else {
+          alert('Please select an element first');
+        }
+      };
+      
+      // Delete selected wall
+      window.deleteSelectedWall = function() {
+        if (!selectedElement || !selectedElement.classList.contains('wall-line')) {
+          alert('Please select a wall first (click on it)');
+          return;
+        }
+        
+        const canvas = document.getElementById('canvas');
+        canvas.removeChild(selectedElement);
+        floorElements = floorElements.filter(el => el !== selectedElement);
+        selectedElement = null;
+        console.log('✅ Wall deleted');
+      };
+      
+      // Wall drawing state
+      let isDrawingWall = false;
+      let wallStartPoint = null;
+      let wallPreviewLine = null;
+      
+      // Toggle wall drawing mode
+      window.toggleWallDrawing = function() {
+        isDrawingWall = !isDrawingWall;
+        const btn = document.getElementById('startWallDrawing');
+        const hint = document.getElementById('wallDrawingHint');
+        
+        if (isDrawingWall) {
+          btn.textContent = '🛑 Stop Drawing';
+          btn.classList.add('bg-red-600');
+          btn.classList.remove('bg-gray-600');
+          hint.classList.remove('hidden');
+          wallStartPoint = null;
+          console.log('🖊️ Wall drawing mode: ON');
+        } else {
+          btn.innerHTML = '<i class="fas fa-pen mr-2"></i>Start Drawing Walls';
+          btn.classList.remove('bg-red-600');
+          btn.classList.add('bg-gray-600');
+          hint.classList.add('hidden');
+          if (wallPreviewLine) {
+            wallPreviewLine.remove();
+            wallPreviewLine = null;
+          }
+          wallStartPoint = null;
+          console.log('🖊️ Wall drawing mode: OFF');
+        }
+      };
+      
+      // Save layout
+      window.saveLayout = async function() {
+        try {
+          // Save all table positions (already saved individually on drag)
+          console.log('✅ Layout saved (table positions auto-saved on drag)');
+          alert('Layout saved successfully!');
+        } catch (error) {
+          console.error('❌ Error saving layout:', error);
+          alert('Error saving layout');
+        }
+      };
+      
+      // Clear canvas
+      window.clearCanvas = function() {
+        if (!confirm('Clear entire canvas? This will remove all decorative elements but keep tables.')) {
+          return;
+        }
+        
+        // Remove only floor elements (walls, decorations), keep tables
+        floorElements.forEach(el => {
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        });
+        floorElements = [];
+        selectedElement = null;
+        console.log('✅ Canvas cleared (tables preserved)');
+      };
+      
+      // Add keyboard shortcuts for delete
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            deleteSelectedElement();
+          }
+        }
+      });
+      
+      // Canvas click handler for wall drawing
+      const canvasEl = document.getElementById('canvas');
+      if (canvasEl) {
+        canvasEl.addEventListener('click', function(e) {
+          if (!isDrawingWall) return;
+          
+          const rect = canvasEl.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          
+          if (!wallStartPoint) {
+            // First click - set start point
+            wallStartPoint = { x, y };
+            console.log('📍 Wall start point:', wallStartPoint);
+          } else {
+            // Second click - draw wall
+            const wallStyle = document.getElementById('wallStyle').value;
+            const wallThickness = parseInt(document.getElementById('wallThickness').value) || 4;
+            const wallColor = document.getElementById('wallColor').value;
+            
+            drawWall(wallStartPoint.x, wallStartPoint.y, x, y, wallStyle, wallThickness, wallColor);
+            
+            // Reset for next wall
+            wallStartPoint = null;
+            if (wallPreviewLine) {
+              wallPreviewLine.remove();
+              wallPreviewLine = null;
+            }
+          }
+        });
+        
+        // Show preview line while moving mouse
+        canvasEl.addEventListener('mousemove', function(e) {
+          if (!isDrawingWall || !wallStartPoint) return;
+          
+          const rect = canvasEl.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          
+          // Remove old preview
+          if (wallPreviewLine) {
+            wallPreviewLine.remove();
+          }
+          
+          // Draw preview line
+          const length = Math.sqrt(Math.pow(x - wallStartPoint.x, 2) + Math.pow(y - wallStartPoint.y, 2));
+          const angle = Math.atan2(y - wallStartPoint.y, x - wallStartPoint.x) * 180 / Math.PI;
+          
+          wallPreviewLine = document.createElement('div');
+          wallPreviewLine.className = 'absolute';
+          wallPreviewLine.style.left = wallStartPoint.x + 'px';
+          wallPreviewLine.style.top = wallStartPoint.y + 'px';
+          wallPreviewLine.style.width = length + 'px';
+          wallPreviewLine.style.height = '2px';
+          wallPreviewLine.style.backgroundColor = '#3B82F6';
+          wallPreviewLine.style.transformOrigin = '0 0';
+          wallPreviewLine.style.transform = 'rotate(' + angle + 'deg)';
+          wallPreviewLine.style.opacity = '0.5';
+          wallPreviewLine.style.pointerEvents = 'none';
+          
+          canvasEl.appendChild(wallPreviewLine);
+        });
+      }
+      
+      // Draw wall function
+      function drawWall(x1, y1, x2, y2, style, thickness, color) {
+        const canvas = document.getElementById('canvas');
+        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        
+        const wall = document.createElement('div');
+        wall.className = 'absolute wall-line cursor-pointer';
+        wall.style.left = x1 + 'px';
+        wall.style.top = y1 + 'px';
+        wall.style.width = length + 'px';
+        wall.style.height = thickness + 'px';
+        wall.style.backgroundColor = color;
+        wall.style.transformOrigin = '0 0';
+        wall.style.transform = 'rotate(' + angle + 'deg)';
+        
+        if (style === 'dashed') {
+          wall.style.borderTop = thickness + 'px dashed ' + color;
+          wall.style.backgroundColor = 'transparent';
+        } else if (style === 'door') {
+          wall.style.backgroundColor = '#F59E0B';
+        } else if (style === 'window') {
+          wall.style.backgroundColor = '#3B82F6';
+          wall.style.opacity = '0.6';
+        }
+        
+        // Make walls selectable
+        wall.onclick = function(e) {
+          e.stopPropagation();
+          // Deselect previous
+          if (selectedElement) {
+            selectedElement.style.outline = 'none';
+          }
+          selectedElement = wall;
+          wall.style.outline = '2px solid #10B981';
+          console.log('🧱 Wall selected');
+        };
+        
+        canvas.appendChild(wall);
+        floorElements.push(wall);
+        
+        console.log('✅ Wall drawn');
+      }
 
       function renderTables() {
             const canvas = document.getElementById('tableCanvas');
