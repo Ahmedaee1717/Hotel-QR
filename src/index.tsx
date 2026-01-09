@@ -67109,7 +67109,7 @@ app.get('/room-service/:property_id', async (c) => {
     const roomService = await DB.prepare(`
       SELECT offering_id, title_en, short_description_en, full_description_en, location, images
       FROM hotel_offerings
-      WHERE property_id = ? AND offering_type = 'room_service' AND is_active = 1
+      WHERE property_id = ? AND offering_type = 'room_service'
       LIMIT 1
     `).bind(property_id).first()
     
@@ -67240,7 +67240,29 @@ app.get('/room-service/:property_id', async (c) => {
     return c.html(htmlContent)
   } catch (error) {
     console.error('Room service page error:', error)
-    return c.html('<h1>Error loading room service menu</h1>')
+    return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - Room Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-2xl font-bold text-red-600 mb-4">Error Loading Room Service Menu</h1>
+        <p class="text-gray-600 mb-4">We encountered an error while loading the menu. Please try again later or contact the front desk.</p>
+        <div class="bg-gray-100 p-4 rounded-lg">
+            <p class="text-sm text-gray-700 font-mono">${error instanceof Error ? error.message : String(error)}</p>
+        </div>
+        <a href="/hotel/paradise-resort" class="mt-4 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Back to Homepage
+        </a>
+    </div>
+</body>
+</html>
+    `)
   }
 })
 
