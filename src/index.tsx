@@ -64454,15 +64454,18 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Clear existing tables
         canvas.innerHTML = '';
         
+        // Calculate scale factor (masterScale is percentage: 100 = 1.0x)
+        const scaleFactor = masterScale / 100;
+        
         // Render each table as a draggable element
         tables.forEach(table => {
           const tableEl = document.createElement('div');
           tableEl.className = 'table-item';
           tableEl.id = 'table-' + table.table_id;
-          tableEl.style.left = table.position_x + 'px';
-          tableEl.style.top = table.position_y + 'px';
-          tableEl.style.width = table.width + 'px';
-          tableEl.style.height = table.height + 'px';
+          tableEl.style.left = (table.position_x * scaleFactor) + 'px';
+          tableEl.style.top = (table.position_y * scaleFactor) + 'px';
+          tableEl.style.width = (table.width * scaleFactor) + 'px';
+          tableEl.style.height = (table.height * scaleFactor) + 'px';
           
           if (table.shape === 'circle') {
             tableEl.classList.add('table-circle');
@@ -64479,7 +64482,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           canvas.appendChild(tableEl);
         });
         
-        console.log('✅ Rendered ' + tables.length + ' tables on admin floor plan');
+        console.log('✅ Rendered ' + tables.length + ' tables on admin floor plan (scale: ' + masterScale + '%)');
       }
       
       // Admin drag handlers
@@ -64520,11 +64523,16 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const canvas = document.getElementById('canvas');
         const canvasRect = canvas.getBoundingClientRect();
         
-        const finalX = e.clientX - canvasRect.left - dragOffset.x;
-        const finalY = e.clientY - canvasRect.top - dragOffset.y;
+        const scaledX = e.clientX - canvasRect.left - dragOffset.x;
+        const scaledY = e.clientY - canvasRect.top - dragOffset.y;
         
-        // Save position to database
-        saveTablePosition(selectedTable.table_id, finalX, finalY);
+        // Convert scaled position back to original (unscaled) position
+        const scaleFactor = masterScale / 100;
+        const originalX = Math.round(scaledX / scaleFactor);
+        const originalY = Math.round(scaledY / scaleFactor);
+        
+        // Save UNSCALED position to database
+        saveTablePosition(selectedTable.table_id, originalX, originalY);
         
         isDragging = false;
         selectedTable = null;
@@ -64535,25 +64543,26 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function saveTablePosition(tableId, x, y) {
         try {
-          const response = await fetchWithAuth('/api/restaurant/tables/' + tableId, {
+          const response = await fetchWithAuth('/api/admin/restaurant/table/' + tableId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              position_x: Math.round(x),
-              position_y: Math.round(y)
+              position_x: x,
+              position_y: y
             })
           });
           
           if (response.ok) {
-            console.log('✅ Table position saved');
+            console.log('✅ Table position saved: (' + x + ', ' + y + ')');
             // Update local data
             const table = tables.find(t => t.table_id === tableId);
             if (table) {
-              table.position_x = Math.round(x);
-              table.position_y = Math.round(y);
+              table.position_x = x;
+              table.position_y = y;
             }
           } else {
-            console.error('❌ Failed to save table position');
+            const errorData = await response.json();
+            console.error('❌ Failed to save table position:', errorData);
           }
         } catch (error) {
           console.error('❌ Error saving table position:', error);
@@ -64569,6 +64578,21 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         });
         document.getElementById('table-' + table.table_id).classList.add('ring-4', 'ring-blue-500');
       }
+      
+      // Implement master scale function for admin page
+      window.updateMasterScale = function(value) {
+        masterScale = parseInt(value);
+        console.log('Master scale:', masterScale);
+        
+        // Re-render admin floor plan with new scale
+        renderAdminFloorPlan();
+        
+        // Update scale display
+        const scaleDisplay = document.getElementById('scaleValue');
+        if (scaleDisplay) {
+          scaleDisplay.textContent = masterScale + '%';
+        }
+      };
 
       function renderTables() {
             const canvas = document.getElementById('tableCanvas');
