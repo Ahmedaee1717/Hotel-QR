@@ -7354,26 +7354,13 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
     const originalId = parseInt(offering_id.substring(1), 10);
     const sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activity';
     
-    console.log(`PUT ${offering_id}: table=${sourceTable}, id=${originalId}, property=${propertyIdInt}`);
-    
     // Validate offering exists and belongs to property
-    // First try without property filter to see if record exists
-    const offeringTest = await DB.prepare(`
-      SELECT offering_id, property_id, title_en FROM ${sourceTable} WHERE offering_id = ?
-    `).bind(originalId).first()
-    
-    console.log(`Test query (no property filter): offering_id=${originalId}, result:`, offeringTest);
-    
-    // Now with property filter
     const offering = await DB.prepare(`
       SELECT offering_id, property_id FROM ${sourceTable} 
       WHERE offering_id = ? AND property_id = ?
     `).bind(originalId, propertyIdInt).first()
     
-    console.log(`Query result:`, offering, `| Types: id=${typeof originalId}, prop=${typeof propertyIdInt}`);
-    
     if (!offering) {
-      console.error(`Not found: ${sourceTable} id=${originalId} property=${propertyIdInt}`);
       return c.json({ error: 'Offering not found' }, 404)
     }
     
@@ -7392,7 +7379,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       data.short_description_en || '',
       data.full_description_en || '',
       data.enable_booking ? 1 : 0,
-      data.images || '[]',
+      typeof data.images === 'string' ? data.images : JSON.stringify(data.images || []),
       originalId,
       propertyIdInt
     ).run()
@@ -64194,11 +64181,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           console.log('🍽️ Filtered restaurants:', restaurants.length);
           
           // Debug: log each restaurant ID
-          restaurants.forEach(r => {
-            const match = String(r.offering_id).toUpperCase() === String(offeringId).toUpperCase();
-            console.log(`  - ${r.offering_id} (${typeof r.offering_id}) vs ${offeringId} => ${r.offering_id.toUpperCase()} === ${offeringId.toUpperCase()} = ${match}`);
-          });
-          
           const restaurant = restaurants.find(o => String(o.offering_id).toUpperCase() === String(offeringId).toUpperCase());
           console.log('✅ Found restaurant:', restaurant ? restaurant.title_en : 'NOT FOUND');
           
