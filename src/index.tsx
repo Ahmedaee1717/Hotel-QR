@@ -6792,6 +6792,7 @@ app.post('/api/admin/custom-sections', async (c) => {
             description_en = ?,
             icon_class = ?,
             color_class = ?,
+            color_class_end = ?,
             is_visible = ?,
             link_url = ?,
             updated_at = CURRENT_TIMESTAMP
@@ -6802,6 +6803,7 @@ app.post('/api/admin/custom-sections', async (c) => {
         data.description_en || null,
         data.icon_class || 'fas fa-star',
         data.color_class || 'blue',
+        data.color_class_end || null,
         data.is_visible !== undefined ? data.is_visible : 1,
         data.link_url || null,
         existing.section_id
@@ -6813,8 +6815,8 @@ app.post('/api/admin/custom-sections', async (c) => {
       const result = await DB.prepare(`
         INSERT INTO custom_sections (
           property_id, section_key, section_name_en, subtitle_en, description_en, 
-          icon_class, color_class, display_order, is_visible, link_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          icon_class, color_class, color_class_end, display_order, is_visible, link_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,  // Use authenticated property_id
         data.section_key,
@@ -6823,6 +6825,7 @@ app.post('/api/admin/custom-sections', async (c) => {
         data.description_en || null,
         data.icon_class || 'fas fa-star',
         data.color_class || 'blue',
+        data.color_class_end || null,
         data.display_order || 0,
         data.is_visible !== undefined ? data.is_visible : 1,
         data.link_url || null
@@ -24602,28 +24605,18 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             const cardDescription = roomServiceSection?.description_en || 'Browse our menu and call to order delicious meals delivered to your room';
             const cardIcon = roomServiceSection?.icon_class || 'fas fa-concierge-bell';
             const cardColor = roomServiceSection?.color_class || '#6366f1'; // Default indigo
+            const cardColorEnd = roomServiceSection?.color_class_end || cardColor; // Use same color if not set
             
-            // Calculate lighter shade for gradient
-            const hexToRgb = (hex) => {
-                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                return result ? {
-                    r: parseInt(result[1], 16),
-                    g: parseInt(result[2], 16),
-                    b: parseInt(result[3], 16)
-                } : { r: 99, g: 102, b: 241 }; // Default indigo
-            };
-            
-            const rgb = hexToRgb(cardColor);
-            const lighterColor = '#' + 
-                Math.min(255, rgb.r + 40).toString(16).padStart(2, '0') +
-                Math.min(255, rgb.g + 40).toString(16).padStart(2, '0') +
-                Math.min(255, rgb.b + 40).toString(16).padStart(2, '0');
+            // Create room service card with gradient (or solid if both colors are the same)
+            const gradientStyle = cardColor === cardColorEnd 
+                ? 'background: ' + cardColor + ';' 
+                : 'background: linear-gradient(135deg, ' + cardColor + ' 0%, ' + cardColorEnd + ' 100%);';
             
             // Create room service card
             grid.innerHTML = \`
                 <div class="offering-card bg-gradient-to-br rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1" 
                      onclick="window.location.href='/room-service/\${propertyData.property_id}'"
-                     style="background: linear-gradient(135deg, \${cardColor} 0%, \${lighterColor} 100%);">
+                     style="\${gradientStyle}">
                     <div class="p-8 text-white">
                         <div class="flex items-start justify-between mb-4">
                             <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
@@ -53869,6 +53862,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           const cardDescription = document.getElementById('roomServiceCardDescription').value.trim() || 'Browse our menu and call to order';
           const cardIcon = document.getElementById('roomServiceCardIcon').value.trim() || 'fas fa-concierge-bell';
           const cardColor = document.getElementById('roomServiceCardColor').value || '#6366f1';
+          const cardColorEnd = document.getElementById('roomServiceCardColorEnd').value || '#8b5cf6';
           const cardVisible = document.getElementById('roomServiceCardVisible').checked ? 1 : 0;
           
           const cardResponse = await fetchWithAuth('/api/admin/custom-sections', {
@@ -53880,6 +53874,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
               description_en: cardDescription,
               icon_class: cardIcon,
               color_class: cardColor,
+              color_class_end: cardColorEnd,
               is_visible: cardVisible,
               link_url: '/room-service/' + roomServiceOffering.numeric_id
             })
