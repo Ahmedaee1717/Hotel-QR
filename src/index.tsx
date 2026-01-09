@@ -64176,23 +64176,28 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let masterScale = 100; // 100% by default
 
       async function init() {
+        console.log('🚀 Restaurant Admin init() starting...');
         await loadRestaurant();
-        await loadTables();
-        await loadFloorElements();
-        await loadWalls();
+        await loadOccupancyStatus();
+        console.log('✅ Restaurant Admin init() complete!');
       }
 
       let currentRestaurantData = null;
       
       async function loadRestaurant() {
         try {
+          console.log('🔄 loadRestaurant() called');
           const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
+          console.log('📦 API response:', data);
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
+          console.log('🍽️ Filtered restaurants:', restaurants.length);
           const restaurant = restaurants.find(o => String(o.offering_id).toUpperCase() == String(offeringId).toUpperCase());
+          console.log('✅ Found restaurant:', restaurant ? restaurant.title_en : 'NOT FOUND');
           
           if (restaurant) {
             currentRestaurantData = restaurant;
+            console.log('💾 Set currentRestaurantData:', currentRestaurantData.title_en, 'ID:', currentRestaurantData.offering_id);
             document.getElementById('restaurantName').textContent = restaurant.title_en || restaurant.title;
             document.title = (restaurant.title_en || restaurant.title) + ' - Restaurant Management';
             
@@ -64237,9 +64242,17 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       }
       
       window.addRestaurantImage = function() {
+        console.log('🖼️ addRestaurantImage() called');
+        console.log('📊 currentRestaurantData:', currentRestaurantData);
         const imageUrl = document.getElementById('imageUrl').value.trim();
         if (!imageUrl) {
           alert('Please enter an image URL');
+          return;
+        }
+        
+        if (!currentRestaurantData) {
+          alert('ERROR: Restaurant data not loaded yet. Please wait a moment and try again.');
+          console.error('❌ currentRestaurantData is NULL!');
           return;
         }
         
@@ -64708,9 +64721,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         document.getElementById('numAdults').addEventListener('change', renderTables);
         document.getElementById('numChildren').addEventListener('change', renderTables);
         
-        // Start initialization
-        init();
+        // Start booking page initialization
+        initializePage();
       }
+      
+      // RESTAURANT ADMIN INIT - Called immediately on page load
+      init();
     </script>
 </body>
 </html>
