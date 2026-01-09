@@ -21144,8 +21144,8 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                             <i class="fas fa-badge-check"></i>
                                             <span data-i18n="tier-your-membership">Your Membership</span>
                                         </div>
-                                        <h3 class="text-3xl font-black text-white mb-1" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
-                                        <p class="text-sm text-white/90 mt-2 font-medium" id="tierDescription"></p>
+                                        <h3 class="text-3xl font-black text-white mb-2" id="tierName" style="text-shadow: 0 2px 10px rgba(0,0,0,0.2);">Loading...</h3>
+                                        <p class="text-sm text-white/90 mt-1 mb-2 font-medium leading-relaxed" id="tierDescription"></p>
                                         
                                         <!-- À La Carte Voucher Info -->
                                         <div id="alacarteVoucherInfo" class="hidden mt-4 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4"></div>
@@ -21154,7 +21154,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             </div>
                             
                             <!-- View Details Button (Below Header) -->
-                            <div class="relative z-10 -mt-2">
+                            <div class="relative z-10 mt-4">
                                 <button onclick="toggleTierDetails()" class="w-full bg-white/30 backdrop-blur-lg hover:bg-white/40 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 border-2 border-white/50">
                                     <span id="tierToggleText" class="text-base font-bold uppercase tracking-wide">View Full Benefits</span>
                                     <i class="fas fa-chevron-down transition-transform text-xl" id="tierToggleIcon"></i>
