@@ -64543,7 +64543,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     const voucher_code = data.voucher_code;
                     const meals_remaining = data.meals_remaining;
                     const total_cost = data.total_cost;
-                    alert('SUCCESS! Voucher Created\n\nVoucher Code: ' + voucher_code + '\nTotal Cost: EUR ' + total_cost.toFixed(2) + '\nMeals Remaining: ' + meals_remaining + '\n\nRedirecting to your bookings...');
+                    alert('SUCCESS! Voucher Created\\n\\nVoucher Code: ' + voucher_code + '\\nTotal Cost: EUR ' + total_cost.toFixed(2) + '\\nMeals Remaining: ' + meals_remaining + '\\n\\nRedirecting to your bookings...');
                     
                     // Redirect to my bookings page
                     window.location.href = '/my-bookings?property=' + propertyId + (passReference ? '&pass=' + passReference : '');
