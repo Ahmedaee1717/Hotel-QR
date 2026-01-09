@@ -25424,7 +25424,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     }).join('');
                     
                     // Build elegant introduction text for expanded panel using custom message
-                    const mealText = voucherData.vouchers.remaining === 1 ? 'remaining dining experience' : 'remaining dining experiences';
+                    const mealText = voucherData.vouchers.remaining === 1 ? 'dining experience' : 'dining experiences';
                     
                     // Use custom message from tier settings or fallback to default
                     const defaultMessage = 'As a valued {tierName} member, you have {remaining} {mealText} included in your stay.\\n\\nSimply select your preferred restaurant below and reserve your table. Your meal will be charged to your all-inclusive package.';
@@ -25432,7 +25432,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     
                     // Replace placeholders
                     const processedMessage = customMessage
-                      .replace(/{remaining}/g, voucherData.vouchers.remaining + ' ' + mealText)
+                      .replace(/{remaining}/g, voucherData.vouchers.remaining)
                       .replace(/{tierName}/g, voucherData.tier.tier_name)
                       .replace(/{mealText}/g, mealText);
                     
