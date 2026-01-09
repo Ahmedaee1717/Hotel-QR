@@ -63239,7 +63239,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     <i class="fas fa-info-circle mr-2 text-blue-600"></i>Restaurant Information
                 </h2>
                 
-                <form id="restaurantInfoForm" class="space-y-6">
+                <!-- Loading Indicator -->
+                <div id="formLoading" class="text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-5xl text-blue-600 mb-4"></i>
+                    <p class="text-lg text-gray-600 font-semibold">Loading restaurant data...</p>
+                    <p class="text-sm text-gray-500 mt-2">Please wait a moment</p>
+                </div>
+                
+                <form id="restaurantInfoForm" class="space-y-6" style="display: none;">
                     <!-- Restaurant Name -->
                     <div>
                         <label class="block text-sm font-bold mb-2">Restaurant Name (English)</label>
@@ -64187,12 +64194,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       async function loadRestaurant() {
         try {
           console.log('🔄 loadRestaurant() called');
+          console.log('🔍 Looking for offeringId:', offeringId, 'Type:', typeof offeringId);
           const response = await fetchWithAuth('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           console.log('📦 API response:', data);
           const restaurants = data.offerings.filter(o => o.offering_type === 'restaurant');
           console.log('🍽️ Filtered restaurants:', restaurants.length);
-          const restaurant = restaurants.find(o => String(o.offering_id).toUpperCase() == String(offeringId).toUpperCase());
+          
+          // Debug: log each restaurant ID
+          restaurants.forEach(r => {
+            const match = String(r.offering_id).toUpperCase() === String(offeringId).toUpperCase();
+            console.log(`  - ${r.offering_id} (${typeof r.offering_id}) vs ${offeringId} => ${r.offering_id.toUpperCase()} === ${offeringId.toUpperCase()} = ${match}`);
+          });
+          
+          const restaurant = restaurants.find(o => String(o.offering_id).toUpperCase() === String(offeringId).toUpperCase());
           console.log('✅ Found restaurant:', restaurant ? restaurant.title_en : 'NOT FOUND');
           
           if (restaurant) {
@@ -64209,6 +64224,13 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             
             // Display current images
             displayRestaurantImages(restaurant.images);
+            
+            // Hide loading, show form
+            document.getElementById('formLoading').style.display = 'none';
+            document.getElementById('restaurantInfoForm').style.display = 'block';
+          } else {
+            console.error('❌ Restaurant not found with ID:', offeringId);
+            document.getElementById('formLoading').innerHTML = '<div class="text-center py-12"><i class="fas fa-exclamation-triangle text-5xl text-red-600 mb-4"></i><p class="text-lg text-red-600 font-semibold">Restaurant not found</p><p class="text-sm text-gray-500 mt-2">Please check the URL</p></div>';
           }
           
           // Populate restaurant selector
