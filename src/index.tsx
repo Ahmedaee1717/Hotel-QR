@@ -64710,6 +64710,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         // Start initialization
         init();
+      }
     </script>
 </body>
 </html>
