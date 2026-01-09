@@ -64299,7 +64299,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         };
         
         try {
-          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId, {
+          const response = await fetchWithAuth('/api/admin/offerings/' + currentRestaurantData.offering_id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updateData)
@@ -64321,7 +64321,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // Occupancy Status Management
       async function setOccupancyStatus(status) {
         try {
-          const response = await fetchWithAuth('/api/admin/offerings/' + offeringId + '/occupancy', {
+          const response = await fetchWithAuth('/api/admin/offerings/' + currentRestaurantData.offering_id + '/occupancy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -64425,7 +64425,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       async function loadTables() {
         try {
-          const response = await fetchWithAuth('/api/restaurant/' + offeringId + '/tables');
+          const actualOfferingId = currentRestaurantData?.offering_id || offeringId.toUpperCase();
+          const response = await fetchWithAuth('/api/restaurant/' + actualOfferingId + '/tables');
           const data = await response.json();
           tables = data.tables || [];
           renderTables();
