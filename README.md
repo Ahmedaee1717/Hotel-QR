@@ -4,9 +4,9 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://28f19fb0.project-c8738f5c.pages.dev 🚀 **✅ DATABASE UPDATE FIXED**
-**Admin Dashboard:** https://28f19fb0.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
-**Restaurant Admin (LA Cucina):** https://28f19fb0.project-c8738f5c.pages.dev/admin/restaurant/h10 🍽️ **✅ SAVE ACTUALLY WORKS NOW!**
+**Production:** https://b4624f44.project-c8738f5c.pages.dev 🚀 **🔍 DEBUG VERSION - Check Cloudflare logs**
+**Admin Dashboard:** https://b4624f44.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️
+**Restaurant Admin:** https://b4624f44.project-c8738f5c.pages.dev/admin/restaurant/h10 🍽️ **Testing DB query**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
 **Analytics Dashboard:** https://db7cd5dc.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
 **Kitchen View:** https://db7cd5dc.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
