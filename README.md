@@ -4,11 +4,11 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://4921d967.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
-**Admin Dashboard:** https://4921d967.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **3 NEW BUTTONS**
+**Production:** https://eacba53d.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
+**Admin Dashboard:** https://eacba53d.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
-**Analytics Dashboard:** https://4921d967.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **WORKING NOW**
-**Kitchen View:** Dynamic - opens first restaurant automatically 👨‍🍳
+**Analytics Dashboard:** https://eacba53d.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ ACCESSIBLE**
+**Kitchen View:** https://eacba53d.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
