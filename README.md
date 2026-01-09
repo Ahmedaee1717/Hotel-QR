@@ -4,12 +4,12 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://19b21374.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
-**Admin Dashboard:** https://19b21374.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
+**Production:** https://379d06a1.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
+**Admin Dashboard:** https://379d06a1.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
-**Analytics Dashboard:** https://19b21374.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
-**Kitchen View:** https://19b21374.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
-**Test Booking:** https://19b21374.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD ✅ **WORKING**
+**Analytics Dashboard:** https://379d06a1.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
+**Kitchen View:** https://379d06a1.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
+**Test Booking:** https://379d06a1.project-c8738f5c.pages.dev/alacarte/book/3?property=1&pass=PASS-1767791192596-5QBRD ✅ **WORKING**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
