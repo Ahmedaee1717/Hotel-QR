@@ -20953,28 +20953,28 @@ app.get('/hotel/:property_slug', async (c) => {
 </div>
 <div id="passLinkBarLinked" class="hidden pass-link-bar py-3">
     <div class="max-w-7xl mx-auto px-4">
-        <div class="flex items-center justify-between py-2">
-            <!-- Left: Welcome Message (Compact) -->
-            <div class="flex items-center gap-2">
-                <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center flex-shrink-0">
-                    <i class="fas fa-user text-base" style="color: #016e8f;"></i>
+        <div class="flex items-center justify-between py-3.5">
+            <!-- Left: Welcome Message -->
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 bg-white rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                    <i class="fas fa-user text-lg" style="color: #016e8f;"></i>
                 </div>
-                <div>
-                    <p class="text-white text-sm font-medium leading-tight">Welcome back,</p>
-                    <p class="text-white font-bold text-lg leading-tight" id="linkedGuestName">Guest</p>
+                <div class="leading-relaxed">
+                    <p class="text-white text-sm font-medium opacity-90">Welcome back,</p>
+                    <p class="text-white font-bold text-lg" id="linkedGuestName">Guest</p>
                 </div>
-                <span class="text-white text-sm font-medium bg-white/20 px-3 py-1 rounded-lg backdrop-blur-sm ml-2">
-                    <i class="fas fa-door-open mr-1.5 text-xs"></i>Room <strong id="linkedRoomNumber">—</strong>
+                <span class="text-white text-sm font-semibold bg-white/25 px-4 py-2 rounded-xl backdrop-blur-sm ml-3 shadow-sm">
+                    <i class="fas fa-door-open mr-2"></i>Room <strong id="linkedRoomNumber" class="text-base">—</strong>
                 </span>
             </div>
             
             <!-- Right: Action Buttons -->
-            <div class="flex items-center gap-2">
-                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all">
-                    <i class="fas fa-clipboard-list mr-1.5"></i>My Bookings
+            <div class="flex items-center gap-3">
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-md">
+                    <i class="fas fa-clipboard-list mr-2"></i>My Bookings
                 </a>
-                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-2 rounded-lg" title="Sign out">
-                    <i class="fas fa-sign-out-alt text-lg"></i>
+                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-2.5 rounded-xl" title="Sign out">
+                    <i class="fas fa-sign-out-alt text-xl"></i>
                 </button>
             </div>
         </div>
