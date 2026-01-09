@@ -2542,30 +2542,78 @@ app.get('/api/my-bookings', async (c) => {
       return c.json({ error: 'Invalid session' }, 401)
     }
 
-    let query = `
+    // Query for activity bookings
+    let activityQuery = `
       SELECT 
-        b.*,
-        ${lang === 'ar' ? 'a.title_ar' : 'a.title_en'} as activity_title,
-        a.images as activity_images,
+        'activity' as booking_type,
+        b.booking_id as id,
+        b.booking_reference as reference,
+        b.activity_date as date,
+        b.activity_time as time,
+        b.booking_status as status,
+        b.payment_status,
+        b.created_at,
+        ${lang === 'ar' ? 'a.title_ar' : 'a.title_en'} as title,
+        a.images,
         v.business_name as vendor_name,
-        v.phone as vendor_phone
+        v.phone as vendor_phone,
+        b.party_size_adults as adults,
+        b.party_size_children as children,
+        NULL as table_info,
+        NULL as restaurant_name
       FROM bookings b
       JOIN activities a ON b.activity_id = a.activity_id
       JOIN vendors v ON b.vendor_id = v.vendor_id
       WHERE b.guest_id = ?
     `
 
+    // Query for restaurant reservations
+    let restaurantQuery = `
+      SELECT 
+        'restaurant' as booking_type,
+        tr.reservation_id as id,
+        tr.reservation_reference as reference,
+        tr.reservation_date as date,
+        ds.session_time as time,
+        tr.status,
+        tr.payment_status,
+        tr.created_at,
+        ${lang === 'ar' ? 'ho.title_ar' : 'ho.title_en'} as title,
+        ho.images,
+        NULL as vendor_name,
+        NULL as vendor_phone,
+        tr.party_size_adults as adults,
+        tr.party_size_children as children,
+        'Table ' || rt.table_number as table_info,
+        ${lang === 'ar' ? 'ho.title_ar' : 'ho.title_en'} as restaurant_name
+      FROM table_reservations tr
+      JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+      JOIN dining_sessions ds ON tr.session_id = ds.session_id
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE tr.guest_id = ?
+    `
+
+    // Apply status filters
     if (status === 'upcoming') {
-      query += ` AND b.activity_date >= date('now') AND b.booking_status = 'confirmed'`
+      activityQuery += ` AND b.activity_date >= date('now') AND b.booking_status = 'confirmed'`
+      restaurantQuery += ` AND tr.reservation_date >= date('now') AND tr.status = 'confirmed'`
     } else if (status === 'past') {
-      query += ` AND b.activity_date < date('now')`
+      activityQuery += ` AND b.activity_date < date('now')`
+      restaurantQuery += ` AND tr.reservation_date < date('now')`
     } else if (status === 'cancelled') {
-      query += ` AND b.booking_status = 'cancelled'`
+      activityQuery += ` AND b.booking_status = 'cancelled'`
+      restaurantQuery += ` AND tr.status = 'cancelled'`
     }
 
-    query += ` ORDER BY b.activity_date DESC, b.activity_time DESC`
+    // Combine with UNION ALL
+    const combinedQuery = `
+      ${activityQuery}
+      UNION ALL
+      ${restaurantQuery}
+      ORDER BY date DESC, time DESC
+    `
 
-    const bookings = await DB.prepare(query).bind(guest.guest_id).all()
+    const bookings = await DB.prepare(combinedQuery).bind(guest.guest_id, guest.guest_id).all()
 
     return c.json({ bookings: bookings.results })
   } catch (error) {
@@ -18640,19 +18688,20 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
           tr.reservation_id as id,
           'restaurant' as type,
           tr.reservation_date as date,
-          tr.reservation_time as start_time,
+          ds.session_time as start_time,
           NULL as end_time,
           COALESCE(ho.title_en, 'Restaurant Reservation') as title,
           COALESCE(ho.location, 'Resort Dining') as location,
           tr.status,
-          tr.num_guests,
-          CONCAT('RES', SUBSTR('000000' || tr.reservation_id, -6)) as reference,
-          ds.offering_id as offering_id
+          tr.party_size_adults + COALESCE(tr.party_size_children, 0) as num_guests,
+          tr.reservation_reference as reference,
+          ho.offering_id as offering_id
         FROM table_reservations tr
         LEFT JOIN dining_sessions ds ON tr.session_id = ds.session_id
-        LEFT JOIN hotel_offerings ho ON ds.offering_id = ho.offering_id
+        LEFT JOIN restaurant_tables rt ON tr.table_id = rt.table_id
+        LEFT JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
         WHERE (tr.guest_id = ? OR tr.room_number = ?) AND tr.status != 'cancelled'
-        ORDER BY tr.reservation_date ASC, tr.reservation_time ASC
+        ORDER BY tr.reservation_date ASC, ds.session_time ASC
       `
       
       const restaurants = await DB.prepare(query).bind(guestId || null, pass.room_number || null).all()
@@ -59500,10 +59549,7 @@ app.get('/my-bookings', async (c) => {
             <div id="emptyState" class="hidden text-center py-12">
                 <i class="fas fa-calendar-times text-6xl text-gray-300 mb-4"></i>
                 <h3 class="text-xl font-semibold text-gray-700 mb-2">No bookings yet</h3>
-                <p class="text-gray-500 mb-6">Start planning your perfect week!</p>
-                <button onclick="goToMyWeek()" class="px-6 py-3 rounded-xl text-white font-semibold" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);">
-                    <i class="fas fa-calendar-week mr-2"></i>Plan My Week
-                </button>
+                <p class="text-gray-500 mb-6">Your bookings will appear here once you make a reservation.</p>
             </div>
         </div>
     </div>
