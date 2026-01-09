@@ -25373,51 +25373,66 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
               .then(res => res.json())
               .then(voucherData => {
                 console.log('🎫 Voucher status loaded:', voucherData);
-                if (voucherData.success && voucherData.eligible) {
+                if (voucherData.success) {
                   voucherInfo.classList.remove('hidden');
                   
-                  // Show ONLY meal count in the summary card (always visible)
-                  voucherInfo.innerHTML = 
-                    '<div class="flex items-center gap-3">' +
-                      '<i class="fas fa-ticket-alt text-white text-2xl"></i>' +
-                      '<div class="text-white">' +
-                        '<div class="text-xl font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
-                        '<div class="text-xs text-white/80">À la carte dining included</div>' +
-                      '</div>' +
-                    '</div>';
-                  
-                  // Build restaurant cards for the EXPANDED panel
-                  // Get property primary color for button
-                  const buttonColor = propertyData?.primary_color || tierColor || '#667eea';
-                  
-                  const restaurantCards = voucherData.eligible_restaurants.map(restaurant => {
-                    // Get the first image from the restaurant, or use placeholder
-                    const restaurantImage = (restaurant.images && restaurant.images.length > 0) 
-                      ? restaurant.images[0] 
-                      : '/static/placeholder.jpg';
-                    const bookingUrl = '/alacarte/book/' + restaurant.offering_id + '?property=' + propertyId + '&pass=' + passReference;
-                    
-                    return '<div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all">' +
-                      '<div class="h-32 bg-gray-100 relative overflow-hidden">' +
-                        '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover">' +
-                        '<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>' +
-                        '<div class="absolute bottom-2 left-2 text-white text-xs flex items-center gap-1">' +
-                          '<i class="fas fa-map-marker-alt"></i>' +
-                          '<span>' + restaurant.location + '</span>' +
+                  // Check if guest has remaining meals
+                  if (voucherData.eligible && voucherData.vouchers.remaining > 0) {
+                    // Show ONLY meal count in the summary card (always visible)
+                    voucherInfo.innerHTML = 
+                      '<div class="flex items-center gap-3">' +
+                        '<i class="fas fa-ticket-alt text-white text-2xl"></i>' +
+                        '<div class="text-white">' +
+                          '<div class="text-xl font-bold">' + voucherData.vouchers.remaining + ' of ' + voucherData.vouchers.total_allowed + ' Meals</div>' +
+                          '<div class="text-xs text-white/80">À la carte dining included</div>' +
                         '</div>' +
-                      '</div>' +
-                      '<div class="p-3">' +
-                        '<h4 class="font-bold text-sm mb-2" style="color: #1f2937 !important;">' + restaurant.title_en + '</h4>' +
-                        '<a href="' + bookingUrl + '" class="block w-full text-center py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90" style="background-color: ' + buttonColor + ' !important; color: #ffffff !important; text-decoration: none !important;">' +
-                          '<i class="fas fa-calendar-check mr-1" style="color: #ffffff !important;"></i><span style="color: #ffffff !important;">Book Now</span>' +
-                        '</a>' +
-                      '</div>' +
-                    '</div>';
-                  }).join('');
-                  
-                  // Store restaurant cards for when panel expands
-                  window.alacarteRestaurantCards = restaurantCards;
-                  console.log('✅ À la carte voucher info displayed!');
+                      '</div>';
+                    
+                    // Build restaurant cards for the EXPANDED panel
+                    // Get property primary color for button
+                    const buttonColor = propertyData?.primary_color || tierColor || '#667eea';
+                    
+                    const restaurantCards = voucherData.eligible_restaurants.map(restaurant => {
+                      // Get the first image from the restaurant, or use placeholder
+                      const restaurantImage = (restaurant.images && restaurant.images.length > 0) 
+                        ? restaurant.images[0] 
+                        : '/static/placeholder.jpg';
+                      const bookingUrl = '/alacarte/book/' + restaurant.offering_id + '?property=' + propertyId + '&pass=' + passReference;
+                      
+                      return '<div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all">' +
+                        '<div class="h-32 bg-gray-100 relative overflow-hidden">' +
+                          '<img src="' + restaurantImage + '" alt="' + restaurant.title_en + '" class="w-full h-full object-cover">' +
+                          '<div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>' +
+                          '<div class="absolute bottom-2 left-2 text-white text-xs flex items-center gap-1">' +
+                            '<i class="fas fa-map-marker-alt"></i>' +
+                            '<span>' + restaurant.location + '</span>' +
+                          '</div>' +
+                        '</div>' +
+                        '<div class="p-3">' +
+                          '<h4 class="font-bold text-sm mb-2" style="color: #1f2937 !important;">' + restaurant.title_en + '</h4>' +
+                          '<a href="' + bookingUrl + '" class="block w-full text-center py-2 rounded-lg text-xs font-bold transition-all hover:opacity-90" style="background-color: ' + buttonColor + ' !important; color: #ffffff !important; text-decoration: none !important;">' +
+                            '<i class="fas fa-calendar-check mr-1" style="color: #ffffff !important;"></i><span style="color: #ffffff !important;">Book Now</span>' +
+                          '</a>' +
+                        '</div>' +
+                      '</div>';
+                    }).join('');
+                    
+                    // Store restaurant cards for when panel expands
+                    window.alacarteRestaurantCards = restaurantCards;
+                    console.log('✅ À la carte voucher info displayed!');
+                  } else {
+                    // Show "All meals used" message
+                    voucherInfo.innerHTML = 
+                      '<div class="flex items-center gap-3">' +
+                        '<i class="fas fa-utensils text-white/60 text-2xl"></i>' +
+                        '<div class="text-white">' +
+                          '<div class="text-xl font-bold">' + voucherData.vouchers.used + ' of ' + voucherData.vouchers.total_allowed + ' Meals Used</div>' +
+                          '<div class="text-xs text-white/80">All à la carte meals used this stay</div>' +
+                        '</div>' +
+                      '</div>';
+                    window.alacarteRestaurantCards = '';
+                    console.log('ℹ️ All meals used: ' + voucherData.vouchers.used + ' of ' + voucherData.vouchers.total_allowed);
+                  }
                 } else {
                   voucherInfo.classList.add('hidden');
                   console.log('❌ Guest not eligible for vouchers:', voucherData.reason || voucherData.error);
