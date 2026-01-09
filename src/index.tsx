@@ -67099,6 +67099,289 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
   }
 })
 
+// Admin: Room Service Menu Management Page
+app.get('/admin/room-service/:offering_id', (c) => {
+  const { offering_id } = c.req.param()
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Service Menu Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-purple-700 to-indigo-700 text-white py-6 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <a href="/admin-dashboard.html" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </a>
+                    <h1 class="text-3xl font-bold">
+                        <i class="fas fa-concierge-bell mr-3"></i>Room Service Menu Management
+                    </h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- AI Menu Upload Card -->
+        <div class="bg-white rounded-xl shadow-lg p-8 mb-8">
+            <div class="flex items-center gap-4 mb-6">
+                <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-magic text-3xl text-white"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">AI Menu Upload</h2>
+                    <p class="text-gray-600">Upload images of your room service menu and let AI extract all items</p>
+                </div>
+            </div>
+            
+            <form id="aiMenuUploadForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-images mr-2 text-purple-600"></i>Upload Menu Images (JPG, PNG)
+                    </label>
+                    <input type="file" 
+                           id="aiMenuImages" 
+                           accept="image/*" 
+                           multiple 
+                           class="block w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none cursor-pointer">
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>You can upload multiple pages. AI will extract all menu items automatically.
+                    </p>
+                </div>
+                
+                <!-- Image Preview -->
+                <div id="aiMenuPreview" class="hidden">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Preview:</label>
+                    <div id="aiMenuImagePreviews" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                </div>
+                
+                <!-- Progress -->
+                <div id="aiMenuProgress" class="hidden bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-robot text-3xl text-purple-600 mr-4"></i>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">AI Processing</h3>
+                            <p class="text-sm text-gray-600">Please wait while AI extracts menu items...</p>
+                        </div>
+                    </div>
+                    <div id="aiMenuProgressSteps" class="space-y-2 text-sm"></div>
+                </div>
+                
+                <button type="submit" 
+                        id="aiMenuUploadBtn"
+                        class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-lg hover:from-purple-700 hover:to-indigo-700 font-bold text-lg shadow-lg transition-all hover:scale-105">
+                    <i class="fas fa-upload mr-2"></i>Upload & Process with AI
+                </button>
+            </form>
+        </div>
+
+        <!-- Menu Items List -->
+        <div class="bg-white rounded-xl shadow-lg p-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-list mr-2 text-purple-600"></i>Current Menu Items
+                </h2>
+                <button onclick="loadMenuItems()" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-semibold">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+            </div>
+            
+            <div id="menuItemsList" class="space-y-4">
+                <div class="text-center text-gray-500 py-8">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+                    <p>Loading menu items...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const propertyId = localStorage.getItem('property_id') || '1';
+        const offeringId = '${offering_id}';
+        
+        // Helper: Convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Helper: Fetch with auth
+        async function fetchWithAuth(url, options = {}) {
+            const token = localStorage.getItem('admin_token');
+            const userId = localStorage.getItem('user_id');
+            
+            const headers = {
+                'X-Property-ID': propertyId,
+                'X-Auth-Token': token || '',
+                'X-User-ID': userId || '',
+                ...options.headers
+            };
+            
+            return fetch(url, { ...options, headers });
+        }
+        
+        // Image Preview
+        document.getElementById('aiMenuImages').addEventListener('change', function(e) {
+            const files = e.target.files;
+            const preview = document.getElementById('aiMenuPreview');
+            const previews = document.getElementById('aiMenuImagePreviews');
+            
+            if (files && files.length > 0) {
+                preview.classList.remove('hidden');
+                previews.innerHTML = '';
+                
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'w-full h-24 object-cover rounded-lg border-2 border-gray-200';
+                        previews.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                preview.classList.add('hidden');
+            }
+        });
+        
+        // Form Submission
+        document.getElementById('aiMenuUploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const files = document.getElementById('aiMenuImages').files;
+            
+            if (!files || files.length === 0) {
+                alert('Please upload at least one menu image.');
+                return;
+            }
+            
+            // Show progress
+            const btn = document.getElementById('aiMenuUploadBtn');
+            const progress = document.getElementById('aiMenuProgress');
+            const progressSteps = document.getElementById('aiMenuProgressSteps');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+            progress.classList.remove('hidden');
+            
+            try {
+                // Convert images to base64
+                const imageDataArray = [];
+                for (let file of files) {
+                    const base64 = await fileToBase64(file);
+                    imageDataArray.push(base64);
+                }
+                
+                progressSteps.innerHTML = '<div><i class="fas fa-check text-green-500 mr-2"></i>Images uploaded</div>' +
+                    '<div><i class="fas fa-spinner fa-spin text-purple-600 mr-2"></i>AI extracting menu items...</div>';
+                
+                // Call AI menu processing API
+                const response = await fetchWithAuth('/api/admin/alacarte/ai-menu-upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        restaurant_id: offeringId,
+                        images: imageDataArray
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    progressSteps.innerHTML = '<div><i class="fas fa-check text-green-500 mr-2"></i>Images uploaded</div>' +
+                        '<div><i class="fas fa-check text-green-500 mr-2"></i>AI extraction complete</div>' +
+                        '<div><i class="fas fa-check text-green-500 mr-2"></i>' + result.items_created + ' menu items created!</div>';
+                    
+                    setTimeout(() => {
+                        alert('Success! Created ' + result.items_created + ' menu items\\nCategories: ' + result.categories.join(', '));
+                        document.getElementById('aiMenuUploadForm').reset();
+                        document.getElementById('aiMenuPreview').classList.add('hidden');
+                        progress.classList.add('hidden');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-upload mr-2"></i>Upload & Process with AI';
+                        loadMenuItems();
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || 'Upload failed');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                progressSteps.innerHTML = '<div><i class="fas fa-times text-red-500 mr-2"></i>Error: ' + error.message + '</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-upload mr-2"></i>Upload & Process with AI';
+            }
+        });
+        
+        // Load menu items
+        async function loadMenuItems() {
+            const list = document.getElementById('menuItemsList');
+            list.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-3xl mb-4"></i><p>Loading...</p></div>';
+            
+            try {
+                const response = await fetchWithAuth('/api/alacarte/menu/' + offeringId);
+                const data = await response.json();
+                
+                if (data.success && data.menu && data.menu.length > 0) {
+                    // Group by category
+                    const grouped = {};
+                    data.menu.forEach(item => {
+                        if (!grouped[item.category]) grouped[item.category] = [];
+                        grouped[item.category].push(item);
+                    });
+                    
+                    let html = '';
+                    Object.keys(grouped).sort().forEach(category => {
+                        html += \`
+                            <div class="mb-6">
+                                <h3 class="text-lg font-bold text-gray-700 mb-3 capitalize bg-purple-50 px-4 py-2 rounded-lg">
+                                    <i class="fas fa-utensils mr-2 text-purple-600"></i>\${category} (\${grouped[category].length} items)
+                                </h3>
+                                <div class="space-y-2">
+                                    \${grouped[category].map(item => \`
+                                        <div class="flex justify-between items-center bg-gray-50 px-4 py-3 rounded-lg hover:bg-gray-100">
+                                            <div>
+                                                <span class="font-semibold text-gray-800">\${item.item_name}</span>
+                                                \${item.description ? '<p class="text-sm text-gray-600">' + item.description + '</p>' : ''}
+                                            </div>
+                                            \${item.is_premium ? '<span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold"><i class="fas fa-star mr-1"></i>Premium</span>' : ''}
+                                        </div>
+                                    \`).join('')}
+                                </div>
+                            </div>
+                        \`;
+                    });
+                    
+                    list.innerHTML = html;
+                } else {
+                    list.innerHTML = '<div class="text-center text-gray-500 py-8"><i class="fas fa-utensils text-4xl mb-4 opacity-30"></i><p>No menu items yet. Upload a menu to get started!</p></div>';
+                }
+            } catch (error) {
+                console.error('Load menu error:', error);
+                list.innerHTML = '<div class="text-center text-red-500 py-8"><i class="fas fa-exclamation-triangle text-3xl mb-4"></i><p>Error loading menu items</p></div>';
+            }
+        }
+        
+        // Load on page ready
+        loadMenuItems();
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Admin: AI Menu Upload - Process menu images with OpenAI Vision
 app.post('/api/admin/alacarte/ai-menu-upload', async (c) => {
   const { DB, OPENAI_API_KEY } = c.env
