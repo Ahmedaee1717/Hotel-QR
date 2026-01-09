@@ -64543,23 +64543,36 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       async function saveTablePosition(tableId, x, y) {
         try {
+          // Get the full table data
+          const table = tables.find(t => t.table_id === tableId);
+          if (!table) {
+            console.error('❌ Table not found in local data');
+            return;
+          }
+          
+          // Send complete table data with updated position
           const response = await fetchWithAuth('/api/admin/restaurant/table/' + tableId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              table_number: table.table_number,
+              table_name: table.table_name || null,
+              capacity: table.capacity,
               position_x: x,
-              position_y: y
+              position_y: y,
+              width: table.width,
+              height: table.height,
+              shape: table.shape,
+              table_type: table.table_type || 'standard',
+              features: table.features || []
             })
           });
           
           if (response.ok) {
             console.log('✅ Table position saved: (' + x + ', ' + y + ')');
             // Update local data
-            const table = tables.find(t => t.table_id === tableId);
-            if (table) {
-              table.position_x = x;
-              table.position_y = y;
-            }
+            table.position_x = x;
+            table.position_y = y;
           } else {
             const errorData = await response.json();
             console.error('❌ Failed to save table position:', errorData);
