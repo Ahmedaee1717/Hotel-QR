@@ -64712,7 +64712,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         document.getElementById('numChildren').addEventListener('change', renderTables);
         
         // Start initialization
-        initializePage();
+        init();
     </script>
 </body>
 </html>
