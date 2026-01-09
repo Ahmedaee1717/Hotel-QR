@@ -1,5 +1,7 @@
 let formData = null;
-const formId = new URLSearchParams(window.location.search).get('id');
+// Extract form ID from URL path: /feedback/9004 -> 9004
+const pathParts = window.location.pathname.split('/');
+const formId = pathParts[pathParts.length - 1];
 
 async function loadForm() {
     try {
