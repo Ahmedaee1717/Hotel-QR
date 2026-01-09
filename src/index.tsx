@@ -68418,64 +68418,70 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         /* Tablet optimized */
         .order-card { min-height: 320px; }
         .action-btn { min-height: 64px; font-size: 1.125rem; }
+        
+        /* Dark mode optimized for bright environments */
+        body { background: #0f172a; }
+        .dark-card { background: #1e293b; border: 1px solid #334155; }
+        .dark-text { color: #e2e8f0; }
+        .dark-text-muted { color: #94a3b8; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-900">
     <div class="max-w-7xl mx-auto p-4">
-        <!-- Professional Header -->
-        <div class="bg-white border-b-4 border-blue-600 shadow-sm p-6 mb-6 rounded-lg">
+        <!-- Professional Header - DARK MODE -->
+        <div class="dark-card border-b-4 border-emerald-500 shadow-xl p-6 mb-6 rounded-lg">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">${restaurant.title_en}</h1>
-                    <p class="text-gray-600 mt-1">${restaurant.location} • Kitchen Display</p>
+                    <h1 class="text-3xl font-bold dark-text">${restaurant.title_en}</h1>
+                    <p class="dark-text-muted mt-1">${restaurant.location} • Kitchen Display</p>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm text-gray-500">Last Updated</div>
-                    <div id="lastUpdate" class="text-lg font-semibold text-gray-900">--:--</div>
+                    <div class="text-sm dark-text-muted">Last Updated</div>
+                    <div id="lastUpdate" class="text-lg font-semibold text-emerald-400">--:--</div>
                 </div>
             </div>
         </div>
 
-        <!-- Status Legend -->
-        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <!-- Status Legend - DARK MODE -->
+        <div class="dark-card rounded-lg shadow-lg p-4 mb-6">
             <div class="flex flex-wrap gap-6 text-sm">
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 bg-yellow-400 rounded"></div>
-                    <span class="font-medium">New Orders</span>
+                    <div class="w-4 h-4 bg-yellow-400 rounded shadow-lg"></div>
+                    <span class="font-medium dark-text">New Orders</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 bg-orange-500 rounded"></div>
-                    <span class="font-medium">Preparing</span>
+                    <div class="w-4 h-4 bg-orange-500 rounded shadow-lg"></div>
+                    <span class="font-medium dark-text">Preparing</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 bg-green-500 rounded"></div>
-                    <span class="font-medium">Ready to Serve</span>
+                    <div class="w-4 h-4 bg-emerald-500 rounded shadow-lg"></div>
+                    <span class="font-medium dark-text">Ready to Serve</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 bg-gray-400 rounded"></div>
-                    <span class="font-medium">Completed</span>
+                    <div class="w-4 h-4 bg-slate-500 rounded shadow-lg"></div>
+                    <span class="font-medium dark-text">Completed</span>
                 </div>
             </div>
 
-        <!-- Filters and View Tabs -->
-        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <!-- Filters and View Tabs - DARK MODE -->
+        <div class="dark-card rounded-lg shadow-lg p-4 mb-6">
             <div class="flex flex-wrap items-center gap-4 mb-4">
                 <!-- Date Filter -->
                 <div class="flex items-center gap-2">
-                    <label class="font-medium text-gray-700">Date:</label>
-                    <input type="date" id="filterDate" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
+                    <label class="font-medium dark-text">Date:</label>
+                    <input type="date" id="filterDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 
                 <!-- Restaurant Selector -->
                 <div class="flex items-center gap-2">
-                    <label class="font-medium text-gray-700">Restaurant:</label>
-                    <select id="restaurantSelector" onchange="switchRestaurant()" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <label class="font-medium dark-text">Restaurant:</label>
+                    <select id="restaurantSelector" onchange="switchRestaurant()" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500">
                         <option value="${restaurant_id}" selected>${restaurant.title_en}</option>
                     </select>
                 </div>
                 
                 <!-- Refresh Button -->
-                <button onclick="loadOrders()" class="ml-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+                <button onclick="loadOrders()" class="ml-auto px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-lg">
                     <i class="fas fa-sync-alt mr-2"></i>Refresh
                 </button>
             </div>

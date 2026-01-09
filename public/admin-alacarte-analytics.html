@@ -7,21 +7,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Dark mode optimized for bright environments */
+        body { background: #0f172a; }
+        .dark-card { background: #1e293b; border: 1px solid #334155; }
+        .dark-text { color: #e2e8f0; }
+        .dark-text-muted { color: #94a3b8; }
+        .dark-border { border-color: #334155; }
+    </style>
 </head>
-<body class="bg-gray-50">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-6 shadow-lg">
+<body class="bg-slate-900">
+    <!-- Header - DARK MODE -->
+    <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-6 shadow-2xl border-b-2 border-emerald-500">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-3xl font-bold mb-2">
-                        <i class="fas fa-chart-line mr-3"></i>
+                        <i class="fas fa-chart-line mr-3 text-emerald-400"></i>
                         À La Carte Analytics & Reports
                     </h1>
-                    <p class="text-blue-200">Real-time insights and AI-powered recommendations</p>
+                    <p class="text-slate-300">Real-time insights and AI-powered recommendations</p>
                 </div>
                 <div class="flex gap-3">
-                    <a href="/admin-alacarte-viewer.html" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-semibold transition-colors">
+                    <a href="/admin-alacarte-viewer.html" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold transition-colors">
                         <i class="fas fa-utensils mr-2"></i>Menu Manager
                     </a>
                     <a href="/kitchen/alacarte/3" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg font-semibold transition-colors">
@@ -33,81 +41,101 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- Quick Actions -->
+        <!-- Date Range Filter - NEW FEATURE -->
+        <div class="dark-card rounded-lg shadow-xl p-6 mb-8">
+            <div class="flex flex-wrap items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label class="font-medium dark-text">From:</label>
+                    <input type="date" id="startDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
+                </div>
+                <div class="flex items-center gap-2">
+                    <label class="font-medium dark-text">To:</label>
+                    <input type="date" id="endDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
+                </div>
+                <button onclick="loadCustomDateRange()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-lg">
+                    <i class="fas fa-filter mr-2"></i>Filter
+                </button>
+                <button onclick="clearDateFilter()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold">
+                    <i class="fas fa-times mr-2"></i>Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions - DARK MODE -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <button onclick="loadReport('today')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
-                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-day"></i></div>
-                <div class="font-bold text-gray-900">Today's Report</div>
-                <div class="text-sm text-gray-600">Current day analytics</div>
+            <button onclick="loadReport('today')" class="dark-card hover:bg-slate-700 border-2 border-emerald-500 rounded-lg p-4 text-left transition-all shadow-lg">
+                <div class="text-emerald-400 text-3xl mb-2"><i class="fas fa-calendar-day"></i></div>
+                <div class="font-bold dark-text">Today's Report</div>
+                <div class="text-sm dark-text-muted">Current day analytics</div>
             </button>
-            <button onclick="loadReport('week')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
-                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-week"></i></div>
-                <div class="font-bold text-gray-900">Weekly Report</div>
-                <div class="text-sm text-gray-600">Last 7 days</div>
+            <button onclick="loadReport('week')" class="dark-card hover:bg-slate-700 border-2 border-blue-500 rounded-lg p-4 text-left transition-all shadow-lg">
+                <div class="text-blue-400 text-3xl mb-2"><i class="fas fa-calendar-week"></i></div>
+                <div class="font-bold dark-text">Weekly Report</div>
+                <div class="text-sm dark-text-muted">Last 7 days</div>
             </button>
-            <button onclick="loadReport('month')" class="bg-white hover:bg-blue-50 border-2 border-blue-200 rounded-lg p-4 text-left transition-all">
-                <div class="text-blue-600 text-3xl mb-2"><i class="fas fa-calendar-alt"></i></div>
-                <div class="font-bold text-gray-900">Monthly Report</div>
-                <div class="text-sm text-gray-600">Last 30 days</div>
+            <button onclick="loadReport('month')" class="dark-card hover:bg-slate-700 border-2 border-purple-500 rounded-lg p-4 text-left transition-all shadow-lg">
+                <div class="text-purple-400 text-3xl mb-2"><i class="fas fa-calendar-alt"></i></div>
+                <div class="font-bold dark-text">Monthly Report</div>
+                <div class="text-sm dark-text-muted">Last 30 days</div>
             </button>
-            <button onclick="generateAIInsights()" class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg p-4 text-left transition-all shadow-lg">
+            <button onclick="generateAIInsights()" class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg p-4 text-left transition-all shadow-xl">
                 <div class="text-3xl mb-2"><i class="fas fa-brain"></i></div>
                 <div class="font-bold">AI Insights</div>
                 <div class="text-sm text-emerald-100">Get recommendations</div>
             </button>
         </div>
 
-        <!-- Key Metrics -->
+        <!-- Key Metrics - DARK MODE -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-gray-600 text-sm font-medium">Total Orders</span>
-                    <i class="fas fa-shopping-cart text-blue-600 text-xl"></i>
+                    <span class="dark-text-muted text-sm font-medium">Total Orders</span>
+                    <i class="fas fa-shopping-cart text-blue-400 text-xl"></i>
                 </div>
-                <div id="totalOrders" class="text-4xl font-bold text-gray-900">-</div>
-                <div class="text-sm text-gray-500 mt-2">
-                    <span id="ordersChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                <div id="totalOrders" class="text-4xl font-bold dark-text">-</div>
+                <div class="text-sm dark-text-muted mt-2">
+                    <span id="ordersChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-gray-600 text-sm font-medium">Total Revenue</span>
-                    <i class="fas fa-euro-sign text-emerald-600 text-xl"></i>
+                    <span class="dark-text-muted text-sm font-medium">Total Revenue</span>
+                    <i class="fas fa-euro-sign text-emerald-400 text-xl"></i>
                 </div>
-                <div id="totalRevenue" class="text-4xl font-bold text-gray-900">-</div>
-                <div class="text-sm text-gray-500 mt-2">
-                    <span id="revenueChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                <div id="totalRevenue" class="text-4xl font-bold dark-text">-</div>
+                <div class="text-sm dark-text-muted mt-2">
+                    <span id="revenueChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-gray-600 text-sm font-medium">Avg Order Value</span>
-                    <i class="fas fa-receipt text-amber-600 text-xl"></i>
+                    <span class="dark-text-muted text-sm font-medium">Avg Order Value</span>
+                    <i class="fas fa-receipt text-amber-400 text-xl"></i>
                 </div>
-                <div id="avgOrderValue" class="text-4xl font-bold text-gray-900">-</div>
-                <div class="text-sm text-gray-500 mt-2">
-                    <span id="avgChange" class="text-emerald-600"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                <div id="avgOrderValue" class="text-4xl font-bold dark-text">-</div>
+                <div class="text-sm dark-text-muted mt-2">
+                    <span id="avgChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm p-6">
+            <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-gray-600 text-sm font-medium">Most Popular Time</span>
-                    <i class="fas fa-clock text-slate-600 text-xl"></i>
+                    <span class="dark-text-muted text-sm font-medium">Most Popular Time</span>
+                    <i class="fas fa-clock text-purple-400 text-xl"></i>
                 </div>
-                <div id="popularTime" class="text-4xl font-bold text-gray-900">-</div>
-                <div class="text-sm text-gray-500 mt-2" id="popularTimeDetail">Loading...</div>
+                <div id="popularTime" class="text-4xl font-bold dark-text">-</div>
+                <div class="text-sm dark-text-muted mt-2" id="popularTimeDetail">Loading...</div>
             </div>
         </div>
 
-        <!-- Charts Row -->
+        <!-- Charts Row - DARK MODE -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <!-- Most Sold Items -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">
-                    <i class="fas fa-trophy text-amber-500 mr-2"></i>
+            <div class="dark-card rounded-lg shadow-xl p-6">
+                <h3 class="text-xl font-bold dark-text mb-4">
+                    <i class="fas fa-trophy text-amber-400 mr-2"></i>
                     Top Selling Items
                 </h3>
                 <div style="height: 300px;">
@@ -116,9 +144,9 @@
             </div>
 
             <!-- Revenue Trend -->
-            <div class="bg-white rounded-lg shadow-sm p-6">
-                <h3 class="text-xl font-bold text-gray-900 mb-4">
-                    <i class="fas fa-chart-area text-blue-600 mr-2"></i>
+            <div class="dark-card rounded-lg shadow-xl p-6">
+                <h3 class="text-xl font-bold dark-text mb-4">
+                    <i class="fas fa-chart-area text-emerald-400 mr-2"></i>
                     Revenue Trend
                 </h3>
                 <div style="height: 300px;">
@@ -127,10 +155,10 @@
             </div>
         </div>
 
-        <!-- Orders by Time Chart -->
-        <div class="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 class="text-xl font-bold text-gray-900 mb-4">
-                <i class="fas fa-clock text-slate-600 mr-2"></i>
+        <!-- Orders by Time Chart - DARK MODE -->
+        <div class="dark-card rounded-lg shadow-xl p-6 mb-8">
+            <h3 class="text-xl font-bold dark-text mb-4">
+                <i class="fas fa-clock text-purple-400 mr-2"></i>
                 Orders by Time of Day
             </h3>
             <div style="height: 250px;">
@@ -138,44 +166,44 @@
             </div>
         </div>
 
-        <!-- AI Insights Panel -->
+        <!-- AI Insights Panel - DARK MODE -->
         <div id="aiInsightsPanel" class="hidden">
-            <div class="bg-gradient-to-br from-emerald-50 to-blue-50 border-2 border-emerald-300 rounded-lg p-6 mb-8">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-emerald-500 rounded-lg p-6 mb-8 shadow-2xl">
                 <div class="flex items-start gap-4">
                     <div class="bg-emerald-600 text-white rounded-full p-4 text-2xl">
                         <i class="fas fa-brain"></i>
                     </div>
                     <div class="flex-1">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-4">AI-Powered Insights & Recommendations</h3>
+                        <h3 class="text-2xl font-bold dark-text mb-4">AI-Powered Insights & Recommendations</h3>
                         <div id="aiInsightsContent" class="space-y-4">
-                            <p class="text-gray-600">Generating insights...</p>
+                            <p class="dark-text-muted">Generating insights...</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Detailed Reports Table -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-            <h3 class="text-xl font-bold text-gray-900 mb-4">
-                <i class="fas fa-table text-gray-600 mr-2"></i>
+        <!-- Detailed Reports Table - DARK MODE -->
+        <div class="dark-card rounded-lg shadow-xl p-6">
+            <h3 class="text-xl font-bold dark-text mb-4">
+                <i class="fas fa-table text-slate-400 mr-2"></i>
                 Detailed Order History
             </h3>
             <div class="overflow-x-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                    <thead class="bg-slate-800 border-b-2 border-slate-600">
                         <tr>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Voucher Code</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Guest</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Items</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Cost</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Date</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Voucher Code</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Guest</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Items</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Total Cost</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Status</th>
                         </tr>
                     </thead>
-                    <tbody id="ordersTableBody" class="divide-y divide-gray-200">
+                    <tbody id="ordersTableBody" class="divide-y divide-slate-700">
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="6" class="px-4 py-8 text-center dark-text-muted">
                                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>
                                 Loading orders...
                             </td>
@@ -190,6 +218,32 @@
         let currentPeriod = 'today';
         let analytics = null;
         let charts = {};
+
+        // NEW: Load custom date range
+        async function loadCustomDateRange() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Start date must be before end date');
+                return;
+            }
+            
+            currentPeriod = `custom:${startDate}:${endDate}`;
+            await loadReport(currentPeriod);
+        }
+        
+        // NEW: Clear date filter
+        function clearDateFilter() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            loadReport('today');
+        }
 
         async function loadReport(period) {
             currentPeriod = period;
@@ -217,7 +271,7 @@
                     document.getElementById('avgOrderValue').textContent = '€' + (analytics.metrics.avg_order_value || 0).toFixed(2);
                     document.getElementById('popularTime').textContent = analytics.metrics.popular_time;
                     
-                    // Update charts
+                    // Update charts with dark mode colors
                     updateTopItemsChart(analytics.charts.top_items);
                     updateRevenueTrendChart(analytics.charts.revenue_trend);
                     updateOrdersByTimeChart(analytics.charts.orders_by_time);
@@ -236,16 +290,13 @@
             }
         }
 
+        // UPDATED: Chart with dark mode colors
         function updateTopItemsChart(items) {
             const ctx = document.getElementById('topItemsChart');
             if (!ctx) return;
             
-            // Destroy existing chart
-            if (charts.topItems) {
-                charts.topItems.destroy();
-            }
+            if (charts.topItems) charts.topItems.destroy();
             
-            // Create new chart
             charts.topItems = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -253,44 +304,40 @@
                     datasets: [{
                         label: 'Orders',
                         data: items.map(item => item.order_count),
-                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(52, 211, 153, 0.5)',
+                        borderColor: 'rgba(52, 211, 153, 1)',
+                        borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
-                        },
-                        title: {
-                            display: false
-                        }
+                        legend: { display: false },
+                        title: { display: false }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: {
-                                precision: 0
-                            }
+                            ticks: { precision: 0, color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
                         }
                     }
                 }
             });
         }
 
+        // UPDATED: Chart with dark mode colors
         function updateRevenueTrendChart(trend) {
             const ctx = document.getElementById('revenueTrendChart');
             if (!ctx) return;
             
-            // Destroy existing chart
-            if (charts.revenue) {
-                charts.revenue.destroy();
-            }
+            if (charts.revenue) charts.revenue.destroy();
             
-            // Create new chart
             charts.revenue = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -298,39 +345,39 @@
                     datasets: [{
                         label: 'Revenue (€)',
                         data: trend.map(t => t.revenue),
-                        borderColor: 'rgba(16, 185, 129, 1)',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderColor: 'rgba(52, 211, 153, 1)',
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
                         tension: 0.4,
-                        fill: true
+                        fill: true,
+                        borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
                         }
                     }
                 }
             });
         }
 
+        // UPDATED: Chart with dark mode colors
         function updateOrdersByTimeChart(timeData) {
             const ctx = document.getElementById('ordersByTimeChart');
             if (!ctx) return;
             
-            // Destroy existing chart
-            if (charts.time) {
-                charts.time.destroy();
-            }
+            if (charts.time) charts.time.destroy();
             
-            // Create new chart
             charts.time = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -338,26 +385,26 @@
                     datasets: [{
                         label: 'Orders',
                         data: timeData.map(t => t.order_count),
-                        borderColor: 'rgba(245, 158, 11, 1)',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderColor: 'rgba(251, 191, 36, 1)',
+                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
                         tension: 0.4,
-                        fill: true
+                        fill: true,
+                        borderWidth: 2
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: {
-                                precision: 0
-                            }
+                            ticks: { precision: 0, color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
                         }
                     }
                 }
@@ -366,53 +413,48 @@
 
         async function generateAIInsights() {
             document.getElementById('aiInsightsPanel').classList.remove('hidden');
-            document.getElementById('aiInsightsContent').innerHTML = '<p class="text-gray-600"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing data and generating insights...</p>';
+            document.getElementById('aiInsightsContent').innerHTML = '<p class="dark-text-muted"><i class="fas fa-spinner fa-spin mr-2"></i>Analyzing data and generating insights...</p>';
             
             if (!analytics || !analytics.success) {
-                document.getElementById('aiInsightsContent').innerHTML = '<p class="text-red-600"><i class="fas fa-exclamation-triangle mr-2"></i>Please load a report first</p>';
+                document.getElementById('aiInsightsContent').innerHTML = '<p class="text-red-400"><i class="fas fa-exclamation-triangle mr-2"></i>Please load a report first</p>';
                 return;
             }
             
-            // Create AI insights based on data
             setTimeout(() => {
                 const insights = [];
                 
-                // Revenue optimization
                 if (analytics.charts.top_items && analytics.charts.top_items.length > 0) {
                     const topItem = analytics.charts.top_items[0];
                     insights.push(`
-                        <div class="bg-white rounded-lg p-4 border-l-4 border-emerald-500 mb-4">
-                            <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-lightbulb text-yellow-500 mr-2"></i>Top Seller</h4>
-                            <p class="text-gray-700">${topItem.item_name} is your best-seller with ${topItem.order_count} orders. Consider featuring it prominently on menus.</p>
+                        <div class="dark-card rounded-lg p-4 border-l-4 border-emerald-500 mb-4">
+                            <h4 class="font-bold dark-text mb-2"><i class="fas fa-lightbulb text-yellow-400 mr-2"></i>Top Seller</h4>
+                            <p class="dark-text-muted">${topItem.item_name} is your best-seller with ${topItem.order_count} orders. Consider featuring it prominently on menus.</p>
                         </div>
                     `);
                 }
                 
-                // Peak time analysis
                 if (analytics.metrics.popular_time !== 'N/A') {
                     insights.push(`
-                        <div class="bg-white rounded-lg p-4 border-l-4 border-blue-500 mb-4">
-                            <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-clock text-blue-500 mr-2"></i>Peak Hours</h4>
-                            <p class="text-gray-700">Most bookings are at ${analytics.metrics.popular_time}. Ensure adequate kitchen staff during this time.</p>
+                        <div class="dark-card rounded-lg p-4 border-l-4 border-blue-500 mb-4">
+                            <h4 class="font-bold dark-text mb-2"><i class="fas fa-clock text-blue-400 mr-2"></i>Peak Hours</h4>
+                            <p class="dark-text-muted">Most bookings are at ${analytics.metrics.popular_time}. Ensure adequate kitchen staff during this time.</p>
                         </div>
                     `);
                 }
                 
-                // Revenue insights
                 if (analytics.metrics.avg_order_value > 0) {
                     insights.push(`
-                        <div class="bg-white rounded-lg p-4 border-l-4 border-amber-500 mb-4">
-                            <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-euro-sign text-amber-500 mr-2"></i>Average Order Value</h4>
-                            <p class="text-gray-700">Average order is €${analytics.metrics.avg_order_value.toFixed(2)}. Consider upselling premium items to increase this value.</p>
+                        <div class="dark-card rounded-lg p-4 border-l-4 border-amber-500 mb-4">
+                            <h4 class="font-bold dark-text mb-2"><i class="fas fa-euro-sign text-amber-400 mr-2"></i>Average Order Value</h4>
+                            <p class="dark-text-muted">Average order is €${analytics.metrics.avg_order_value.toFixed(2)}. Consider upselling premium items to increase this value.</p>
                         </div>
                     `);
                 }
                 
-                // General recommendation
                 insights.push(`
-                    <div class="bg-white rounded-lg p-4 border-l-4 border-purple-500">
-                        <h4 class="font-bold text-gray-900 mb-2"><i class="fas fa-chart-line text-purple-500 mr-2"></i>Performance Summary</h4>
-                        <p class="text-gray-700">Total of ${analytics.metrics.total_orders} orders generating €${analytics.metrics.total_revenue.toFixed(2)} in revenue. Keep up the great work!</p>
+                    <div class="dark-card rounded-lg p-4 border-l-4 border-purple-500">
+                        <h4 class="font-bold dark-text mb-2"><i class="fas fa-chart-line text-purple-400 mr-2"></i>Performance Summary</h4>
+                        <p class="dark-text-muted">Total of ${analytics.metrics.total_orders} orders generating €${analytics.metrics.total_revenue.toFixed(2)} in revenue. Keep up the great work!</p>
                     </div>
                 `);
                 
@@ -422,7 +464,13 @@
 
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
-            console.log('Analytics dashboard loaded');
+            console.log('Analytics dashboard loaded - DARK MODE');
+            
+            // Set default date range (today)
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('startDate').value = today;
+            document.getElementById('endDate').value = today;
+            
             // Auto-load today's report
             loadReport('today');
         });
