@@ -67099,6 +67099,151 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
   }
 })
 
+// Guest: Room Service Menu Page
+app.get('/room-service/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    // Get room service offering
+    const roomService = await DB.prepare(`
+      SELECT offering_id, title_en, short_description_en, full_description_en, location, images
+      FROM hotel_offerings
+      WHERE property_id = ? AND offering_type = 'room_service' AND is_active = 1
+      LIMIT 1
+    `).bind(property_id).first()
+    
+    if (!roomService) {
+      return c.html('<h1>Room Service not available</h1>')
+    }
+    
+    // Get menu items
+    const menuItems = await DB.prepare(`
+      SELECT 
+        item_id,
+        category,
+        item_name,
+        description,
+        is_premium,
+        allergens
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'appetizer' THEN 3
+          WHEN 'soup' THEN 4
+          WHEN 'pasta' THEN 5
+          WHEN 'main' THEN 6
+          WHEN 'seafood' THEN 7
+          WHEN 'side' THEN 8
+          WHEN 'dessert' THEN 9
+          WHEN 'drink' THEN 10
+          ELSE 11
+        END,
+        item_name
+    `).bind(roomService.offering_id, property_id).all()
+    
+    // Group by category
+    const grouped: Record<string, any[]> = {}
+    menuItems.results.forEach((item: any) => {
+      if (!grouped[item.category]) grouped[item.category] = []
+      grouped[item.category].push(item)
+    })
+    
+    // Build HTML
+    let menuHTML = '';
+    if (Object.keys(grouped).length > 0) {
+      Object.keys(grouped).forEach(category => {
+        menuHTML += '<div class="bg-white rounded-xl shadow-lg p-6 mb-6">';
+        menuHTML += '<h2 class="text-2xl font-bold text-gray-800 mb-4 capitalize border-b-2 border-purple-200 pb-2">';
+        menuHTML += '<i class="fas fa-utensils text-purple-600 mr-2"></i>' + category + '</h2>';
+        menuHTML += '<div class="space-y-4">';
+        
+        grouped[category].forEach((item: any) => {
+          menuHTML += '<div class="border-b border-gray-100 pb-4 last:border-0">';
+          menuHTML += '<div class="flex justify-between items-start mb-2">';
+          menuHTML += '<h3 class="text-lg font-semibold text-gray-800">' + item.item_name + '</h3>';
+          if (item.is_premium) {
+            menuHTML += '<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold"><i class="fas fa-star mr-1"></i>Premium</span>';
+          }
+          menuHTML += '</div>';
+          if (item.description) {
+            menuHTML += '<p class="text-gray-600 text-sm mb-2">' + item.description + '</p>';
+          }
+          if (item.allergens) {
+            menuHTML += '<p class="text-xs text-orange-600"><i class="fas fa-exclamation-triangle mr-1"></i>Allergens: ' + item.allergens + '</p>';
+          }
+          menuHTML += '</div>';
+        });
+        
+        menuHTML += '</div></div>';
+      });
+    } else {
+      menuHTML = '<div class="bg-white rounded-xl shadow-lg p-12 text-center">';
+      menuHTML += '<i class="fas fa-utensils text-6xl text-gray-300 mb-4"></i>';
+      menuHTML += '<h2 class="text-2xl font-bold text-gray-700 mb-2">Menu Coming Soon</h2>';
+      menuHTML += '<p class="text-gray-500">Our room service menu is being updated. Please call the front desk for assistance.</p>';
+      menuHTML += '</div>';
+    }
+    
+    // Build HTML page
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${roomService.title_en} - Menu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-8 px-4">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                    <i class="fas fa-concierge-bell text-3xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold">${roomService.title_en}</h1>
+                    <p class="text-white/90">${roomService.short_description_en || 'Order from your room'}</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-white/90">
+                <i class="fas fa-clock"></i>
+                <span>${roomService.full_description_en || '24/7 Service'}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        ${menuHTML}
+        
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg p-8 text-white text-center mt-8">
+            <h3 class="text-2xl font-bold mb-3">
+                <i class="fas fa-phone-alt mr-2"></i>Ready to Order?
+            </h3>
+            <p class="text-lg mb-4">Call us to place your order</p>
+            <div class="inline-block bg-white/20 backdrop-blur-sm px-8 py-4 rounded-lg">
+                <p class="text-sm text-white/80 mb-1">Dial from your room phone:</p>
+                <p class="text-3xl font-bold">0</p>
+                <p class="text-sm text-white/80 mt-1">or call the front desk</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+    
+    return c.html(htmlContent)
+  } catch (error) {
+    console.error('Room service page error:', error)
+    return c.html('<h1>Error loading room service menu</h1>')
+  }
+})
+
 // Admin: Room Service Menu Management Page
 app.get('/admin/room-service/:offering_id', (c) => {
   const { offering_id } = c.req.param()
