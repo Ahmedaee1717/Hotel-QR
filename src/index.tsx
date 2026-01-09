@@ -7345,13 +7345,21 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     
+    // Extract source table and original ID from prefixed offering_id
+    // Format: H10 -> hotel table, ID 10 | A5 -> activity table, ID 5
+    const prefix = offering_id.charAt(0).toUpperCase();
+    const originalId = offering_id.substring(1);
+    const sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activity';
+    
+    console.log(`Updating ${sourceTable} with ID ${originalId} (from ${offering_id})`);
+    
     // Validate offering belongs to property
     const offering = await DB.prepare(`
-      SELECT property_id FROM hotel_offerings WHERE offering_id = ?
-    `).bind(offering_id).first()
+      SELECT property_id FROM ${sourceTable} WHERE offering_id = ?
+    `).bind(originalId).first()
     
     if (!offering) {
-      return c.json({ error: 'Offering not found' }, 404)
+      return c.json({ error: 'Offering not found', details: `${sourceTable} ID ${originalId}` }, 404)
     }
     
     if (offering.property_id != property_id) {
@@ -7359,7 +7367,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
     }
     
     await DB.prepare(`
-      UPDATE hotel_offerings SET
+      UPDATE ${sourceTable} SET
         title_en = ?, short_description_en = ?, full_description_en = ?,
         price = ?, location = ?, duration_minutes = ?,
         requires_booking = ?, enable_booking = ?, images = ?, video_url = ?,
@@ -7380,7 +7388,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
       data.event_date || null,
       data.event_start_time || null,
       data.event_end_time || null,
-      offering_id,
+      originalId,
       property_id
     ).run()
     
