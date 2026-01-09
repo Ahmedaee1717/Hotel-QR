@@ -18681,7 +18681,7 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
     const guestId = guest?.guest_id
     const allBookings = []
     
-    // 1. Fetch Restaurant Reservations (by guest_id OR room_number)
+    // 1. Fetch Restaurant Reservations from table_reservations (by guest_id OR room_number)
     if (guestId || pass.room_number) {
       let query = `
         SELECT 
@@ -18707,6 +18707,35 @@ app.get('/api/guest/bookings/:pass_reference', async (c) => {
       const restaurants = await DB.prepare(query).bind(guestId || null, pass.room_number || null).all()
       
       allBookings.push(...restaurants.results)
+    }
+    
+    // 1b. Fetch A La Carte Vouchers (bookings made through OnePass system)
+    if (pass.pass_id) {
+      try {
+        const vouchers = await DB.prepare(`
+          SELECT 
+            av.voucher_id as id,
+            'restaurant' as type,
+            av.reservation_date as date,
+            av.reservation_time as start_time,
+            NULL as end_time,
+            COALESCE(ho.title_en, 'A La Carte Dining') as title,
+            COALESCE(ho.location, 'Resort Dining') as location,
+            av.status,
+            av.party_size as num_guests,
+            av.voucher_code as reference,
+            av.restaurant_id as offering_id
+          FROM alacarte_vouchers av
+          LEFT JOIN hotel_offerings ho ON av.restaurant_id = ho.offering_id
+          WHERE av.pass_id = ? AND av.status IN ('confirmed', 'used')
+          ORDER BY av.reservation_date ASC, av.reservation_time ASC
+        `).bind(pass.pass_id).all()
+        
+        console.log('A la carte vouchers found:', vouchers.results.length, 'for pass_id:', pass.pass_id)
+        allBookings.push(...vouchers.results)
+      } catch (e) {
+        console.log('A la carte vouchers query error:', e.message)
+      }
     }
     
     // 2. Fetch Activity Bookings (if exist)
