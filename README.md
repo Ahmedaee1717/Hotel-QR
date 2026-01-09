@@ -4,12 +4,12 @@ A complete, production-ready resort activity booking platform with QR code entry
 
 ## 🚀 Live Application
 
-**Production:** https://f1a91d52.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
-**Admin Dashboard:** https://f1a91d52.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
+**Production:** https://79384c9a.project-c8738f5c.pages.dev 🚀 **ALL WORKING!**
+**Admin Dashboard:** https://79384c9a.project-c8738f5c.pages.dev/admin-dashboard.html 🎛️ **COMPLETE ALACARTE**
 **À La Carte Section:** Click tab → Kitchen View, Analytics & Reports buttons work! 🔥📊
-**Analytics Dashboard:** https://f1a91d52.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
-**Kitchen View:** https://f1a91d52.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
-**Test Guest Page:** https://f1a91d52.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **CLEAN UI + CUSTOM MESSAGE WORKING**
+**Analytics Dashboard:** https://79384c9a.project-c8738f5c.pages.dev/admin-alacarte-analytics.html 📊 **✅ FULLY WORKING**
+**Kitchen View:** https://79384c9a.project-c8738f5c.pages.dev/kitchen/alacarte/3 👨‍🍳 **TABLET-OPTIMIZED**
+**Test Guest Page:** https://79384c9a.project-c8738f5c.pages.dev/hotel/paradise-resort 🎯 **NO ERRORS + IMAGES WORKING**
 **My Perfect Week:** https://08a476de.project-c8738f5c.pages.dev/my-perfect-week?property=1 📅✨ 
 **My Bookings:** https://08a476de.project-c8738f5c.pages.dev/my-bookings?property=1 📋✅ **All bookings with cancel!**
 **Mood Check:** https://08a476de.project-c8738f5c.pages.dev/mood-check?property=1 ❤️ **NEW: Prevent negative reviews!**
