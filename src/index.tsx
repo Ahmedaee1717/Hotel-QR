@@ -67318,7 +67318,29 @@ app.get('/room-service/:property_id', async (c) => {
             'ja': 'ホテルに戻る',
             'it': 'Torna all\\'hotel',
             'pt': 'Voltar ao Hotel',
-            'ko': '호텔로 돌아가기'
+            'ko': '호텔로 돌아가기',
+            'pl': 'Powrót do hotelu',
+            'cs': 'Zpět do hotelu',
+            'uk': 'Повернутися до готелю',
+            'tr': 'Otele Dön',
+            'hi': 'होटल पर वापस जाएं',
+            'el': 'Επιστροφή στο ξενοδοχείο',
+            'sv': 'Tillbaka till hotellet',
+            'no': 'Tilbake til hotellet',
+            'da': 'Tilbage til hotellet',
+            'ro': 'Înapoi la hotel',
+            'hu': 'Vissza a szállodába',
+            'fi': 'Takaisin hotelliin',
+            'hr': 'Natrag u hotel',
+            'sk': 'Späť do hotela',
+            'bg': 'Обратно в хотела',
+            'sr': 'Назад у хотел',
+            'sl': 'Nazaj v hotel',
+            'th': 'กลับไปที่โรงแรม',
+            'id': 'Kembali ke Hotel',
+            'vi': 'Quay lại khách sạn',
+            'tl': 'Bumalik sa Hotel',
+            'ms': 'Kembali ke Hotel'
           },
           'ready-to-order': {
             'en': 'Ready to Order?',
@@ -67331,7 +67353,29 @@ app.get('/room-service/:property_id', async (c) => {
             'ja': '注文の準備はできましたか？',
             'it': 'Pronto per ordinare?',
             'pt': 'Pronto para pedir?',
-            'ko': '주문할 준비가 되셨나요?'
+            'ko': '주문할 준비가 되셨나요?',
+            'pl': 'Gotowy do zamówienia?',
+            'cs': 'Připraveni objednat?',
+            'uk': 'Готові замовити?',
+            'tr': 'Sipariş vermeye hazır mısınız?',
+            'hi': 'ऑर्डर करने के लिए तैयार?',
+            'el': 'Έτοιμοι να παραγγείλετε;',
+            'sv': 'Redo att beställa?',
+            'no': 'Klar til å bestille?',
+            'da': 'Klar til at bestille?',
+            'ro': 'Pregătit să comandați?',
+            'hu': 'Készen áll a rendelésre?',
+            'fi': 'Valmis tilaamaan?',
+            'hr': 'Spremni za narudžbu?',
+            'sk': 'Pripravení objednať?',
+            'bg': 'Готови да поръчате?',
+            'sr': 'Спремни за наруџбину?',
+            'sl': 'Pripravljeni naročiti?',
+            'th': 'พร้อมสั่งอาหารหรือยัง?',
+            'id': 'Siap memesan?',
+            'vi': 'Sẵn sàng đặt hàng?',
+            'tl': 'Handa nang mag-order?',
+            'ms': 'Bersedia untuk memesan?'
           },
           'call-to-order': {
             'en': 'Call us to place your order',
@@ -67344,7 +67388,29 @@ app.get('/room-service/:property_id', async (c) => {
             'ja': 'ご注文は電話でお願いします',
             'it': 'Chiamaci per effettuare l\\'ordine',
             'pt': 'Ligue para fazer seu pedido',
-            'ko': '주문하려면 전화하세요'
+            'ko': '주문하려면 전화하세요',
+            'pl': 'Zadzwoń, aby złożyć zamówienie',
+            'cs': 'Zavolejte nám pro objednávku',
+            'uk': 'Зателефонуйте нам, щоб зробити замовлення',
+            'tr': 'Sipariş vermek için bizi arayın',
+            'hi': 'ऑर्डर देने के लिए हमें कॉल करें',
+            'el': 'Καλέστε μας για να κάνετε την παραγγελία σας',
+            'sv': 'Ring oss för att beställa',
+            'no': 'Ring oss for å bestille',
+            'da': 'Ring os for at bestille',
+            'ro': 'Sunați-ne pentru a plasa comanda',
+            'hu': 'Hívjon minket a rendeléshez',
+            'fi': 'Soita meille tilauksen tekemiseksi',
+            'hr': 'Nazovite nas za narudžbu',
+            'sk': 'Zavolajte nám pre objednávku',
+            'bg': 'Обадете ни се, за да направите поръчка',
+            'sr': 'Позовите нас да поручите',
+            'sl': 'Pokličite nas za naročilo',
+            'th': 'โทรหาเราเพื่อสั่งอาหาร',
+            'id': 'Hubungi kami untuk memesan',
+            'vi': 'Gọi cho chúng tôi để đặt hàng',
+            'tl': 'Tumawag sa amin upang mag-order',
+            'ms': 'Hubungi kami untuk membuat pesanan'
           },
           'dial-from-room': {
             'en': 'Dial from your room phone:',
@@ -67357,7 +67423,29 @@ app.get('/room-service/:property_id', async (c) => {
             'ja': '客室の電話からダイヤル：',
             'it': 'Componi dal telefono della camera:',
             'pt': 'Disque do telefone do quarto:',
-            'ko': '객실 전화에서 다이얼：'
+            'ko': '객실 전화에서 다이얼：',
+            'pl': 'Dzwoń z telefonu pokojowego:',
+            'cs': 'Vytočte z telefonu v pokoji:',
+            'uk': 'Набирайте з телефону в номері:',
+            'tr': 'Oda telefonunuzdan arayın:',
+            'hi': 'कमरे के फोन से डायल करें:',
+            'el': 'Καλέστε από το τηλέφωνο του δωματίου:',
+            'sv': 'Ring från rumstelefonen:',
+            'no': 'Ring fra romtelefonen:',
+            'da': 'Ring fra værelsets telefon:',
+            'ro': 'Formați de la telefonul camerei:',
+            'hu': 'Tárcsázzon a szoba telefonjáról:',
+            'fi': 'Soita huoneen puhelimesta:',
+            'hr': 'Nazovite s telefona u sobi:',
+            'sk': 'Volajte z telefónu v izbe:',
+            'bg': 'Набирайте от телефона в стаята:',
+            'sr': 'Позовите са телефона у соби:',
+            'sl': 'Pokličite s sobnega telefona:',
+            'th': 'โทรจากโทรศัพท์ในห้อง:',
+            'id': 'Hubungi dari telepon kamar:',
+            'vi': 'Gọi từ điện thoại phòng:',
+            'tl': 'Tumawag mula sa telepono ng kuwarto:',
+            'ms': 'Dail dari telefon bilik:'
           },
           'or-call-desk': {
             'en': 'or call the front desk',
@@ -67370,7 +67458,29 @@ app.get('/room-service/:property_id', async (c) => {
             'ja': 'またはフロントに電話',
             'it': 'o chiama la reception',
             'pt': 'ou ligue para a recepção',
-            'ko': '또는 프런트 데스크로 전화하세요'
+            'ko': '또는 프런트 데스크로 전화하세요',
+            'pl': 'lub zadzwoń do recepcji',
+            'cs': 'nebo zavolejte na recepci',
+            'uk': 'або зателефонуйте на ресепшн',
+            'tr': 'veya resepsiyonu arayın',
+            'hi': 'या फ्रंट डेस्क पर कॉल करें',
+            'el': 'ή καλέστε την υποδοχή',
+            'sv': 'eller ring receptionen',
+            'no': 'eller ring resepsjonen',
+            'da': 'eller ring receptionen',
+            'ro': 'sau sunați la recepție',
+            'hu': 'vagy hívja a recepciót',
+            'fi': 'tai soita vastaanottoon',
+            'hr': 'ili nazovite recepciju',
+            'sk': 'alebo zavolajte na recepciu',
+            'bg': 'или се обадете на рецепцията',
+            'sr': 'или позовите рецепцију',
+            'sl': 'ali pokličite recepcijo',
+            'th': 'หรือโทรหาแผนกต้อนรับ',
+            'id': 'atau hubungi resepsionis',
+            'vi': 'hoặc gọi lễ tân',
+            'tl': 'o tumawag sa front desk',
+            'ms': 'atau hubungi kaunter tetamu'
           }
         };
         
@@ -67419,7 +67529,7 @@ app.get('/room-service/:property_id', async (c) => {
             });
         }
         
-        // Translate menu items using Google Translate API (client-side)
+        // Translate menu items using OpenAI API (batch translation)
         async function translateMenuItems(targetLang) {
             if (targetLang === 'en') {
                 // Reset to original English
@@ -67435,6 +67545,12 @@ app.get('/room-service/:property_id', async (c) => {
             });
             
             try {
+                // Check if menuItems exist
+                if (!menuItems || menuItems.length === 0) {
+                    console.warn('⚠️ No menu items to translate');
+                    return;
+                }
+                
                 // Collect all texts to translate
                 const textsToTranslate = [];
                 menuItems.forEach(item => {
@@ -67442,30 +67558,43 @@ app.get('/room-service/:property_id', async (c) => {
                     if (item.description) textsToTranslate.push(item.description);
                 });
                 
+                console.log('📝 Texts to translate:', textsToTranslate.length, 'items');
+                
+                // Join all texts with delimiter for batch translation
+                const combinedText = textsToTranslate.join('|||');
+                
                 // Call translation API
                 const response = await fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        texts: textsToTranslate,
-                        targetLang: targetLang
+                        text: combinedText,
+                        target_lang: targetLang
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Translation failed');
+                    const errorText = await response.text();
+                    console.error('❌ Translation API error:', errorText);
+                    throw new Error('Translation failed: ' + response.status);
                 }
                 
                 const data = await response.json();
-                const translated = data.translations;
+                console.log('✅ Translation response:', data);
+                
+                // Split translated text back into array
+                const translatedText = data.translation || data.translated_text || '';
+                const translatedArray = translatedText.split('|||');
+                
+                console.log('📝 Translated texts:', translatedArray.length, 'items');
                 
                 // Map translations back to menu items
                 let index = 0;
                 const translatedItems = menuItems.map(item => {
                     const translatedItem = { ...item };
-                    translatedItem.item_name = translated[index++] || item.item_name;
+                    translatedItem.item_name = translatedArray[index++] || item.item_name;
                     if (item.description) {
-                        translatedItem.description = translated[index++] || item.description;
+                        translatedItem.description = translatedArray[index++] || item.description;
                     }
                     return translatedItem;
                 });
@@ -67475,7 +67604,7 @@ app.get('/room-service/:property_id', async (c) => {
                 
             } catch (error) {
                 console.error('Translation error:', error);
-                alert('Translation service temporarily unavailable');
+                alert('Translation service temporarily unavailable. Error: ' + error.message);
             } finally {
                 // Remove loading state
                 document.querySelectorAll('.translate-item').forEach(el => {
