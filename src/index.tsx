@@ -7396,11 +7396,22 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
     // Convert property_id to integer for database query
     const propertyIdInt = parseInt(property_id, 10);
     
-    // Extract source table and original ID from prefixed offering_id
-    // Format: H10 -> hotel_offerings ID 10 | A5 -> activity ID 5
-    const prefix = offering_id.charAt(0).toUpperCase();
-    const originalId = parseInt(offering_id.substring(1), 10);
-    const sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activity';
+    // Extract source table and original ID from offering_id
+    // Handles both formats: "H10" or "10" (numeric only)
+    let prefix, originalId, sourceTable;
+    
+    if (/^[A-Z]\d+$/i.test(offering_id)) {
+      // Format: H10 -> hotel_offerings ID 10 | A5 -> activities ID 5
+      prefix = offering_id.charAt(0).toUpperCase();
+      originalId = parseInt(offering_id.substring(1), 10);
+      sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activities';
+    } else {
+      // Numeric only: assume hotel_offerings
+      originalId = parseInt(offering_id, 10);
+      sourceTable = 'hotel_offerings';
+    }
+    
+    console.log(`PUT /api/admin/offerings/${offering_id} -> table=${sourceTable}, id=${originalId}`);
     
     // Validate offering exists and belongs to property
     const offering = await DB.prepare(`
@@ -7409,6 +7420,7 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
     `).bind(originalId, propertyIdInt).first()
     
     if (!offering) {
+      console.error(`Offering not found: ${sourceTable}.offering_id=${originalId}, property_id=${propertyIdInt}`);
       return c.json({ error: 'Offering not found' }, 404)
     }
     
@@ -66447,6 +66459,41 @@ app.get('/api/alacarte/restaurants', async (c) => {
   } catch (error) {
     console.error('Get restaurants error:', error)
     return c.json({ success: false, error: 'Failed to fetch restaurants' }, 500)
+  }
+})
+
+// Get all menu items for admin dashboard
+app.get('/api/alacarte/menu-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  
+  try {
+    const items = await DB.prepare(`
+      SELECT 
+        item_id,
+        restaurant_id,
+        category,
+        item_name,
+        item_name_ar,
+        description,
+        description_ar,
+        cost_to_hotel,
+        is_premium,
+        allergens,
+        is_available,
+        display_order
+      FROM alacarte_menu_items
+      WHERE property_id = ?
+      ORDER BY restaurant_id, category, display_order
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      items: items.results
+    })
+  } catch (error) {
+    console.error('Get menu items error:', error)
+    return c.json({ success: false, error: 'Failed to fetch menu items' }, 500)
   }
 })
 
