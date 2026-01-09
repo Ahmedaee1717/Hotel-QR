@@ -7935,7 +7935,7 @@ app.post('/api/translate', async (c) => {
           { role: 'user', content: text }
         ],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 4000  // Increased from 500 to handle large menu translations
       })
     })
     
