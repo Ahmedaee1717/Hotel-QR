@@ -64158,12 +64158,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       // Authenticated fetch helper
       async function fetchWithAuth(url, options = {}) {
-        const headers = {
-          ...options.headers,
+        const headers = Object.assign({}, options.headers || {}, {
           'X-User-ID': userId,
           'X-Property-ID': propertyId
-        };
-        return fetch(url, { ...options, headers });
+        });
+        const fetchOptions = Object.assign({}, options, { headers: headers });
+        return fetch(url, fetchOptions);
       }
       
       let tables = [];
@@ -64512,8 +64512,20 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             const preorder = {};
             Object.keys(selectedItems).forEach(itemId => {
                 const item = selectedItems[itemId];
-                preorder[\`preorder_\${item.category}\`] = parseInt(itemId);
+                preorder['preorder_' + item.category] = parseInt(itemId);
             });
+            
+            // Merge preorder into request body
+            const requestBody = {
+                pass_reference: passReference,
+                restaurant_id: restaurantId,
+                reservation_date: date,
+                reservation_time: time,
+                party_size_adults: parseInt(adults),
+                party_size_children: parseInt(children),
+                table_id: selectedTableId
+            };
+            Object.assign(requestBody, preorder);
             
             try {
                 const response = await fetch('/api/alacarte/voucher', {
@@ -64522,30 +64534,19 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         'Content-Type': 'application/json',
                         'X-Property-ID': propertyId
                     },
-                    body: JSON.stringify({
-                        pass_reference: passReference,
-                        restaurant_id: restaurantId,
-                        reservation_date: date,
-                        reservation_time: time,
-                        party_size_adults: parseInt(adults),
-                        party_size_children: parseInt(children),
-                        table_id: selectedTableId,
-                        ...preorder
-                    })
-                });
-                        party_size_children: parseInt(children),
-                        ...preorder
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    const { voucher_code, meals_remaining, total_cost } = data;
-                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nRedirecting to your bookings...\`);
+                    const voucher_code = data.voucher_code;
+                    const meals_remaining = data.meals_remaining;
+                    const total_cost = data.total_cost;
+                    alert('✅ Voucher Created Successfully!\n\nVoucher Code: ' + voucher_code + '\nTotal Cost: €' + total_cost.toFixed(2) + '\nMeals Remaining: ' + meals_remaining + '\n\nRedirecting to your bookings...');
                     
                     // Redirect to my bookings page
-                    window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
+                    window.location.href = '/my-bookings?property=' + propertyId + (passReference ? '&pass=' + passReference : '');
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
@@ -64608,7 +64609,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             const trimmedText = text.trim();
             if (!trimmedText) return text; // Skip whitespace-only
             
-            const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
+            const cacheKey = targetLanguage + ':' + trimmedText;
             if (translationCache.has(cacheKey)) {
                 return translationCache.get(cacheKey);
             }
@@ -65506,7 +65507,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const trimmedText = text.trim();
             if (!trimmedText) return text; // Skip whitespace-only
             
-            const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
+            const cacheKey = targetLanguage + ':' + trimmedText;
             if (translationCache.has(cacheKey)) {
                 return translationCache.get(cacheKey);
             }
