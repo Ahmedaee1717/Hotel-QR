@@ -7348,49 +7348,24 @@ app.put('/api/admin/offerings/:offering_id', async (c) => {
     // Extract source table and original ID from prefixed offering_id
     // Format: H10 -> hotel table, ID 10 | A5 -> activity table, ID 5
     const prefix = offering_id.charAt(0).toUpperCase();
-    const originalId = offering_id.substring(1);
-    const sourceTable = prefix === 'H' ? 'hotel_offerings' : 'activity';
+    const originalId = parseInt(offering_id.substring(1), 10); // Convert to integer
     
-    console.log(`Updating ${sourceTable} with ID ${originalId} (from ${offering_id})`);
+    console.log(`UPDATE request for ${offering_id} -> prefix: ${prefix}, originalId: ${originalId} (int), property: ${property_id}`);
     
-    // Validate offering belongs to property
+    // Query hotel_offerings table (restaurants are stored there)
     const offering = await DB.prepare(`
-      SELECT property_id FROM ${sourceTable} WHERE offering_id = ?
+      SELECT offering_id, property_id, title_en FROM hotel_offerings WHERE offering_id = ?
     `).bind(originalId).first()
     
-    if (!offering) {
-      return c.json({ error: 'Offering not found', details: `${sourceTable} ID ${originalId}` }, 404)
-    }
-    
-    if (offering.property_id != property_id) {
-      return c.json({ error: 'Offering not found' }, 404)
-    }
-    
-    await DB.prepare(`
-      UPDATE ${sourceTable} SET
-        title_en = ?, short_description_en = ?, full_description_en = ?,
-        price = ?, location = ?, duration_minutes = ?,
-        requires_booking = ?, enable_booking = ?, images = ?, video_url = ?,
-        event_date = ?, event_start_time = ?, event_end_time = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE offering_id = ? AND property_id = ?
-    `).bind(
-      data.title_en || '',
-      data.short_description_en || '',
-      data.full_description_en || '',
-      data.price || 0,
-      data.location || '',
-      data.duration_minutes || null,
-      data.requires_booking ? 1 : 0,
-      data.enable_booking !== undefined ? (data.enable_booking ? 1 : 0) : null,
-      data.images || JSON.stringify([]),
-      data.video_url || null,
-      data.event_date || null,
-      data.event_start_time || null,
-      data.event_end_time || null,
-      originalId,
-      property_id
-    ).run()
+    // DEBUG: Return what we found
+    return c.json({ 
+      debug: true,
+      searchedFor: originalId,
+      searchedForType: typeof originalId,
+      property_id_from_header: property_id,
+      offering: offering,
+      message: offering ? 'Found' : 'Not found'
+    });
     
     // Update restaurant menus if provided
     if (data.offering_type === 'restaurant' && data.menu_urls !== undefined) {
