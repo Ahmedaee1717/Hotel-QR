@@ -21024,7 +21024,7 @@ app.get('/hotel/:property_slug', async (c) => {
             
             <!-- Right: Action Buttons -->
             <div class="flex items-center gap-4">
-                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-md">
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-md" style="background-color: var(--accent-color, #D4AF37);">
                     <i class="fas fa-clipboard-list mr-2"></i>My Bookings
                 </a>
                 <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-2.5 rounded-xl" title="Sign out">
@@ -22577,6 +22577,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           // Apply colors to pass link bar via CSS variables
           document.documentElement.style.setProperty('--pass-bar-primary', primaryColor);
           document.documentElement.style.setProperty('--pass-bar-secondary', secondaryColor);
+          document.documentElement.style.setProperty('--accent-color', accentColor);
           
           // Logo - add to propertyLogo container (Facebook Profile Style)
           console.log('🎨 Loading logo from settings:', settings.brand_logo_url);
@@ -24285,7 +24286,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                         <div class="pt-3 border-t border-gray-100 space-y-2">
                             \${isEligible ? \`
                             <button onclick="window.location.href='\${bookingUrl}'" 
-                                    class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-lg hover:opacity-90 font-bold text-sm transition-all shadow-md">
+                                    class="w-full text-white py-3 rounded-lg hover:opacity-90 font-bold text-sm transition-all shadow-md" style="background-color: var(--accent-color, #D4AF37);">
                                 <i class="fas fa-ticket-alt mr-2"></i>Use Voucher (\${voucherData.vouchers.remaining} Left)
                             </button>
                             \` : ''}
