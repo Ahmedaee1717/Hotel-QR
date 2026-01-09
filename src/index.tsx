@@ -67529,7 +67529,7 @@ app.get('/room-service/:property_id', async (c) => {
             });
         }
         
-        // Translate menu items using OpenAI API (batch translation)
+        // Translate menu items using OpenAI API (batch translation with numbered format)
         async function translateMenuItems(targetLang) {
             if (targetLang === 'en') {
                 // Reset to original English
@@ -67551,7 +67551,7 @@ app.get('/room-service/:property_id', async (c) => {
                     return;
                 }
                 
-                // Collect all texts to translate
+                // Collect all texts to translate with numbering
                 const textsToTranslate = [];
                 menuItems.forEach(item => {
                     textsToTranslate.push(item.item_name);
@@ -67560,15 +67560,21 @@ app.get('/room-service/:property_id', async (c) => {
                 
                 console.log('📝 Texts to translate:', textsToTranslate.length, 'items');
                 
-                // Join all texts with delimiter for batch translation
-                const combinedText = textsToTranslate.join('|||');
+                // Format as numbered list for better preservation
+                const numberedText = textsToTranslate.map((text, idx) => {
+                    return '[' + (idx + 1) + '] ' + text;
+                }).join('\\n');
                 
-                // Call translation API
+                console.log('📤 Sending to API:', numberedText.substring(0, 200) + '...');
+                
+                // Call translation API with instruction to preserve numbering
+                const instructionText = 'Translate the following numbered list to ' + targetLang + '. IMPORTANT: Preserve the exact numbering format [1], [2], etc. and translate ONLY the text after each number. Return the COMPLETE list with ALL ' + textsToTranslate.length + ' items:\\n\\n' + numberedText;
+                
                 const response = await fetch('/api/translate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text: combinedText,
+                        text: instructionText,
                         target_lang: targetLang
                     })
                 });
@@ -67580,13 +67586,43 @@ app.get('/room-service/:property_id', async (c) => {
                 }
                 
                 const data = await response.json();
-                console.log('✅ Translation response:', data);
+                console.log('✅ Translation response received');
                 
-                // Split translated text back into array
+                // Extract translations from numbered format
                 const translatedText = data.translation || data.translated_text || '';
-                const translatedArray = translatedText.split('|||');
+                console.log('📥 Received text:', translatedText.substring(0, 200) + '...');
                 
-                console.log('📝 Translated texts:', translatedArray.length, 'items');
+                // Parse numbered format: [1] text, [2] text, etc.
+                const translatedArray = [];
+                const lines = translatedText.split('\\n');
+                
+                lines.forEach(line => {
+                    // Match pattern [number] text
+                    const match = line.match(/\\[(\\d+)\\]\\s*(.+)/);
+                    if (match) {
+                        const index = parseInt(match[1]) - 1;
+                        const text = match[2].trim();
+                        translatedArray[index] = text;
+                    }
+                });
+                
+                console.log('📝 Parsed translations:', translatedArray.length, 'items');
+                
+                // If parsing failed, fall back to simple split
+                if (translatedArray.length < textsToTranslate.length * 0.8) {
+                    console.warn('⚠️ Numbered parsing incomplete, trying fallback...');
+                    // Try splitting by newlines and removing numbers
+                    const fallbackArray = translatedText
+                        .split('\\n')
+                        .map(line => line.replace(/^\\[\\d+\\]\\s*/, '').trim())
+                        .filter(line => line.length > 0);
+                    
+                    if (fallbackArray.length >= translatedArray.length) {
+                        translatedArray.length = 0;
+                        translatedArray.push(...fallbackArray);
+                        console.log('✅ Fallback parsing:', translatedArray.length, 'items');
+                    }
+                }
                 
                 // Map translations back to menu items
                 let index = 0;
@@ -67598,6 +67634,8 @@ app.get('/room-service/:property_id', async (c) => {
                     }
                     return translatedItem;
                 });
+                
+                console.log('✅ Mapped to menu items successfully');
                 
                 // Re-render menu with translated items
                 renderMenuItems(translatedItems);
