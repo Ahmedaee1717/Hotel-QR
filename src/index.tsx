@@ -64173,6 +64173,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         console.log('🚀 Restaurant Admin init() starting...');
         await loadRestaurant();
         await loadOccupancyStatus();
+        await loadTables();  // Load tables for floor plan
         console.log('✅ Restaurant Admin init() complete!');
       }
 
@@ -64433,11 +64434,140 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const response = await fetchWithAuth('/api/restaurant/' + numericOfferingId + '/tables');
           const data = await response.json();
           tables = data.tables || [];
-          renderTables();
-          updateTablesList();
+          
+          // Render tables on admin floor plan (not booking canvas)
+          renderAdminFloorPlan();
+          // updateTablesList(); // Optional: add if table list UI exists
         } catch (error) {
           console.error('Load tables error:', error);
         }
+      }
+      
+      // Admin floor plan renderer
+      function renderAdminFloorPlan() {
+        const canvas = document.getElementById('canvas');
+        if (!canvas) {
+          console.warn('Admin canvas not found');
+          return;
+        }
+        
+        // Clear existing tables
+        canvas.innerHTML = '';
+        
+        // Render each table as a draggable element
+        tables.forEach(table => {
+          const tableEl = document.createElement('div');
+          tableEl.className = 'table-item';
+          tableEl.id = 'table-' + table.table_id;
+          tableEl.style.left = table.position_x + 'px';
+          tableEl.style.top = table.position_y + 'px';
+          tableEl.style.width = table.width + 'px';
+          tableEl.style.height = table.height + 'px';
+          
+          if (table.shape === 'circle') {
+            tableEl.classList.add('table-circle');
+          } else if (table.shape === 'square') {
+            tableEl.classList.add('table-square');
+          } else {
+            tableEl.classList.add('table-rectangle');
+          }
+          
+          tableEl.textContent = table.table_number;
+          tableEl.onclick = () => selectTable(table);
+          tableEl.onmousedown = (e) => startDrag(e, table);
+          
+          canvas.appendChild(tableEl);
+        });
+        
+        console.log('✅ Rendered ' + tables.length + ' tables on admin floor plan');
+      }
+      
+      // Admin drag handlers
+      function startDrag(e, table) {
+        e.preventDefault();
+        isDragging = true;
+        selectedTable = table;
+        
+        const tableEl = document.getElementById('table-' + table.table_id);
+        const rect = tableEl.getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+        
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+      }
+      
+      function handleDragMove(e) {
+        if (!isDragging || !selectedTable) return;
+        
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        const newX = e.clientX - canvasRect.left - dragOffset.x;
+        const newY = e.clientY - canvasRect.top - dragOffset.y;
+        
+        const tableEl = document.getElementById('table-' + selectedTable.table_id);
+        tableEl.style.left = newX + 'px';
+        tableEl.style.top = newY + 'px';
+      }
+      
+      function handleDragEnd(e) {
+        if (!isDragging || !selectedTable) return;
+        
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        const finalX = e.clientX - canvasRect.left - dragOffset.x;
+        const finalY = e.clientY - canvasRect.top - dragOffset.y;
+        
+        // Save position to database
+        saveTablePosition(selectedTable.table_id, finalX, finalY);
+        
+        isDragging = false;
+        selectedTable = null;
+        
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+      }
+      
+      async function saveTablePosition(tableId, x, y) {
+        try {
+          const response = await fetchWithAuth('/api/restaurant/tables/' + tableId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              position_x: Math.round(x),
+              position_y: Math.round(y)
+            })
+          });
+          
+          if (response.ok) {
+            console.log('✅ Table position saved');
+            // Update local data
+            const table = tables.find(t => t.table_id === tableId);
+            if (table) {
+              table.position_x = Math.round(x);
+              table.position_y = Math.round(y);
+            }
+          } else {
+            console.error('❌ Failed to save table position');
+          }
+        } catch (error) {
+          console.error('❌ Error saving table position:', error);
+        }
+      }
+      
+      function selectTable(table) {
+        selectedTable = table;
+        console.log('Admin table selected:', table.table_number);
+        // Optionally highlight selected table
+        document.querySelectorAll('.table-item').forEach(el => {
+          el.classList.remove('ring-4', 'ring-blue-500');
+        });
+        document.getElementById('table-' + table.table_id).classList.add('ring-4', 'ring-blue-500');
       }
 
       function renderTables() {
