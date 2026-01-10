@@ -68447,7 +68447,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             <div class="flex flex-wrap gap-6 text-sm">
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 bg-yellow-400 rounded shadow-lg"></div>
-                    <span class="font-medium dark-text">New Orders</span>
+                    <span class="font-medium dark-text">Accepted</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 bg-orange-500 rounded shadow-lg"></div>
@@ -68455,7 +68455,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 rounded shadow-lg" style="background-color: #D4AF37;"></div>
-                    <span class="font-medium dark-text">Ready to Serve</span>
+                    <span class="font-medium dark-text">Service (Ready)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <div class="w-4 h-4 bg-slate-500 rounded shadow-lg"></div>
@@ -68658,20 +68658,40 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 
                 let actionButton = '';
                 if (order.status === 'confirmed') {
-                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'preparing\\\')" class="action-btn w-full bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">' +
+                    actionButton = '<div class="flex gap-2">' +
+                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'preparing\\\')" class="action-btn flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">' +
                         '<i class="fas fa-fire mr-2"></i>START PREPARING' +
-                        '</button>';
+                        '</button>' +
+                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                        '</div>';
                 } else if (order.status === 'preparing') {
-                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'ready\\\')" class="action-btn w-full bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors">' +
-                        '<i class="fas fa-check-circle mr-2"></i>MARK AS READY' +
-                        '</button>';
+                    actionButton = '<div class="flex gap-2">' +
+                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'ready\\\')" class="action-btn flex-1 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors">' +
+                        '<i class="fas fa-concierge-bell mr-2"></i>READY TO SERVE' +
+                        '</button>' +
+                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                        '</div>';
                 } else if (order.status === 'ready') {
-                    actionButton = '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'served\\\')" class="action-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">' +
-                        '<i class="fas fa-check-double mr-2"></i>MARK AS SERVED' +
-                        '</button>';
+                    actionButton = '<div class="flex gap-2">' +
+                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'served\\\')" class="action-btn flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">' +
+                        '<i class="fas fa-check-double mr-2"></i>COMPLETE ORDER' +
+                        '</button>' +
+                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                        '</div>';
                 } else {
-                    actionButton = '<div class="action-btn w-full bg-gray-200 text-gray-600 font-bold rounded-lg flex items-center justify-center">' +
+                    actionButton = '<div class="flex gap-2">' +
+                        '<div class="action-btn flex-1 bg-gray-200 text-gray-600 font-bold rounded-lg flex items-center justify-center">' +
                         '<i class="fas fa-check-double mr-2"></i>COMPLETED' +
+                        '</div>' +
+                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<i class="fas fa-trash"></i>' +
+                        '</button>' +
                         '</div>';
                 }
                 
@@ -68737,6 +68757,33 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             } catch (error) {
                 console.error('Update status error:', error);
                 alert('Error updating status');
+            }
+        }
+
+        async function deleteOrder(voucherId) {
+            if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/kitchen/order/' + voucherId, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadOrders();
+                } else {
+                    alert('Failed to delete order: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete order error:', error);
+                alert('Error deleting order');
             }
         }
 
@@ -68931,6 +68978,33 @@ app.post('/api/kitchen/order-status', async (c) => {
     return c.json({
       success: false,
       error: 'Failed to update status'
+    }, 500)
+  }
+})
+
+// API: Delete order
+app.delete('/api/kitchen/order/:voucher_id', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { voucher_id } = c.req.param()
+  const { DB } = c.env
+  
+  try {
+    // Delete the order
+    await DB.prepare(`
+      DELETE FROM alacarte_vouchers
+      WHERE voucher_id = ?
+        AND property_id = ?
+    `).bind(voucher_id, property_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Order deleted successfully'
+    })
+  } catch (error) {
+    console.error('Delete order error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to delete order'
     }, 500)
   }
 })
@@ -69194,3 +69268,4 @@ export default {
     }
   }
 }
+
