@@ -70087,8 +70087,17 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         <!-- Filters and View Tabs - DARK MODE -->
         <div class="dark-card rounded-lg shadow-lg p-4 mb-6">
             <div class="flex flex-wrap items-center gap-4 mb-4">
-                <!-- Date Filter -->
+                <!-- View Mode Toggle -->
                 <div class="flex items-center gap-2">
+                    <label class="font-medium dark-text">View:</label>
+                    <select id="viewMode" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                        <option value="upcoming">📅 All Upcoming Orders</option>
+                        <option value="date">📆 Specific Date</option>
+                    </select>
+                </div>
+                
+                <!-- Date Filter (hidden by default) -->
+                <div id="dateFilterContainer" class="hidden flex items-center gap-2">
                     <label class="font-medium dark-text">Date:</label>
                     <input type="date" id="filterDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
                 </div>
@@ -70148,11 +70157,26 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         const propertyId = '${property_id}';
         let orders = [];
         let currentView = 'orders'; // 'orders' or 'items'
+        let viewMode = 'upcoming'; // 'upcoming' or 'date'
         let selectedDate = new Date().toISOString().split('T')[0]; // Today
 
-        // Initialize date filter to today
+        // Initialize filters
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('filterDate').value = selectedDate;
+            
+            // View mode toggle
+            document.getElementById('viewMode').addEventListener('change', (e) => {
+                viewMode = e.target.value;
+                const dateContainer = document.getElementById('dateFilterContainer');
+                if (viewMode === 'date') {
+                    dateContainer.classList.remove('hidden');
+                } else {
+                    dateContainer.classList.add('hidden');
+                }
+                loadOrders();
+            });
+            
+            // Date filter
             document.getElementById('filterDate').addEventListener('change', (e) => {
                 selectedDate = e.target.value;
                 loadOrders();
@@ -70212,7 +70236,12 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
 
         async function loadOrders() {
             try {
-                const response = await fetch('/api/kitchen/orders/' + restaurantId + '?property=' + propertyId + '&date=' + selectedDate);
+                let url = '/api/kitchen/orders/' + restaurantId + '?property=' + propertyId + '&mode=' + viewMode;
+                if (viewMode === 'date') {
+                    url += '&date=' + selectedDate;
+                }
+                
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -70334,7 +70363,8 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                             ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.party_size || 0) + ' guests</span>' +
                         '</div>' +
                         '<div class="text-sm text-gray-600 mt-1">' +
-                            '<i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') +
+                            '<i class="fas fa-calendar mr-1"></i>' + (order.reservation_date || '--') + 
+                            ' <span class="ml-2"><i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') + '</span>' +
                         '</div>' +
                     '</div>' +
                     
@@ -70476,10 +70506,23 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
 app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
   const { restaurant_id } = c.req.param()
   const property_id = c.req.query('property') || '1'
-  const filterDate = c.req.query('date') || new Date().toISOString().split('T')[0] // Default to today
+  const filterDate = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const mode = c.req.query('mode') || 'upcoming' // 'date' for specific date, 'upcoming' for today+future
   const { DB } = c.env
   
   try {
+    // Build date filter based on mode
+    let dateCondition = ''
+    let bindParams = [restaurant_id, property_id]
+    
+    if (mode === 'upcoming') {
+      dateCondition = 'AND v.reservation_date >= ?'
+      bindParams.push(new Date().toISOString().split('T')[0]) // Today onwards
+    } else {
+      dateCondition = 'AND v.reservation_date = ?'
+      bindParams.push(filterDate)
+    }
+    
     // Get all active orders (confirmed, preparing, ready, served)
     const orders = await DB.prepare(`
       SELECT 
@@ -70499,8 +70542,9 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       WHERE v.restaurant_id = ?
         AND v.property_id = ?
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
-        AND v.reservation_date = ?
+        ${dateCondition}
       ORDER BY 
+        v.reservation_date ASC,
         CASE v.status 
           WHEN 'confirmed' THEN 1
           WHEN 'preparing' THEN 2
@@ -70508,7 +70552,7 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
           WHEN 'served' THEN 4
         END,
         v.reservation_time ASC
-    `).bind(restaurant_id, property_id, filterDate).all()
+    `).bind(...bindParams).all()
     
     // Handle empty results
     if (!orders || !orders.results) {
