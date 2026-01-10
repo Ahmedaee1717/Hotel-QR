@@ -27198,11 +27198,17 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 alert('Please link your guest pass first to request services');
                 return;
             }
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+            
             document.getElementById('serviceModal').classList.remove('hidden');
             renderServiceTypes();
         }
 
         function closeServiceMenu() {
+            // Re-enable body scroll
+            document.body.style.overflow = '';
+            
             document.getElementById('serviceModal').classList.add('hidden');
         }
 
