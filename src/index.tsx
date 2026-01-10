@@ -63316,6 +63316,697 @@ app.get('/waitlist/:waitlist_id', (c) => {
   `)
 })
 
+// Front Desk À La Carte Booking Dashboard
+app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
+  const { property_id } = c.req.param()
+  const { DB } = c.env
+  
+  // Get property branding
+  const property = await DB.prepare('SELECT property_name, primary_color, secondary_color, accent_color FROM properties WHERE property_id = ?')
+    .bind(property_id).first()
+  
+  const primaryColor = property?.primary_color || '#972626'
+  const secondaryColor = property?.secondary_color || '#7a1f1f'
+  const accentColor = property?.accent_color || '#D4AF37'
+  
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>À La Carte Booking - ${property?.property_name || 'Front Desk'}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: ${primaryColor};
+            --secondary-color: ${secondaryColor};
+            --accent-color: ${accentColor};
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            touch-action: manipulation;
+        }
+        
+        .brand-gradient {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        }
+        
+        .accent-bg {
+            background-color: var(--accent-color);
+        }
+        
+        .accent-text {
+            color: var(--accent-color);
+        }
+        
+        .accent-border {
+            border-color: var(--accent-color);
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            transition: all 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn-accent {
+            background: var(--accent-color);
+            transition: all 0.2s;
+        }
+        
+        .btn-accent:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .menu-item {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .menu-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        
+        .menu-item.selected {
+            border: 3px solid var(--accent-color);
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.05) 0%, rgba(212, 175, 55, 0.1) 100%);
+        }
+        
+        .step-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .step-indicator.active {
+            background: var(--accent-color);
+            color: white;
+            transform: scale(1.2);
+        }
+        
+        .step-indicator.completed {
+            background: #10b981;
+            color: white;
+        }
+        
+        .step-indicator.inactive {
+            background: #e5e7eb;
+            color: #9ca3af;
+        }
+        
+        .quantity-controls button {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .shake {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        /* Tablet optimizations */
+        @media (min-width: 768px) {
+            .container-tablet {
+                max-width: 900px;
+                margin: 0 auto;
+            }
+        }
+        
+        /* Touch-friendly sizing */
+        .touch-target {
+            min-height: 48px;
+            min-width: 48px;
+        }
+        
+        input, select, button {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="brand-gradient text-white py-4 px-6 shadow-lg sticky top-0 z-50">
+        <div class="container-tablet flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">À La Carte Booking</h1>
+                <p class="text-white/80 text-sm">${property?.property_name || 'Front Desk System'}</p>
+            </div>
+            <button onclick="confirmReset()" class="text-white/90 hover:text-white px-4 py-2 rounded-lg hover:bg-white/10 transition">
+                <i class="fas fa-redo mr-2"></i>New Booking
+            </button>
+        </div>
+    </div>
+
+    <!-- Step Indicator -->
+    <div class="bg-white shadow-sm py-4 px-6 mb-6">
+        <div class="container-tablet">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div id="step1" class="step-indicator active">1</div>
+                    <span class="text-sm font-medium hidden sm:inline">Guest Info</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-2"></div>
+                <div class="flex items-center gap-2">
+                    <div id="step2" class="step-indicator inactive">2</div>
+                    <span class="text-sm font-medium hidden sm:inline">Restaurant</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-2"></div>
+                <div class="flex items-center gap-2">
+                    <div id="step3" class="step-indicator inactive">3</div>
+                    <span class="text-sm font-medium hidden sm:inline">Menu</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-2"></div>
+                <div class="flex items-center gap-2">
+                    <div id="step4" class="step-indicator inactive">4</div>
+                    <span class="text-sm font-medium hidden sm:inline">Confirm</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-tablet px-6 pb-8">
+        <!-- Step 1: Guest Information -->
+        <div id="stepContent1" class="fade-in">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-user-circle mr-3 accent-text"></i>
+                    Guest Information
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Guest Name *</label>
+                        <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Room Number *</label>
+                        <input type="text" id="roomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Party Size *</label>
+                        <div class="flex items-center gap-4">
+                            <button onclick="adjustPartySize(-1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" id="partySize" value="2" min="1" max="12" class="w-24 text-center px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color text-xl font-bold touch-target" readonly>
+                            <button onclick="adjustPartySize(1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Date *</label>
+                        <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2">Time *</label>
+                        <input type="time" id="bookingTime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target">
+                    </div>
+                </div>
+            </div>
+            <button onclick="goToStep(2)" class="w-full btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                <i class="fas fa-arrow-right mr-2"></i>Next: Select Restaurant
+            </button>
+        </div>
+
+        <!-- Step 2: Restaurant Selection -->
+        <div id="stepContent2" class="hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-utensils mr-3 accent-text"></i>
+                    Select Restaurant
+                </h2>
+                <div id="restaurantsList" class="grid grid-cols-1 gap-4">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="goToStep(1)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="goToStep(3)" class="flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    Next: Choose Menu<i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Menu Selection -->
+        <div id="stepContent3" class="hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-clipboard-list mr-3 accent-text"></i>
+                    Select Menu Items
+                </h2>
+                <div id="menuCategories" class="space-y-6">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="goToStep(2)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="goToStep(4)" class="flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    Review Order<i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 4: Confirmation -->
+        <div id="stepContent4" class="hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-check-circle mr-3 accent-text"></i>
+                    Review & Confirm
+                </h2>
+                <div id="orderSummary" class="space-y-4">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="goToStep(3)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="submitBooking()" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition">
+                    <i class="fas fa-check-double mr-2"></i>Confirm Booking
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[1001] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-8 text-center fade-in">
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-check text-4xl text-green-600"></i>
+            </div>
+            <h3 class="text-2xl font-bold mb-2">Booking Confirmed!</h3>
+            <p class="text-gray-600 mb-6">The order has been sent to the kitchen.</p>
+            <div id="bookingDetails" class="bg-gray-50 rounded-xl p-4 mb-6 text-left text-sm">
+                <!-- Details shown here -->
+            </div>
+            <button onclick="resetBooking()" class="w-full btn-accent text-white py-3 rounded-xl font-bold">
+                <i class="fas fa-plus mr-2"></i>Create New Booking
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const propertyId = '${property_id}';
+        let currentStep = 1;
+        let selectedRestaurant = null;
+        let selectedItems = {}; // { item_id: { item, quantity, customLimit } }
+        let restaurants = [];
+        let menuItems = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setTodayDate();
+            setCurrentTime();
+            loadRestaurants();
+        });
+        
+        function setTodayDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('bookingDate').value = today;
+        }
+        
+        function setCurrentTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('bookingTime').value = hours + ':' + minutes;
+        }
+        
+        function adjustPartySize(delta) {
+            const input = document.getElementById('partySize');
+            let value = parseInt(input.value) + delta;
+            if (value < 1) value = 1;
+            if (value > 12) value = 12;
+            input.value = value;
+        }
+        
+        async function loadRestaurants() {
+            try {
+                const response = await fetch('/api/alacarte/restaurants?property=' + propertyId, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                restaurants = data.restaurants || [];
+                renderRestaurants();
+            } catch (error) {
+                console.error('Failed to load restaurants:', error);
+                alert('Failed to load restaurants');
+            }
+        }
+        
+        function renderRestaurants() {
+            const list = document.getElementById('restaurantsList');
+            if (restaurants.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 text-center py-8">No restaurants available</p>';
+                return;
+            }
+            
+            list.innerHTML = restaurants.map(r => \`
+                <div class="menu-item border-2 border-gray-200 rounded-xl p-4 \${selectedRestaurant?.offering_id === r.offering_id ? 'selected' : ''}" 
+                     onclick="selectRestaurant(\${r.offering_id})">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-2xl">
+                            <i class="fas fa-utensils"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-lg">\${r.title_en || r.title}</h3>
+                            <p class="text-sm text-gray-600">\${r.location || ''}</p>
+                        </div>
+                        \${selectedRestaurant?.offering_id === r.offering_id ? '<i class="fas fa-check-circle text-2xl accent-text"></i>' : ''}
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function selectRestaurant(restaurantId) {
+            selectedRestaurant = restaurants.find(r => r.offering_id === restaurantId);
+            renderRestaurants();
+            loadMenuItems(restaurantId);
+        }
+        
+        async function loadMenuItems(restaurantId) {
+            try {
+                const response = await fetch('/api/alacarte/menu/' + restaurantId + '?property=' + propertyId, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                menuItems = data.items || [];
+            } catch (error) {
+                console.error('Failed to load menu:', error);
+                alert('Failed to load menu items');
+            }
+        }
+        
+        function renderMenuItems() {
+            const container = document.getElementById('menuCategories');
+            if (!selectedRestaurant || menuItems.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">Please select a restaurant first</p>';
+                return;
+            }
+            
+            // Group by category
+            const categories = {};
+            menuItems.forEach(item => {
+                const cat = item.category || 'other';
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push(item);
+            });
+            
+            container.innerHTML = Object.keys(categories).map(cat => \`
+                <div class="border-b pb-4">
+                    <h3 class="text-xl font-bold mb-3 capitalize accent-text">
+                        <i class="fas fa-tag mr-2"></i>\${cat}
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        \${categories[cat].map(item => renderMenuItem(item)).join('')}
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        function renderMenuItem(item) {
+            const isSelected = selectedItems[item.item_id];
+            const quantity = isSelected ? isSelected.quantity : 0;
+            
+            return \`
+                <div class="menu-item border-2 \${isSelected ? 'border-accent-color' : 'border-gray-200'} rounded-xl p-4">
+                    <div class="mb-3">
+                        <h4 class="font-bold">\${item.item_name}</h4>
+                        \${item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : ''}
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="quantity-controls flex items-center gap-2">
+                            <button onclick="adjustItemQuantity(\${item.item_id}, -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" \${quantity === 0 ? 'disabled' : ''}>
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <span class="w-12 text-center font-bold text-lg">\${quantity}</span>
+                            <button onclick="adjustItemQuantity(\${item.item_id}, 1)" class="btn-primary text-white">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        \${isSelected ? \`
+                            <button onclick="toggleCustomLimit(\${item.item_id})" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition">
+                                <i class="fas fa-sliders-h mr-1"></i>Limit
+                            </button>
+                        \` : ''}
+                    </div>
+                    <div id="customLimit\${item.item_id}" class="hidden mt-3 pt-3 border-t">
+                        <label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>
+                        <input type="number" id="limitInput\${item.item_id}" min="0" value="\${isSelected?.customLimit || ''}" 
+                               onchange="setCustomLimit(\${item.item_id}, this.value)"
+                               class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">
+                    </div>
+                </div>
+            \`;
+        }
+        
+        function adjustItemQuantity(itemId, delta) {
+            const item = menuItems.find(i => i.item_id === itemId);
+            if (!item) return;
+            
+            if (!selectedItems[itemId]) {
+                selectedItems[itemId] = { item, quantity: 0, customLimit: null };
+            }
+            
+            selectedItems[itemId].quantity += delta;
+            if (selectedItems[itemId].quantity <= 0) {
+                delete selectedItems[itemId];
+            }
+            
+            renderMenuItems();
+        }
+        
+        function toggleCustomLimit(itemId) {
+            const el = document.getElementById('customLimit' + itemId);
+            el.classList.toggle('hidden');
+        }
+        
+        function setCustomLimit(itemId, value) {
+            if (selectedItems[itemId]) {
+                selectedItems[itemId].customLimit = value ? parseInt(value) : null;
+            }
+        }
+        
+        function goToStep(step) {
+            // Validate current step
+            if (step > currentStep) {
+                if (currentStep === 1) {
+                    if (!document.getElementById('guestName').value.trim()) {
+                        alert('Please enter guest name');
+                        document.getElementById('guestName').classList.add('shake');
+                        setTimeout(() => document.getElementById('guestName').classList.remove('shake'), 500);
+                        return;
+                    }
+                    if (!document.getElementById('roomNumber').value.trim()) {
+                        alert('Please enter room number');
+                        return;
+                    }
+                    if (!document.getElementById('bookingDate').value) {
+                        alert('Please select a date');
+                        return;
+                    }
+                    if (!document.getElementById('bookingTime').value) {
+                        alert('Please select a time');
+                        return;
+                    }
+                } else if (currentStep === 2) {
+                    if (!selectedRestaurant) {
+                        alert('Please select a restaurant');
+                        return;
+                    }
+                    renderMenuItems();
+                } else if (currentStep === 3) {
+                    if (Object.keys(selectedItems).length === 0) {
+                        alert('Please select at least one menu item');
+                        return;
+                    }
+                    renderOrderSummary();
+                }
+            }
+            
+            // Hide all steps
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById('stepContent' + i).classList.add('hidden');
+                const stepEl = document.getElementById('step' + i);
+                stepEl.classList.remove('active', 'completed');
+                stepEl.classList.add('inactive');
+            }
+            
+            // Show current step
+            document.getElementById('stepContent' + step).classList.remove('hidden');
+            document.getElementById('step' + step).classList.add('active');
+            
+            // Mark completed steps
+            for (let i = 1; i < step; i++) {
+                document.getElementById('step' + i).classList.add('completed');
+                document.getElementById('step' + i).classList.remove('inactive');
+            }
+            
+            currentStep = step;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function renderOrderSummary() {
+            const summary = document.getElementById('orderSummary');
+            const guestName = document.getElementById('guestName').value;
+            const roomNumber = document.getElementById('roomNumber').value;
+            const partySize = document.getElementById('partySize').value;
+            const date = document.getElementById('bookingDate').value;
+            const time = document.getElementById('bookingTime').value;
+            
+            const itemsList = Object.values(selectedItems).map(s => \`
+                <div class="flex items-start justify-between py-2 border-b">
+                    <div class="flex-1">
+                        <p class="font-medium">\${s.item.item_name}</p>
+                        \${s.customLimit ? \`<p class="text-xs text-gray-500">Custom limit: \${s.customLimit}</p>\` : ''}
+                    </div>
+                    <span class="font-bold">×\${s.quantity}</span>
+                </div>
+            \`).join('');
+            
+            summary.innerHTML = \`
+                <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                    <h3 class="font-bold mb-2">Guest Details</h3>
+                    <div class="space-y-1 text-sm">
+                        <p><i class="fas fa-user w-6"></i><strong>Name:</strong> \${guestName}</p>
+                        <p><i class="fas fa-door-open w-6"></i><strong>Room:</strong> \${roomNumber}</p>
+                        <p><i class="fas fa-users w-6"></i><strong>Party:</strong> \${partySize} guests</p>
+                        <p><i class="fas fa-calendar w-6"></i><strong>Date:</strong> \${new Date(date).toLocaleDateString()}</p>
+                        <p><i class="fas fa-clock w-6"></i><strong>Time:</strong> \${time}</p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                    <h3 class="font-bold mb-2">Restaurant</h3>
+                    <p class="font-medium">\${selectedRestaurant.title_en || selectedRestaurant.title}</p>
+                    <p class="text-sm text-gray-600">\${selectedRestaurant.location || ''}</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <h3 class="font-bold mb-2">Selected Items (\${Object.keys(selectedItems).length})</h3>
+                    \${itemsList}
+                </div>
+            \`;
+        }
+        
+        async function submitBooking() {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Booking...';
+            
+            try {
+                const booking = {
+                    guest_name: document.getElementById('guestName').value,
+                    room_number: document.getElementById('roomNumber').value,
+                    party_size: parseInt(document.getElementById('partySize').value),
+                    reservation_date: document.getElementById('bookingDate').value,
+                    reservation_time: document.getElementById('bookingTime').value,
+                    restaurant_id: selectedRestaurant.offering_id,
+                    items: Object.values(selectedItems).map(s => ({
+                        item_id: s.item.item_id,
+                        quantity: s.quantity,
+                        custom_limit: s.customLimit
+                    }))
+                };
+                
+                const response = await fetch('/api/front-desk/alacarte-booking', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify(booking)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccessModal(data);
+                } else {
+                    alert('Failed to create booking: ' + (data.error || 'Unknown error'));
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-double mr-2"></i>Confirm Booking';
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                alert('Failed to create booking');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check-double mr-2"></i>Confirm Booking';
+            }
+        }
+        
+        function showSuccessModal(data) {
+            const details = document.getElementById('bookingDetails');
+            details.innerHTML = \`
+                <p class="mb-2"><strong>Voucher Code:</strong> \${data.voucher_code}</p>
+                <p class="mb-2"><strong>Guest:</strong> \${document.getElementById('guestName').value}</p>
+                <p class="mb-2"><strong>Room:</strong> \${document.getElementById('roomNumber').value}</p>
+                <p><strong>Items:</strong> \${Object.keys(selectedItems).length} selected</p>
+            \`;
+            document.getElementById('successModal').classList.remove('hidden');
+        }
+        
+        function confirmReset() {
+            if (confirm('Start a new booking? All current data will be lost.')) {
+                resetBooking();
+            }
+        }
+        
+        function resetBooking() {
+            selectedRestaurant = null;
+            selectedItems = {};
+            currentStep = 1;
+            document.getElementById('guestName').value = '';
+            document.getElementById('roomNumber').value = '';
+            document.getElementById('partySize').value = '2';
+            setTodayDate();
+            setCurrentTime();
+            document.getElementById('successModal').classList.add('hidden');
+            goToStep(1);
+        }
+    </script>
+</body>
+</html>
+  `)
+})
+
 // Staff Check-in Dashboard Route
 app.get('/staff/restaurant/:offering_id', (c) => {
   const { offering_id } = c.req.param()
@@ -68514,6 +69205,78 @@ app.get('/api/alacarte/voucher/:voucher_code', async (c) => {
   } catch (error) {
     console.error('Get voucher error:', error)
     return c.json({ success: false, error: 'Failed to fetch voucher' }, 500)
+  }
+})
+
+// Front Desk Manual À La Carte Booking
+app.post('/api/front-desk/alacarte-booking', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const {
+      guest_name,
+      room_number,
+      party_size,
+      reservation_date,
+      reservation_time,
+      restaurant_id,
+      items // [{ item_id, quantity, custom_limit }]
+    } = body
+    
+    // Validate required fields
+    if (!guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Generate voucher code
+    const timestamp = Date.now()
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+    const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
+    
+    // Get item IDs
+    const item_ids = items.map(i => i.item_id)
+    
+    // Create voucher
+    await DB.prepare(`
+      INSERT INTO alacarte_vouchers (
+        property_id,
+        voucher_code,
+        tier_id,
+        meal_number,
+        restaurant_id,
+        reservation_date,
+        reservation_time,
+        party_size,
+        table_number,
+        preorder_item_ids,
+        special_requests,
+        status,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
+    `).bind(
+      property_id,
+      voucher_code,
+      null, // No tier for manual bookings
+      null, // No meal number
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size,
+      null, // Table assigned by staff
+      JSON.stringify(item_ids),
+      `Manual booking - Guest: ${guest_name}, Room: ${room_number}`,
+    ).run()
+    
+    return c.json({
+      success: true,
+      voucher_code,
+      message: 'Booking created successfully'
+    })
+  } catch (error) {
+    console.error('Front desk booking error:', error)
+    return c.json({ success: false, error: 'Failed to create booking' }, 500)
   }
 })
 
