@@ -26071,16 +26071,16 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             .replace(/'/g, '&#039;');
           
           // Parse bold (**text**)
-          escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+          escaped = escaped.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
           
           // Parse italic (*text*)
-          escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+          escaped = escaped.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
           
           // Parse underline (__text__)
           escaped = escaped.replace(/__(.+?)__/g, '<u>$1</u>');
           
           // Parse line breaks
-          escaped = escaped.replace(/\n/g, '<br>');
+          escaped = escaped.replace(/\\n/g, '<br>');
           
           return escaped;
         }
