@@ -68428,8 +68428,8 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
 </head>
 <body class="bg-slate-900">
     <div class="max-w-7xl mx-auto p-4">
-        <!-- Professional Header - DARK MODE -->
-        <div class="dark-card border-b-4 border-emerald-500 shadow-xl p-6 mb-6 rounded-lg">
+        <!-- Professional Header - DARK MODE with BRAND COLORS -->
+        <div class="dark-card border-b-4 shadow-xl p-6 mb-6 rounded-lg" style="border-color: #D4AF37;">
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-3xl font-bold dark-text">${restaurant.title_en}</h1>
@@ -68437,7 +68437,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 </div>
                 <div class="text-right">
                     <div class="text-sm dark-text-muted">Last Updated</div>
-                    <div id="lastUpdate" class="text-lg font-semibold text-emerald-400">--:--</div>
+                    <div id="lastUpdate" class="text-lg font-semibold" style="color: #D4AF37;">--:--</div>
                 </div>
             </div>
         </div>
@@ -68454,7 +68454,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     <span class="font-medium dark-text">Preparing</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="w-4 h-4 bg-emerald-500 rounded shadow-lg"></div>
+                    <div class="w-4 h-4 rounded shadow-lg" style="background-color: #D4AF37;"></div>
                     <span class="font-medium dark-text">Ready to Serve</span>
                 </div>
                 <div class="flex items-center gap-2">
@@ -68481,7 +68481,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 </div>
                 
                 <!-- Refresh Button -->
-                <button onclick="loadOrders()" class="ml-auto px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-lg">
+                <button onclick="loadOrders()" class="ml-auto px-6 py-2 text-white rounded-lg font-semibold shadow-lg" style="background-color: #972626;" onmouseover="this.style.backgroundColor='#6B1529'" onmouseout="this.style.backgroundColor='#972626'">
                     <i class="fas fa-sync-alt mr-2"></i>Refresh
                 </button>
             </div>
@@ -68948,12 +68948,31 @@ app.get('/api/analytics/alacarte', async (c) => {
   try {
     // Calculate date range based on period
     let dateFilter = ''
-    if (period === 'today') {
+    let startDate = ''
+    let endDate = ''
+    
+    if (period.startsWith('custom:')) {
+      // Parse custom date range: custom:YYYY-MM-DD:YYYY-MM-DD
+      const parts = period.split(':')
+      if (parts.length === 3) {
+        startDate = parts[1]
+        endDate = parts[2]
+        dateFilter = `'${startDate}'`
+      } else {
+        throw new Error('Invalid custom date format. Expected: custom:YYYY-MM-DD:YYYY-MM-DD')
+      }
+    } else if (period === 'today') {
       dateFilter = "date('now')"
     } else if (period === 'week') {
       dateFilter = "date('now', '-7 days')"
     } else if (period === 'month') {
       dateFilter = "date('now', '-30 days')"
+    }
+    
+    // Build date condition for custom range
+    let dateCondition = `v.reservation_date >= ${dateFilter}`
+    if (startDate && endDate) {
+      dateCondition = `v.reservation_date BETWEEN '${startDate}' AND '${endDate}'`
     }
     
     // Build restaurant filter
@@ -68971,7 +68990,7 @@ app.get('/api/analytics/alacarte', async (c) => {
         COUNT(DISTINCT v.pass_id) as unique_guests
       FROM alacarte_vouchers v
       WHERE v.property_id = ?
-        AND v.reservation_date >= ${dateFilter}
+        AND ${dateCondition}
         ${restaurantFilter}
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
     `).bind(property_id).first()
@@ -68983,7 +69002,7 @@ app.get('/api/analytics/alacarte', async (c) => {
         COUNT(*) as order_count
       FROM alacarte_vouchers v
       WHERE v.property_id = ?
-        AND v.reservation_date >= ${dateFilter}
+        AND ${dateCondition}
         ${restaurantFilter}
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
       GROUP BY hour
@@ -69003,7 +69022,7 @@ app.get('/api/analytics/alacarte', async (c) => {
            json_each(v.preorder_item_ids) je
       JOIN alacarte_menu_items m ON m.item_id = je.value
       WHERE v.property_id = ?
-        AND v.reservation_date >= ${dateFilter}
+        AND ${dateCondition}
         ${restaurantFilter}
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
       GROUP BY m.item_id
@@ -69019,7 +69038,7 @@ app.get('/api/analytics/alacarte', async (c) => {
         SUM(v.total_cost) as revenue
       FROM alacarte_vouchers v
       WHERE v.property_id = ?
-        AND v.reservation_date >= ${dateFilter}
+        AND ${dateCondition}
         ${restaurantFilter}
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
       GROUP BY v.reservation_date
@@ -69033,7 +69052,7 @@ app.get('/api/analytics/alacarte', async (c) => {
         COUNT(*) as booking_count
       FROM alacarte_vouchers v
       WHERE v.property_id = ?
-        AND v.reservation_date >= ${dateFilter}
+        AND ${dateCondition}
         ${restaurantFilter}
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
       GROUP BY v.reservation_time

@@ -17,13 +17,13 @@
     </style>
 </head>
 <body class="bg-slate-900">
-    <!-- Header - DARK MODE -->
-    <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-6 shadow-2xl border-b-2 border-emerald-500">
+    <!-- Header - DARK MODE with BRAND COLORS -->
+    <div class="bg-gradient-to-r text-white py-6 shadow-2xl border-b-2" style="background: linear-gradient(135deg, #972626 0%, #6B1529 100%); border-color: #D4AF37;">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-3xl font-bold mb-2">
-                        <i class="fas fa-chart-line mr-3 text-emerald-400"></i>
+                        <i class="fas fa-chart-line mr-3" style="color: #D4AF37;"></i>
                         À La Carte Analytics & Reports
                     </h1>
                     <p class="text-slate-300">Real-time insights and AI-powered recommendations</p>
@@ -32,7 +32,7 @@
                     <a href="/admin-alacarte-viewer.html" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold transition-colors">
                         <i class="fas fa-utensils mr-2"></i>Menu Manager
                     </a>
-                    <a href="/kitchen/alacarte/3" target="_blank" class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                    <a href="/kitchen/alacarte/3" target="_blank" class="px-4 py-2 rounded-lg font-semibold transition-colors" style="background-color: #D4AF37; color: #000;" onmouseover="this.style.backgroundColor='#C49F2E'" onmouseout="this.style.backgroundColor='#D4AF37'">
                         <i class="fas fa-fire mr-2"></i>Kitchen View
                     </a>
                 </div>
@@ -52,7 +52,7 @@
                     <label class="font-medium dark-text">To:</label>
                     <input type="date" id="endDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
                 </div>
-                <button onclick="loadCustomDateRange()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-lg">
+                <button onclick="loadCustomDateRange()" class="px-6 py-2 text-white rounded-lg font-semibold shadow-lg" style="background-color: #972626;" onmouseover="this.style.backgroundColor='#6B1529'" onmouseout="this.style.backgroundColor='#972626'">
                     <i class="fas fa-filter mr-2"></i>Filter
                 </button>
                 <button onclick="clearDateFilter()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold">
@@ -63,8 +63,8 @@
 
         <!-- Quick Actions - DARK MODE -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <button onclick="loadReport('today')" class="dark-card hover:bg-slate-700 border-2 border-emerald-500 rounded-lg p-4 text-left transition-all shadow-lg">
-                <div class="text-emerald-400 text-3xl mb-2"><i class="fas fa-calendar-day"></i></div>
+            <button onclick="loadReport('today')" class="dark-card hover:bg-slate-700 border-2 rounded-lg p-4 text-left transition-all shadow-lg" style="border-color: #D4AF37;">
+                <div class="text-3xl mb-2" style="color: #D4AF37;"><i class="fas fa-calendar-day"></i></div>
                 <div class="font-bold dark-text">Today's Report</div>
                 <div class="text-sm dark-text-muted">Current day analytics</div>
             </button>
@@ -78,10 +78,10 @@
                 <div class="font-bold dark-text">Monthly Report</div>
                 <div class="text-sm dark-text-muted">Last 30 days</div>
             </button>
-            <button onclick="generateAIInsights()" class="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg p-4 text-left transition-all shadow-xl">
+            <button onclick="generateAIInsights()" class="text-white rounded-lg p-4 text-left transition-all shadow-xl" style="background: linear-gradient(135deg, #972626 0%, #6B1529 100%);" onmouseover="this.style.background='linear-gradient(135deg, #6B1529 0%, #4A0E1B 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #972626 0%, #6B1529 100%)'">
                 <div class="text-3xl mb-2"><i class="fas fa-brain"></i></div>
                 <div class="font-bold">AI Insights</div>
-                <div class="text-sm text-emerald-100">Get recommendations</div>
+                <div class="text-sm" style="color: #D4AF37;">Get recommendations</div>
             </button>
         </div>
 
@@ -94,18 +94,18 @@
                 </div>
                 <div id="totalOrders" class="text-4xl font-bold dark-text">-</div>
                 <div class="text-sm dark-text-muted mt-2">
-                    <span id="ordersChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                    <span id="ordersChange" style="color: #D4AF37;"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
             <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
                     <span class="dark-text-muted text-sm font-medium">Total Revenue</span>
-                    <i class="fas fa-euro-sign text-emerald-400 text-xl"></i>
+                    <i class="fas fa-euro-sign text-xl" style="color: #D4AF37;"></i>
                 </div>
                 <div id="totalRevenue" class="text-4xl font-bold dark-text">-</div>
                 <div class="text-sm dark-text-muted mt-2">
-                    <span id="revenueChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                    <span id="revenueChange" style="color: #D4AF37;"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
@@ -116,7 +116,7 @@
                 </div>
                 <div id="avgOrderValue" class="text-4xl font-bold dark-text">-</div>
                 <div class="text-sm dark-text-muted mt-2">
-                    <span id="avgChange" class="text-emerald-400"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
+                    <span id="avgChange" style="color: #D4AF37;"><i class="fas fa-arrow-up mr-1"></i>-</span> vs last period
                 </div>
             </div>
 
@@ -146,7 +146,7 @@
             <!-- Revenue Trend -->
             <div class="dark-card rounded-lg shadow-xl p-6">
                 <h3 class="text-xl font-bold dark-text mb-4">
-                    <i class="fas fa-chart-area text-emerald-400 mr-2"></i>
+                    <i class="fas fa-chart-area mr-2" style="color: #D4AF37;"></i>
                     Revenue Trend
                 </h3>
                 <div style="height: 300px;">
@@ -166,11 +166,11 @@
             </div>
         </div>
 
-        <!-- AI Insights Panel - DARK MODE -->
+        <!-- AI Insights Panel - DARK MODE with BRAND COLORS -->
         <div id="aiInsightsPanel" class="hidden">
-            <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-emerald-500 rounded-lg p-6 mb-8 shadow-2xl">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 rounded-lg p-6 mb-8 shadow-2xl" style="border-color: #D4AF37;">
                 <div class="flex items-start gap-4">
-                    <div class="bg-emerald-600 text-white rounded-full p-4 text-2xl">
+                    <div class="text-white rounded-full p-4 text-2xl" style="background-color: #972626;">
                         <i class="fas fa-brain"></i>
                     </div>
                     <div class="flex-1">
@@ -290,7 +290,7 @@
             }
         }
 
-        // UPDATED: Chart with dark mode colors
+        // UPDATED: Chart with dark mode and BRAND COLORS
         function updateTopItemsChart(items) {
             const ctx = document.getElementById('topItemsChart');
             if (!ctx) return;
@@ -304,8 +304,8 @@
                     datasets: [{
                         label: 'Orders',
                         data: items.map(item => item.order_count),
-                        backgroundColor: 'rgba(52, 211, 153, 0.5)',
-                        borderColor: 'rgba(52, 211, 153, 1)',
+                        backgroundColor: 'rgba(212, 175, 55, 0.5)',  // Gold with opacity
+                        borderColor: '#D4AF37',  // Gold
                         borderWidth: 2
                     }]
                 },
@@ -331,7 +331,7 @@
             });
         }
 
-        // UPDATED: Chart with dark mode colors
+        // UPDATED: Chart with dark mode and BRAND COLORS
         function updateRevenueTrendChart(trend) {
             const ctx = document.getElementById('revenueTrendChart');
             if (!ctx) return;
@@ -345,8 +345,8 @@
                     datasets: [{
                         label: 'Revenue (€)',
                         data: trend.map(t => t.revenue),
-                        borderColor: 'rgba(52, 211, 153, 1)',
-                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        borderColor: '#D4AF37',  // Gold
+                        backgroundColor: 'rgba(212, 175, 55, 0.1)',  // Gold with low opacity
                         tension: 0.4,
                         fill: true,
                         borderWidth: 2
