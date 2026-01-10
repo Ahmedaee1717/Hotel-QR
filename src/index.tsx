@@ -63684,7 +63684,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('bookingTime').value = hours + ':' + minutes;
         }
         
-        function adjustPartySize(delta) {
+        window.adjustPartySize = function(delta) {
             const input = document.getElementById('partySize');
             let value = parseInt(input.value) + delta;
             if (value < 1) value = 1;
@@ -63730,7 +63730,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`).join('');
         }
         
-        function selectRestaurant(restaurantId) {
+        window.selectRestaurant = function(restaurantId) {
             selectedRestaurant = restaurants.find(r => r.offering_id === restaurantId);
             renderRestaurants();
             loadMenuItems(restaurantId);
@@ -63812,7 +63812,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`;
         }
         
-        function adjustItemQuantity(itemId, delta) {
+        window.adjustItemQuantity = function(itemId, delta) {
             const item = menuItems.find(i => i.item_id === itemId);
             if (!item) return;
             
@@ -63828,18 +63828,18 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             renderMenuItems();
         }
         
-        function toggleCustomLimit(itemId) {
+        window.toggleCustomLimit = function(itemId) {
             const el = document.getElementById('customLimit' + itemId);
             el.classList.toggle('hidden');
         }
         
-        function setCustomLimit(itemId, value) {
+        window.setCustomLimit = function(itemId, value) {
             if (selectedItems[itemId]) {
                 selectedItems[itemId].customLimit = value ? parseInt(value) : null;
             }
         }
         
-        function goToStep(step) {
+        window.goToStep = function(step) {
             // Validate current step
             if (step > currentStep) {
                 if (currentStep === 1) {
@@ -63939,7 +63939,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`;
         }
         
-        async function submitBooking() {
+        window.submitBooking = async function() {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Booking...';
@@ -63996,13 +63996,13 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('successModal').classList.remove('hidden');
         }
         
-        function confirmReset() {
+        window.confirmReset = function() {
             if (confirm('Start a new booking? All current data will be lost.')) {
                 resetBooking();
             }
         }
         
-        function resetBooking() {
+        window.resetBooking = function() {
             selectedRestaurant = null;
             selectedItems = {};
             currentStep = 1;
