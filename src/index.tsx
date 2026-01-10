@@ -41118,7 +41118,7 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <!-- Communications Feed -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div id="frontdeskFeedGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Left Column: Recent Communications -->
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <h3 class="text-xl font-bold mb-4">
@@ -43471,6 +43471,115 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
         <!-- END SERVICE TYPES TAB -->
+        
+        <!-- Add Service Type Modal -->
+        <div id="addServiceTypeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b sticky top-0 bg-white rounded-t-2xl" style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold text-white">
+                            <i class="fas fa-plus-circle mr-2"></i>Add New Service Type
+                        </h3>
+                        <button onclick="closeAddServiceTypeModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition-all">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6 space-y-6">
+                    <form id="addServiceTypeForm" onsubmit="submitNewServiceType(event)" class="space-y-4">
+                        <!-- Service Name -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-2" style="color: var(--accent-color, #D4AF37);"></i>Service Name *
+                            </label>
+                            <input type="text" id="newServiceName" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                   placeholder="e.g., Housekeeping, Maintenance, Room Service" />
+                        </div>
+                        
+                        <!-- Icon & Color Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-icons mr-2" style="color: var(--accent-color, #D4AF37);"></i>Icon (FontAwesome)
+                                </label>
+                                <input type="text" id="newServiceIcon" 
+                                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                       placeholder="fa-broom" value="fa-concierge-bell" />
+                                <p class="text-xs text-gray-500 mt-1">
+                                    <a href="https://fontawesome.com/icons" target="_blank" class="text-blue-600 hover:underline">Browse icons</a>
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-palette mr-2" style="color: var(--accent-color, #D4AF37);"></i>Service Color
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="newServiceColor" value="#D4AF37"
+                                           class="h-12 w-16 border-2 border-gray-300 rounded-lg cursor-pointer" />
+                                    <input type="text" id="newServiceColorHex" value="#D4AF37"
+                                           class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 transition-all"
+                                           placeholder="#D4AF37" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-align-left mr-2" style="color: var(--accent-color, #D4AF37);"></i>Description
+                            </label>
+                            <textarea id="newServiceDescription" rows="3"
+                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                      placeholder="Brief description of this service type..."></textarea>
+                        </div>
+                        
+                        <!-- Response Time -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-clock mr-2" style="color: var(--accent-color, #D4AF37);"></i>Estimated Response Time (minutes)
+                            </label>
+                            <input type="number" id="newServiceResponseTime" value="30" min="1" max="1440"
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" />
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div class="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+                            <p class="text-sm font-semibold text-gray-600 mb-3">Preview:</p>
+                            <div class="bg-white rounded-lg shadow p-4 border-2" id="servicePreview" style="border-color: #D4AF3720;">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl" 
+                                         id="previewIcon" style="background-color: #D4AF3720; color: #D4AF37;">
+                                        <i class="fas fa-concierge-bell"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-gray-800" id="previewName">Service Name</h4>
+                                        <p class="text-sm text-gray-500">Response: ~<span id="previewTime">30</span> min</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="closeAddServiceTypeModal()"
+                                    class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 px-6 py-3 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                                    style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                                <i class="fas fa-check mr-2"></i>Create Service Type
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <!-- Settings Tab -->
         <div id="settingsTab" class="tab-content hidden">
@@ -46560,10 +46669,12 @@ app.get('/admin/dashboard', (c) => {
         
         // Show/hide appropriate view
         if (view === 'service-requests') {
-          document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6').style.display = 'none';
+          const feedGrid = document.getElementById('frontdeskFeedGrid');
+          if (feedGrid) feedGrid.style.display = 'none';
           showServiceRequestsView();
         } else {
-          document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6').style.display = 'grid';
+          const feedGrid = document.getElementById('frontdeskFeedGrid');
+          if (feedGrid) feedGrid.style.display = 'grid';
           const serviceView = document.getElementById('serviceRequestsViewContainer');
           if (serviceView) serviceView.style.display = 'none';
           loadFrontDeskData();
@@ -48154,25 +48265,52 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openAddServiceTypeModal = function() {
-        // Simple prompt for now - can be replaced with a modal
-        const name = prompt('Service Name (e.g., Housekeeping):');
-        if (!name) return;
+        document.getElementById('addServiceTypeModal').classList.remove('hidden');
         
-        const icon = prompt('Font Awesome Icon (e.g., fa-broom):', 'fa-concierge-bell');
-        const color = prompt('Service Color (hex):', '#D4AF37');
-        const description = prompt('Description:');
-        const responseTime = prompt('Estimated Response Time (minutes):', '30');
-        
-        createServiceType({
-          service_name: name,
-          service_icon: icon,
-          service_color: color,
-          description: description,
-          estimated_response_minutes: parseInt(responseTime)
+        // Setup preview updates
+        document.getElementById('newServiceName').addEventListener('input', updateServicePreview);
+        document.getElementById('newServiceIcon').addEventListener('input', updateServicePreview);
+        document.getElementById('newServiceColor').addEventListener('input', function(e) {
+          document.getElementById('newServiceColorHex').value = e.target.value;
+          updateServicePreview();
         });
+        document.getElementById('newServiceColorHex').addEventListener('input', function(e) {
+          document.getElementById('newServiceColor').value = e.target.value;
+          updateServicePreview();
+        });
+        document.getElementById('newServiceResponseTime').addEventListener('input', updateServicePreview);
       };
       
-      async function createServiceType(serviceData) {
+      window.closeAddServiceTypeModal = function() {
+        document.getElementById('addServiceTypeModal').classList.add('hidden');
+        document.getElementById('addServiceTypeForm').reset();
+      };
+      
+      function updateServicePreview() {
+        const name = document.getElementById('newServiceName').value || 'Service Name';
+        const icon = document.getElementById('newServiceIcon').value || 'fa-concierge-bell';
+        const color = document.getElementById('newServiceColor').value || '#D4AF37';
+        const responseTime = document.getElementById('newServiceResponseTime').value || '30';
+        
+        document.getElementById('previewName').textContent = name;
+        document.getElementById('previewTime').textContent = responseTime;
+        document.getElementById('previewIcon').innerHTML = '<i class="fas ' + icon + '"></i>';
+        document.getElementById('previewIcon').style.backgroundColor = color + '20';
+        document.getElementById('previewIcon').style.color = color;
+        document.getElementById('servicePreview').style.borderColor = color + '20';
+      }
+      
+      window.submitNewServiceType = async function(event) {
+        event.preventDefault();
+        
+        const serviceData = {
+          service_name: document.getElementById('newServiceName').value,
+          service_icon: document.getElementById('newServiceIcon').value,
+          service_color: document.getElementById('newServiceColor').value,
+          description: document.getElementById('newServiceDescription').value,
+          estimated_response_minutes: parseInt(document.getElementById('newServiceResponseTime').value)
+        };
+        
         try {
           const response = await fetch('/api/admin/service-types', {
             method: 'POST',
@@ -48186,20 +48324,30 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           if (data.success) {
-            alert('Service type created successfully!');
+            closeAddServiceTypeModal();
             loadServiceTypes();
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center gap-3';
+            successDiv.innerHTML = '<i class="fas fa-check-circle text-2xl"></i><div><p class="font-bold">Service Type Created!</p><p class="text-sm">' + serviceData.service_name + ' has been added successfully.</p></div>';
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+              successDiv.remove();
+            }, 3000);
           } else {
-            alert('Failed to create service type');
+            alert('Failed to create service type: ' + (data.error || 'Unknown error'));
           }
         } catch (error) {
           console.error('Create service type error:', error);
-          alert('Error creating service type');
+          alert('Error creating service type: ' + error.message);
         }
-      }
+      };
       
       window.toggleServiceType = async function(serviceTypeId, isActive) {
         try {
-          const response = await fetch(\`/api/admin/service-types/\${serviceTypeId}\`, {
+          const response = await fetch('/api/admin/service-types/' + serviceTypeId, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -48221,7 +48369,6 @@ app.get('/admin/dashboard', (c) => {
       };
       
       window.editServiceType = async function(serviceTypeId) {
-        // Simple implementation - can be replaced with a modal
         alert('Edit functionality coming soon. Service ID: ' + serviceTypeId);
       };
       
@@ -48229,7 +48376,7 @@ app.get('/admin/dashboard', (c) => {
         if (!confirm('Are you sure you want to delete this service type?')) return;
         
         try {
-          const response = await fetch(\`/api/admin/service-types/\${serviceTypeId}\`, {
+          const response = await fetch('/api/admin/service-types/' + serviceTypeId, {
             method: 'DELETE',
             headers: {
               'X-Property-ID': propertyId
@@ -48239,7 +48386,16 @@ app.get('/admin/dashboard', (c) => {
           const data = await response.json();
           
           if (data.success) {
-            alert('Service type deleted successfully!');
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center gap-3';
+            successDiv.innerHTML = '<i class="fas fa-trash-alt text-2xl"></i><div><p class="font-bold">Service Type Deleted</p><p class="text-sm">The service type has been removed.</p></div>';
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+              successDiv.remove();
+            }, 3000);
+            
             loadServiceTypes();
           } else {
             alert('Failed to delete service type');
