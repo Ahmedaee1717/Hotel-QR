@@ -26058,6 +26058,33 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
           }
         }
         
+        // Parse formatted text (markdown-style) to HTML
+        function parseFormattedText(text) {
+          if (!text) return '';
+          
+          // Escape HTML first to prevent XSS
+          let escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+          
+          // Parse bold (**text**)
+          escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+          
+          // Parse italic (*text*)
+          escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+          
+          // Parse underline (__text__)
+          escaped = escaped.replace(/__(.+?)__/g, '<u>$1</u>');
+          
+          // Parse line breaks
+          escaped = escaped.replace(/\n/g, '<br>');
+          
+          return escaped;
+        }
+        
         function displayBenefitsByCategory(category, benefits, tierColor) {
           const section = document.getElementById(category + 'BenefitsSection');
           const list = document.getElementById(category + 'BenefitsList');
@@ -26129,7 +26156,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     '<h5 class="font-bold text-gray-900 text-lg leading-tight">' + benefitName + '</h5>' +
                     accessBadgeHTML +
                   '</div>' +
-                  (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + benefitDescription + '</p>' : '') +
+                  (benefitDescription ? '<p class="text-sm text-gray-600 leading-relaxed">' + parseFormattedText(benefitDescription) + '</p>' : '') +
                 '</div>' +
               '</div>';
             
@@ -26140,17 +26167,59 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                 '<div class="grid gap-3">';
               
               benefit.linked_venues.forEach(venue => {
-                const venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                // Determine the correct URL based on venue type
+                let venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                
+                // Special routing for specific offering types
+                if (venue.type === 'room_service' || venue.type === 'room-service') {
+                  venueUrl = '/room-service/' + (window.propertyData?.property_id || '1');
+                } else if (venue.type === 'restaurant') {
+                  venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                } else if (venue.type === 'spa') {
+                  venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                } else if (venue.type === 'activity') {
+                  venueUrl = '/offering-detail?id=' + venue.offering_id + '&property=' + (window.propertyData?.property_id || '1');
+                }
+                
                 const venueCTA = venue.custom_cta_text || 'View Details';
                 
-                // Parse images JSON
+                // Parse images JSON or generate elegant SVG for room service
                 let venueImage = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400';
-                try {
-                  const images = JSON.parse(venue.images || '[]');
-                  if (images && images.length > 0) {
-                    venueImage = images[0];
-                  }
-                } catch (e) {}
+                
+                // Generate elegant room service icon if it's room service
+                if ((venue.type === 'room_service' || venue.type === 'room-service') && (!venue.images || venue.images === '[]')) {
+                  const primaryColor = window.propertyData?.primary_color || '#972626';
+                  const accentColor = window.propertyData?.accent_color || '#D4AF37';
+                  
+                  // Create elegant SVG with admin colors
+                  const svgContent = '<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">' +
+                    '<defs>' +
+                      '<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">' +
+                        '<stop offset="0%" style="stop-color:' + primaryColor + ';stop-opacity:1" />' +
+                        '<stop offset="100%" style="stop-color:' + accentColor + ';stop-opacity:1" />' +
+                      '</linearGradient>' +
+                    '</defs>' +
+                    '<rect width="400" height="400" fill="url(#bgGrad)"/>' +
+                    '<g transform="translate(200, 200)">' +
+                      '<path d="M -60 -20 Q -60 -80 0 -90 Q 60 -80 60 -20 L 60 -10 L -60 -10 Z" fill="white" opacity="0.95" stroke="' + accentColor + '" stroke-width="3"/>' +
+                      '<ellipse cx="0" cy="0" rx="80" ry="15" fill="white" opacity="0.9" stroke="' + accentColor + '" stroke-width="3"/>' +
+                      '<ellipse cx="0" cy="-95" rx="15" ry="8" fill="' + accentColor + '" stroke="white" stroke-width="2"/>' +
+                      '<circle cx="-35" cy="-50" r="3" fill="white" opacity="0.8"/>' +
+                      '<circle cx="40" cy="-60" r="2" fill="white" opacity="0.8"/>' +
+                      '<circle cx="0" cy="-70" r="2.5" fill="white" opacity="0.8"/>' +
+                    '</g>' +
+                  '</svg>';
+                  venueImage = 'data:image/svg+xml;base64,' + btoa(svgContent);
+                } else {
+                  try {
+                    const images = JSON.parse(venue.images || '[]');
+                    if (images && images.length > 0) {
+                      venueImage = images[0];
+                    }
+                  } catch (e) {}
+                }
+                
+                const venueCTA = venue.custom_cta_text || 'View Details';
                 
                 // Elegant venue card with image thumbnail
                 html += '<div onclick="window.location.href=\\'' + venueUrl + '\\'" class="group cursor-pointer bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden border border-gray-200 hover:shadow-xl transition-all duration-300">' +
@@ -56845,8 +56914,22 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</div>';
         
         html += '<div class="mb-4">';
-        html += '<label class="block text-sm font-semibold mb-1">Description</label>';
-        html += '<textarea name="benefit_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Details about this benefit..."></textarea>';
+        html += '<label class="block text-sm font-semibold mb-1">Description <span class="text-xs text-gray-500">(supports rich formatting)</span></label>';
+        html += '<div class="border border-gray-300 rounded-lg overflow-hidden">';
+        html += '<div class="bg-gray-50 border-b border-gray-300 p-2 flex gap-1 flex-wrap">';
+        html += '<button type="button" onclick="formatBenefitText(\'bold\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\'italic\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\'underline\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
+        html += '<span class="w-px bg-gray-300 mx-1"></span>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'⭐\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'✨\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🍽️\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🍹\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🏊\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
+        html += '</div>';
+        html += '<textarea id="benefit_description_input" name="benefit_description" rows="4" class="w-full px-3 py-2 focus:outline-none" placeholder="Details about this benefit... Use the toolbar above to add formatting and emojis!"></textarea>';
+        html += '</div>';
+        html += '<p class="text-xs text-gray-500 mt-1">💡 Tip: Select text and click Bold/Italic/Underline. Use ** for bold, * for italic, __ for underline.</p>';
         html += '</div>';
         
         html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
@@ -57026,6 +57109,46 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
       
       // Close add benefit modal
+      // Rich text formatting functions for benefit descriptions
+      window.formatBenefitText = function(format) {
+        const textarea = document.getElementById('benefit_description_input');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selectedText = textarea.value.substring(start, end);
+        
+        if (!selectedText) {
+          alert('Please select some text first!');
+          return;
+        }
+        
+        let formattedText = selectedText;
+        if (format === 'bold') {
+          formattedText = '**' + selectedText + '**';
+        } else if (format === 'italic') {
+          formattedText = '*' + selectedText + '*';
+        } else if (format === 'underline') {
+          formattedText = '__' + selectedText + '__';
+        }
+        
+        textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start, start + formattedText.length);
+      };
+      
+      window.insertBenefitEmoji = function(emoji) {
+        const textarea = document.getElementById('benefit_description_input');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        
+        textarea.value = textarea.value.substring(0, start) + emoji + textarea.value.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+      };
+      
       window.closeAddBenefitModal = function() {
         const modal = document.getElementById('add-benefit-modal');
         if (modal) modal.remove();
@@ -57235,8 +57358,22 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '</div>';
         
         html += '<div class="mb-4">';
-        html += '<label class="block text-sm font-semibold mb-1">Description</label>';
-        html += '<textarea name="benefit_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2">' + (benefit.benefit_description || '') + '</textarea>';
+        html += '<label class="block text-sm font-semibold mb-1">Description <span class="text-xs text-gray-500">(supports rich formatting)</span></label>';
+        html += '<div class="border border-gray-300 rounded-lg overflow-hidden">';
+        html += '<div class="bg-gray-50 border-b border-gray-300 p-2 flex gap-1 flex-wrap">';
+        html += '<button type="button" onclick="formatBenefitText(\'bold\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\'italic\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\'underline\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
+        html += '<span class="w-px bg-gray-300 mx-1"></span>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'⭐\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'✨\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🍽️\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🍹\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\'🏊\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
+        html += '</div>';
+        html += '<textarea id="benefit_description_input" name="benefit_description" rows="4" class="w-full px-3 py-2 focus:outline-none">' + (benefit.benefit_description || '') + '</textarea>';
+        html += '</div>';
+        html += '<p class="text-xs text-gray-500 mt-1">💡 Tip: Select text and click Bold/Italic/Underline. Use ** for bold, * for italic, __ for underline.</p>';
         html += '</div>';
         
         html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
