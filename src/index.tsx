@@ -43504,14 +43504,85 @@ app.get('/admin/dashboard', (c) => {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                    <i class="fas fa-icons mr-2" style="color: var(--accent-color, #D4AF37);"></i>Icon (FontAwesome)
+                                    <i class="fas fa-icons mr-2" style="color: var(--accent-color, #D4AF37);"></i>Icon
                                 </label>
-                                <input type="text" id="newServiceIcon" 
-                                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                                       placeholder="fa-broom" value="fa-concierge-bell" />
-                                <p class="text-xs text-gray-500 mt-1">
-                                    <a href="https://fontawesome.com/icons" target="_blank" class="text-blue-600 hover:underline">Browse icons</a>
-                                </p>
+                                <select id="newServiceIcon" 
+                                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                                    <optgroup label="Service Icons">
+                                        <option value="fa-concierge-bell" selected>🛎️ Concierge Bell</option>
+                                        <option value="fa-broom">🧹 Broom (Housekeeping)</option>
+                                        <option value="fa-tools">🔧 Tools (Maintenance)</option>
+                                        <option value="fa-wrench">🔩 Wrench</option>
+                                        <option value="fa-hammer">🔨 Hammer</option>
+                                        <option value="fa-tshirt">👕 T-Shirt (Laundry)</option>
+                                        <option value="fa-bed">🛏️ Bed</option>
+                                        <option value="fa-couch">🛋️ Couch</option>
+                                        <option value="fa-bath">🛁 Bath</option>
+                                        <option value="fa-shower">🚿 Shower</option>
+                                        <option value="fa-toilet">🚽 Toilet</option>
+                                    </optgroup>
+                                    <optgroup label="Food & Beverage">
+                                        <option value="fa-utensils">🍴 Utensils</option>
+                                        <option value="fa-pizza-slice">🍕 Pizza</option>
+                                        <option value="fa-hamburger">🍔 Hamburger</option>
+                                        <option value="fa-coffee">☕ Coffee</option>
+                                        <option value="fa-wine-glass">🍷 Wine Glass</option>
+                                        <option value="fa-cocktail">🍸 Cocktail</option>
+                                        <option value="fa-ice-cream">🍦 Ice Cream</option>
+                                        <option value="fa-apple-alt">🍎 Apple</option>
+                                    </optgroup>
+                                    <optgroup label="Transportation">
+                                        <option value="fa-car">🚗 Car</option>
+                                        <option value="fa-taxi">🚕 Taxi</option>
+                                        <option value="fa-shuttle-van">🚐 Shuttle Van</option>
+                                        <option value="fa-bus">🚌 Bus</option>
+                                        <option value="fa-plane">✈️ Plane</option>
+                                        <option value="fa-ship">🚢 Ship</option>
+                                    </optgroup>
+                                    <optgroup label="Activities">
+                                        <option value="fa-swimming-pool">🏊 Swimming Pool</option>
+                                        <option value="fa-dumbbell">🏋️ Dumbbell (Gym)</option>
+                                        <option value="fa-spa">🧖 Spa</option>
+                                        <option value="fa-massage">💆 Massage</option>
+                                        <option value="fa-umbrella-beach">🏖️ Beach</option>
+                                        <option value="fa-hiking">🥾 Hiking</option>
+                                        <option value="fa-skiing">⛷️ Skiing</option>
+                                        <option value="fa-bicycle">🚴 Bicycle</option>
+                                    </optgroup>
+                                    <optgroup label="Communication">
+                                        <option value="fa-phone">📞 Phone</option>
+                                        <option value="fa-envelope">✉️ Envelope</option>
+                                        <option value="fa-comment">💬 Comment</option>
+                                        <option value="fa-bell">🔔 Bell</option>
+                                        <option value="fa-info-circle">ℹ️ Info</option>
+                                        <option value="fa-question-circle">❓ Question</option>
+                                    </optgroup>
+                                    <optgroup label="Medical & Safety">
+                                        <option value="fa-first-aid">🩹 First Aid</option>
+                                        <option value="fa-hospital">🏥 Hospital</option>
+                                        <option value="fa-heart">❤️ Heart</option>
+                                        <option value="fa-shield-alt">🛡️ Shield</option>
+                                        <option value="fa-fire-extinguisher">🧯 Fire Extinguisher</option>
+                                    </optgroup>
+                                    <optgroup label="Technology">
+                                        <option value="fa-wifi">📶 WiFi</option>
+                                        <option value="fa-tv">📺 TV</option>
+                                        <option value="fa-plug">🔌 Plug</option>
+                                        <option value="fa-lightbulb">💡 Lightbulb</option>
+                                        <option value="fa-thermometer-half">🌡️ Temperature</option>
+                                        <option value="fa-fan">🌀 Fan</option>
+                                    </optgroup>
+                                    <optgroup label="General">
+                                        <option value="fa-star">⭐ Star</option>
+                                        <option value="fa-key">🔑 Key</option>
+                                        <option value="fa-lock">🔒 Lock</option>
+                                        <option value="fa-shopping-bag">🛍️ Shopping Bag</option>
+                                        <option value="fa-gift">🎁 Gift</option>
+                                        <option value="fa-calendar">📅 Calendar</option>
+                                        <option value="fa-clock">🕐 Clock</option>
+                                        <option value="fa-map-marked-alt">🗺️ Map</option>
+                                    </optgroup>
+                                </select>
                             </div>
                             
                             <div>
