@@ -11105,6 +11105,7 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           a.duration_minutes,
           a.capacity_per_slot,
           1 as requires_booking,
+          1 as enable_booking,
           'Activity Center' as location,
           a.status,
           a.is_featured,
