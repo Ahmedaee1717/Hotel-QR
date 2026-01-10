@@ -64950,6 +64950,15 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         </div>
                     </div>
                     
+                    <!-- Location -->
+                    <div>
+                        <label class="block text-sm font-bold mb-2">
+                            <i class="fas fa-map-marker-alt mr-2 text-red-600"></i>Location
+                        </label>
+                        <input type="text" id="infoLocation" class="w-full px-4 py-2 border rounded-lg" placeholder="e.g., Garden Restaurant - 2nd Floor, Main Building - Ground Floor">
+                        <p class="text-xs text-gray-500 mt-1">This location will be displayed to guests on the restaurant page and in benefits</p>
+                    </div>
+                    
                     <!-- Short Description -->
                     <div>
                         <label class="block text-sm font-bold mb-2">Short Description (English)</label>
@@ -66019,6 +66028,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             // Populate info form
             document.getElementById('infoTitleEn').value = restaurant.title_en || '';
             document.getElementById('infoEnableBooking').checked = restaurant.enable_booking === 1 || restaurant.enable_booking === true;
+            document.getElementById('infoLocation').value = restaurant.location || '';
             document.getElementById('infoShortDescEn').value = restaurant.short_description_en || '';
             document.getElementById('infoFullDescEn').value = restaurant.full_description_en || '';
             
@@ -66115,6 +66125,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const updateData = {
           title_en: document.getElementById('infoTitleEn').value,
           enable_booking: document.getElementById('infoEnableBooking').checked ? 1 : 0,
+          location: document.getElementById('infoLocation').value,
           short_description_en: document.getElementById('infoShortDescEn').value,
           full_description_en: document.getElementById('infoFullDescEn').value,
           images: currentRestaurantData.images || JSON.stringify([])
