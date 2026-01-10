@@ -63321,13 +63321,26 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
   const { property_id } = c.req.param()
   const { DB } = c.env
   
-  // Get property branding
-  const property = await DB.prepare('SELECT property_name, primary_color, secondary_color, accent_color FROM properties WHERE property_id = ?')
-    .bind(property_id).first()
+  let primaryColor = '#972626'
+  let secondaryColor = '#7a1f1f'
+  let accentColor = '#D4AF37'
+  let propertyName = 'Front Desk System'
   
-  const primaryColor = property?.primary_color || '#972626'
-  const secondaryColor = property?.secondary_color || '#7a1f1f'
-  const accentColor = property?.accent_color || '#D4AF37'
+  try {
+    // Get property branding
+    const property = await DB.prepare('SELECT property_name, primary_color, secondary_color, accent_color FROM properties WHERE property_id = ?')
+      .bind(property_id).first()
+    
+    if (property) {
+      primaryColor = property.primary_color || primaryColor
+      secondaryColor = property.secondary_color || secondaryColor
+      accentColor = property.accent_color || accentColor
+      propertyName = property.property_name || propertyName
+    }
+  } catch (error) {
+    console.error('Failed to load property:', error)
+    // Continue with defaults
+  }
   
   return c.html(`
 <!DOCTYPE html>
@@ -63335,7 +63348,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>À La Carte Booking - ${property?.property_name || 'Front Desk'}</title>
+    <title>À La Carte Booking - ${propertyName}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -63484,7 +63497,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         <div class="container-tablet flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">À La Carte Booking</h1>
-                <p class="text-white/80 text-sm">${property?.property_name || 'Front Desk System'}</p>
+                <p class="text-white/80 text-sm">${propertyName}</p>
             </div>
             <button onclick="confirmReset()" class="text-white/90 hover:text-white px-4 py-2 rounded-lg hover:bg-white/10 transition">
                 <i class="fas fa-redo mr-2"></i>New Booking
@@ -63783,11 +63796,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
-                        \${isSelected ? \`
+                        \${isSelected ? \\\`
                             <button onclick="toggleCustomLimit(\${item.item_id})" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition">
                                 <i class="fas fa-sliders-h mr-1"></i>Limit
                             </button>
-                        \` : ''}
+                        \\\` : ''}
                     </div>
                     <div id="customLimit\${item.item_id}" class="hidden mt-3 pt-3 border-t">
                         <label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>
