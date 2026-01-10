@@ -691,7 +691,7 @@ app.get('/', (c) => {
 </head>
 <body class="bg-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-200 z-50 shadow-sm">
+    <nav class="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-200 z-[1001] shadow-sm">
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-24">
                 <div class="flex items-center">
@@ -1695,7 +1695,7 @@ app.get('/blog', async (c) => {
 </head>
 <body class="bg-gray-50">
     <!-- Navigation -->
-    <nav class="bg-white shadow-md sticky top-0 z-50">
+    <nav class="bg-white shadow-md sticky top-0 z-[1001]">
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center gap-3">
@@ -1950,7 +1950,7 @@ app.get('/blog/:slug', async (c) => {
 </head>
 <body class="bg-gray-50">
     <!-- Navigation -->
-    <nav class="bg-white shadow-md sticky top-0 z-50">
+    <nav class="bg-white shadow-md sticky top-0 z-[1001]">
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex justify-between items-center">
                 <a href="/" class="flex items-center gap-3">
@@ -21497,7 +21497,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         ${passLinkBarHTML}
         
         <!-- Loading Spinner -->
-        <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div id="loading" class="fixed inset-0 bg-white z-[1001] flex items-center justify-center">
             <div class="text-center">
                 <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
                 <p class="mt-4 text-gray-600">Loading your experience...</p>
@@ -21894,13 +21894,13 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         <!-- Floating Map Button (appears when map available) -->
         <button id="mapFloatingBtn" 
                 onclick="openMapModal()" 
-                class="fixed bottom-6 right-6 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-50 hidden">
+                class="fixed bottom-6 right-6 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-[1001] hidden">
             <i class="fas fa-map-marked-alt mr-2"></i>
             <span class="font-semibold">Hotel Map</span>
         </button>
 
         <!-- Map Modal -->
-        <div id="mapModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div id="mapModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-[1001] flex items-center justify-center p-4">
             <div class="relative bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-auto">
                 <button onclick="closeMapModal()" 
                         class="absolute top-4 right-4 bg-white hover:bg-gray-100 text-gray-800 w-10 h-10 rounded-full shadow-lg z-10 flex items-center justify-center">
@@ -25049,7 +25049,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                      class="absolute inset-0 w-full h-full object-contain rounded-lg">
                                 <div id="mapHotspots" class="absolute inset-0">
                                     \${data.hotspots.map(hotspot => \`
-                                        <div class="absolute cursor-pointer transition-all duration-200 hover:z-50 group"
+                                        <div class="absolute cursor-pointer transition-all duration-200 hover:z-[1001] group"
                                              style="left: \${hotspot.position_x}%; top: \${hotspot.position_y}%; width: \${hotspot.width}%; height: \${hotspot.height}%;"
                                              onclick="showHotspotInfo('\${hotspot.hotspot_id}')">
                                             <div class="w-full h-full border-3 rounded-lg \${hotspot.shape === 'circle' ? 'rounded-full' : ''}"
@@ -25059,7 +25059,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                                                 </div>
                                             </div>
                                             <!-- Tooltip on hover -->
-                                            <div class="absolute hidden group-hover:block bg-black text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap -top-12 left-1/2 transform -translate-x-1/2 z-50 shadow-xl">
+                                            <div class="absolute hidden group-hover:block bg-black text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap -top-12 left-1/2 transform -translate-x-1/2 z-[1001] shadow-xl">
                                                 <div class="font-bold">\${hotspot.title}</div>
                                                 \${hotspot.subtitle ? '<div class="text-xs text-gray-300">' + hotspot.subtitle + '</div>' : ''}
                                                 <div class="absolute w-3 h-3 bg-black transform rotate-45 -bottom-1 left-1/2 -translate-x-1/2"></div>
@@ -25070,7 +25070,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             </div>
                             
                             <!-- Hotspot Details Modal -->
-                            <div id="hotspotModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+                            <div id="hotspotModal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-[1001] flex items-center justify-center p-4">
                                 <div class="bg-white rounded-2xl max-w-md w-full p-6 relative">
                                     <button onclick="closeHotspotModal()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
                                         <i class="fas fa-times text-xl"></i>
@@ -26351,7 +26351,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         </script>
 
         <!-- Info Menu Modal -->
-        <div id="infoMenuModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div id="infoMenuModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[1001] flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden animate-scale-up">
                 <!-- Header -->
                 <div id="infoModalHeader" class="p-6 flex justify-between items-center">
@@ -26372,7 +26372,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         </div>
 
         <!-- Info Page Display Modal -->
-        <div id="infoPageModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 overflow-y-auto">
+        <div id="infoPageModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-[1001] overflow-y-auto">
             <div class="min-h-screen p-4 flex items-center justify-center">
                 <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 animate-scale-up">
                     <!-- Header -->
@@ -27096,7 +27096,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         </script>
 
         <!-- Daily Mood Check Modal -->
-        <div id="moodCheckModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="backdrop-filter: blur(4px);">
+        <div id="moodCheckModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[1001] flex items-center justify-center p-4" style="backdrop-filter: blur(4px);">
             <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 relative animate-fadeIn">
                 <button onclick="closeMoodCheck()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl">
                     <i class="fas fa-times"></i>
@@ -27461,11 +27461,11 @@ app.get('/offering-detail', async (c) => {
     </style>
 </head>
 <body class="bg-gray-50">
-    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+    <div id="loading" class="fixed inset-0 bg-white z-[1001] flex items-center justify-center">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
     </div>
 
-    <div id="translating" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+    <div id="translating" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center">
         <div class="bg-white p-6 rounded-xl shadow-2xl flex items-center gap-4">
             <div class="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-blue-500"></div>
             <span class="text-lg font-medium">Translating content...</span>
@@ -27474,7 +27474,7 @@ app.get('/offering-detail', async (c) => {
 
     <div id="content" class="hidden">
         <!-- Language Selector -->
-        <div class="fixed top-4 right-4 z-50">
+        <div class="fixed top-4 right-4 z-[1001]">
             <select id="languageSelector" class="px-4 py-2 border rounded-lg bg-white shadow-md">
                 <option value="en">English</option>
                 <option value="es">Español</option>
@@ -28240,7 +28240,7 @@ app.get('/welcome/:property_slug/:room_token', async (c) => {
         </style>
     </head>
     <body class="bg-gray-50">
-        <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div id="loading" class="fixed inset-0 bg-white z-[1001] flex items-center justify-center">
             <div class="text-center">
                 <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
                 <p class="mt-4 text-gray-600">Loading...</p>
@@ -29565,7 +29565,7 @@ app.get('/superadmin/dashboard', (c) => {
             </div>
             
             <!-- Ticket Detail Modal (hidden by default) -->
-            <div id="ticketModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div id="ticketModal" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center p-4">
                 <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                     <div class="p-6 border-b flex justify-between items-center">
                         <h3 class="text-2xl font-bold" id="ticketModalTitle">Ticket Details</h3>
@@ -31495,7 +31495,7 @@ app.get('/superadmin/dashboard', (c) => {
     </script>
 
     <!-- Subscription Management Modal -->
-    <div id="subscriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div id="subscriptionModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[1001]">
         <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
                 <h3 class="text-xl font-bold"><i class="fas fa-cog mr-2"></i>Manage Subscription</h3>
@@ -31840,7 +31840,7 @@ app.get('/admin/beach-management', (c) => {
     </div>
 
     <!-- Walk-In Booking Modal - Mobile Optimized -->
-    <div id="walkinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-2 md:p-4">
+    <div id="walkinModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[1001] flex items-center justify-center p-2 md:p-4">
         <div class="bg-white rounded-xl md:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto">
             <div class="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 md:p-6 rounded-t-xl md:rounded-t-2xl">
                 <div class="flex items-center justify-between">
@@ -37392,7 +37392,7 @@ app.get('/activity', (c) => {
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-50">
-    <div id="loading" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+    <div id="loading" class="fixed inset-0 bg-white z-[1001] flex items-center justify-center">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
     </div>
 
@@ -37497,7 +37497,7 @@ app.get('/activity', (c) => {
         </div>
 
         <!-- Callback Request Modal -->
-        <div id="callbackModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div id="callbackModal" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center p-4">
             <div class="bg-white rounded-lg max-w-md w-full p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-2xl font-bold">Request Callback</h2>
@@ -37525,7 +37525,7 @@ app.get('/activity', (c) => {
         </div>
 
         <!-- Booking Modal -->
-        <div id="bookingModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div id="bookingModal" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center p-4">
             <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
                 <div class="flex items-center justify-between mb-6">
                     <h2 class="text-2xl font-bold">Book This Activity</h2>
@@ -38075,7 +38075,7 @@ app.get('/gm-features-showcase', (c) => {
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white py-8 sticky top-0 z-50 shadow-xl">
+    <div class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white py-8 sticky top-0 z-[1001] shadow-xl">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -43325,7 +43325,7 @@ app.get('/admin/dashboard', (c) => {
         </div>
 
         <!-- Info Page Editor Modal -->
-        <div id="infoPageModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 overflow-y-auto">
+        <div id="infoPageModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[1001] overflow-y-auto">
             <div class="min-h-screen px-4 flex items-center justify-center">
                 <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">
                     <!-- Modal Header -->
@@ -43581,7 +43581,7 @@ app.get('/admin/dashboard', (c) => {
         <!-- END SERVICE TYPES TAB -->
         
         <!-- Add Service Type Modal -->
-        <div id="addServiceTypeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div id="addServiceTypeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[1001] flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
                 <!-- Modal Header -->
                 <div class="px-6 py-4 border-b sticky top-0 z-10 rounded-t-2xl" style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
@@ -44686,7 +44686,7 @@ app.get('/admin/dashboard', (c) => {
         </div>
 
     <!-- Edit Document Modal -->
-    <div id="editDocumentModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div id="editDocumentModal" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-2xl font-bold"><i class="fas fa-edit mr-2 text-blue-600"></i>Edit Knowledge Document</h3>
@@ -44728,7 +44728,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Support Ticket Modal -->
-    <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div id="supportModal" class="hidden fixed inset-0 bg-black/50 z-[1001] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-2xl font-bold"><i class="fas fa-ticket-alt mr-2 text-orange-600"></i>Create Support Ticket</h3>
@@ -46054,7 +46054,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Form Builder Modal -->
-    <div id="formBuilderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+    <div id="formBuilderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[1001] p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6 rounded-t-xl">
                 <h3 class="text-2xl font-bold"><i class="fas fa-edit mr-2"></i>Form Builder</h3>
@@ -46165,7 +46165,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Question Type Modal -->
-    <div id="questionTypeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+    <div id="questionTypeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[1001] p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-xl">
                 <h3 class="text-xl font-bold">Choose Question Type</h3>
@@ -46311,7 +46311,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- View Submission Modal -->
-    <div id="submissionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+    <div id="submissionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[1001] p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl">
                 <h3 class="text-2xl font-bold"><i class="fas fa-file-alt mr-2"></i>Feedback Details</h3>
@@ -46328,7 +46328,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Live Chat Widget -->
-    <div id="chatWidget" class="hidden fixed bottom-4 left-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-50">
+    <div id="chatWidget" class="hidden fixed bottom-4 left-4 w-96 h-[500px] bg-white rounded-xl shadow-2xl flex flex-col z-[1001]">
         <div class="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-xl flex justify-between items-center">
             <div>
                 <h4 class="font-bold"><i class="fas fa-comments mr-2"></i>Live Support Chat</h4>
@@ -46353,7 +46353,7 @@ app.get('/admin/dashboard', (c) => {
     </div><!-- End Sidebar + Content Layout -->
 
     <!-- AI Insights Modal -->
-    <div id="insightsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="insightsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[1001] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div class="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-4 flex items-center justify-between">
                 <h3 class="text-2xl font-bold"><i class="fas fa-lightbulb mr-2"></i>AI Insights Dashboard</h3>
@@ -46373,7 +46373,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Submissions Modal -->
-    <div id="submissionsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="submissionsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[1001] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 flex items-center justify-between">
                 <div>
@@ -46651,7 +46651,7 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Analytics Dashboard Modal -->
-    <div id="analyticsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div id="analyticsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[1001] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
             <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white px-6 py-4 flex items-center justify-between">
                 <div>
@@ -48508,7 +48508,7 @@ app.get('/admin/dashboard', (c) => {
             
             // Show success message
             const successDiv = document.createElement('div');
-            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center gap-3';
+            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-[1001] flex items-center gap-3';
             successDiv.innerHTML = '<i class="fas fa-check-circle text-2xl"></i><div><p class="font-bold">Service Type Created!</p><p class="text-sm">' + serviceData.service_name + ' has been added successfully.</p></div>';
             document.body.appendChild(successDiv);
             
@@ -48567,7 +48567,7 @@ app.get('/admin/dashboard', (c) => {
           if (data.success) {
             // Show success message
             const successDiv = document.createElement('div');
-            successDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center gap-3';
+            successDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg z-[1001] flex items-center gap-3';
             successDiv.innerHTML = '<i class="fas fa-trash-alt text-2xl"></i><div><p class="font-bold">Service Type Deleted</p><p class="text-sm">The service type has been removed.</p></div>';
             document.body.appendChild(successDiv);
             
@@ -48715,7 +48715,7 @@ app.get('/admin/dashboard', (c) => {
         
         const modal = document.createElement('div');
         modal.id = 'qr-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[1001] p-4';
         modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">' +
           '<div class="flex justify-between items-center mb-4">' +
             '<h3 class="text-2xl font-bold">Room ' + roomNumber + ' QR Code</h3>' +
@@ -52510,7 +52510,7 @@ app.get('/admin/dashboard', (c) => {
         // Create popup
         const popup = document.createElement('div');
         popup.id = 'notificationPopup';
-        popup.className = 'fixed top-20 right-4 bg-white border-l-4 border-blue-600 shadow-2xl rounded-lg p-4 max-w-sm z-50 animate-slide-in';
+        popup.className = 'fixed top-20 right-4 bg-white border-l-4 border-blue-600 shadow-2xl rounded-lg p-4 max-w-sm z-[1001] animate-slide-in';
         popup.innerHTML = 
           '<div class="flex items-start gap-3">' +
             '<div class="flex-shrink-0">' +
@@ -53855,7 +53855,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         // Create modal to show QR code
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001]';
         modal.innerHTML = \`
           <div class="bg-white rounded-xl p-6 max-w-md">
             <h3 class="text-xl font-bold mb-4"><i class="fas fa-qrcode mr-2 text-purple-600"></i>\${formName}</h3>
@@ -54811,7 +54811,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
       
       function createNewRestaurant() {
-        const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">' +
+        const modalHtml = '<div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[1001]">' +
           '<div class="bg-gradient-to-br from-white to-orange-50 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-slideUp">' +
             '<div class="flex items-center mb-6">' +
               '<div class="bg-gradient-to-br from-orange-600 to-red-600 text-white rounded-full p-3 mr-4">' +
@@ -55630,7 +55630,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       function createAssistant() {
         const assistantHTML = \`
           <!-- AI Assistant Floating Button -->
-          <div id="aiAssistantBtn" class="fixed bottom-6 right-6 z-50">
+          <div id="aiAssistantBtn" class="fixed bottom-6 right-6 z-[1001]">
             <button onclick="toggleAssistant()" class="relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full w-16 h-16 shadow-2xl transition-all duration-300 flex items-center justify-center group hover:scale-110">
               <i class="fas fa-robot text-2xl"></i>
               <span id="assistantBadge" class="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">3</span>
@@ -55641,7 +55641,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           </div>
           
           <!-- AI Assistant Panel -->
-          <div id="aiAssistantPanel" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl z-50 hidden transform transition-all duration-300 border-2 border-indigo-100" style="max-height: 650px;">
+          <div id="aiAssistantPanel" class="fixed bottom-24 right-6 w-96 bg-white rounded-2xl shadow-2xl z-[1001] hidden transform transition-all duration-300 border-2 border-indigo-100" style="max-height: 650px;">
             <!-- Header -->
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -55737,7 +55737,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           </div>
           
           <!-- Welcome Modal (First-Time Users) -->
-          <div id="welcomeModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+          <div id="welcomeModal" class="fixed inset-0 bg-black bg-opacity-50 z-[1001] hidden flex items-center justify-center p-4">
             <div class="bg-white rounded-2xl max-w-2xl w-full p-8 transform transition-all">
               <div class="text-center">
                 <div class="w-20 h-20 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -56355,7 +56355,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         const modal = document.createElement('div');
         modal.id = 'create-tier-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4 overflow-y-auto';
         
         const tierLevels = [
           { value: 1, name: 'Basic All-Inclusive', color: '#3B82F6', icon: 'fa-star' },
@@ -56539,7 +56539,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         // Show a modal with tier and benefits management
         const modal = document.createElement('div');
         modal.id = 'edit-tier-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4 overflow-y-auto';
         
         // Load tier and benefits data
         let tier = null;
@@ -57590,7 +57590,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         const modal = document.createElement('div');
         modal.id = 'create-pass-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4';
         
         let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
         html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
@@ -57700,7 +57700,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             // Show success modal with guest portal link
             const guestPortalFullUrl = window.location.origin + result.guest_portal_url;
             const successModal = document.createElement('div');
-            successModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            successModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4';
             successModal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">' +
               '<div class="text-center mb-6">' +
               '<div class="inline-block p-4 bg-green-100 rounded-full mb-4">' +
@@ -57795,7 +57795,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         const guestPortalUrl = window.location.origin + '/guest-portal.html?pass=' + passReference + '&token=' + guestAccessToken;
         
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4';
         modal.innerHTML = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">' +
           '<div class="flex items-center justify-between mb-6">' +
           '<h2 class="text-2xl font-bold text-gray-800">' +
@@ -57901,7 +57901,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         const modal = document.createElement('div');
         modal.id = 'edit-pass-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4';
         
         let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
         html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
@@ -58083,7 +58083,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.enrollPassFace = function(passId, passReference) {
         const modal = document.createElement('div');
         modal.id = 'face-enroll-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1001] p-4';
         
         let html = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-screen overflow-y-auto">';
         html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
@@ -58632,7 +58632,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           
           const modal = document.createElement('div');
           modal.id = 'face-viewer-modal';
-          modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+          modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[1001] p-4';
           
           let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-screen overflow-y-auto">';
           html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
@@ -59000,7 +59000,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         
         const modal = document.createElement('div');
         modal.id = 'signature-viewer-modal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[1001] p-4';
         
         let html = '<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">';
         html += '<div class="p-6 border-b flex items-center justify-between" style="background: linear-gradient(to right, #016e8f, #014a5e);">';
@@ -59758,7 +59758,7 @@ app.get('/my-perfect-week', async (c) => {
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
     
     <!-- Top Bar -->
-    <div class="bg-white shadow-md sticky top-0 z-50">
+    <div class="bg-white shadow-md sticky top-0 z-[1001]">
         <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <button onclick="window.location.href='/hotel/${propertySlug}?property=${propertyId}'" class="text-gray-600 hover:text-purple-600">
@@ -61120,7 +61120,7 @@ app.get('/my-bookings', async (c) => {
 <body class="bg-gray-50">
     <div class="min-h-screen pb-20">
         <!-- Header -->
-        <div class="sticky top-0 z-50" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);">
+        <div class="sticky top-0 z-[1001]" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);">
             <div class="max-w-6xl mx-auto px-4 py-4">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
@@ -61721,7 +61721,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
 </head>
 <body class="antialiased">
     <!-- Translation Loading Overlay -->
-    <div id="translationOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div id="translationOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[1001] flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
         <div class="loading-spinner w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"></div>
         <h3 class="text-2xl font-bold text-gray-800 mb-2">Translating Menu...</h3>
@@ -61870,7 +61870,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
       const position = d.language_switcher_position || 'top-right';
       const positionClasses = position === 'top-right' ? 'top-4 right-4' : position === 'top-left' ? 'top-4 left-4' : 'top-4 right-4';
       
-      html += '<div class="fixed ' + positionClasses + ' z-50">';
+      html += '<div class="fixed ' + positionClasses + ' z-[1001]">';
       html += '<select id="languageSelector" onchange="changeLanguage(this.value)" class="px-4 py-2 rounded-lg shadow-lg border-2 font-semibold" style="background-color: white; border-color: ' + d.accent_color + '; color: ' + d.primary_color + ';">';
       
       // Show ALL supported languages from the system
@@ -67212,7 +67212,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 </head>
 <body class="bg-gray-50">
     <!-- Language Selector (Fixed Top Right) -->
-    <div class="fixed top-4 right-4 z-50">
+    <div class="fixed top-4 right-4 z-[1001]">
         <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
             <option value="en">English</option>
         </select>
