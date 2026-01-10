@@ -15299,6 +15299,9 @@ app.put('/api/admin/all-inclusive/benefits/:benefit_id', async (c) => {
       time_restrictions,
       benefit_title,
       benefit_description,
+      benefit_category,
+      benefit_type,
+      linked_venues,
       included,
       upgrade_price,
       icon,
@@ -15315,6 +15318,9 @@ app.put('/api/admin/all-inclusive/benefits/:benefit_id', async (c) => {
           time_restrictions = ?,
           benefit_title = ?,
           benefit_description = ?,
+          benefit_category = ?,
+          benefit_type = ?,
+          linked_venues = ?,
           included = ?,
           upgrade_price = ?,
           icon = ?,
@@ -15330,6 +15336,9 @@ app.put('/api/admin/all-inclusive/benefits/:benefit_id', async (c) => {
       time_restrictions ? JSON.stringify(time_restrictions) : benefit.time_restrictions,
       benefit_title || benefit.benefit_title,
       benefit_description !== undefined ? benefit_description : benefit.benefit_description,
+      benefit_category || benefit.benefit_category,
+      benefit_type || benefit.benefit_type,
+      linked_venues ? JSON.stringify(linked_venues) : benefit.linked_venues,
       included !== undefined ? included : benefit.included,
       upgrade_price !== undefined ? upgrade_price : benefit.upgrade_price,
       icon || benefit.icon,
@@ -15343,6 +15352,32 @@ app.put('/api/admin/all-inclusive/benefits/:benefit_id', async (c) => {
   } catch (error) {
     console.error('Update benefit error:', error)
     return c.json({ error: 'Failed to update benefit' }, 500)
+  }
+})
+
+// Get single benefit details
+app.get('/api/admin/all-inclusive/benefits/:benefit_id', async (c) => {
+  const { DB } = c.env
+  const { benefit_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID')
+  
+  if (!property_id) {
+    return c.json({ error: 'Unauthorized - Missing property ID' }, 401)
+  }
+  
+  try {
+    const benefit = await DB.prepare(`
+      SELECT * FROM tier_benefits WHERE benefit_id = ? AND property_id = ?
+    `).bind(benefit_id, property_id).first()
+    
+    if (!benefit) {
+      return c.json({ error: 'Benefit not found' }, 404)
+    }
+    
+    return c.json({ success: true, benefit })
+  } catch (error) {
+    console.error('Get benefit error:', error)
+    return c.json({ error: 'Failed to load benefit' }, 500)
   }
 })
 
@@ -56995,6 +57030,76 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         if (modal) modal.remove();
       };
       
+      window.closeEditBenefitModal = function() {
+        const modal = document.getElementById('edit-benefit-modal');
+        if (modal) modal.remove();
+      };
+      
+      // Submit edit benefit
+      window.submitEditBenefit = async function(event, benefitId) {
+        event.preventDefault();
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        if (data.quantity_limit) {
+          data.quantity_limit = parseInt(data.quantity_limit);
+        } else {
+          delete data.quantity_limit;
+        }
+        
+        // Handle multi-venue data
+        try {
+          const venueIdsInput = document.getElementById('venue_ids_input');
+          if (venueIdsInput && venueIdsInput.value) {
+            data.linked_venues = JSON.parse(venueIdsInput.value);
+          } else {
+            data.linked_venues = [];
+          }
+        } catch (e) {
+          console.error('Failed to parse venue data:', e);
+          data.linked_venues = [];
+        }
+        
+        // Remove old single venue_id field
+        delete data.venue_id;
+        delete data.venue_cta_text;
+        
+        try {
+          const response = await fetchWithAuth(`/api/admin/all-inclusive/benefits/${benefitId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            alert('✅ Benefit updated successfully with ' + (data.linked_venues.length || 0) + ' linked venue(s)!');
+            closeEditBenefitModal();
+            // Reload the tier modal to show updated data
+            const editTierModal = document.getElementById('edit-tier-modal');
+            if (editTierModal) {
+              // Get tier ID from the modal (assuming it's stored in the form or URL)
+              const tierId = editTierModal.querySelector('form')?.id.match(/\d+/)?.[0];
+              if (tierId) {
+                closeEditTierModal();
+                editTier(parseInt(tierId));
+              } else {
+                // Fallback: just reload tiers list
+                loadTiers();
+              }
+            } else {
+              loadTiers();
+            }
+          } else {
+            alert('❌ Failed to update benefit: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Update benefit error:', error);
+          alert('❌ Failed to update benefit');
+        }
+      };
+      
       // Submit add benefit
       window.submitAddBenefit = async function(event, tierId) {
         event.preventDefault();
@@ -57050,14 +57155,150 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       
       // Edit benefit
       window.editBenefit = async function(benefitId) {
-        alert('Edit Benefit Feature Coming Soon! Currently you can: Delete the benefit and Add a new benefit with updated info. Full edit functionality (including multi-venue editing) will be added in the next update.');
-        // TODO: Implement edit benefit modal with pre-filled data and existing venues
-        // Will need to:
-        // 1. Fetch benefit details + linked venues
-        // 2. Open modal similar to addBenefit
-        // 3. Pre-populate all fields
-        // 4. Show existing venues in multi-venue selector
-        // 5. PUT endpoint instead of POST
+        // Fetch benefit details
+        let benefit = null;
+        try {
+          const response = await fetchWithAuth(`/api/admin/all-inclusive/benefits/${benefitId}`);
+          const data = await response.json();
+          
+          if (!data.success || !data.benefit) {
+            alert('❌ Failed to load benefit details');
+            return;
+          }
+          
+          benefit = data.benefit;
+        } catch (error) {
+          console.error('Load benefit error:', error);
+          alert('❌ Failed to load benefit details');
+          return;
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'edit-benefit-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4';
+        
+        const venues = window.currentTierVenues || [];
+        
+        // Pre-populate selected venues from benefit data
+        window.selectedVenues = [];
+        if (benefit.linked_venues) {
+          try {
+            const linkedVenues = JSON.parse(benefit.linked_venues);
+            window.selectedVenues = linkedVenues || [];
+          } catch (e) {
+            console.error('Parse linked venues error:', e);
+          }
+        }
+        
+        let html = '<div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">';
+        html += '<div class="p-6 border-b bg-gradient-to-r from-blue-600 to-indigo-600">';
+        html += '<h2 class="text-2xl font-bold text-white flex items-center gap-2">';
+        html += '<i class="fas fa-edit"></i>Edit Benefit';
+        html += '</h2>';
+        html += '</div>';
+        
+        html += '<div class="p-6">';
+        html += '<form id="edit-benefit-form" onsubmit="submitEditBenefit(event, ' + benefitId + ')">';
+        
+        html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Category *</label>';
+        html += '<select name="benefit_category" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        const categories = [
+          { value: 'dining', label: '🍽️ Dining' },
+          { value: 'drinks', label: '🍹 Drinks' },
+          { value: 'recreation', label: '🏊 Recreation' },
+          { value: 'services', label: '🔔 Services' },
+          { value: 'amenities', label: '🛏️ Amenities' }
+        ];
+        categories.forEach(cat => {
+          html += '<option value="' + cat.value + '" ' + (benefit.benefit_category === cat.value ? 'selected' : '') + '>' + cat.label + '</option>';
+        });
+        html += '</select></div>';
+        
+        html += '<div><label class="block text-sm font-semibold mb-1">Type *</label>';
+        html += '<select name="benefit_type" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        const types = [
+          'restaurant_access', 'bar_access', 'a_la_carte', 'buffet_access',
+          'room_service', 'spa_service', 'activity', 'minibar', 'concierge'
+        ];
+        types.forEach(type => {
+          const typeLabel = type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          html += '<option value="' + type + '" ' + (benefit.benefit_type === type ? 'selected' : '') + '>' + typeLabel + '</option>';
+        });
+        html += '</select></div>';
+        html += '</div>';
+        
+        html += '<div class="mb-4">';
+        html += '<label class="block text-sm font-semibold mb-1">Benefit Title *</label>';
+        html += '<input type="text" name="benefit_title" required class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + (benefit.benefit_title || '') + '">';
+        html += '</div>';
+        
+        html += '<div class="mb-4">';
+        html += '<label class="block text-sm font-semibold mb-1">Description</label>';
+        html += '<textarea name="benefit_description" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2">' + (benefit.benefit_description || '') + '</textarea>';
+        html += '</div>';
+        
+        html += '<div class="grid md:grid-cols-2 gap-4 mb-4">';
+        html += '<div><label class="block text-sm font-semibold mb-1">Access Level *</label>';
+        html += '<select name="access_level" required class="w-full border border-gray-300 rounded-lg px-3 py-2">';
+        html += '<option value="unlimited" ' + (benefit.access_level === 'unlimited' ? 'selected' : '') + '>✅ Unlimited</option>';
+        html += '<option value="limited" ' + (benefit.access_level === 'limited' ? 'selected' : '') + '>⚠️ Limited</option>';
+        html += '<option value="excluded" ' + (benefit.access_level === 'excluded' ? 'selected' : '') + '>❌ Excluded</option>';
+        html += '</select></div>';
+        
+        html += '<div><label class="block text-sm font-semibold mb-1">Quantity Limit (if limited)</label>';
+        html += '<input type="number" name="quantity_limit" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="' + (benefit.quantity_limit || '') + '">';
+        html += '</div>';
+        html += '</div>';
+        
+        if (venues.length > 0) {
+          html += '<div class="mb-4 border-2 border-dashed border-blue-200 rounded-lg p-4 bg-blue-50">';
+          html += '<label class="block text-sm font-bold mb-2 text-blue-800">';
+          html += '<i class="fas fa-link mr-2"></i>Linked Venues (Optional)';
+          html += '</label>';
+          html += '<p class="text-xs text-gray-600 mb-3">Link this benefit to one or more venues. Guests will see beautiful venue cards with "Click for details" buttons.</p>';
+          
+          // Hidden input to store selected venue IDs as JSON array
+          html += '<input type="hidden" name="venue_ids" id="venue_ids_input" value="' + JSON.stringify(window.selectedVenues) + '">';
+          
+          // Dropdown to add venues
+          html += '<div class="mb-3">';
+          html += '<div class="flex gap-2">';
+          html += '<select id="venue_selector" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 bg-white">';
+          html += '<option value="">➕ Select a venue to add...</option>';
+          venues.forEach(v => {
+            html += '<option value="' + v.id + '" data-name="' + v.name + '" data-type="' + v.type + '">' + v.name + ' (' + v.type + ')</option>';
+          });
+          html += '</select>';
+          html += '<button type="button" onclick="addSelectedVenue()" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">';
+          html += '<i class="fas fa-plus mr-2"></i>Add';
+          html += '</button>';
+          html += '</div>';
+          html += '</div>';
+          
+          // Selected venues container
+          html += '<div id="selected_venues_container" class="space-y-2">';
+          html += '<p class="text-xs text-gray-500 italic">Loading selected venues...</p>';
+          html += '</div>';
+          
+          html += '</div>';
+        }
+        
+        html += '<div class="flex gap-3 justify-end pt-4 border-t">';
+        html += '<button type="button" onclick="closeEditBenefitModal()" class="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50">Cancel</button>';
+        html += '<button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">';
+        html += '<i class="fas fa-save mr-2"></i>Save Changes';
+        html += '</button>';
+        html += '</div>';
+        
+        html += '</form>';
+        html += '</div></div>';
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        
+        // Render pre-populated venues
+        setTimeout(() => renderSelectedVenues(), 100);
       };
       
       // Delete benefit
