@@ -27161,7 +27161,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         </script>
         
         <!-- At Your Service Modal -->
-        <div id="serviceModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div id="serviceModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style="z-index: 9999;">
             <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
                 <div class="sticky top-0 z-10 p-6 border-b flex justify-between items-center" style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #6B1529));">
                     <div class="flex items-center gap-3 text-white">
