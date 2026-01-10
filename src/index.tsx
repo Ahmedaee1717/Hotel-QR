@@ -26219,8 +26219,6 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                   } catch (e) {}
                 }
                 
-                const venueCTA = venue.custom_cta_text || 'View Details';
-                
                 // Elegant venue card with image thumbnail
                 html += '<div onclick="window.location.href=\\'' + venueUrl + '\\'" class="group cursor-pointer bg-gradient-to-br from-white to-gray-50 rounded-xl overflow-hidden border border-gray-200 hover:shadow-xl transition-all duration-300">' +
                   '<div class="flex items-center gap-4 p-3">' +
