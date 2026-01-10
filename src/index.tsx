@@ -18651,13 +18651,14 @@ app.get('/api/guest/tier-benefits', async (c) => {
       }
     }
     
-    // Deduplicate benefits by benefit_type and venue_id
-    // Keep only the first occurrence of each unique combination
+    // Deduplicate benefits by benefit_id (primary key)
+    // This ensures each unique benefit is shown once
     const seenBenefits = new Set()
     const uniqueBenefits = []
     
     for (const benefit of benefits) {
-      const key = `${benefit.benefit_type}_${benefit.venue_id || 'null'}_${benefit.benefit_category}`
+      // Use benefit_id as the unique key since it's the primary key
+      const key = benefit.benefit_id
       if (!seenBenefits.has(key)) {
         seenBenefits.add(key)
         uniqueBenefits.push(benefit)
