@@ -27162,14 +27162,14 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
         
         <!-- At Your Service Modal -->
         <div id="serviceModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div class="sticky top-0 p-6 border-b flex justify-between items-center" style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #6B1529));">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                <div class="sticky top-0 z-10 p-6 border-b flex justify-between items-center" style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #6B1529));">
                     <div class="flex items-center gap-3 text-white">
                         <i class="fas fa-concierge-bell text-2xl"></i>
                         <h2 class="text-2xl font-bold">At Your Service</h2>
                     </div>
-                    <button onclick="closeServiceMenu()" class="text-white hover:bg-white/20 rounded-lg p-2 transition">
-                        <i class="fas fa-times text-xl"></i>
+                    <button onclick="closeServiceMenu()" class="text-white hover:bg-white/20 rounded-lg p-2 transition-all">
+                        <i class="fas fa-times text-2xl"></i>
                     </button>
                 </div>
                 <div id="serviceModalContent" class="p-6"></div>
@@ -43474,15 +43474,15 @@ app.get('/admin/dashboard', (c) => {
         
         <!-- Add Service Type Modal -->
         <div id="addServiceTypeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
                 <!-- Modal Header -->
-                <div class="px-6 py-4 border-b sticky top-0 bg-white rounded-t-2xl" style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                <div class="px-6 py-4 border-b sticky top-0 z-10 rounded-t-2xl" style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
                     <div class="flex items-center justify-between">
                         <h3 class="text-2xl font-bold text-white">
                             <i class="fas fa-plus-circle mr-2"></i>Add New Service Type
                         </h3>
                         <button onclick="closeAddServiceTypeModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition-all">
-                            <i class="fas fa-times text-xl"></i>
+                            <i class="fas fa-times text-2xl"></i>
                         </button>
                     </div>
                 </div>
