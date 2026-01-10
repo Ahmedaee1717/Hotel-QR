@@ -21031,7 +21031,7 @@ app.get('/api/admin/service-requests', async (c) => {
         st.service_icon,
         st.service_color,
         dp.primary_guest_name as pass_guest_name,
-        dp.tier_name
+        dp.room_number as pass_room_number
       FROM service_requests sr
       JOIN service_types st ON sr.service_type_id = st.service_type_id
       LEFT JOIN digital_passes dp ON sr.pass_id = dp.pass_id
