@@ -20946,6 +20946,194 @@ app.post('/api/admin/feedback/generate-insights/:property_id', async (c) => {
 // ========== END FEEDBACK SYSTEM API ENDPOINTS ==========
 
 // Hotel Landing Page - Main QR entry point
+// ===========================================
+// SERVICE REQUESTS API ENDPOINTS
+// ===========================================
+
+// Get service types for a property
+app.get('/api/service-types', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  
+  try {
+    const types = await DB.prepare(`
+      SELECT * FROM service_types
+      WHERE property_id = ? AND is_active = 1
+      ORDER BY display_order ASC, service_name ASC
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      service_types: types.results
+    })
+  } catch (error) {
+    console.error('Get service types error:', error)
+    return c.json({ success: false, error: 'Failed to load service types' }, 500)
+  }
+})
+
+// Create service request
+app.post('/api/service-requests', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const {
+      service_type_id,
+      pass_id,
+      guest_name,
+      room_number,
+      guest_phone,
+      request_details,
+      priority
+    } = body
+    
+    const result = await DB.prepare(`
+      INSERT INTO service_requests (
+        property_id, service_type_id, pass_id, guest_name, room_number,
+        guest_phone, request_details, priority, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).bind(
+      property_id,
+      service_type_id,
+      pass_id || null,
+      guest_name,
+      room_number,
+      guest_phone || null,
+      request_details,
+      priority || 'normal'
+    ).run()
+    
+    return c.json({
+      success: true,
+      request_id: result.meta.last_row_id,
+      message: 'Service request submitted successfully'
+    })
+  } catch (error) {
+    console.error('Create service request error:', error)
+    return c.json({ success: false, error: 'Failed to create service request' }, 500)
+  }
+})
+
+// Get service requests for admin (Front Desk)
+app.get('/api/admin/service-requests', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const status = c.req.query('status') // Optional filter
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    let query = `
+      SELECT 
+        sr.*,
+        st.service_name,
+        st.service_icon,
+        st.service_color,
+        dp.primary_guest_name as pass_guest_name,
+        dp.tier_name
+      FROM service_requests sr
+      JOIN service_types st ON sr.service_type_id = st.service_type_id
+      LEFT JOIN digital_passes dp ON sr.pass_id = dp.pass_id
+      WHERE sr.property_id = ?
+        AND DATE(sr.requested_at) = ?
+    `
+    
+    const params = [property_id, date]
+    
+    if (status) {
+      query += ` AND sr.status = ?`
+      params.push(status)
+    }
+    
+    query += ` ORDER BY 
+      CASE sr.priority 
+        WHEN 'urgent' THEN 1
+        WHEN 'high' THEN 2
+        WHEN 'normal' THEN 3
+        ELSE 4
+      END,
+      sr.requested_at DESC
+    `
+    
+    const requests = await DB.prepare(query).bind(...params).all()
+    
+    // Get counts by status
+    const counts = await DB.prepare(`
+      SELECT 
+        status,
+        COUNT(*) as count
+      FROM service_requests
+      WHERE property_id = ? AND DATE(requested_at) = ?
+      GROUP BY status
+    `).bind(property_id, date).all()
+    
+    const statusCounts = {}
+    counts.results.forEach(row => {
+      statusCounts[row.status] = row.count
+    })
+    
+    return c.json({
+      success: true,
+      requests: requests.results,
+      counts: statusCounts,
+      total: requests.results.length
+    })
+  } catch (error) {
+    console.error('Get service requests error:', error)
+    return c.json({ success: false, error: 'Failed to load service requests' }, 500)
+  }
+})
+
+// Update service request status
+app.patch('/api/admin/service-requests/:request_id', async (c) => {
+  const { DB } = c.env
+  const { request_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { status, admin_notes, completion_notes } = body
+    
+    let updateFields = ['status = ?']
+    let params = [status]
+    
+    if (status === 'acknowledged') {
+      updateFields.push('acknowledged_at = datetime("now")')
+    } else if (status === 'in_progress') {
+      updateFields.push('started_at = datetime("now")')
+    } else if (status === 'completed') {
+      updateFields.push('completed_at = datetime("now")')
+    }
+    
+    if (admin_notes !== undefined) {
+      updateFields.push('admin_notes = ?')
+      params.push(admin_notes)
+    }
+    
+    if (completion_notes !== undefined) {
+      updateFields.push('completion_notes = ?')
+      params.push(completion_notes)
+    }
+    
+    params.push(request_id, property_id)
+    
+    await DB.prepare(`
+      UPDATE service_requests
+      SET ${updateFields.join(', ')}
+      WHERE request_id = ? AND property_id = ?
+    `).bind(...params).run()
+    
+    return c.json({
+      success: true,
+      message: 'Service request updated successfully'
+    })
+  } catch (error) {
+    console.error('Update service request error:', error)
+    return c.json({ success: false, error: 'Failed to update service request' }, 500)
+  }
+})
+
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
   
@@ -21135,8 +21323,13 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             <div class="relative bg-white">
                 <!-- Cover Photo -->
                 <div class="gradient-hero h-64 md:h-96 relative">
-                    <!-- Info Button, Feedback Button & Language Selector - Top Right on Cover -->
+                    <!-- Info Button, Feedback Button, At Your Service Button & Language Selector - Top Right on Cover -->
                     <div class="absolute top-4 right-4 z-10 flex gap-2">
+                        <!-- At Your Service Button -->
+                        <button id="serviceButton" onclick="openServiceMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2" style="background-color: var(--accent-color, #D4AF37);" title="At Your Service">
+                            <i class="fas fa-concierge-bell"></i>
+                            <span class="hidden sm:inline">At Your Service</span>
+                        </button>
                         <!-- Feedback Button (only shows if active form exists) -->
                         <button id="feedbackButton" onclick="openFeedbackForm()" class="hidden px-4 py-2 bg-black text-white rounded-lg shadow-lg font-semibold transition-all hover:bg-gray-800 flex items-center gap-2" title="Share Your Feedback">
                             <i class="fas fa-comment-dots"></i>
@@ -26815,6 +27008,174 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
             window.addEventListener('passLinked', () => {
                 setTimeout(showMoodCheckModal, 1000);
             });
+        </script>
+        
+        <!-- At Your Service Modal -->
+        <div id="serviceModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="sticky top-0 p-6 border-b flex justify-between items-center" style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #6B1529));">
+                    <div class="flex items-center gap-3 text-white">
+                        <i class="fas fa-concierge-bell text-2xl"></i>
+                        <h2 class="text-2xl font-bold">At Your Service</h2>
+                    </div>
+                    <button onclick="closeServiceMenu()" class="text-white hover:bg-white/20 rounded-lg p-2 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div id="serviceModalContent" class="p-6"></div>
+            </div>
+        </div>
+
+        <script>
+        let serviceTypes = [];
+
+        async function loadServiceTypes() {
+            try {
+                const propertyId = getPropertyId();
+                const response = await fetch('/api/service-types?property_id=' + propertyId);
+                const data = await response.json();
+                if (data.success) {
+                    serviceTypes = data.service_types;
+                }
+            } catch (error) {
+                console.error('Load service types error:', error);
+            }
+        }
+
+        function openServiceMenu() {
+            const guest = getGuestSession();
+            if (!guest) {
+                alert('Please link your guest pass first to request services');
+                return;
+            }
+            document.getElementById('serviceModal').classList.remove('hidden');
+            renderServiceTypes();
+        }
+
+        function closeServiceMenu() {
+            document.getElementById('serviceModal').classList.add('hidden');
+        }
+
+        function renderServiceTypes() {
+            const content = document.getElementById('serviceModalContent');
+            if (serviceTypes.length === 0) {
+                content.innerHTML = '<p class="text-gray-500 text-center py-8">No services available at this time.</p>';
+                return;
+            }
+            
+            content.innerHTML = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+                serviceTypes.map(service => {
+                    return '<button onclick="showServiceRequestForm(' + service.service_type_id + ')" class="p-6 border-2 rounded-xl hover:shadow-lg transition-all text-left group" style="border-color: ' + service.service_color + '20; background: ' + service.service_color + '05;">' +
+                        '<div class="flex items-start gap-4">' +
+                            '<div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition" style="background: ' + service.service_color + '; color: white;">' +
+                                '<i class="fas ' + service.service_icon + ' text-xl"></i>' +
+                            '</div>' +
+                            '<div class="flex-1">' +
+                                '<h3 class="font-bold text-lg mb-1">' + service.service_name + '</h3>' +
+                                '<p class="text-sm text-gray-600 mb-2">' + (service.description || '') + '</p>' +
+                                '<p class="text-xs" style="color: ' + service.service_color + ';">' +
+                                    '<i class="fas fa-clock mr-1"></i>Response time: ~' + service.estimated_response_minutes + ' min' +
+                                '</p>' +
+                            '</div>' +
+                        '</div>' +
+                    '</button>';
+                }).join('') +
+            '</div>';
+        }
+
+        function showServiceRequestForm(serviceTypeId) {
+            const service = serviceTypes.find(s => s.service_type_id === serviceTypeId);
+            const guest = getGuestSession();
+            
+            const content = document.getElementById('serviceModalContent');
+            content.innerHTML = 
+                '<button onclick="renderServiceTypes()" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-2">' +
+                    '<i class="fas fa-arrow-left"></i> Back to Services' +
+                '</button>' +
+                '<div class="bg-gradient-to-br p-6 rounded-xl mb-6" style="background: linear-gradient(135deg, ' + service.service_color + '15, ' + service.service_color + '05);">' +
+                    '<div class="flex items-center gap-4 mb-3">' +
+                        '<div class="w-16 h-16 rounded-xl flex items-center justify-center" style="background: ' + service.service_color + '; color: white;">' +
+                            '<i class="fas ' + service.service_icon + ' text-2xl"></i>' +
+                        '</div>' +
+                        '<div>' +
+                            '<h3 class="text-2xl font-bold">' + service.service_name + '</h3>' +
+                            '<p class="text-gray-600">' + (service.description || '') + '</p>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<form id="serviceRequestForm" onsubmit="submitServiceRequest(event, ' + serviceTypeId + ')" class="space-y-4">' +
+                    '<div><label class="block font-semibold mb-2">Guest Name</label>' +
+                    '<input type="text" name="guest_name" value="' + (guest.full_name || '') + '" readonly class="w-full px-4 py-3 border-2 rounded-lg bg-gray-50"></div>' +
+                    '<div><label class="block font-semibold mb-2">Room Number</label>' +
+                    '<input type="text" name="room_number" value="' + (guest.room_number || '') + '" readonly class="w-full px-4 py-3 border-2 rounded-lg bg-gray-50"></div>' +
+                    '<div><label class="block font-semibold mb-2">Phone Number (Optional)</label>' +
+                    '<input type="tel" name="guest_phone" placeholder="Your phone number" class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none"></div>' +
+                    '<div><label class="block font-semibold mb-2">Request Details</label>' +
+                    '<textarea name="request_details" rows="4" placeholder="Please describe what you need..." class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none" required></textarea></div>' +
+                    '<div><label class="block font-semibold mb-2">Priority</label>' +
+                    '<select name="priority" class="w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 outline-none">' +
+                        '<option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>' +
+                    '</select></div>' +
+                    '<button type="submit" class="w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg hover:opacity-90 transition" style="background: ' + service.service_color + ';">' +
+                        '<i class="fas fa-paper-plane mr-2"></i>Submit Request' +
+                    '</button>' +
+                '</form>';
+        }
+
+        async function submitServiceRequest(event, serviceTypeId) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const guest = getGuestSession();
+            
+            const data = {
+                service_type_id: serviceTypeId,
+                pass_id: guest.pass_id,
+                guest_name: formData.get('guest_name'),
+                room_number: formData.get('room_number'),
+                guest_phone: formData.get('guest_phone'),
+                request_details: formData.get('request_details'),
+                priority: formData.get('priority')
+            };
+            
+            try {
+                const propertyId = getPropertyId();
+                const response = await fetch('/api/service-requests', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Property-ID': propertyId},
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (typeof confetti !== 'undefined') {
+                        confetti({particleCount: 100, spread: 70, origin: {y: 0.6}});
+                    }
+                    
+                    const service = serviceTypes.find(s => s.service_type_id === serviceTypeId);
+                    const content = document.getElementById('serviceModalContent');
+                    content.innerHTML = 
+                        '<div class="text-center py-12">' +
+                            '<div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background: ' + service.service_color + '20;">' +
+                                '<i class="fas fa-check-circle text-5xl" style="color: ' + service.service_color + ';"></i>' +
+                            '</div>' +
+                            '<h3 class="text-2xl font-bold mb-3">Request Submitted Successfully!</h3>' +
+                            '<p class="text-gray-600 mb-2">Request ID: <strong>#' + result.request_id + '</strong></p>' +
+                            '<p class="text-gray-600 mb-6">Our team will respond within ' + service.estimated_response_minutes + ' minutes</p>' +
+                            '<button onclick="closeServiceMenu()" class="px-8 py-3 rounded-xl text-white font-semibold" style="background: ' + service.service_color + ';">Close</button>' +
+                        '</div>';
+                } else {
+                    alert('Failed to submit request: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Submit service request error:', error);
+                alert('Failed to submit request. Please try again.');
+            }
+        }
+
+        // Load service types on page load
+        document.addEventListener('DOMContentLoaded', loadServiceTypes);
         </script>
     </body>
     </html>
