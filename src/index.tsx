@@ -57066,7 +57066,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         delete data.venue_cta_text;
         
         try {
-          const response = await fetchWithAuth(`/api/admin/all-inclusive/benefits/${benefitId}`, {
+          const response = await fetchWithAuth('/api/admin/all-inclusive/benefits/' + benefitId, {
             method: 'PUT',
             body: JSON.stringify(data)
           });
@@ -57158,7 +57158,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         // Fetch benefit details
         let benefit = null;
         try {
-          const response = await fetchWithAuth(`/api/admin/all-inclusive/benefits/${benefitId}`);
+          const response = await fetchWithAuth('/api/admin/all-inclusive/benefits/' + benefitId);
           const data = await response.json();
           
           if (!data.success || !data.benefit) {
