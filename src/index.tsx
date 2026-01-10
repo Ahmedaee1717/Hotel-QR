@@ -11063,6 +11063,7 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           ho.duration_minutes,
           ho.capacity_per_slot,
           ho.requires_booking,
+          ho.enable_booking,
           ho.location,
           ho.status,
           ho.is_featured,
@@ -27310,8 +27311,8 @@ app.get('/offering-detail', async (c) => {
                 }
             });
             
-            // Re-render restaurant booking section if it's a restaurant
-            if (offeringData && offeringData.offering_type === 'restaurant') {
+            // Re-render restaurant booking section if it's a restaurant with booking enabled
+            if (offeringData && offeringData.offering_type === 'restaurant' && offeringData.enable_booking !== 0) {
                 const bookingSection = document.getElementById('bookingSection');
                 if (bookingSection) {
                     // Use original_id (database ID) instead of prefixed offering_id
@@ -27438,9 +27439,9 @@ app.get('/offering-detail', async (c) => {
 
             // Show restaurant-specific fields and load menus
             if (offeringData.offering_type === 'restaurant') {
-                // ALWAYS show booking section for restaurants with View Menu + Book Table buttons
+                // Show booking section only if booking is enabled
                 const bookingSection = document.getElementById('bookingSection');
-                if (bookingSection) {
+                if (bookingSection && offeringData.enable_booking !== 0) {
                     // Use original_id (database ID) instead of prefixed offering_id
                     const actualId = offeringData.original_id || offeringId.toString().replace(/^[HA]/, '');
                     
@@ -27455,6 +27456,9 @@ app.get('/offering-detail', async (c) => {
                         'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-calendar-check mr-2"></i>' + t('book-table') + '</button>' +
                         '</div>';
+                } else if (bookingSection) {
+                    // Booking disabled - hide the section
+                    bookingSection.classList.add('hidden');
                 }
                 // Hide the menu cards section - we have View Menu button instead
                 const menuSection = document.getElementById('restaurantMenus');
