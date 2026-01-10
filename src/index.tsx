@@ -26230,7 +26230,6 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                     '<div class="flex-1 min-w-0">' +
                       '<h6 class="font-bold text-gray-900 text-base mb-1 group-hover:text-' + accentColor.replace('#', '') + ' transition-colors">' + venue.name + '</h6>' +
                       (venue.location ? '<p class="text-xs text-gray-500 mb-1 flex items-center gap-1"><i class="fas fa-map-marker-alt"></i> ' + venue.location + '</p>' : '') +
-                      (venue.price && venue.price > 0 ? '<p class="text-xs font-semibold text-gray-700">' + venue.currency + ' ' + venue.price + '</p>' : '') +
                     '</div>' +
                     // CTA arrow
                     '<div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white group-hover:scale-110 transition-transform" style="background: linear-gradient(135deg, ' + accentColor + ' 0%, ' + accentColor + 'dd 100%);">' +
