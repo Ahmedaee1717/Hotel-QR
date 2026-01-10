@@ -21134,6 +21134,156 @@ app.patch('/api/admin/service-requests/:request_id', async (c) => {
   }
 })
 
+// Admin: Get all service types
+app.get('/api/admin/service-types', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  
+  try {
+    const serviceTypes = await DB.prepare(`
+      SELECT *
+      FROM service_types
+      WHERE property_id = ?
+      ORDER BY display_order ASC, service_name ASC
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      service_types: serviceTypes.results
+    })
+  } catch (error) {
+    console.error('Get service types error:', error)
+    return c.json({ success: false, error: 'Failed to load service types' }, 500)
+  }
+})
+
+// Admin: Create new service type
+app.post('/api/admin/service-types', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { service_name, service_icon, service_color, description, estimated_response_minutes } = body
+    
+    const result = await DB.prepare(`
+      INSERT INTO service_types (
+        property_id,
+        service_name,
+        service_icon,
+        service_color,
+        description,
+        estimated_response_minutes,
+        is_active,
+        display_order
+      ) VALUES (?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM service_types WHERE property_id = ?))
+    `).bind(
+      property_id,
+      service_name,
+      service_icon || 'fa-concierge-bell',
+      service_color || '#D4AF37',
+      description || '',
+      estimated_response_minutes || 30,
+      property_id
+    ).run()
+    
+    return c.json({
+      success: true,
+      service_type_id: result.meta.last_row_id,
+      message: 'Service type created successfully'
+    })
+  } catch (error) {
+    console.error('Create service type error:', error)
+    return c.json({ success: false, error: 'Failed to create service type' }, 500)
+  }
+})
+
+// Admin: Update service type
+app.patch('/api/admin/service-types/:service_type_id', async (c) => {
+  const { DB } = c.env
+  const { service_type_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { service_name, service_icon, service_color, description, estimated_response_minutes, is_active, display_order } = body
+    
+    let updateFields = []
+    let params = []
+    
+    if (service_name !== undefined) {
+      updateFields.push('service_name = ?')
+      params.push(service_name)
+    }
+    if (service_icon !== undefined) {
+      updateFields.push('service_icon = ?')
+      params.push(service_icon)
+    }
+    if (service_color !== undefined) {
+      updateFields.push('service_color = ?')
+      params.push(service_color)
+    }
+    if (description !== undefined) {
+      updateFields.push('description = ?')
+      params.push(description)
+    }
+    if (estimated_response_minutes !== undefined) {
+      updateFields.push('estimated_response_minutes = ?')
+      params.push(estimated_response_minutes)
+    }
+    if (is_active !== undefined) {
+      updateFields.push('is_active = ?')
+      params.push(is_active)
+    }
+    if (display_order !== undefined) {
+      updateFields.push('display_order = ?')
+      params.push(display_order)
+    }
+    
+    if (updateFields.length === 0) {
+      return c.json({ success: false, error: 'No fields to update' }, 400)
+    }
+    
+    params.push(service_type_id, property_id)
+    
+    await DB.prepare(`
+      UPDATE service_types
+      SET ${updateFields.join(', ')}
+      WHERE service_type_id = ? AND property_id = ?
+    `).bind(...params).run()
+    
+    return c.json({
+      success: true,
+      message: 'Service type updated successfully'
+    })
+  } catch (error) {
+    console.error('Update service type error:', error)
+    return c.json({ success: false, error: 'Failed to update service type' }, 500)
+  }
+})
+
+// Admin: Delete service type
+app.delete('/api/admin/service-types/:service_type_id', async (c) => {
+  const { DB } = c.env
+  const { service_type_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    await DB.prepare(`
+      DELETE FROM service_types
+      WHERE service_type_id = ? AND property_id = ?
+    `).bind(service_type_id, property_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Service type deleted successfully'
+    })
+  } catch (error) {
+    console.error('Delete service type error:', error)
+    return c.json({ success: false, error: 'Failed to delete service type' }, 500)
+  }
+})
+
 app.get('/hotel/:property_slug', async (c) => {
   const { property_slug } = c.req.param()
   
@@ -40831,6 +40981,9 @@ app.get('/admin/dashboard', (c) => {
                     <button data-tab="callbacks" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-phone w-5"></i><span>Callbacks</span>
                     </button>
+                    <button data-tab="servicetypes" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-concierge-bell w-5" style="color: var(--accent-color, #D4AF37);"></i><span>Service Types</span>
+                    </button>
                 </div>
                 
                 <!-- AI & Advanced Section -->
@@ -40873,7 +41026,7 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <!-- Live Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                 <div class="rounded-lg shadow-lg p-6 text-white" style="background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%);">
                     <div class="flex items-center justify-between">
                         <div>
@@ -40921,6 +41074,19 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                     </div>
                 </div>
+                
+                <div class="rounded-lg shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow" style="background: linear-gradient(135deg, #D4AF37 0%, #C49E2E 100%);" onclick="showServiceRequestsView()">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-white/80 text-sm font-semibold uppercase tracking-wide">Service Requests</p>
+                            <p class="text-4xl font-bold mt-2" id="statServiceRequests">0</p>
+                            <p class="text-xs text-white/70 mt-1"><span id="statPendingRequests">0</span> pending</p>
+                        </div>
+                        <div class="bg-white/10 rounded-full p-4">
+                            <i class="fas fa-concierge-bell text-3xl"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Filter and Controls -->
@@ -40937,6 +41103,9 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                     <button onclick="setFrontDeskView('urgent')" id="viewUrgentBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
                         <i class="fas fa-exclamation-circle mr-2"></i>Urgent Only
+                    </button>
+                    <button onclick="setFrontDeskView('service-requests')" id="viewServiceRequestsBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-concierge-bell mr-2"></i>Service Requests
                     </button>
                     
                     <div class="ml-auto flex gap-2">
@@ -40973,6 +41142,49 @@ app.get('/admin/dashboard', (c) => {
                         <i class="fas fa-mouse-pointer text-5xl mb-4"></i>
                         <p>Click on any communication to view details</p>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Service Requests View Container -->
+        <div id="serviceRequestsViewContainer" style="display: none;">
+            <!-- Service Requests Header -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-bold">
+                        <i class="fas fa-concierge-bell mr-3" style="color: var(--accent-color, #D4AF37);"></i>
+                        Service Requests Management
+                    </h3>
+                    <button onclick="loadServiceRequests()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
+                
+                <!-- Filter Controls -->
+                <div class="flex flex-wrap gap-3 items-center">
+                    <button onclick="filterServiceRequests('all')" id="filterAllRequests" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">
+                        All Requests
+                    </button>
+                    <button onclick="filterServiceRequests('pending')" id="filterPendingRequests" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-clock mr-2"></i>Pending
+                    </button>
+                    <button onclick="filterServiceRequests('acknowledged')" id="filterAcknowledgedRequests" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-check-circle mr-2"></i>Acknowledged
+                    </button>
+                    <button onclick="filterServiceRequests('in_progress')" id="filterInProgressRequests" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-spinner mr-2"></i>In Progress
+                    </button>
+                    <button onclick="filterServiceRequests('completed')" id="filterCompletedRequests" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-check-double mr-2"></i>Completed
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Service Requests List -->
+            <div id="serviceRequestsList" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="col-span-2 text-center text-gray-400 py-8">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                    <p>Loading service requests...</p>
                 </div>
             </div>
         </div>
@@ -43232,6 +43444,33 @@ app.get('/admin/dashboard', (c) => {
                 <div id="callbacksList" class="space-y-3"></div>
             </div>
         </div>
+
+        <!-- Service Types Tab -->
+        <div id="servicetypesTab" class="tab-content hidden">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                    <i class="fas fa-concierge-bell mr-3" style="color: var(--accent-color, #D4AF37);"></i>Service Types Management
+                </h2>
+                <p class="text-gray-600">Manage available service types for guest requests (Housekeeping, Maintenance, etc.)</p>
+            </div>
+
+            <!-- Add New Service Type Button -->
+            <div class="mb-6">
+                <button onclick="openAddServiceTypeModal()" class="px-6 py-3 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                        style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                    <i class="fas fa-plus mr-2"></i>Add New Service Type
+                </button>
+            </div>
+
+            <!-- Service Types List -->
+            <div id="serviceTypesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="col-span-3 text-center text-gray-400 py-8">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                    <p>Loading service types...</p>
+                </div>
+            </div>
+        </div>
+        <!-- END SERVICE TYPES TAB -->
 
         <!-- Settings Tab -->
         <div id="settingsTab" class="tab-content hidden">
@@ -46277,6 +46516,7 @@ app.get('/admin/dashboard', (c) => {
         if (tab === 'infopages') loadInfoPages();
         if (tab === 'activities') loadActivities();
         if (tab === 'callbacks') loadCallbacks();
+        if (tab === 'servicetypes') loadServiceTypes();
         if (tab === 'settings') loadSettings();
         if (tab === 'chatbot') loadChatbot();
         if (tab === 'beach') loadBeachSettings();
@@ -46307,10 +46547,10 @@ app.get('/admin/dashboard', (c) => {
         currentFrontDeskView = view;
         
         // Update button styles
-        ['All', 'Feedback', 'Chatbot', 'Urgent'].forEach(v => {
+        ['All', 'Feedback', 'Chatbot', 'Urgent', 'ServiceRequests'].forEach(v => {
           const btn = document.getElementById('view' + v + 'Btn');
           if (btn) {
-            if (v.toLowerCase() === view || (v === 'All' && view === 'all')) {
+            if (v.toLowerCase() === view || (v === 'All' && view === 'all') || (v === 'ServiceRequests' && view === 'service-requests')) {
               btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
             } else {
               btn.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
@@ -46318,7 +46558,16 @@ app.get('/admin/dashboard', (c) => {
           }
         });
         
-        loadFrontDeskData();
+        // Show/hide appropriate view
+        if (view === 'service-requests') {
+          document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6').style.display = 'none';
+          showServiceRequestsView();
+        } else {
+          document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6').style.display = 'grid';
+          const serviceView = document.getElementById('serviceRequestsViewContainer');
+          if (serviceView) serviceView.style.display = 'none';
+          loadFrontDeskData();
+        }
       };
       
       async function loadFrontDeskData() {
@@ -46334,6 +46583,15 @@ app.get('/admin/dashboard', (c) => {
             document.getElementById('statActiveChats').textContent = statsData.stats.active_chats || 0;
             document.getElementById('statUrgentIssues').textContent = statsData.stats.urgent_issues || 0;
             document.getElementById('statUnreadMessages').textContent = statsData.stats.unread_messages || 0;
+          }
+          
+          // Load service requests stats
+          const serviceResponse = await fetch('/api/admin/service-requests?property_id=' + propertyId);
+          const serviceData = await serviceResponse.json();
+          
+          if (serviceData.success) {
+            document.getElementById('statServiceRequests').textContent = serviceData.total || 0;
+            document.getElementById('statPendingRequests').textContent = serviceData.counts.pending || 0;
           }
           
           // Load communications feed
@@ -46590,6 +46848,220 @@ app.get('/admin/dashboard', (c) => {
       
       // ========================================
       // END FRONT DESK FUNCTIONS
+      // ========================================
+      
+      // ========================================
+      // SERVICE REQUESTS FUNCTIONS
+      // ========================================
+      let currentServiceFilter = 'all';
+      let allServiceRequests = [];
+      
+      window.showServiceRequestsView = async function() {
+        document.getElementById('serviceRequestsViewContainer').style.display = 'block';
+        await loadServiceRequests();
+      };
+      
+      async function loadServiceRequests() {
+        try {
+          const response = await fetch('/api/admin/service-requests?property_id=' + propertyId);
+          const data = await response.json();
+          
+          if (data.success) {
+            allServiceRequests = data.requests;
+            renderServiceRequests(allServiceRequests);
+          }
+        } catch (error) {
+          console.error('Load service requests error:', error);
+          document.getElementById('serviceRequestsList').innerHTML = \`
+            <div class="col-span-2 text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error loading service requests</p>
+            </div>
+          \`;
+        }
+      }
+      
+      window.filterServiceRequests = function(status) {
+        currentServiceFilter = status;
+        
+        // Update button styles
+        ['All', 'Pending', 'Acknowledged', 'InProgress', 'Completed'].forEach(f => {
+          const btn = document.getElementById('filter' + f + 'Requests');
+          if (btn) {
+            if (f.toLowerCase() === status || (f === 'All' && status === 'all') || 
+                (f === 'InProgress' && status === 'in_progress')) {
+              btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+            } else {
+              btn.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+            }
+          }
+        });
+        
+        const filtered = status === 'all' ? allServiceRequests : 
+                        allServiceRequests.filter(r => r.status === status);
+        renderServiceRequests(filtered);
+      };
+      
+      function renderServiceRequests(requests) {
+        const container = document.getElementById('serviceRequestsList');
+        
+        if (!requests || requests.length === 0) {
+          container.innerHTML = \`
+            <div class="col-span-2 text-center text-gray-400 py-8">
+              <i class="fas fa-inbox text-4xl mb-3"></i>
+              <p>No service requests found</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        container.innerHTML = requests.map(req => {
+          const statusColors = {
+            pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+            acknowledged: 'bg-blue-100 text-blue-800 border-blue-300',
+            in_progress: 'bg-orange-100 text-orange-800 border-orange-300',
+            completed: 'bg-green-100 text-green-800 border-green-300'
+          };
+          
+          const priorityColors = {
+            normal: 'bg-gray-100 text-gray-700',
+            high: 'bg-orange-100 text-orange-700',
+            urgent: 'bg-red-100 text-red-700'
+          };
+          
+          const statusIcons = {
+            pending: 'fa-clock',
+            acknowledged: 'fa-check-circle',
+            in_progress: 'fa-spinner',
+            completed: 'fa-check-double'
+          };
+          
+          return \`
+            <div class="bg-white rounded-lg shadow-lg p-6 border-l-4 \${statusColors[req.status] || 'border-gray-300'} hover:shadow-xl transition-shadow">
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background-color: \${req.service_color || '#D4AF37'}20;">
+                    <i class="fas \${req.service_icon || 'fa-concierge-bell'} text-2xl" style="color: \${req.service_color || '#D4AF37'};"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-bold text-gray-800">\${req.service_name || 'Service Request'}</h4>
+                    <p class="text-sm text-gray-500">Request #\${req.request_id}</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="px-3 py-1 rounded-lg text-xs font-bold \${statusColors[req.status] || 'bg-gray-100'}">
+                    <i class="fas \${statusIcons[req.status]} mr-1"></i>\${req.status.toUpperCase().replace('_', ' ')}
+                  </span>
+                  \${req.priority !== 'normal' ? \`
+                    <span class="mt-2 block px-2 py-1 rounded text-xs font-bold \${priorityColors[req.priority]}">
+                      \${req.priority.toUpperCase()}
+                    </span>
+                  \` : ''}
+                </div>
+              </div>
+              
+              <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span class="font-semibold text-gray-600">Guest:</span>
+                    <p class="text-gray-800 font-medium">\${req.guest_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span class="font-semibold text-gray-600">Room:</span>
+                    <p class="text-gray-800 font-medium">\${req.room_number || 'N/A'}</p>
+                  </div>
+                  \${req.guest_phone ? \`
+                    <div>
+                      <span class="font-semibold text-gray-600">Phone:</span>
+                      <p class="text-gray-800">\${req.guest_phone}</p>
+                    </div>
+                  \` : ''}
+                  <div>
+                    <span class="font-semibold text-gray-600">Requested:</span>
+                    <p class="text-gray-800">\${formatTimeAgo(req.created_at)}</p>
+                  </div>
+                </div>
+              </div>
+              
+              \${req.request_details ? \`
+                <div class="mb-4">
+                  <p class="text-sm font-semibold text-gray-600 mb-1">Details:</p>
+                  <p class="text-sm text-gray-800 bg-blue-50 p-3 rounded-lg">\${req.request_details}</p>
+                </div>
+              \` : ''}
+              
+              <div class="flex gap-2 flex-wrap">
+                \${req.status === 'pending' ? \`
+                  <button onclick="updateServiceRequestStatus(\${req.request_id}, 'acknowledged')" 
+                          class="flex-1 px-4 py-2 rounded-lg font-medium transition-all"
+                          style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%); color: white;">
+                    <i class="fas fa-check-circle mr-2"></i>Acknowledge
+                  </button>
+                \` : ''}
+                \${req.status === 'acknowledged' ? \`
+                  <button onclick="updateServiceRequestStatus(\${req.request_id}, 'in_progress')" 
+                          class="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 transition-all">
+                    <i class="fas fa-play mr-2"></i>Start Working
+                  </button>
+                \` : ''}
+                \${req.status === 'in_progress' ? \`
+                  <button onclick="updateServiceRequestStatus(\${req.request_id}, 'completed')" 
+                          class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all">
+                    <i class="fas fa-check-double mr-2"></i>Mark Complete
+                  </button>
+                \` : ''}
+                \${req.status !== 'completed' ? \`
+                  <button onclick="viewServiceRequestDetails(\${req.request_id})" 
+                          class="px-4 py-2 border-2 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                          style="border-color: var(--accent-color, #D4AF37);">
+                    <i class="fas fa-eye mr-2"></i>Details
+                  </button>
+                \` : \`
+                  <div class="flex-1 text-center py-2 text-green-700 font-medium">
+                    <i class="fas fa-check-circle mr-2"></i>Request Completed
+                    \${req.completed_at ? '<span class="text-sm text-gray-500 block">' + new Date(req.completed_at).toLocaleString() + '</span>' : ''}
+                  </div>
+                \`}
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+      
+      window.updateServiceRequestStatus = async function(requestId, newStatus) {
+        try {
+          const response = await fetch('/api/admin/service-requests/' + requestId, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            await loadServiceRequests();
+            await loadFrontDeskData(); // Refresh stats
+          } else {
+            alert('Failed to update request status');
+          }
+        } catch (error) {
+          console.error('Update status error:', error);
+          alert('Error updating request status');
+        }
+      };
+      
+      window.viewServiceRequestDetails = function(requestId) {
+        const request = allServiceRequests.find(r => r.request_id === requestId);
+        if (!request) return;
+        
+        alert('Service Request Details:\\n\\nRequest ID: ' + requestId + '\\nGuest: ' + request.guest_name + '\\nRoom: ' + request.room_number + '\\nService: ' + request.service_name + '\\nStatus: ' + request.status + '\\nDetails: ' + (request.request_details || 'N/A'));
+      };
+      
+      // ========================================
+      // END SERVICE REQUESTS FUNCTIONS
       // ========================================
       
       // ========================================
@@ -47607,6 +48079,181 @@ app.get('/admin/dashboard', (c) => {
           console.error('Load callbacks error:', error);
         }
       }
+      
+      // ========================================
+      // SERVICE TYPES MANAGEMENT FUNCTIONS
+      // ========================================
+      
+      async function loadServiceTypes() {
+        try {
+          const response = await fetch('/api/admin/service-types?property_id=' + propertyId);
+          const data = await response.json();
+          
+          if (data.success) {
+            renderServiceTypes(data.service_types);
+          }
+        } catch (error) {
+          console.error('Load service types error:', error);
+          document.getElementById('serviceTypesList').innerHTML = \`
+            <div class="col-span-3 text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error loading service types</p>
+            </div>
+          \`;
+        }
+      }
+      
+      function renderServiceTypes(serviceTypes) {
+        const container = document.getElementById('serviceTypesList');
+        
+        if (!serviceTypes || serviceTypes.length === 0) {
+          container.innerHTML = \`
+            <div class="col-span-3 text-center text-gray-400 py-8">
+              <i class="fas fa-inbox text-4xl mb-3"></i>
+              <p>No service types found. Add your first service type!</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        container.innerHTML = serviceTypes.map(service => \`
+          <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow border-2" style="border-color: \${service.service_color}20;">
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center text-2xl" 
+                     style="background-color: \${service.service_color}20; color: \${service.service_color};">
+                  <i class="fas \${service.service_icon}"></i>
+                </div>
+                <div>
+                  <h3 class="text-xl font-bold text-gray-800">\${service.service_name}</h3>
+                  <p class="text-sm text-gray-500">Response: ~\${service.estimated_response_minutes} min</p>
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" class="sr-only peer" \${service.is_active ? 'checked' : ''}
+                       onchange="toggleServiceType(\${service.service_type_id}, this.checked)">
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+              </label>
+            </div>
+            
+            <p class="text-sm text-gray-600 mb-4">\${service.description}</p>
+            
+            <div class="flex gap-2">
+              <button onclick="editServiceType(\${service.service_type_id})" 
+                      class="flex-1 px-4 py-2 border-2 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                      style="border-color: var(--accent-color, #D4AF37); color: #333;">
+                <i class="fas fa-edit mr-2"></i>Edit
+              </button>
+              <button onclick="deleteServiceType(\${service.service_type_id})" 
+                      class="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-all">
+                <i class="fas fa-trash mr-2"></i>Delete
+              </button>
+            </div>
+          </div>
+        \`).join('');
+      }
+      
+      window.openAddServiceTypeModal = function() {
+        // Simple prompt for now - can be replaced with a modal
+        const name = prompt('Service Name (e.g., Housekeeping):');
+        if (!name) return;
+        
+        const icon = prompt('Font Awesome Icon (e.g., fa-broom):', 'fa-concierge-bell');
+        const color = prompt('Service Color (hex):', '#D4AF37');
+        const description = prompt('Description:');
+        const responseTime = prompt('Estimated Response Time (minutes):', '30');
+        
+        createServiceType({
+          service_name: name,
+          service_icon: icon,
+          service_color: color,
+          description: description,
+          estimated_response_minutes: parseInt(responseTime)
+        });
+      };
+      
+      async function createServiceType(serviceData) {
+        try {
+          const response = await fetch('/api/admin/service-types', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify(serviceData)
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Service type created successfully!');
+            loadServiceTypes();
+          } else {
+            alert('Failed to create service type');
+          }
+        } catch (error) {
+          console.error('Create service type error:', error);
+          alert('Error creating service type');
+        }
+      }
+      
+      window.toggleServiceType = async function(serviceTypeId, isActive) {
+        try {
+          const response = await fetch(\`/api/admin/service-types/\${serviceTypeId}\`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({ is_active: isActive ? 1 : 0 })
+          });
+          
+          const data = await response.json();
+          
+          if (!data.success) {
+            alert('Failed to update service type');
+            loadServiceTypes();
+          }
+        } catch (error) {
+          console.error('Toggle service type error:', error);
+          alert('Error updating service type');
+        }
+      };
+      
+      window.editServiceType = async function(serviceTypeId) {
+        // Simple implementation - can be replaced with a modal
+        alert('Edit functionality coming soon. Service ID: ' + serviceTypeId);
+      };
+      
+      window.deleteServiceType = async function(serviceTypeId) {
+        if (!confirm('Are you sure you want to delete this service type?')) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/service-types/\${serviceTypeId}\`, {
+            method: 'DELETE',
+            headers: {
+              'X-Property-ID': propertyId
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('Service type deleted successfully!');
+            loadServiceTypes();
+          } else {
+            alert('Failed to delete service type');
+          }
+        } catch (error) {
+          console.error('Delete service type error:', error);
+          alert('Error deleting service type');
+        }
+      };
+      
+      // ========================================
+      // END SERVICE TYPES MANAGEMENT FUNCTIONS
+      // ========================================
+
 
       async function loadRooms() {
         try {
