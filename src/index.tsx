@@ -56917,15 +56917,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<label class="block text-sm font-semibold mb-1">Description <span class="text-xs text-gray-500">(supports rich formatting)</span></label>';
         html += '<div class="border border-gray-300 rounded-lg overflow-hidden">';
         html += '<div class="bg-gray-50 border-b border-gray-300 p-2 flex gap-1 flex-wrap">';
-        html += '<button type="button" onclick="formatBenefitText(\'bold\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
-        html += '<button type="button" onclick="formatBenefitText(\'italic\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
-        html += '<button type="button" onclick="formatBenefitText(\'underline\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'bold\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'italic\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'underline\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
         html += '<span class="w-px bg-gray-300 mx-1"></span>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'⭐\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'✨\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🍽️\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🍹\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🏊\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'⭐\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'✨\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🍽️\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🍹\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🏊\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
         html += '</div>';
         html += '<textarea id="benefit_description_input" name="benefit_description" rows="4" class="w-full px-3 py-2 focus:outline-none" placeholder="Details about this benefit... Use the toolbar above to add formatting and emojis!"></textarea>';
         html += '</div>';
@@ -57108,7 +57108,6 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         document.getElementById('venue_ids_input').value = JSON.stringify(window.selectedVenues);
       }
       
-      // Close add benefit modal
       // Rich text formatting functions for benefit descriptions
       window.formatBenefitText = function(format) {
         const textarea = document.getElementById('benefit_description_input');
@@ -57361,15 +57360,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         html += '<label class="block text-sm font-semibold mb-1">Description <span class="text-xs text-gray-500">(supports rich formatting)</span></label>';
         html += '<div class="border border-gray-300 rounded-lg overflow-hidden">';
         html += '<div class="bg-gray-50 border-b border-gray-300 p-2 flex gap-1 flex-wrap">';
-        html += '<button type="button" onclick="formatBenefitText(\'bold\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
-        html += '<button type="button" onclick="formatBenefitText(\'italic\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
-        html += '<button type="button" onclick="formatBenefitText(\'underline\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'bold\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm font-bold" title="Bold"><i class="fas fa-bold"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'italic\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm italic" title="Italic"><i class="fas fa-italic"></i></button>';
+        html += '<button type="button" onclick="formatBenefitText(\\\'underline\\\')" class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm underline" title="Underline"><i class="fas fa-underline"></i></button>';
         html += '<span class="w-px bg-gray-300 mx-1"></span>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'⭐\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'✨\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🍽️\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🍹\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
-        html += '<button type="button" onclick="insertBenefitEmoji(\'🏊\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'⭐\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Star">⭐</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'✨\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Sparkle">✨</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🍽️\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Dining">🍽️</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🍹\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Drinks">🍹</button>';
+        html += '<button type="button" onclick="insertBenefitEmoji(\\\'🏊\\\')" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-sm" title="Activities">🏊</button>';
         html += '</div>';
         html += '<textarea id="benefit_description_input" name="benefit_description" rows="4" class="w-full px-3 py-2 focus:outline-none">' + (benefit.benefit_description || '') + '</textarea>';
         html += '</div>';
