@@ -24668,7 +24668,7 @@ const PASS_SESSION_KEY='guestPassSession';document.addEventListener('DOMContentL
                             \${generateOccupancyBadge(r.occupancy_status)}
                             <div class="flex-shrink-0 flex flex-col gap-2 items-end">
                                 \${isEligible ? '<span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse"><i class="fas fa-ticket-alt mr-1"></i>' + voucherData.vouchers.remaining + ' VOUCHERS</span>' : ''}
-                                ${(r.offering_type === 'restaurant' ? r.enable_booking === 1 : r.requires_booking === 1) ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
+                                \${(r.offering_type === 'restaurant' ? r.enable_booking === 1 : r.requires_booking === 1) ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
                             </div>
                         </div>
                     </div>
