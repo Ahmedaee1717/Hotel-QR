@@ -63780,6 +63780,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const isSelected = selectedItems[item.item_id];
             const quantity = isSelected ? isSelected.quantity : 0;
             
+            let limitButton = '';
+            if (isSelected) {
+                limitButton = '<button onclick="toggleCustomLimit(' + item.item_id + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+            }
+            
             return \`
                 <div class="menu-item border-2 \${isSelected ? 'border-accent-color' : 'border-gray-200'} rounded-xl p-4">
                     <div class="mb-3">
@@ -63796,11 +63801,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
-                        \${isSelected ? \\\`
-                            <button onclick="toggleCustomLimit(\${item.item_id})" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition">
-                                <i class="fas fa-sliders-h mr-1"></i>Limit
-                            </button>
-                        \\\` : ''}
+                        \${limitButton}
                     </div>
                     <div id="customLimit\${item.item_id}" class="hidden mt-3 pt-3 border-t">
                         <label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>
