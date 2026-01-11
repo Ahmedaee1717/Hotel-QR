@@ -68047,11 +68047,33 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         <option value="21:00">9:00 PM</option>
                     </select>
                 </div>
-                <div>
+                <div class="md:col-span-2" id="orderingForSection" style="display: none;">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-users mr-2"></i><span data-i18n="ordering-for">Ordering For</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mb-3" id="guestInfoText"></p>
+                    <div class="flex items-center gap-4">
+                        <button onclick="adjustOrderingFor(-1)" type="button" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <div class="flex-1 text-center">
+                            <input type="number" id="orderingFor" value="1" min="1" max="10" class="w-24 mx-auto text-center px-4 py-2 border-2 border-primary rounded-lg text-2xl font-bold" readonly>
+                            <p class="text-sm text-gray-600 mt-1"><span data-i18n="people">people</span></p>
+                        </div>
+                        <button onclick="adjustOrderingFor(1)" type="button" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div id="voucherUsageWarning" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                        <i class="fas fa-ticket-alt text-amber-600 mr-2"></i>
+                        <span id="voucherUsageText" class="text-amber-800"></span>
+                    </div>
+                </div>
+                <div class="hidden">
                     <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="adults">Adults</label>
                     <input type="number" id="numAdults" value="2" min="1" max="10" class="w-full px-4 py-2 border rounded-lg">
                 </div>
-                <div>
+                <div class="hidden">
                     <label class="block text-sm font-semibold text-gray-700 mb-2" data-i18n="children">Children</label>
                     <input type="number" id="numChildren" value="0" min="0" max="10" class="w-full px-4 py-2 border rounded-lg">
                 </div>
@@ -68327,7 +68349,23 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const statusDiv = document.getElementById('voucherStatus');
             if (!statusDiv) return;
             
-            const { guest_name, tier, vouchers } = voucherEligibility;
+            const { guest_name, tier, vouchers, num_guests, num_adults, num_children } = voucherEligibility;
+            
+            // Show ordering for section
+            const orderingSection = document.getElementById('orderingForSection');
+            const guestInfoText = document.getElementById('guestInfoText');
+            if (orderingSection && guestInfoText) {
+                orderingSection.style.display = 'block';
+                guestInfoText.textContent = \`\${num_adults} adult\${num_adults > 1 ? 's' : ''}\${num_children > 0 ? ' + ' + num_children + ' child' + (num_children > 1 ? 'ren' : '') : ''} on this pass (max \${num_guests} people can order)\`;
+                
+                // Set initial ordering for to 1
+                const orderingForInput = document.getElementById('orderingFor');
+                if (orderingForInput) {
+                    orderingForInput.value = 1;
+                    orderingForInput.max = num_guests;
+                    updateVoucherUsageWarning();
+                }
+            }
             
             // Show the status card with margin
             statusDiv.classList.remove('hidden');
@@ -68349,10 +68387,14 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                                     <strong>Tier:</strong> 
                                     <span class="px-3 py-1 rounded-full text-white text-xs font-bold uppercase tracking-wide shadow" style="background-color: \${tier.tier_color}">\${tier.tier_name}</span>
                                 </p>
+                                <p class="text-gray-700">
+                                    <strong>Guests on Pass:</strong> \${num_adults} adult\${num_adults > 1 ? 's' : ''}\${num_children > 0 ? ' + ' + num_children + ' child' + (num_children > 1 ? 'ren' : '') : ''}
+                                </p>
                                 <p class="text-gray-900 text-lg font-bold mt-3 flex items-center gap-2">
                                     <i class="fas fa-utensils text-green-600"></i>
-                                    <span>\${vouchers.remaining} of \${vouchers.total_allowed} meals remaining</span>
+                                    <span>\${vouchers.remaining} of \${vouchers.total_vouchers} vouchers remaining</span>
                                 </p>
+                                <p class="text-xs text-gray-600 mt-1">(\${vouchers.meals_per_stay} meals/stay × \${num_guests} guests = \${vouchers.total_vouchers} total vouchers)</p>
                             </div>
                             <div class="bg-white border-2 border-green-400 rounded-lg p-4 shadow-sm">
                                 <p class="text-green-900 font-bold text-sm flex items-center gap-2">
@@ -68382,6 +68424,42 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             if (confirmButton) {
                 const buttonText = currentLanguage === 'en' ? 'Use Voucher & Confirm' : await translateText('Use Voucher & Confirm', currentLanguage);
                 confirmButton.innerHTML = \`<i class="fas fa-ticket-alt mr-2"></i>\${buttonText}\`;
+            }
+        }
+        
+        window.adjustOrderingFor = function(delta) {
+            if (!voucherEligibility) return;
+            
+            const input = document.getElementById('orderingFor');
+            const maxGuests = voucherEligibility.num_guests || 1;
+            
+            let value = parseInt(input.value) + delta;
+            if (value < 1) value = 1;
+            if (value > maxGuests) value = maxGuests;
+            
+            input.value = value;
+            updateVoucherUsageWarning();
+        }
+        
+        function updateVoucherUsageWarning() {
+            if (!voucherEligibility) return;
+            
+            const orderingFor = parseInt(document.getElementById('orderingFor').value);
+            const { vouchers } = voucherEligibility;
+            const vouchersNeeded = orderingFor;
+            const vouchersRemaining = vouchers.remaining;
+            
+            const warningText = document.getElementById('voucherUsageText');
+            const warningDiv = document.getElementById('voucherUsageWarning');
+            
+            if (warningText && warningDiv) {
+                if (vouchersNeeded > vouchersRemaining) {
+                    warningDiv.className = 'mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm';
+                    warningText.innerHTML = \`<strong class="text-red-800">⚠️ Not enough vouchers!</strong> <span class="text-red-700">This booking needs \${vouchersNeeded} voucher\${vouchersNeeded > 1 ? 's' : ''} but you only have \${vouchersRemaining} remaining.</span>\`;
+                } else {
+                    warningDiv.className = 'mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm';
+                    warningText.innerHTML = \`<span class="text-amber-800">This will use <strong>\${vouchersNeeded}</strong> voucher\${vouchersNeeded > 1 ? 's' : ''}. You'll have <strong>\${vouchersRemaining - vouchersNeeded}</strong> voucher\${(vouchersRemaining - vouchersNeeded) !== 1 ? 's' : ''} left.</span>\`;
+                }
             }
         }
         async function showMenuCategory(category) {
@@ -68617,8 +68695,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         async function confirmBooking() {
             const date = document.getElementById('bookingDate').value;
             const time = document.getElementById('bookingTime').value;
-            const adults = document.getElementById('numAdults').value;
-            const children = document.getElementById('numChildren').value;
+            const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
             
             if (!date) {
                 alert('Please select a date');
@@ -68637,6 +68714,30 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             if (!passReference || !voucherEligibility) {
                 alert('Booking without voucher not yet implemented. Please access through your digital pass.');
+                return;
+            }
+            
+            // Validate vouchers remaining
+            const vouchersNeeded = orderingFor;
+            const vouchersRemaining = voucherEligibility.vouchers.remaining;
+            
+            if (vouchersNeeded > vouchersRemaining) {
+                alert(\`❌ Not enough vouchers!\\n\\nYou need \${vouchersNeeded} voucher\${vouchersNeeded > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}, but only have \${vouchersRemaining} remaining.\\n\\nPlease reduce the number of people or contact reception.\`);
+                return;
+            }
+            
+            // Confirm booking
+            const restaurantName = '${restaurant.title_en}';
+            const confirmMsg = \`📋 Booking Summary:\\n\\n\` +
+                \`🍽️ Restaurant: \${restaurantName}\\n\` +
+                \`📅 Date: \${date}\\n\` +
+                \`🕐 Time: \${time}\\n\` +
+                \`👥 Ordering for: \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}\\n\` +
+                \`🎫 Vouchers to use: \${vouchersNeeded}\\n\` +
+                \`🎫 Vouchers remaining after: \${vouchersRemaining - vouchersNeeded}\\n\\n\` +
+                \`Confirm this booking?\`;
+            
+            if (!confirm(confirmMsg)) {
                 return;
             }
             
@@ -68659,8 +68760,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         restaurant_id: restaurantId,
                         reservation_date: date,
                         reservation_time: time,
-                        party_size_adults: parseInt(adults),
-                        party_size_children: parseInt(children),
+                        num_people: orderingFor,
                         table_id: selectedTableId,
                         ...preorder
                     })
@@ -68669,8 +68769,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    const { voucher_code, meals_remaining, total_cost } = data;
-                    alert(\`✅ Voucher Created Successfully!\\n\\nVoucher Code: \${voucher_code}\\nTotal Cost: €\${total_cost.toFixed(2)}\\nMeals Remaining: \${meals_remaining}\\n\\nRedirecting to your bookings...\`);
+                    const { voucher_code, vouchers_remaining, total_cost } = data;
+                    alert(\`✅ Booking Confirmed!\\n\\nVoucher Code: \${voucher_code}\\n👥 Ordering for: \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}\\n🎫 Vouchers used: \${vouchersNeeded}\\n🎫 Vouchers remaining: \${vouchers_remaining}\\nTotal Cost: €\${(total_cost || 0).toFixed(2)}\\n\\nRedirecting to your bookings...\`);
                     
                     // Redirect to my bookings page
                     window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
@@ -68993,6 +69093,8 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
         dp.pass_reference,
         dp.primary_guest_name,
         dp.room_number,
+        dp.num_adults,
+        dp.num_children,
         dp.valid_from,
         dp.valid_until,
         t.tier_id,
@@ -69027,6 +69129,10 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
       })
     }
 
+    // Calculate total vouchers: meals_per_stay × number_of_guests
+    const numGuests = (passInfo.num_adults || 1) + (passInfo.num_children || 0)
+    const totalVouchers = mealsAllowed * numGuests
+
     // Count used vouchers for this pass
     const usedVouchers = await DB.prepare(`
       SELECT COUNT(*) as used_count
@@ -69034,8 +69140,8 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
       WHERE pass_id = ? AND status IN ('confirmed', 'used')
     `).bind(passInfo.pass_id).first()
 
-    const mealsUsed = usedVouchers?.used_count || 0
-    const mealsRemaining = mealsAllowed - mealsUsed
+    const vouchersUsed = usedVouchers?.used_count || 0
+    const vouchersRemaining = totalVouchers - vouchersUsed
 
     // Parse eligible restaurants
     let eligibleRestaurants = []
@@ -69082,8 +69188,11 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
 
     return c.json({
       success: true,
-      eligible: mealsRemaining > 0,
+      eligible: vouchersRemaining > 0,
       guest_name: passInfo.primary_guest_name,
+      num_guests: numGuests,
+      num_adults: passInfo.num_adults || 1,
+      num_children: passInfo.num_children || 0,
       tier: {
         tier_code: passInfo.tier_code,
         tier_name: passInfo.tier_display_name,
@@ -69091,9 +69200,10 @@ app.get('/api/alacarte/voucher-eligibility/:pass_reference', async (c) => {
         privileges_message: passInfo.alacarte_privileges_message
       },
       vouchers: {
-        total_allowed: mealsAllowed,
-        used: mealsUsed,
-        remaining: mealsRemaining
+        meals_per_stay: mealsAllowed,
+        total_vouchers: totalVouchers,
+        used: vouchersUsed,
+        remaining: vouchersRemaining
       },
       eligible_restaurants: restaurantDetails,
       premium_surcharge: passInfo.alacarte_premium_surcharge || 0
@@ -69121,8 +69231,7 @@ app.post('/api/alacarte/voucher', async (c) => {
       restaurant_id,
       reservation_date,
       reservation_time,
-      party_size_adults,
-      party_size_children,
+      num_people, // Number of people ordering (uses this many vouchers)
       table_id,
       preorder_salad,
       preorder_starter,
@@ -69131,16 +69240,16 @@ app.post('/api/alacarte/voucher', async (c) => {
       special_requests
     } = body
 
-    // Calculate total party size
-    const party_size = (party_size_adults || 1) + (party_size_children || 0)
-
-    // Verify pass eligibility
+    // Verify pass and get eligibility info
     const passInfo = await DB.prepare(`
       SELECT 
         dp.pass_id,
         dp.property_id,
+        dp.num_adults,
+        dp.num_children,
         t.alacarte_meals_per_stay,
-        t.alacarte_eligible_restaurants
+        t.alacarte_eligible_restaurants,
+        t.alacarte_premium_surcharge
       FROM digital_passes dp
       JOIN all_inclusive_tiers t ON dp.tier_id = t.tier_id
       WHERE dp.pass_reference = ? AND dp.property_id = ?
@@ -69150,22 +69259,36 @@ app.post('/api/alacarte/voucher', async (c) => {
       return c.json({ success: false, error: 'Pass not found' }, 404)
     }
 
-    // Check remaining vouchers
-    const usedCount = await DB.prepare(`
-      SELECT COUNT(*) as used
+    // Calculate total vouchers available
+    const numGuests = (passInfo.num_adults || 1) + (passInfo.num_children || 0)
+    const mealsPerStay = passInfo.alacarte_meals_per_stay || 0
+    const totalVouchers = mealsPerStay * numGuests
+
+    // Validate num_people
+    const peopleOrdering = num_people || 1
+    if (peopleOrdering > numGuests) {
+      return c.json({ 
+        success: false, 
+        error: `Cannot order for ${peopleOrdering} people. Pass only has ${numGuests} guest${numGuests > 1 ? 's' : ''}.` 
+      }, 400)
+    }
+
+    // Check vouchers remaining
+    const usedVouchers = await DB.prepare(`
+      SELECT COUNT(*) as used_count
       FROM alacarte_vouchers
       WHERE pass_id = ? AND status IN ('confirmed', 'used')
     `).bind(passInfo.pass_id).first()
 
-    const mealsUsed = usedCount?.used || 0
-    const mealsAllowed = passInfo.alacarte_meals_per_stay || 0
-    
-    if (mealsUsed >= mealsAllowed) {
+    const vouchersUsed = usedVouchers?.used_count || 0
+    const vouchersRemaining = totalVouchers - vouchersUsed
+
+    // Validate enough vouchers
+    const vouchersNeeded = peopleOrdering
+    if (vouchersNeeded > vouchersRemaining) {
       return c.json({ 
         success: false, 
-        error: 'No vouchers remaining',
-        used: mealsUsed,
-        allowed: mealsAllowed
+        error: `Not enough vouchers. Need ${vouchersNeeded} but only ${vouchersRemaining} remaining.` 
       }, 400)
     }
 
@@ -69197,11 +69320,6 @@ app.post('/api/alacarte/voucher', async (c) => {
       }
     }
 
-    // Generate voucher code
-    const dateStr = reservation_date.replace(/-/g, '')
-    const randomNum = Math.floor(1000 + Math.random() * 9000)
-    const voucherCode = `MEAL-${dateStr}-${randomNum}`
-
     // Get tier_id for the voucher
     const passWithTier = await DB.prepare(`
       SELECT tier_id FROM digital_passes WHERE pass_id = ?
@@ -69216,48 +69334,61 @@ app.post('/api/alacarte/voucher', async (c) => {
       tableNumber = table?.table_number || null
     }
 
-    // Insert voucher
-    const result = await DB.prepare(`
-      INSERT INTO alacarte_vouchers (
+    // Create vouchers (one for each person ordering)
+    const voucherCodes = []
+    for (let i = 0; i < peopleOrdering; i++) {
+      // Generate unique voucher code
+      const dateStr = reservation_date.replace(/-/g, '')
+      const randomNum = Math.floor(1000 + Math.random() * 9000)
+      const voucherCode = `MEAL-${dateStr}-${randomNum}`
+      voucherCodes.push(voucherCode)
+
+      // Insert voucher
+      await DB.prepare(`
+        INSERT INTO alacarte_vouchers (
+          property_id,
+          pass_id,
+          voucher_code,
+          tier_id,
+          meal_number,
+          restaurant_id,
+          reservation_date,
+          reservation_time,
+          party_size,
+          table_number,
+          preorder_item_ids,
+          special_requests,
+          total_cost,
+          status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+      `).bind(
         property_id,
-        pass_id,
-        voucher_code,
-        tier_id,
-        meal_number,
+        passInfo.pass_id,
+        voucherCode,
+        passWithTier?.tier_id || 1,
+        vouchersUsed + i + 1, // Sequential meal number
         restaurant_id,
         reservation_date,
         reservation_time,
-        party_size,
-        table_number,
-        preorder_item_ids,
-        special_requests,
-        total_cost,
-        status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
-    `).bind(
-      property_id,
-      passInfo.pass_id,
-      voucherCode,
-      passWithTier?.tier_id || 1,
-      mealsUsed + 1,
-      restaurant_id,
-      reservation_date,
-      reservation_time,
-      party_size,
-      tableNumber,
-      JSON.stringify(preorder_item_ids),
-      special_requests || null,
-      totalCost
-    ).run()
+        1, // Party size is 1 per voucher (each person gets their own voucher)
+        tableNumber,
+        JSON.stringify(preorder_item_ids),
+        special_requests || `Ordering for ${peopleOrdering} people (voucher ${i + 1}/${peopleOrdering})`,
+        totalCost
+      ).run()
+    }
+
+    const newVouchersUsed = vouchersUsed + peopleOrdering
+    const newVouchersRemaining = totalVouchers - newVouchersUsed
 
     return c.json({
       success: true,
-      voucher_code: voucherCode,
-      voucher_id: result.meta.last_row_id,
-      total_cost: totalCost,
-      meals_used: mealsUsed + 1,
-      meals_allowed: mealsAllowed,
-      meals_remaining: mealsAllowed - (mealsUsed + 1)
+      voucher_code: voucherCodes[0], // Primary voucher code
+      voucher_codes: voucherCodes, // All voucher codes
+      num_vouchers_created: peopleOrdering,
+      total_cost: totalCost * peopleOrdering, // Total cost for all people
+      vouchers_used: newVouchersUsed,
+      vouchers_remaining: newVouchersRemaining
     })
   } catch (error) {
     console.error('Create voucher error:', error)
