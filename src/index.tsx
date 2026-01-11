@@ -63542,23 +63542,40 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 </h2>
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-bold mb-2">Guest Name *</label>
-                        <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold mb-2">Room Number *</label>
-                        <input type="text" id="roomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold mb-2">Party Size *</label>
-                        <div class="flex items-center gap-4">
-                            <button onclick="adjustPartySize(-1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
-                                <i class="fas fa-minus"></i>
+                        <label class="block text-sm font-bold mb-2">
+                            <i class="fas fa-id-card mr-2"></i>Digital Pass Reference *
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="passReference" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="PASS-1234567890-ABCDE">
+                            <button onclick="loadPassInfo()" class="btn-primary text-white px-6 py-3 rounded-xl touch-target">
+                                <i class="fas fa-search"></i>
                             </button>
-                            <input type="number" id="partySize" value="2" min="1" max="12" class="w-24 text-center px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color text-xl font-bold touch-target" readonly>
-                            <button onclick="adjustPartySize(1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
-                                <i class="fas fa-plus"></i>
-                            </button>
+                        </div>
+                        <div id="passInfoMessage" class="mt-2 text-sm"></div>
+                    </div>
+                    <div id="guestInfoFields" class="space-y-4 hidden">
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Guest Name *</label>
+                            <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">Room Number *</label>
+                            <input type="text" id="roomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold mb-2">
+                                Party Size * 
+                                <span id="maxGuestsInfo" class="text-xs text-gray-500 font-normal"></span>
+                            </label>
+                            <div class="flex items-center gap-4">
+                                <button onclick="adjustPartySize(-1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <input type="number" id="partySize" value="2" min="1" max="12" class="w-24 text-center px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color text-xl font-bold touch-target" readonly>
+                                <button onclick="adjustPartySize(1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -63664,6 +63681,8 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let selectedItems = {}; // { item_id: { item, quantity, customLimit } }
         let restaurants = [];
         let menuItems = [];
+        let currentPass = null; // Store loaded pass info
+        let maxPartySize = 12; // Default max
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -63684,11 +63703,58 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('bookingTime').value = hours + ':' + minutes;
         }
         
+        window.loadPassInfo = async function() {
+            const passReference = document.getElementById('passReference').value.trim();
+            const messageEl = document.getElementById('passInfoMessage');
+            const guestFields = document.getElementById('guestInfoFields');
+            
+            if (!passReference) {
+                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>Please enter a pass reference</span>';
+                return;
+            }
+            
+            messageEl.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Loading pass info...</span>';
+            
+            try {
+                const response = await fetch('/api/guest/verify-pass?pass_reference=' + encodeURIComponent(passReference) + '&property_id=' + propertyId, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.pass) {
+                    messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Pass not found or invalid</span>';
+                    guestFields.classList.add('hidden');
+                    currentPass = null;
+                    return;
+                }
+                
+                currentPass = data.pass;
+                maxPartySize = (currentPass.num_adults || 1) + (currentPass.num_children || 0);
+                
+                // Populate fields
+                document.getElementById('guestName').value = currentPass.primary_guest_name || '';
+                document.getElementById('roomNumber').value = currentPass.room_number || '';
+                document.getElementById('partySize').value = Math.min(maxPartySize, 2);
+                document.getElementById('partySize').max = maxPartySize;
+                document.getElementById('maxGuestsInfo').textContent = '(Max: ' + maxPartySize + ' guests on this pass)';
+                
+                messageEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Pass verified! ' + maxPartySize + ' guests on pass</span>';
+                guestFields.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Failed to load pass:', error);
+                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>Failed to load pass info</span>';
+                guestFields.classList.add('hidden');
+                currentPass = null;
+            }
+        }
+        
         window.adjustPartySize = function(delta) {
             const input = document.getElementById('partySize');
             let value = parseInt(input.value) + delta;
             if (value < 1) value = 1;
-            if (value > 12) value = 12;
+            if (value > maxPartySize) value = maxPartySize;
             input.value = value;
         }
         
@@ -63844,6 +63910,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             // Validate current step
             if (step > currentStep) {
                 if (currentStep === 1) {
+                    if (!currentPass) {
+                        alert('Please load a valid digital pass first');
+                        document.getElementById('passReference').classList.add('shake');
+                        setTimeout(() => document.getElementById('passReference').classList.remove('shake'), 500);
+                        return;
+                    }
                     if (!document.getElementById('guestName').value.trim()) {
                         alert('Please enter guest name');
                         document.getElementById('guestName').classList.add('shake');
@@ -63852,6 +63924,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     }
                     if (!document.getElementById('roomNumber').value.trim()) {
                         alert('Please enter room number');
+                        return;
+                    }
+                    const partySize = parseInt(document.getElementById('partySize').value);
+                    if (partySize > maxPartySize) {
+                        alert('Party size (' + partySize + ') exceeds maximum guests on pass (' + maxPartySize + ')');
                         return;
                     }
                     if (!document.getElementById('bookingDate').value) {
@@ -63947,6 +64024,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             try {
                 const booking = {
+                    pass_reference: document.getElementById('passReference').value,
                     guest_name: document.getElementById('guestName').value,
                     room_number: document.getElementById('roomNumber').value,
                     party_size: parseInt(document.getElementById('partySize').value),
@@ -64007,9 +64085,16 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             selectedRestaurant = null;
             selectedItems = {};
             currentStep = 1;
+            currentPass = null;
+            maxPartySize = 12;
+            document.getElementById('passReference').value = '';
+            document.getElementById('passInfoMessage').innerHTML = '';
+            document.getElementById('guestInfoFields').classList.add('hidden');
             document.getElementById('guestName').value = '';
             document.getElementById('roomNumber').value = '';
             document.getElementById('partySize').value = '2';
+            document.getElementById('partySize').max = '12';
+            document.getElementById('maxGuestsInfo').textContent = '';
             setTodayDate();
             setCurrentTime();
             document.getElementById('successModal').classList.add('hidden');
@@ -69230,6 +69315,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
   try {
     const body = await c.req.json()
     const {
+      pass_reference,
       guest_name,
       room_number,
       party_size,
@@ -69240,8 +69326,31 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     } = body
     
     // Validate required fields
-    if (!guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
+    if (!pass_reference || !guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Verify pass and check party size limit
+    const pass = await DB.prepare(`
+      SELECT pass_id, num_adults, num_children, pass_status
+      FROM digital_passes
+      WHERE pass_reference = ? AND property_id = ?
+    `).bind(pass_reference, property_id).first()
+    
+    if (!pass) {
+      return c.json({ success: false, error: 'Digital pass not found' }, 404)
+    }
+    
+    if (pass.pass_status !== 'active') {
+      return c.json({ success: false, error: 'Pass is not active' }, 400)
+    }
+    
+    const maxGuests = (pass.num_adults || 1) + (pass.num_children || 0)
+    if (party_size > maxGuests) {
+      return c.json({ 
+        success: false, 
+        error: `Party size (${party_size}) exceeds maximum guests on pass (${maxGuests})` 
+      }, 400)
     }
     
     // Generate voucher code
@@ -69252,11 +69361,12 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     // Get item IDs
     const item_ids = items.map(i => i.item_id)
     
-    // Create voucher
+    // Create voucher linked to pass
     await DB.prepare(`
       INSERT INTO alacarte_vouchers (
         property_id,
         voucher_code,
+        pass_id,
         tier_id,
         meal_number,
         restaurant_id,
@@ -69268,10 +69378,11 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
         special_requests,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
     `).bind(
       property_id,
       voucher_code,
+      pass.pass_id, // Link to digital pass
       null, // No tier for manual bookings
       null, // No meal number
       restaurant_id,
@@ -69280,7 +69391,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       party_size,
       null, // Table assigned by staff
       JSON.stringify(item_ids),
-      `Manual booking - Guest: ${guest_name}, Room: ${room_number}`,
+      `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}, Pass: ${pass_reference}`,
     ).run()
     
     return c.json({
