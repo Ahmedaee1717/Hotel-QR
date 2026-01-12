@@ -8681,14 +8681,30 @@ app.post('/api/booking/cancel/:type/:id', async (c) => {
   
   try {
     if (bookingType === 'restaurant') {
-      // Cancel restaurant reservation
-      await DB.prepare(`
-        UPDATE table_reservations 
-        SET status = 'cancelled'
-        WHERE reservation_id = ?
-      `).bind(bookingId).run()
+      // First check if it's an alacarte voucher or regular table reservation
+      const voucher = await DB.prepare(`
+        SELECT voucher_id FROM alacarte_vouchers WHERE voucher_id = ?
+      `).bind(bookingId).first()
       
-      return c.json({ success: true, message: 'Restaurant reservation cancelled' })
+      if (voucher) {
+        // It's an alacarte voucher - cancel it
+        await DB.prepare(`
+          UPDATE alacarte_vouchers 
+          SET status = 'cancelled'
+          WHERE voucher_id = ?
+        `).bind(bookingId).run()
+        
+        return c.json({ success: true, message: 'Restaurant booking cancelled successfully' })
+      } else {
+        // It's a regular table reservation - cancel it
+        await DB.prepare(`
+          UPDATE table_reservations 
+          SET status = 'cancelled'
+          WHERE reservation_id = ?
+        `).bind(bookingId).run()
+        
+        return c.json({ success: true, message: 'Restaurant reservation cancelled' })
+      }
       
     } else if (bookingType === 'activity') {
       // Cancel activity booking
@@ -8715,7 +8731,7 @@ app.post('/api/booking/cancel/:type/:id', async (c) => {
     }
   } catch (error) {
     console.error('Cancel booking error:', error)
-    return c.json({ error: 'Failed to cancel booking' }, 500)
+    return c.json({ error: 'Failed to cancel booking', details: error.message }, 500)
   }
 })
 
@@ -71363,6 +71379,45 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
         }
 
+        // Group multiple vouchers from same booking into one display
+        function groupOrders(ordersList) {
+            const grouped = {};
+            
+            ordersList.forEach(order => {
+                // Create a unique key for grouping: table + date + time + guest
+                const groupKey = order.table_number + '_' + order.reservation_date + '_' + order.reservation_time + '_' + order.guest_name;
+                
+                if (!grouped[groupKey]) {
+                    // First voucher in this group
+                    grouped[groupKey] = {
+                        ...order,
+                        voucher_codes: [order.voucher_code],
+                        voucher_ids: [order.voucher_id],
+                        total_party_size: order.party_size || 1,
+                        grouped_dishes: [...order.dishes] // Copy dishes array
+                    };
+                } else {
+                    // Additional voucher in same booking - merge the data
+                    grouped[groupKey].voucher_codes.push(order.voucher_code);
+                    grouped[groupKey].voucher_ids.push(order.voucher_id);
+                    grouped[groupKey].total_party_size += (order.party_size || 1);
+                    
+                    // Merge dishes - combine quantities for same items
+                    order.dishes.forEach(newDish => {
+                        const existing = grouped[groupKey].grouped_dishes.find(d => d.item_id === newDish.item_id);
+                        if (existing) {
+                            existing.quantity = (existing.quantity || 1) + (newDish.quantity || 1);
+                        } else {
+                            grouped[groupKey].grouped_dishes.push({...newDish});
+                        }
+                    });
+                }
+            });
+            
+            // Convert back to array
+            return Object.values(grouped);
+        }
+
         function renderOrders() {
             const grid = document.getElementById('ordersGrid');
             const emptyState = document.getElementById('emptyState');
@@ -71373,10 +71428,13 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 return;
             }
             
+            // Group orders before rendering
+            const groupedOrders = groupOrders(orders);
+            
             grid.classList.remove('hidden');
             emptyState.classList.add('hidden');
             
-            const html = orders.map(order => {
+            const html = groupedOrders.map(order => {
                 const statusInfo = {
                     confirmed: { bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-400 text-yellow-900', label: 'NEW ORDER' },
                     preparing: { bg: 'bg-orange-50', border: 'border-orange-500', badge: 'bg-orange-500 text-white', label: 'PREPARING' },
@@ -71388,8 +71446,10 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 const isNew = order.status === 'confirmed';
                 
                 let dishesHtml = '';
-                if (order.dishes && order.dishes.length > 0) {
-                    dishesHtml = order.dishes.map(dish => 
+                // Use grouped_dishes if available (from grouping), otherwise use dishes
+                const dishesToRender = order.grouped_dishes || order.dishes || [];
+                if (dishesToRender.length > 0) {
+                    dishesHtml = dishesToRender.map(dish => 
                         '<div class="bg-white rounded-lg p-3 border border-gray-200">' +
                             '<div class="flex items-start gap-2">' +
                                 '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">' +
@@ -71463,12 +71523,17 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                         '<div class="text-4xl font-black text-blue-600 mb-1">TABLE ' + (order.table_number || '?') + '</div>' +
                         '<div class="text-sm text-gray-600">' +
                             '<i class="fas fa-user mr-1"></i>' + (order.guest_name || 'Guest') +
-                            ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.party_size || 0) + ' guests</span>' +
+                            ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.total_party_size || order.party_size || 0) + ' guests</span>' +
                         '</div>' +
                         '<div class="text-sm text-gray-600 mt-1">' +
                             '<i class="fas fa-calendar mr-1"></i>' + (order.reservation_date || '--') + 
                             ' <span class="ml-2"><i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') + '</span>' +
                         '</div>' +
+                        (order.voucher_codes && order.voucher_codes.length > 1 ? 
+                            '<div class="text-xs text-gray-500 mt-1">' +
+                                '<i class="fas fa-ticket-alt mr-1"></i>' + order.voucher_codes.length + ' vouchers' +
+                            '</div>'
+                        : '') +
                     '</div>' +
                     
                     '<div class="space-y-2 mb-4">' + dishesHtml + '</div>' +
