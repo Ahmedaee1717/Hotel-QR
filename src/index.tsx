@@ -68507,25 +68507,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 const selectedItem = selectedItems[item.item_id];
                 const quantity = selectedItem?.quantity || 0;
                 
+                // Build quantity controls separately to avoid template literal nesting issues
+                let quantityControls = '';
+                if (quantity > 0) {
+                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', \'' + item.category + '\')" ' +
+                                      'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
+                                      '<i class="fas fa-minus"></i>' +
+                                      '</button>' +
+                                      '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>';
+                }
+                
+                const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
+                const itemNameEscaped = item.item_name.replace(/'/g, "\\'");
+                
                 return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
-                                \${item.is_premium ? \`<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">\${premiumText}</span>\` : ''}
+                                \${premiumBadge}
                             </div>
                             <p class="text-gray-600 text-sm">\${item.description || ''}</p>
                         </div>
                         <div class="ml-4 flex items-center gap-2">
-                            \${quantity > 0 ? \`
-                                <button onclick="decreaseItemQuantity(\${item.item_id}, '\${item.category}')" 
-                                        class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">
-                                    <i class="fas fa-minus"></i>
-                                </button>
-                                <span class="w-12 text-center font-bold text-lg">\${quantity}</span>
-                            \` : ''}
-                            <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
+                            \${quantityControls}
+                            <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${itemNameEscaped}', \${item.cost_to_hotel})" 
                                     id="btn-\${item.item_id}"
                                     class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
                                 <i class="fas fa-plus"></i>
@@ -69418,7 +69425,7 @@ app.post('/api/alacarte/voucher', async (c) => {
           special_requests,
           total_cost,
           status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         property_id,
         passInfo.pass_id,
@@ -69451,7 +69458,11 @@ app.post('/api/alacarte/voucher', async (c) => {
     })
   } catch (error) {
     console.error('Create voucher error:', error)
-    return c.json({ success: false, error: 'Failed to create voucher' }, 500)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to create voucher',
+      details: error.message || String(error)
+    }, 500)
   }
 })
 
