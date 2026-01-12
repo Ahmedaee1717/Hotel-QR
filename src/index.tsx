@@ -69690,7 +69690,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     
     // Verify pass and check party size limit
     const pass = await DB.prepare(`
-      SELECT pass_id, num_adults, num_children, pass_status
+      SELECT pass_id, tier_id, num_adults, num_children, pass_status
       FROM digital_passes
       WHERE pass_reference = ? AND property_id = ?
     `).bind(pass_reference, property_id).first()
@@ -69711,13 +69711,25 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       }, 400)
     }
     
+    // Get meal number (next available)
+    const vouchersUsed = await DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(pass.pass_id).first()
+    
+    const mealNumber = (vouchersUsed?.count || 0) + 1
+    
     // Generate voucher code
     const timestamp = Date.now()
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
     const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
     
-    // Get item IDs
-    const item_ids = items.map(i => i.item_id)
+    // Get item IDs and quantities
+    const preorder_items = items.map(i => ({
+      item_id: i.item_id,
+      quantity: i.quantity || 1
+    }))
     
     // Create voucher linked to pass
     await DB.prepare(`
@@ -69736,20 +69748,21 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
         special_requests,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       property_id,
       voucher_code,
-      pass.pass_id, // Link to digital pass
-      null, // No tier for manual bookings
-      null, // No meal number
+      pass.pass_id,
+      pass.tier_id || 1,
+      mealNumber,
       restaurant_id,
       reservation_date,
       reservation_time,
       party_size,
       null, // Table assigned by staff
-      JSON.stringify(item_ids),
+      JSON.stringify(preorder_items),
       `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}, Pass: ${pass_reference}`,
+      'confirmed'
     ).run()
     
     return c.json({
@@ -69759,7 +69772,11 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     })
   } catch (error) {
     console.error('Front desk booking error:', error)
-    return c.json({ success: false, error: 'Failed to create booking' }, 500)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to create booking',
+      details: error.message 
+    }, 500)
   }
 })
 
