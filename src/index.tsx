@@ -63894,6 +63894,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 });
                 const data = await response.json();
                 menuItems = data.items || [];
+                renderMenuItems(); // Render menu after loading
             } catch (error) {
                 console.error('Failed to load menu:', error);
                 alert('Failed to load menu items');
