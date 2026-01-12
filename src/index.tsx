@@ -28291,6 +28291,82 @@ app.get('/offering-detail', async (c) => {
             }
         });
 
+        // Add Table Form Handler
+        document.getElementById('addTableForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const tableNumber = document.getElementById('tableNumber').value;
+            const tableName = document.getElementById('tableName').value;
+            const capacity = parseInt(document.getElementById('capacity').value);
+            const shape = document.getElementById('shape').value;
+            const tableType = document.getElementById('tableType').value;
+            
+            // Get selected features
+            const features = Array.from(document.querySelectorAll('input[name="features"]:checked'))
+                .map(cb => cb.value);
+            
+            try {
+                const response = await fetchWithAuth('/api/admin/restaurant/table', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        offering_id: numericOfferingId,
+                        table_number: tableNumber,
+                        table_name: tableName || null,
+                        capacity: capacity,
+                        shape: shape,
+                        table_type: tableType,
+                        features: features, // Send as array
+                        position_x: 50, // Default position
+                        position_y: 50,
+                        width: shape === 'circle' ? 80 : 100,
+                        height: shape === 'circle' ? 80 : 60
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Table added successfully!');
+                    document.getElementById('addTableForm').reset();
+                    await loadTables();
+                } else {
+                    alert('Failed to add table: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Add table error:', error);
+                alert('Failed to add table. Please try again.');
+            }
+        });
+        
+        // Add Element Form Handler
+        document.getElementById('addElementForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const elementType = document.getElementById('elementType').value;
+            const elementLabel = document.getElementById('elementLabel').value;
+            const elementWidth = parseInt(document.getElementById('elementWidth').value);
+            const elementHeight = parseInt(document.getElementById('elementHeight').value);
+            const elementColor = document.getElementById('elementColor').value;
+            
+            // Create floor element (store in localStorage or add API endpoint)
+            const newElement = {
+                id: Date.now(),
+                type: elementType,
+                label: elementLabel,
+                width: elementWidth,
+                height: elementHeight,
+                color: elementColor,
+                position_x: 100,
+                position_y: 100
+            };
+            
+            floorElements.push(newElement);
+            alert('Element added to floor plan! (Note: Elements are not yet persisted to database)');
+            document.getElementById('addElementForm').reset();
+            renderAdminFloorPlan();
+        });
+
         init();
     </script>
 </body>
