@@ -63768,6 +63768,8 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let menuItems = [];
         let currentPass = null; // Store loaded pass info
         let maxPartySize = 12; // Default max
+        let orderingFor = 1; // Party size selected by front desk
+        let voucherEligibility = null; // Store voucher eligibility data
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -63817,6 +63819,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 currentPass = data.pass;
                 maxPartySize = (currentPass.num_adults || 1) + (currentPass.num_children || 0);
                 
+                // Check voucher eligibility
+                await checkVoucherEligibility(currentPass.pass_reference);
+                
                 // Populate fields
                 document.getElementById('guestName').value = currentPass.primary_guest_name || '';
                 document.getElementById('passReference').value = currentPass.pass_reference || '';
@@ -63841,6 +63846,31 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             if (value < 1) value = 1;
             if (value > maxPartySize) value = maxPartySize;
             input.value = value;
+            
+            // Update orderingFor to reflect party size
+            orderingFor = value;
+        }
+        
+        async function checkVoucherEligibility(passReference) {
+            try {
+                const response = await fetch('/api/alacarte/voucher-eligibility/' + passReference + '?property=' + propertyId, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                
+                if (data.success && data.eligible) {
+                    voucherEligibility = data;
+                    console.log('Voucher eligibility:', data);
+                    
+                    // Update party size info with voucher details
+                    const maxGuestsInfo = document.getElementById('maxGuestsInfo');
+                    maxGuestsInfo.textContent = '(Max: ' + maxPartySize + ' guests | ' + data.vouchers_remaining + ' vouchers available)';
+                } else {
+                    console.warn('Not eligible for vouchers');
+                }
+            } catch (error) {
+                console.error('Failed to check voucher eligibility:', error);
+            }
         }
         
         async function loadRestaurants() {
@@ -63979,6 +64009,20 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const item = menuItems.find(i => i.item_id === itemId);
             if (!item) return;
             
+            // Get current party size
+            const partySize = parseInt(document.getElementById('partySize')?.value || 1);
+            
+            // Calculate total quantity for this category
+            const categoryTotal = Object.values(selectedItems)
+                .filter(si => si.item.category === item.category)
+                .reduce((sum, si) => sum + si.quantity, 0);
+            
+            // Check if we're trying to add beyond the limit
+            if (delta > 0 && categoryTotal >= partySize) {
+                alert('You can only select ' + partySize + ' item(s) from ' + item.category + ' category (ordering for ' + partySize + ' people)');
+                return;
+            }
+            
             if (!selectedItems[itemId]) {
                 selectedItems[itemId] = { item, quantity: 0, customLimit: null };
             }
@@ -63989,6 +64033,13 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             }
             
             renderMenuItems();
+            updateOrderSummary();
+        }
+        
+        function updateOrderSummary() {
+            // This will be called to update the order display
+            // For now, just log the selection
+            console.log('Order updated:', selectedItems);
         }
         
         window.toggleCustomLimit = function(itemId) {
@@ -64027,6 +64078,16 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         alert('Party size (' + partySize + ') exceeds maximum guests on pass (' + maxPartySize + ')');
                         return;
                     }
+                    
+                    // Check voucher availability
+                    if (voucherEligibility && partySize > voucherEligibility.vouchers_remaining) {
+                        alert('Not enough vouchers! Party size: ' + partySize + ', Available vouchers: ' + voucherEligibility.vouchers_remaining);
+                        return;
+                    }
+                    
+                    // Set orderingFor to party size
+                    orderingFor = partySize;
+                    
                     if (!document.getElementById('bookingDate').value) {
                         alert('Please select a date');
                         return;
