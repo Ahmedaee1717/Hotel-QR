@@ -68510,7 +68510,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 // Build quantity controls separately to avoid template literal nesting issues
                 let quantityControls = '';
                 if (quantity > 0) {
-                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', \'' + item.category + '\')" ' +
+                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;)" ' +
                                       'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
                                       '<i class="fas fa-minus"></i>' +
                                       '</button>' +
@@ -68518,7 +68518,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
-                const itemNameEscaped = item.item_name.replace(/'/g, "\\'");
+                const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
                 
                 return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
@@ -68532,7 +68532,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
-                            <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${itemNameEscaped}', \${item.cost_to_hotel})" 
+                            <button onclick="toggleItem(\${item.item_id}, &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel})" 
                                     id="btn-\${item.item_id}"
                                     class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
                                 <i class="fas fa-plus"></i>
