@@ -18319,7 +18319,7 @@ app.get('/api/guest/lookup-room', async (c) => {
         valid_until
       FROM digital_passes
       WHERE room_number = ? AND property_id = ? AND pass_status = 'active'
-      ORDER BY created_at DESC
+      ORDER BY pass_id DESC
       LIMIT 1
     `).bind(room_number, property_id).first()
     
@@ -18357,7 +18357,8 @@ app.get('/api/guest/lookup-room', async (c) => {
     console.error('Lookup room error:', error)
     return c.json({ 
       success: false, 
-      error: 'Failed to lookup room' 
+      error: 'Failed to lookup room',
+      details: error.message
     }, 500)
   }
 })
