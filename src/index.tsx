@@ -63893,7 +63893,17 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 const data = await response.json();
-                menuItems = data.items || [];
+                
+                // Flatten menu from category-based object to flat array
+                if (data.menu) {
+                    menuItems = [];
+                    Object.keys(data.menu).forEach(category => {
+                        menuItems = menuItems.concat(data.menu[category]);
+                    });
+                } else {
+                    menuItems = data.items || [];
+                }
+                
                 renderMenuItems(); // Render menu after loading
             } catch (error) {
                 console.error('Failed to load menu:', error);
