@@ -18294,6 +18294,74 @@ app.post('/api/guest/link-pass', async (c) => {
   }
 })
 
+// Guest: Lookup pass by room number (for front desk)
+app.get('/api/guest/lookup-room', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  const room_number = c.req.query('room_number')
+  
+  if (!room_number) {
+    return c.json({ error: 'Room number required' }, 400)
+  }
+  
+  try {
+    // Look up active pass for this room
+    const pass = await DB.prepare(`
+      SELECT 
+        pass_id,
+        pass_reference,
+        primary_guest_name,
+        room_number,
+        num_adults,
+        num_children,
+        pass_status,
+        valid_from,
+        valid_until
+      FROM digital_passes
+      WHERE room_number = ? AND property_id = ? AND pass_status = 'active'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(room_number, property_id).first()
+    
+    if (!pass) {
+      return c.json({ 
+        success: false, 
+        error: 'No active pass found for this room' 
+      }, 404)
+    }
+    
+    // Check if pass is currently valid
+    const now = new Date()
+    const validFrom = new Date(pass.valid_from)
+    const validUntil = new Date(pass.valid_until)
+    
+    if (now < validFrom || now > validUntil) {
+      return c.json({ 
+        success: false, 
+        error: 'Pass found but not currently valid' 
+      }, 400)
+    }
+    
+    return c.json({
+      success: true,
+      pass: {
+        pass_id: pass.pass_id,
+        pass_reference: pass.pass_reference,
+        primary_guest_name: pass.primary_guest_name,
+        room_number: pass.room_number,
+        num_adults: pass.num_adults,
+        num_children: pass.num_children
+      }
+    })
+  } catch (error) {
+    console.error('Lookup room error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to lookup room' 
+    }, 500)
+  }
+})
+
 // Guest: Get tier benefits for linked pass
 app.get('/api/guest/tier-benefits', async (c) => {
   const { DB } = c.env
@@ -63559,15 +63627,15 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-bold mb-2">
-                            <i class="fas fa-id-card mr-2"></i>Digital Pass Reference *
+                            <i class="fas fa-door-open mr-2"></i>Room Number *
                         </label>
                         <div class="flex gap-2">
-                            <input type="text" id="passReference" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="PASS-1234567890-ABCDE">
-                            <button onclick="loadPassInfo()" class="btn-primary text-white px-6 py-3 rounded-xl touch-target">
+                            <input type="text" id="roomNumber" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301">
+                            <button onclick="loadRoomInfo()" class="btn-primary text-white px-6 py-3 rounded-xl touch-target">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
-                        <div id="passInfoMessage" class="mt-2 text-sm"></div>
+                        <div id="roomInfoMessage" class="mt-2 text-sm"></div>
                     </div>
                     <div id="guestInfoFields" class="space-y-4 hidden">
                         <div>
@@ -63575,8 +63643,8 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                             <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name" readonly>
                         </div>
                         <div>
-                            <label class="block text-sm font-bold mb-2">Room Number *</label>
-                            <input type="text" id="roomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301" readonly>
+                            <label class="block text-sm font-bold mb-2">Digital Pass</label>
+                            <input type="text" id="passReference" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl bg-gray-100 text-gray-600" placeholder="Will be auto-filled" readonly>
                         </div>
                         <div>
                             <label class="block text-sm font-bold mb-2">
@@ -63719,27 +63787,27 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('bookingTime').value = hours + ':' + minutes;
         }
         
-        window.loadPassInfo = async function() {
-            const passReference = document.getElementById('passReference').value.trim();
-            const messageEl = document.getElementById('passInfoMessage');
+        window.loadRoomInfo = async function() {
+            const roomNumber = document.getElementById('roomNumber').value.trim();
+            const messageEl = document.getElementById('roomInfoMessage');
             const guestFields = document.getElementById('guestInfoFields');
             
-            if (!passReference) {
-                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>Please enter a pass reference</span>';
+            if (!roomNumber) {
+                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>Please enter a room number</span>';
                 return;
             }
             
-            messageEl.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Loading pass info...</span>';
+            messageEl.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Looking up room...</span>';
             
             try {
-                const response = await fetch('/api/guest/verify-pass?pass_reference=' + encodeURIComponent(passReference) + '&property_id=' + propertyId, {
+                const response = await fetch('/api/guest/lookup-room?room_number=' + encodeURIComponent(roomNumber) + '&property_id=' + propertyId, {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 
                 const data = await response.json();
                 
                 if (!data.success || !data.pass) {
-                    messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Pass not found or invalid</span>';
+                    messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Room not found or no active pass</span>';
                     guestFields.classList.add('hidden');
                     currentPass = null;
                     return;
@@ -63750,17 +63818,17 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 
                 // Populate fields
                 document.getElementById('guestName').value = currentPass.primary_guest_name || '';
-                document.getElementById('roomNumber').value = currentPass.room_number || '';
+                document.getElementById('passReference').value = currentPass.pass_reference || '';
                 document.getElementById('partySize').value = Math.min(maxPartySize, 2);
                 document.getElementById('partySize').max = maxPartySize;
                 document.getElementById('maxGuestsInfo').textContent = '(Max: ' + maxPartySize + ' guests on this pass)';
                 
-                messageEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Pass verified! ' + maxPartySize + ' guests on pass</span>';
+                messageEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Guest found! ' + maxPartySize + ' guests in room</span>';
                 guestFields.classList.remove('hidden');
                 
             } catch (error) {
-                console.error('Failed to load pass:', error);
-                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>Failed to load pass info</span>';
+                console.error('Failed to look up room:', error);
+                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>Failed to load room info</span>';
                 guestFields.classList.add('hidden');
                 currentPass = null;
             }
