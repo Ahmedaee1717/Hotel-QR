@@ -67210,6 +67210,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           const data = await response.json();
           tables = data.tables || [];
           
+          console.log('📊 Loaded tables:', tables.length, tables);
+          
           // Render tables on admin floor plan (not booking canvas)
           renderAdminFloorPlan();
           // updateTablesList(); // Optional: add if table list UI exists
@@ -67222,9 +67224,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       function renderAdminFloorPlan() {
         const canvas = document.getElementById('canvas');
         if (!canvas) {
-          console.warn('Admin canvas not found');
+          console.warn('❌ Admin canvas not found');
           return;
         }
+        
+        console.log('🎨 Rendering', tables.length, 'tables on canvas');
         
         // Clear existing tables
         canvas.innerHTML = '';
@@ -67234,6 +67238,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         // Render each table as a draggable element
         tables.forEach(table => {
+          console.log('  📍 Rendering table:', table.table_number, 'at', table.position_x, table.position_y);
+          
           const tableEl = document.createElement('div');
           tableEl.className = 'table-item';
           tableEl.id = 'table-' + table.table_id;
