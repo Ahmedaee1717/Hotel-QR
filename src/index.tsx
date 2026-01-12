@@ -68503,7 +68503,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const addText = currentLanguage === 'en' ? 'Add' : await translateText('Add', currentLanguage);
             const premiumText = currentLanguage === 'en' ? 'PREMIUM' : await translateText('PREMIUM', currentLanguage);
             
-            container.innerHTML = translatedItems.map(item => \`
+            container.innerHTML = translatedItems.map(item => {
+                const selectedItem = selectedItems[item.item_id];
+                const quantity = selectedItem?.quantity || 0;
+                
+                return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
@@ -68513,26 +68517,76 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                             </div>
                             <p class="text-gray-600 text-sm">\${item.description || ''}</p>
                         </div>
-                        <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
-                                id="btn-\${item.item_id}"
-                                class="ml-4 px-4 py-2 rounded-lg font-semibold transition-colors \${selectedItems[item.item_id] ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
-                            \${selectedItems[item.item_id] ? \`<i class="fas fa-check mr-1"></i>\${selectedText}\` : \`<i class="fas fa-plus mr-1"></i>\${addText}\`}
-                        </button>
+                        <div class="ml-4 flex items-center gap-2">
+                            \${quantity > 0 ? \`
+                                <button onclick="decreaseItemQuantity(\${item.item_id}, '\${item.category}')" 
+                                        class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <span class="w-12 text-center font-bold text-lg">\${quantity}</span>
+                            \` : ''}
+                            <button onclick="toggleItem(\${item.item_id}, '\${item.category}', '\${item.item_name.replace(/'/g, "\\'")}', \${item.cost_to_hotel})" 
+                                    id="btn-\${item.item_id}"
+                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            \`).join('');
+                \`;
+            }).join('');
         }
         
         function toggleItem(itemId, category, itemName, cost) {
-            // Remove any existing selection in this category (ONE per category rule)
-            Object.keys(selectedItems).forEach(id => {
-                if (selectedItems[id].category === category) {
-                    delete selectedItems[id];
-                }
-            });
+            const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
             
-            // Add the new selection
-            selectedItems[itemId] = { category, name: itemName, cost };
+            // Count total quantity in this category
+            const currentCategoryTotal = Object.keys(selectedItems)
+                .filter(id => selectedItems[id].category === category)
+                .reduce((sum, id) => sum + (selectedItems[id].quantity || 1), 0);
+            
+            // If item exists, increment quantity (up to orderingFor limit)
+            if (selectedItems[itemId]) {
+                const currentQuantity = selectedItems[itemId].quantity || 1;
+                
+                if (currentCategoryTotal >= orderingFor) {
+                    alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
+                    return;
+                }
+                
+                selectedItems[itemId].quantity = currentQuantity + 1;
+            } else {
+                // Check if we can add new item
+                if (currentCategoryTotal >= orderingFor) {
+                    alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
+                    return;
+                }
+                
+                // Add the new selection
+                selectedItems[itemId] = { 
+                    category, 
+                    name: itemName, 
+                    cost,
+                    quantity: 1
+                };
+            }
+            
+            updateOrderSummary();
+            showMenuCategory(category); // Refresh to update button states
+        }
+        
+        function decreaseItemQuantity(itemId, category) {
+            if (!selectedItems[itemId]) return;
+            
+            const currentQuantity = selectedItems[itemId].quantity || 1;
+            
+            if (currentQuantity <= 1) {
+                // Remove item completely
+                delete selectedItems[itemId];
+            } else {
+                // Decrease quantity
+                selectedItems[itemId].quantity = currentQuantity - 1;
+            }
             
             updateOrderSummary();
             showMenuCategory(category); // Refresh to update button states
@@ -68549,22 +68603,31 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             // Group by category for display
             const categories = ['salad', 'starter', 'main', 'dessert'];
             const categoryLabels = {
-                'salad': '🥗 Salad',
-                'starter': '🍤 Starter', 
-                'main': '🥩 Main Course',
-                'dessert': '🍰 Dessert'
+                'salad': '🥗 Salads',
+                'starter': '🍤 Starters', 
+                'main': '🥩 Main Courses',
+                'dessert': '🍰 Desserts'
             };
             
             let html = '';
+            let totalItems = 0;
+            
             categories.forEach(cat => {
-                const item = Object.values(selectedItems).find(i => i.category === cat);
-                if (item) {
+                const itemsInCategory = Object.values(selectedItems).filter(i => i.category === cat);
+                const categoryTotal = itemsInCategory.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                
+                if (itemsInCategory.length > 0) {
+                    totalItems += categoryTotal;
                     html += \`
                         <div class="border-b pb-2 mb-2">
-                            <div class="text-xs text-gray-500 mb-1">\${categoryLabels[cat]}</div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-semibold">\${item.name}</span>
-                                <span class="text-purple-600">€\${item.cost.toFixed(2)}</span>
+                            <div class="text-xs text-gray-500 mb-1">\${categoryLabels[cat]} (\${categoryTotal} total)</div>
+                            <div class="space-y-1">
+                                \${itemsInCategory.map(item => \`
+                                    <div class="flex justify-between items-center text-sm">
+                                        <span class="font-semibold">\${item.name} \${item.quantity > 1 ? 'x' + item.quantity : ''}</span>
+                                        <span class="text-purple-600">€\${(item.cost * (item.quantity || 1)).toFixed(2)}</span>
+                                    </div>
+                                \`).join('')}
                             </div>
                         </div>
                     \`;
@@ -68741,12 +68804,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 return;
             }
             
-            // Build preorder data
-            const preorder = {};
-            Object.keys(selectedItems).forEach(itemId => {
-                const item = selectedItems[itemId];
-                preorder[\`preorder_\${item.category}\`] = parseInt(itemId);
-            });
+            // Build preorder data - send all selected items with quantities
+            const preorderItems = Object.keys(selectedItems).map(id => ({
+                item_id: parseInt(id),
+                quantity: selectedItems[id].quantity || 1
+            }));
             
             try {
                 const response = await fetch('/api/alacarte/voucher', {
@@ -68762,7 +68824,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         reservation_time: time,
                         num_people: orderingFor,
                         table_id: selectedTableId,
-                        ...preorder
+                        preorder_items: preorderItems  // Send items with quantities
                     })
                 });
                 
@@ -69233,10 +69295,7 @@ app.post('/api/alacarte/voucher', async (c) => {
       reservation_time,
       num_people, // Number of people ordering (uses this many vouchers)
       table_id,
-      preorder_salad,
-      preorder_starter,
-      preorder_main,
-      preorder_dessert,
+      preorder_items, // Array of { item_id, quantity }
       special_requests
     } = body
 
@@ -69305,18 +69364,17 @@ app.post('/api/alacarte/voucher', async (c) => {
       console.error('Parse restaurants error:', e)
     }
 
-    // Calculate total cost and build item IDs array
-    const items = [preorder_salad, preorder_starter, preorder_main, preorder_dessert].filter(Boolean)
-    const preorder_item_ids = items
+    // Calculate total cost from items with quantities
     let totalCost = 0
+    const itemsArray = preorder_items || []
     
-    for (const itemId of items) {
+    for (const preorderItem of itemsArray) {
       const item = await DB.prepare(`
         SELECT cost_to_hotel FROM alacarte_menu_items WHERE item_id = ?
-      `).bind(itemId).first()
+      `).bind(preorderItem.item_id).first()
       
       if (item) {
-        totalCost += item.cost_to_hotel || 0
+        totalCost += (item.cost_to_hotel || 0) * (preorderItem.quantity || 1)
       }
     }
 
@@ -69343,7 +69401,7 @@ app.post('/api/alacarte/voucher', async (c) => {
       const voucherCode = `MEAL-${dateStr}-${randomNum}`
       voucherCodes.push(voucherCode)
 
-      // Insert voucher
+      // Insert voucher with items as JSON array
       await DB.prepare(`
         INSERT INTO alacarte_vouchers (
           property_id,
@@ -69372,9 +69430,10 @@ app.post('/api/alacarte/voucher', async (c) => {
         reservation_time,
         1, // Party size is 1 per voucher (each person gets their own voucher)
         tableNumber,
-        JSON.stringify(preorder_item_ids),
-        special_requests || `Ordering for ${peopleOrdering} people (voucher ${i + 1}/${peopleOrdering})`,
-        totalCost
+        JSON.stringify(itemsArray), // Store items with quantities as JSON
+        special_requests || null,
+        totalCost / peopleOrdering, // Divide cost evenly per person
+        'confirmed'
       ).run()
     }
 
@@ -69386,7 +69445,7 @@ app.post('/api/alacarte/voucher', async (c) => {
       voucher_code: voucherCodes[0], // Primary voucher code
       voucher_codes: voucherCodes, // All voucher codes
       num_vouchers_created: peopleOrdering,
-      total_cost: totalCost * peopleOrdering, // Total cost for all people
+      total_cost: totalCost, // Total cost for all items
       vouchers_used: newVouchersUsed,
       vouchers_remaining: newVouchersRemaining
     })
