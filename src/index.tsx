@@ -71396,7 +71396,10 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                                     '<i class="fas fa-utensils text-blue-600"></i>' +
                                 '</div>' +
                                 '<div class="flex-1 min-w-0">' +
-                                    '<p class="font-bold text-gray-900 truncate">' + (dish.item_name || 'Unknown Item') + '</p>' +
+                                    '<p class="font-bold text-gray-900 truncate">' + 
+                                    (dish.item_name || 'Unknown Item') + 
+                                    (dish.quantity > 1 ? ' <span class="text-blue-600">x' + dish.quantity + '</span>' : '') +
+                                    '</p>' +
                                     '<p class="text-sm text-gray-500">' + (dish.category || '') + 
                                     (dish.is_premium ? ' <span class="text-orange-600"><i class="fas fa-star"></i> Premium</span>' : '') +
                                     '</p>' +
@@ -71664,8 +71667,42 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
     
     // For each order, get the dish details
     const ordersWithDishes = await Promise.all(orders.results.map(async (order) => {
-      const itemIds = JSON.parse(order.preorder_item_ids || '[]')
+      let itemsData = []
+      try {
+        itemsData = JSON.parse(order.preorder_item_ids || '[]')
+      } catch (e) {
+        console.error('Failed to parse preorder_item_ids:', e)
+        itemsData = []
+      }
       
+      if (itemsData.length === 0) {
+        return {
+          ...order,
+          dishes: []
+        }
+      }
+      
+      // Extract item IDs - handle both formats:
+      // Old format: [15, 18, 20]
+      // New format: [{item_id: 15, quantity: 2}, {item_id: 18, quantity: 1}]
+      const itemIds = itemsData.map(item => {
+        if (typeof item === 'object' && item.item_id) {
+          return item.item_id  // New format
+        }
+        return item  // Old format (plain number)
+      })
+      
+      // Create a quantity map for the new format
+      const quantityMap = {}
+      itemsData.forEach(item => {
+        if (typeof item === 'object' && item.item_id) {
+          quantityMap[item.item_id] = item.quantity || 1
+        } else {
+          quantityMap[item] = 1  // Old format defaults to 1
+        }
+      })
+      
+      // Get dish details
       if (itemIds.length === 0) {
         return {
           ...order,
@@ -71673,25 +71710,36 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         }
       }
       
-      // Get dish details
       const placeholders = itemIds.map(() => '?').join(',')
-      const dishes = await DB.prepare(
-        'SELECT item_id, category, item_name, is_premium ' +
-        'FROM alacarte_menu_items ' +
-        'WHERE item_id IN (' + placeholders + ') ' +
-        'ORDER BY ' +
-        "  CASE category " +
-        "    WHEN 'salad' THEN 1 " +
-        "    WHEN 'starter' THEN 2 " +
-        "    WHEN 'main' THEN 3 " +
-        "    WHEN 'dessert' THEN 4 " +
-        "    ELSE 5 " +
-        "  END"
-      ).bind(...itemIds).all()
+      let dishes = { results: [] }
+      try {
+        dishes = await DB.prepare(
+          'SELECT item_id, category, item_name, is_premium ' +
+          'FROM alacarte_menu_items ' +
+          'WHERE item_id IN (' + placeholders + ') ' +
+          'ORDER BY ' +
+          "  CASE category " +
+          "    WHEN 'salad' THEN 1 " +
+          "    WHEN 'starter' THEN 2 " +
+          "    WHEN 'main' THEN 3 " +
+          "    WHEN 'dessert' THEN 4 " +
+          "    ELSE 5 " +
+          "  END"
+        ).bind(...itemIds).all()
+      } catch (e) {
+        console.error('Failed to fetch dishes for order', order.voucher_code, ':', e)
+        console.error('itemIds:', itemIds)
+      }
+      
+      // Add quantities to dishes
+      const dishesWithQuantity = (dishes.results || []).map(dish => ({
+        ...dish,
+        quantity: quantityMap[dish.item_id] || 1
+      }))
       
       return {
         ...order,
-        dishes: dishes.results
+        dishes: dishesWithQuantity
       }
     }))
     
