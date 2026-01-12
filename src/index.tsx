@@ -68110,7 +68110,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             await loadTables();
           } else {
             console.error('Add table failed:', data);
-            alert('❌ Failed to add table: ' + (data.error || 'Unknown error') + '\nDetails: ' + (data.details || 'No details'));
+            alert('❌ Failed to add table: ' + (data.error || 'Unknown error') + '. Details: ' + (data.details || 'No details'));
           }
         } catch (error) {
           console.error('Add table error:', error);
