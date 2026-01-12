@@ -68078,33 +68078,39 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const features = Array.from(document.querySelectorAll('input[name="features"]:checked'))
           .map(cb => cb.value);
         
+        const payload = {
+          offering_id: numericOfferingId,
+          table_number: tableNumber,
+          table_name: tableName || null,
+          capacity: capacity,
+          shape: shape,
+          table_type: tableType,
+          features: features,
+          position_x: 50,
+          position_y: 50,
+          width: shape === 'circle' ? 80 : 100,
+          height: shape === 'circle' ? 80 : 60
+        };
+        
+        console.log('Creating table with payload:', payload);
+        
         try {
           const response = await fetchWithAuth('/api/admin/restaurant/table', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              offering_id: numericOfferingId,
-              table_number: tableNumber,
-              table_name: tableName || null,
-              capacity: capacity,
-              shape: shape,
-              table_type: tableType,
-              features: features,
-              position_x: 50,
-              position_y: 50,
-              width: shape === 'circle' ? 80 : 100,
-              height: shape === 'circle' ? 80 : 60
-            })
+            body: JSON.stringify(payload)
           });
           
           const data = await response.json();
+          console.log('Add table response:', data);
           
           if (data.success) {
             alert('✅ Table added successfully!');
             document.getElementById('addTableForm').reset();
             await loadTables();
           } else {
-            alert('❌ Failed to add table: ' + (data.error || 'Unknown error'));
+            console.error('Add table failed:', data);
+            alert('❌ Failed to add table: ' + (data.error || 'Unknown error') + '\nDetails: ' + (data.details || 'No details'));
           }
         } catch (error) {
           console.error('Add table error:', error);
