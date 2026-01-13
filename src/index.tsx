@@ -63929,12 +63929,20 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         window.generateGuestQRCode = function() {
-            if (!selectedRestaurant) return;
+            console.log('=== generateGuestQRCode called ===');
+            console.log('selectedRestaurant:', selectedRestaurant);
+            
+            if (!selectedRestaurant) {
+                console.error('No restaurant selected!');
+                return;
+            }
             
             // Build guest ordering URL
             const roomNumber = document.getElementById('roomNumber').value;
             const guestName = document.getElementById('guestName').value;
             const partySize = document.getElementById('partySize').value;
+            
+            console.log('Room:', roomNumber, 'Guest:', guestName, 'Party:', partySize);
             
             const baseUrl = window.location.origin;
             const guestUrl = baseUrl + '/alacarte/book/' + selectedRestaurant.offering_id + 
@@ -63943,20 +63951,46 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 '&guest=' + encodeURIComponent(guestName) +
                 '&party=' + partySize;
             
-            // Display link
-            document.getElementById('guestOrderLink').value = guestUrl;
+            console.log('Generated guest ordering URL:', guestUrl);
             
-            // Generate QR Code using Google Charts API
-            const qrSize = 250;
-            const qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=' + qrSize + 'x' + qrSize + '&chl=' + encodeURIComponent(guestUrl);
+            // Display link
+            const linkInput = document.getElementById('guestOrderLink');
+            if (linkInput) {
+                linkInput.value = guestUrl;
+                console.log('Link input updated');
+            } else {
+                console.error('guestOrderLink element not found!');
+            }
+            
+            // Generate QR Code using QR Server API (more reliable than Google Charts)
+            const qrSize = 300;
+            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=' + qrSize + 'x' + qrSize + '&data=' + encodeURIComponent(guestUrl);
+            
+            console.log('QR Code URL:', qrUrl);
             
             const qrContainer = document.getElementById('qrCodeContainer');
-            qrContainer.innerHTML = '<img src="' + qrUrl + '" alt="QR Code for Guest Ordering" class="w-64 h-64 mx-auto">';
+            if (qrContainer) {
+                qrContainer.innerHTML = '<img src="' + qrUrl + '" alt="QR Code for Guest Ordering" class="w-full h-auto max-w-sm mx-auto border-4 border-gray-200 rounded-lg shadow-lg" onload="console.log(\'QR image loaded\')" onerror="console.error(\'QR image failed to load\')">';
+                console.log('QR container updated');
+            } else {
+                console.error('qrCodeContainer element not found!');
+            }
             
             // Show QR section
-            document.getElementById('guestQRSection').classList.remove('hidden');
+            const qrSection = document.getElementById('guestQRSection');
+            if (qrSection) {
+                qrSection.classList.remove('hidden');
+                console.log('QR section shown');
+                
+                // Scroll to QR section
+                setTimeout(function() {
+                    qrSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            } else {
+                console.error('guestQRSection element not found!');
+            }
             
-            console.log('Generated guest ordering URL:', guestUrl);
+            console.log('=== generateGuestQRCode complete ===');
         }
         
         window.copyGuestLink = function() {
