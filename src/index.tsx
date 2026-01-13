@@ -69082,7 +69082,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             renderFloorPlan();
         }
         
-        function handleAllergyDeclaration(choice) {
+        window.handleAllergyDeclaration = function(choice) {
             const container = document.getElementById('allergyInputContainer');
             const textarea = document.getElementById('allergyDetails');
             const hasAllergiesLabel = document.getElementById('hasAllergiesLabel');
@@ -69128,13 +69128,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             // Validate allergy declaration is selected
             if (!allergyDeclaration) {
-                alert('⚠️ REQUIRED: Please select an allergy declaration option.\n\nYou must choose either:\n• I have food allergies, OR\n• I confirm I have NO allergies');
+                alert('REQUIRED: Please select an allergy declaration option. You must choose either: I have food allergies, OR I confirm I have NO allergies');
                 return;
             }
             
             // Validate allergy details if "has allergies" is selected
             if (hasAllergiesRadio && !allergyDetails) {
-                alert('⚠️ Please specify your allergies or dietary restrictions.\n\nIf you have no allergies, please select "I confirm I have NO allergies" instead.');
+                alert('Please specify your allergies or dietary restrictions. If you have no allergies, please select "I confirm I have NO allergies" instead.');
                 document.getElementById('allergyDetails').focus();
                 return;
             }
@@ -69149,20 +69149,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const vouchersRemaining = voucherEligibility.vouchers.remaining;
             
             if (vouchersNeeded > vouchersRemaining) {
-                alert(\`❌ Not enough vouchers!\\n\\nYou need \${vouchersNeeded} voucher\${vouchersNeeded > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}, but only have \${vouchersRemaining} remaining.\\n\\nPlease reduce the number of people or contact reception.\`);
+                alert('Not enough vouchers! You need ' + vouchersNeeded + ' voucher' + (vouchersNeeded > 1 ? 's' : '') + ' for ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + ', but only have ' + vouchersRemaining + ' remaining. Please reduce the number of people or contact reception.');
                 return;
             }
             
             // Confirm booking
             const restaurantName = '${restaurant.title_en}';
-            const confirmMsg = \`📋 Booking Summary:\\n\\n\` +
-                \`🍽️ Restaurant: \${restaurantName}\\n\` +
-                \`📅 Date: \${date}\\n\` +
-                \`🕐 Time: \${time}\\n\` +
-                \`👥 Ordering for: \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}\\n\` +
-                \`🎫 Vouchers to use: \${vouchersNeeded}\\n\` +
-                \`🎫 Vouchers remaining after: \${vouchersRemaining - vouchersNeeded}\\n\\n\` +
-                \`Confirm this booking?\`;
+            const confirmMsg = 'Booking Summary: Restaurant: ' + restaurantName + '. Date: ' + date + '. Time: ' + time + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Vouchers to use: ' + vouchersNeeded + '. Vouchers remaining after: ' + (vouchersRemaining - vouchersNeeded) + '. Confirm this booking?';
             
             if (!confirm(confirmMsg)) {
                 return;
@@ -69198,7 +69191,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 if (data.success) {
                     const { voucher_code, vouchers_remaining, total_cost } = data;
-                    alert(\`✅ Booking Confirmed!\\n\\nVoucher Code: \${voucher_code}\\n👥 Ordering for: \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}\\n🎫 Vouchers used: \${vouchersNeeded}\\n🎫 Vouchers remaining: \${vouchers_remaining}\\nTotal Cost: €\${(total_cost || 0).toFixed(2)}\\n\\nRedirecting to your bookings...\`);
+                    alert('Booking Confirmed! Voucher Code: ' + voucher_code + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Vouchers used: ' + vouchersNeeded + '. Vouchers remaining: ' + vouchers_remaining + '. Total Cost: EUR' + (total_cost || 0).toFixed(2) + '. Redirecting to your bookings...');
                     
                     // Redirect to my bookings page
                     window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
