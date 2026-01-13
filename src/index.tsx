@@ -63970,7 +63970,16 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             const qrContainer = document.getElementById('qrCodeContainer');
             if (qrContainer) {
-                qrContainer.innerHTML = '<img src="' + qrUrl + '" alt="QR Code for Guest Ordering" class="w-full h-auto max-w-sm mx-auto border-4 border-gray-200 rounded-lg shadow-lg" onload="console.log(\'QR image loaded\')" onerror="console.error(\'QR image failed to load\')">';
+                // Create img element safely
+                const img = document.createElement('img');
+                img.src = qrUrl;
+                img.alt = 'QR Code for Guest Ordering';
+                img.className = 'w-full h-auto max-w-sm mx-auto border-4 border-gray-200 rounded-lg shadow-lg';
+                img.onload = function() { console.log('QR image loaded successfully'); };
+                img.onerror = function() { console.error('QR image failed to load'); };
+                
+                qrContainer.innerHTML = '';
+                qrContainer.appendChild(img);
                 console.log('QR container updated');
             } else {
                 console.error('qrCodeContainer element not found!');
