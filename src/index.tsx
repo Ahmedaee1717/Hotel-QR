@@ -68383,6 +68383,35 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             <div id="orderSummary" class="space-y-2 mb-4">
                 <p class="text-gray-500 text-center py-4" data-i18n="no-items-selected">No items selected yet</p>
             </div>
+            
+            <!-- Allergy Information -->
+            <div class="border-t pt-4 mb-4">
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" id="hasAllergiesCheckbox" onchange="toggleAllergyInput()" class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer">
+                    <span class="text-gray-700 font-medium">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                        <span data-i18n="has-allergies">I have food allergies or dietary restrictions</span>
+                    </span>
+                </label>
+                
+                <div id="allergyInputContainer" class="hidden mt-3">
+                    <label for="allergyDetails" class="block text-sm font-medium text-gray-700 mb-2">
+                        <span data-i18n="allergy-details">Please specify your allergies or dietary restrictions:</span>
+                    </label>
+                    <textarea 
+                        id="allergyDetails" 
+                        rows="3" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+                        placeholder="e.g., Peanuts, Shellfish, Gluten, Lactose intolerant, Vegetarian, etc."
+                        data-i18n-placeholder="allergy-placeholder"
+                    ></textarea>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <span data-i18n="allergy-note">This information will be shared with the kitchen staff to ensure your safety.</span>
+                    </p>
+                </div>
+            </div>
+            
             <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-lg font-bold text-lg transition-colors">
                 <i class="fas fa-check-circle mr-2"></i><span data-i18n="confirm-reservation">Confirm Reservation</span>
             </button>
@@ -69014,10 +69043,26 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             renderFloorPlan();
         }
         
+        function toggleAllergyInput() {
+            const checkbox = document.getElementById('hasAllergiesCheckbox');
+            const container = document.getElementById('allergyInputContainer');
+            const textarea = document.getElementById('allergyDetails');
+            
+            if (checkbox.checked) {
+                container.classList.remove('hidden');
+                textarea.focus();
+            } else {
+                container.classList.add('hidden');
+                textarea.value = '';
+            }
+        }
+        
         async function confirmBooking() {
             const date = document.getElementById('bookingDate').value;
             const time = document.getElementById('bookingTime').value;
             const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
+            const hasAllergies = document.getElementById('hasAllergiesCheckbox').checked;
+            const allergyDetails = document.getElementById('allergyDetails').value.trim();
             
             if (!date) {
                 alert('Please select a date');
@@ -69031,6 +69076,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             if (!selectedTableId) {
                 alert('Please select a table for your reservation');
+                return;
+            }
+            
+            // Validate allergy details if checkbox is checked
+            if (hasAllergies && !allergyDetails) {
+                alert('⚠️ Please specify your allergies or dietary restrictions, or uncheck the allergy checkbox.');
+                document.getElementById('allergyDetails').focus();
                 return;
             }
             
@@ -69083,7 +69135,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         reservation_time: time,
                         num_people: orderingFor,
                         table_id: selectedTableId,
-                        preorder_items: preorderItems  // Send items with quantities
+                        preorder_items: preorderItems,  // Send items with quantities
+                        allergy_info: hasAllergies ? allergyDetails : null  // Include allergy information
                     })
                 });
                 
@@ -69555,8 +69608,18 @@ app.post('/api/alacarte/voucher', async (c) => {
       num_people, // Number of people ordering (uses this many vouchers)
       table_id,
       preorder_items, // Array of { item_id, quantity }
-      special_requests
+      special_requests,
+      allergy_info // NEW: Allergy/dietary restriction information
     } = body
+    
+    // Build special requests field with allergy info
+    let combinedSpecialRequests = special_requests || ''
+    if (allergy_info) {
+      const allergyNote = `⚠️ ALLERGIES/DIETARY: ${allergy_info}`
+      combinedSpecialRequests = combinedSpecialRequests 
+        ? `${combinedSpecialRequests}\n\n${allergyNote}` 
+        : allergyNote
+    }
 
     // Verify pass and get eligibility info
     const passInfo = await DB.prepare(`
@@ -69690,7 +69753,7 @@ app.post('/api/alacarte/voucher', async (c) => {
         1, // Party size is 1 per voucher (each person gets their own voucher)
         tableNumber,
         JSON.stringify(itemsArray), // Store items with quantities as JSON
-        special_requests || null,
+        combinedSpecialRequests || null,
         totalCost / peopleOrdering, // Divide cost evenly per person
         'confirmed'
       ).run()
