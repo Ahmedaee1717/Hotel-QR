@@ -68116,7 +68116,15 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             await loadTables();
           } else {
             console.error('Add table failed:', data);
-            alert('❌ Failed to add table: ' + (data.error || 'Unknown error') + '. Details: ' + (data.details || 'No details'));
+            const errorMsg = data.error || 'Unknown error';
+            const detailsMsg = data.details || 'No details';
+            
+            // Show user-friendly message for duplicate table
+            if (detailsMsg.includes('UNIQUE constraint') && detailsMsg.includes('table_number')) {
+              alert('❌ Table number already exists!\n\nThis table number is already used in this restaurant. Please use a different table number (e.g., T1, T2, T3, etc.)');
+            } else {
+              alert('❌ Failed to add table: ' + errorMsg + '. Details: ' + detailsMsg);
+            }
           }
         } catch (error) {
           console.error('Add table error:', error);
