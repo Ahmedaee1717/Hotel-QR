@@ -43176,6 +43176,10 @@ app.get('/admin/dashboard', (c) => {
                         <i class="fas fa-fire"></i>
                         Kitchen View
                     </button>
+                    <button onclick="openFrontDeskOrdering()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
+                        <i class="fas fa-concierge-bell"></i>
+                        Front Desk Ordering
+                    </button>
                     <button onclick="refreshALaCarteStats()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2">
                         <i class="fas fa-sync-alt"></i>
                         Refresh
@@ -49667,6 +49671,11 @@ app.get('/admin/dashboard', (c) => {
           console.error('Error loading restaurants:', error);
           alert('Failed to open kitchen view');
         }
+      }
+      
+      function openFrontDeskOrdering() {
+        // Open front desk ordering page for property
+        window.open('/front-desk/alacarte-booking/' + propertyId, '_blank');
       }
       
       async function refreshALaCarteStats() {
