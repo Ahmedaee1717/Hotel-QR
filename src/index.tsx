@@ -68121,7 +68121,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             
             // Show user-friendly message for duplicate table
             if (detailsMsg.includes('UNIQUE constraint') && detailsMsg.includes('table_number')) {
-              alert('❌ Table number already exists!\n\nThis table number is already used in this restaurant. Please use a different table number (e.g., T1, T2, T3, etc.)');
+              alert('❌ Table number already exists! This table number is already used in this restaurant. Please use a different table number (e.g., T1, T2, T3, etc.)');
             } else {
               alert('❌ Failed to add table: ' + errorMsg + '. Details: ' + detailsMsg);
             }
