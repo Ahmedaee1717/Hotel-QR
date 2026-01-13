@@ -64079,6 +64079,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             selectedRestaurant = restaurants.find(r => r.offering_id === restaurantId);
             renderRestaurants();
             loadMenuItems(restaurantId);
+            
+            // Regenerate QR code with new restaurant
+            if (typeof generateGuestQRCode === 'function') {
+                generateGuestQRCode();
+            }
         }
         
         async function loadMenuItems(restaurantId) {
@@ -70264,6 +70269,65 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
     }
     
+    // Look up or create a digital pass for this room
+    let pass = await DB.prepare(`
+      SELECT pass_id, tier_id, pass_reference
+      FROM digital_passes
+      WHERE room_number = ? AND property_id = ? AND pass_status = 'active'
+      ORDER BY pass_id DESC
+      LIMIT 1
+    `).bind(room_number, property_id).first()
+    
+    if (!pass) {
+      // Create a temporary pass for this guest
+      const pass_reference = `QR-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`
+      
+      await DB.prepare(`
+        INSERT INTO digital_passes (
+          property_id,
+          pass_reference,
+          primary_guest_name,
+          room_number,
+          num_adults,
+          num_children,
+          tier_id,
+          pass_status,
+          valid_from,
+          valid_until,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        property_id,
+        pass_reference,
+        guest_name,
+        room_number,
+        party_size,
+        0,
+        1, // Default tier
+        'active',
+        reservation_date,
+        reservation_date
+      ).run()
+      
+      // Retrieve the newly created pass
+      pass = await DB.prepare(`
+        SELECT pass_id, tier_id, pass_reference
+        FROM digital_passes
+        WHERE pass_reference = ? AND property_id = ?
+      `).bind(pass_reference, property_id).first()
+      
+      console.log('✅ Created temporary pass:', pass_reference)
+    }
+    
+    // Get meal number for this pass
+    const vouchersUsed = await DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM alacarte_vouchers
+      WHERE pass_id = ? AND status IN ('confirmed', 'used')
+    `).bind(pass.pass_id).first()
+    
+    const mealNumber = (vouchersUsed?.count || 0) + 1
+    
     // Generate voucher code
     const timestamp = Date.now()
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
@@ -70283,10 +70347,13 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       special_requests = `NO ALLERGIES CONFIRMED\n\n${special_requests}`
     }
     
-    // Create voucher WITHOUT pass_id (standalone booking)
+    // Create voucher with pass reference
     await DB.prepare(`
       INSERT INTO alacarte_vouchers (
         property_id,
+        pass_id,
+        tier_id,
+        meal_number,
         voucher_code,
         restaurant_id,
         reservation_date,
@@ -70297,9 +70364,12 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
         special_requests,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       property_id,
+      pass.pass_id,
+      pass.tier_id || 1,
+      mealNumber,
       voucher_code,
       restaurant_id,
       reservation_date,
