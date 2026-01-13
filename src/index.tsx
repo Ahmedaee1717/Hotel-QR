@@ -63662,63 +63662,6 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         </div>
                     </div>
                     
-                    <!-- Allergy Declaration (REQUIRED) -->
-                    <div class="border-t border-b py-4 bg-yellow-50 rounded-xl px-4">
-                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
-                            <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
-                            Allergy Declaration (Required)
-                        </h4>
-                        <p class="text-sm text-gray-600 mb-3">Please select one option:</p>
-                        
-                        <div class="space-y-3">
-                            <!-- Option 1: Has Allergies -->
-                            <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-yellow-100 transition" id="hasAllergiesLabel">
-                                <input 
-                                    type="radio" 
-                                    name="allergyDeclaration" 
-                                    id="hasAllergiesRadio" 
-                                    value="has_allergies"
-                                    onchange="handleAllergyDeclaration('has_allergies')" 
-                                    class="mt-1 w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500 cursor-pointer">
-                                <div class="flex-1">
-                                    <span class="text-gray-800 font-medium block">
-                                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
-                                        Guest has food allergies or dietary restrictions
-                                    </span>
-                                </div>
-                            </label>
-                            
-                            <div id="allergyInputContainer" class="hidden ml-8 mt-2">
-                                <label for="allergyDetails" class="block text-sm font-medium text-gray-700 mb-2">
-                                    Please specify allergies or dietary restrictions:
-                                </label>
-                                <textarea 
-                                    id="allergyDetails" 
-                                    rows="3" 
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
-                                    placeholder="e.g., Peanuts, Shellfish, Gluten, Lactose intolerant, Vegetarian, etc."
-                                ></textarea>
-                            </div>
-                            
-                            <!-- Option 2: No Allergies -->
-                            <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-green-50 transition" id="noAllergiesLabel">
-                                <input 
-                                    type="radio" 
-                                    name="allergyDeclaration" 
-                                    id="noAllergiesRadio" 
-                                    value="no_allergies"
-                                    onchange="handleAllergyDeclaration('no_allergies')" 
-                                    class="mt-1 w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                <div class="flex-1">
-                                    <span class="text-gray-800 font-medium block">
-                                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                                        Guest confirms NO food allergies or dietary restrictions
-                                    </span>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                    
                     <div>
                         <label class="block text-sm font-bold mb-2">Date *</label>
                         <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" required>
@@ -63745,6 +63688,53 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     <!-- Loaded dynamically -->
                 </div>
             </div>
+            
+            <!-- QR Code for Guest Ordering -->
+            <div id="guestQRSection" class="hidden bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl shadow-lg p-6 mb-6 border-2 border-purple-300">
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-full mb-4">
+                        <i class="fas fa-qrcode text-3xl text-white"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">Guest Self-Ordering Available</h3>
+                    <p class="text-gray-600 mb-4">Guest can scan this QR code to order from their phone</p>
+                    
+                    <div class="bg-white rounded-xl p-6 inline-block shadow-xl mb-4">
+                        <div id="qrCodeContainer" class="flex justify-center">
+                            <!-- QR Code will be generated here -->
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-4 mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Or share this link:</p>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="guestOrderLink" readonly class="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm font-mono" value="">
+                            <button onclick="copyGuestLink()" class="btn-primary text-white px-4 py-2 rounded-lg text-sm">
+                                <i class="fas fa-copy mr-1"></i>Copy
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 text-left">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-yellow-600 mt-1 mr-3"></i>
+                            <div class="text-sm text-gray-700">
+                                <p class="font-semibold mb-1">How it works:</p>
+                                <ul class="list-disc list-inside space-y-1 text-xs">
+                                    <li>Guest scans QR or opens link on their phone</li>
+                                    <li>Pre-filled with room number and restaurant selection</li>
+                                    <li>Guest selects items and declares allergies</li>
+                                    <li>Order appears in kitchen view automatically</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-sm text-purple-600 font-semibold mt-4">
+                        <i class="fas fa-arrow-down mr-2"></i>OR continue ordering on behalf of guest below
+                    </p>
+                </div>
+            </div>
+            
             <div class="flex gap-4">
                 <button onclick="goToStep(1)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
                     <i class="fas fa-arrow-left mr-2"></i>Back
@@ -63757,6 +63747,67 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
 
         <!-- Step 3: Menu Selection -->
         <div id="stepContent3" class="hidden">
+            <!-- Allergy Declaration (REQUIRED) - At Top -->
+            <div class="bg-gradient-to-r from-red-50 to-yellow-50 rounded-2xl shadow-lg p-6 mb-6 border-2 border-yellow-400">
+                <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-3 text-2xl"></i>
+                    Allergy Declaration (Required)
+                </h3>
+                <p class="text-sm text-gray-700 mb-4 font-medium">Before ordering, please confirm guest's allergy status:</p>
+                
+                <div class="space-y-3">
+                    <!-- Option 1: Has Allergies -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-4 border-2 rounded-xl hover:bg-red-50 transition bg-white" id="hasAllergiesLabel">
+                        <input 
+                            type="radio" 
+                            name="allergyDeclaration" 
+                            id="hasAllergiesRadio" 
+                            value="has_allergies"
+                            onchange="handleAllergyDeclaration('has_allergies')" 
+                            class="mt-1 w-6 h-6 text-red-600 border-gray-300 focus:ring-red-500 cursor-pointer">
+                        <div class="flex-1">
+                            <span class="text-gray-800 font-bold block text-lg">
+                                <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                                Guest has food allergies or dietary restrictions
+                            </span>
+                        </div>
+                    </label>
+                    
+                    <div id="allergyInputContainer" class="hidden ml-10 mt-2 bg-red-50 p-4 rounded-xl border-2 border-red-300">
+                        <label for="allergyDetails" class="block text-sm font-bold text-red-800 mb-2">
+                            <i class="fas fa-pen mr-2"></i>Please specify allergies or dietary restrictions:
+                        </label>
+                        <textarea 
+                            id="allergyDetails" 
+                            rows="3" 
+                            class="w-full px-4 py-3 border-2 border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none text-base"
+                            placeholder="e.g., Peanuts, Shellfish, Gluten-free, Lactose intolerant, Vegetarian, Vegan, etc."
+                        ></textarea>
+                        <p class="text-xs text-red-600 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            This information will be highlighted in RED in the kitchen view
+                        </p>
+                    </div>
+                    
+                    <!-- Option 2: No Allergies -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-4 border-2 rounded-xl hover:bg-green-50 transition bg-white" id="noAllergiesLabel">
+                        <input 
+                            type="radio" 
+                            name="allergyDeclaration" 
+                            id="noAllergiesRadio" 
+                            value="no_allergies"
+                            onchange="handleAllergyDeclaration('no_allergies')" 
+                            class="mt-1 w-6 h-6 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
+                        <div class="flex-1">
+                            <span class="text-gray-800 font-bold block text-lg">
+                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                Guest confirms NO food allergies or dietary restrictions
+                            </span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
             <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4 flex items-center">
                     <i class="fas fa-clipboard-list mr-3 accent-text"></i>
@@ -63875,6 +63926,50 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             // Update orderingFor to reflect party size
             orderingFor = value;
+        }
+        
+        window.generateGuestQRCode = function() {
+            if (!selectedRestaurant) return;
+            
+            // Build guest ordering URL
+            const roomNumber = document.getElementById('roomNumber').value;
+            const guestName = document.getElementById('guestName').value;
+            const partySize = document.getElementById('partySize').value;
+            
+            const baseUrl = window.location.origin;
+            const guestUrl = baseUrl + '/alacarte/book/' + selectedRestaurant.offering_id + 
+                '?property=' + propertyId + 
+                '&room=' + encodeURIComponent(roomNumber) +
+                '&guest=' + encodeURIComponent(guestName) +
+                '&party=' + partySize;
+            
+            // Display link
+            document.getElementById('guestOrderLink').value = guestUrl;
+            
+            // Generate QR Code using Google Charts API
+            const qrSize = 250;
+            const qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=' + qrSize + 'x' + qrSize + '&chl=' + encodeURIComponent(guestUrl);
+            
+            const qrContainer = document.getElementById('qrCodeContainer');
+            qrContainer.innerHTML = '<img src="' + qrUrl + '" alt="QR Code for Guest Ordering" class="w-64 h-64 mx-auto">';
+            
+            // Show QR section
+            document.getElementById('guestQRSection').classList.remove('hidden');
+            
+            console.log('Generated guest ordering URL:', guestUrl);
+        }
+        
+        window.copyGuestLink = function() {
+            const linkInput = document.getElementById('guestOrderLink');
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // For mobile
+            
+            navigator.clipboard.writeText(linkInput.value).then(function() {
+                alert('Link copied to clipboard! You can send this to the guest via SMS or messaging app.');
+            }).catch(function(err) {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy link. Please copy manually.');
+            });
         }
         
         async function checkVoucherEligibility(passReference) {
@@ -64104,22 +64199,6 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         return;
                     }
                     
-                    // Validate allergy declaration
-                    const allergyDeclaration = document.querySelector('input[name="allergyDeclaration"]:checked');
-                    if (!allergyDeclaration) {
-                        alert('REQUIRED: Please select an allergy declaration option');
-                        return;
-                    }
-                    
-                    // If has allergies, validate details are entered
-                    const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
-                    const allergyDetails = document.getElementById('allergyDetails').value.trim();
-                    if (hasAllergiesRadio && !allergyDetails) {
-                        alert('Please specify allergies or dietary restrictions');
-                        document.getElementById('allergyDetails').focus();
-                        return;
-                    }
-                    
                     // Set orderingFor to party size
                     orderingFor = partySize;
                     
@@ -64137,8 +64216,30 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         alert('Please select a restaurant');
                         return;
                     }
+                    
+                    // Generate QR code for guest ordering
+                    generateGuestQRCode();
+                    
                     renderMenuItems();
                 } else if (currentStep === 3) {
+                    // Validate allergy declaration (moved to Step 3)
+                    const allergyDeclaration = document.querySelector('input[name="allergyDeclaration"]:checked');
+                    if (!allergyDeclaration) {
+                        alert('REQUIRED: Please select an allergy declaration option');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return;
+                    }
+                    
+                    // If has allergies, validate details are entered
+                    const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
+                    const allergyDetails = document.getElementById('allergyDetails').value.trim();
+                    if (hasAllergiesRadio && !allergyDetails) {
+                        alert('Please specify allergies or dietary restrictions');
+                        document.getElementById('allergyDetails').focus();
+                        return;
+                    }
+                    
+                    // Validate items selected {
                     if (Object.keys(selectedItems).length === 0) {
                         alert('Please select at least one menu item');
                         return;
