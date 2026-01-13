@@ -63632,53 +63632,100 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4 flex items-center">
                     <i class="fas fa-user-circle mr-3 accent-text"></i>
-                    Guest Information
+                    Guest Information (Manual Entry)
                 </h2>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-bold mb-2">
                             <i class="fas fa-door-open mr-2"></i>Room Number *
                         </label>
-                        <div class="flex gap-2">
-                            <input type="text" id="roomNumber" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301">
-                            <button onclick="loadRoomInfo()" class="btn-primary text-white px-6 py-3 rounded-xl touch-target">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                        <div id="roomInfoMessage" class="mt-2 text-sm"></div>
-                    </div>
-                    <div id="guestInfoFields" class="space-y-4 hidden">
-                        <div>
-                            <label class="block text-sm font-bold mb-2">Guest Name *</label>
-                            <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name" readonly>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold mb-2">Digital Pass</label>
-                            <input type="text" id="passReference" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl bg-gray-100 text-gray-600" placeholder="Will be auto-filled" readonly>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold mb-2">
-                                Party Size * 
-                                <span id="maxGuestsInfo" class="text-xs text-gray-500 font-normal"></span>
-                            </label>
-                            <div class="flex items-center gap-4">
-                                <button onclick="adjustPartySize(-1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
-                                    <i class="fas fa-minus"></i>
-                                </button>
-                                <input type="number" id="partySize" value="2" min="1" max="12" class="w-24 text-center px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color text-xl font-bold touch-target" readonly>
-                                <button onclick="adjustPartySize(1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            </div>
-                        </div>
+                        <input type="text" id="roomNumber" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="e.g., 301" required>
                     </div>
                     <div>
+                        <label class="block text-sm font-bold mb-2">
+                            <i class="fas fa-user mr-2"></i>Guest Name *
+                        </label>
+                        <input type="text" id="guestName" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" placeholder="Enter guest name" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-2">
+                            <i class="fas fa-users mr-2"></i>Party Size *
+                        </label>
+                        <div class="flex items-center gap-4">
+                            <button type="button" onclick="adjustPartySize(-1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" id="partySize" value="1" min="1" max="12" class="w-24 text-center px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color text-xl font-bold touch-target">
+                            <button type="button" onclick="adjustPartySize(1)" class="btn-primary text-white px-4 py-3 rounded-xl touch-target">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Allergy Declaration (REQUIRED) -->
+                    <div class="border-t border-b py-4 bg-yellow-50 rounded-xl px-4">
+                        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                            <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                            Allergy Declaration (Required)
+                        </h4>
+                        <p class="text-sm text-gray-600 mb-3">Please select one option:</p>
+                        
+                        <div class="space-y-3">
+                            <!-- Option 1: Has Allergies -->
+                            <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-yellow-100 transition" id="hasAllergiesLabel">
+                                <input 
+                                    type="radio" 
+                                    name="allergyDeclaration" 
+                                    id="hasAllergiesRadio" 
+                                    value="has_allergies"
+                                    onchange="handleAllergyDeclaration('has_allergies')" 
+                                    class="mt-1 w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500 cursor-pointer">
+                                <div class="flex-1">
+                                    <span class="text-gray-800 font-medium block">
+                                        <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                                        Guest has food allergies or dietary restrictions
+                                    </span>
+                                </div>
+                            </label>
+                            
+                            <div id="allergyInputContainer" class="hidden ml-8 mt-2">
+                                <label for="allergyDetails" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Please specify allergies or dietary restrictions:
+                                </label>
+                                <textarea 
+                                    id="allergyDetails" 
+                                    rows="3" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
+                                    placeholder="e.g., Peanuts, Shellfish, Gluten, Lactose intolerant, Vegetarian, etc."
+                                ></textarea>
+                            </div>
+                            
+                            <!-- Option 2: No Allergies -->
+                            <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-green-50 transition" id="noAllergiesLabel">
+                                <input 
+                                    type="radio" 
+                                    name="allergyDeclaration" 
+                                    id="noAllergiesRadio" 
+                                    value="no_allergies"
+                                    onchange="handleAllergyDeclaration('no_allergies')" 
+                                    class="mt-1 w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
+                                <div class="flex-1">
+                                    <span class="text-gray-800 font-medium block">
+                                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                        Guest confirms NO food allergies or dietary restrictions
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
                         <label class="block text-sm font-bold mb-2">Date *</label>
-                        <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target">
+                        <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" required>
                     </div>
                     <div>
                         <label class="block text-sm font-bold mb-2">Time *</label>
-                        <input type="time" id="bookingTime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target">
+                        <input type="time" id="bookingTime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" required>
                     </div>
                 </div>
             </div>
@@ -63799,53 +63846,23 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('bookingTime').value = hours + ':' + minutes;
         }
         
-        window.loadRoomInfo = async function() {
-            const roomNumber = document.getElementById('roomNumber').value.trim();
-            const messageEl = document.getElementById('roomInfoMessage');
-            const guestFields = document.getElementById('guestInfoFields');
+        // Handle allergy declaration radio buttons
+        window.handleAllergyDeclaration = function(choice) {
+            const container = document.getElementById('allergyInputContainer');
+            const textarea = document.getElementById('allergyDetails');
+            const hasAllergiesLabel = document.getElementById('hasAllergiesLabel');
+            const noAllergiesLabel = document.getElementById('noAllergiesLabel');
             
-            if (!roomNumber) {
-                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>Please enter a room number</span>';
-                return;
-            }
-            
-            messageEl.innerHTML = '<span class="text-blue-600"><i class="fas fa-spinner fa-spin mr-1"></i>Looking up room...</span>';
-            
-            try {
-                const response = await fetch('/api/guest/lookup-room?room_number=' + encodeURIComponent(roomNumber) + '&property_id=' + propertyId, {
-                    headers: { 'X-Property-ID': propertyId }
-                });
-                
-                const data = await response.json();
-                
-                if (!data.success || !data.pass) {
-                    messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-times-circle mr-1"></i>Room not found or no active pass</span>';
-                    guestFields.classList.add('hidden');
-                    currentPass = null;
-                    return;
-                }
-                
-                currentPass = data.pass;
-                maxPartySize = (currentPass.num_adults || 1) + (currentPass.num_children || 0);
-                
-                // Check voucher eligibility
-                await checkVoucherEligibility(currentPass.pass_reference);
-                
-                // Populate fields
-                document.getElementById('guestName').value = currentPass.primary_guest_name || '';
-                document.getElementById('passReference').value = currentPass.pass_reference || '';
-                document.getElementById('partySize').value = Math.min(maxPartySize, 2);
-                document.getElementById('partySize').max = maxPartySize;
-                document.getElementById('maxGuestsInfo').textContent = '(Max: ' + maxPartySize + ' guests on this pass)';
-                
-                messageEl.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Guest found! ' + maxPartySize + ' guests in room</span>';
-                guestFields.classList.remove('hidden');
-                
-            } catch (error) {
-                console.error('Failed to look up room:', error);
-                messageEl.innerHTML = '<span class="text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>Failed to load room info</span>';
-                guestFields.classList.add('hidden');
-                currentPass = null;
+            if (choice === 'has_allergies') {
+                container.classList.remove('hidden');
+                textarea.focus();
+                hasAllergiesLabel.classList.add('border-red-500', 'bg-red-50');
+                noAllergiesLabel.classList.remove('border-green-500', 'bg-green-50');
+            } else if (choice === 'no_allergies') {
+                container.classList.add('hidden');
+                textarea.value = '';
+                noAllergiesLabel.classList.add('border-green-500', 'bg-green-50');
+                hasAllergiesLabel.classList.remove('border-red-500', 'bg-red-50');
             }
         }
         
@@ -64066,37 +64083,47 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             // Validate current step
             if (step > currentStep) {
                 if (currentStep === 1) {
-                    if (!currentPass) {
-                        alert('Please load a valid digital pass first');
-                        document.getElementById('passReference').classList.add('shake');
-                        setTimeout(() => document.getElementById('passReference').classList.remove('shake'), 500);
-                        return;
-                    }
-                    if (!document.getElementById('guestName').value.trim()) {
-                        alert('Please enter guest name');
-                        document.getElementById('guestName').classList.add('shake');
-                        setTimeout(() => document.getElementById('guestName').classList.remove('shake'), 500);
-                        return;
-                    }
+                    // Validate room number
                     if (!document.getElementById('roomNumber').value.trim()) {
                         alert('Please enter room number');
-                        return;
-                    }
-                    const partySize = parseInt(document.getElementById('partySize').value);
-                    if (partySize > maxPartySize) {
-                        alert('Party size (' + partySize + ') exceeds maximum guests on pass (' + maxPartySize + ')');
+                        document.getElementById('roomNumber').focus();
                         return;
                     }
                     
-                    // Check voucher availability
-                    if (voucherEligibility && partySize > voucherEligibility.vouchers_remaining) {
-                        alert('Not enough vouchers! Party size: ' + partySize + ', Available vouchers: ' + voucherEligibility.vouchers_remaining);
+                    // Validate guest name
+                    if (!document.getElementById('guestName').value.trim()) {
+                        alert('Please enter guest name');
+                        document.getElementById('guestName').focus();
+                        return;
+                    }
+                    
+                    // Validate party size
+                    const partySize = parseInt(document.getElementById('partySize').value);
+                    if (!partySize || partySize < 1) {
+                        alert('Please enter valid party size');
+                        return;
+                    }
+                    
+                    // Validate allergy declaration
+                    const allergyDeclaration = document.querySelector('input[name="allergyDeclaration"]:checked');
+                    if (!allergyDeclaration) {
+                        alert('REQUIRED: Please select an allergy declaration option');
+                        return;
+                    }
+                    
+                    // If has allergies, validate details are entered
+                    const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
+                    const allergyDetails = document.getElementById('allergyDetails').value.trim();
+                    if (hasAllergiesRadio && !allergyDetails) {
+                        alert('Please specify allergies or dietary restrictions');
+                        document.getElementById('allergyDetails').focus();
                         return;
                     }
                     
                     // Set orderingFor to party size
                     orderingFor = partySize;
                     
+                    // Validate date and time
                     if (!document.getElementById('bookingDate').value) {
                         alert('Please select a date');
                         return;
@@ -64189,8 +64216,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Booking...';
             
             try {
+                // Get allergy info
+                const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
+                const allergyDetails = document.getElementById('allergyDetails').value.trim();
+                
                 const booking = {
-                    pass_reference: document.getElementById('passReference').value,
                     guest_name: document.getElementById('guestName').value,
                     room_number: document.getElementById('roomNumber').value,
                     party_size: parseInt(document.getElementById('partySize').value),
@@ -64201,7 +64231,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         item_id: s.item.item_id,
                         quantity: s.quantity,
                         custom_limit: s.customLimit
-                    }))
+                    })),
+                    allergy_info: hasAllergiesRadio ? allergyDetails : null,
+                    no_allergies_confirmed: !hasAllergiesRadio
                 };
                 
                 const response = await fetch('/api/front-desk/alacarte-booking', {
@@ -69900,7 +69932,9 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       reservation_date,
       reservation_time,
       restaurant_id,
-      items // [{ item_id, quantity, custom_limit }]
+      items, // [{ item_id, quantity, custom_limit }]
+      allergy_info,
+      no_allergies_confirmed
     } = body
     
     // Validate required fields
@@ -69951,6 +69985,14 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       quantity: i.quantity || 1
     }))
     
+    // Build special requests with allergy info
+    let special_requests = `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}, Pass: ${pass_reference}`
+    if (allergy_info && allergy_info.trim()) {
+      special_requests = `ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
+    } else if (no_allergies_confirmed) {
+      special_requests = `NO ALLERGIES CONFIRMED\n\n${special_requests}`
+    }
+    
     // Create voucher linked to pass
     await DB.prepare(`
       INSERT INTO alacarte_vouchers (
@@ -69981,7 +70023,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       party_size,
       null, // Table assigned by staff
       JSON.stringify(preorder_items),
-      `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}, Pass: ${pass_reference}`,
+      special_requests,
       'confirmed'
     ).run()
     
