@@ -70343,11 +70343,11 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
     }))
     
     // Build special requests with allergy info
-    let special_requests = `Guest order via QR code - Room: ${room_number}, Guest: ${guest_name}`
+    let special_requests = `📱 Guest order via QR code\nRoom: ${room_number}, Guest: ${guest_name}`
     if (allergy_info && allergy_info.trim()) {
-      special_requests = `ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
+      special_requests = `⚠️ ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
     } else if (no_allergies_confirmed) {
-      special_requests = `NO ALLERGIES CONFIRMED\n\n${special_requests}`
+      special_requests = `✅ NO ALLERGIES CONFIRMED\n\n${special_requests}`
     }
     
     // Create voucher with pass reference
@@ -72532,7 +72532,8 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         v.special_requests,
         v.status,
         v.created_at,
-        dp.primary_guest_name as guest_name
+        dp.primary_guest_name as pass_guest_name,
+        dp.pass_reference
       FROM alacarte_vouchers v
       LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
       WHERE v.restaurant_id = ?
@@ -72630,8 +72631,32 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         quantity: quantityMap[dish.item_id] || 1
       }))
       
+      // Extract guest name and room from special_requests for QR bookings
+      let guest_name = order.pass_guest_name
+      let display_table = order.table_number
+      
+      // Check if this is a QR booking (pass_reference starts with QR-)
+      if (order.pass_reference && order.pass_reference.startsWith('QR-')) {
+        // Parse special_requests to extract guest name and room
+        const specialReq = order.special_requests || ''
+        
+        // Extract room number from "Room: XXXX"
+        const roomMatch = specialReq.match(/Room:\s*([^,\n]+)/)
+        if (roomMatch) {
+          display_table = 'Room ' + roomMatch[1].trim()
+        }
+        
+        // Extract guest name from "Guest: XXXX"
+        const guestMatch = specialReq.match(/Guest:\s*([^\n]+)/)
+        if (guestMatch) {
+          guest_name = guestMatch[1].trim()
+        }
+      }
+      
       return {
         ...order,
+        guest_name,
+        table_number: display_table,
         dishes: dishesWithQuantity
       }
     }))
