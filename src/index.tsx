@@ -70281,6 +70281,7 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
     if (!pass) {
       // Create a temporary pass for this guest
       const pass_reference = `QR-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`
+      const qr_secret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
       
       await DB.prepare(`
         INSERT INTO digital_passes (
@@ -70294,8 +70295,9 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
           pass_status,
           valid_from,
           valid_until,
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          qr_secret,
+          issued_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `).bind(
         property_id,
         pass_reference,
@@ -70303,10 +70305,11 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
         room_number,
         party_size,
         0,
-        1, // Default tier
+        2, // Use existing tier_id
         'active',
         reservation_date,
-        reservation_date
+        reservation_date,
+        qr_secret
       ).run()
       
       // Retrieve the newly created pass
