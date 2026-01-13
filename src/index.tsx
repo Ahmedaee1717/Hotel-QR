@@ -68384,32 +68384,71 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 <p class="text-gray-500 text-center py-4" data-i18n="no-items-selected">No items selected yet</p>
             </div>
             
-            <!-- Allergy Information -->
-            <div class="border-t pt-4 mb-4">
-                <label class="flex items-center space-x-3 cursor-pointer">
-                    <input type="checkbox" id="hasAllergiesCheckbox" onchange="toggleAllergyInput()" class="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer">
-                    <span class="text-gray-700 font-medium">
-                        <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
-                        <span data-i18n="has-allergies">I have food allergies or dietary restrictions</span>
-                    </span>
-                </label>
+            <!-- Allergy Information (REQUIRED) -->
+            <div class="border-t border-b py-4 mb-4 bg-yellow-50">
+                <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                    <span data-i18n="allergy-declaration">Allergy Declaration (Required)</span>
+                </h4>
+                <p class="text-sm text-gray-600 mb-3" data-i18n="allergy-required">Please select one option below:</p>
                 
-                <div id="allergyInputContainer" class="hidden mt-3">
-                    <label for="allergyDetails" class="block text-sm font-medium text-gray-700 mb-2">
-                        <span data-i18n="allergy-details">Please specify your allergies or dietary restrictions:</span>
+                <div class="space-y-3">
+                    <!-- Option 1: Has Allergies -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-yellow-100 transition" id="hasAllergiesLabel">
+                        <input 
+                            type="radio" 
+                            name="allergyDeclaration" 
+                            id="hasAllergiesRadio" 
+                            value="has_allergies"
+                            onchange="handleAllergyDeclaration('has_allergies')" 
+                            class="mt-1 w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500 cursor-pointer">
+                        <div class="flex-1">
+                            <span class="text-gray-800 font-medium block">
+                                <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                                <span data-i18n="has-allergies">I have food allergies or dietary restrictions</span>
+                            </span>
+                        </div>
                     </label>
-                    <textarea 
-                        id="allergyDetails" 
-                        rows="3" 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
-                        placeholder="e.g., Peanuts, Shellfish, Gluten, Lactose intolerant, Vegetarian, etc."
-                        data-i18n-placeholder="allergy-placeholder"
-                    ></textarea>
-                    <p class="text-xs text-gray-500 mt-1">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        <span data-i18n="allergy-note">This information will be shared with the kitchen staff to ensure your safety.</span>
-                    </p>
+                    
+                    <div id="allergyInputContainer" class="hidden ml-8 mt-2">
+                        <label for="allergyDetails" class="block text-sm font-medium text-gray-700 mb-2">
+                            <span data-i18n="allergy-details">Please specify your allergies or dietary restrictions:</span>
+                        </label>
+                        <textarea 
+                            id="allergyDetails" 
+                            rows="3" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none"
+                            placeholder="e.g., Peanuts, Shellfish, Gluten, Lactose intolerant, Vegetarian, etc."
+                            data-i18n-placeholder="allergy-placeholder"
+                        ></textarea>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <span data-i18n="allergy-note">This information will be shared with the kitchen staff to ensure your safety.</span>
+                        </p>
+                    </div>
+                    
+                    <!-- Option 2: No Allergies -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-3 border-2 rounded-lg hover:bg-green-50 transition" id="noAllergiesLabel">
+                        <input 
+                            type="radio" 
+                            name="allergyDeclaration" 
+                            id="noAllergiesRadio" 
+                            value="no_allergies"
+                            onchange="handleAllergyDeclaration('no_allergies')" 
+                            class="mt-1 w-5 h-5 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
+                        <div class="flex-1">
+                            <span class="text-gray-800 font-medium block">
+                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                <span data-i18n="no-allergies">I confirm I have NO food allergies or dietary restrictions</span>
+                            </span>
+                        </div>
+                    </label>
                 </div>
+                
+                <p class="text-xs text-gray-500 mt-3 italic">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    <span data-i18n="allergy-safety">Your safety is our priority. Please be honest about any allergies or dietary restrictions.</span>
+                </p>
             </div>
             
             <button onclick="confirmBooking()" id="confirmButton" class="w-full bg-primary hover:bg-primary-dark text-white py-4 rounded-lg font-bold text-lg transition-colors">
@@ -69043,17 +69082,22 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             renderFloorPlan();
         }
         
-        function toggleAllergyInput() {
-            const checkbox = document.getElementById('hasAllergiesCheckbox');
+        function handleAllergyDeclaration(choice) {
             const container = document.getElementById('allergyInputContainer');
             const textarea = document.getElementById('allergyDetails');
+            const hasAllergiesLabel = document.getElementById('hasAllergiesLabel');
+            const noAllergiesLabel = document.getElementById('noAllergiesLabel');
             
-            if (checkbox.checked) {
+            if (choice === 'has_allergies') {
                 container.classList.remove('hidden');
                 textarea.focus();
-            } else {
+                hasAllergiesLabel.classList.add('border-red-500', 'bg-red-50');
+                noAllergiesLabel.classList.remove('border-green-500', 'bg-green-50');
+            } else if (choice === 'no_allergies') {
                 container.classList.add('hidden');
                 textarea.value = '';
+                noAllergiesLabel.classList.add('border-green-500', 'bg-green-50');
+                hasAllergiesLabel.classList.remove('border-red-500', 'bg-red-50');
             }
         }
         
@@ -69061,7 +69105,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const date = document.getElementById('bookingDate').value;
             const time = document.getElementById('bookingTime').value;
             const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
-            const hasAllergies = document.getElementById('hasAllergiesCheckbox').checked;
+            
+            // Get allergy declaration
+            const allergyDeclaration = document.querySelector('input[name="allergyDeclaration"]:checked');
+            const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
             const allergyDetails = document.getElementById('allergyDetails').value.trim();
             
             if (!date) {
@@ -69079,9 +69126,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 return;
             }
             
-            // Validate allergy details if checkbox is checked
-            if (hasAllergies && !allergyDetails) {
-                alert('⚠️ Please specify your allergies or dietary restrictions, or uncheck the allergy checkbox.');
+            // Validate allergy declaration is selected
+            if (!allergyDeclaration) {
+                alert('⚠️ REQUIRED: Please select an allergy declaration option.\n\nYou must choose either:\n• I have food allergies, OR\n• I confirm I have NO allergies');
+                return;
+            }
+            
+            // Validate allergy details if "has allergies" is selected
+            if (hasAllergiesRadio && !allergyDetails) {
+                alert('⚠️ Please specify your allergies or dietary restrictions.\n\nIf you have no allergies, please select "I confirm I have NO allergies" instead.');
                 document.getElementById('allergyDetails').focus();
                 return;
             }
@@ -69136,7 +69189,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         num_people: orderingFor,
                         table_id: selectedTableId,
                         preorder_items: preorderItems,  // Send items with quantities
-                        allergy_info: hasAllergies ? allergyDetails : null  // Include allergy information
+                        allergy_info: hasAllergiesRadio ? allergyDetails : null,  // Include allergy information
+                        no_allergies_confirmed: !hasAllergiesRadio  // Track if guest confirmed no allergies
                     })
                 });
                 
@@ -69609,16 +69663,22 @@ app.post('/api/alacarte/voucher', async (c) => {
       table_id,
       preorder_items, // Array of { item_id, quantity }
       special_requests,
-      allergy_info // NEW: Allergy/dietary restriction information
+      allergy_info, // NEW: Allergy/dietary restriction information
+      no_allergies_confirmed // NEW: Guest confirmed no allergies
     } = body
     
     // Build special requests field with allergy info
     let combinedSpecialRequests = special_requests || ''
     if (allergy_info) {
-      const allergyNote = `⚠️ ALLERGIES/DIETARY: ${allergy_info}`
+      const allergyNote = `🚨 ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}`
       combinedSpecialRequests = combinedSpecialRequests 
         ? `${combinedSpecialRequests}\n\n${allergyNote}` 
         : allergyNote
+    } else if (no_allergies_confirmed) {
+      const noAllergyNote = `✅ NO ALLERGIES - Guest confirmed no dietary restrictions`
+      combinedSpecialRequests = combinedSpecialRequests 
+        ? `${combinedSpecialRequests}\n\n${noAllergyNote}` 
+        : noAllergyNote
     }
 
     // Verify pass and get eligibility info
@@ -71758,7 +71818,22 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     served: { bg: 'bg-gray-50', border: 'border-gray-400', badge: 'bg-gray-400 text-white', label: 'SERVED' }
                 };
                 
-                const info = statusInfo[order.status] || statusInfo.confirmed;
+                // Check if order has allergy warning
+                const hasAllergies = order.special_requests && 
+                    (order.special_requests.includes('🚨 ALLERGIES') || 
+                     order.special_requests.includes('ALLERGIES/DIETARY RESTRICTIONS'));
+                
+                // Override styling for allergy orders
+                let info = statusInfo[order.status] || statusInfo.confirmed;
+                if (hasAllergies) {
+                    info = { 
+                        bg: 'bg-red-100', 
+                        border: 'border-red-600', 
+                        badge: 'bg-red-600 text-white', 
+                        label: '🚨 ALLERGY ALERT' 
+                    };
+                }
+                
                 const isNew = order.status === 'confirmed';
                 
                 let dishesHtml = '';
@@ -71824,7 +71899,9 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                         '</div>';
                 }
                 
-                return '<div class="order-card ' + info.bg + ' border-l-4 ' + info.border + ' rounded-lg shadow-md p-5">' +
+                return '<div class="order-card ' + info.bg + ' ' + 
+                    (hasAllergies ? 'border-l-8 border-red-600 shadow-2xl ring-4 ring-red-300' : 'border-l-4 ' + info.border) + 
+                    ' rounded-lg shadow-md p-5">' +
                     '<div class="flex items-start justify-between mb-4">' +
                         '<div class="flex-1">' +
                             '<div class="text-xs text-gray-500 mb-1">Order #</div>' +
@@ -71855,10 +71932,34 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     '<div class="space-y-2 mb-4">' + dishesHtml + '</div>' +
                     
                     (order.special_requests ? 
-                        '<div class="bg-yellow-100 border-l-4 border-yellow-500 rounded p-3 mb-4">' +
-                            '<p class="text-xs font-bold text-yellow-900 mb-1"><i class="fas fa-exclamation-circle mr-1"></i>SPECIAL REQUESTS</p>' +
-                            '<p class="text-sm text-yellow-900 font-medium">' + order.special_requests + '</p>' +
-                        '</div>'
+                        // Check if contains allergy warning
+                        (order.special_requests.includes('🚨 ALLERGIES') || order.special_requests.includes('ALLERGIES/DIETARY RESTRICTIONS')) ?
+                            // ALLERGY WARNING - RED ALERT with pulsing animation
+                            '<div class="bg-red-600 border-4 border-red-800 rounded-lg p-4 mb-4 shadow-2xl animate-pulse">' +
+                                '<p class="text-lg font-black text-white mb-2 flex items-center">' +
+                                    '<i class="fas fa-exclamation-triangle mr-2 text-3xl"></i>' +
+                                    '<span>⚠️ ALLERGY ALERT ⚠️</span>' +
+                                '</p>' +
+                                '<p class="text-base text-white font-bold bg-red-700 rounded p-2">' + 
+                                    order.special_requests.replace(/🚨/g, '⚠️') + 
+                                '</p>' +
+                            '</div>'
+                        : (order.special_requests.includes('✅ NO ALLERGIES')) ?
+                            // NO ALLERGIES - Green confirmation
+                            '<div class="bg-green-100 border-l-4 border-green-600 rounded p-3 mb-4">' +
+                                '<p class="text-xs font-bold text-green-900 mb-1">' +
+                                    '<i class="fas fa-check-circle mr-1"></i>DIETARY INFORMATION' +
+                                '</p>' +
+                                '<p class="text-sm text-green-800 font-medium">' + order.special_requests + '</p>' +
+                            '</div>'
+                        :
+                            // Regular special requests - Yellow
+                            '<div class="bg-yellow-100 border-l-4 border-yellow-500 rounded p-3 mb-4">' +
+                                '<p class="text-xs font-bold text-yellow-900 mb-1">' +
+                                    '<i class="fas fa-exclamation-circle mr-1"></i>SPECIAL REQUESTS' +
+                                '</p>' +
+                                '<p class="text-sm text-yellow-900 font-medium">' + order.special_requests + '</p>' +
+                            '</div>'
                     : '') +
                     
                     actionButton +
