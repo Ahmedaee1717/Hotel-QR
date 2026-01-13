@@ -68648,6 +68648,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const propertyId = ${property_id};
         const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
         const passData = ${passData ? JSON.stringify(passData) : 'null'};
+        
+        // Get URL parameters for front desk QR code flow
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomNumber = urlParams.get('room');
+        const guestName = urlParams.get('guest');
+        const partySize = parseInt(urlParams.get('party')) || 1;
+        const isFrontDeskBooking = roomNumber && guestName; // Coming from front desk QR
+        
+        console.log('📱 Booking params:', { roomNumber, guestName, partySize, isFrontDeskBooking, hasPass: !!passReference });
+        
         let selectedItems = {};
         let voucherEligibility = null;
         let selectedDate = null;
@@ -68658,6 +68668,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         // Get unique categories from actual menu data
         const availableCategories = [...new Set(menuData.map(item => item.category))].filter(Boolean);
         console.log('🍽️ Available menu categories:', availableCategories);
+        console.log('🍽️ Total menu items:', menuData.length);
         
         // Category display configuration
         const categoryConfig = {
@@ -69324,23 +69335,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 return;
             }
             
-            if (!passReference || !voucherEligibility) {
-                alert('Booking without voucher not yet implemented. Please access through your digital pass.');
+            if (!passReference && !isFrontDeskBooking) {
+                alert('Booking requires either a digital pass or front desk assistance. Please contact reception.');
                 return;
             }
             
-            // Validate vouchers remaining
-            const vouchersNeeded = orderingFor;
-            const vouchersRemaining = voucherEligibility.vouchers.remaining;
-            
-            if (vouchersNeeded > vouchersRemaining) {
-                alert('Not enough vouchers! You need ' + vouchersNeeded + ' voucher' + (vouchersNeeded > 1 ? 's' : '') + ' for ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + ', but only have ' + vouchersRemaining + ' remaining. Please reduce the number of people or contact reception.');
-                return;
+            // For front desk bookings without pass, skip voucher validation
+            if (passReference && voucherEligibility) {
+                // Validate vouchers remaining
+                const vouchersNeeded = orderingFor;
+                const vouchersRemaining = voucherEligibility.vouchers.remaining;
+                
+                if (vouchersNeeded > vouchersRemaining) {
+                    alert('Not enough vouchers! You need ' + vouchersNeeded + ' voucher' + (vouchersNeeded > 1 ? 's' : '') + ' for ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + ', but only have ' + vouchersRemaining + ' remaining. Please reduce the number of people or contact reception.');
+                    return;
+                }
             }
             
             // Confirm booking
             const restaurantName = '${restaurant.title_en}';
-            const confirmMsg = 'Booking Summary: Restaurant: ' + restaurantName + '. Date: ' + date + '. Time: ' + time + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Vouchers to use: ' + vouchersNeeded + '. Vouchers remaining after: ' + (vouchersRemaining - vouchersNeeded) + '. Confirm this booking?';
+            let confirmMsg = 'Booking Summary: Restaurant: ' + restaurantName + '. Date: ' + date + '. Time: ' + time + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. ';
+            
+            if (isFrontDeskBooking) {
+                confirmMsg += 'Room: ' + roomNumber + '. Guest: ' + guestName + '. Confirm this booking?';
+            } else {
+                confirmMsg += 'Vouchers to use: ' + orderingFor + '. Confirm this booking?';
+            }
             
             if (!confirm(confirmMsg)) {
                 return;
@@ -69353,39 +69373,70 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }));
             
             try {
-                const response = await fetch('/api/alacarte/voucher', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Property-ID': propertyId
-                    },
-                    body: JSON.stringify({
-                        pass_reference: passReference,
-                        restaurant_id: restaurantId,
-                        reservation_date: date,
-                        reservation_time: time,
-                        num_people: orderingFor,
-                        table_id: selectedTableId,
-                        preorder_items: preorderItems,  // Send items with quantities
-                        allergy_info: hasAllergiesRadio ? allergyDetails : null,  // Include allergy information
-                        no_allergies_confirmed: !hasAllergiesRadio  // Track if guest confirmed no allergies
-                    })
-                });
+                let response, data;
                 
-                const data = await response.json();
+                if (isFrontDeskBooking) {
+                    // Use front desk booking endpoint (requires pass_reference)
+                    // First, create/get a pass for this room if needed
+                    response = await fetch('/api/front-desk/guest-alacarte-booking', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            room_number: roomNumber,
+                            guest_name: guestName,
+                            party_size: partySize,
+                            restaurant_id: restaurantId,
+                            reservation_date: date,
+                            reservation_time: time,
+                            table_id: selectedTableId,
+                            items: preorderItems,
+                            allergy_info: hasAllergiesRadio ? allergyDetails : null,
+                            no_allergies_confirmed: !hasAllergiesRadio
+                        })
+                    });
+                } else {
+                    // Use regular voucher endpoint with digital pass
+                    response = await fetch('/api/alacarte/voucher', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            pass_reference: passReference,
+                            restaurant_id: restaurantId,
+                            reservation_date: date,
+                            reservation_time: time,
+                            num_people: orderingFor,
+                            table_id: selectedTableId,
+                            preorder_items: preorderItems,
+                            allergy_info: hasAllergiesRadio ? allergyDetails : null,
+                            no_allergies_confirmed: !hasAllergiesRadio
+                        })
+                    });
+                }
+                
+                data = await response.json();
                 
                 if (data.success) {
-                    const { voucher_code, vouchers_remaining, total_cost } = data;
-                    alert('Booking Confirmed! Voucher Code: ' + voucher_code + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Vouchers used: ' + vouchersNeeded + '. Vouchers remaining: ' + vouchers_remaining + '. Total Cost: EUR' + (total_cost || 0).toFixed(2) + '. Redirecting to your bookings...');
+                    const { voucher_code } = data;
+                    alert('Booking Confirmed! Voucher Code: ' + voucher_code + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Your order has been sent to the kitchen!');
                     
-                    // Redirect to my bookings page
-                    window.location.href = \`/my-bookings?property=\${propertyId}\${passReference ? '&pass=' + passReference : ''}\`;
+                    // Redirect based on booking type
+                    if (isFrontDeskBooking) {
+                        window.location.href = '/kitchen/alacarte/' + restaurantId + '?property=' + propertyId;
+                    } else {
+                        window.location.href = '/my-bookings?property=' + propertyId + (passReference ? '&pass=' + passReference : '');
+                    }
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Booking error:', error);
-                alert('Failed to create voucher. Please try again.');
+                alert('Failed to create booking. Please try again.');
             }
         }
         
@@ -70178,6 +70229,97 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     })
   } catch (error) {
     console.error('Front desk booking error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to create booking',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// Guest à la carte booking (from QR code - no pass required)
+app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const {
+      room_number,
+      guest_name,
+      party_size,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      table_id,
+      items, // [{ item_id, quantity }]
+      allergy_info,
+      no_allergies_confirmed
+    } = body
+    
+    console.log('📱 Guest QR booking:', { room_number, guest_name, party_size, restaurant_id })
+    
+    // Validate required fields
+    if (!room_number || !guest_name || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Generate voucher code
+    const timestamp = Date.now()
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+    const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
+    
+    // Get item IDs and quantities
+    const preorder_items = items.map(i => ({
+      item_id: i.item_id,
+      quantity: i.quantity || 1
+    }))
+    
+    // Build special requests with allergy info
+    let special_requests = `Guest order via QR code - Room: ${room_number}, Guest: ${guest_name}`
+    if (allergy_info && allergy_info.trim()) {
+      special_requests = `ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
+    } else if (no_allergies_confirmed) {
+      special_requests = `NO ALLERGIES CONFIRMED\n\n${special_requests}`
+    }
+    
+    // Create voucher WITHOUT pass_id (standalone booking)
+    await DB.prepare(`
+      INSERT INTO alacarte_vouchers (
+        property_id,
+        voucher_code,
+        restaurant_id,
+        reservation_date,
+        reservation_time,
+        party_size,
+        table_number,
+        preorder_item_ids,
+        special_requests,
+        status,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      property_id,
+      voucher_code,
+      restaurant_id,
+      reservation_date,
+      reservation_time,
+      party_size,
+      room_number, // Use room as table reference
+      JSON.stringify(preorder_items),
+      special_requests,
+      'confirmed'
+    ).run()
+    
+    console.log('✅ Guest QR booking created:', voucher_code)
+    
+    return c.json({
+      success: true,
+      voucher_code,
+      message: 'Booking created successfully'
+    })
+  } catch (error) {
+    console.error('Guest QR booking error:', error)
     return c.json({ 
       success: false, 
       error: 'Failed to create booking',
