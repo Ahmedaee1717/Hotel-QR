@@ -71576,6 +71576,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 <div class="flex items-center gap-2">
                     <label class="font-medium dark-text">View:</label>
                     <select id="viewMode" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                        <option value="all">📋 All Orders</option>
                         <option value="upcoming">📅 All Upcoming Orders</option>
                         <option value="date">📆 Specific Date</option>
                     </select>
