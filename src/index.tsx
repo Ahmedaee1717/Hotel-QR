@@ -72096,7 +72096,14 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
     if (mode === 'upcoming') {
       dateCondition = 'AND v.reservation_date >= ?'
       bindParams.push(new Date().toISOString().split('T')[0]) // Today onwards
+    } else if (mode === 'date') {
+      dateCondition = 'AND v.reservation_date = ?'
+      bindParams.push(filterDate)
+    } else if (mode === 'all') {
+      // No date filter - show all orders
+      dateCondition = ''
     } else {
+      // Default to date mode for backward compatibility
       dateCondition = 'AND v.reservation_date = ?'
       bindParams.push(filterDate)
     }
