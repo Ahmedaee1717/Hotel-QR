@@ -28026,7 +28026,7 @@ app.get('/offering-detail', async (c) => {
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
                         '<div class="flex gap-3">' +
-                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/menu\\', \\'_blank\\')" ' +
+                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/menu\\'" ' +
                         'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-utensils mr-2"></i>' + t('view-menu') + '</button>' +
                         '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/book\\'" ' +
@@ -28154,7 +28154,7 @@ app.get('/offering-detail', async (c) => {
                     bookingSection.innerHTML = '<h3 class="font-bold text-lg mb-4">' + t('ready-to-dine') + '</h3>' +
                         '<p class="text-gray-600 mb-4">' + t('reserve-table-description') + '</p>' +
                         '<div class="flex gap-3">' +
-                        '<button onclick="window.open(\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/menu\\', \\'_blank\\')" ' +
+                        '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/menu\\'" ' +
                         'class="flex-1 bg-secondary text-white py-4 px-6 rounded-lg font-semibold hover:opacity-90 transition-all text-lg">' +
                         '<i class="fas fa-utensils mr-2"></i>' + t('view-menu') + '</button>' +
                         '<button onclick="window.location.href=\\'/hotel/' + propertyData.slug + '/restaurant/' + actualId + '/book\\'" ' +
@@ -61945,7 +61945,15 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
       // Header
       if (d.show_restaurant_name || d.show_restaurant_description) {
         html += '<div class="py-12 px-4" style="background-color: ' + d.header_background_color + '; color: ' + d.header_text_color + ';">';
-        html += '<div class="max-w-6xl mx-auto text-center">';
+        html += '<div class="max-w-6xl mx-auto">';
+        
+        // Back button
+        html += '<button onclick="window.history.back()" class="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-lg hover:opacity-80 transition-opacity" style="background-color: rgba(255,255,255,0.2); color: ' + d.header_text_color + ';">';
+        html += '<i class="fas fa-arrow-left"></i>';
+        html += '<span>Back to Restaurant</span>';
+        html += '</button>';
+        
+        html += '<div class="text-center">';
         
         // Logo removed - keeping it simple as requested
         
@@ -61957,7 +61965,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
           html += '<p class="text-xl opacity-90 max-w-2xl mx-auto">' + restaurant.short_description_en + '</p>';
         }
         
-        html += '</div></div>';
+        html += '</div></div></div>';
       }
       
       // Language Switcher - Always show, with ALL supported languages
