@@ -69864,6 +69864,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 const tablesData = await tablesResponse.json();
                 availableTables = tablesData.tables || [];
                 
+                // Load floor elements
+                const elementsResponse = await fetch('/api/admin/restaurant/' + restaurantId + '/floor-elements');
+                const elementsData = await elementsResponse.json();
+                const floorElements = elementsData.elements || [];
+                
                 if (availableTables.length === 0) {
                     document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>No tables configured for this restaurant</p>';
                     return;
@@ -69873,15 +69878,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 document.getElementById('tableLoadingMessage').classList.add('hidden');
                 document.getElementById('tableSelectionArea').classList.remove('hidden');
                 
-                // Render tables on floor plan
-                renderFloorPlan();
+                // Render tables and elements on floor plan
+                renderFloorPlan(floorElements);
             } catch (error) {
                 console.error('Load tables error:', error);
                 document.getElementById('tableLoadingMessage').innerHTML = '<p class="text-red-500"><i class="fas fa-exclamation-circle mr-2"></i>Failed to load tables</p>';
             }
         }
         
-        function renderFloorPlan() {
+        function renderFloorPlan(floorElements = []) {
             const canvas = document.getElementById('tablesListMobile');
             if (!canvas) return;
             
@@ -69902,7 +69907,32 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const canvasHeight = (maxY + 50) * 0.8;
             canvas.style.height = canvasHeight + 'px';
             
-            // Render each table
+            // Render floor elements FIRST (behind tables)
+            floorElements.forEach(element => {
+                const elementDiv = document.createElement('div');
+                elementDiv.style.position = 'absolute';
+                elementDiv.style.left = (element.position_x * 0.8) + 'px';
+                elementDiv.style.top = (element.position_y * 0.8) + 'px';
+                elementDiv.style.width = (element.width * 0.8) + 'px';
+                elementDiv.style.height = (element.height * 0.8) + 'px';
+                elementDiv.style.backgroundColor = element.color || '#E5E7EB';
+                elementDiv.style.border = '2px dashed #9CA3AF';
+                elementDiv.style.borderRadius = '8px';
+                elementDiv.style.display = 'flex';
+                elementDiv.style.alignItems = 'center';
+                elementDiv.style.justifyContent = 'center';
+                elementDiv.style.color = '#4B5563';
+                elementDiv.style.fontSize = '0.875rem';
+                elementDiv.style.fontWeight = '600';
+                elementDiv.style.textAlign = 'center';
+                elementDiv.style.padding = '8px';
+                elementDiv.style.pointerEvents = 'none'; // Not clickable
+                elementDiv.style.zIndex = '1';
+                elementDiv.textContent = element.element_label || element.element_type;
+                canvas.appendChild(elementDiv);
+            });
+            
+            // Render each table (on top of elements)
             availableTables.forEach(table => {
                 const isSelected = selectedTableId === table.table_id;
                 const canFit = totalGuests === 0 || table.capacity >= totalGuests;
@@ -69923,6 +69953,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 tableDiv.style.cursor = canFit ? 'pointer' : 'not-allowed';
                 tableDiv.style.opacity = canFit ? '1' : '0.6';
                 tableDiv.style.transition = 'all 0.3s';
+                tableDiv.style.zIndex = '10'; // Tables on top
                 
                 tableDiv.innerHTML = '<div style="font-size: 1.5rem; font-weight: bold;">' + table.table_number + '</div>' +
                     '<div style="font-size: 0.75rem; color: #6B7280; margin-top: 0.25rem;">' +
@@ -69960,8 +69991,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             document.getElementById('selectedTableCapacity').textContent = capacity;
             document.getElementById('selectedTableDisplay').classList.remove('hidden');
             
-            // Re-render floor plan to show selection
-            renderFloorPlan();
+            // Re-render floor plan to show selection (keep floor elements)
+            loadTables(); // Reload to get fresh elements
             
             console.log('✅ Selected table:', tableNumber);
         }
