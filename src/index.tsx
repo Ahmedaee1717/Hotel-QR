@@ -8077,6 +8077,7 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
             shape = ?,
             table_type = ?,
             features = ?,
+            rotation = ?,
             updated_at = CURRENT_TIMESTAMP
           WHERE table_id = ?
         `).bind(
@@ -8089,6 +8090,7 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
           data.shape || 'rectangle',
           data.table_type || 'standard',
           JSON.stringify(data.features || []),
+          data.rotation || 0,
           existing.table_id
         ).run()
         
@@ -8110,8 +8112,8 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
     const result = await DB.prepare(`
       INSERT INTO restaurant_tables (
         offering_id, table_number, table_name, capacity,
-        position_x, position_y, width, height, shape, table_type, features
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        position_x, position_y, width, height, shape, table_type, features, rotation
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       data.offering_id,
       data.table_number,
@@ -8123,7 +8125,8 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
       data.height || 80,
       data.shape || 'rectangle',
       data.table_type || 'standard',
-      JSON.stringify(data.features || [])
+      JSON.stringify(data.features || []),
+      data.rotation || 0
     ).run()
     
     return c.json({ 
@@ -8152,7 +8155,7 @@ app.put('/api/admin/restaurant/table/:table_id', requirePermission('restaurant_t
       UPDATE restaurant_tables SET
         table_number = ?, table_name = ?, capacity = ?,
         position_x = ?, position_y = ?, width = ?, height = ?,
-        shape = ?, table_type = ?, features = ?,
+        shape = ?, table_type = ?, features = ?, rotation = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE table_id = ?
     `).bind(
@@ -8166,6 +8169,7 @@ app.put('/api/admin/restaurant/table/:table_id', requirePermission('restaurant_t
       data.shape,
       data.table_type,
       JSON.stringify(data.features || []),
+      data.rotation || 0,
       table_id
     ).run()
     
@@ -66434,6 +66438,21 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
                     <div id="tableDetails"></div>
                     <div class="flex gap-2 mt-4">
+                        <button onclick="rotateSelectedTable(-45)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 45° counter-clockwise">
+                            <i class="fas fa-undo mr-1"></i>↶
+                        </button>
+                        <button onclick="rotateSelectedTable(-15)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 15° counter-clockwise">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button onclick="rotateSelectedTable(15)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 15° clockwise">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button onclick="rotateSelectedTable(45)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 45° clockwise">
+                            ↷ <i class="fas fa-redo ml-1"></i>
+                        </button>
+                        <button onclick="rotateSelectedTable(0, true)" class="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700" title="Reset rotation">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
                         <button onclick="deleteSelectedTable()" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
                             <i class="fas fa-trash mr-2"></i>Delete
                         </button>
@@ -67678,6 +67697,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           tableEl.style.width = (table.width * scaleFactor) + 'px';
           tableEl.style.height = (table.height * scaleFactor) + 'px';
           
+          // Apply rotation if exists
+          if (table.rotation) {
+            tableEl.style.transform = 'rotate(' + table.rotation + 'deg)';
+          }
+          
           if (table.shape === 'circle') {
             tableEl.classList.add('table-circle');
           } else if (table.shape === 'square') {
@@ -67775,7 +67799,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               height: table.height,
               shape: table.shape,
               table_type: table.table_type || 'standard',
-              features: table.features || []
+              features: table.features || [],
+              rotation: table.rotation || 0
             })
           });
           
@@ -67817,6 +67842,54 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           }
         });
       }
+      
+      // Rotate selected table
+      window.rotateSelectedTable = async function(degrees, reset = false) {
+        if (!selectedTable) {
+          alert('Please select a table first');
+          return;
+        }
+        
+        const currentRotation = selectedTable.rotation || 0;
+        const newRotation = reset ? 0 : (currentRotation + degrees) % 360;
+        
+        // Update visual rotation immediately
+        const tableEl = document.getElementById('table-' + selectedTable.table_id);
+        if (tableEl) {
+          tableEl.style.transform = 'rotate(' + newRotation + 'deg)';
+        }
+        
+        // Save to database
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/table/' + selectedTable.table_id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              table_number: selectedTable.table_number,
+              table_name: selectedTable.table_name || null,
+              capacity: selectedTable.capacity,
+              position_x: selectedTable.position_x,
+              position_y: selectedTable.position_y,
+              width: selectedTable.width,
+              height: selectedTable.height,
+              shape: selectedTable.shape,
+              table_type: selectedTable.table_type || 'standard',
+              features: selectedTable.features || [],
+              rotation: newRotation
+            })
+          });
+          
+          if (response.ok) {
+            console.log('✅ Table rotation saved:', newRotation + '°');
+            selectedTable.rotation = newRotation;
+          } else {
+            const errorData = await response.json();
+            console.error('❌ Failed to save rotation:', errorData);
+          }
+        } catch (error) {
+          console.error('❌ Error saving rotation:', error);
+        }
+      };
       
       // Select element
       function selectElement(element) {
@@ -68556,6 +68629,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             alert('✅ Table added successfully!');
             document.getElementById('addTableForm').reset();
             await loadTables();
+            renderAdminFloorPlan(); // Re-render to show new table
           } else {
             console.error('Add table failed:', data);
             const errorMsg = data.error || 'Unknown error';
