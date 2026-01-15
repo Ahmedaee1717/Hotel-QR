@@ -66433,32 +66433,6 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     </div>
                 </div>
 
-                <!-- Selected Table Info -->
-                <div id="selectedTableInfo" class="bg-white rounded-lg shadow-lg p-6 hidden">
-                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
-                    <div id="tableDetails"></div>
-                    <div class="flex gap-2 mt-4">
-                        <button onclick="rotateSelectedTable(-45)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 45° counter-clockwise">
-                            <i class="fas fa-undo mr-1"></i>↶
-                        </button>
-                        <button onclick="rotateSelectedTable(-15)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 15° counter-clockwise">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                        <button onclick="rotateSelectedTable(15)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 15° clockwise">
-                            <i class="fas fa-redo"></i>
-                        </button>
-                        <button onclick="rotateSelectedTable(45)" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700" title="Rotate 45° clockwise">
-                            ↷ <i class="fas fa-redo ml-1"></i>
-                        </button>
-                        <button onclick="rotateSelectedTable(0, true)" class="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700" title="Reset rotation">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                        <button onclick="deleteSelectedTable()" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
-                            <i class="fas fa-trash mr-2"></i>Delete
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Tables List -->
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <h2 class="text-xl font-bold mb-4">All Tables (<span id="tableCount">0</span>)</h2>
@@ -66467,7 +66441,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
 
             <!-- Center: Floor Plan Canvas -->
-            <div class="md:col-span-2">
+            <div class="md:col-span-1">
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold"><i class="fas fa-th mr-2 text-purple-600"></i>Floor Plan Designer</h2>
@@ -66507,6 +66481,40 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
                         <span><i class="fas fa-chair mr-2"></i>Drag tables to position them</span>
                         <span>Total Capacity: <strong id="totalCapacity">0</strong> seats</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Selected Table Info -->
+            <div class="space-y-6">
+                <!-- Selected Table Info -->
+                <div id="selectedTableInfo" class="bg-white rounded-lg shadow-lg p-6 hidden">
+                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
+                    <div id="tableDetails"></div>
+                    <div class="mt-4">
+                        <p class="text-sm font-semibold mb-2 text-gray-700">Rotate Table:</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="rotateSelectedTable(-45)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 45° counter-clockwise">
+                                <i class="fas fa-undo"></i> 45°
+                            </button>
+                            <button onclick="rotateSelectedTable(-15)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 15° counter-clockwise">
+                                <i class="fas fa-undo"></i> 15°
+                            </button>
+                            <button onclick="rotateSelectedTable(0, true)" class="bg-gray-600 text-white px-2 py-2 rounded-lg hover:bg-gray-700 text-sm" title="Reset rotation">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <button onclick="rotateSelectedTable(15)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 15° clockwise">
+                                <i class="fas fa-redo"></i> 15°
+                            </button>
+                            <button onclick="rotateSelectedTable(45)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 45° clockwise">
+                                <i class="fas fa-redo"></i> 45°
+                            </button>
+                        </div>
+                        <button onclick="deleteSelectedTable()" class="w-full mt-3 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                            <i class="fas fa-trash mr-2"></i>Delete Table
+                        </button>
                     </div>
                 </div>
             </div>
