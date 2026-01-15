@@ -69006,7 +69006,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             menu.categories.forEach(category => {
                 category.items.forEach(item => {
                     // Normalize category name: "Hot Coffee" -> "hot_coffee"
-                    const normalizedCategory = (item.category || category.category_name).toLowerCase().replace(/\s+/g, '_');
+                    const normalizedCategory = (item.category || category.category_name).toLowerCase().split(/\\s+/).join('_');
                     
                     if (!restaurantMenuByCategory[normalizedCategory]) {
                         restaurantMenuByCategory[normalizedCategory] = [];
