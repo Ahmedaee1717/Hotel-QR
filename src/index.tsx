@@ -68411,21 +68411,38 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
       return c.html('<h1>Restaurant not found</h1>', 404)
     }
     
-    // Get menu
-    const menu = await DB.prepare(`
-      SELECT item_id, category, item_name, item_name_ar, description, description_ar,
-             cost_to_hotel, is_premium, allergens, display_order
-      FROM alacarte_menu_items
-      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
-      ORDER BY 
-        CASE category
-          WHEN 'salad' THEN 1
-          WHEN 'starter' THEN 2
-          WHEN 'main' THEN 3
-          WHEN 'dessert' THEN 4
-        END,
-        display_order, item_name
-    `).bind(restaurant_id, property_id).all()
+    // Get menu using the menu-display API internally
+    // This will return the full menu structure with all items, categories, and prices
+    const menuDisplayResponse = await fetch(`${c.req.url.split('/alacarte')[0]}/api/restaurant/${offering_id}/menu-display?language=en`, {
+      headers: c.req.raw.headers
+    })
+    const menuDisplayData = await menuDisplayResponse.json()
+    
+    // Extract menu items in flat format for backward compatibility
+    let menu = { results: [] }
+    if (menuDisplayData.success && menuDisplayData.menus) {
+      const allItems = []
+      menuDisplayData.menus.forEach(menuSection => {
+        menuSection.categories.forEach(category => {
+          category.items.forEach(item => {
+            allItems.push({
+              item_id: item.item_id,
+              category: item.category,
+              item_name: item.item_name,
+              item_name_ar: item.item_name_ar || '',
+              description: item.description || '',
+              description_ar: item.description_ar || '',
+              cost_to_hotel: item.price || 0,
+              is_premium: item.is_premium || 0,
+              allergens: item.allergens || '',
+              display_order: item.display_order || 0,
+              image_url: item.image_url || null
+            })
+          })
+        })
+      })
+      menu.results = allItems
+    }
     
     return c.html(`
 <!DOCTYPE html>
@@ -69048,6 +69065,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-primary font-bold text-lg">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
@@ -69057,7 +69075,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
                                 \${premiumBadge}
                             </div>
-                            <p class="text-gray-600 text-sm">\${item.description || ''}</p>
+                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
+                            \${priceDisplay}
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
