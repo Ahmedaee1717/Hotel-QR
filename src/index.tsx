@@ -72532,8 +72532,12 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     dishesHtml = dishesToRender.map(dish => 
                         '<div class="bg-white rounded-lg p-3 border border-gray-200">' +
                             '<div class="flex items-start gap-2">' +
-                                '<div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">' +
-                                    '<i class="fas fa-utensils text-blue-600"></i>' +
+                                '<div class="flex-shrink-0 w-10 h-10 ' + 
+                                (dish.extraCharge ? 'bg-amber-100' : 'bg-blue-100') + 
+                                ' rounded-full flex items-center justify-center">' +
+                                    '<i class="fas fa-utensils ' + 
+                                    (dish.extraCharge ? 'text-amber-600' : 'text-blue-600') + 
+                                    '"></i>' +
                                 '</div>' +
                                 '<div class="flex-1 min-w-0">' +
                                     '<p class="font-bold text-gray-900 truncate">' + 
@@ -72541,6 +72545,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                                     (dish.quantity > 1 ? ' <span class="text-blue-600">x' + dish.quantity + '</span>' : '') +
                                     '</p>' +
                                     '<p class="text-sm text-gray-500">' + (dish.category || '') + 
+                                    (dish.extraCharge ? ' <span class="text-amber-600 font-semibold"><i class="fas fa-coins"></i> Extra Charge</span>' : '') +
                                     (dish.is_premium ? ' <span class="text-orange-600"><i class="fas fa-star"></i> Premium</span>' : '') +
                                     '</p>' +
                                 '</div>' +
