@@ -68413,36 +68413,42 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     
     // Get à la carte menu items directly from database
     // These are the items available for ordering with EXTRA CHARGE
-    const menu = await DB.prepare(`
-      SELECT 
-        item_id,
-        item_name,
-        item_name_ar,
-        description,
-        description_ar,
-        category,
-        cost_to_hotel,
-        is_premium,
-        allergens,
-        display_order,
-        image_url
-      FROM alacarte_menu_items
-      WHERE restaurant_id = ? AND is_available = 1
-      ORDER BY 
-        CASE category
-          WHEN 'salad' THEN 1
-          WHEN 'starter' THEN 2
-          WHEN 'soup' THEN 3
-          WHEN 'pasta' THEN 4
-          WHEN 'seafood' THEN 5
-          WHEN 'main' THEN 6
-          WHEN 'dessert' THEN 7
-          WHEN 'drink' THEN 8
-          ELSE 99
-        END,
-        display_order,
-        item_name
-    `).bind(restaurant_id).all()
+    let menu = { results: [] }
+    try {
+      menu = await DB.prepare(`
+        SELECT 
+          item_id,
+          item_name,
+          item_name_ar,
+          description,
+          description_ar,
+          category,
+          cost_to_hotel,
+          is_premium,
+          allergens,
+          display_order,
+          image_url
+        FROM alacarte_menu_items
+        WHERE restaurant_id = ? AND is_available = 1
+        ORDER BY 
+          CASE category
+            WHEN 'salad' THEN 1
+            WHEN 'starter' THEN 2
+            WHEN 'soup' THEN 3
+            WHEN 'pasta' THEN 4
+            WHEN 'seafood' THEN 5
+            WHEN 'main' THEN 6
+            WHEN 'dessert' THEN 7
+            WHEN 'drink' THEN 8
+            ELSE 99
+          END,
+          display_order,
+          item_name
+      `).bind(restaurant_id).all()
+    } catch (menuError) {
+      console.error('Menu query error:', menuError)
+      // Continue with empty menu if query fails
+    }
     
     return c.html(`
 <!DOCTYPE html>
@@ -68688,7 +68694,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </div>
 
     <script>
-        const menuData = ${JSON.stringify(menu.results)};
+        const menuData = ${JSON.stringify(menu.results || [])};
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
         const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
