@@ -8050,6 +8050,63 @@ app.get('/api/restaurant/:offering_id/tables', async (c) => {
   }
 })
 
+// Get tables with availability check for à la carte bookings
+app.get('/api/restaurant/:offering_id/tables/availability', async (c) => {
+  const { DB } = c.env
+  const { offering_id } = c.req.param()
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  const time = c.req.query('time') || '12:00'
+  
+  try {
+    // Get all tables
+    const tables = await DB.prepare(`
+      SELECT * FROM restaurant_tables 
+      WHERE offering_id = ? AND is_active = 1
+      ORDER BY table_number
+    `).bind(offering_id).all()
+    
+    // Get reserved table_numbers for this date/time from alacarte_vouchers
+    // Check for bookings within ±1 hour of the selected time
+    const reservedTables = await DB.prepare(`
+      SELECT DISTINCT table_number
+      FROM alacarte_vouchers
+      WHERE restaurant_id = ?
+        AND reservation_date = ?
+        AND table_number IS NOT NULL
+        AND status IN ('confirmed', 'preparing', 'ready')
+        AND (
+          reservation_time = ?
+          OR ABS(
+            (CAST(SUBSTR(reservation_time, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(reservation_time, 4, 2) AS INTEGER))
+            - (CAST(SUBSTR(?, 1, 2) AS INTEGER) * 60 + CAST(SUBSTR(?, 4, 2) AS INTEGER))
+          ) <= 60
+        )
+    `).bind(offering_id, date, time, time, time).all()
+    
+    const reservedTableNumbers = new Set(reservedTables.results.map(r => r.table_number))
+    
+    console.log('Availability check:', {
+      restaurant: offering_id,
+      date,
+      time,
+      totalTables: tables.results.length,
+      reservedTables: Array.from(reservedTableNumbers)
+    })
+    
+    return c.json({ 
+      success: true,
+      tables: tables.results.map(t => ({
+        ...t,
+        features: t.features ? JSON.parse(t.features) : [],
+        is_available: !reservedTableNumbers.has(t.table_number)
+      }))
+    })
+  } catch (error) {
+    console.error('Get tables availability error:', error)
+    return c.json({ error: 'Failed to get tables availability' }, 500)
+  }
+})
+
 // Create table (Admin)
 app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), async (c) => {
   const { DB } = c.env
@@ -64681,10 +64738,14 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`;
         }
         
-        // Load tables for table selection (Step 4) - SAME AS GUEST BOOKING
+        // Load tables for table selection (Step 4) - WITH AVAILABILITY CHECK
         async function loadTablesForSelection(restaurantId) {
             try {
                 console.log('🪑 Loading tables for restaurant:', restaurantId);
+                
+                // Get the selected date and time for availability checking
+                const selectedDate = document.getElementById('bookingDate').value;
+                const selectedTime = document.getElementById('bookingTime').value;
                 
                 // Load AI-extracted textures for this restaurant
                 let restaurantTextures = null;
@@ -64698,8 +64759,8 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     console.log('No textures available, using defaults');
                 }
                 
-                // Load all tables
-                const tablesResponse = await fetch('/api/restaurant/' + restaurantId + '/tables', {
+                // Load all tables with availability check
+                const tablesResponse = await fetch('/api/restaurant/' + restaurantId + '/tables/availability?date=' + selectedDate + '&time=' + selectedTime, {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 const tablesData = await tablesResponse.json();
@@ -64871,8 +64932,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             // Render tables
             tables.forEach(table => {
+                const isReserved = !table.is_available; // API returns is_available flag
                 const tableEl = document.createElement('div');
-                tableEl.className = 'table-item table-' + table.shape;
+                tableEl.className = 'table-item table-' + table.shape + (isReserved ? ' reserved' : '');
                 tableEl.style.position = 'absolute';
                 tableEl.style.left = (table.position_x * scaleFactor) + 'px';
                 tableEl.style.top = (table.position_y * scaleFactor) + 'px';
@@ -64889,8 +64951,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 tableEl.style.width = width + 'px';
                 tableEl.style.height = height + 'px';
                 
-                // Apply textures
-                if (restaurantTextures) {
+                // Apply textures or reserved styling
+                if (isReserved) {
+                    tableEl.style.background = '#FEE2E2'; // Red background for reserved
+                    tableEl.style.opacity = '0.6';
+                    tableEl.style.cursor = 'not-allowed';
+                } else if (restaurantTextures) {
                     const tableColor = restaurantTextures.table_color_primary || '#FFFFFF';
                     const tableSecondary = restaurantTextures.table_color_secondary || tableColor;
                     tableEl.style.background = 'linear-gradient(135deg, ' + tableColor + ' 0%, ' + tableSecondary + ' 100%)';
@@ -64905,14 +64971,18 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 tableEl.style.alignItems = 'center';
                 tableEl.style.justifyContent = 'center';
                 tableEl.style.fontSize = isMobile ? '11px' : '14px';
-                tableEl.style.cursor = 'pointer';
+                tableEl.style.cursor = isReserved ? 'not-allowed' : 'pointer';
                 tableEl.style.zIndex = '10';
                 
                 tableEl.innerHTML = 
                     '<div class=\"font-bold\" style=\"margin-bottom: 2px;\">' + table.table_number + '</div>' +
-                    '<div class=\"text-gray-600\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-user\"></i> ' + table.capacity + '</div>';
+                    '<div class=\"text-gray-600\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-user\"></i> ' + table.capacity + '</div>' +
+                    (isReserved ? '<div class=\"text-red-600 text-xs\" style=\"font-size: ' + (isMobile ? '8px' : '10px') + ';\">Reserved</div>' : '');
                 
-                tableEl.onclick = () => selectTableForBooking(table);
+                // Only allow clicking on available tables
+                if (!isReserved) {
+                    tableEl.onclick = () => selectTableForBooking(table);
+                }
                 
                 canvas.appendChild(tableEl);
             });
