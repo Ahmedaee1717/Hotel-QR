@@ -64227,154 +64227,168 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         function renderMenuItems() {
-            const container = document.getElementById('menuCategories');
-            if (!selectedRestaurant || menuItems.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">Please select a restaurant first</p>';
-                return;
-            }
-            
-            // Separate SET MENU and RESTAURANT MENU
-            const setMenuItems = menuItems.filter(item => !item.extraCharge);
-            const restaurantMenuItems = menuItems.filter(item => item.extraCharge);
-            
-            console.log('📊 Menu breakdown:', {
-                total: menuItems.length,
-                setMenu: setMenuItems.length,
-                restaurantMenu: restaurantMenuItems.length,
-                sampleSetItem: setMenuItems[0],
-                sampleRestaurantItem: restaurantMenuItems[0]
-            });
-            
-            let html = '';
-            
-            // Render SET MENU section
-            if (setMenuItems.length > 0) {
-                html += \`
-                    <div class="mb-8 bg-white rounded-lg shadow-md p-6 border-2 border-blue-200">
-                        <h2 class="text-2xl font-bold mb-2 text-blue-800 flex items-center">
-                            <i class="fas fa-check-circle mr-3"></i>
-                            Set Menu
-                        </h2>
-                        <p class="text-sm text-gray-600 mb-6 italic">
-                            <i class="fas fa-gift mr-2"></i>Included in your package
-                        </p>
-                \`;
+            try {
+                const container = document.getElementById('menuCategories');
+                if (!selectedRestaurant || menuItems.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-8">Please select a restaurant first</p>';
+                    return;
+                }
                 
-                // Group SET MENU by category
-                const setMenuCategories = {};
-                setMenuItems.forEach(item => {
-                    const cat = item.category || 'other';
-                    if (!setMenuCategories[cat]) setMenuCategories[cat] = [];
-                    setMenuCategories[cat].push(item);
+                // Separate SET MENU and RESTAURANT MENU
+                const setMenuItems = menuItems.filter(item => !item.extraCharge);
+                const restaurantMenuItems = menuItems.filter(item => item.extraCharge);
+                
+                console.log('📊 Menu breakdown:', {
+                    total: menuItems.length,
+                    setMenu: setMenuItems.length,
+                    restaurantMenu: restaurantMenuItems.length,
+                    sampleSetItem: setMenuItems[0],
+                    sampleRestaurantItem: restaurantMenuItems[0]
                 });
                 
-                Object.keys(setMenuCategories).forEach(cat => {
+                let html = '';
+                
+                // Render SET MENU section
+                if (setMenuItems.length > 0) {
                     html += \`
-                        <div class="border-b pb-4 mb-4 last:border-b-0">
-                            <h3 class="text-lg font-bold mb-3 capitalize text-gray-700">
-                                <i class="fas fa-utensils mr-2"></i>\${cat.replace(/_/g, ' ')}
-                            </h3>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                \${setMenuCategories[cat].map(item => renderMenuItem(item)).join('')}
-                            </div>
-                        </div>
+                        <div class="mb-8 bg-white rounded-lg shadow-md p-6 border-2 border-blue-200">
+                            <h2 class="text-2xl font-bold mb-2 text-blue-800 flex items-center">
+                                <i class="fas fa-check-circle mr-3"></i>
+                                Set Menu
+                            </h2>
+                            <p class="text-sm text-gray-600 mb-6 italic">
+                                <i class="fas fa-gift mr-2"></i>Included in your package
+                            </p>
                     \`;
-                });
+                    
+                    // Group SET MENU by category
+                    const setMenuCategories = {};
+                    setMenuItems.forEach(item => {
+                        const cat = item.category || 'other';
+                        if (!setMenuCategories[cat]) setMenuCategories[cat] = [];
+                        setMenuCategories[cat].push(item);
+                    });
+                    
+                    Object.keys(setMenuCategories).forEach(cat => {
+                        html += \`
+                            <div class="border-b pb-4 mb-4 last:border-b-0">
+                                <h3 class="text-lg font-bold mb-3 capitalize text-gray-700">
+                                    <i class="fas fa-utensils mr-2"></i>\${cat.replace(/_/g, ' ')}
+                                </h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    \${setMenuCategories[cat].map(item => renderMenuItem(item)).join('')}
+                                </div>
+                            </div>
+                        \`;
+                    });
+                    
+                    html += '</div>';
+                }
                 
-                html += '</div>';
-            }
-            
-            // Render RESTAURANT MENU section
-            if (restaurantMenuItems.length > 0) {
-                html += \`
-                    <div class="mb-8 bg-amber-50 rounded-lg shadow-md p-6 border-2 border-amber-300">
-                        <h2 class="text-2xl font-bold mb-2 text-amber-800 flex items-center">
-                            <i class="fas fa-coffee mr-3"></i>
-                            Restaurant Menu
-                        </h2>
-                        <p class="text-sm text-amber-700 mb-6 italic font-medium">
-                            <i class="fas fa-coins mr-2"></i>Additional items available for purchase
-                        </p>
-                \`;
-                
-                // Group RESTAURANT MENU by category
-                const restaurantMenuCategories = {};
-                restaurantMenuItems.forEach(item => {
-                    const cat = item.category || 'other';
-                    if (!restaurantMenuCategories[cat]) restaurantMenuCategories[cat] = [];
-                    restaurantMenuCategories[cat].push(item);
-                });
-                
-                Object.keys(restaurantMenuCategories).forEach(cat => {
+                // Render RESTAURANT MENU section
+                if (restaurantMenuItems.length > 0) {
                     html += \`
-                        <div class="border-b border-amber-200 pb-4 mb-4 last:border-b-0">
-                            <h3 class="text-lg font-bold mb-3 capitalize text-amber-900">
-                                <i class="fas fa-utensils mr-2"></i>\${cat.replace(/_/g, ' ')}
-                            </h3>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                \${restaurantMenuCategories[cat].map(item => renderMenuItem(item)).join('')}
-                            </div>
-                        </div>
+                        <div class="mb-8 bg-amber-50 rounded-lg shadow-md p-6 border-2 border-amber-300">
+                            <h2 class="text-2xl font-bold mb-2 text-amber-800 flex items-center">
+                                <i class="fas fa-coffee mr-3"></i>
+                                Restaurant Menu
+                            </h2>
+                            <p class="text-sm text-amber-700 mb-6 italic font-medium">
+                                <i class="fas fa-coins mr-2"></i>Additional items available for purchase
+                            </p>
                     \`;
-                });
+                    
+                    // Group RESTAURANT MENU by category
+                    const restaurantMenuCategories = {};
+                    restaurantMenuItems.forEach(item => {
+                        const cat = item.category || 'other';
+                        if (!restaurantMenuCategories[cat]) restaurantMenuCategories[cat] = [];
+                        restaurantMenuCategories[cat].push(item);
+                    });
+                    
+                    Object.keys(restaurantMenuCategories).forEach(cat => {
+                        html += \`
+                            <div class="border-b border-amber-200 pb-4 mb-4 last:border-b-0">
+                                <h3 class="text-lg font-bold mb-3 capitalize text-amber-900">
+                                    <i class="fas fa-utensils mr-2"></i>\${cat.replace(/_/g, ' ')}
+                                </h3>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    \${restaurantMenuCategories[cat].map(item => renderMenuItem(item)).join('')}
+                                </div>
+                            </div>
+                        \`;
+                    });
+                    
+                    html += '</div>';
+                }
                 
-                html += '</div>';
+                container.innerHTML = html;
+                console.log('✅ Menu rendered successfully');
+            } catch (error) {
+                console.error('❌ Fatal error in renderMenuItems:', error);
+                const container = document.getElementById('menuCategories');
+                if (container) {
+                    container.innerHTML = '<div class="p-8 bg-red-100 text-red-700 rounded-lg"><h3 class="font-bold mb-2">Error Loading Menu</h3><p>' + error.message + '</p></div>';
+                }
             }
-            
-            container.innerHTML = html;
         }
         
         function renderMenuItem(item) {
-            const isSelected = selectedItems[item.item_id];
-            const quantity = isSelected ? isSelected.quantity : 0;
-            
-            // Pre-escape the item_id for onclick handlers
-            const itemIdEscaped = JSON.stringify(item.item_id);
-            
-            // Escape item name for HTML safety
-            const itemNameEscaped = item.item_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            
-            let limitButton = '';
-            if (isSelected) {
-                limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+            try {
+                const isSelected = selectedItems[item.item_id];
+                const quantity = isSelected ? isSelected.quantity : 0;
+                
+                // Pre-escape the item_id for onclick handlers
+                const itemIdEscaped = JSON.stringify(item.item_id);
+                
+                // Escape item name for HTML safety
+                const itemNameEscaped = (item.item_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                let limitButton = '';
+                if (isSelected) {
+                    limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+                }
+                
+                // Price display for extra charge items
+                const priceDisplay = item.extraCharge && item.cost_to_hotel > 0 ? 
+                    '<span class="text-amber-600 font-bold">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                
+                const borderClass = isSelected ? 'border-accent-color' : 'border-gray-200';
+                const premiumBadge = item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : '';
+                const disabledAttr = quantity === 0 ? 'disabled' : '';
+                const customLimitValue = isSelected?.customLimit || '';
+                
+                return '<div class="menu-item border-2 ' + borderClass + ' rounded-xl p-4">' +
+                    '<div class="mb-3">' +
+                        '<div class="flex items-start justify-between">' +
+                            '<h4 class="font-bold">' + itemNameEscaped + '</h4>' +
+                            priceDisplay +
+                        '</div>' +
+                        premiumBadge +
+                    '</div>' +
+                    '<div class="flex items-center justify-between">' +
+                        '<div class="quantity-controls flex items-center gap-2">' +
+                            '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" ' + disabledAttr + '>' +
+                                '<i class="fas fa-minus"></i>' +
+                            '</button>' +
+                            '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>' +
+                            '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', 1)" class="btn-primary text-white">' +
+                                '<i class="fas fa-plus"></i>' +
+                            '</button>' +
+                        '</div>' +
+                        limitButton +
+                    '</div>' +
+                    '<div id="customLimit' + item.item_id + '" class="hidden mt-3 pt-3 border-t">' +
+                        '<label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>' +
+                        '<input type="number" id="limitInput' + item.item_id + '" min="0" value="' + customLimitValue + '" ' +
+                               'onchange="setCustomLimit(' + itemIdEscaped + ', this.value)" ' +
+                               'class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">' +
+                    '</div>' +
+                '</div>';
+            } catch (error) {
+                console.error('❌ Error rendering item:', item, error);
+                return '<div class="p-4 bg-red-100 text-red-700">Error rendering item: ' + (item?.item_name || 'Unknown') + '</div>';
             }
-            
-            // Price display for extra charge items
-            const priceDisplay = item.extraCharge && item.cost_to_hotel > 0 ? 
-                '<span class="text-amber-600 font-bold">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
-            
-            const borderClass = isSelected ? 'border-accent-color' : 'border-gray-200';
-            const premiumBadge = item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : '';
-            const disabledAttr = quantity === 0 ? 'disabled' : '';
-            const customLimitValue = isSelected?.customLimit || '';
-            
-            return '<div class="menu-item border-2 ' + borderClass + ' rounded-xl p-4">' +
-                '<div class="mb-3">' +
-                    '<div class="flex items-start justify-between">' +
-                        '<h4 class="font-bold">' + itemNameEscaped + '</h4>' +
-                        priceDisplay +
-                    '</div>' +
-                    premiumBadge +
-                '</div>' +
-                '<div class="flex items-center justify-between">' +
-                    '<div class="quantity-controls flex items-center gap-2">' +
-                        '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" ' + disabledAttr + '>' +
-                            '<i class="fas fa-minus"></i>' +
-                        '</button>' +
-                        '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>' +
-                        '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', 1)" class="btn-primary text-white">' +
-                            '<i class="fas fa-plus"></i>' +
-                        '</button>' +
-                    '</div>' +
-                    limitButton +
-                '</div>' +
-                '<div id="customLimit' + item.item_id + '" class="hidden mt-3 pt-3 border-t">' +
-                    '<label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>' +
-                    '<input type="number" id="limitInput' + item.item_id + '" min="0" value="' + customLimitValue + '" ' +
-                           'onchange="setCustomLimit(' + itemIdEscaped + ', this.value)" ' +
-                           'class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">' +
-                '</div>' +
-            '</div>';
         }
         
         window.adjustItemQuantity = function(itemId, delta) {
