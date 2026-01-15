@@ -66359,7 +66359,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     <h2 class="text-xl font-bold mb-4"><i class="fas fa-shapes mr-2 text-purple-600"></i>Add Floor Element</h2>
                     <form id="addElementForm" class="space-y-3">
                         <select id="elementType" required class="w-full px-3 py-2 border rounded-lg text-sm">
-                            <option value="">Select Type...</option>
+                            <option value="" disabled selected>Select Type...</option>
                             <option value="buffet">🍽️ Buffet</option>
                             <option value="bar">🍷 Bar</option>
                             <option value="kitchen">🔥 Kitchen</option>
