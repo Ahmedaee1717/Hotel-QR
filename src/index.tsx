@@ -63702,6 +63702,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 <div class="flex-1 h-1 bg-gray-200 mx-2"></div>
                 <div class="flex items-center gap-2">
                     <div id="step4" class="step-indicator inactive">4</div>
+                    <span class="text-sm font-medium hidden sm:inline">Table</span>
+                </div>
+                <div class="flex-1 h-1 bg-gray-200 mx-2"></div>
+                <div class="flex items-center gap-2">
+                    <div id="step5" class="step-indicator inactive">5</div>
                     <span class="text-sm font-medium hidden sm:inline">Confirm</span>
                 </div>
             </div>
@@ -63909,8 +63914,58 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             </div>
         </div>
 
-        <!-- Step 4: Confirmation -->
+        <!-- Step 4: Table Selection -->
         <div id="stepContent4" class="hidden">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-chair mr-3 accent-text"></i>
+                    Select Table
+                </h2>
+                <p class="text-gray-600 mb-4">Click on a table in the floor plan to assign this booking</p>
+                
+                <div class="bg-gray-100 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold">Selected Table:</span>
+                        <span id="selectedTableDisplay" class="text-lg font-bold accent-text">None</span>
+                    </div>
+                </div>
+                
+                <!-- Floor Plan Canvas -->
+                <div class="border-2 border-gray-300 rounded-xl overflow-hidden bg-white" style="position: relative;">
+                    <canvas id="floorCanvas" width="600" height="400" style="cursor: pointer; max-width: 100%;"></canvas>
+                </div>
+                
+                <div class="mt-4 flex items-center gap-4 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-green-500"></div>
+                        <span>Free</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-yellow-500"></div>
+                        <span>Booked</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded bg-red-500"></div>
+                        <span>Occupied</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 rounded border-2 border-blue-500 bg-blue-100"></div>
+                        <span>Selected</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="goToStep(3)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    <i class="fas fa-arrow-left mr-2"></i>Back
+                </button>
+                <button onclick="goToStep(5)" class="flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                    Review Order<i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 5: Confirmation -->
+        <div id="stepContent5" class="hidden">
             <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4 flex items-center">
                     <i class="fas fa-check-circle mr-3 accent-text"></i>
@@ -63921,7 +63976,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 </div>
             </div>
             <div class="flex gap-4">
-                <button onclick="goToStep(3)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                <button onclick="goToStep(4)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
                 <button onclick="submitBooking()" id="submitBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition">
@@ -63959,6 +64014,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let maxPartySize = 12; // Default max
         let orderingFor = 1; // Party size selected by front desk
         let voucherEligibility = null; // Store voucher eligibility data
+        let selectedTableId = null; // Selected table for booking
+        let tables = []; // All tables
+        let floorElements = []; // Floor plan elements
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -64507,17 +64565,25 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         return;
                     }
                     
-                    // Validate items selected {
+                    // Validate items selected
                     if (Object.keys(selectedItems).length === 0) {
                         alert('Please select at least one menu item');
                         return;
                     }
+                    
+                    // Load tables for Step 4
+                    if (selectedRestaurant) {
+                        loadTablesForSelection(selectedRestaurant.offering_id);
+                    }
+                } else if (currentStep === 4) {
+                    // Step 4: Table selection - optional but recommended
+                    // Allow proceeding without table selection (table_id will be null)
                     renderOrderSummary();
                 }
             }
             
             // Hide all steps
-            for (let i = 1; i <= 4; i++) {
+            for (let i = 1; i <= 5; i++) {
                 document.getElementById('stepContent' + i).classList.add('hidden');
                 const stepEl = document.getElementById('step' + i);
                 stepEl.classList.remove('active', 'completed');
@@ -64579,6 +64645,150 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`;
         }
         
+        // Load tables for table selection (Step 4)
+        async function loadTablesForSelection(restaurantId) {
+            try {
+                console.log('Loading tables for restaurant:', restaurantId);
+                
+                // Fetch tables
+                const tablesResponse = await fetch('/api/restaurant/' + restaurantId + '/tables', {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const tablesData = await tablesResponse.json();
+                tables = tablesData.tables || [];
+                
+                // Fetch floor elements
+                const elementsResponse = await fetch('/api/admin/restaurant/' + restaurantId + '/floor-elements', {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const elementsData = await elementsResponse.json();
+                floorElements = elementsData.elements || [];
+                
+                console.log('Loaded', tables.length, 'tables and', floorElements.length, 'floor elements');
+                
+                // Render floor plan
+                renderFloorPlan();
+            } catch (error) {
+                console.error('Failed to load tables:', error);
+                alert('Failed to load floor plan. You can proceed without selecting a table.');
+            }
+        }
+        
+        function renderFloorPlan() {
+            const canvas = document.getElementById('floorCanvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gridSize = 50;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw floor elements (walls, decorations)
+            floorElements.forEach(element => {
+                if (element.element_type === 'wall') {
+                    ctx.fillStyle = '#9ca3af';
+                    ctx.fillRect(element.x * gridSize, element.y * gridSize, element.width * gridSize, element.height * gridSize);
+                } else if (element.element_type === 'decoration') {
+                    ctx.fillStyle = '#d1d5db';
+                    ctx.fillRect(element.x * gridSize, element.y * gridSize, element.width * gridSize, element.height * gridSize);
+                    ctx.fillStyle = '#6b7280';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(element.label || 'Decor', (element.x + element.width / 2) * gridSize, (element.y + element.height / 2) * gridSize);
+                }
+            });
+            
+            // Draw tables
+            tables.forEach(table => {
+                const x = table.x * gridSize;
+                const y = table.y * gridSize;
+                const width = table.width * gridSize;
+                const height = table.height * gridSize;
+                
+                // Table color based on status
+                let color = '#10b981'; // green - free
+                if (table.current_status === 'booked') color = '#f59e0b'; // yellow
+                else if (table.current_status === 'occupied') color = '#ef4444'; // red
+                
+                // Highlight if selected
+                if (selectedTableId === table.table_id) {
+                    ctx.fillStyle = '#dbeafe'; // blue-100
+                    ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+                    ctx.strokeStyle = '#3b82f6'; // blue-500
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+                }
+                
+                // Draw table
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, width, height);
+                
+                // Table border
+                ctx.strokeStyle = '#374151';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+                
+                // Table label
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(table.table_number, x + width / 2, y + height / 2);
+            });
+            
+            // Add click handler
+            canvas.onclick = function(event) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const clickX = (event.clientX - rect.left) * scaleX;
+                const clickY = (event.clientY - rect.top) * scaleY;
+                
+                // Find clicked table
+                for (let table of tables) {
+                    const x = table.x * gridSize;
+                    const y = table.y * gridSize;
+                    const width = table.width * gridSize;
+                    const height = table.height * gridSize;
+                    
+                    if (clickX >= x && clickX <= x + width && clickY >= y && clickY <= y + height) {
+                        selectTableForBooking(table.table_id, table.table_number);
+                        return;
+                    }
+                }
+                
+                // Clicked empty space - deselect
+                selectedTableId = null;
+                document.getElementById('selectedTableDisplay').textContent = 'None';
+                renderFloorPlan();
+            };
+        }
+        
+        function selectTableForBooking(tableId, tableNumber) {
+            selectedTableId = tableId;
+            document.getElementById('selectedTableDisplay').textContent = 'Table ' + tableNumber;
+            renderFloorPlan();
+            console.log('Selected table:', tableId, tableNumber);
+        }
+        
         window.submitBooking = async function() {
             const btn = document.getElementById('submitBtn');
             btn.disabled = true;
@@ -64596,6 +64806,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     reservation_date: document.getElementById('bookingDate').value,
                     reservation_time: document.getElementById('bookingTime').value,
                     restaurant_id: selectedRestaurant.offering_id,
+                    table_id: selectedTableId, // Include selected table
                     items: Object.values(selectedItems).map(s => ({
                         item_id: s.item.item_id,
                         quantity: s.quantity,
@@ -64651,6 +64862,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         window.resetBooking = function() {
             selectedRestaurant = null;
             selectedItems = {};
+            selectedTableId = null;
             currentStep = 1;
             currentPass = null;
             maxPartySize = 12;
@@ -64662,6 +64874,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('partySize').value = '2';
             document.getElementById('partySize').max = '12';
             document.getElementById('maxGuestsInfo').textContent = '';
+            if (document.getElementById('selectedTableDisplay')) {
+                document.getElementById('selectedTableDisplay').textContent = 'None';
+            }
             setTodayDate();
             setCurrentTime();
             document.getElementById('successModal').classList.add('hidden');
