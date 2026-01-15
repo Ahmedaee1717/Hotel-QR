@@ -72591,30 +72591,33 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 }
                 
                 let actionButton = '';
+                // Use voucher_ids array if grouped, otherwise single voucher_id
+                const voucherIdsStr = order.voucher_ids ? JSON.stringify(order.voucher_ids) : '[' + order.voucher_id + ']';
+                
                 if (order.status === 'confirmed') {
                     actionButton = '<div class="flex gap-2">' +
-                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'preparing\\\')" class="action-btn flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">' +
+                        '<button onclick="updateOrderStatus(' + voucherIdsStr + ', \\\'preparing\\\')" class="action-btn flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-colors">' +
                         '<i class="fas fa-fire mr-2"></i>START PREPARING' +
                         '</button>' +
-                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<button onclick="deleteOrder(' + voucherIdsStr + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
                         '<i class="fas fa-trash"></i>' +
                         '</button>' +
                         '</div>';
                 } else if (order.status === 'preparing') {
                     actionButton = '<div class="flex gap-2">' +
-                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'ready\\\')" class="action-btn flex-1 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors">' +
+                        '<button onclick="updateOrderStatus(' + voucherIdsStr + ', \\\'ready\\\')" class="action-btn flex-1 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition-colors">' +
                         '<i class="fas fa-concierge-bell mr-2"></i>READY TO SERVE' +
                         '</button>' +
-                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<button onclick="deleteOrder(' + voucherIdsStr + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
                         '<i class="fas fa-trash"></i>' +
                         '</button>' +
                         '</div>';
                 } else if (order.status === 'ready') {
                     actionButton = '<div class="flex gap-2">' +
-                        '<button onclick="updateOrderStatus(' + order.voucher_id + ', \\\'served\\\')" class="action-btn flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">' +
+                        '<button onclick="updateOrderStatus(' + voucherIdsStr + ', \\\'served\\\')" class="action-btn flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">' +
                         '<i class="fas fa-check-double mr-2"></i>COMPLETE ORDER' +
                         '</button>' +
-                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<button onclick="deleteOrder(' + voucherIdsStr + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
                         '<i class="fas fa-trash"></i>' +
                         '</button>' +
                         '</div>';
@@ -72623,7 +72626,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                         '<div class="action-btn flex-1 bg-gray-200 text-gray-600 font-bold rounded-lg flex items-center justify-center">' +
                         '<i class="fas fa-check-double mr-2"></i>COMPLETED' +
                         '</div>' +
-                        '<button onclick="deleteOrder(' + order.voucher_id + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
+                        '<button onclick="deleteOrder(' + voucherIdsStr + ')" class="action-btn px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors" title="Delete Order">' +
                         '<i class="fas fa-trash"></i>' +
                         '</button>' +
                         '</div>';
@@ -72699,25 +72702,29 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             grid.innerHTML = html;
         }
 
-        async function updateOrderStatus(voucherId, newStatus) {
+        async function updateOrderStatus(voucherIds, newStatus) {
             try {
-                const response = await fetch('/api/kitchen/order-status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Property-ID': propertyId
-                    },
-                    body: JSON.stringify({
-                        voucher_id: voucherId,
-                        status: newStatus
-                    })
-                });
+                // Handle both single ID and array of IDs
+                const idsArray = Array.isArray(voucherIds) ? voucherIds : [voucherIds];
                 
-                const data = await response.json();
+                // Update all vouchers in the group
+                await Promise.all(idsArray.map(async (voucherId) => {
+                    const response = await fetch('/api/kitchen/order-status', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            voucher_id: voucherId,
+                            status: newStatus
+                        })
+                    });
+                    return response.json();
+                }));
                 
-                if (data.success) {
-                    await loadOrders();
-                } else {
+                await loadOrders();
+            } catch (error) {
                     alert('Failed to update status: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
@@ -72726,27 +72733,28 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             }
         }
 
-        async function deleteOrder(voucherId) {
+        async function deleteOrder(voucherIds) {
             if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
                 return;
             }
             
             try {
-                const response = await fetch('/api/kitchen/order/' + voucherId, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Property-ID': propertyId
-                    }
-                });
+                // Handle both single ID and array of IDs
+                const idsArray = Array.isArray(voucherIds) ? voucherIds : [voucherIds];
                 
-                const data = await response.json();
+                // Delete all vouchers in the group
+                await Promise.all(idsArray.map(async (voucherId) => {
+                    const response = await fetch('/api/kitchen/order/' + voucherId, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        }
+                    });
+                    return response.json();
+                }));
                 
-                if (data.success) {
-                    await loadOrders();
-                } else {
-                    alert('Failed to delete order: ' + (data.error || 'Unknown error'));
-                }
+                await loadOrders();
             } catch (error) {
                 console.error('Delete order error:', error);
                 alert('Error deleting order');
