@@ -74272,6 +74272,238 @@ app.get('/api/analytics/alacarte', async (c) => {
   }
 })
 
+// Staff Performance Analytics API
+app.get('/api/analytics/staff-performance', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { period = 'month', start_date, end_date } = c.req.query()
+  
+  try {
+    // Calculate date range
+    let dateCondition = ''
+    let params = [property_id]
+    
+    if (start_date && end_date) {
+      dateCondition = 'AND v.reservation_date >= ? AND v.reservation_date <= ?'
+      params.push(start_date, end_date)
+    } else if (period === 'today') {
+      dateCondition = 'AND v.reservation_date = DATE("now")'
+    } else if (period === 'week') {
+      dateCondition = 'AND v.reservation_date >= DATE("now", "-7 days")'
+    } else if (period === 'month') {
+      dateCondition = 'AND v.reservation_date >= DATE("now", "-30 days")'
+    }
+    
+    // Staff performance summary
+    const staffPerformance = await DB.prepare(`
+      SELECT 
+        u.user_id,
+        u.first_name || ' ' || u.last_name AS staff_name,
+        u.email,
+        u.role,
+        COUNT(DISTINCT v.voucher_id) AS total_bookings,
+        SUM(v.party_size) AS total_guests,
+        COUNT(CASE WHEN v.total_cost > 0 THEN 1 END) AS upsell_count,
+        ROUND(COUNT(CASE WHEN v.total_cost > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(v.voucher_id), 0), 1) AS upsell_rate,
+        SUM(v.total_cost) AS total_upsell_revenue,
+        ROUND(AVG(v.total_cost), 2) AS avg_upsell_per_booking,
+        COUNT(DISTINCT v.reservation_date) AS active_days
+      FROM users u
+      LEFT JOIN alacarte_vouchers v ON u.user_id = v.created_by_staff_id
+        AND v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'used')
+        ${dateCondition}
+      WHERE u.property_id = ? AND u.status = 'active'
+      GROUP BY u.user_id, u.first_name, u.last_name, u.email, u.role
+      HAVING total_bookings > 0
+      ORDER BY total_upsell_revenue DESC, upsell_rate DESC
+    `).bind(...params, property_id).all()
+    
+    // Extra charge items breakdown
+    const extraChargeStats = await DB.prepare(`
+      SELECT 
+        ami.item_name,
+        ami.category,
+        ami.cost_to_hotel,
+        COUNT(*) AS times_sold,
+        SUM(CAST(json_extract(items.value, '$.quantity') AS INTEGER)) AS total_quantity,
+        SUM(ami.cost_to_hotel * CAST(json_extract(items.value, '$.quantity') AS INTEGER)) AS total_revenue
+      FROM alacarte_vouchers v
+      CROSS JOIN json_each(v.preorder_item_ids) AS items
+      INNER JOIN alacarte_menu_items ami ON ami.item_id = CAST(
+        CASE 
+          WHEN json_extract(items.value, '$.item_id') LIKE 'rm_%' 
+          THEN SUBSTR(json_extract(items.value, '$.item_id'), 4)
+          ELSE json_extract(items.value, '$.item_id')
+        END AS TEXT
+      )
+      WHERE v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'used')
+        AND v.created_by_staff_id IS NOT NULL
+        AND ami.cost_to_hotel > 0
+        ${dateCondition}
+      GROUP BY ami.item_id, ami.item_name, ami.category, ami.cost_to_hotel
+      ORDER BY total_revenue DESC
+      LIMIT 20
+    `).bind(...params).all()
+    
+    // Daily staff performance trend
+    const dailyTrend = await DB.prepare(`
+      SELECT 
+        v.reservation_date,
+        COUNT(DISTINCT v.voucher_id) AS total_bookings,
+        COUNT(CASE WHEN v.total_cost > 0 THEN 1 END) AS bookings_with_upsell,
+        SUM(v.total_cost) AS daily_revenue,
+        COUNT(DISTINCT v.created_by_staff_id) AS active_staff_count
+      FROM alacarte_vouchers v
+      WHERE v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'used')
+        AND v.created_by_staff_id IS NOT NULL
+        ${dateCondition}
+      GROUP BY v.reservation_date
+      ORDER BY v.reservation_date ASC
+    `).bind(...params).all()
+    
+    // Top upsellers (staff with highest conversion rates)
+    const topUpsellers = await DB.prepare(`
+      SELECT 
+        u.user_id,
+        u.first_name || ' ' || u.last_name AS staff_name,
+        COUNT(DISTINCT v.voucher_id) AS total_bookings,
+        COUNT(CASE WHEN v.total_cost > 0 THEN 1 END) AS upsell_count,
+        ROUND(COUNT(CASE WHEN v.total_cost > 0 THEN 1 END) * 100.0 / COUNT(v.voucher_id), 1) AS upsell_rate,
+        SUM(v.total_cost) AS total_revenue
+      FROM users u
+      INNER JOIN alacarte_vouchers v ON u.user_id = v.created_by_staff_id
+      WHERE v.property_id = ?
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'used')
+        ${dateCondition}
+      GROUP BY u.user_id, u.first_name, u.last_name
+      HAVING total_bookings >= 5
+      ORDER BY upsell_rate DESC, total_revenue DESC
+      LIMIT 10
+    `).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      period: period,
+      date_range: { start_date, end_date },
+      staff_performance: staffPerformance.results || [],
+      extra_charge_items: extraChargeStats.results || [],
+      daily_trend: dailyTrend.results || [],
+      top_upsellers: topUpsellers.results || []
+    })
+  } catch (error) {
+    console.error('Staff analytics error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to load staff analytics',
+      details: error.message
+    }, 500)
+  }
+})
+
+// Staff Management API - Add new staff
+app.post('/api/admin/staff', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { email, first_name, last_name, role = 'staff', password } = body
+    
+    if (!email || !first_name || !last_name || !password) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Check if email already exists
+    const existing = await DB.prepare(`
+      SELECT user_id FROM users WHERE email = ? AND property_id = ?
+    `).bind(email, property_id).first()
+    
+    if (existing) {
+      return c.json({ success: false, error: 'Email already exists' }, 400)
+    }
+    
+    // Hash password (simple for demo - use bcrypt in production)
+    const crypto = require('crypto')
+    const password_hash = crypto.createHash('sha256').update(password).digest('hex')
+    
+    // Insert new staff member
+    const result = await DB.prepare(`
+      INSERT INTO users (
+        email, password_hash, first_name, last_name, role, 
+        property_id, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)
+    `).bind(email, password_hash, first_name, last_name, role, property_id).run()
+    
+    return c.json({
+      success: true,
+      user_id: result.meta.last_row_id,
+      message: 'Staff member added successfully'
+    })
+  } catch (error) {
+    console.error('Add staff error:', error)
+    return c.json({ success: false, error: 'Failed to add staff member' }, 500)
+  }
+})
+
+// Staff Management API - Update staff
+app.put('/api/admin/staff/:user_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { user_id } = c.req.param()
+  
+  try {
+    const body = await c.req.json()
+    const { first_name, last_name, role, status } = body
+    
+    // Update staff member
+    await DB.prepare(`
+      UPDATE users 
+      SET first_name = COALESCE(?, first_name),
+          last_name = COALESCE(?, last_name),
+          role = COALESCE(?, role),
+          status = COALESCE(?, status),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND property_id = ?
+    `).bind(first_name, last_name, role, status, user_id, property_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Staff member updated successfully'
+    })
+  } catch (error) {
+    console.error('Update staff error:', error)
+    return c.json({ success: false, error: 'Failed to update staff member' }, 500)
+  }
+})
+
+// Staff Management API - Deactivate staff
+app.delete('/api/admin/staff/:user_id', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { user_id } = c.req.param()
+  
+  try {
+    // Soft delete by setting status to inactive
+    await DB.prepare(`
+      UPDATE users 
+      SET status = 'inactive',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND property_id = ?
+    `).bind(user_id, property_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Staff member deactivated successfully'
+    })
+  } catch (error) {
+    console.error('Delete staff error:', error)
+    return c.json({ success: false, error: 'Failed to deactivate staff member' }, 500)
+  }
+})
+
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
