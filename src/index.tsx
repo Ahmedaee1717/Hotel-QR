@@ -67797,7 +67797,25 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         selectedTable = table;
         selectedElement = null; // Deselect element when selecting table
         console.log('Admin table selected:', table.table_number);
-        renderAdminFloorPlan(); // Re-render to show selection
+        // Don't re-render during selection - only update visual highlight
+        updateSelectionHighlight();
+      }
+      
+      function updateSelectionHighlight() {
+        // Update selection borders without full re-render
+        const allTables = document.querySelectorAll('.table-item');
+        allTables.forEach(el => {
+          if (el.id.startsWith('table-')) {
+            const tableId = parseInt(el.id.replace('table-', ''));
+            if (selectedTable && selectedTable.table_id === tableId) {
+              el.style.borderColor = '#10B981';
+              el.style.borderWidth = '3px';
+            } else {
+              el.style.borderColor = '#3B82F6';
+              el.style.borderWidth = '2px';
+            }
+          }
+        });
       }
       
       // Select element
@@ -68518,8 +68536,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           features: features,
           position_x: 50,
           position_y: 50,
-          width: shape === 'circle' ? 80 : 100,
-          height: shape === 'circle' ? 80 : 60
+          width: shape === 'circle' ? 80 : (shape === 'square' ? 80 : 100),
+          height: shape === 'circle' ? 80 : (shape === 'square' ? 80 : 60)
         };
         
         console.log('Creating table with payload:', payload);
