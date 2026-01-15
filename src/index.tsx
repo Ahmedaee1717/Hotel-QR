@@ -67646,23 +67646,23 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Render floor elements FIRST (so they appear behind tables)
         floorElements.forEach(element => {
           const elementEl = document.createElement('div');
+          elementEl.className = 'table-item'; // Use same class as tables for styling
+          elementEl.id = 'element-' + element.element_id;
           elementEl.style.position = 'absolute';
           elementEl.style.left = (element.position_x * scaleFactor) + 'px';
           elementEl.style.top = (element.position_y * scaleFactor) + 'px';
           elementEl.style.width = (element.width * scaleFactor) + 'px';
           elementEl.style.height = (element.height * scaleFactor) + 'px';
           elementEl.style.backgroundColor = element.color || '#E5E7EB';
-          elementEl.style.border = '2px dashed #9CA3AF';
+          elementEl.style.border = selectedElement && selectedElement.element_id === element.element_id ? '3px solid #10B981' : '2px dashed #9CA3AF';
           elementEl.style.borderRadius = '8px';
-          elementEl.style.display = 'flex';
-          elementEl.style.alignItems = 'center';
-          elementEl.style.justifyContent = 'center';
-          elementEl.style.fontSize = '12px';
-          elementEl.style.color = '#6B7280';
-          elementEl.style.fontWeight = 'bold';
-          elementEl.style.userSelect = 'none';
-          elementEl.style.pointerEvents = 'none';
+          elementEl.style.cursor = 'move';
           elementEl.textContent = element.element_label || element.element_type;
+          
+          // Make element interactive
+          elementEl.onclick = () => selectElement(element);
+          elementEl.onmousedown = (e) => startDragElement(e, element);
+          
           canvas.appendChild(elementEl);
         });
         
@@ -67795,12 +67795,93 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       
       function selectTable(table) {
         selectedTable = table;
+        selectedElement = null; // Deselect element when selecting table
         console.log('Admin table selected:', table.table_number);
-        // Optionally highlight selected table
-        document.querySelectorAll('.table-item').forEach(el => {
-          el.classList.remove('ring-4', 'ring-blue-500');
-        });
-        document.getElementById('table-' + table.table_id).classList.add('ring-4', 'ring-blue-500');
+        renderAdminFloorPlan(); // Re-render to show selection
+      }
+      
+      // Select element
+      function selectElement(element) {
+        selectedElement = element;
+        selectedTable = null; // Deselect table when selecting element
+        console.log('Floor element selected:', element.element_label);
+        renderAdminFloorPlan(); // Re-render to show selection
+      }
+      
+      // Drag element
+      function startDragElement(e, element) {
+        e.preventDefault();
+        isDragging = true;
+        selectedElement = element;
+        selectedTable = null;
+        
+        const elementEl = document.getElementById('element-' + element.element_id);
+        const rect = elementEl.getBoundingClientRect();
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+        
+        document.addEventListener('mousemove', handleDragMoveElement);
+        document.addEventListener('mouseup', handleDragEndElement);
+      }
+      
+      function handleDragMoveElement(e) {
+        if (!isDragging || !selectedElement) return;
+        
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleFactor = masterScale / 100;
+        
+        const newX = (e.clientX - canvasRect.left - dragOffset.x) / scaleFactor;
+        const newY = (e.clientY - canvasRect.top - dragOffset.y) / scaleFactor;
+        
+        const elementEl = document.getElementById('element-' + selectedElement.element_id);
+        elementEl.style.left = (newX * scaleFactor) + 'px';
+        elementEl.style.top = (newY * scaleFactor) + 'px';
+      }
+      
+      async function handleDragEndElement(e) {
+        if (!isDragging || !selectedElement) return;
+        
+        document.removeEventListener('mousemove', handleDragMoveElement);
+        document.removeEventListener('mouseup', handleDragEndElement);
+        
+        const canvas = document.getElementById('canvas');
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleFactor = masterScale / 100;
+        
+        const finalX = Math.round((e.clientX - canvasRect.left - dragOffset.x) / scaleFactor);
+        const finalY = Math.round((e.clientY - canvasRect.top - dragOffset.y) / scaleFactor);
+        
+        // Update element position in array
+        const elementIndex = floorElements.findIndex(el => el.element_id === selectedElement.element_id);
+        if (elementIndex !== -1) {
+          floorElements[elementIndex].position_x = finalX;
+          floorElements[elementIndex].position_y = finalY;
+        }
+        
+        // Save to database
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              position_x: finalX,
+              position_y: finalY
+            })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            console.log('Element position saved');
+          }
+        } catch (error) {
+          console.error('Failed to save element position:', error);
+        }
+        
+        isDragging = false;
       }
       
       // Implement master scale function for admin page
@@ -67853,20 +67934,38 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       };
       
       // Delete selected element (generic)
-      window.deleteSelectedElement = function() {
+      window.deleteSelectedElement = async function() {
         if (selectedTable) {
-          deleteSelectedTable();
+          await deleteSelectedTable();
         } else if (selectedElement) {
-          // Delete floor element (wall, decoration, etc.)
-          const canvas = document.getElementById('canvas');
-          if (selectedElement.parentNode === canvas) {
-            canvas.removeChild(selectedElement);
-            floorElements = floorElements.filter(el => el !== selectedElement);
-            selectedElement = null;
-            console.log('Floor element deleted');
+          // Delete floor element from database
+          if (!confirm('Delete floor element "' + selectedElement.element_label + '"?')) {
+            return;
+          }
+          
+          try {
+            const response = await fetchWithAuth('/api/admin/restaurant/floor-element/' + selectedElement.element_id, {
+              method: 'DELETE'
+            });
+            
+            if (response.ok) {
+              console.log('Floor element deleted');
+              // Remove from local array
+              floorElements = floorElements.filter(el => el.element_id !== selectedElement.element_id);
+              selectedElement = null;
+              renderAdminFloorPlan();
+              alert('Floor element deleted successfully!');
+            } else {
+              const errorData = await response.json();
+              console.error('❌ Failed to delete element:', errorData);
+              alert('Failed to delete floor element');
+            }
+          } catch (error) {
+            console.error('❌ Error deleting element:', error);
+            alert('Error deleting floor element');
           }
         } else {
-          alert('Please select an element first');
+          alert('Please select a table or floor element first');
         }
       };
       
