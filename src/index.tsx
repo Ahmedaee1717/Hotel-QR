@@ -8201,7 +8201,12 @@ app.get('/api/admin/restaurant/:offering_id/floor-elements', async (c) => {
   try {
     const elements = await DB.prepare(`
       SELECT * FROM floor_plan_elements 
-      WHERE offering_id = ? AND is_active = 1
+      WHERE offering_id = ? 
+        AND is_active = 1
+        AND element_type IS NOT NULL 
+        AND element_type != ''
+        AND element_label IS NOT NULL
+        AND element_label != ''
       ORDER BY element_id ASC
     `).bind(offering_id).all()
     
