@@ -72725,9 +72725,6 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 
                 await loadOrders();
             } catch (error) {
-                    alert('Failed to update status: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
                 console.error('Update status error:', error);
                 alert('Error updating status');
             }
