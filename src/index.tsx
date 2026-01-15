@@ -74504,6 +74504,392 @@ app.delete('/api/admin/staff/:user_id', async (c) => {
   }
 })
 
+// ==========================================
+// WAITER DASHBOARD APIs
+// ==========================================
+
+// Get restaurant info
+app.get('/api/restaurant/:restaurant_id/info', async (c) => {
+  const { DB } = c.env
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const restaurant = await DB.prepare(`
+      SELECT offering_id, title_en, location, description_en
+      FROM hotel_offerings
+      WHERE offering_id = ? AND property_id = ?
+    `).bind(restaurant_id, property_id).first()
+    
+    if (!restaurant) {
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+    
+    return c.json({ success: true, restaurant })
+  } catch (error) {
+    console.error('Get restaurant info error:', error)
+    return c.json({ success: false, error: 'Failed to get restaurant info' }, 500)
+  }
+})
+
+// Get extra charge menu items
+app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
+  const { DB } = c.env
+  const { restaurant_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const items = await DB.prepare(`
+      SELECT 
+        item_id,
+        item_name,
+        category,
+        cost_to_hotel,
+        is_premium
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? 
+        AND property_id = ?
+        AND cost_to_hotel > 0
+        AND is_active = 1
+      ORDER BY category, item_name
+    `).bind(restaurant_id, property_id).all()
+    
+    return c.json({
+      success: true,
+      items: items.results || []
+    })
+  } catch (error) {
+    console.error('Get menu items error:', error)
+    return c.json({ success: false, error: 'Failed to get menu items' }, 500)
+  }
+})
+
+// Get tables with current status
+app.get('/api/waiter/tables', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { restaurant, property } = c.req.query()
+  
+  try {
+    // Get all tables for restaurant
+    const tables = await DB.prepare(`
+      SELECT 
+        rt.table_id,
+        rt.table_number,
+        rt.capacity,
+        wo.order_id,
+        wo.guest_name,
+        wo.party_size,
+        wo.status
+      FROM restaurant_tables rt
+      LEFT JOIN waiter_orders wo ON rt.table_id = wo.table_id 
+        AND wo.status IN ('pending', 'confirmed')
+      WHERE rt.offering_id = ?
+        AND rt.is_active = 1
+      ORDER BY CAST(rt.table_number AS INTEGER)
+    `).bind(restaurant).all()
+    
+    // Format response
+    const formattedTables = tables.results.map(t => ({
+      table_id: t.table_id,
+      table_number: t.table_number,
+      capacity: t.capacity,
+      current_order: t.order_id ? {
+        order_id: t.order_id,
+        guest_name: t.guest_name,
+        party_size: t.party_size,
+        status: t.status
+      } : null
+    }))
+    
+    return c.json({
+      success: true,
+      tables: formattedTables
+    })
+  } catch (error) {
+    console.error('Get tables error:', error)
+    return c.json({ success: false, error: 'Failed to get tables' }, 500)
+  }
+})
+
+// Get waiter's active orders
+app.get('/api/waiter/orders', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { restaurant, waiter, property } = c.req.query()
+  
+  try {
+    const orders = await DB.prepare(`
+      SELECT 
+        wo.order_id,
+        wo.table_id,
+        rt.table_number,
+        wo.guest_name,
+        wo.party_size,
+        wo.status,
+        wo.items,
+        wo.total_cost
+      FROM waiter_orders wo
+      INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+      WHERE wo.restaurant_id = ?
+        AND wo.waiter_id = ?
+        AND wo.status IN ('pending', 'confirmed', 'preparing', 'ready')
+      ORDER BY wo.created_at DESC
+    `).bind(restaurant, waiter).all()
+    
+    // Parse items JSON
+    const formattedOrders = orders.results.map(o => ({
+      ...o,
+      items: o.items ? JSON.parse(o.items) : []
+    }))
+    
+    return c.json({
+      success: true,
+      orders: formattedOrders
+    })
+  } catch (error) {
+    console.error('Get orders error:', error)
+    return c.json({ success: false, error: 'Failed to get orders' }, 500)
+  }
+})
+
+// Seat guests at table
+app.post('/api/waiter/seat-guests', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { table_id, restaurant_id, waiter_id, guest_name, room_number, party_size } = body
+    
+    if (!table_id || !restaurant_id || !waiter_id || !guest_name || !party_size) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Check if table has active order
+    const existing = await DB.prepare(`
+      SELECT order_id FROM waiter_orders 
+      WHERE table_id = ? AND status IN ('pending', 'confirmed')
+    `).bind(table_id).first()
+    
+    if (existing) {
+      return c.json({ success: false, error: 'Table already has an active order' }, 400)
+    }
+    
+    // Create new order
+    const result = await DB.prepare(`
+      INSERT INTO waiter_orders (
+        table_id,
+        restaurant_id,
+        waiter_id,
+        guest_name,
+        room_number,
+        party_size,
+        items,
+        total_cost,
+        status,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 'pending', CURRENT_TIMESTAMP)
+    `).bind(table_id, restaurant_id, waiter_id, guest_name, room_number || null, party_size).run()
+    
+    const order = await DB.prepare(`
+      SELECT * FROM waiter_orders WHERE order_id = ?
+    `).bind(result.meta.last_row_id).first()
+    
+    return c.json({
+      success: true,
+      order: {
+        ...order,
+        items: []
+      }
+    })
+  } catch (error) {
+    console.error('Seat guests error:', error)
+    return c.json({ success: false, error: 'Failed to seat guests' }, 500)
+  }
+})
+
+// Add items to order
+app.post('/api/waiter/add-items', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { order_id, items } = body
+    
+    if (!order_id || !items || items.length === 0) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Get current order
+    const order = await DB.prepare(`
+      SELECT * FROM waiter_orders WHERE order_id = ?
+    `).bind(order_id).first()
+    
+    if (!order) {
+      return c.json({ success: false, error: 'Order not found' }, 404)
+    }
+    
+    let currentItems = order.items ? JSON.parse(order.items) : []
+    
+    // Add new items
+    for (const newItem of items) {
+      // Get item details
+      const itemDetails = await DB.prepare(`
+        SELECT item_id, item_name, cost_to_hotel as cost
+        FROM alacarte_menu_items
+        WHERE item_id = ?
+      `).bind(newItem.item_id).first()
+      
+      if (itemDetails) {
+        const existing = currentItems.find(i => i.item_id === newItem.item_id)
+        if (existing) {
+          existing.quantity += newItem.quantity
+        } else {
+          currentItems.push({
+            item_id: itemDetails.item_id,
+            item_name: itemDetails.item_name,
+            cost: itemDetails.cost,
+            quantity: newItem.quantity
+          })
+        }
+      }
+    }
+    
+    // Calculate total
+    const totalCost = currentItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0)
+    
+    // Update order
+    await DB.prepare(`
+      UPDATE waiter_orders
+      SET items = ?, total_cost = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE order_id = ?
+    `).bind(JSON.stringify(currentItems), totalCost, order_id).run()
+    
+    return c.json({
+      success: true,
+      order: {
+        ...order,
+        items: currentItems,
+        total_cost: totalCost
+      }
+    })
+  } catch (error) {
+    console.error('Add items error:', error)
+    return c.json({ success: false, error: 'Failed to add items' }, 500)
+  }
+})
+
+// Update item quantity
+app.post('/api/waiter/update-item', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { order_id, item_id, quantity } = body
+    
+    // Get current order
+    const order = await DB.prepare(`
+      SELECT * FROM waiter_orders WHERE order_id = ?
+    `).bind(order_id).first()
+    
+    if (!order) {
+      return c.json({ success: false, error: 'Order not found' }, 404)
+    }
+    
+    let currentItems = order.items ? JSON.parse(order.items) : []
+    
+    if (quantity === 0) {
+      // Remove item
+      currentItems = currentItems.filter(i => i.item_id !== item_id)
+    } else {
+      // Update quantity
+      const item = currentItems.find(i => i.item_id === item_id)
+      if (item) {
+        item.quantity = quantity
+      }
+    }
+    
+    // Calculate total
+    const totalCost = currentItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0)
+    
+    // Update order
+    await DB.prepare(`
+      UPDATE waiter_orders
+      SET items = ?, total_cost = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE order_id = ?
+    `).bind(JSON.stringify(currentItems), totalCost, order_id).run()
+    
+    return c.json({
+      success: true,
+      order: {
+        ...order,
+        items: currentItems,
+        total_cost: totalCost
+      }
+    })
+  } catch (error) {
+    console.error('Update item error:', error)
+    return c.json({ success: false, error: 'Failed to update item' }, 500)
+  }
+})
+
+// Send order to kitchen
+app.post('/api/waiter/send-order', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { order_id } = body
+    
+    // Update order status to confirmed
+    await DB.prepare(`
+      UPDATE waiter_orders
+      SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP
+      WHERE order_id = ?
+    `).bind(order_id).run()
+    
+    // TODO: Integrate with kitchen view (create alacarte_voucher)
+    
+    return c.json({
+      success: true,
+      message: 'Order sent to kitchen'
+    })
+  } catch (error) {
+    console.error('Send order error:', error)
+    return c.json({ success: false, error: 'Failed to send order' }, 500)
+  }
+})
+
+// Clear table
+app.post('/api/waiter/clear-table', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { order_id } = body
+    
+    // Mark order as completed/cleared
+    await DB.prepare(`
+      UPDATE waiter_orders
+      SET status = 'cleared', updated_at = CURRENT_TIMESTAMP
+      WHERE order_id = ?
+    `).bind(order_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Table cleared'
+    })
+  } catch (error) {
+    console.error('Clear table error:', error)
+    return c.json({ success: false, error: 'Failed to clear table' }, 500)
+  }
+})
+
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
