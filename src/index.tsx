@@ -64322,7 +64322,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             let limitButton = '';
             if (isSelected) {
-                limitButton = '<button onclick="toggleCustomLimit(' + item.item_id + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+                limitButton = '<button onclick="toggleCustomLimit(\'' + item.item_id + '\')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
             }
             
             // Price display for extra charge items
@@ -64340,11 +64340,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     </div>
                     <div class="flex items-center justify-between">
                         <div class="quantity-controls flex items-center gap-2">
-                            <button onclick="adjustItemQuantity(\${item.item_id}, -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" \${quantity === 0 ? 'disabled' : ''}>
+                            <button onclick="adjustItemQuantity('\${item.item_id}', -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" \${quantity === 0 ? 'disabled' : ''}>
                                 <i class="fas fa-minus"></i>
                             </button>
                             <span class="w-12 text-center font-bold text-lg">\${quantity}</span>
-                            <button onclick="adjustItemQuantity(\${item.item_id}, 1)" class="btn-primary text-white">
+                            <button onclick="adjustItemQuantity('\${item.item_id}', 1)" class="btn-primary text-white">
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
@@ -64353,7 +64353,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     <div id="customLimit\${item.item_id}" class="hidden mt-3 pt-3 border-t">
                         <label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>
                         <input type="number" id="limitInput\${item.item_id}" min="0" value="\${isSelected?.customLimit || ''}" 
-                               onchange="setCustomLimit(\${item.item_id}, this.value)"
+                               onchange="setCustomLimit('\${item.item_id}', this.value)"
                                class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">
                     </div>
                 </div>
@@ -70856,7 +70856,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
   try {
     const body = await c.req.json()
     const {
-      pass_reference,
+      pass_reference, // OPTIONAL - for digital pass voucher bookings
       guest_name,
       room_number,
       party_size,
@@ -70868,42 +70868,51 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       no_allergies_confirmed
     } = body
     
-    // Validate required fields
-    if (!pass_reference || !guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
+    // Validate required fields (pass_reference is OPTIONAL for walk-in guests)
+    if (!guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
     }
     
-    // Verify pass and check party size limit
-    const pass = await DB.prepare(`
-      SELECT pass_id, tier_id, num_adults, num_children, pass_status
-      FROM digital_passes
-      WHERE pass_reference = ? AND property_id = ?
-    `).bind(pass_reference, property_id).first()
+    let pass = null
+    let passId = null
+    let tierId = 1 // Default tier for walk-in
+    let mealNumber = 1
     
-    if (!pass) {
-      return c.json({ success: false, error: 'Digital pass not found' }, 404)
+    // If pass_reference provided, verify the pass
+    if (pass_reference) {
+      pass = await DB.prepare(`
+        SELECT pass_id, tier_id, num_adults, num_children, pass_status
+        FROM digital_passes
+        WHERE pass_reference = ? AND property_id = ?
+      `).bind(pass_reference, property_id).first()
+      
+      if (!pass) {
+        return c.json({ success: false, error: 'Digital pass not found' }, 404)
+      }
+      
+      if (pass.pass_status !== 'active') {
+        return c.json({ success: false, error: 'Pass is not active' }, 400)
+      }
+      
+      const maxGuests = (pass.num_adults || 1) + (pass.num_children || 0)
+      if (party_size > maxGuests) {
+        return c.json({ 
+          success: false, 
+          error: `Party size (${party_size}) exceeds maximum guests on pass (${maxGuests})` 
+        }, 400)
+      }
+      
+      // Get meal number (next available)
+      const vouchersUsed = await DB.prepare(`
+        SELECT COUNT(*) as count
+        FROM alacarte_vouchers
+        WHERE pass_id = ? AND status IN ('confirmed', 'used')
+      `).bind(pass.pass_id).first()
+      
+      mealNumber = (vouchersUsed?.count || 0) + 1
+      passId = pass.pass_id
+      tierId = pass.tier_id || 1
     }
-    
-    if (pass.pass_status !== 'active') {
-      return c.json({ success: false, error: 'Pass is not active' }, 400)
-    }
-    
-    const maxGuests = (pass.num_adults || 1) + (pass.num_children || 0)
-    if (party_size > maxGuests) {
-      return c.json({ 
-        success: false, 
-        error: `Party size (${party_size}) exceeds maximum guests on pass (${maxGuests})` 
-      }, 400)
-    }
-    
-    // Get meal number (next available)
-    const vouchersUsed = await DB.prepare(`
-      SELECT COUNT(*) as count
-      FROM alacarte_vouchers
-      WHERE pass_id = ? AND status IN ('confirmed', 'used')
-    `).bind(pass.pass_id).first()
-    
-    const mealNumber = (vouchersUsed?.count || 0) + 1
     
     // Generate voucher code
     const timestamp = Date.now()
@@ -70917,14 +70926,20 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     }))
     
     // Build special requests with allergy info
-    let special_requests = `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}, Pass: ${pass_reference}`
+    let special_requests = `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}`
+    if (pass_reference) {
+      special_requests += `, Pass: ${pass_reference}`
+    } else {
+      special_requests += ` (Walk-in - No Pass)`
+    }
+    
     if (allergy_info && allergy_info.trim()) {
       special_requests = `ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
     } else if (no_allergies_confirmed) {
       special_requests = `NO ALLERGIES CONFIRMED\n\n${special_requests}`
     }
     
-    // Create voucher linked to pass
+    // Create voucher (with or without pass)
     await DB.prepare(`
       INSERT INTO alacarte_vouchers (
         property_id,
@@ -70945,8 +70960,8 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     `).bind(
       property_id,
       voucher_code,
-      pass.pass_id,
-      pass.tier_id || 1,
+      passId, // NULL for walk-in guests
+      tierId,
       mealNumber,
       restaurant_id,
       reservation_date,
