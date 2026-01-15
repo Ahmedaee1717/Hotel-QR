@@ -69342,36 +69342,54 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         function toggleItem(itemId, category, itemName, cost, extraCharge = false) {
             const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
             
-            // Count total quantity in this category
-            const currentCategoryTotal = Object.keys(selectedItems)
-                .filter(id => selectedItems[id].category === category)
-                .reduce((sum, id) => sum + (selectedItems[id].quantity || 1), 0);
-            
-            // If item exists, increment quantity (up to orderingFor limit)
-            if (selectedItems[itemId]) {
-                const currentQuantity = selectedItems[itemId].quantity || 1;
+            // EXTRA CHARGE items are UNLIMITED (no PAX limit)
+            if (!extraCharge) {
+                // Count total quantity in this category (only for SET MENU items)
+                const currentCategoryTotal = Object.keys(selectedItems)
+                    .filter(id => selectedItems[id].category === category && !selectedItems[id].extraCharge)
+                    .reduce((sum, id) => sum + (selectedItems[id].quantity || 1), 0);
                 
-                if (currentCategoryTotal >= orderingFor) {
-                    alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
-                    return;
-                }
-                
-                selectedItems[itemId].quantity = currentQuantity + 1;
-            } else {
-                // Check if we can add new item
-                if (currentCategoryTotal >= orderingFor) {
-                    alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
-                    return;
-                }
-                
-                // Add the new selection
-                selectedItems[itemId] = { 
-                    category, 
-                    name: itemName, 
-                    cost,
-                    extraCharge: extraCharge || false,
+                // If item exists, increment quantity (up to orderingFor limit for SET MENU)
+                if (selectedItems[itemId]) {
+                    const currentQuantity = selectedItems[itemId].quantity || 1;
+                    
+                    if (currentCategoryTotal >= orderingFor) {
+                        alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
+                        return;
+                    }
+                    
+                    selectedItems[itemId].quantity = currentQuantity + 1;
+                } else {
+                    // Check if we can add new item
+                    if (currentCategoryTotal >= orderingFor) {
+                        alert(\`You can only select \${orderingFor} \${category}\${orderingFor > 1 ? 's' : ''} for \${orderingFor} \${orderingFor > 1 ? 'people' : 'person'}.\`);
+                        return;
+                    }
+                    
+                    // Add the new selection
+                    selectedItems[itemId] = { 
+                        category, 
+                        name: itemName, 
+                        cost,
+                        extraCharge: false,
                     quantity: 1
                 };
+            }
+            } else {
+                // EXTRA CHARGE items - UNLIMITED (no PAX restrictions)
+                if (selectedItems[itemId]) {
+                    // Increment quantity
+                    selectedItems[itemId].quantity = (selectedItems[itemId].quantity || 1) + 1;
+                } else {
+                    // Add new extra charge item
+                    selectedItems[itemId] = { 
+                        category, 
+                        name: itemName, 
+                        cost,
+                        extraCharge: true,
+                        quantity: 1
+                    };
+                }
             }
             
             updateOrderSummary();
