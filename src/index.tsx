@@ -71324,9 +71324,9 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     if (table_id) {
       const table = await DB.prepare(`
         SELECT table_number
-        FROM tables
-        WHERE table_id = ? AND property_id = ?
-      `).bind(table_id, property_id).first()
+        FROM restaurant_tables
+        WHERE table_id = ? AND offering_id = ?
+      `).bind(table_id, restaurant_id).first()
       
       if (table) {
         table_number = table.table_number
