@@ -74711,9 +74711,18 @@ app.get('/api/waiter/tables', async (c) => {
 app.get('/api/waiter/orders', async (c) => {
   const { DB } = c.env
   const property_id = c.req.header('X-Property-ID') || '1'
-  const { restaurant, waiter, property } = c.req.query()
+  const { restaurant, waiter, property, date } = c.req.query()
   
   try {
+    // Calculate date range: today to 7 days in future
+    const today = new Date().toISOString().split('T')[0]
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + 7)
+    const maxDateStr = maxDate.toISOString().split('T')[0]
+    
+    // Use specific date if provided, otherwise use today
+    const filterDate = date || today
+    
     // Get waiter orders (if waiter=0, get all)
     let waiterOrdersQuery = `
       SELECT 
@@ -74725,14 +74734,16 @@ app.get('/api/waiter/orders', async (c) => {
         wo.status,
         wo.items,
         wo.total_cost,
+        wo.created_at,
         'waiter' as source
       FROM waiter_orders wo
       INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       WHERE wo.restaurant_id = ?
         AND wo.status IN ('pending', 'confirmed', 'preparing', 'ready')
+        AND DATE(wo.created_at) BETWEEN ? AND ?
     `
     
-    const waiterOrdersParams = [restaurant]
+    const waiterOrdersParams = [restaurant, today, maxDateStr]
     
     // Filter by waiter if specified and not 0
     if (waiter && waiter !== '0') {
@@ -74744,7 +74755,7 @@ app.get('/api/waiter/orders', async (c) => {
     
     const waiterOrders = await DB.prepare(waiterOrdersQuery).bind(...waiterOrdersParams).all()
     
-    // Get kitchen orders (alacarte_vouchers) for this restaurant - show all active orders
+    // Get kitchen orders (alacarte_vouchers) for this restaurant - only recent ones
     const kitchenOrders = await DB.prepare(`
       SELECT 
         av.voucher_id,
@@ -74756,14 +74767,16 @@ app.get('/api/waiter/orders', async (c) => {
         av.total_cost,
         av.reservation_time,
         av.reservation_date,
+        av.created_at,
         'kitchen' as source
       FROM alacarte_vouchers av
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
         AND av.status IN ('confirmed', 'preparing', 'ready')
-      ORDER BY av.created_at DESC
+        AND av.reservation_date BETWEEN ? AND ?
+      ORDER BY av.reservation_date DESC, av.created_at DESC
       LIMIT 50
-    `).bind(restaurant, property_id).all()
+    `).bind(restaurant, property_id, today, maxDateStr).all()
     
     // Parse waiter orders
     const formattedWaiterOrders = waiterOrders.results.map(o => ({
@@ -74817,7 +74830,8 @@ app.get('/api/waiter/orders', async (c) => {
           items: items,
           total_cost: totalCost,
           source: 'kitchen',
-          reservation_date: order.reservation_date
+          reservation_date: order.reservation_date,
+          created_at: order.created_at
         })
       } catch (err) {
         console.error('Error processing kitchen order:', order.voucher_id, err)
@@ -74831,11 +74845,48 @@ app.get('/api/waiter/orders', async (c) => {
     
     return c.json({
       success: true,
-      orders: allOrders
+      orders: allOrders,
+      date_range: { from: today, to: maxDateStr }
     })
   } catch (error) {
     console.error('Get orders error:', error)
     return c.json({ success: false, error: 'Failed to get orders', message: error.message }, 500)
+  }
+})
+
+// Delete/cancel order
+app.delete('/api/waiter/order/:order_id', async (c) => {
+  const { DB } = c.env
+  const { order_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    // Check if it's a kitchen order (starts with "kitchen-")
+    if (order_id.startsWith('kitchen-')) {
+      const voucherId = order_id.replace('kitchen-', '')
+      
+      // Cancel the voucher (set status to 'cancelled')
+      await DB.prepare(`
+        UPDATE alacarte_vouchers
+        SET status = 'cancelled',
+            cancelled_at = CURRENT_TIMESTAMP,
+            cancellation_reason = 'Cancelled by waiter'
+        WHERE voucher_id = ?
+      `).bind(voucherId).run()
+      
+      return c.json({ success: true, message: 'Kitchen order cancelled' })
+    } else {
+      // It's a waiter order - delete it
+      await DB.prepare(`
+        DELETE FROM waiter_orders
+        WHERE order_id = ?
+      `).bind(order_id).run()
+      
+      return c.json({ success: true, message: 'Waiter order deleted' })
+    }
+  } catch (error) {
+    console.error('Delete order error:', error)
+    return c.json({ success: false, error: 'Failed to delete order' }, 500)
   }
 })
 

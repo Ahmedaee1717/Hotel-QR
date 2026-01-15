@@ -237,6 +237,29 @@
 
         <!-- Orders View -->
         <div id="ordersView" class="hidden p-4">
+            <!-- Date Filter -->
+            <div class="mb-4 flex items-center gap-4 bg-slate-800 p-4 rounded-lg">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-calendar text-yellow-500"></i>
+                    <label class="dark-text font-medium">Filter by Date:</label>
+                </div>
+                <input 
+                    type="date" 
+                    id="orderDateFilter" 
+                    class="px-4 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-yellow-500 focus:outline-none"
+                    onchange="filterOrdersByDate()"
+                />
+                <button 
+                    onclick="resetDateFilter()" 
+                    class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
+                >
+                    <i class="fas fa-redo mr-2"></i>Show All
+                </button>
+                <div class="flex-1 text-right">
+                    <span class="dark-text-muted text-sm" id="dateRangeInfo">Today + 7 days</span>
+                </div>
+            </div>
+            
             <div class="space-y-4" id="ordersList">
                 <!-- Loaded dynamically -->
             </div>
@@ -710,23 +733,6 @@
             return match ? match[1].trim() : '';
         }
 
-        async function loadOrders() {
-            try {
-                // Load ALL orders for this restaurant (not just this waiter's)
-                const response = await fetch(`/api/waiter/orders?restaurant=${restaurantId}&waiter=0&property=${propertyId}`, {
-                    headers: { 'X-Property-ID': propertyId }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    orders = data.orders || [];
-                    console.log('Loaded orders:', orders.length, orders);
-                    renderOrders();
-                }
-            } catch (error) {
-                console.error('Failed to load orders:', error);
-            }
-        }
-
         function renderOrders() {
             const container = document.getElementById('ordersList');
             
@@ -744,14 +750,39 @@
                     served: 'bg-gray-500'
                 };
                 
+                const sourceColors = {
+                    kitchen: 'bg-purple-600',
+                    waiter: 'bg-teal-600'
+                };
+                
+                const sourceIcons = {
+                    kitchen: 'fa-utensils',
+                    waiter: 'fa-concierge-bell'
+                };
+                
                 return `
-                    <div class="dark-card rounded-lg p-4 order-item">
+                    <div class="dark-card rounded-lg p-4 order-item border-l-4 ${order.source === 'kitchen' ? 'border-purple-500' : 'border-teal-500'}">
                         <div class="flex items-center justify-between mb-3">
-                            <div>
-                                <div class="font-bold dark-text text-lg">Table ${order.table_number}</div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="font-bold dark-text text-lg">Table ${order.table_number}</div>
+                                    <span class="px-2 py-1 rounded text-xs font-bold text-white ${sourceColors[order.source]}">
+                                        <i class="fas ${sourceIcons[order.source]} mr-1"></i>${order.source.toUpperCase()}
+                                    </span>
+                                </div>
                                 <div class="text-sm dark-text-muted">${order.guest_name} • ${order.party_size} guests</div>
+                                ${order.reservation_date ? `<div class="text-xs dark-text-muted mt-1"><i class="fas fa-calendar mr-1"></i>${order.reservation_date}</div>` : ''}
                             </div>
-                            <span class="px-3 py-1 rounded-full text-xs font-bold text-white ${statusColors[order.status]}">${order.status.toUpperCase()}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="px-3 py-1 rounded-full text-xs font-bold text-white ${statusColors[order.status]}">${order.status.toUpperCase()}</span>
+                                <button 
+                                    onclick="deleteOrder('${order.order_id}', '${order.guest_name}')" 
+                                    class="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                                    title="Delete Order"
+                                >
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="space-y-1">
                             ${order.items.map(item => `
@@ -1236,6 +1267,90 @@
                 alert('Failed to clear table');
             }
         }
+        // Date filter functions
+        function filterOrdersByDate() {
+            const dateInput = document.getElementById('orderDateFilter');
+            const selectedDate = dateInput.value;
+            
+            if (selectedDate) {
+                loadOrders(selectedDate);
+            }
+        }
+        
+        function resetDateFilter() {
+            const dateInput = document.getElementById('orderDateFilter');
+            dateInput.value = '';
+            loadOrders();
+        }
+        
+        // Update loadOrders to accept date parameter
+        async function loadOrders(date = null) {
+            try {
+                let url = `/api/waiter/orders?restaurant=${restaurantId}&waiter=0&property=${propertyId}`;
+                if (date) {
+                    url += `&date=${date}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    orders = data.orders || [];
+                    console.log('Loaded orders:', orders.length, orders);
+                    renderOrders();
+                    
+                    // Update date range info
+                    if (data.date_range) {
+                        document.getElementById('dateRangeInfo').textContent = 
+                            `${data.date_range.from} to ${data.date_range.to}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load orders:', error);
+            }
+        }
+        
+        // Delete order function
+        async function deleteOrder(orderId, guestName) {
+            if (!confirm(`Are you sure you want to delete the order for ${guestName}?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/waiter/order/${orderId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Order deleted successfully!');
+                    // Reload orders and tables
+                    await loadOrders();
+                    await loadTables();
+                    renderFloorPlan();
+                } else {
+                    alert('Failed to delete order: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete order error:', error);
+                alert('Failed to delete order. Please try again.');
+            }
+        }
+        
+        // Set max date to 7 days from now
+        window.addEventListener('DOMContentLoaded', () => {
+            const dateInput = document.getElementById('orderDateFilter');
+            if (dateInput) {
+                const today = new Date();
+                const maxDate = new Date();
+                maxDate.setDate(today.getDate() + 7);
+                
+                dateInput.min = today.toISOString().split('T')[0];
+                dateInput.max = maxDate.toISOString().split('T')[0];
+            }
+        });
     </script>
 </body>
 </html>
