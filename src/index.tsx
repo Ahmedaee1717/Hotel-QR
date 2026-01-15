@@ -67241,6 +67241,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         await loadOccupancyStatus();
         await loadTables();  // Load tables for floor plan
         await loadFloorElements();  // Load floor elements
+        renderAdminFloorPlan();  // Render AFTER both tables and elements are loaded
         await loadReservations();  // Load reservations
         console.log('✅ Restaurant Admin init() complete!');
       }
@@ -67619,8 +67620,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           
           console.log('📊 Loaded tables:', tables.length, tables);
           
-          // Render tables on admin floor plan (not booking canvas)
-          renderAdminFloorPlan();
+          // Don't render here - will render in init() after elements are loaded
           // updateTablesList(); // Optional: add if table list UI exists
         } catch (error) {
           console.error('Load tables error:', error);
