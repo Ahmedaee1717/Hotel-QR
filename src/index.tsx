@@ -74546,23 +74546,25 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
   const property_id = c.req.header('X-Property-ID') || '1'
   
   try {
+    // Get extra charge items from menu_items table (the REAL restaurant menu with prices)
+    // These have IDs that get prefixed with "rm_" when ordered
     const items = await DB.prepare(`
       SELECT 
-        item_id,
-        item_name,
-        item_name_ar,
-        category,
-        description,
-        cost_to_hotel,
-        is_premium,
-        is_available
-      FROM alacarte_menu_items
-      WHERE restaurant_id = ? 
-        AND property_id = ?
-        AND cost_to_hotel > 0
-        AND is_available = 1
-      ORDER BY category, display_order, item_name
-    `).bind(restaurant_id, property_id).all()
+        mi.item_id,
+        mi.item_name,
+        mc.category_name as category,
+        mi.description,
+        mi.price as cost_to_hotel,
+        0 as is_premium,
+        mi.is_available
+      FROM menu_items mi
+      LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id
+      LEFT JOIN restaurant_menus rm ON mc.menu_id = rm.menu_id
+      WHERE rm.offering_id = ?
+        AND mi.is_available = 1
+        AND mi.price > 0
+      ORDER BY mc.display_order, mi.display_order, mi.item_name
+    `).bind(restaurant_id).all()
     
     return c.json({
       success: true,
