@@ -66486,8 +66486,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
         </div>
         
-        <!-- Floating Selected Table Panel (Popup) -->
-        <div id="selectedTableInfo" class="hidden fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-2xl p-6 border-4 border-green-500" style="min-width: 320px; max-width: 400px;">
+        <!-- Floating Selected Table Panel (Popup) - LEFT SIDE -->
+        <div id="selectedTableInfo" class="hidden fixed top-24 left-8 z-50 bg-white rounded-lg shadow-2xl p-6 border-4 border-green-500" style="width: 320px;">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
                 <button onclick="closeTablePanel()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">×</button>
