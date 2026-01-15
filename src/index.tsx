@@ -68411,38 +68411,38 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
       return c.html('<h1>Restaurant not found</h1>', 404)
     }
     
-    // Get menu using the menu-display API internally
-    // This will return the full menu structure with all items, categories, and prices
-    const menuDisplayResponse = await fetch(`${c.req.url.split('/alacarte')[0]}/api/restaurant/${offering_id}/menu-display?language=en`, {
-      headers: c.req.raw.headers
-    })
-    const menuDisplayData = await menuDisplayResponse.json()
-    
-    // Extract menu items in flat format for backward compatibility
-    let menu = { results: [] }
-    if (menuDisplayData.success && menuDisplayData.menus) {
-      const allItems = []
-      menuDisplayData.menus.forEach(menuSection => {
-        menuSection.categories.forEach(category => {
-          category.items.forEach(item => {
-            allItems.push({
-              item_id: item.item_id,
-              category: item.category,
-              item_name: item.item_name,
-              item_name_ar: item.item_name_ar || '',
-              description: item.description || '',
-              description_ar: item.description_ar || '',
-              cost_to_hotel: item.price || 0,
-              is_premium: item.is_premium || 0,
-              allergens: item.allergens || '',
-              display_order: item.display_order || 0,
-              image_url: item.image_url || null
-            })
-          })
-        })
-      })
-      menu.results = allItems
-    }
+    // Get à la carte menu items directly from database
+    // These are the items available for ordering with EXTRA CHARGE
+    const menu = await DB.prepare(`
+      SELECT 
+        item_id,
+        item_name,
+        item_name_ar,
+        description,
+        description_ar,
+        category,
+        cost_to_hotel,
+        is_premium,
+        allergens,
+        display_order,
+        image_url
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND is_available = 1
+      ORDER BY 
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'soup' THEN 3
+          WHEN 'pasta' THEN 4
+          WHEN 'seafood' THEN 5
+          WHEN 'main' THEN 6
+          WHEN 'dessert' THEN 7
+          WHEN 'drink' THEN 8
+          ELSE 99
+        END,
+        display_order,
+        item_name
+    `).bind(restaurant_id).all()
     
     return c.html(`
 <!DOCTYPE html>
@@ -68549,6 +68549,21 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
         <!-- Menu Selection -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <!-- Extra Charge Notice -->
+            <div class="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-info-circle text-red-600 text-2xl mt-1"></i>
+                    <div>
+                        <h3 class="font-bold text-red-800 text-lg mb-1">
+                            <span data-i18n="extra-charge-title">À La Carte Menu - Extra Charges Apply</span>
+                        </h3>
+                        <p class="text-gray-700 text-sm">
+                            <span data-i18n="extra-charge-desc">Items below are from our à la carte menu and will incur additional charges. Prices are shown for each item.</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
             <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
             
@@ -68700,12 +68715,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         console.log('🍽️ Available menu categories:', availableCategories);
         console.log('🍽️ Total menu items:', menuData.length);
         
-        // Category display configuration
+        // Category display configuration with EXTRA CHARGE labels
         const categoryConfig = {
             'salad': { emoji: '🥗', label: 'Salads', i18n: 'salads', order: 1 },
             'starter': { emoji: '🍤', label: 'Starters', i18n: 'starters', order: 2 },
-            'main': { emoji: '🥩', label: 'Mains', i18n: 'mains', order: 3 },
-            'dessert': { emoji: '🍰', label: 'Desserts', i18n: 'desserts', order: 4 }
+            'soup': { emoji: '🍲', label: 'Soups', i18n: 'soups', order: 3 },
+            'pasta': { emoji: '🍝', label: 'Pasta', i18n: 'pasta', order: 4 },
+            'seafood': { emoji: '🦞', label: 'Seafood', i18n: 'seafood', order: 5 },
+            'main': { emoji: '🥩', label: 'Mains', i18n: 'mains', order: 6 },
+            'dessert': { emoji: '🍰', label: 'Desserts', i18n: 'desserts', order: 7 },
+            'drink': { emoji: '🍹', label: 'Drinks', i18n: 'drinks', order: 8 }
         };
         
         // Generate dynamic category tabs
@@ -69064,15 +69083,17 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
+                const extraChargeBadge = '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>';
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-primary font-bold text-lg">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-red-600 font-bold text-lg">+€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
+                                \${extraChargeBadge}
                                 \${premiumBadge}
                             </div>
                             <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
