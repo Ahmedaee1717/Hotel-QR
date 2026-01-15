@@ -64328,44 +64328,50 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const isSelected = selectedItems[item.item_id];
             const quantity = isSelected ? isSelected.quantity : 0;
             
+            // Pre-escape the item_id for onclick handlers
+            const itemIdEscaped = JSON.stringify(item.item_id);
+            
             let limitButton = '';
             if (isSelected) {
-                limitButton = '<button onclick="toggleCustomLimit(' + JSON.stringify(item.item_id) + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+                limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
             }
             
             // Price display for extra charge items
             const priceDisplay = item.extraCharge && item.cost_to_hotel > 0 ? 
                 '<span class="text-amber-600 font-bold">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
             
-            return \`
-                <div class="menu-item border-2 \${isSelected ? 'border-accent-color' : 'border-gray-200'} rounded-xl p-4">
-                    <div class="mb-3">
-                        <div class="flex items-start justify-between">
-                            <h4 class="font-bold">\${item.item_name}</h4>
-                            \${priceDisplay}
-                        </div>
-                        \${item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : ''}
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <div class="quantity-controls flex items-center gap-2">
-                            <button onclick="adjustItemQuantity(\${JSON.stringify(item.item_id)}, -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" \${quantity === 0 ? 'disabled' : ''}>
-                                <i class="fas fa-minus"></i>
-                            </button>
-                            <span class="w-12 text-center font-bold text-lg">\${quantity}</span>
-                            <button onclick="adjustItemQuantity(\${JSON.stringify(item.item_id)}, 1)" class="btn-primary text-white">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                        \${limitButton}
-                    </div>
-                    <div id="customLimit\${item.item_id}" class="hidden mt-3 pt-3 border-t">
-                        <label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>
-                        <input type="number" id="limitInput\${item.item_id}" min="0" value="\${isSelected?.customLimit || ''}" 
-                               onchange="setCustomLimit(\${JSON.stringify(item.item_id)}, this.value)"
-                               class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">
-                    </div>
-                </div>
-            \`;
+            const borderClass = isSelected ? 'border-accent-color' : 'border-gray-200';
+            const premiumBadge = item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : '';
+            const disabledAttr = quantity === 0 ? 'disabled' : '';
+            const customLimitValue = isSelected?.customLimit || '';
+            
+            return '<div class="menu-item border-2 ' + borderClass + ' rounded-xl p-4">' +
+                '<div class="mb-3">' +
+                    '<div class="flex items-start justify-between">' +
+                        '<h4 class="font-bold">' + item.item_name + '</h4>' +
+                        priceDisplay +
+                    '</div>' +
+                    premiumBadge +
+                '</div>' +
+                '<div class="flex items-center justify-between">' +
+                    '<div class="quantity-controls flex items-center gap-2">' +
+                        '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" ' + disabledAttr + '>' +
+                            '<i class="fas fa-minus"></i>' +
+                        '</button>' +
+                        '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>' +
+                        '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', 1)" class="btn-primary text-white">' +
+                            '<i class="fas fa-plus"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    limitButton +
+                '</div>' +
+                '<div id="customLimit' + item.item_id + '" class="hidden mt-3 pt-3 border-t">' +
+                    '<label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>' +
+                    '<input type="number" id="limitInput' + item.item_id + '" min="0" value="' + customLimitValue + '" ' +
+                           'onchange="setCustomLimit(' + itemIdEscaped + ', this.value)" ' +
+                           'class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">' +
+                '</div>' +
+            '</div>';
         }
         
         window.adjustItemQuantity = function(itemId, delta) {
