@@ -69261,7 +69261,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
-                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, false)" 
+                            <button onclick="toggleItem('\${item.item_id}', '\${item.category}', '\${itemNameEscaped}', \${item.cost_to_hotel}, false)" 
                                     id="btn-\${item.item_id}"
                                     class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
                                 <i class="fas fa-plus"></i>
@@ -69327,7 +69327,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
-                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, true)" 
+                            <button onclick="toggleItem('\${item.item_id}', '\${item.category}', '\${itemNameEscaped}', \${item.cost_to_hotel}, true)" 
                                     id="btn-\${item.item_id}"
                                     class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-200 text-gray-700 hover:bg-amber-100'}">
                                 <i class="fas fa-plus"></i>
