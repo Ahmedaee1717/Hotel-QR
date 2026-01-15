@@ -72933,22 +72933,48 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         }
       }
       
-      const placeholders = itemIds.map(() => '?').join(',')
+      // Query BOTH tables: alacarte_menu_items (SET MENU) AND menu_items (EXTRA CHARGE)
       let dishes = { results: [] }
       try {
-        dishes = await DB.prepare(
-          'SELECT item_id, category, item_name, is_premium ' +
-          'FROM alacarte_menu_items ' +
-          'WHERE item_id IN (' + placeholders + ') ' +
-          'ORDER BY ' +
-          "  CASE category " +
-          "    WHEN 'salad' THEN 1 " +
-          "    WHEN 'starter' THEN 2 " +
-          "    WHEN 'main' THEN 3 " +
-          "    WHEN 'dessert' THEN 4 " +
-          "    ELSE 5 " +
-          "  END"
-        ).bind(...itemIds).all()
+        // First, get SET MENU items from alacarte_menu_items
+        const setMenuItems = await Promise.all(
+          itemIds.map(async (id) => {
+            const result = await DB.prepare(
+              'SELECT item_id, category, item_name, is_premium, 0 as extraCharge ' +
+              'FROM alacarte_menu_items ' +
+              'WHERE item_id = ?'
+            ).bind(id).first()
+            return result
+          })
+        )
+        
+        // Then, get EXTRA CHARGE items from menu_items
+        const extraChargeItems = await Promise.all(
+          itemIds.map(async (id) => {
+            const result = await DB.prepare(
+              'SELECT mi.item_id, mc.category_name as category, mi.item_name, 0 as is_premium, 1 as extraCharge ' +
+              'FROM menu_items mi ' +
+              'LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id ' +
+              'WHERE mi.item_id = ?'
+            ).bind(id).first()
+            return result
+          })
+        )
+        
+        // Combine results - prefer SET MENU if item exists in both (shouldn't happen but safety)
+        const allItems = []
+        itemIds.forEach((id) => {
+          const setItem = setMenuItems.find(item => item && item.item_id === id)
+          const extraItem = extraChargeItems.find(item => item && item.item_id === id)
+          
+          if (setItem) {
+            allItems.push(setItem)
+          } else if (extraItem) {
+            allItems.push(extraItem)
+          }
+        })
+        
+        dishes.results = allItems
       } catch (e) {
         console.error('Failed to fetch dishes for order', order.voucher_code, ':', e)
         console.error('itemIds:', itemIds)
