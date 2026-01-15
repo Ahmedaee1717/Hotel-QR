@@ -68624,18 +68624,44 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             </div>
         </div>
 
-        <!-- Menu Selection -->
+        <!-- SET MENU (Included in Voucher) -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
-            <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold"><i class="fas fa-utensils mr-2 text-primary"></i>À La Carte Set Menu</h2>
+                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
+                    <i class="fas fa-check-circle mr-1"></i>INCLUDED IN VOUCHER
+                </span>
+            </div>
+            <p class="text-gray-600 mb-6">Select your dishes from the set menu - all items are included in your à la carte voucher!</p>
             
-            <!-- Category Tabs (Dynamic) -->
-            <div id="menuTabs" class="flex space-x-2 mb-6 border-b overflow-x-auto">
-                <!-- Tabs will be dynamically generated from actual menu data -->
+            <!-- Set Menu Category Tabs -->
+            <div id="setMenuTabs" class="flex space-x-2 mb-6 border-b overflow-x-auto">
+                <!-- Tabs will be dynamically generated -->
             </div>
 
-            <!-- Menu Items -->
-            <div id="menuContainer"></div>
+            <!-- Set Menu Items -->
+            <div id="setMenuContainer"></div>
+        </div>
+
+        <!-- RESTAURANT MENU (Extra Charge) -->
+        <div id="restaurantMenuSection" class="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-red-200">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-bold"><i class="fas fa-concierge-bell mr-2 text-primary"></i>Restaurant Menu</h2>
+                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-bold border border-red-300">
+                    <i class="fas fa-credit-card mr-1"></i>EXTRA CHARGE
+                </span>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <p class="text-red-800 font-semibold"><i class="fas fa-info-circle mr-2"></i>These items are not included in your voucher and will be charged separately.</p>
+            </div>
+            
+            <!-- Restaurant Menu Category Tabs -->
+            <div id="restaurantMenuTabs" class="flex space-x-2 mb-6 border-b overflow-x-auto">
+                <!-- Tabs will be dynamically generated -->
+            </div>
+
+            <!-- Restaurant Menu Items -->
+            <div id="restaurantMenuContainer"></div>
         </div>
 
         <!-- Table Selection -->
@@ -68796,25 +68822,54 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             'pastries': { emoji: '🥐', label: 'Pastries', i18n: 'pastries', order: 10 }
         };
         
-        // Generate dynamic category tabs
-        function generateMenuTabs() {
-            const tabsContainer = document.getElementById('menuTabs');
+        // Generate SET MENU tabs
+        function generateSetMenuTabs() {
+            const tabsContainer = document.getElementById('setMenuTabs');
             if (!tabsContainer) return;
             
-            const sortedCategories = availableCategories
+            const setCategories = Object.keys(setMenuByCategory)
                 .filter(cat => categoryConfig[cat])
                 .sort((a, b) => (categoryConfig[a]?.order || 999) - (categoryConfig[b]?.order || 999));
             
-            tabsContainer.innerHTML = sortedCategories.map((category, index) => {
+            tabsContainer.innerHTML = setCategories.map((category, index) => {
                 const config = categoryConfig[category];
                 const isFirst = index === 0;
                 const activeClass = isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600';
-                return '<button onclick="showMenuCategory(\\'' + category + '\\')" class="menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span data-i18n="' + config.i18n + '">' + config.label + '</span></button>';
+                return '<button onclick="showSetMenuCategory(\\'' + category + '\\')" class="set-menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span>' + config.label + '</span></button>';
             }).join('');
             
             // Show first category by default
-            if (sortedCategories.length > 0) {
-                showMenuCategory(sortedCategories[0]);
+            if (setCategories.length > 0) {
+                showSetMenuCategory(setCategories[0]);
+            }
+        }
+        
+        // Generate RESTAURANT MENU tabs
+        function generateRestaurantMenuTabs() {
+            const tabsContainer = document.getElementById('restaurantMenuTabs');
+            const section = document.getElementById('restaurantMenuSection');
+            if (!tabsContainer || !section) return;
+            
+            const restaurantCategories = Object.keys(restaurantMenuByCategory)
+                .filter(cat => categoryConfig[cat])
+                .sort((a, b) => (categoryConfig[a]?.order || 999) - (categoryConfig[b]?.order || 999));
+            
+            // Hide section if no restaurant menu
+            if (restaurantCategories.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            
+            tabsContainer.innerHTML = restaurantCategories.map((category, index) => {
+                const config = categoryConfig[category];
+                const isFirst = index === 0;
+                const activeClass = isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600';
+                return '<button onclick="showRestaurantMenuCategory(\\'' + category + '\\')" class="restaurant-menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span>' + config.label + '</span></button>';
+            }).join('');
+            
+            // Show first category by default
+            if (restaurantCategories.length > 0) {
+                showRestaurantMenuCategory(restaurantCategories[0]);
             }
         }
         
@@ -69152,15 +69207,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
             }
         }
-        async function showMenuCategory(category) {
+        // Show SET MENU category
+        async function showSetMenuCategory(category) {
             // Update tabs
-            document.querySelectorAll('.menu-tab').forEach(tab => {
+            document.querySelectorAll('.set-menu-tab').forEach(tab => {
                 tab.classList.remove('border-primary', 'text-primary');
                 tab.classList.add('border-transparent', 'text-gray-600');
             });
             
             // Find and update the clicked tab
-            const tabs = document.querySelectorAll('.menu-tab');
+            const tabs = document.querySelectorAll('.set-menu-tab');
             tabs.forEach(tab => {
                 if (tab.getAttribute('onclick').includes(category)) {
                     tab.classList.remove('border-transparent', 'text-gray-600');
@@ -69169,35 +69225,18 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             });
             
             // Render items
-            const container = document.getElementById('menuContainer');
-            const items = menuByCategory[category] || [];
+            const container = document.getElementById('setMenuContainer');
+            const items = setMenuByCategory[category] || [];
             
             if (items.length === 0) {
-                const noItemsText = currentLanguage === 'en' ? 'No items in this category' : await translateText('No items in this category', currentLanguage);
-                container.innerHTML = \`<p class="text-gray-500 text-center py-8">\${noItemsText}</p>\`;
+                container.innerHTML = \`<p class="text-gray-500 text-center py-8">No items in this category</p>\`;
                 return;
             }
             
-            // Translate items if needed
-            const translatedItems = await Promise.all(items.map(async item => {
-                if (currentLanguage === 'en') return item;
-                
-                return {
-                    ...item,
-                    item_name: await translateText(item.item_name, currentLanguage),
-                    description: item.description ? await translateText(item.description, currentLanguage) : ''
-                };
-            }));
-            
-            const selectedText = currentLanguage === 'en' ? 'Selected' : await translateText('Selected', currentLanguage);
-            const addText = currentLanguage === 'en' ? 'Add' : await translateText('Add', currentLanguage);
-            const premiumText = currentLanguage === 'en' ? 'PREMIUM' : await translateText('PREMIUM', currentLanguage);
-            
-            container.innerHTML = translatedItems.map(item => {
+            container.innerHTML = items.map(item => {
                 const selectedItem = selectedItems[item.item_id];
                 const quantity = selectedItem?.quantity || 0;
                 
-                // Build quantity controls separately to avoid template literal nesting issues
                 let quantityControls = '';
                 if (quantity > 0) {
                     quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;)" ' +
@@ -69207,31 +69246,97 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                                       '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>';
                 }
                 
-                const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
-                const extraChargeBadge = item.extraCharge ? '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>' : '';
-                const setMenuBadge = item.isSetMenu ? '<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold border border-green-300">✓ INCLUDED</span>' : '';
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="' + (item.extraCharge ? 'text-red-600 font-bold' : 'text-gray-600') + ' text-sm">' + (item.extraCharge ? '+' : '') + '€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
-                <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : item.extraCharge ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}">
+                <div class="border rounded-lg p-4 mb-3 border-green-200 bg-green-50">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h4 class="font-bold text-lg mb-1">\${item.item_name}</h4>
+                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
+                            \${priceDisplay}
+                        </div>
+                        <div class="ml-4 flex items-center gap-2">
+                            \${quantityControls}
+                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, false)" 
+                                    id="btn-\${item.item_id}"
+                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                \`;
+            }).join('');
+        }
+        
+        // Show RESTAURANT MENU category
+        async function showRestaurantMenuCategory(category) {
+            // Update tabs
+            document.querySelectorAll('.restaurant-menu-tab').forEach(tab => {
+                tab.classList.remove('border-primary', 'text-primary');
+                tab.classList.add('border-transparent', 'text-gray-600');
+            });
+            
+            // Find and update the clicked tab
+            const tabs = document.querySelectorAll('.restaurant-menu-tab');
+            tabs.forEach(tab => {
+                if (tab.getAttribute('onclick').includes(category)) {
+                    tab.classList.remove('border-transparent', 'text-gray-600');
+                    tab.classList.add('border-primary', 'text-primary');
+                }
+            });
+            
+            // Render items
+            const container = document.getElementById('restaurantMenuContainer');
+            const items = restaurantMenuByCategory[category] || [];
+            
+            if (items.length === 0) {
+                container.innerHTML = \`<p class="text-gray-500 text-center py-8">No items in this category</p>\`;
+                return;
+            }
+            
+            container.innerHTML = items.map(item => {
+                const selectedItem = selectedItems[item.item_id];
+                const quantity = selectedItem?.quantity || 0;
+                
+                let quantityControls = '';
+                if (quantity > 0) {
+                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;)" ' +
+                                      'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
+                                      '<i class="fas fa-minus"></i>' +
+                                      '</button>' +
+                                      '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>';
+                }
+                
+                const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-red-600 font-bold text-sm">+€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                
+                return \`
+                <div class="border-2 rounded-lg p-4 mb-3 border-red-300 bg-red-50">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-1 flex-wrap">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
-                                \${setMenuBadge}
-                                \${extraChargeBadge}
-                                \${premiumBadge}
+                                <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>
                             </div>
                             <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
                             \${priceDisplay}
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
-                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, \${item.extraCharge})" 
+                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, true)" 
                                     id="btn-\${item.item_id}"
-                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
+                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}">
                                 <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                \`;
+            }).join('');
+        }
                             </button>
                         </div>
                     </div>
@@ -69755,7 +69860,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             // Generate dynamic menu tabs based on actual menu data
-            generateMenuTabs();
+            generateSetMenuTabs();
+            generateRestaurantMenuTabs();
             
             // Load tables
             await loadTables();
