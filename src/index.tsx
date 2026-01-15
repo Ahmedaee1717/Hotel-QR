@@ -64110,21 +64110,53 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         
         async function loadMenuItems(restaurantId) {
             try {
-                const response = await fetch('/api/alacarte/menu/' + restaurantId + '?property=' + propertyId, {
+                // Load SET MENU (included in voucher)
+                const setMenuResponse = await fetch('/api/alacarte/menu/' + restaurantId + '?property=' + propertyId, {
                     headers: { 'X-Property-ID': propertyId }
                 });
-                const data = await response.json();
+                const setMenuData = await setMenuResponse.json();
                 
-                // Flatten menu from category-based object to flat array
-                if (data.menu) {
-                    menuItems = [];
-                    Object.keys(data.menu).forEach(category => {
-                        menuItems = menuItems.concat(data.menu[category]);
+                // Load RESTAURANT MENU (extra charge)
+                const restaurantMenuResponse = await fetch('/api/restaurant/' + restaurantId + '/menu-display?language=en');
+                const restaurantMenuData = await restaurantMenuResponse.json();
+                
+                // Flatten SET MENU from category-based object to flat array
+                menuItems = [];
+                if (setMenuData.menu) {
+                    Object.keys(setMenuData.menu).forEach(category => {
+                        const items = setMenuData.menu[category].map(item => ({
+                            ...item,
+                            extraCharge: false,
+                            isSetMenu: true
+                        }));
+                        menuItems = menuItems.concat(items);
                     });
-                } else {
-                    menuItems = data.items || [];
+                } else if (setMenuData.items) {
+                    menuItems = setMenuData.items.map(item => ({
+                        ...item,
+                        extraCharge: false,
+                        isSetMenu: true
+                    }));
                 }
                 
+                // Add RESTAURANT MENU items (extra charge)
+                if (restaurantMenuData.success && restaurantMenuData.categories) {
+                    restaurantMenuData.categories.forEach(category => {
+                        category.items.forEach(item => {
+                            menuItems.push({
+                                item_id: 'rm_' + item.item_id, // Prefix to avoid conflicts
+                                item_name: item.item_name,
+                                category: category.category_name.toLowerCase().replace(/\s+/g, '_'),
+                                cost_to_hotel: item.price || 0,
+                                is_premium: false,
+                                extraCharge: true,
+                                isSetMenu: false
+                            });
+                        });
+                    });
+                }
+                
+                console.log('Loaded', menuItems.length, 'items (SET MENU + RESTAURANT MENU)');
                 renderMenuItems(); // Render menu after loading
             } catch (error) {
                 console.error('Failed to load menu:', error);
@@ -64168,11 +64200,21 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 limitButton = '<button onclick="toggleCustomLimit(' + item.item_id + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
             }
             
+            // Extra charge badge and price
+            const extraChargeBadge = item.extraCharge ? 
+                '<span class="inline-block bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold mt-1"><i class="fas fa-coins mr-1"></i>EXTRA CHARGE</span>' : '';
+            const priceDisplay = item.extraCharge && item.cost_to_hotel > 0 ? 
+                '<span class="text-amber-600 font-bold">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+            
             return \`
                 <div class="menu-item border-2 \${isSelected ? 'border-accent-color' : 'border-gray-200'} rounded-xl p-4">
                     <div class="mb-3">
-                        <h4 class="font-bold">\${item.item_name}</h4>
+                        <div class="flex items-start justify-between">
+                            <h4 class="font-bold">\${item.item_name}</h4>
+                            \${priceDisplay}
+                        </div>
                         \${item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : ''}
+                        \${extraChargeBadge}
                     </div>
                     <div class="flex items-center justify-between">
                         <div class="quantity-controls flex items-center gap-2">
@@ -64200,18 +64242,21 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const item = menuItems.find(i => i.item_id === itemId);
             if (!item) return;
             
-            // Get current party size
-            const partySize = parseInt(document.getElementById('partySize')?.value || 1);
-            
-            // Calculate total quantity for this category
-            const categoryTotal = Object.values(selectedItems)
-                .filter(si => si.item.category === item.category)
-                .reduce((sum, si) => sum + si.quantity, 0);
-            
-            // Check if we're trying to add beyond the limit
-            if (delta > 0 && categoryTotal >= partySize) {
-                alert('You can only select ' + partySize + ' item(s) from ' + item.category + ' category (ordering for ' + partySize + ' people)');
-                return;
+            // EXTRA CHARGE items have no PAX limit (unlimited)
+            if (!item.extraCharge) {
+                // Get current party size
+                const partySize = parseInt(document.getElementById('partySize')?.value || 1);
+                
+                // Calculate total quantity for this category (only SET MENU items)
+                const categoryTotal = Object.values(selectedItems)
+                    .filter(si => si.item.category === item.category && !si.item.extraCharge)
+                    .reduce((sum, si) => sum + si.quantity, 0);
+                
+                // Check if we're trying to add beyond the limit (only for SET MENU)
+                if (delta > 0 && categoryTotal >= partySize) {
+                    alert('You can only select ' + partySize + ' item(s) from ' + item.category + ' category (ordering for ' + partySize + ' people)');
+                    return;
+                }
             }
             
             if (!selectedItems[itemId]) {
