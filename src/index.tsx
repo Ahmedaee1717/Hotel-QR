@@ -8056,6 +8056,57 @@ app.post('/api/admin/restaurant/table', requirePermission('restaurant_tables'), 
   const data = await c.req.json()
   
   try {
+    // Check if table exists (even if inactive)
+    const existing = await DB.prepare(`
+      SELECT table_id, is_active FROM restaurant_tables 
+      WHERE offering_id = ? AND table_number = ?
+    `).bind(data.offering_id, data.table_number).first()
+    
+    if (existing) {
+      // If exists but inactive, reactivate it
+      if (existing.is_active === 0) {
+        await DB.prepare(`
+          UPDATE restaurant_tables SET
+            is_active = 1,
+            table_name = ?,
+            capacity = ?,
+            position_x = ?,
+            position_y = ?,
+            width = ?,
+            height = ?,
+            shape = ?,
+            table_type = ?,
+            features = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE table_id = ?
+        `).bind(
+          data.table_name || null,
+          data.capacity,
+          data.position_x || 0,
+          data.position_y || 0,
+          data.width || 100,
+          data.height || 80,
+          data.shape || 'rectangle',
+          data.table_type || 'standard',
+          JSON.stringify(data.features || []),
+          existing.table_id
+        ).run()
+        
+        return c.json({ 
+          success: true,
+          table_id: existing.table_id,
+          reactivated: true
+        })
+      } else {
+        // Table exists and is active - duplicate error
+        return c.json({ 
+          error: 'Table number already exists', 
+          details: 'UNIQUE constraint failed: restaurant_tables.table_number'
+        }, 400)
+      }
+    }
+    
+    // Table doesn't exist, create new one
     const result = await DB.prepare(`
       INSERT INTO restaurant_tables (
         offering_id, table_number, table_name, capacity,
@@ -67148,11 +67199,43 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       let currentTab = 'tables';
       let masterScale = 100; // 100% by default
 
+      // Load tables from DB
+      async function loadTables() {
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + numericOfferingId + '/tables', {
+            headers: { 'X-Property-ID': propertyId }
+          });
+          const data = await response.json();
+          if (data.success) {
+            tables = data.tables || [];
+            console.log('✅ Loaded', tables.length, 'tables');
+          }
+        } catch (error) {
+          console.error('Failed to load tables:', error);
+        }
+      }
+      
+      // Load floor elements from DB
+      async function loadFloorElements() {
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + numericOfferingId + '/floor-elements');
+          const data = await response.json();
+          if (data.success) {
+            floorElements = data.elements || [];
+            console.log('✅ Loaded', floorElements.length, 'floor elements');
+          }
+        } catch (error) {
+          console.error('Failed to load floor elements:', error);
+          floorElements = [];
+        }
+      }
+
       async function init() {
         console.log('🚀 Restaurant Admin init() starting...');
         await loadRestaurant();
         await loadOccupancyStatus();
         await loadTables();  // Load tables for floor plan
+        await loadFloorElements();  // Load floor elements
         await loadReservations();  // Load reservations
         console.log('✅ Restaurant Admin init() complete!');
       }
@@ -68461,21 +68544,39 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const elementHeight = parseInt(document.getElementById('elementHeight').value);
         const elementColor = document.getElementById('elementColor').value;
         
-        const newElement = {
-          id: Date.now(),
-          type: elementType,
-          label: elementLabel,
+        const payload = {
+          offering_id: currentRestaurant.offering_id,
+          property_id: currentPropertyId,
+          element_type: elementType,
+          element_label: elementLabel,
+          position_x: 100,
+          position_y: 100,
           width: elementWidth,
           height: elementHeight,
-          color: elementColor,
-          position_x: 100,
-          position_y: 100
+          color: elementColor
         };
         
-        floorElements.push(newElement);
-        alert('✅ Element added to floor plan!');
-        document.getElementById('addElementForm').reset();
-        renderAdminFloorPlan();
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/floor-element', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ Floor element added successfully!');
+            document.getElementById('addElementForm').reset();
+            await loadFloorElements(); // Reload elements from DB
+            renderAdminFloorPlan();
+          } else {
+            alert('❌ Failed to add element: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Add element error:', error);
+          alert('❌ Failed to add element. Please try again.');
+        }
       });
       
       // RESTAURANT ADMIN INIT - Called immediately on page load
@@ -70908,7 +71009,7 @@ app.get('/api/admin/restaurant/:restaurant_id/tables', async (c) => {
         width,
         height
       FROM restaurant_tables
-      WHERE offering_id = ?
+      WHERE offering_id = ? AND is_active = 1
       ORDER BY table_number ASC
     `).bind(restaurant_id).all()
     
