@@ -67630,13 +67630,36 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           return;
         }
         
-        console.log('🎨 Rendering', tables.length, 'tables on canvas');
+        console.log('🎨 Rendering', tables.length, 'tables and', floorElements.length, 'elements on canvas');
         
-        // Clear existing tables
+        // Clear existing items
         canvas.innerHTML = '';
         
         // Calculate scale factor (masterScale is percentage: 100 = 1.0x)
         const scaleFactor = masterScale / 100;
+        
+        // Render floor elements FIRST (so they appear behind tables)
+        floorElements.forEach(element => {
+          const elementEl = document.createElement('div');
+          elementEl.style.position = 'absolute';
+          elementEl.style.left = (element.position_x * scaleFactor) + 'px';
+          elementEl.style.top = (element.position_y * scaleFactor) + 'px';
+          elementEl.style.width = (element.width * scaleFactor) + 'px';
+          elementEl.style.height = (element.height * scaleFactor) + 'px';
+          elementEl.style.backgroundColor = element.color || '#E5E7EB';
+          elementEl.style.border = '2px dashed #9CA3AF';
+          elementEl.style.borderRadius = '8px';
+          elementEl.style.display = 'flex';
+          elementEl.style.alignItems = 'center';
+          elementEl.style.justifyContent = 'center';
+          elementEl.style.fontSize = '12px';
+          elementEl.style.color = '#6B7280';
+          elementEl.style.fontWeight = 'bold';
+          elementEl.style.userSelect = 'none';
+          elementEl.style.pointerEvents = 'none';
+          elementEl.textContent = element.element_label || element.element_type;
+          canvas.appendChild(elementEl);
+        });
         
         // Render each table as a draggable element
         tables.forEach(table => {
@@ -67665,7 +67688,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           canvas.appendChild(tableEl);
         });
         
-        console.log('✅ Rendered ' + tables.length + ' tables on admin floor plan (scale: ' + masterScale + '%)');
+        console.log('✅ Rendered', tables.length, 'tables and', floorElements.length, 'elements on admin floor plan (scale: ' + masterScale + '%)');
       }
       
       // Admin drag handlers
