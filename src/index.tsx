@@ -69313,24 +69313,23 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-red-600 font-bold text-sm">+€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-amber-600 font-bold text-lg">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
-                <div class="border-2 rounded-lg p-4 mb-3 border-red-300 bg-red-50">
+                <div class="border-2 rounded-lg p-4 mb-3 border-gray-200 bg-white hover:border-amber-300 hover:shadow-md transition-all">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1 flex-wrap">
-                                <h4 class="font-bold text-lg">\${item.item_name}</h4>
-                                <span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>
+                            <div class="flex items-center gap-3 mb-1 flex-wrap">
+                                <h4 class="font-bold text-lg text-gray-800">\${item.item_name}</h4>
+                                \${priceDisplay}
                             </div>
                             <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
-                            \${priceDisplay}
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
                             <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, true)" 
                                     id="btn-\${item.item_id}"
-                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}">
+                                    class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-gray-200 text-gray-700 hover:bg-amber-100'}">
                                 <i class="fas fa-plus"></i>
                             </button>
                         </div>
