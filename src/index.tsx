@@ -63665,6 +63665,39 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         input, select, button {
             font-size: 16px; /* Prevents zoom on iOS */
         }
+        
+        /* Table selection styles (same as guest booking) */
+        .table-item {
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #D1D5DB;
+        }
+        .table-item:hover {
+            border-color: var(--primary-color);
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .table-item.selected {
+            border-color: var(--secondary-color);
+            border-width: 3px;
+            background: #D1FAE5 !important;
+        }
+        .table-item.reserved {
+            background: #FEE2E2 !important;
+            border-color: #DC2626;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        /* Table shapes */
+        .table-rectangle {
+            border-radius: 8px;
+        }
+        .table-circle {
+            border-radius: 50%;
+        }
+        .table-square {
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -63930,28 +63963,31 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     </div>
                 </div>
                 
-                <!-- Floor Plan Canvas -->
-                <div class="border-2 border-gray-300 rounded-xl overflow-hidden bg-white" style="position: relative;">
-                    <canvas id="floorCanvas" width="600" height="400" style="cursor: pointer; max-width: 100%;"></canvas>
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                    <div class="flex items-center gap-4 text-sm">
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 border-2 border-gray-400 bg-white"></div>
+                            <span>Available</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 border-2 border-red-600 bg-red-100"></div>
+                            <span>Reserved</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 border-3 border-green-600 bg-green-100"></div>
+                            <span>Your Selection</span>
+                        </div>
+                    </div>
                 </div>
                 
-                <div class="mt-4 flex items-center gap-4 text-sm">
-                    <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded bg-green-500"></div>
-                        <span>Free</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded bg-yellow-500"></div>
-                        <span>Booked</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded bg-red-500"></div>
-                        <span>Occupied</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-4 h-4 rounded border-2 border-blue-500 bg-blue-100"></div>
-                        <span>Selected</span>
-                    </div>
+                <!-- Floor Plan Container (like guest booking) -->
+                <div id="tableCanvas" class="relative bg-gray-100 rounded-lg" style="height: 600px; width: 100%; overflow: auto; -webkit-overflow-scrolling: touch;">
+                    <!-- Tables loaded dynamically - responsive floor plan view -->
+                </div>
+                
+                <div id="selectedTableInfo" class="mt-4 p-4 bg-green-50 border-2 border-green-200 rounded-lg hidden">
+                    <h3 class="font-bold text-green-900">Selected Table:</h3>
+                    <p id="selectedTableDetails" class="text-green-800 mt-1"></p>
                 </div>
             </div>
             <div class="flex gap-4">
@@ -64645,148 +64681,259 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             \`;
         }
         
-        // Load tables for table selection (Step 4)
+        // Load tables for table selection (Step 4) - SAME AS GUEST BOOKING
         async function loadTablesForSelection(restaurantId) {
             try {
-                console.log('Loading tables for restaurant:', restaurantId);
+                console.log('🪑 Loading tables for restaurant:', restaurantId);
                 
-                // Fetch tables
+                // Load AI-extracted textures for this restaurant
+                let restaurantTextures = null;
+                try {
+                    const textureResponse = await fetch('/api/restaurant/' + restaurantId + '/textures');
+                    const textureData = await textureResponse.json();
+                    if (textureData.success && textureData.texture && textureData.texture.is_active) {
+                        restaurantTextures = textureData.texture;
+                    }
+                } catch (err) {
+                    console.log('No textures available, using defaults');
+                }
+                
+                // Load all tables
                 const tablesResponse = await fetch('/api/restaurant/' + restaurantId + '/tables', {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 const tablesData = await tablesResponse.json();
                 tables = tablesData.tables || [];
                 
-                // Fetch floor elements
-                const elementsResponse = await fetch('/api/admin/restaurant/' + restaurantId + '/floor-elements', {
-                    headers: { 'X-Property-ID': propertyId }
-                });
-                const elementsData = await elementsResponse.json();
-                floorElements = elementsData.elements || [];
+                // Load floor elements (buffet, bar, kitchen, etc.)
+                try {
+                    const elementsResponse = await fetch('/api/admin/restaurant/' + restaurantId + '/floor-elements', {
+                        headers: { 'X-Property-ID': propertyId }
+                    });
+                    const elementsData = await elementsResponse.json();
+                    floorElements = elementsData.elements || [];
+                } catch (err) {
+                    console.log('No floor elements available');
+                    floorElements = [];
+                }
                 
-                console.log('Loaded', tables.length, 'tables and', floorElements.length, 'floor elements');
+                // Load walls
+                let walls = [];
+                try {
+                    const wallsResponse = await fetch('/api/admin/restaurant/' + restaurantId + '/walls', {
+                        headers: { 'X-Property-ID': propertyId }
+                    });
+                    const wallsData = await wallsResponse.json();
+                    walls = wallsData.walls || [];
+                } catch (err) {
+                    console.log('No walls available');
+                }
+                
+                console.log('Loaded:', tables.length, 'tables,', floorElements.length, 'floor elements,', walls.length, 'walls');
                 
                 // Render floor plan
-                renderFloorPlan();
+                renderFloorPlan(tables, floorElements, walls, restaurantTextures);
             } catch (error) {
                 console.error('Failed to load tables:', error);
                 alert('Failed to load floor plan. You can proceed without selecting a table.');
             }
         }
         
-        function renderFloorPlan() {
-            const canvas = document.getElementById('floorCanvas');
+        function renderFloorPlan(tables, floorElements, walls, restaurantTextures) {
+            const canvas = document.getElementById('tableCanvas');
             if (!canvas) return;
             
-            const ctx = canvas.getContext('2d');
-            const gridSize = 50;
+            canvas.innerHTML = '';
             
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw grid
-            ctx.strokeStyle = '#e5e7eb';
-            ctx.lineWidth = 1;
-            for (let x = 0; x <= canvas.width; x += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-            for (let y = 0; y <= canvas.height; y += gridSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
+            // Apply AI-extracted floor texture if available
+            if (restaurantTextures) {
+                canvas.style.background = restaurantTextures.floor_color_primary || '#F3F4F6';
+                canvas.style.backgroundImage = 'linear-gradient(45deg, ' + 
+                    (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 25%, ' +
+                    (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 25%, ' +
+                    (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 50%, ' +
+                    (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 50%, ' +
+                    (restaurantTextures.floor_color_primary || '#F3F4F6') + ' 75%, ' +
+                    (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ' 75%, ' +
+                    (restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#E5E7EB') + ')';
+                canvas.style.backgroundSize = '40px 40px';
+                canvas.style.opacity = restaurantTextures.floor_opacity || 0.8;
             }
             
-            // Draw floor elements (walls, decorations)
+            // Calculate responsive scale
+            const screenWidth = window.innerWidth;
+            const isMobile = screenWidth < 768;
+            
+            // Find the rightmost table position
+            const maxX = Math.max(...tables.map(t => t.position_x + t.width), 100);
+            const designWidth = maxX + 50;
+            
+            // Calculate scale factor
+            let scaleFactor;
+            if (isMobile) {
+                const availableWidth = screenWidth - 32;
+                scaleFactor = availableWidth / designWidth;
+                scaleFactor = Math.min(scaleFactor, 0.6);
+                scaleFactor = Math.max(scaleFactor, 0.3);
+            } else {
+                scaleFactor = 0.8;
+            }
+            
+            // Calculate canvas height
+            const maxY = Math.max(...tables.map(t => t.position_y + t.height), 100);
+            const canvasHeight = (maxY + 50) * scaleFactor;
+            
+            canvas.style.height = canvasHeight + 'px';
+            canvas.style.display = 'block';
+            canvas.style.position = 'relative';
+            canvas.style.overflow = 'auto';
+            canvas.style.touchAction = 'pan-y pinch-zoom';
+            
+            // Render walls first
+            walls.forEach(wall => {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.style.position = 'absolute';
+                svg.style.pointerEvents = 'none';
+                svg.style.zIndex = '0';
+                
+                const scaledStartX = wall.start_x * scaleFactor;
+                const scaledStartY = wall.start_y * scaleFactor;
+                const scaledEndX = wall.end_x * scaleFactor;
+                const scaledEndY = wall.end_y * scaleFactor;
+                
+                const minX = Math.min(scaledStartX, scaledEndX);
+                const minY = Math.min(scaledStartY, scaledEndY);
+                const width = Math.abs(scaledEndX - scaledStartX);
+                const height = Math.abs(scaledEndY - scaledStartY);
+                
+                svg.style.left = minX + 'px';
+                svg.style.top = minY + 'px';
+                svg.style.width = (width + 10) + 'px';
+                svg.style.height = (height + 10) + 'px';
+                
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', scaledStartX - minX);
+                line.setAttribute('y1', scaledStartY - minY);
+                line.setAttribute('x2', scaledEndX - minX);
+                line.setAttribute('y2', scaledEndY - minY);
+                line.setAttribute('stroke', wall.color || '#64748B');
+                line.setAttribute('stroke-width', (wall.thickness || 4) * scaleFactor);
+                
+                if (wall.style === 'dashed') {
+                    line.setAttribute('stroke-dasharray', '10,5');
+                } else if (wall.style === 'door') {
+                    line.setAttribute('stroke-dasharray', '20,10');
+                } else if (wall.style === 'window') {
+                    line.setAttribute('stroke-dasharray', '5,5');
+                }
+                
+                svg.appendChild(line);
+                canvas.appendChild(svg);
+            });
+            
+            // Render floor elements
             floorElements.forEach(element => {
-                if (element.element_type === 'wall') {
-                    ctx.fillStyle = '#9ca3af';
-                    ctx.fillRect(element.x * gridSize, element.y * gridSize, element.width * gridSize, element.height * gridSize);
-                } else if (element.element_type === 'decoration') {
-                    ctx.fillStyle = '#d1d5db';
-                    ctx.fillRect(element.x * gridSize, element.y * gridSize, element.width * gridSize, element.height * gridSize);
-                    ctx.fillStyle = '#6b7280';
-                    ctx.font = '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(element.label || 'Decor', (element.x + element.width / 2) * gridSize, (element.y + element.height / 2) * gridSize);
-                }
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.left = (element.position_x * scaleFactor) + 'px';
+                div.style.top = (element.position_y * scaleFactor) + 'px';
+                div.style.width = (element.width * scaleFactor) + 'px';
+                div.style.height = (element.height * scaleFactor) + 'px';
+                div.style.background = element.color || '#94A3B8';
+                div.style.border = '2px solid ' + (element.border_color || '#64748B');
+                div.style.borderRadius = '8px';
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.justifyContent = 'center';
+                div.style.fontSize = (isMobile ? '10px' : '12px');
+                div.style.fontWeight = 'bold';
+                div.style.color = '#1F2937';
+                div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                div.style.zIndex = '1';
+                div.style.pointerEvents = 'none';
+                
+                const iconMap = {
+                    'buffet': 'fas fa-utensils',
+                    'bar': 'fas fa-wine-glass-alt',
+                    'kitchen': 'fas fa-fire-burner',
+                    'entrance': 'fas fa-door-open',
+                    'restroom': 'fas fa-restroom',
+                    'stage': 'fas fa-music',
+                    'plant': 'fas fa-leaf',
+                    'decoration': 'fas fa-star'
+                };
+                const icon = iconMap[element.element_type] || 'fas fa-square';
+                const fontSize = Math.max(8, 12 * scaleFactor);
+                
+                div.innerHTML = '<div class=\"text-center\"><i class=\"' + icon + ' mr-1\"></i><br><span style=\"font-size: ' + (fontSize * 0.8) + 'px;\">' + element.element_label + '</span></div>';
+                canvas.appendChild(div);
             });
             
-            // Draw tables
+            // Render tables
             tables.forEach(table => {
-                const x = table.x * gridSize;
-                const y = table.y * gridSize;
-                const width = table.width * gridSize;
-                const height = table.height * gridSize;
+                const tableEl = document.createElement('div');
+                tableEl.className = 'table-item table-' + table.shape;
+                tableEl.style.position = 'absolute';
+                tableEl.style.left = (table.position_x * scaleFactor) + 'px';
+                tableEl.style.top = (table.position_y * scaleFactor) + 'px';
                 
-                // Table color based on status
-                let color = '#10b981'; // green - free
-                if (table.current_status === 'booked') color = '#f59e0b'; // yellow
-                else if (table.current_status === 'occupied') color = '#ef4444'; // red
+                let width = table.width * scaleFactor;
+                let height = table.height * scaleFactor;
                 
-                // Highlight if selected
-                if (selectedTableId === table.table_id) {
-                    ctx.fillStyle = '#dbeafe'; // blue-100
-                    ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
-                    ctx.strokeStyle = '#3b82f6'; // blue-500
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+                if (table.shape === 'circle') {
+                    const size = Math.max(width, height);
+                    width = size;
+                    height = size;
                 }
                 
-                // Draw table
-                ctx.fillStyle = color;
-                ctx.fillRect(x, y, width, height);
+                tableEl.style.width = width + 'px';
+                tableEl.style.height = height + 'px';
                 
-                // Table border
-                ctx.strokeStyle = '#374151';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, width, height);
+                // Apply textures
+                if (restaurantTextures) {
+                    const tableColor = restaurantTextures.table_color_primary || '#FFFFFF';
+                    const tableSecondary = restaurantTextures.table_color_secondary || tableColor;
+                    tableEl.style.background = 'linear-gradient(135deg, ' + tableColor + ' 0%, ' + tableSecondary + ' 100%)';
+                    tableEl.style.opacity = restaurantTextures.table_opacity || 0.9;
+                    tableEl.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15), inset 0 1px 3px rgba(255,255,255,0.3)';
+                } else {
+                    tableEl.style.background = 'white';
+                }
                 
-                // Table label
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(table.table_number, x + width / 2, y + height / 2);
+                tableEl.style.display = 'flex';
+                tableEl.style.flexDirection = 'column';
+                tableEl.style.alignItems = 'center';
+                tableEl.style.justifyContent = 'center';
+                tableEl.style.fontSize = isMobile ? '11px' : '14px';
+                tableEl.style.cursor = 'pointer';
+                tableEl.style.zIndex = '10';
+                
+                tableEl.innerHTML = 
+                    '<div class=\"font-bold\" style=\"margin-bottom: 2px;\">' + table.table_number + '</div>' +
+                    '<div class=\"text-gray-600\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-user\"></i> ' + table.capacity + '</div>';
+                
+                tableEl.onclick = () => selectTableForBooking(table);
+                
+                canvas.appendChild(tableEl);
             });
-            
-            // Add click handler
-            canvas.onclick = function(event) {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const clickX = (event.clientX - rect.left) * scaleX;
-                const clickY = (event.clientY - rect.top) * scaleY;
-                
-                // Find clicked table
-                for (let table of tables) {
-                    const x = table.x * gridSize;
-                    const y = table.y * gridSize;
-                    const width = table.width * gridSize;
-                    const height = table.height * gridSize;
-                    
-                    if (clickX >= x && clickX <= x + width && clickY >= y && clickY <= y + height) {
-                        selectTableForBooking(table.table_id, table.table_number);
-                        return;
-                    }
-                }
-                
-                // Clicked empty space - deselect
-                selectedTableId = null;
-                document.getElementById('selectedTableDisplay').textContent = 'None';
-                renderFloorPlan();
-            };
         }
         
-        function selectTableForBooking(tableId, tableNumber) {
-            selectedTableId = tableId;
-            document.getElementById('selectedTableDisplay').textContent = 'Table ' + tableNumber;
-            renderFloorPlan();
-            console.log('Selected table:', tableId, tableNumber);
+        function selectTableForBooking(table) {
+            selectedTableId = table.table_id;
+            
+            // Remove selection from all tables
+            document.querySelectorAll('.table-item').forEach(el => el.classList.remove('selected'));
+            
+            // Add selection to clicked table
+            event.target.closest('.table-item').classList.add('selected');
+            
+            // Update display
+            document.getElementById('selectedTableDisplay').textContent = 'Table ' + table.table_number;
+            document.getElementById('selectedTableInfo').classList.remove('hidden');
+            document.getElementById('selectedTableDetails').textContent = 
+                'Table ' + table.table_number + ' - ' + (table.table_name || '') + ' (Seats ' + table.capacity + ')';
+            
+            console.log('✅ Selected table:', table.table_id, table.table_number);
         }
         
         window.submitBooking = async function() {
