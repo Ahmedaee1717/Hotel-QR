@@ -66441,7 +66441,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             </div>
 
             <!-- Center: Floor Plan Canvas -->
-            <div class="md:col-span-1">
+            <div class="md:col-span-2">
                 <div class="bg-white rounded-lg shadow-lg p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-bold"><i class="fas fa-th mr-2 text-purple-600"></i>Floor Plan Designer</h2>
@@ -66484,40 +66484,44 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     </div>
                 </div>
             </div>
-            
-            <!-- Right Panel: Selected Table Info -->
-            <div class="space-y-6">
-                <!-- Selected Table Info -->
-                <div id="selectedTableInfo" class="bg-white rounded-lg shadow-lg p-6 hidden">
-                    <h2 class="text-xl font-bold mb-4"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
-                    <div id="tableDetails"></div>
-                    <div class="mt-4">
-                        <p class="text-sm font-semibold mb-2 text-gray-700">Rotate Table:</p>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button onclick="rotateSelectedTable(-45)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 45° counter-clockwise">
-                                <i class="fas fa-undo"></i> 45°
-                            </button>
-                            <button onclick="rotateSelectedTable(-15)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 15° counter-clockwise">
-                                <i class="fas fa-undo"></i> 15°
-                            </button>
-                            <button onclick="rotateSelectedTable(0, true)" class="bg-gray-600 text-white px-2 py-2 rounded-lg hover:bg-gray-700 text-sm" title="Reset rotation">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 mt-2">
-                            <button onclick="rotateSelectedTable(15)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 15° clockwise">
-                                <i class="fas fa-redo"></i> 15°
-                            </button>
-                            <button onclick="rotateSelectedTable(45)" class="bg-blue-600 text-white px-2 py-2 rounded-lg hover:bg-blue-700 text-sm" title="Rotate 45° clockwise">
-                                <i class="fas fa-redo"></i> 45°
-                            </button>
-                        </div>
-                        <button onclick="deleteSelectedTable()" class="w-full mt-3 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
-                            <i class="fas fa-trash mr-2"></i>Delete Table
-                        </button>
-                    </div>
-                </div>
+        </div>
+        
+        <!-- Floating Selected Table Panel (Popup) -->
+        <div id="selectedTableInfo" class="hidden fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-2xl p-6 border-4 border-green-500" style="min-width: 320px; max-width: 400px;">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold"><i class="fas fa-info-circle mr-2 text-green-600"></i>Selected Table</h2>
+                <button onclick="closeTablePanel()" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">×</button>
             </div>
+            <div id="tableDetails" class="mb-4"></div>
+            <div>
+                <p class="text-sm font-semibold mb-2 text-gray-700">Rotate Table:</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="rotateSelectedTable(-45)" class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm font-semibold" title="Rotate 45° counter-clockwise">
+                        <i class="fas fa-undo"></i> 45°
+                    </button>
+                    <button onclick="rotateSelectedTable(-15)" class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm font-semibold" title="Rotate 15° counter-clockwise">
+                        <i class="fas fa-undo"></i> 15°
+                    </button>
+                    <button onclick="rotateSelectedTable(0, true)" class="bg-gray-600 text-white px-3 py-3 rounded-lg hover:bg-gray-700 text-sm font-semibold" title="Reset rotation">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-2">
+                    <button onclick="rotateSelectedTable(15)" class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm font-semibold" title="Rotate 15° clockwise">
+                        <i class="fas fa-redo"></i> 15°
+                    </button>
+                    <button onclick="rotateSelectedTable(45)" class="bg-blue-600 text-white px-3 py-3 rounded-lg hover:bg-blue-700 text-sm font-semibold" title="Rotate 45° clockwise">
+                        <i class="fas fa-redo"></i> 45°
+                    </button>
+                </div>
+                <button onclick="deleteSelectedTable()" class="w-full mt-4 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold">
+                    <i class="fas fa-trash mr-2"></i>Delete Table
+                </button>
+            </div>
+        </div>
+        <!-- Overlay backdrop -->
+        <div id="tableInfoBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-50 z-40" onclick="closeTablePanel()"></div>
+        
         </div>
         </div>
         <!-- END TABLES TAB -->
@@ -67831,8 +67835,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         selectedElement = null; // Deselect element when selecting table
         console.log('Admin table selected:', table.table_number);
         
-        // Show the selected table info panel
+        // Show the floating panel AND backdrop
         const panel = document.getElementById('selectedTableInfo');
+        const backdrop = document.getElementById('tableInfoBackdrop');
         if (panel) {
           panel.classList.remove('hidden');
           
@@ -67848,10 +67853,23 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               '</div>';
           }
         }
+        if (backdrop) {
+          backdrop.classList.remove('hidden');
+        }
         
         // Update visual highlight
         updateSelectionHighlight();
       }
+      
+      // Close table panel
+      window.closeTablePanel = function() {
+        const panel = document.getElementById('selectedTableInfo');
+        const backdrop = document.getElementById('tableInfoBackdrop');
+        if (panel) panel.classList.add('hidden');
+        if (backdrop) backdrop.classList.add('hidden');
+        selectedTable = null;
+        updateSelectionHighlight(); // Remove green border
+      };
       
       function updateSelectionHighlight() {
         // Update selection borders without full re-render
