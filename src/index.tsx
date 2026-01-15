@@ -64140,17 +64140,19 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 }
                 
                 // Add RESTAURANT MENU items (extra charge)
-                if (restaurantMenuData.success && restaurantMenuData.categories) {
-                    restaurantMenuData.categories.forEach(category => {
-                        category.items.forEach(item => {
-                            menuItems.push({
-                                item_id: 'rm_' + item.item_id, // Prefix to avoid conflicts
-                                item_name: item.item_name,
-                                category: category.category_name.toLowerCase().replace(/\s+/g, '_'),
-                                cost_to_hotel: item.price || 0,
-                                is_premium: false,
-                                extraCharge: true,
-                                isSetMenu: false
+                if (restaurantMenuData.success && restaurantMenuData.menus) {
+                    restaurantMenuData.menus.forEach(menu => {
+                        menu.categories.forEach(category => {
+                            category.items.forEach(item => {
+                                menuItems.push({
+                                    item_id: 'rm_' + item.item_id, // Prefix to avoid conflicts
+                                    item_name: item.item_name,
+                                    category: category.category_name.toLowerCase().replace(/\s+/g, '_'),
+                                    cost_to_hotel: item.price || 0,
+                                    is_premium: false,
+                                    extraCharge: true,
+                                    isSetMenu: false
+                                });
                             });
                         });
                     });
