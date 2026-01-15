@@ -61987,6 +61987,17 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
       // Menu Content
       html += '<div class="max-w-6xl mx-auto px-4 py-8">';
       
+      // Extra Charge Notice Banner
+      html += '<div class="mb-8 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-6 shadow-lg">';
+      html += '<div class="flex items-start gap-4">';
+      html += '<i class="fas fa-exclamation-circle text-red-600 text-3xl mt-1"></i>';
+      html += '<div>';
+      html += '<h3 class="font-bold text-red-800 text-xl mb-2">⚠️ À La Carte Menu - Extra Charges Apply</h3>';
+      html += '<p class="text-gray-700">All items on this menu are available for order but will incur <strong>additional charges</strong> beyond your package. Prices are displayed next to each item.</p>';
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+      
       // Column layout based on settings
       const colsClass = d.columns_count === 2 ? 'md:grid-cols-2' : d.columns_count === 3 ? 'md:grid-cols-3' : '';
       const gapClass = d.item_spacing === 'compact' ? 'gap-4' : d.item_spacing === 'spacious' ? 'gap-8' : 'gap-6';
@@ -62027,10 +62038,13 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
             
             html += '<div class="flex-1">';
             html += '<div class="flex justify-between items-baseline gap-4">';
+            html += '<div class="flex items-center gap-2 flex-wrap">';
             html += '<h4 class="menu-item-name">' + item.item_name + '</h4>';
+            html += '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300" style="white-space: nowrap;">💳 EXTRA CHARGE</span>';
+            html += '</div>';
             
             if (d.show_prices && item.price && d.price_position === 'right') {
-              html += '<span class="menu-item-price flex-shrink-0">' + item.price + ' ' + (item.currency || 'USD') + '</span>';
+              html += '<span class="menu-item-price flex-shrink-0" style="color: #dc2626; font-weight: bold;">+' + item.price + ' ' + (item.currency || 'USD') + '</span>';
             }
             
             html += '</div>';
@@ -62040,7 +62054,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
             }
             
             if (d.show_prices && item.price && d.price_position === 'below') {
-              html += '<div class="mt-3"><span class="menu-item-price">' + item.price + ' ' + (item.currency || 'USD') + '</span></div>';
+              html += '<div class="mt-3"><span class="menu-item-price" style="color: #dc2626; font-weight: bold;">+' + item.price + ' ' + (item.currency || 'USD') + '</span></div>';
             }
             
             // Dietary icons
@@ -68558,21 +68572,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
         <!-- Menu Selection -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <!-- Extra Charge Notice -->
-            <div class="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-4">
-                <div class="flex items-start gap-3">
-                    <i class="fas fa-info-circle text-red-600 text-2xl mt-1"></i>
-                    <div>
-                        <h3 class="font-bold text-red-800 text-lg mb-1">
-                            <span data-i18n="extra-charge-title">À La Carte Menu - Extra Charges Apply</span>
-                        </h3>
-                        <p class="text-gray-700 text-sm">
-                            <span data-i18n="extra-charge-desc">Items below are from our à la carte menu and will incur additional charges. Prices are shown for each item.</span>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
             <h2 class="text-2xl font-bold mb-4"><i class="fas fa-utensils mr-2 text-primary"></i><span data-i18n="preorder-meal">Pre-Order Your Meal</span></h2>
             <p class="text-gray-600 mb-6" data-i18n="preorder-desc">Select your dishes for each course. Pre-ordering helps us prepare the freshest ingredients!</p>
             
@@ -68727,7 +68726,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         console.log('🍽️ Available menu categories:', availableCategories);
         console.log('🍽️ Total menu items:', menuData.length);
         
-        // Category display configuration with EXTRA CHARGE labels
+        // Category display configuration
         const categoryConfig = {
             'salad': { emoji: '🥗', label: 'Salads', i18n: 'salads', order: 1 },
             'starter': { emoji: '🍤', label: 'Starters', i18n: 'starters', order: 2 },
@@ -69095,17 +69094,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
-                const extraChargeBadge = '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>';
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-red-600 font-bold text-lg">+€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
                 <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1 flex-wrap">
+                            <div class="flex items-center gap-2 mb-1">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
-                                \${extraChargeBadge}
                                 \${premiumBadge}
                             </div>
                             <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
