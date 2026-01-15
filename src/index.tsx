@@ -64331,6 +64331,9 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             // Pre-escape the item_id for onclick handlers
             const itemIdEscaped = JSON.stringify(item.item_id);
             
+            // Escape item name for HTML safety
+            const itemNameEscaped = item.item_name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            
             let limitButton = '';
             if (isSelected) {
                 limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
@@ -64348,7 +64351,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             return '<div class="menu-item border-2 ' + borderClass + ' rounded-xl p-4">' +
                 '<div class="mb-3">' +
                     '<div class="flex items-start justify-between">' +
-                        '<h4 class="font-bold">' + item.item_name + '</h4>' +
+                        '<h4 class="font-bold">' + itemNameEscaped + '</h4>' +
                         priceDisplay +
                     '</div>' +
                     premiumBadge +
