@@ -69412,13 +69412,18 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 return;
             }
             
-            // Group by category for display
-            const categories = ['salad', 'starter', 'main', 'dessert'];
+            // Group by category for display - INCLUDE ALL CATEGORIES
+            const categories = ['salad', 'soup', 'pasta', 'seafood', 'main', 'dessert', 'drink', 'hot_coffee', 'pastries'];
             const categoryLabels = {
                 'salad': '🥗 Salads',
-                'starter': '🍤 Starters', 
+                'soup': '🍲 Soups',
+                'pasta': '🍝 Pasta',
+                'seafood': '🦞 Seafood',
                 'main': '🥩 Main Courses',
-                'dessert': '🍰 Desserts'
+                'dessert': '🍰 Desserts',
+                'drink': '🍷 Drinks',
+                'hot_coffee': '☕ Hot Coffee',
+                'pastries': '🥐 Pastries'
             };
             
             let html = '';
@@ -69436,8 +69441,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                             <div class="space-y-1">
                                 \${itemsInCategory.map(item => \`
                                     <div class="flex justify-between items-center text-sm">
-                                        <span class="font-semibold">\${item.name} \${item.quantity > 1 ? 'x' + item.quantity : ''}</span>
-                                        <span class="text-purple-600">€\${(item.cost * (item.quantity || 1)).toFixed(2)}</span>
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-semibold">\${item.name} \${item.quantity > 1 ? 'x' + item.quantity : ''}</span>
+                                            \${item.extraCharge ? '<span class="text-xs text-amber-600 font-semibold">💳 EXTRA</span>' : ''}
+                                        </div>
+                                        <span class="\${item.extraCharge ? 'text-amber-600' : 'text-purple-600'} font-semibold">€\${(item.cost * (item.quantity || 1)).toFixed(2)}</span>
                                     </div>
                                 \`).join('')}
                             </div>
