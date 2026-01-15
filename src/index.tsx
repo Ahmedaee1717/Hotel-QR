@@ -68545,8 +68545,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         const elementColor = document.getElementById('elementColor').value;
         
         const payload = {
-          offering_id: currentRestaurant.offering_id,
-          property_id: currentPropertyId,
+          offering_id: numericOfferingId,
+          property_id: propertyId,
           element_type: elementType,
           element_label: elementLabel,
           position_x: 100,
