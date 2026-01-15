@@ -68782,11 +68782,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let selectedTableNumber = null;
         let availableTables = [];
         
-        // Get unique categories from actual menu data
-        const availableCategories = Object.keys(menuByCategory).filter(Boolean);
-        console.log('🍽️ Available menu categories:', availableCategories);
-        console.log('🍽️ Total menu items:', menuData.length);
-        
         // Category display configuration
         const categoryConfig = {
             'salad': { emoji: '🥗', label: 'Salads', i18n: 'salads', order: 1 },
@@ -68999,6 +68994,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         console.log('🍽️ SET MENU categories:', Object.keys(setMenuByCategory));
         console.log('🍽️ RESTAURANT MENU categories:', Object.keys(restaurantMenuByCategory));
         console.log('🍽️ COMBINED categories:', Object.keys(menuByCategory));
+        
+        // Get unique categories from actual menu data
+        const availableCategories = Object.keys(menuByCategory).filter(Boolean);
+        console.log('🍽️ Available menu categories:', availableCategories);
         
         // Check voucher eligibility on load
         async function checkVoucherEligibility() {
