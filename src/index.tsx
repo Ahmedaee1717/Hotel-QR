@@ -69337,13 +69337,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 \`;
             }).join('');
         }
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                \`;
-            }).join('');
-        }
         
         function toggleItem(itemId, category, itemName, cost, extraCharge = false) {
             const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
