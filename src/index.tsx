@@ -69207,6 +69207,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         }
         // Show SET MENU category
         async function showSetMenuCategory(category) {
+            console.log('🔍 showSetMenuCategory called with:', category);
+            console.log('📦 setMenuByCategory:', setMenuByCategory);
+            console.log('📦 items for category:', setMenuByCategory[category]);
+            
             // Update tabs
             document.querySelectorAll('.set-menu-tab').forEach(tab => {
                 tab.classList.remove('border-primary', 'text-primary');
@@ -69652,10 +69656,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             // Build preorder data - send all selected items with quantities
-            const preorderItems = Object.keys(selectedItems).map(id => ({
-                item_id: parseInt(id),
-                quantity: selectedItems[id].quantity || 1
-            }));
+            const preorderItems = Object.keys(selectedItems).map(id => {
+                // Remove 'rm_' prefix if present (restaurant menu items)
+                const numericId = id.toString().startsWith('rm_') ? id.substring(3) : id;
+                return {
+                    item_id: parseInt(numericId),
+                    quantity: selectedItems[id].quantity || 1,
+                    extraCharge: selectedItems[id].extraCharge || false
+                };
+            });
             
             try {
                 let response, data;
