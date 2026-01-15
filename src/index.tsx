@@ -63775,7 +63775,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     <i class="fas fa-exclamation-triangle text-red-600 mr-3 text-2xl"></i>
                     Allergy Declaration (Required)
                 </h3>
-                <p class="text-sm text-gray-700 mb-4 font-medium">Before ordering, please confirm guest's allergy status:</p>
+                <p class="text-sm text-gray-700 mb-4 font-medium">Confirm the guest's allergy status before proceeding:</p>
                 
                 <div class="space-y-3">
                     <!-- Option 1: Has Allergies -->
@@ -63790,20 +63790,20 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         <div class="flex-1">
                             <span class="text-gray-800 font-bold block text-lg">
                                 <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
-                                Guest has food allergies or dietary restrictions
+                                Yes, guest has food allergies or dietary restrictions
                             </span>
                         </div>
                     </label>
                     
                     <div id="allergyInputContainer" class="hidden ml-10 mt-2 bg-red-50 p-4 rounded-xl border-2 border-red-300">
                         <label for="allergyDetails" class="block text-sm font-bold text-red-800 mb-2">
-                            <i class="fas fa-pen mr-2"></i>Please specify allergies or dietary restrictions:
+                            <i class="fas fa-pen mr-2"></i>Enter guest's allergies or dietary restrictions:
                         </label>
                         <textarea 
                             id="allergyDetails" 
                             rows="3" 
                             class="w-full px-4 py-3 border-2 border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 resize-none text-base"
-                            placeholder="e.g., Peanuts, Shellfish, Gluten-free, Lactose intolerant, Vegetarian, Vegan, etc."
+                            placeholder="e.g., Guest allergic to peanuts and shellfish, prefers vegetarian options, lactose intolerant, etc."
                         ></textarea>
                         <p class="text-xs text-red-600 mt-2">
                             <i class="fas fa-info-circle mr-1"></i>
@@ -63823,7 +63823,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         <div class="flex-1">
                             <span class="text-gray-800 font-bold block text-lg">
                                 <i class="fas fa-check-circle text-green-500 mr-2"></i>
-                                Guest confirms NO food allergies or dietary restrictions
+                                No, guest has NO food allergies or dietary restrictions
                             </span>
                         </div>
                     </label>
