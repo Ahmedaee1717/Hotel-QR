@@ -68414,7 +68414,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     // Get à la carte menu items directly from database
     // These are the items available for ordering with EXTRA CHARGE
     let menu = { results: [] }
+    let menuError = null
     try {
+      console.log('[DEBUG] Fetching menu for restaurant_id:', restaurant_id)
       menu = await DB.prepare(`
         SELECT 
           item_id,
@@ -68426,8 +68428,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
           cost_to_hotel,
           is_premium,
           allergens,
-          display_order,
-          image_url
+          display_order
         FROM alacarte_menu_items
         WHERE restaurant_id = ? AND is_available = 1
         ORDER BY 
@@ -68445,8 +68446,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
           display_order,
           item_name
       `).bind(restaurant_id).all()
-    } catch (menuError) {
-      console.error('Menu query error:', menuError)
+      console.log('[DEBUG] Menu fetched:', menu.results?.length || 0, 'items')
+    } catch (err) {
+      console.error('Menu query error:', err)
+      menuError = String(err)
       // Continue with empty menu if query fails
     }
     
@@ -68694,6 +68697,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </div>
 
     <script>
+        // DEBUG: restaurant_id = ${restaurant_id}, offering_id = ${offering_id}
+        // DEBUG: menu.results.length = ${menu.results?.length || 0}
+        // DEBUG: menuError = ${menuError || 'null'}
         const menuData = ${JSON.stringify(menu.results || [])};
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
