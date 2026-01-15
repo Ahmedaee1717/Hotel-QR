@@ -68507,8 +68507,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
           })
         }
         
+        // Clean menu data - remove image URLs to avoid JSON serialization issues
+        const { original_image_url, ...cleanMenu } = menu
         menusWithContent.push({
-          ...menu,
+          ...cleanMenu,
           categories: categoriesWithItems
         })
       }
