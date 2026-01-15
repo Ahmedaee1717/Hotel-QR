@@ -74516,7 +74516,14 @@ app.get('/api/restaurant/:restaurant_id/info', async (c) => {
   
   try {
     const restaurant = await DB.prepare(`
-      SELECT offering_id, title_en, location, description_en
+      SELECT 
+        offering_id, 
+        title_en, 
+        title_ar,
+        short_description_en as description,
+        full_description_en as full_description,
+        price,
+        currency
       FROM hotel_offerings
       WHERE offering_id = ? AND property_id = ?
     `).bind(restaurant_id, property_id).first()
@@ -74543,20 +74550,24 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
       SELECT 
         item_id,
         item_name,
+        item_name_ar,
         category,
+        description,
         cost_to_hotel,
-        is_premium
+        is_premium,
+        is_available
       FROM alacarte_menu_items
       WHERE restaurant_id = ? 
         AND property_id = ?
         AND cost_to_hotel > 0
-        AND is_active = 1
-      ORDER BY category, item_name
+        AND is_available = 1
+      ORDER BY category, display_order, item_name
     `).bind(restaurant_id, property_id).all()
     
     return c.json({
       success: true,
-      items: items.results || []
+      items: items.results,
+      count: items.results.length
     })
   } catch (error) {
     console.error('Get menu items error:', error)
@@ -74571,12 +74582,18 @@ app.get('/api/waiter/tables', async (c) => {
   const { restaurant, property } = c.req.query()
   
   try {
-    // Get all tables for restaurant
+    // Get all tables for restaurant with position data
     const tables = await DB.prepare(`
       SELECT 
         rt.table_id,
         rt.table_number,
-        rt.capacity
+        rt.capacity,
+        rt.position_x,
+        rt.position_y,
+        rt.width,
+        rt.height,
+        rt.shape,
+        rt.rotation
       FROM restaurant_tables rt
       WHERE rt.offering_id = ?
         AND rt.is_active = 1
@@ -74629,13 +74646,23 @@ app.get('/api/waiter/tables', async (c) => {
     
     // Format response - match tables with orders/bookings
     const formattedTables = tables.results.map(t => {
+      const baseTable = {
+        table_id: t.table_id,
+        table_number: t.table_number,
+        capacity: t.capacity,
+        position_x: t.position_x || 0,
+        position_y: t.position_y || 0,
+        width: t.width || 80,
+        height: t.height || 80,
+        shape: t.shape || 'rectangle',
+        rotation: t.rotation || 0
+      }
+      
       // Check waiter order first
       const waiterOrder = waiterOrderMap.get(t.table_id)
       if (waiterOrder) {
         return {
-          table_id: t.table_id,
-          table_number: t.table_number,
-          capacity: t.capacity,
+          ...baseTable,
           current_order: {
             order_id: waiterOrder.order_id,
             guest_name: waiterOrder.guest_name,
@@ -74650,9 +74677,7 @@ app.get('/api/waiter/tables', async (c) => {
       const kitchenBooking = kitchenBookingMap.get(t.table_number)
       if (kitchenBooking) {
         return {
-          table_id: t.table_id,
-          table_number: t.table_number,
-          capacity: t.capacity,
+          ...baseTable,
           current_order: {
             order_id: `kitchen-${kitchenBooking.voucher_id}`,
             guest_name: kitchenBooking.guest_name,
@@ -74665,9 +74690,7 @@ app.get('/api/waiter/tables', async (c) => {
       
       // Table is free
       return {
-        table_id: t.table_id,
-        table_number: t.table_number,
-        capacity: t.capacity,
+        ...baseTable,
         current_order: null
       }
     })
