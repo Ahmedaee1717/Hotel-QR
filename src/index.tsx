@@ -69241,7 +69241,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 let quantityControls = '';
                 if (quantity > 0) {
-                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;)" ' +
+                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
                                       'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
                                       '<i class="fas fa-minus"></i>' +
                                       '</button>' +
@@ -69305,7 +69305,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 let quantityControls = '';
                 if (quantity > 0) {
-                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;)" ' +
+                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
                                       'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
                                       '<i class="fas fa-minus"></i>' +
                                       '</button>' +
@@ -69375,10 +69375,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             updateOrderSummary();
-            showMenuCategory(category); // Refresh to update button states
+            refreshMenuCategory(category, extraCharge); // Refresh to update button states
         }
         
-        function decreaseItemQuantity(itemId, category) {
+        function decreaseItemQuantity(itemId, category, isExtraCharge = false) {
             if (!selectedItems[itemId]) return;
             
             const currentQuantity = selectedItems[itemId].quantity || 1;
@@ -69392,7 +69392,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             updateOrderSummary();
-            showMenuCategory(category); // Refresh to update button states
+            refreshMenuCategory(category, isExtraCharge); // Refresh to update button states
+        }
+        
+        // Helper function to refresh the correct menu category
+        function refreshMenuCategory(category, isExtraCharge) {
+            if (isExtraCharge) {
+                showRestaurantMenuCategory(category);
+            } else {
+                showSetMenuCategory(category);
+            }
         }
         
         function updateOrderSummary() {
