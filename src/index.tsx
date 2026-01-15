@@ -72401,7 +72401,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             loadRestaurants();
         });
 
-        async function loadRestaurants() {
+        window.loadRestaurants = async function() {
             try {
                 const response = await fetch('/api/alacarte/restaurants?property=' + propertyId);
                 const data = await response.json();
@@ -72416,14 +72416,14 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             }
         }
 
-        function switchRestaurant() {
+        window.switchRestaurant = function() {
             const newRestaurantId = document.getElementById('restaurantSelector').value;
             if (newRestaurantId != restaurantId) {
                 window.location.href = '/kitchen/alacarte/' + newRestaurantId + '?property=' + propertyId;
             }
         }
 
-        function switchView(view) {
+        window.switchView = function(view) {
             currentView = view;
             const ordersView = document.getElementById('ordersGrid');
             const itemsView = document.getElementById('itemsSummaryView');
@@ -72451,7 +72451,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             }
         }
 
-        async function loadOrders() {
+        window.loadOrders = async function() {
             try {
                 let url = '/api/kitchen/orders/' + restaurantId + '?property=' + propertyId + '&mode=' + viewMode;
                 if (viewMode === 'date') {
@@ -72475,7 +72475,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             }
         }
 
-        function updateTimestamp() {
+        window.updateTimestamp = function() {
             const now = new Date();
             document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
         }
