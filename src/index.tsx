@@ -64237,6 +64237,14 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const setMenuItems = menuItems.filter(item => !item.extraCharge);
             const restaurantMenuItems = menuItems.filter(item => item.extraCharge);
             
+            console.log('📊 Menu breakdown:', {
+                total: menuItems.length,
+                setMenu: setMenuItems.length,
+                restaurantMenu: restaurantMenuItems.length,
+                sampleSetItem: setMenuItems[0],
+                sampleRestaurantItem: restaurantMenuItems[0]
+            });
+            
             let html = '';
             
             // Render SET MENU section
