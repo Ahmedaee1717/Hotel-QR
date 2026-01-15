@@ -68425,13 +68425,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
       return c.html('<h1>Restaurant not found</h1>', 404)
     }
     
-    // Get à la carte menu items directly from database
-    // These are the items available for ordering with EXTRA CHARGE
-    let menu = { results: [] }
-    let menuError = null
+    // Get SET MENU (à la carte voucher items - INCLUDED in package)
+    let setMenu = { results: [] }
+    let setMenuError = null
     try {
-      console.log('[DEBUG] Fetching menu for restaurant_id:', restaurant_id)
-      menu = await DB.prepare(`
+      console.log('[DEBUG] Fetching SET MENU for restaurant_id:', restaurant_id)
+      setMenu = await DB.prepare(`
         SELECT 
           item_id,
           item_name,
@@ -68460,11 +68459,66 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
           display_order,
           item_name
       `).bind(restaurant_id).all()
-      console.log('[DEBUG] Menu fetched:', menu.results?.length || 0, 'items')
+      console.log('[DEBUG] SET MENU fetched:', setMenu.results?.length || 0, 'items')
     } catch (err) {
-      console.error('Menu query error:', err)
-      menuError = String(err)
-      // Continue with empty menu if query fails
+      console.error('SET MENU query error:', err)
+      setMenuError = String(err)
+    }
+    
+    // Get RESTAURANT MENU (full menu - EXTRA CHARGE)
+    // Query directly from D1 instead of calling the API to avoid Worker-to-Worker fetch issues
+    let restaurantMenu = { menus: [] }
+    let restaurantMenuError = null
+    try {
+      console.log('[DEBUG] Querying RESTAURANT MENU from D1')
+      
+      // Get menus with their categories and items
+      const menus = await DB.prepare(`
+        SELECT * FROM restaurant_menus
+        WHERE offering_id = ? AND ocr_status = 'completed'
+        ORDER BY display_order, created_at
+      `).bind(offering_id).all()
+      
+      console.log('[DEBUG] Found', menus.results?.length || 0, 'menus')
+      
+      const menusWithContent = []
+      
+      for (const menu of menus.results) {
+        // Get categories for this menu
+        const categories = await DB.prepare(`
+          SELECT * FROM menu_categories
+          WHERE menu_id = ?
+          ORDER BY display_order
+        `).bind(menu.menu_id).all()
+        
+        const categoriesWithItems = []
+        
+        for (const category of categories.results) {
+          // Get items for this category
+          const items = await DB.prepare(`
+            SELECT * FROM menu_items
+            WHERE category_id = ? AND is_available = 1
+            ORDER BY display_order
+          `).bind(category.category_id).all()
+          
+          categoriesWithItems.push({
+            ...category,
+            items: items.results
+          })
+        }
+        
+        menusWithContent.push({
+          ...menu,
+          categories: categoriesWithItems
+        })
+      }
+      
+      restaurantMenu = { menus: menusWithContent }
+      console.log('[DEBUG] RESTAURANT MENU loaded:', menusWithContent.length, 'menus with', 
+                  menusWithContent.reduce((sum, m) => sum + m.categories.length, 0), 'categories')
+    } catch (err) {
+      console.error('RESTAURANT MENU query error:', err)
+      restaurantMenuError = String(err)
     }
     
     return c.html(`
@@ -68697,9 +68751,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
     <script>
         // DEBUG: restaurant_id = ${restaurant_id}, offering_id = ${offering_id}
-        // DEBUG: menu.results.length = ${menu.results?.length || 0}
-        // DEBUG: menuError = ${menuError || 'null'}
-        const menuData = ${JSON.stringify(menu.results || [])};
+        // DEBUG: setMenu.results.length = ${setMenu.results?.length || 0}
+        // DEBUG: restaurantMenu.menus.length = ${restaurantMenu.menus?.length || 0}
+        // DEBUG: setMenuError = ${setMenuError || 'null'}
+        // DEBUG: restaurantMenuError = ${restaurantMenuError || 'null'}
+        
+        // SET MENU (included in voucher)
+        const setMenuData = ${JSON.stringify(setMenu.results || [])};
+        
+        // RESTAURANT MENU (extra charge)
+        const restaurantMenuData = ${JSON.stringify(restaurantMenu.menus || [])};
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
         const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
@@ -68722,7 +68783,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         let availableTables = [];
         
         // Get unique categories from actual menu data
-        const availableCategories = [...new Set(menuData.map(item => item.category))].filter(Boolean);
+        const availableCategories = Object.keys(menuByCategory).filter(Boolean);
         console.log('🍽️ Available menu categories:', availableCategories);
         console.log('🍽️ Total menu items:', menuData.length);
         
@@ -68735,7 +68796,9 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             'seafood': { emoji: '🦞', label: 'Seafood', i18n: 'seafood', order: 5 },
             'main': { emoji: '🥩', label: 'Mains', i18n: 'mains', order: 6 },
             'dessert': { emoji: '🍰', label: 'Desserts', i18n: 'desserts', order: 7 },
-            'drink': { emoji: '🍹', label: 'Drinks', i18n: 'drinks', order: 8 }
+            'drink': { emoji: '🍹', label: 'Drinks', i18n: 'drinks', order: 8 },
+            'hot_coffee': { emoji: '☕', label: 'Hot Coffee', i18n: 'hot_coffee', order: 9 },
+            'pastries': { emoji: '🥐', label: 'Pastries', i18n: 'pastries', order: 10 }
         };
         
         // Generate dynamic category tabs
@@ -68876,14 +68939,66 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         // Initialize date picker on load
         initCustomDatePicker();
         
-        // Group menu by category
-        const menuByCategory = {};
-        menuData.forEach(item => {
-            if (!menuByCategory[item.category]) {
-                menuByCategory[item.category] = [];
+        // Process SET MENU (included in voucher)
+        const setMenuByCategory = {};
+        setMenuData.forEach(item => {
+            if (!setMenuByCategory[item.category]) {
+                setMenuByCategory[item.category] = [];
             }
-            menuByCategory[item.category].push(item);
+            setMenuByCategory[item.category].push({...item, isSetMenu: true, extraCharge: false});
         });
+        
+        // Process RESTAURANT MENU (extra charge) - flatten from menu-display format
+        const restaurantMenuByCategory = {};
+        restaurantMenuData.forEach(menu => {
+            menu.categories.forEach(category => {
+                category.items.forEach(item => {
+                    // Normalize category name: "Hot Coffee" -> "hot_coffee"
+                    const normalizedCategory = (item.category || category.category_name).toLowerCase().replace(/\s+/g, '_');
+                    
+                    if (!restaurantMenuByCategory[normalizedCategory]) {
+                        restaurantMenuByCategory[normalizedCategory] = [];
+                    }
+                    
+                    restaurantMenuByCategory[normalizedCategory].push({
+                        item_id: 'rm_' + item.item_id, // Prefix to avoid ID conflicts
+                        item_name: item.item_name,
+                        description: item.description || '',
+                        category: normalizedCategory,
+                        cost_to_hotel: item.price || 0,
+                        is_premium: false,
+                        display_order: item.display_order || 0,
+                        isSetMenu: false,
+                        extraCharge: true
+                    });
+                });
+            });
+        });
+        
+        // Combine both menus
+        const combinedMenuByCategory = {};
+        
+        // Add set menu items
+        Object.keys(setMenuByCategory).forEach(cat => {
+            if (!combinedMenuByCategory[cat]) {
+                combinedMenuByCategory[cat] = [];
+            }
+            combinedMenuByCategory[cat].push(...setMenuByCategory[cat]);
+        });
+        
+        // Add restaurant menu items
+        Object.keys(restaurantMenuByCategory).forEach(cat => {
+            if (!combinedMenuByCategory[cat]) {
+                combinedMenuByCategory[cat] = [];
+            }
+            combinedMenuByCategory[cat].push(...restaurantMenuByCategory[cat]);
+        });
+        
+        const menuByCategory = combinedMenuByCategory;
+        
+        console.log('🍽️ SET MENU categories:', Object.keys(setMenuByCategory));
+        console.log('🍽️ RESTAURANT MENU categories:', Object.keys(restaurantMenuByCategory));
+        console.log('🍽️ COMBINED categories:', Object.keys(menuByCategory));
         
         // Check voucher eligibility on load
         async function checkVoucherEligibility() {
@@ -69094,15 +69209,19 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const premiumBadge = item.is_premium ? '<span class="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-semibold">' + premiumText + '</span>' : '';
+                const extraChargeBadge = item.extraCharge ? '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300">💳 EXTRA CHARGE</span>' : '';
+                const setMenuBadge = item.isSetMenu ? '<span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold border border-green-300">✓ INCLUDED</span>' : '';
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="' + (item.extraCharge ? 'text-red-600 font-bold' : 'text-gray-600') + ' text-sm">' + (item.extraCharge ? '+' : '') + '€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 return \`
-                <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}">
+                <div class="border rounded-lg p-4 mb-3 \${item.is_premium ? 'border-yellow-300 bg-yellow-50' : item.extraCharge ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
                                 <h4 class="font-bold text-lg">\${item.item_name}</h4>
+                                \${setMenuBadge}
+                                \${extraChargeBadge}
                                 \${premiumBadge}
                             </div>
                             <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
@@ -69110,7 +69229,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
-                            <button onclick="toggleItem(\${item.item_id}, &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel})" 
+                            <button onclick="toggleItem('\${item.item_id}', &quot;\${item.category}&quot;, &quot;\${itemNameEscaped}&quot;, \${item.cost_to_hotel}, \${item.extraCharge})" 
                                     id="btn-\${item.item_id}"
                                     class="w-10 h-10 rounded-lg font-semibold transition-colors \${quantity > 0 ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700'}">
                                 <i class="fas fa-plus"></i>
@@ -69122,7 +69241,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }).join('');
         }
         
-        function toggleItem(itemId, category, itemName, cost) {
+        function toggleItem(itemId, category, itemName, cost, extraCharge = false) {
             const orderingFor = parseInt(document.getElementById('orderingFor')?.value || '1');
             
             // Count total quantity in this category
@@ -69152,6 +69271,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     category, 
                     name: itemName, 
                     cost,
+                    extraCharge: extraCharge || false,
                     quantity: 1
                 };
             }
