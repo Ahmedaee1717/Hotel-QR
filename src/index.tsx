@@ -68841,9 +68841,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }).join('');
             
             // Show first category by default
-            if (setCategories.length > 0) {
-                showSetMenuCategory(setCategories[0]);
-            }
+            return setCategories.length > 0 ? setCategories[0] : null;
         }
         
         // Generate RESTAURANT MENU tabs
@@ -68870,9 +68868,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }).join('');
             
             // Show first category by default
-            if (restaurantCategories.length > 0) {
-                showRestaurantMenuCategory(restaurantCategories[0]);
-            }
+            return restaurantCategories.length > 0 ? restaurantCategories[0] : null;
         }
         
         // Load voucher eligibility from localStorage if available
@@ -69863,8 +69859,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             // Generate dynamic menu tabs based on actual menu data
-            generateSetMenuTabs();
-            generateRestaurantMenuTabs();
+            const firstSetCategory = generateSetMenuTabs();
+            const firstRestaurantCategory = generateRestaurantMenuTabs();
+            
+            // Show first categories after all functions are defined
+            if (firstSetCategory) {
+                showSetMenuCategory(firstSetCategory);
+            }
+            if (firstRestaurantCategory) {
+                showRestaurantMenuCategory(firstRestaurantCategory);
+            }
             
             // Load tables
             await loadTables();
