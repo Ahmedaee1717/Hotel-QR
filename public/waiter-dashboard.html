@@ -180,24 +180,58 @@
         <!-- Tables View -->
         <div id="tablesView" class="p-4">
             <!-- Quick Stats -->
-            <div class="grid grid-cols-3 gap-3 mb-6">
-                <div class="dark-card rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold dark-text" id="statFree">0</div>
-                    <div class="text-xs dark-text-muted mt-1">Free Tables</div>
+            <div class="grid grid-cols-4 gap-2 mb-4">
+                <div class="dark-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-green-400" id="statFree">0</div>
+                    <div class="text-xs dark-text-muted mt-1">🟢 Free</div>
                 </div>
-                <div class="dark-card rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold dark-text" id="statOccupied">0</div>
-                    <div class="text-xs dark-text-muted mt-1">Occupied</div>
+                <div class="dark-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-yellow-400" id="statSeated">0</div>
+                    <div class="text-xs dark-text-muted mt-1">🟡 Seated</div>
                 </div>
-                <div class="dark-card rounded-lg p-4 text-center">
-                    <div class="text-3xl font-bold dark-text" id="statPending">0</div>
-                    <div class="text-xs dark-text-muted mt-1">Pending Orders</div>
+                <div class="dark-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-blue-400" id="statOrdering">0</div>
+                    <div class="text-xs dark-text-muted mt-1">🔵 Ordering</div>
+                </div>
+                <div class="dark-card rounded-lg p-3 text-center">
+                    <div class="text-2xl font-bold text-red-400" id="statOccupied">0</div>
+                    <div class="text-xs dark-text-muted mt-1">🔴 Dining</div>
                 </div>
             </div>
 
-            <!-- Tables Grid -->
-            <div id="tablesGrid" class="table-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <!-- Loaded dynamically -->
+            <!-- Legend -->
+            <div class="dark-card rounded-lg p-3 mb-4">
+                <div class="grid grid-cols-4 gap-2 text-xs">
+                    <div class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span class="dark-text">Available</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span class="dark-text">Seated</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span class="dark-text">Ordering</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="dark-text">Dining</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floor Plan Container -->
+            <div class="dark-card rounded-lg p-4 mb-4">
+                <h3 class="font-bold dark-text mb-3 flex items-center justify-between">
+                    <span><i class="fas fa-layer-group mr-2"></i>Restaurant Floor Plan</span>
+                    <button onclick="loadDashboard()" class="text-sm px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg">
+                        <i class="fas fa-sync-alt mr-1"></i>Refresh
+                    </button>
+                </h3>
+                <div id="floorPlanContainer" class="relative bg-slate-800 rounded-lg" style="min-height: 500px; overflow: hidden;">
+                    <!-- Floor plan rendered here -->
+                </div>
             </div>
         </div>
 
@@ -336,9 +370,13 @@
         let currentTable = null;
         let currentOrder = null;
         let tables = [];
+        let floorElements = [];
+        let walls = [];
+        let kitchenOrders = []; // Orders from kitchen/alacarte_vouchers
         let menuItems = [];
         let orders = [];
         let selectedMenuItems = {}; // { item_id: quantity }
+        let restaurantTextures = null;
         
         const urlParams = new URLSearchParams(window.location.search);
         const restaurantId = urlParams.get('restaurant') || '2';
@@ -418,16 +456,81 @@
 
         async function loadDashboard() {
             await loadTables();
+            await loadFloorElements();
+            await loadWalls();
+            await loadTextures();
+            await loadKitchenOrders();
             await loadOrders();
             await loadMenuItems();
+            renderFloorPlan();
             updateStats();
             
             // Auto-refresh every 30 seconds
-            setInterval(() => {
-                loadTables();
-                loadOrders();
+            setInterval(async () => {
+                await loadTables();
+                await loadKitchenOrders();
+                await loadOrders();
+                renderFloorPlan();
                 updateStats();
             }, 30000);
+        }
+
+        async function loadTextures() {
+            try {
+                const response = await fetch(`/api/restaurant/${restaurantId}/textures`);
+                const data = await response.json();
+                if (data.success && data.texture && data.texture.is_active) {
+                    restaurantTextures = data.texture;
+                }
+            } catch (error) {
+                console.log('No textures available');
+            }
+        }
+
+        async function loadFloorElements() {
+            try {
+                const response = await fetch(`/api/admin/restaurant/${restaurantId}/floor-elements`, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    floorElements = data.elements || [];
+                }
+            } catch (error) {
+                console.log('No floor elements');
+                floorElements = [];
+            }
+        }
+
+        async function loadWalls() {
+            try {
+                const response = await fetch(`/api/admin/restaurant/${restaurantId}/walls`, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    walls = data.walls || [];
+                }
+            } catch (error) {
+                console.log('No walls');
+                walls = [];
+            }
+        }
+
+        async function loadKitchenOrders() {
+            try {
+                const response = await fetch(`/api/kitchen/orders/${restaurantId}?property=${propertyId}`, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    kitchenOrders = data.orders || [];
+                    console.log('Loaded kitchen orders:', kitchenOrders.length);
+                }
+            } catch (error) {
+                console.error('Failed to load kitchen orders:', error);
+                kitchenOrders = [];
+            }
         }
 
         async function loadTables() {
@@ -438,48 +541,185 @@
                 const data = await response.json();
                 if (data.success) {
                     tables = data.tables || [];
-                    renderTables();
+                    // Merge with kitchen order data
+                    tables.forEach(table => {
+                        const kitchenOrder = kitchenOrders.find(o => o.table_number === table.table_number);
+                        if (kitchenOrder) {
+                            table.kitchen_order = kitchenOrder;
+                        }
+                    });
                 }
             } catch (error) {
                 console.error('Failed to load tables:', error);
             }
         }
 
-        function renderTables() {
-            const grid = document.getElementById('tablesGrid');
+        function renderFloorPlan() {
+            const container = document.getElementById('floorPlanContainer');
+            container.innerHTML = '';
             
-            if (tables.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center py-8 dark-text-muted">No tables available</div>';
-                return;
+            // Apply floor texture
+            if (restaurantTextures) {
+                container.style.background = restaurantTextures.floor_color_primary || '#1e293b';
+                container.style.backgroundImage = `linear-gradient(45deg, ${restaurantTextures.floor_color_primary || '#1e293b'} 25%, ${restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#334155'} 25%, ${restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#334155'} 50%, ${restaurantTextures.floor_color_primary || '#1e293b'} 50%, ${restaurantTextures.floor_color_primary || '#1e293b'} 75%, ${restaurantTextures.floor_color_secondary || restaurantTextures.floor_color_primary || '#334155'} 75%)`;
+                container.style.backgroundSize = '40px 40px';
+                container.style.opacity = restaurantTextures.floor_opacity || 0.9;
             }
             
-            grid.innerHTML = tables.map(table => {
-                const status = table.current_order ? 'occupied' : 'free';
-                const statusColor = status === 'free' ? 'status-free' : 'status-occupied';
-                const statusText = status === 'free' ? 'Available' : 'Occupied';
+            // Calculate scale
+            const screenWidth = window.innerWidth - 32;
+            const maxX = Math.max(...tables.map(t => t.position_x + t.width), 600);
+            const scaleFactor = Math.min(screenWidth / maxX, 0.8);
+            
+            const canvasHeight = 600 * scaleFactor;
+            container.style.height = canvasHeight + 'px';
+            
+            // Render walls (SVG)
+            if (walls.length > 0) {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.style.position = 'absolute';
+                svg.style.top = '0';
+                svg.style.left = '0';
+                svg.style.width = '100%';
+                svg.style.height = '100%';
+                svg.style.pointerEvents = 'none';
                 
-                return `
-                    <div onclick="openTableModal(${table.table_id})" class="dark-card rounded-lg p-4 cursor-pointer hover:bg-slate-700 transition">
-                        <div class="flex items-center justify-between mb-3">
-                            <div class="text-2xl font-bold dark-text">Table ${table.table_number}</div>
-                            <span class="table-status ${statusColor}"></span>
-                        </div>
-                        <div class="text-sm dark-text-muted mb-1">Capacity: ${table.capacity}</div>
-                        <div class="text-sm font-bold ${status === 'free' ? 'text-green-400' : 'text-red-400'}">${statusText}</div>
-                        ${table.current_order ? `<div class="text-xs dark-text-muted mt-2">${table.guest_name || 'Guest'}</div>` : ''}
-                    </div>
+                walls.forEach(wall => {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', wall.start_x * scaleFactor);
+                    line.setAttribute('y1', wall.start_y * scaleFactor);
+                    line.setAttribute('x2', wall.end_x * scaleFactor);
+                    line.setAttribute('y2', wall.end_y * scaleFactor);
+                    line.setAttribute('stroke', wall.color || '#475569');
+                    line.setAttribute('stroke-width', (wall.thickness || 4) * scaleFactor);
+                    svg.appendChild(line);
+                });
+                
+                container.appendChild(svg);
+            }
+            
+            // Render floor elements
+            floorElements.forEach(element => {
+                const el = document.createElement('div');
+                el.style.position = 'absolute';
+                el.style.left = (element.position_x * scaleFactor) + 'px';
+                el.style.top = (element.position_y * scaleFactor) + 'px';
+                el.style.width = (element.width * scaleFactor) + 'px';
+                el.style.height = (element.height * scaleFactor) + 'px';
+                el.style.backgroundColor = element.color || '#64748b';
+                el.style.borderRadius = '4px';
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.fontSize = '12px';
+                el.style.color = 'white';
+                el.style.fontWeight = 'bold';
+                el.style.opacity = '0.7';
+                el.style.pointerEvents = 'none';
+                
+                const iconMap = {
+                    'buffet': '🍽️',
+                    'bar': '🍷',
+                    'kitchen': '👨‍🍳',
+                    'entrance': '🚪'
+                };
+                el.innerHTML = iconMap[element.element_type] || element.element_type;
+                
+                container.appendChild(el);
+            });
+            
+            // Render tables
+            tables.forEach(table => {
+                const tableEl = document.createElement('div');
+                tableEl.style.position = 'absolute';
+                tableEl.style.left = (table.position_x * scaleFactor) + 'px';
+                tableEl.style.top = (table.position_y * scaleFactor) + 'px';
+                
+                const width = (table.width * scaleFactor);
+                const height = (table.height * scaleFactor);
+                
+                if (table.shape === 'circle') {
+                    const size = Math.max(width, height);
+                    tableEl.style.width = size + 'px';
+                    tableEl.style.height = size + 'px';
+                    tableEl.style.borderRadius = '50%';
+                } else {
+                    tableEl.style.width = width + 'px';
+                    tableEl.style.height = height + 'px';
+                    tableEl.style.borderRadius = '8px';
+                }
+                
+                // Determine table status
+                let status = 'free';
+                let statusColor = '#10b981'; // green
+                let guestInfo = '';
+                
+                if (table.kitchen_order) {
+                    // Has order from kitchen (dining/preparing)
+                    status = 'dining';
+                    statusColor = '#ef4444'; // red
+                    guestInfo = extractGuestName(table.kitchen_order.special_requests);
+                } else if (table.current_order) {
+                    // Has waiter order (seated/ordering)
+                    if (table.current_order.status === 'pending') {
+                        status = 'seated';
+                        statusColor = '#eab308'; // yellow
+                    } else {
+                        status = 'ordering';
+                        statusColor = '#3b82f6'; // blue
+                    }
+                    guestInfo = table.current_order.guest_name;
+                }
+                
+                tableEl.style.backgroundColor = 'white';
+                tableEl.style.border = `3px solid ${statusColor}`;
+                tableEl.style.cursor = 'pointer';
+                tableEl.style.display = 'flex';
+                tableEl.style.flexDirection = 'column';
+                tableEl.style.alignItems = 'center';
+                tableEl.style.justifyContent = 'center';
+                tableEl.style.padding = '8px';
+                tableEl.style.transition = 'all 0.2s';
+                tableEl.style.boxShadow = `0 4px 6px rgba(0,0,0,0.1)`;
+                
+                tableEl.onmouseover = () => {
+                    tableEl.style.transform = 'scale(1.05)';
+                    tableEl.style.boxShadow = `0 8px 12px rgba(0,0,0,0.2)`;
+                };
+                tableEl.onmouseout = () => {
+                    tableEl.style.transform = 'scale(1)';
+                    tableEl.style.boxShadow = `0 4px 6px rgba(0,0,0,0.1)`;
+                };
+                
+                tableEl.onclick = () => openTableModal(table.table_id);
+                
+                const fontSize = Math.max(12, width / 8);
+                tableEl.innerHTML = `
+                    <div style="font-size: ${fontSize}px; font-weight: bold; color: #1e293b;">${table.table_number}</div>
+                    <div style="font-size: ${fontSize * 0.6}px; color: #64748b; margin-top: 2px;">${table.capacity} seats</div>
+                    ${guestInfo ? `<div style="font-size: ${fontSize * 0.5}px; color: #1e293b; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${guestInfo}</div>` : ''}
                 `;
-            }).join('');
+                
+                container.appendChild(tableEl);
+            });
+        }
+
+        function extractGuestName(specialRequests) {
+            if (!specialRequests) return '';
+            const match = specialRequests.match(/Guest:\s*([^,]+)/);
+            return match ? match[1].trim() : '';
         }
 
         async function loadOrders() {
             try {
-                const response = await fetch(`/api/waiter/orders?restaurant=${restaurantId}&waiter=${currentWaiter.id}&property=${propertyId}`, {
+                // Load ALL orders for this restaurant (not just this waiter's)
+                const response = await fetch(`/api/waiter/orders?restaurant=${restaurantId}&waiter=0&property=${propertyId}`, {
                     headers: { 'X-Property-ID': propertyId }
                 });
                 const data = await response.json();
                 if (data.success) {
                     orders = data.orders || [];
+                    console.log('Loaded orders:', orders.length, orders);
                     renderOrders();
                 }
             } catch (error) {
@@ -545,13 +785,26 @@
         }
 
         function updateStats() {
-            const free = tables.filter(t => !t.current_order).length;
-            const occupied = tables.filter(t => t.current_order).length;
-            const pending = orders.filter(o => o.status === 'pending').length;
+            let free = 0, seated = 0, ordering = 0, dining = 0;
+            
+            tables.forEach(table => {
+                if (table.kitchen_order) {
+                    dining++;
+                } else if (table.current_order) {
+                    if (table.current_order.status === 'pending') {
+                        seated++;
+                    } else {
+                        ordering++;
+                    }
+                } else {
+                    free++;
+                }
+            });
             
             document.getElementById('statFree').textContent = free;
-            document.getElementById('statOccupied').textContent = occupied;
-            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statSeated').textContent = seated;
+            document.getElementById('statOrdering').textContent = ordering;
+            document.getElementById('statOccupied').textContent = dining;
         }
 
         function switchTab(tab) {
@@ -575,8 +828,57 @@
             
             document.getElementById('modalTableNumber').textContent = currentTable.table_number;
             
-            if (currentTable.current_order) {
-                // Show current order
+            // Check if table has kitchen order (dining)
+            if (currentTable.kitchen_order) {
+                // Show kitchen order details with checkout option
+                document.getElementById('guestSeatingSection').classList.add('hidden');
+                document.getElementById('currentOrderSection').classList.remove('hidden');
+                
+                const order = currentTable.kitchen_order;
+                document.getElementById('currentGuestName').textContent = extractGuestName(order.special_requests) || 'Guest';
+                document.getElementById('currentPartySize').textContent = order.party_size;
+                
+                const statusColors = {
+                    pending: 'bg-yellow-500',
+                    confirmed: 'bg-blue-500',
+                    preparing: 'bg-orange-500',
+                    ready: 'bg-green-500'
+                };
+                document.getElementById('currentOrderStatus').className = `px-3 py-1 rounded-full text-sm font-bold text-white ${statusColors[order.status] || 'bg-gray-500'}`;
+                document.getElementById('currentOrderStatus').textContent = order.status.toUpperCase();
+                
+                // Render dishes from kitchen order
+                const container = document.getElementById('orderItemsList');
+                container.innerHTML = order.dishes.map(dish => `
+                    <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                        <div class="flex-1">
+                            <div class="font-bold dark-text">${dish.item_name}</div>
+                            <div class="text-xs text-slate-400">${dish.extraCharge ? '💰 Extra Charge' : '✓ Set Menu'}</div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="w-8 text-center font-bold dark-text">${dish.quantity}</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Change buttons to show checkout instead of add items
+                const buttonsHTML = `
+                    <div class="grid grid-cols-2 gap-3 mt-6">
+                        <button onclick="checkoutTable()" class="btn-accent text-black py-4 rounded-xl font-bold">
+                            <i class="fas fa-check-circle mr-2"></i>Checkout & Clear
+                        </button>
+                        <button onclick="closeTableModal()" class="bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold">
+                            <i class="fas fa-times mr-2"></i>Cancel
+                        </button>
+                    </div>
+                `;
+                container.insertAdjacentHTML('afterend', buttonsHTML);
+                
+                // Hide add items button
+                document.querySelector('button[onclick="showMenuModal()"]').style.display = 'none';
+                
+            } else if (currentTable.current_order) {
+                // Show current waiter order
                 currentOrder = currentTable.current_order;
                 document.getElementById('guestSeatingSection').classList.add('hidden');
                 document.getElementById('currentOrderSection').classList.remove('hidden');
@@ -590,6 +892,9 @@
                 document.getElementById('currentOrderStatus').className = `px-3 py-1 rounded-full text-sm font-bold text-white ${statusColors[currentOrder.status]}`;
                 document.getElementById('currentOrderStatus').textContent = currentOrder.status.toUpperCase();
                 
+                // Show add items button
+                document.querySelector('button[onclick="showMenuModal()"]').style.display = 'block';
+                
                 renderOrderItems();
             } else {
                 // Show guest seating
@@ -601,6 +906,44 @@
             }
             
             document.getElementById('tableDetailModal').classList.remove('hidden');
+        }
+
+        async function checkoutTable() {
+            if (!currentTable || !currentTable.kitchen_order) return;
+            
+            if (!confirm('Checkout guests and clear this table?')) {
+                return;
+            }
+            
+            try {
+                // Mark the voucher as served/used
+                const response = await fetch('/api/waiter/checkout-table', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify({
+                        voucher_id: currentTable.kitchen_order.voucher_id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✓ Table checked out successfully!');
+                    closeTableModal();
+                    await loadKitchenOrders();
+                    await loadTables();
+                    renderFloorPlan();
+                    updateStats();
+                } else {
+                    alert('Failed to checkout: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                alert('Failed to checkout table');
+            }
         }
 
         function closeTableModal() {

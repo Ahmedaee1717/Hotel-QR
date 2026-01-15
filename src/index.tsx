@@ -74576,31 +74576,101 @@ app.get('/api/waiter/tables', async (c) => {
       SELECT 
         rt.table_id,
         rt.table_number,
-        rt.capacity,
-        wo.order_id,
-        wo.guest_name,
-        wo.party_size,
-        wo.status
+        rt.capacity
       FROM restaurant_tables rt
-      LEFT JOIN waiter_orders wo ON rt.table_id = wo.table_id 
-        AND wo.status IN ('pending', 'confirmed')
       WHERE rt.offering_id = ?
         AND rt.is_active = 1
       ORDER BY CAST(rt.table_number AS INTEGER)
     `).bind(restaurant).all()
     
-    // Format response
-    const formattedTables = tables.results.map(t => ({
-      table_id: t.table_id,
-      table_number: t.table_number,
-      capacity: t.capacity,
-      current_order: t.order_id ? {
-        order_id: t.order_id,
-        guest_name: t.guest_name,
-        party_size: t.party_size,
-        status: t.status
-      } : null
-    }))
+    // Get waiter orders
+    const waiterOrders = await DB.prepare(`
+      SELECT table_id, order_id, guest_name, party_size, status
+      FROM waiter_orders
+      WHERE restaurant_id = ? 
+        AND status IN ('pending', 'confirmed', 'preparing', 'ready')
+    `).bind(restaurant).all()
+    
+    // Get kitchen bookings (alacarte_vouchers) - show all active
+    const kitchenBookings = await DB.prepare(`
+      SELECT 
+        table_number,
+        special_requests,
+        party_size,
+        status,
+        voucher_id
+      FROM alacarte_vouchers
+      WHERE restaurant_id = ?
+        AND property_id = ?
+        AND status IN ('confirmed', 'preparing', 'ready', 'served')
+      LIMIT 50
+    `).bind(restaurant, property_id).all()
+    
+    // Create maps for quick lookup
+    const waiterOrderMap = new Map()
+    for (const wo of waiterOrders.results) {
+      waiterOrderMap.set(wo.table_id, wo)
+    }
+    
+    const kitchenBookingMap = new Map()
+    for (const kb of kitchenBookings.results) {
+      if (kb.table_number) {
+        // Extract guest name from special_requests
+        let guestName = 'Guest'
+        if (kb.special_requests) {
+          const match = kb.special_requests.match(/Guest:\s*([^,\n]+)/)
+          if (match) {
+            guestName = match[1].trim()
+          }
+        }
+        kitchenBookingMap.set(kb.table_number, { ...kb, guest_name: guestName })
+      }
+    }
+    
+    // Format response - match tables with orders/bookings
+    const formattedTables = tables.results.map(t => {
+      // Check waiter order first
+      const waiterOrder = waiterOrderMap.get(t.table_id)
+      if (waiterOrder) {
+        return {
+          table_id: t.table_id,
+          table_number: t.table_number,
+          capacity: t.capacity,
+          current_order: {
+            order_id: waiterOrder.order_id,
+            guest_name: waiterOrder.guest_name,
+            party_size: waiterOrder.party_size,
+            status: waiterOrder.status,
+            source: 'waiter'
+          }
+        }
+      }
+      
+      // Check kitchen booking
+      const kitchenBooking = kitchenBookingMap.get(t.table_number)
+      if (kitchenBooking) {
+        return {
+          table_id: t.table_id,
+          table_number: t.table_number,
+          capacity: t.capacity,
+          current_order: {
+            order_id: `kitchen-${kitchenBooking.voucher_id}`,
+            guest_name: kitchenBooking.guest_name,
+            party_size: kitchenBooking.party_size,
+            status: kitchenBooking.status,
+            source: 'kitchen'
+          }
+        }
+      }
+      
+      // Table is free
+      return {
+        table_id: t.table_id,
+        table_number: t.table_number,
+        capacity: t.capacity,
+        current_order: null
+      }
+    })
     
     return c.json({
       success: true,
@@ -74619,7 +74689,8 @@ app.get('/api/waiter/orders', async (c) => {
   const { restaurant, waiter, property } = c.req.query()
   
   try {
-    const orders = await DB.prepare(`
+    // Get waiter orders (if waiter=0, get all)
+    let waiterOrdersQuery = `
       SELECT 
         wo.order_id,
         wo.table_id,
@@ -74628,28 +74699,118 @@ app.get('/api/waiter/orders', async (c) => {
         wo.party_size,
         wo.status,
         wo.items,
-        wo.total_cost
+        wo.total_cost,
+        'waiter' as source
       FROM waiter_orders wo
       INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       WHERE wo.restaurant_id = ?
-        AND wo.waiter_id = ?
         AND wo.status IN ('pending', 'confirmed', 'preparing', 'ready')
-      ORDER BY wo.created_at DESC
-    `).bind(restaurant, waiter).all()
+    `
     
-    // Parse items JSON
-    const formattedOrders = orders.results.map(o => ({
+    const waiterOrdersParams = [restaurant]
+    
+    // Filter by waiter if specified and not 0
+    if (waiter && waiter !== '0') {
+      waiterOrdersQuery += ` AND wo.waiter_id = ?`
+      waiterOrdersParams.push(waiter)
+    }
+    
+    waiterOrdersQuery += ` ORDER BY wo.created_at DESC`
+    
+    const waiterOrders = await DB.prepare(waiterOrdersQuery).bind(...waiterOrdersParams).all()
+    
+    // Get kitchen orders (alacarte_vouchers) for this restaurant - show all active orders
+    const kitchenOrders = await DB.prepare(`
+      SELECT 
+        av.voucher_id,
+        av.table_number,
+        av.special_requests,
+        av.party_size,
+        av.status,
+        av.preorder_item_ids,
+        av.total_cost,
+        av.reservation_time,
+        av.reservation_date,
+        'kitchen' as source
+      FROM alacarte_vouchers av
+      WHERE av.restaurant_id = ?
+        AND av.property_id = ?
+        AND av.status IN ('confirmed', 'preparing', 'ready')
+      ORDER BY av.created_at DESC
+      LIMIT 50
+    `).bind(restaurant, property_id).all()
+    
+    // Parse waiter orders
+    const formattedWaiterOrders = waiterOrders.results.map(o => ({
       ...o,
       items: o.items ? JSON.parse(o.items) : []
     }))
     
+    // Parse kitchen orders - need to look up menu items
+    const formattedKitchenOrders = []
+    for (const order of kitchenOrders.results) {
+      try {
+        const preorderItems = order.preorder_item_ids ? JSON.parse(order.preorder_item_ids) : []
+        const items = []
+        
+        for (const item of preorderItems) {
+          if (!item || !item.item_id) continue
+          
+          const menuItem = await DB.prepare(`
+            SELECT item_name, cost_to_hotel as cost
+            FROM alacarte_menu_items
+            WHERE item_id = ?
+          `).bind(item.item_id).first()
+          
+          if (menuItem) {
+            items.push({
+              item_id: item.item_id,
+              item_name: menuItem.item_name || 'Unknown Item',
+              quantity: parseInt(item.quantity) || 1,
+              cost: parseFloat(menuItem.cost) || 0
+            })
+          }
+        }
+        
+        // Extract guest name from special_requests
+        let guestName = 'Guest'
+        if (order.special_requests) {
+          const match = order.special_requests.match(/Guest:\s*([^,\n]+)/)
+          if (match) {
+            guestName = match[1].trim()
+          }
+        }
+        
+        const totalCost = order.total_cost ? parseFloat(order.total_cost) : items.reduce((sum, i) => sum + (i.cost * i.quantity), 0)
+        
+        formattedKitchenOrders.push({
+          order_id: `kitchen-${order.voucher_id}`,
+          table_number: order.table_number || 'N/A',
+          guest_name: guestName,
+          party_size: parseInt(order.party_size) || 1,
+          status: order.status || 'confirmed',
+          items: items,
+          total_cost: totalCost,
+          source: 'kitchen',
+          reservation_date: order.reservation_date
+        })
+      } catch (err) {
+        console.error('Error processing kitchen order:', order.voucher_id, err)
+        // Skip this order if it fails
+        continue
+      }
+    }
+    
+    // Combine and return
+    const allOrders = [...formattedWaiterOrders, ...formattedKitchenOrders]
+    
     return c.json({
       success: true,
-      orders: formattedOrders
+      orders: allOrders
     })
   } catch (error) {
     console.error('Get orders error:', error)
-    return c.json({ success: false, error: 'Failed to get orders' }, 500)
+    return c.json({ success: false, error: 'Failed to get orders', message: error.message }, 500)
   }
 })
 
