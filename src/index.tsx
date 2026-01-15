@@ -64346,7 +64346,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 
                 let limitButton = '';
                 if (isSelected) {
-                    limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
+                    limitButton = "<button onclick='toggleCustomLimit(" + itemIdEscaped + ")' class='text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition'><i class='fas fa-sliders-h mr-1'></i>Limit</button>";
                 }
                 
                 // Price display for extra charge items
@@ -64368,11 +64368,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     '</div>' +
                     '<div class="flex items-center justify-between">' +
                         '<div class="quantity-controls flex items-center gap-2">' +
-                            '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', -1)" class="bg-gray-200 hover:bg-gray-300 text-gray-700" ' + disabledAttr + '>' +
+                            "<button onclick='adjustItemQuantity(" + itemIdEscaped + ", -1)' class='bg-gray-200 hover:bg-gray-300 text-gray-700' " + disabledAttr + '>' +
                                 '<i class="fas fa-minus"></i>' +
                             '</button>' +
                             '<span class="w-12 text-center font-bold text-lg">' + quantity + '</span>' +
-                            '<button onclick="adjustItemQuantity(' + itemIdEscaped + ', 1)" class="btn-primary text-white">' +
+                            "<button onclick='adjustItemQuantity(" + itemIdEscaped + ", 1)' class='btn-primary text-white'>" +
                                 '<i class="fas fa-plus"></i>' +
                             '</button>' +
                         '</div>' +
@@ -64381,7 +64381,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     '<div id="customLimit' + item.item_id + '" class="hidden mt-3 pt-3 border-t">' +
                         '<label class="block text-xs font-bold mb-1">Custom Quantity Limit</label>' +
                         '<input type="number" id="limitInput' + item.item_id + '" min="0" value="' + customLimitValue + '" ' +
-                               'onchange="setCustomLimit(' + itemIdEscaped + ', this.value)" ' +
+                               "onchange='setCustomLimit(" + itemIdEscaped + ", this.value)' " +
                                'class="w-full px-3 py-2 border rounded-lg text-sm" placeholder="No limit">' +
                     '</div>' +
                 '</div>';
