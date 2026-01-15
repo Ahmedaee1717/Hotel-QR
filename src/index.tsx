@@ -63806,6 +63806,26 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
     <div class="container-tablet px-6 pb-8">
         <!-- Step 1: Guest Information -->
         <div id="stepContent1" class="fade-in">
+            <!-- Staff Selection Card -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-6 mb-6 border-2 border-blue-200">
+                <h2 class="text-xl font-bold mb-4 flex items-center text-gray-800">
+                    <i class="fas fa-user-tie mr-3 text-blue-600"></i>
+                    Staff Member
+                </h2>
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-700">
+                        <i class="fas fa-id-badge mr-2"></i>Who is creating this booking? *
+                    </label>
+                    <select id="staffMember" class="w-full px-4 py-3 border-2 border-blue-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition touch-target bg-white" required>
+                        <option value="">-- Select Staff Member --</option>
+                        <!-- Loaded dynamically -->
+                    </select>
+                    <p class="text-xs text-gray-600 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>This helps track performance and upsell incentives
+                    </p>
+                </div>
+            </div>
+            
             <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4 flex items-center">
                     <i class="fas fa-user-circle mr-3 accent-text"></i>
@@ -64110,11 +64130,14 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let selectedTableId = null; // Selected table for booking
         let tables = []; // All tables
         let floorElements = []; // Floor plan elements
+        let selectedStaffId = null; // Staff member creating the booking
+        let staffMembers = []; // All active staff members
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             setTodayDate();
             setCurrentTime();
+            loadStaffMembers();
             loadRestaurants();
         });
         
@@ -64268,6 +64291,40 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             } catch (error) {
                 console.error('Failed to check voucher eligibility:', error);
             }
+        }
+        
+        
+        // Load staff members for front desk
+        async function loadStaffMembers() {
+            try {
+                const response = await fetch('/api/staff/members?property=' + propertyId, {
+                    headers: { 'X-Property-ID': propertyId }
+                });
+                const data = await response.json();
+                staffMembers = data.staff || [];
+                renderStaffDropdown();
+            } catch (error) {
+                console.error('Failed to load staff members:', error);
+                // Continue - staff selection is optional but recommended
+            }
+        }
+        
+        function renderStaffDropdown() {
+            const select = document.getElementById('staffMember');
+            if (!select) return;
+            
+            if (staffMembers.length === 0) {
+                select.innerHTML = '<option value="">-- No staff members available --</option>';
+                return;
+            }
+            
+            const options = staffMembers.map(staff => {
+                const fullName = \`\${staff.first_name} \${staff.last_name}\`;
+                const role = staff.role || 'Staff';
+                return \`<option value="\${staff.user_id}">\${fullName} (\${role})</option>\`;
+            }).join('');
+            
+            select.innerHTML = '<option value="">-- Select Staff Member --</option>' + options;
         }
         
         async function loadRestaurants() {
@@ -64597,6 +64654,15 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             // Validate current step
             if (step > currentStep) {
                 if (currentStep === 1) {
+                    // Validate staff member
+                    const staffSelect = document.getElementById('staffMember');
+                    selectedStaffId = staffSelect.value;
+                    if (!selectedStaffId) {
+                        alert('Please select the staff member creating this booking');
+                        staffSelect.focus();
+                        return;
+                    }
+                    
                     // Validate room number
                     if (!document.getElementById('roomNumber').value.trim()) {
                         alert('Please enter room number');
@@ -65024,6 +65090,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     reservation_time: document.getElementById('bookingTime').value,
                     restaurant_id: selectedRestaurant.offering_id,
                     table_id: selectedTableId, // Include selected table
+                    staff_id: selectedStaffId, // Track staff member creating booking
                     items: Object.values(selectedItems).map(s => ({
                         item_id: s.item.item_id,
                         quantity: s.quantity,
@@ -65080,6 +65147,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             selectedRestaurant = null;
             selectedItems = {};
             selectedTableId = null;
+            selectedStaffId = null; // Reset staff selection
             currentStep = 1;
             currentPass = null;
             maxPartySize = 12;
@@ -65091,6 +65159,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('partySize').value = '2';
             document.getElementById('partySize').max = '12';
             document.getElementById('maxGuestsInfo').textContent = '';
+            document.getElementById('staffMember').value = ''; // Reset staff dropdown
             if (document.getElementById('selectedTableDisplay')) {
                 document.getElementById('selectedTableDisplay').textContent = 'None';
             }
@@ -65103,6 +65172,30 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
 </body>
 </html>
   `)
+})
+
+// API: Get staff members for property (for front desk staff selection)
+app.get('/api/staff/members', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    // Fetch active staff members for this property
+    const staff = await DB.prepare(`
+      SELECT user_id, email, first_name, last_name, role
+      FROM users
+      WHERE property_id = ? AND status = 'active'
+      ORDER BY first_name, last_name
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      staff: staff.results || []
+    })
+  } catch (error) {
+    console.error('Get staff members error:', error)
+    return c.json({ error: 'Failed to get staff members' }, 500)
+  }
 })
 
 // Staff Check-in Dashboard Route
@@ -71327,6 +71420,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       reservation_time,
       restaurant_id,
       table_id, // OPTIONAL - selected table ID
+      staff_id, // OPTIONAL - staff member creating the booking
       items, // [{ item_id, quantity, custom_limit }]
       allergy_info,
       no_allergies_confirmed
@@ -71432,9 +71526,10 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
         table_number,
         preorder_item_ids,
         special_requests,
+        created_by_staff_id,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
       property_id,
       voucher_code,
@@ -71448,6 +71543,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       table_number, // Will be NULL if no table selected
       JSON.stringify(preorder_items),
       special_requests,
+      staff_id || null, // Staff member creating the booking (NULL if not provided)
       'confirmed'
     ).run()
     
