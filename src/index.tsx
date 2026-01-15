@@ -71256,6 +71256,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       reservation_date,
       reservation_time,
       restaurant_id,
+      table_id, // OPTIONAL - selected table ID
       items, // [{ item_id, quantity, custom_limit }]
       allergy_info,
       no_allergies_confirmed
@@ -71318,6 +71319,20 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       quantity: i.quantity || 1
     }))
     
+    // Look up table number if table_id provided
+    let table_number = null
+    if (table_id) {
+      const table = await DB.prepare(`
+        SELECT table_number
+        FROM tables
+        WHERE table_id = ? AND property_id = ?
+      `).bind(table_id, property_id).first()
+      
+      if (table) {
+        table_number = table.table_number
+      }
+    }
+    
     // Build special requests with allergy info
     let special_requests = `Manual booking via Front Desk - Guest: ${guest_name}, Room: ${room_number}`
     if (pass_reference) {
@@ -71360,7 +71375,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       reservation_date,
       reservation_time,
       party_size,
-      null, // Table assigned by staff
+      table_number, // Will be NULL if no table selected
       JSON.stringify(preorder_items),
       special_requests,
       'confirmed'
@@ -73727,10 +73742,10 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       
       // Extract item IDs - handle both formats:
       // Old format: [15, 18, 20]
-      // New format: [{item_id: 15, quantity: 2}, {item_id: 18, quantity: 1}]
+      // New format: [{item_id: 15, quantity: 2}, {item_id: "rm_14", quantity: 1}]
       const itemIds = itemsData.map(item => {
         if (typeof item === 'object' && item.item_id) {
-          return item.item_id  // New format
+          return item.item_id  // New format (can be number or "rm_XX" string)
         }
         return item  // Old format (plain number)
       })
@@ -73745,8 +73760,25 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         }
       })
       
+      // Separate SET MENU items (numeric IDs) from EXTRA CHARGE items (rm_ prefix)
+      const setMenuIds = []
+      const extraChargeIds = []
+      
+      itemIds.forEach(id => {
+        if (typeof id === 'string' && id.startsWith('rm_')) {
+          // Extract numeric ID from "rm_14" -> 14
+          const numericId = parseInt(id.substring(3))
+          if (!isNaN(numericId)) {
+            extraChargeIds.push({ original: id, numeric: numericId })
+          }
+        } else {
+          // Numeric ID - SET MENU item
+          setMenuIds.push(id)
+        }
+      })
+      
       // Get dish details
-      if (itemIds.length === 0) {
+      if (setMenuIds.length === 0 && extraChargeIds.length === 0) {
         return {
           ...order,
           dishes: []
@@ -73758,41 +73790,32 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       try {
         // First, get SET MENU items from alacarte_menu_items
         const setMenuItems = await Promise.all(
-          itemIds.map(async (id) => {
+          setMenuIds.map(async (id) => {
             const result = await DB.prepare(
               'SELECT item_id, category, item_name, is_premium, 0 as extraCharge ' +
               'FROM alacarte_menu_items ' +
               'WHERE item_id = ?'
             ).bind(id).first()
-            return result
+            return result ? { ...result, originalId: id } : null
           })
         )
         
-        // Then, get EXTRA CHARGE items from menu_items
+        // Then, get EXTRA CHARGE items from menu_items (using numeric ID without rm_ prefix)
         const extraChargeItems = await Promise.all(
-          itemIds.map(async (id) => {
+          extraChargeIds.map(async ({ original, numeric }) => {
             const result = await DB.prepare(
               'SELECT mi.item_id, mc.category_name as category, mi.item_name, 0 as is_premium, 1 as extraCharge ' +
               'FROM menu_items mi ' +
               'LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id ' +
               'WHERE mi.item_id = ?'
-            ).bind(id).first()
-            return result
+            ).bind(numeric).first()
+            // Store the ORIGINAL id (rm_XX) for quantity mapping
+            return result ? { ...result, originalId: original } : null
           })
         )
         
-        // Combine results - prefer SET MENU if item exists in both (shouldn't happen but safety)
-        const allItems = []
-        itemIds.forEach((id) => {
-          const setItem = setMenuItems.find(item => item && item.item_id === id)
-          const extraItem = extraChargeItems.find(item => item && item.item_id === id)
-          
-          if (setItem) {
-            allItems.push(setItem)
-          } else if (extraItem) {
-            allItems.push(extraItem)
-          }
-        })
+        // Combine results and filter out nulls
+        const allItems = [...setMenuItems, ...extraChargeItems].filter(item => item !== null)
         
         dishes.results = allItems
       } catch (e) {
@@ -73800,10 +73823,10 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         console.error('itemIds:', itemIds)
       }
       
-      // Add quantities to dishes
+      // Add quantities to dishes (use originalId for mapping)
       const dishesWithQuantity = (dishes.results || []).map(dish => ({
         ...dish,
-        quantity: quantityMap[dish.item_id] || 1
+        quantity: quantityMap[dish.originalId] || 1
       }))
       
       // Extract guest name and room from special_requests for QR bookings
