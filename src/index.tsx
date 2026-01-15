@@ -68804,6 +68804,18 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         console.log('📱 Booking params:', { roomNumber, guestName, partySize, isFrontDeskBooking, hasPass: !!passReference });
         
+        // Initialize orderingFor input with partySize for front desk bookings
+        if (isFrontDeskBooking && partySize > 0) {
+            document.addEventListener('DOMContentLoaded', () => {
+                const orderingForInput = document.getElementById('orderingFor');
+                if (orderingForInput) {
+                    orderingForInput.value = partySize;
+                    orderingForInput.max = partySize;
+                    console.log('✅ Set orderingFor to:', partySize);
+                }
+            });
+        }
+        
         let selectedItems = {};
         let voucherEligibility = null;
         let selectedDate = null;
