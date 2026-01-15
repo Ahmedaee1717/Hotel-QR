@@ -67822,7 +67822,26 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         selectedTable = table;
         selectedElement = null; // Deselect element when selecting table
         console.log('Admin table selected:', table.table_number);
-        // Don't re-render during selection - only update visual highlight
+        
+        // Show the selected table info panel
+        const panel = document.getElementById('selectedTableInfo');
+        if (panel) {
+          panel.classList.remove('hidden');
+          
+          // Update table details
+          const details = document.getElementById('tableDetails');
+          if (details) {
+            details.innerHTML = 
+              '<div style="font-size: 0.875rem;">' +
+                '<p style="margin-bottom: 0.5rem;"><strong>Table Number:</strong> ' + table.table_number + '</p>' +
+                '<p style="margin-bottom: 0.5rem;"><strong>Capacity:</strong> ' + table.capacity + ' people</p>' +
+                '<p style="margin-bottom: 0.5rem;"><strong>Shape:</strong> ' + table.shape + '</p>' +
+                '<p style="margin-bottom: 0.5rem;"><strong>Rotation:</strong> ' + (table.rotation || 0) + '°</p>' +
+              '</div>';
+          }
+        }
+        
+        // Update visual highlight
         updateSelectionHighlight();
       }
       
