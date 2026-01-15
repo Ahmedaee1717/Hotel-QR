@@ -69746,14 +69746,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     const { voucher_code } = data;
                     alert('Booking Confirmed! Voucher Code: ' + voucher_code + '. Ordering for: ' + orderingFor + ' ' + (orderingFor > 1 ? 'people' : 'person') + '. Your order has been sent to the kitchen!');
                     
-                    // Redirect based on booking type
-                    if (isFrontDeskBooking) {
-                        // Front desk staff → redirect to kitchen
-                        window.location.href = '/kitchen/alacarte/' + restaurantId + '?property=' + propertyId;
-                    } else {
-                        // Guest booking → redirect to hotel home page
-                        window.location.href = '/hotel/' + propertySlug + (passReference ? '?pass=' + passReference : '');
-                    }
+                    // EVERYONE redirects to hotel home page
+                    window.location.href = '/hotel/' + propertySlug + (passReference ? '?pass=' + passReference : '');
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
                 }
