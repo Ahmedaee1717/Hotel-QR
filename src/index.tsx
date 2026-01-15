@@ -68791,6 +68791,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const restaurantMenuData = ${JSON.stringify(restaurantMenu.menus || [])};
         const restaurantId = ${restaurant_id};
         const propertyId = ${property_id};
+        const propertySlug = '${propertySlug}';
         const passReference = ${pass_reference ? `'${pass_reference}'` : 'null'};
         const passData = ${passData ? JSON.stringify(passData) : 'null'};
         
@@ -69747,9 +69748,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     
                     // Redirect based on booking type
                     if (isFrontDeskBooking) {
+                        // Front desk staff → redirect to kitchen
                         window.location.href = '/kitchen/alacarte/' + restaurantId + '?property=' + propertyId;
                     } else {
-                        window.location.href = '/my-bookings?property=' + propertyId + (passReference ? '&pass=' + passReference : '');
+                        // Guest booking → redirect to hotel home page
+                        window.location.href = '/hotel/' + propertySlug + (passReference ? '?pass=' + passReference : '');
                     }
                 } else {
                     alert('Booking failed: ' + (data.error || 'Unknown error'));
