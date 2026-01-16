@@ -67789,7 +67789,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               imageUrls = [menu.original_image_url];
             }
             
-            var menuNameEscaped = menu.menu_name.replace(/'/g, "\\\\'");
+            var menuNameEscaped = menu.menu_name.replace(/'/g, "\\'");
             
             var html = '<div class="border-2 border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-lg transition-all">';
             html += '<div class="flex justify-between items-start mb-4">';
