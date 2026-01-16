@@ -74458,12 +74458,30 @@ app.post('/api/waiter/add-items', async (c) => {
     
     // Add new items
     for (const newItem of items) {
-      // Get item details
-      const itemDetails = await DB.prepare(`
-        SELECT item_id, item_name, cost_to_hotel as cost
-        FROM alacarte_menu_items
-        WHERE item_id = ?
-      `).bind(newItem.item_id).first()
+      const itemId = String(newItem.item_id)
+      let itemDetails = null
+      
+      // Check if this is an extra charge item (starts with 'rm_' or is a string)
+      if (itemId.startsWith('rm_')) {
+        // Extra charge item from menu_items table
+        const numericId = itemId.replace('rm_', '')
+        itemDetails = await DB.prepare(`
+          SELECT item_id, item_name, price as cost
+          FROM menu_items
+          WHERE item_id = ?
+        `).bind(numericId).first()
+        
+        if (itemDetails) {
+          itemDetails.item_id = itemId // Keep the rm_ prefix
+        }
+      } else {
+        // Regular set menu item from alacarte_menu_items
+        itemDetails = await DB.prepare(`
+          SELECT item_id, item_name, cost_to_hotel as cost
+          FROM alacarte_menu_items
+          WHERE item_id = ?
+        `).bind(newItem.item_id).first()
+      }
       
       if (itemDetails) {
         const existing = currentItems.find(i => i.item_id === newItem.item_id)
@@ -74473,7 +74491,7 @@ app.post('/api/waiter/add-items', async (c) => {
           currentItems.push({
             item_id: itemDetails.item_id,
             item_name: itemDetails.item_name,
-            cost: itemDetails.cost,
+            cost: parseFloat(itemDetails.cost) || 0,
             quantity: newItem.quantity
           })
         }
