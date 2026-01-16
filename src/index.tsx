@@ -63436,6 +63436,17 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 </h2>
                 <p class="text-gray-600 mb-4">Click on a table in the floor plan to assign this booking</p>
                 
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-l-4 border-purple-500 rounded-lg p-4 mb-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i class="fas fa-calendar-day text-purple-600"></i>
+                        <span class="font-semibold text-purple-900">Viewing availability for:</span>
+                    </div>
+                    <div class="flex items-center gap-4 text-sm">
+                        <span class="font-medium"><i class="far fa-calendar text-purple-600"></i> <span id="floorPlanDate">-</span></span>
+                        <span class="font-medium"><i class="far fa-clock text-purple-600"></i> <span id="floorPlanTime">-</span></span>
+                    </div>
+                </div>
+                
                 <div class="bg-gray-100 rounded-xl p-4 mb-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="font-semibold">Selected Table:</span>
@@ -63443,19 +63454,23 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     </div>
                 </div>
                 
-                <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-                    <div class="flex items-center gap-4 text-sm">
+                <div class="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-info-circle text-blue-600"></i>
+                        <span class="font-semibold text-sm text-blue-900">Table Availability Legend:</span>
+                    </div>
+                    <div class="flex items-center gap-4 text-sm flex-wrap">
                         <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 border-2 border-gray-400 bg-white"></div>
-                            <span>Available</span>
+                            <div class="w-5 h-5 border-2 border-gray-400 bg-white rounded"></div>
+                            <span class="font-medium"><i class="fas fa-check text-green-600"></i> Available</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 border-2 border-red-600 bg-red-100"></div>
-                            <span>Reserved</span>
+                            <div class="w-5 h-5 border-2 border-red-600 bg-red-100 rounded opacity-60"></div>
+                            <span class="font-medium"><i class="fas fa-lock text-red-600"></i> Reserved</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="w-4 h-4 border-3 border-green-600 bg-green-100"></div>
-                            <span>Your Selection</span>
+                            <div class="w-5 h-5 border-3 border-green-600 bg-green-100 rounded"></div>
+                            <span class="font-medium"><i class="fas fa-check-circle text-green-600"></i> Your Selection</span>
                         </div>
                     </div>
                 </div>
@@ -64216,6 +64231,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 const selectedDate = document.getElementById('bookingDate').value;
                 const selectedTime = document.getElementById('bookingTime').value;
                 
+                // Update the floor plan info display
+                const dateObj = new Date(selectedDate);
+                const formattedDate = dateObj.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                document.getElementById('floorPlanDate').textContent = formattedDate;
+                document.getElementById('floorPlanTime').textContent = selectedTime;
+                
                 // Load AI-extracted textures for this restaurant
                 let restaurantTextures = null;
                 try {
@@ -64425,6 +64446,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     tableEl.style.background = '#FEE2E2'; // Red background for reserved
                     tableEl.style.opacity = '0.6';
                     tableEl.style.cursor = 'not-allowed';
+                    tableEl.title = 'This table is reserved for the selected time slot';
                 } else if (restaurantTextures) {
                     const tableColor = restaurantTextures.table_color_primary || '#FFFFFF';
                     const tableSecondary = restaurantTextures.table_color_secondary || tableColor;
@@ -64446,7 +64468,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 tableEl.innerHTML = 
                     '<div class=\"font-bold\" style=\"margin-bottom: 2px;\">' + table.table_number + '</div>' +
                     '<div class=\"text-gray-600\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-user\"></i> ' + table.capacity + '</div>' +
-                    (isReserved ? '<div class=\"text-red-600 text-xs\" style=\"font-size: ' + (isMobile ? '8px' : '10px') + ';\">Reserved</div>' : '');
+                    (isReserved ? '<div class=\"text-red-700 font-bold\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-lock\"></i> RESERVED</div>' : '');
                 
                 // Only allow clicking on available tables
                 if (!isReserved) {
