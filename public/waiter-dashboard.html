@@ -890,8 +890,8 @@
                     );
                     
                     console.log('Looking for waiter order for table:', currentTable.table_number);
+                    console.log('All orders:', orders.map(o => ({id: o.order_id, table: o.table_number, source: o.source, items_count: o.items?.length || 0})));
                     console.log('Found waiter order:', waiterOrderForTable);
-                    console.log('All orders:', orders.map(o => ({id: o.order_id, table: o.table_number, source: o.source})));
                     
                     // If there's already a waiter order, use it; otherwise create a temp one
                     if (waiterOrderForTable) {
@@ -938,22 +938,27 @@
                         }).join('');
                     }
                     
-                    // Waiter-added extras
-                    if (waiterOrderForTable && waiterOrderForTable.items && waiterOrderForTable.items.length > 0) {
+                    // Waiter-added extras (show even if empty, so user knows they can add)
+                    if (waiterOrderForTable) {
                         itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
-                        itemsHTML += waiterOrderForTable.items.map(item => {
-                            return `
-                                <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
-                                    <div class="flex-1">
-                                        <div class="font-bold dark-text">${item.item_name}</div>
-                                        <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
+                        
+                        if (waiterOrderForTable.items && waiterOrderForTable.items.length > 0) {
+                            itemsHTML += waiterOrderForTable.items.map(item => {
+                                return `
+                                    <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
+                                        <div class="flex-1">
+                                            <div class="font-bold dark-text">${item.item_name}</div>
+                                            <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                        </div>
                                     </div>
-                                    <div class="flex items-center gap-4">
-                                        <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
+                                `;
+                            }).join('');
+                        } else {
+                            itemsHTML += '<div class="p-3 bg-slate-700 rounded-lg text-center text-slate-400 text-sm">Click "Add Items" to add extras</div>';
+                        }
                     }
                     
                     container.innerHTML = itemsHTML || '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
