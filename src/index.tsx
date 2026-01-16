@@ -67505,6 +67505,178 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         }
       };
 
+      // Handle menu image file selection
+      let uploadedMenuImages = [];
+      
+      document.getElementById('menuImageFile')?.addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        
+        const imagePreview = document.getElementById('imagePreview');
+        const imageCount = document.getElementById('imageCount');
+        const menuImageUrls = document.getElementById('menuImageUrls');
+        
+        uploadedMenuImages = Array.from(files);
+        
+        if (imagePreview) {
+          imagePreview.classList.remove('hidden');
+          imageCount.textContent = uploadedMenuImages.length + ' image(s) selected';
+        }
+      });
+      
+      // Clear image upload
+      window.clearImageUpload = function() {
+        uploadedMenuImages = [];
+        document.getElementById('menuImageFile').value = '';
+        document.getElementById('imagePreview')?.classList.add('hidden');
+      };
+      
+      // Handle menu upload form submission
+      document.getElementById('uploadMenuForm')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const menuName = document.getElementById('menuName')?.value;
+        const menuType = document.getElementById('menuType')?.value || 'full';
+        const baseLanguage = document.getElementById('baseLanguage')?.value || 'en';
+        
+        if (!menuName || !menuName.trim()) {
+          alert('❌ Please enter a menu name');
+          return;
+        }
+        
+        if (uploadedMenuImages.length === 0) {
+          alert('❌ Please select at least one menu image');
+          return;
+        }
+        
+        try {
+          // Show progress
+          const uploadProgress = document.getElementById('uploadProgress');
+          const progressBar = document.getElementById('progressBar');
+          const progressText = document.getElementById('progressText');
+          
+          if (uploadProgress) {
+            uploadProgress.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = 'Uploading images...';
+          }
+          
+          // Upload images to blob storage
+          const imageUrls = [];
+          for (let i = 0; i < uploadedMenuImages.length; i++) {
+            const file = uploadedMenuImages[i];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const uploadResponse = await fetch('/api/admin/upload-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            const uploadData = await uploadResponse.json();
+            if (uploadData.url) {
+              imageUrls.push(uploadData.url);
+            }
+            
+            // Update progress
+            if (progressBar) {
+              const progress = ((i + 1) / uploadedMenuImages.length) * 50;
+              progressBar.style.width = progress + '%';
+            }
+          }
+          
+          if (imageUrls.length === 0) {
+            throw new Error('Failed to upload images');
+          }
+          
+          // Update progress
+          if (progressText) progressText.textContent = 'Creating menu...';
+          if (progressBar) progressBar.style.width = '60%';
+          
+          // Create menu with images
+          const createResponse = await fetchWithAuth('/api/admin/restaurant/' + numericOfferingId + '/menus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              menu_name: menuName.trim(),
+              menu_type: menuType,
+              image_urls: imageUrls,
+              base_language: baseLanguage
+            })
+          });
+          
+          const createData = await createResponse.json();
+          
+          if (!createData.success || !createData.menu) {
+            throw new Error(createData.error || 'Failed to create menu');
+          }
+          
+          const menuId = createData.menu.menu_id;
+          
+          // Update progress
+          if (progressText) progressText.textContent = 'Processing OCR...';
+          if (progressBar) progressBar.style.width = '70%';
+          
+          // Process OCR
+          const ocrResponse = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId + '/process-ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          const ocrData = await ocrResponse.json();
+          
+          if (!ocrData.success) {
+            throw new Error('OCR processing failed');
+          }
+          
+          // Update progress
+          if (progressText) progressText.textContent = 'Parsing menu structure...';
+          if (progressBar) progressBar.style.width = '85%';
+          
+          // Parse structure
+          const parseResponse = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId + '/parse-structure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          const parseData = await parseResponse.json();
+          
+          // Complete
+          if (progressBar) progressBar.style.width = '100%';
+          if (progressText) progressText.textContent = 'Complete!';
+          
+          if (parseData.success) {
+            alert('✅ Menu uploaded and processed successfully!\\n\\n' + 
+                  'Categories: ' + (parseData.categories_created || 0) + '\\n' +
+                  'Items: ' + (parseData.items_created || 0));
+            
+            // Reset form
+            document.getElementById('uploadMenuForm')?.reset();
+            window.clearImageUpload();
+            
+            // Reload menus
+            await loadMenus();
+          } else {
+            alert('⚠️ Menu created but parsing had issues.\\n\\n' + 
+                  'You can edit it manually or try uploading again.');
+            await loadMenus();
+          }
+          
+          // Hide progress after 2 seconds
+          setTimeout(() => {
+            if (uploadProgress) uploadProgress.classList.add('hidden');
+          }, 2000);
+          
+        } catch (error) {
+          console.error('❌ Error uploading menu:', error);
+          alert('❌ Error: ' + error.message);
+          
+          // Hide progress
+          const uploadProgress = document.getElementById('uploadProgress');
+          if (uploadProgress) uploadProgress.classList.add('hidden');
+        }
+      });
+
       let currentRestaurantData = null;
       
       async function loadRestaurant() {
