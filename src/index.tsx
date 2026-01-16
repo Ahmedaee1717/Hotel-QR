@@ -72760,9 +72760,14 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     <h1 class="text-3xl font-bold dark-text">${restaurant.title_en}</h1>
                     <p class="dark-text-muted mt-1">${restaurant.location} • Kitchen Display</p>
                 </div>
-                <div class="text-right">
-                    <div class="text-sm dark-text-muted">Last Updated</div>
-                    <div id="lastUpdate" class="text-lg font-semibold" style="color: #D4AF37;">--:--</div>
+                <div class="flex items-center gap-4">
+                    <button id="kitchenSoundToggle" onclick="toggleKitchenSound()" class="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg transition font-bold shadow-lg text-white">
+                        <i class="fas fa-volume-up mr-2"></i>Sound: ON
+                    </button>
+                    <div class="text-right">
+                        <div class="text-sm dark-text-muted">Last Updated</div>
+                        <div id="lastUpdate" class="text-lg font-semibold" style="color: #D4AF37;">--:--</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -72864,9 +72869,71 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         let currentView = 'orders'; // 'orders' or 'items'
         let viewMode = 'upcoming'; // 'upcoming' or 'date'
         let selectedDate = new Date().toISOString().split('T')[0]; // Today
+        
+        // Sound notification system for kitchen
+        let audioContext = null;
+        let lastOrderCount = 0;
+        let soundEnabled = true;
+        
+        // Initialize audio context
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('[Kitchen Sound] Audio initialized');
+            }
+        }
+        
+        // Play LOUD notification sound for kitchen
+        function playKitchenSound(type = 'new_order') {
+            if (!soundEnabled || !audioContext) return;
+            
+            try {
+                const now = audioContext.currentTime;
+                
+                // Create multiple oscillators for EXTRA LOUD sound
+                for (let i = 0; i < 3; i++) {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // MAXIMUM VOLUME for kitchen environment
+                    gainNode.gain.setValueAtTime(1.0, now);
+                    
+                    if (type === 'new_order') {
+                        // Triple LOUD beep pattern
+                        const startTime = now + (i * 0.2);
+                        oscillator.frequency.setValueAtTime(900 + (i * 100), startTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.15);
+                        oscillator.start(startTime);
+                        oscillator.stop(startTime + 0.15);
+                    }
+                }
+                
+                console.log('[Kitchen Sound] Played:', type);
+            } catch (error) {
+                console.error('[Kitchen Sound] Error:', error);
+            }
+        }
+        
+        // Toggle sound
+        function toggleKitchenSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('kitchenSoundToggle');
+            if (btn) {
+                btn.innerHTML = soundEnabled ? 
+                    '<i class="fas fa-volume-up mr-2"></i>Sound: ON' : 
+                    '<i class="fas fa-volume-mute mr-2"></i>Sound: OFF';
+                btn.className = soundEnabled ? 
+                    'px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg transition font-bold shadow-lg' :
+                    'px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg transition font-bold shadow-lg';
+            }
+        }
 
         // Initialize filters
         document.addEventListener('DOMContentLoaded', () => {
+            initAudio(); // Initialize audio on page load
             document.getElementById('filterDate').value = selectedDate;
             
             // View mode toggle
@@ -72950,7 +73017,25 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 const data = await response.json();
                 
                 if (data.success) {
-                    orders = data.orders;
+                    const newOrders = data.orders;
+                    
+                    // Detect new orders and play LOUD sound
+                    if (lastOrderCount > 0 && newOrders.length > lastOrderCount) {
+                        const newOrdersCount = newOrders.length - lastOrderCount;
+                        console.log(`[Kitchen Sound] ${newOrdersCount} NEW ORDER(S)!`);
+                        playKitchenSound('new_order');
+                        
+                        // Show visual alert
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'fixed top-20 right-6 bg-red-600 text-white px-8 py-4 rounded-lg shadow-2xl font-bold text-xl z-50 animate-pulse';
+                        alertDiv.innerHTML = \`<i class="fas fa-bell mr-2"></i>\${newOrdersCount} NEW ORDER(S)!\`;
+                        document.body.appendChild(alertDiv);
+                        setTimeout(() => alertDiv.remove(), 5000);
+                    }
+                    
+                    lastOrderCount = newOrders.length;
+                    orders = newOrders;
+                    
                     if (currentView === 'orders') {
                         renderOrders();
                     } else {

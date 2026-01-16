@@ -189,9 +189,14 @@
                     </h1>
                     <p class="text-sm text-slate-300" id="waiterNameHeader">Waiter Name</p>
                 </div>
-                <button onclick="logout()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
-                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                </button>
+                <div class="flex items-center gap-3">
+                    <button id="soundToggle" onclick="toggleSound()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition text-sm">
+                        <i class="fas fa-volume-up mr-2"></i>Sound: ON
+                    </button>
+                    <button onclick="logout()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Logout
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -437,6 +442,78 @@
         const urlParams = new URLSearchParams(window.location.search);
         const restaurantId = urlParams.get('restaurant') || '2';
         const propertyId = urlParams.get('property') || '1';
+        
+        // Sound notification system
+        let audioContext = null;
+        let lastOrderCount = 0;
+        let soundEnabled = true;
+        
+        // Initialize audio context on first user interaction
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('[Sound] Audio context initialized');
+            }
+        }
+        
+        // Play notification sound
+        function playNotificationSound(type = 'new_order') {
+            if (!soundEnabled || !audioContext) return;
+            
+            try {
+                const now = audioContext.currentTime;
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                // High volume for loud notification
+                gainNode.gain.setValueAtTime(0.8, now);
+                
+                if (type === 'new_order') {
+                    // Triple beep for new order - LOUD and attention-grabbing
+                    oscillator.frequency.setValueAtTime(800, now);
+                    oscillator.frequency.setValueAtTime(1000, now + 0.15);
+                    oscillator.frequency.setValueAtTime(1200, now + 0.3);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                    oscillator.start(now);
+                    oscillator.stop(now + 0.5);
+                } else if (type === 'new_reservation') {
+                    // Double beep for new reservation
+                    oscillator.frequency.setValueAtTime(600, now);
+                    oscillator.frequency.setValueAtTime(900, now + 0.2);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    oscillator.start(now);
+                    oscillator.stop(now + 0.4);
+                } else if (type === 'item_added') {
+                    // Quick single beep for item added
+                    oscillator.frequency.setValueAtTime(1000, now);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    oscillator.start(now);
+                    oscillator.stop(now + 0.2);
+                }
+                
+                console.log('[Sound] Played:', type);
+            } catch (error) {
+                console.error('[Sound] Error playing sound:', error);
+            }
+        }
+        
+        // Toggle sound on/off
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundToggle');
+            if (btn) {
+                btn.innerHTML = soundEnabled ? 
+                    '<i class="fas fa-volume-up mr-2"></i>Sound: ON' : 
+                    '<i class="fas fa-volume-mute mr-2"></i>Sound: OFF';
+                btn.className = soundEnabled ? 
+                    'px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition' :
+                    'px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition';
+            }
+            console.log('[Sound] Toggle:', soundEnabled ? 'ON' : 'OFF');
+        }
 
         // Toast notification system
         function showToast(message, type = 'success') {
@@ -526,6 +603,9 @@
                 id: waiterId,
                 name: waiterOption.textContent
             };
+            
+            // Initialize audio on first user interaction
+            initAudio();
             
             document.getElementById('waiterNameHeader').textContent = currentWaiter.name;
             document.getElementById('loginScreen').classList.add('hidden');
@@ -1500,8 +1580,9 @@
                     console.log('Reopening modal for table:', currentTable.table_id);
                     await openTableModal(currentTable.table_id);
                     
-                    // Show smooth toast notification instead of alert
+                    // Show smooth toast notification and play sound
                     showToast('Items added successfully!');
+                    playNotificationSound('item_added');
                 } else {
                     alert('Failed to add items: ' + (data.error || 'Unknown error'));
                 }
@@ -1676,7 +1757,18 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    orders = data.orders || [];
+                    const newOrders = data.orders || [];
+                    
+                    // Detect new orders and play sound
+                    if (lastOrderCount > 0 && newOrders.length > lastOrderCount) {
+                        const newOrdersCount = newOrders.length - lastOrderCount;
+                        console.log(`[Sound] ${newOrdersCount} new order(s) detected!`);
+                        playNotificationSound('new_order');
+                        showToast(`${newOrdersCount} new order(s)!`, 'info');
+                    }
+                    
+                    lastOrderCount = newOrders.length;
+                    orders = newOrders;
                     console.log('Loaded orders:', orders.length, orders);
                     renderOrders();
                     
