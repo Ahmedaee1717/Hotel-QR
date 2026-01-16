@@ -67313,6 +67313,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         await loadFloorElements();  // Load floor elements
         renderAdminFloorPlan();  // Render AFTER both tables and elements are loaded
         await loadReservations();  // Load reservations
+        await loadMenus();  // Load menus
         console.log('✅ Restaurant Admin init() complete!');
       }
       
@@ -67425,6 +67426,70 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         } catch (error) {
           console.error('❌ Error cancelling reservation:', error);
           alert('Error cancelling reservation');
+        }
+      };
+
+      // Menu helper functions
+      window.viewMenu = async function(menuId) {
+        window.location.href = '/admin/restaurant/menu/' + menuId + '/edit';
+      };
+      
+      window.deleteMenu = async function(menuId, menuName) {
+        if (!confirm('Delete menu "' + menuName + '"? This cannot be undone.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/menus/' + menuId, {
+            method: 'DELETE'
+          });
+          
+          if (response.ok) {
+            alert('✅ Menu deleted successfully!');
+            await loadMenus();
+          } else {
+            const data = await response.json();
+            alert('❌ Failed to delete menu: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('❌ Error deleting menu:', error);
+          alert('❌ Error deleting menu: ' + error.message);
+        }
+      };
+      
+      window.translateMenu = async function(menuId) {
+        window.location.href = '/admin/restaurant/menu/' + menuId + '/translate';
+      };
+      
+      window.createManualMenu = async function() {
+        const menuName = prompt('Enter menu name (e.g., "Breakfast Menu", "Lunch Special"):');
+        if (!menuName || !menuName.trim()) {
+          return;
+        }
+        
+        try {
+          const response = await fetchWithAuth('/api/admin/restaurant/' + numericOfferingId + '/menus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              menu_name: menuName.trim(),
+              menu_type: 'full',
+              image_urls: [],
+              base_language: 'en'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success && data.menu) {
+            alert('✅ Menu created! Now add categories and items.');
+            window.location.href = '/admin/restaurant/menu/' + data.menu.menu_id + '/edit';
+          } else {
+            alert('❌ Failed to create menu: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('❌ Error creating manual menu:', error);
+          alert('❌ Error creating menu: ' + error.message);
         }
       };
 
@@ -67680,6 +67745,108 @@ app.get('/admin/restaurant/:offering_id', (c) => {
           window.location.href = '/admin/restaurant/' + newOfferingId;
         }
       }
+
+      // Load restaurant menus
+      window.loadMenus = async function() {
+        try {
+          console.log('🍽️ Loading menus for restaurant:', numericOfferingId);
+          const response = await fetchWithAuth('/api/admin/restaurant/' + numericOfferingId + '/menus');
+          const data = await response.json();
+          
+          const menusList = document.getElementById('menusList');
+          if (!menusList) {
+            console.warn('❌ menusList element not found');
+            return;
+          }
+          
+          if (!data.menus || data.menus.length === 0) {
+            menusList.innerHTML = '<div class="text-center py-12 text-gray-400">' +
+              '<i class="fas fa-utensils text-6xl mb-4 opacity-50"></i>' +
+              '<p class="text-lg">No menus uploaded yet</p>' +
+              '<p class="text-sm mt-2">Upload your first menu image to get started!</p>' +
+              '</div>';
+            return;
+          }
+          
+          // Render menus list
+          menusList.innerHTML = data.menus.map(function(menu) {
+            // Parse available languages
+            var languages = [];
+            try {
+              if (menu.available_languages) {
+                languages = menu.available_languages.split(',');
+              }
+            } catch (e) {
+              languages = [];
+            }
+            
+            // Parse image URLs
+            var imageUrls = [];
+            try {
+              imageUrls = JSON.parse(menu.original_image_url);
+              if (!Array.isArray(imageUrls)) imageUrls = [menu.original_image_url];
+            } catch {
+              imageUrls = [menu.original_image_url];
+            }
+            
+            var menuNameEscaped = menu.menu_name.replace(/'/g, "\\\\'");
+            
+            var html = '<div class="border-2 border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-lg transition-all">';
+            html += '<div class="flex justify-between items-start mb-4">';
+            html += '<div class="flex-1">';
+            html += '<h3 class="text-xl font-bold text-gray-900 mb-1">' + menu.menu_name + '</h3>';
+            html += '<div class="flex items-center gap-2 text-sm text-gray-600">';
+            html += '<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold capitalize">' + (menu.menu_type || 'full') + '</span>';
+            html += '<span class="text-xs text-gray-500">' + imageUrls.length + ' image' + (imageUrls.length > 1 ? 's' : '') + '</span>';
+            html += '</div></div>';
+            html += '<button onclick="deleteMenu(' + menu.menu_id + ', \'' + menuNameEscaped + '\')" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm transition">';
+            html += '<i class="fas fa-trash"></i></button>';
+            html += '</div>';
+            
+            html += '<div class="flex gap-2 mb-4">';
+            imageUrls.slice(0, 3).forEach(function(url, i) {
+              html += '<div class="relative w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">';
+              html += '<img src="' + url + '" class="w-full h-full object-cover" alt="Menu page ' + (i+1) + '">';
+              html += '</div>';
+            });
+            if (imageUrls.length > 3) {
+              html += '<div class="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 font-semibold">';
+              html += '+' + (imageUrls.length - 3) + '</div>';
+            }
+            html += '</div>';
+            
+            html += '<div class="flex gap-2">';
+            html += '<button onclick="viewMenu(' + menu.menu_id + ')" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">';
+            html += '<i class="fas fa-eye mr-2"></i>View & Edit</button>';
+            html += '<button onclick="translateMenu(' + menu.menu_id + ')" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition">';
+            html += '<i class="fas fa-language mr-2"></i>Translate</button>';
+            html += '</div>';
+            
+            if (languages.length > 0) {
+              html += '<div class="mt-3 flex flex-wrap gap-1">';
+              html += '<span class="text-xs text-gray-500 mr-2">Translations:</span>';
+              languages.forEach(function(lang) {
+                html += '<span class="px-2 py-1 bg-green-50 text-green-700 rounded text-xs">' + lang + '</span>';
+              });
+              html += '</div>';
+            }
+            html += '</div>';
+            return html;
+          }).join('');
+          
+          console.log('✅ Loaded', data.menus.length, 'menus');
+        } catch (error) {
+          console.error('❌ Error loading menus:', error);
+          const menusList = document.getElementById('menusList');
+          if (menusList) {
+            menusList.innerHTML = '<div class="text-center py-12 text-red-500">' +
+              '<i class="fas fa-exclamation-circle text-5xl mb-4"></i>' +
+              '<p class="text-lg font-semibold">Error loading menus</p>' +
+              '<p class="text-sm mt-2">' + error.message + '</p>' +
+              '</div>';
+          }
+        }
+      };
 
       async function loadTables() {
         try {
