@@ -64569,29 +64569,80 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         window.resetBooking = function() {
+            console.log('[resetBooking] Starting reset...');
+            
+            // Reset state variables
             selectedRestaurant = null;
             selectedItems = {};
             selectedTableId = null;
-            selectedStaffId = null; // Reset staff selection
+            selectedStaffId = null;
             currentStep = 1;
             currentPass = null;
             maxPartySize = 12;
-            document.getElementById('passReference').value = '';
-            document.getElementById('passInfoMessage').innerHTML = '';
-            document.getElementById('guestInfoFields').classList.add('hidden');
-            document.getElementById('guestName').value = '';
-            document.getElementById('roomNumber').value = '';
-            document.getElementById('partySize').value = '2';
-            document.getElementById('partySize').max = '12';
-            document.getElementById('maxGuestsInfo').textContent = '';
-            document.getElementById('staffMember').value = ''; // Reset staff dropdown
-            if (document.getElementById('selectedTableDisplay')) {
-                document.getElementById('selectedTableDisplay').textContent = 'None';
-            }
+            
+            // Helper function to safely set element value
+            const safeSetValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = value;
+                } else {
+                    console.warn('[resetBooking] Element not found:', id);
+                }
+            };
+            
+            const safeSetText = (id, text) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = text;
+                } else {
+                    console.warn('[resetBooking] Element not found:', id);
+                }
+            };
+            
+            const safeSetHTML = (id, html) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = html;
+                } else {
+                    console.warn('[resetBooking] Element not found:', id);
+                }
+            };
+            
+            const safeAddClass = (id, className) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add(className);
+                } else {
+                    console.warn('[resetBooking] Element not found:', id);
+                }
+            };
+            
+            // Reset form fields safely
+            safeSetValue('passReference', '');
+            safeSetHTML('passInfoMessage', '');
+            safeAddClass('guestInfoFields', 'hidden');
+            safeSetValue('guestName', '');
+            safeSetValue('roomNumber', '');
+            safeSetValue('partySize', '2');
+            
+            const partySizeEl = document.getElementById('partySize');
+            if (partySizeEl) partySizeEl.max = '12';
+            
+            safeSetText('maxGuestsInfo', '');
+            safeSetValue('staffMember', '');
+            safeSetText('selectedTableDisplay', 'None');
+            
+            // Reset date/time
             setTodayDate();
             setCurrentTime();
-            document.getElementById('successModal').classList.add('hidden');
+            
+            // Hide success modal
+            safeAddClass('successModal', 'hidden');
+            
+            // Go back to step 1
             goToStep(1);
+            
+            console.log('[resetBooking] Reset complete');
         }
     </script>
 </body>
