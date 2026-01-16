@@ -67024,7 +67024,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                                     Upload Menu Images * 
                                     <span class="text-xs text-gray-500 font-normal">(Multiple pages supported)</span>
                                 </label>
-                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-50" id="uploadArea">
+                                <div onclick="document.getElementById('menuImageFile').click(); console.log('Upload area clicked via onclick');" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-green-500 transition-colors cursor-pointer bg-gray-50" id="uploadArea">
                                     <input type="file" id="menuImageFile" accept="image/*" multiple class="hidden">
                                     <div id="uploadPlaceholder">
                                         <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
