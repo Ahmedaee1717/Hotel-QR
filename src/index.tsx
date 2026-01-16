@@ -9389,7 +9389,7 @@ app.get('/api/restaurant/menus/:menu_id/items', async (c) => {
     // Get all categories for this menu
     const categories = await DB.prepare(`
       SELECT DISTINCT mc.*, 
-             COALESCE(mct.category_name, mc.category_name_en) as category_name
+             COALESCE(mct.category_name, mc.category_name) as category_name
       FROM menu_categories mc
       LEFT JOIN menu_category_translations mct ON mc.category_id = mct.category_id AND mct.language_code = ?
       WHERE mc.menu_id = ?
@@ -9401,8 +9401,8 @@ app.get('/api/restaurant/menus/:menu_id/items', async (c) => {
       (categories.results || []).map(async (category) => {
         const items = await DB.prepare(`
           SELECT mi.*,
-                 COALESCE(mit.item_name, mi.item_name_en) as item_name,
-                 COALESCE(mit.description, mi.description_en) as description
+                 COALESCE(mit.item_name, mi.item_name) as item_name,
+                 COALESCE(mit.description, mi.description) as description
           FROM menu_items mi
           LEFT JOIN menu_item_translations mit ON mi.item_id = mit.item_id AND mit.language_code = ?
           WHERE mi.category_id = ?
