@@ -542,8 +542,13 @@
 
         async function loadTables() {
             try {
-                const response = await fetch(`/api/waiter/tables?restaurant=${restaurantId}&property=${propertyId}`, {
-                    headers: { 'X-Property-ID': propertyId }
+                // Add cache-busting timestamp
+                const response = await fetch(`/api/waiter/tables?restaurant=${restaurantId}&property=${propertyId}&_t=${Date.now()}`, {
+                    headers: { 
+                        'X-Property-ID': propertyId,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -1538,9 +1543,15 @@
                 if (date) {
                     url += `&date=${date}`;
                 }
+                // Add cache-busting timestamp
+                url += `&_t=${Date.now()}`;
                 
                 const response = await fetch(url, {
-                    headers: { 'X-Property-ID': propertyId }
+                    headers: { 
+                        'X-Property-ID': propertyId,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
                 });
                 const data = await response.json();
                 if (data.success) {
