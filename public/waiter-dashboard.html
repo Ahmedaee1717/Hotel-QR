@@ -1124,11 +1124,28 @@
             }
             
             try {
-                const order = currentTable.current_order;
+                console.log('[checkoutTable] Starting checkout for table:', currentTable.table_number);
                 
-                // For kitchen orders, extract voucher_id from order_id (format: "kitchen-105")
-                if (order.source === 'kitchen') {
-                    const voucherId = order.order_id.replace('kitchen-', '');
+                // Find ALL orders for this table (both kitchen and waiter)
+                const tableNumber = currentTable.table_number;
+                const kitchenOrderForTable = orders.find(o => 
+                    String(o.table_number) === String(tableNumber) && 
+                    o.source === 'kitchen'
+                );
+                const waiterOrderForTable = orders.find(o => 
+                    String(o.table_number) === String(tableNumber) && 
+                    o.source === 'waiter'
+                );
+                
+                console.log('[checkoutTable] Found orders - Kitchen:', kitchenOrderForTable?.order_id, 'Waiter:', waiterOrderForTable?.order_id);
+                
+                let kitchenSuccess = true;
+                let waiterSuccess = true;
+                
+                // Checkout kitchen order if it exists
+                if (kitchenOrderForTable) {
+                    console.log('[checkoutTable] Checking out kitchen order:', kitchenOrderForTable.order_id);
+                    const voucherId = kitchenOrderForTable.order_id.replace('kitchen-', '');
                     const response = await fetch('/api/waiter/checkout-table', {
                         method: 'POST',
                         headers: {
@@ -1141,20 +1158,16 @@
                     });
                     
                     const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('✓ Table checked out successfully!');
-                        closeTableModal();
-                        await loadTables();
-                        await loadOrders();
-                        renderFloorPlan();
-                        updateStats();
-                    } else {
-                        alert('Failed to checkout: ' + (data.error || 'Unknown error'));
+                    kitchenSuccess = data.success;
+                    if (!kitchenSuccess) {
+                        console.error('[checkoutTable] Kitchen checkout failed:', data.error);
                     }
-                } else {
-                    // Waiter order - delete from waiter_orders
-                    const response = await fetch(`/api/waiter/order/${order.order_id}`, {
+                }
+                
+                // Delete waiter order if it exists
+                if (waiterOrderForTable) {
+                    console.log('[checkoutTable] Deleting waiter order:', waiterOrderForTable.order_id);
+                    const response = await fetch(`/api/waiter/order/${waiterOrderForTable.order_id}`, {
                         method: 'DELETE',
                         headers: {
                             'X-Property-ID': propertyId
@@ -1162,20 +1175,29 @@
                     });
                     
                     const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('✓ Table cleared successfully!');
-                        closeTableModal();
-                        await loadTables();
-                        await loadOrders();
-                        renderFloorPlan();
-                        updateStats();
-                    } else {
-                        alert('Failed to clear table: ' + (data.error || 'Unknown error'));
+                    waiterSuccess = data.success;
+                    if (!waiterSuccess) {
+                        console.error('[checkoutTable] Waiter order deletion failed:', data.error);
                     }
                 }
+                
+                // Show result
+                if (kitchenSuccess && waiterSuccess) {
+                    console.log('[checkoutTable] All orders cleared successfully');
+                    alert('✓ Table checked out and cleared successfully!');
+                    closeTableModal();
+                    await loadTables();
+                    await loadOrders();
+                    renderFloorPlan();
+                    updateStats();
+                } else {
+                    const errors = [];
+                    if (!kitchenSuccess) errors.push('kitchen order');
+                    if (!waiterSuccess) errors.push('waiter order');
+                    alert(`Failed to clear ${errors.join(' and ')}`);
+                }
             } catch (error) {
-                console.error('Checkout error:', error);
+                console.error('[checkoutTable] Error:', error);
                 alert('Failed to checkout table');
             }
         }
