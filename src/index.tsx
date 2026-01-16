@@ -73134,6 +73134,26 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 
                 const isNew = order.status === 'confirmed';
                 
+                // Format order placed time for display
+                let orderPlacedDateStr = '--';
+                let orderPlacedTimeStr = '--:--';
+                if (order.created_at) {
+                    try {
+                        const orderDate = new Date(order.created_at);
+                        orderPlacedTimeStr = orderDate.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            hour12: true 
+                        });
+                        orderPlacedDateStr = orderDate.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                    } catch (e) {
+                        console.error('Error parsing created_at:', e);
+                    }
+                }
+                
                 let dishesHtml = '';
                 // Use grouped_dishes if available (from grouping), otherwise use dishes
                 const dishesToRender = order.grouped_dishes || order.dishes || [];
@@ -73225,36 +73245,32 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                             ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.total_party_size || order.party_size || 0) + ' guests</span>' +
                         '</div>' +
                         
-                        // TWO DISTINCT TIMES
+                        // TWO DISTINCT TIMES - Side by Side
                         '<div class="grid grid-cols-2 gap-4 mt-3 pt-3 border-t-2 border-gray-200">' +
                             // LEFT: Table Booking Time (Reservation)
-                            '<div class="text-left">' +
-                                '<div class="text-xs text-gray-500 font-semibold uppercase mb-1"><i class="fas fa-calendar-check mr-1"></i>Booked For</div>' +
+                            '<div class="text-left bg-blue-50 rounded-lg p-2">' +
+                                '<div class="text-xs text-blue-700 font-semibold uppercase mb-1">' +
+                                    '<i class="fas fa-calendar-check mr-1"></i>Booked For' +
+                                '</div>' +
                                 '<div class="text-sm font-bold text-gray-700">' +
                                     '<i class="fas fa-calendar mr-1 text-blue-500"></i>' + (order.reservation_date || '--') + 
                                 '</div>' +
-                                '<div class="text-lg font-black text-blue-600">' +
+                                '<div class="text-xl font-black text-blue-600">' +
                                     '<i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') +
                                 '</div>' +
                             '</div>' +
                             
                             // RIGHT: Actual Order Placed Time (Kitchen Start Time)
-                            '<div class="text-right">' +
-                                '<div class="text-xs text-orange-500 font-semibold uppercase mb-1"><i class="fas fa-receipt mr-1"></i>Order Placed</div>' +
-                                (order.created_at ? 
-                                    (() => {
-                                        const orderDate = new Date(order.created_at);
-                                        const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                        const dateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                                        return '<div class="text-sm font-bold text-gray-700">' +
-                                            '<i class="fas fa-calendar mr-1 text-orange-500"></i>' + dateStr + 
-                                        '</div>' +
-                                        '<div class="text-lg font-black text-orange-600">' +
-                                            '<i class="fas fa-clock mr-1"></i>' + timeStr +
-                                        '</div>';
-                                    })()
-                                : '<div class="text-sm text-gray-400">Not recorded</div>'
-                                ) +
+                            '<div class="text-right bg-orange-50 rounded-lg p-2">' +
+                                '<div class="text-xs text-orange-700 font-semibold uppercase mb-1">' +
+                                    '<i class="fas fa-receipt mr-1"></i>Order Placed' +
+                                '</div>' +
+                                '<div class="text-sm font-bold text-gray-700">' +
+                                    '<i class="fas fa-calendar mr-1 text-orange-500"></i>' + orderPlacedDateStr + 
+                                '</div>' +
+                                '<div class="text-xl font-black text-orange-600">' +
+                                    '<i class="fas fa-clock mr-1"></i>' + orderPlacedTimeStr +
+                                '</div>' +
                             '</div>' +
                         '</div>' +
                         
