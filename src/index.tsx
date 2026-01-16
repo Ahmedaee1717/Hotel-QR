@@ -75160,6 +75160,37 @@ app.post('/api/waiter/clear-table', async (c) => {
   }
 })
 
+// Checkout kitchen order (mark voucher as served/checked out)
+app.post('/api/waiter/checkout-table', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { voucher_id } = body
+    
+    if (!voucher_id) {
+      return c.json({ success: false, error: 'Voucher ID required' }, 400)
+    }
+    
+    // Mark the alacarte voucher as served/completed
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET status = 'served',
+          completed_at = CURRENT_TIMESTAMP
+      WHERE voucher_id = ?
+    `).bind(voucher_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'Table checked out successfully'
+    })
+  } catch (error) {
+    console.error('Checkout table error:', error)
+    return c.json({ success: false, error: 'Failed to checkout table' }, 500)
+  }
+})
+
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
