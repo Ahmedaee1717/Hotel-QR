@@ -73224,12 +73224,42 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                             '<i class="fas fa-user mr-1"></i>' + (order.guest_name || 'Guest') +
                             ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.total_party_size || order.party_size || 0) + ' guests</span>' +
                         '</div>' +
-                        '<div class="text-sm text-gray-600 mt-1">' +
-                            '<i class="fas fa-calendar mr-1"></i>' + (order.reservation_date || '--') + 
-                            ' <span class="ml-2"><i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') + '</span>' +
+                        
+                        // TWO DISTINCT TIMES
+                        '<div class="grid grid-cols-2 gap-4 mt-3 pt-3 border-t-2 border-gray-200">' +
+                            // LEFT: Table Booking Time (Reservation)
+                            '<div class="text-left">' +
+                                '<div class="text-xs text-gray-500 font-semibold uppercase mb-1"><i class="fas fa-calendar-check mr-1"></i>Booked For</div>' +
+                                '<div class="text-sm font-bold text-gray-700">' +
+                                    '<i class="fas fa-calendar mr-1 text-blue-500"></i>' + (order.reservation_date || '--') + 
+                                '</div>' +
+                                '<div class="text-lg font-black text-blue-600">' +
+                                    '<i class="fas fa-clock mr-1"></i>' + (order.reservation_time || '--:--') +
+                                '</div>' +
+                            '</div>' +
+                            
+                            // RIGHT: Actual Order Placed Time (Kitchen Start Time)
+                            '<div class="text-right">' +
+                                '<div class="text-xs text-orange-500 font-semibold uppercase mb-1"><i class="fas fa-receipt mr-1"></i>Order Placed</div>' +
+                                (order.created_at ? 
+                                    (() => {
+                                        const orderDate = new Date(order.created_at);
+                                        const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                        const dateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                        return '<div class="text-sm font-bold text-gray-700">' +
+                                            '<i class="fas fa-calendar mr-1 text-orange-500"></i>' + dateStr + 
+                                        '</div>' +
+                                        '<div class="text-lg font-black text-orange-600">' +
+                                            '<i class="fas fa-clock mr-1"></i>' + timeStr +
+                                        '</div>';
+                                    })()
+                                : '<div class="text-sm text-gray-400">Not recorded</div>'
+                                ) +
+                            '</div>' +
                         '</div>' +
+                        
                         (order.voucher_codes && order.voucher_codes.length > 1 ? 
-                            '<div class="text-xs text-gray-500 mt-1">' +
+                            '<div class="text-xs text-gray-500 mt-2">' +
                                 '<i class="fas fa-ticket-alt mr-1"></i>' + order.voucher_codes.length + ' vouchers' +
                             '</div>'
                         : '') +
