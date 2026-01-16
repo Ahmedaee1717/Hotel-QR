@@ -74470,7 +74470,7 @@ app.post('/api/waiter/add-items', async (c) => {
         const numericId = itemId.replace('rm_', '')
         console.log('[ADD-ITEMS] Looking up rm_ item, numeric ID:', numericId)
         itemDetails = await DB.prepare(`
-          SELECT item_id, item_name, price as cost
+          SELECT item_id, item_name, cost_to_hotel as cost
           FROM menu_items
           WHERE item_id = ?
         `).bind(numericId).first()
