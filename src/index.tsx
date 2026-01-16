@@ -74703,7 +74703,7 @@ app.post('/api/waiter/seat-guests', async (c) => {
       return c.json({ success: false, error: 'Table already has an active order' }, 400)
     }
     
-    // Create new order
+    // Create new order with automatic check-in (waiter is seating them)
     const result = await DB.prepare(`
       INSERT INTO waiter_orders (
         table_id,
@@ -74716,7 +74716,7 @@ app.post('/api/waiter/seat-guests', async (c) => {
         total_cost,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 'pending', CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 'seated', CURRENT_TIMESTAMP)
     `).bind(table_id, restaurant_id, waiter_id, guest_name, room_number || null, party_size).run()
     
     const order = await DB.prepare(`

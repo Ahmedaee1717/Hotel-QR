@@ -378,6 +378,11 @@
                             <!-- Order items loaded here -->
                         </div>
 
+                        <!-- Dynamic action buttons container (confirm seated, status, etc) -->
+                        <div id="orderActionButtonsContainer">
+                            <!-- Action buttons loaded here by openTableModal() -->
+                        </div>
+
                         <div class="grid grid-cols-2 gap-3">
                             <button onclick="sendOrderToKitchen()" class="btn-primary text-white py-4 rounded-xl font-bold">
                                 <i class="fas fa-paper-plane mr-2"></i>Send to Kitchen
@@ -1375,7 +1380,14 @@
                     </button>
                 </div>
                 `;
-                container.insertAdjacentHTML('afterend', buttonsHTML);
+                
+                // Use innerHTML to REPLACE content instead of insertAdjacentHTML which appends
+                const actionButtonsContainer = document.getElementById('orderActionButtonsContainer');
+                if (actionButtonsContainer) {
+                    actionButtonsContainer.innerHTML = buttonsHTML;
+                } else {
+                    console.error('[openTableModal] orderActionButtonsContainer not found!');
+                }
                 
             } else {
                 // Show guest seating
