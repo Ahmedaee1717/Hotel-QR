@@ -1264,8 +1264,19 @@
                     
                     if (tableOrder) {
                         orderForSeating = tableOrder;
-                        isNotSeated = !tableOrder.checked_in_at;
+                        
+                        // Check if guest is NOT seated:
+                        // - No checked_in_at timestamp
+                        // - Status is NOT 'checked_in' or 'seated'
+                        const hasCheckedInTimestamp = !!tableOrder.checked_in_at;
+                        const hasCheckedInStatus = tableOrder.status === 'checked_in' || tableOrder.status === 'seated';
+                        
+                        isNotSeated = !hasCheckedInTimestamp && !hasCheckedInStatus;
                         seatedBy = tableOrder.checked_in_by;
+                        
+                        console.log('[Confirm Seated Check] checked_in_at:', tableOrder.checked_in_at);
+                        console.log('[Confirm Seated Check] status:', tableOrder.status);
+                        console.log('[Confirm Seated Check] isNotSeated:', isNotSeated);
                         
                         // Extract voucher ID for API call
                         if (tableOrder.source === 'kitchen') {
@@ -1274,7 +1285,7 @@
                             voucherId = tableOrder.order_id; // Waiter order ID
                         }
                         
-                        console.log('[Confirm Seated Check] isNotSeated:', isNotSeated, 'voucherId:', voucherId);
+                        console.log('[Confirm Seated Check] voucherId:', voucherId);
                     }
                 }
                 
@@ -1293,7 +1304,7 @@
                             </button>
                         </div>
                     `;
-                } else if (orderForSeating && orderForSeating.checked_in_at) {
+                } else if (orderForSeating && (orderForSeating.checked_in_at || orderForSeating.status === 'checked_in' || orderForSeating.status === 'seated')) {
                     // Already seated - show STATUS-AWARE message based on order state
                     const orderStatus = orderForSeating.status || 'pending';
                     const hasItems = currentOrder && currentOrder.items && currentOrder.items.length > 0;
