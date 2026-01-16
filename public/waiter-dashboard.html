@@ -1410,37 +1410,50 @@
         }
 
         async function adjustOrderItemQty(itemId, delta) {
+            console.log('[adjustOrderItemQty] Called with:', { itemId, delta });
+            
             // Update in current order
             const item = currentOrder.items.find(i => i.item_id === itemId);
-            if (!item) return;
+            if (!item) {
+                console.log('[adjustOrderItemQty] Item not found in currentOrder.items:', itemId);
+                return;
+            }
             
             const newQty = Math.max(0, item.quantity + delta);
+            console.log('[adjustOrderItemQty] Current quantity:', item.quantity, 'New quantity:', newQty);
             
             try {
+                const payload = {
+                    order_id: currentOrder.order_id,
+                    item_id: itemId,
+                    quantity: newQty
+                };
+                console.log('[adjustOrderItemQty] Sending request:', payload);
+                
                 const response = await fetch('/api/waiter/update-item', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Property-ID': propertyId
                     },
-                    body: JSON.stringify({
-                        order_id: currentOrder.order_id,
-                        item_id: itemId,
-                        quantity: newQty
-                    })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
+                console.log('[adjustOrderItemQty] Response:', data);
                 
                 if (data.success) {
+                    console.log('[adjustOrderItemQty] Update successful, new items:', data.order.items);
                     currentOrder = data.order;
                     renderOrderItems();
-                    loadOrders();
+                    await loadOrders();
+                    console.log('[adjustOrderItemQty] UI updated');
                 } else {
+                    console.error('[adjustOrderItemQty] Failed:', data.error);
                     alert('Failed to update item');
                 }
             } catch (error) {
-                console.error('Update item error:', error);
+                console.error('[adjustOrderItemQty] Error:', error);
                 alert('Failed to update item');
             }
         }
