@@ -67789,7 +67789,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               imageUrls = [menu.original_image_url];
             }
             
-            var menuNameEscaped = menu.menu_name.replace(/'/g, "\\'");
+            var menuNameEscaped = String(menu.menu_name).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             
             var html = '<div class="border-2 border-gray-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-lg transition-all">';
             html += '<div class="flex justify-between items-start mb-4">';
@@ -67799,7 +67799,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             html += '<span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-semibold capitalize">' + (menu.menu_type || 'full') + '</span>';
             html += '<span class="text-xs text-gray-500">' + imageUrls.length + ' image' + (imageUrls.length > 1 ? 's' : '') + '</span>';
             html += '</div></div>';
-            html += '<button onclick="deleteMenu(' + menu.menu_id + ', \'' + menuNameEscaped + '\')" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm transition">';
+            html += '<button onclick="deleteMenu(' + menu.menu_id + ', &quot;' + menuNameEscaped + '&quot;)" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm transition">';
             html += '<i class="fas fa-trash"></i></button>';
             html += '</div>';
             
