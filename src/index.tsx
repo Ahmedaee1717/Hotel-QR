@@ -73463,9 +73463,113 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       }
     }))
     
+    // Also get waiter orders with status 'confirmed' (sent to kitchen)
+    const waiterOrders = await DB.prepare(`
+      SELECT 
+        wo.order_id as voucher_id,
+        wo.order_id as voucher_code,
+        DATE(wo.created_at) as reservation_date,
+        TIME(wo.created_at) as reservation_time,
+        wo.party_size,
+        rt.table_number,
+        wo.items as preorder_item_ids,
+        '' as special_requests,
+        wo.status,
+        wo.created_at,
+        wo.guest_name as pass_guest_name,
+        NULL as pass_reference
+      FROM waiter_orders wo
+      INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+      WHERE wo.restaurant_id = ?
+        AND wo.status = 'confirmed'
+      ORDER BY wo.created_at ASC
+    `).bind(restaurant_id).all()
+    
+    // Process waiter orders similarly
+    const waiterOrdersWithDishes = await Promise.all((waiterOrders.results || []).map(async (order) => {
+      let itemsData = []
+      try {
+        itemsData = JSON.parse(order.preorder_item_ids || '[]')
+      } catch (e) {
+        console.error('Failed to parse waiter order items:', e)
+        itemsData = []
+      }
+      
+      if (itemsData.length === 0) {
+        return {
+          ...order,
+          guest_name: order.pass_guest_name,
+          dishes: []
+        }
+      }
+      
+      // Extract item IDs and quantities
+      const itemIds = itemsData.map(item => item.item_id)
+      const quantityMap = {}
+      itemsData.forEach(item => {
+        quantityMap[item.item_id] = item.quantity || 1
+      })
+      
+      // Separate SET MENU items from EXTRA CHARGE items
+      const setMenuIds = []
+      const extraChargeIds = []
+      
+      itemIds.forEach(id => {
+        if (typeof id === 'string' && id.startsWith('rm_')) {
+          const numericId = parseInt(id.substring(3))
+          if (!isNaN(numericId)) {
+            extraChargeIds.push({ original: id, numeric: numericId })
+          }
+        } else {
+          setMenuIds.push(id)
+        }
+      })
+      
+      // Get dish details from both tables
+      const setMenuItems = await Promise.all(
+        setMenuIds.map(async (id) => {
+          const result = await DB.prepare(
+            'SELECT item_id, category, item_name, is_premium, 0 as extraCharge ' +
+            'FROM alacarte_menu_items ' +
+            'WHERE item_id = ?'
+          ).bind(id).first()
+          return result ? { ...result, originalId: id } : null
+        })
+      )
+      
+      const extraChargeItems = await Promise.all(
+        extraChargeIds.map(async ({ original, numeric }) => {
+          const result = await DB.prepare(
+            'SELECT mi.item_id, mc.category_name as category, mi.item_name, 0 as is_premium, 1 as extraCharge ' +
+            'FROM menu_items mi ' +
+            'LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id ' +
+            'WHERE mi.item_id = ?'
+          ).bind(numeric).first()
+          return result ? { ...result, originalId: original } : null
+        })
+      )
+      
+      const allDishes = [...setMenuItems, ...extraChargeItems].filter(d => d !== null)
+      
+      const dishesWithQuantity = allDishes.map(dish => ({
+        ...dish,
+        quantity: quantityMap[dish.originalId] || 1
+      }))
+      
+      return {
+        ...order,
+        guest_name: order.pass_guest_name,
+        dishes: dishesWithQuantity,
+        source: 'waiter'  // Mark as waiter order
+      }
+    }))
+    
+    // Merge both arrays (kitchen orders + waiter orders)
+    const allOrders = [...ordersWithDishes, ...waiterOrdersWithDishes]
+    
     return c.json({
       success: true,
-      orders: ordersWithDishes
+      orders: allOrders
     })
   } catch (error) {
     console.error('Get kitchen orders error:', error)
