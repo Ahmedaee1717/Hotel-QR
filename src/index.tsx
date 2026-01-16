@@ -71140,8 +71140,9 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
     
     // Get item IDs and quantities
+    // Add rm_ prefix for extra-charge menu items to track upsells in analytics
     const preorder_items = items.map(i => ({
-      item_id: i.item_id,
+      item_id: `rm_${i.item_id}`,
       quantity: i.quantity || 1
     }))
     
@@ -71329,8 +71330,9 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
     const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
     
     // Get item IDs and quantities
+    // Add rm_ prefix for extra-charge menu items to track upsells in analytics
     const preorder_items = items.map(i => ({
-      item_id: i.item_id,
+      item_id: `rm_${i.item_id}`,
       quantity: i.quantity || 1
     }))
     
@@ -74245,30 +74247,32 @@ app.get('/api/analytics/staff-performance', async (c) => {
       ORDER BY total_upsell_revenue DESC, upsell_rate DESC
     `).bind(...params, property_id).all()
     
-    // Extra charge items breakdown
+    // Extra charge items breakdown (items from menu_items table with rm_ prefix)
     const extraChargeStats = await DB.prepare(`
       SELECT 
-        ami.item_name,
-        ami.category,
-        ami.cost_to_hotel,
+        mi.item_name,
+        mc.category_name AS category,
+        mi.price AS cost_to_hotel,
         COUNT(*) AS times_sold,
         SUM(CAST(json_extract(items.value, '$.quantity') AS INTEGER)) AS total_quantity,
-        SUM(ami.cost_to_hotel * CAST(json_extract(items.value, '$.quantity') AS INTEGER)) AS total_revenue
+        SUM(mi.price * CAST(json_extract(items.value, '$.quantity') AS INTEGER)) AS total_revenue
       FROM alacarte_vouchers v
       CROSS JOIN json_each(v.preorder_item_ids) AS items
-      INNER JOIN alacarte_menu_items ami ON ami.item_id = CAST(
+      INNER JOIN menu_items mi ON mi.item_id = CAST(
         CASE 
           WHEN json_extract(items.value, '$.item_id') LIKE 'rm_%' 
           THEN SUBSTR(json_extract(items.value, '$.item_id'), 4)
-          ELSE json_extract(items.value, '$.item_id')
-        END AS TEXT
+          ELSE NULL
+        END AS INTEGER
       )
+      LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id
       WHERE v.property_id = ?
         AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'used')
         AND v.created_by_staff_id IS NOT NULL
-        AND ami.cost_to_hotel > 0
+        AND json_extract(items.value, '$.item_id') LIKE 'rm_%'
+        AND mi.price > 0
         ${dateCondition}
-      GROUP BY ami.item_id, ami.item_name, ami.category, ami.cost_to_hotel
+      GROUP BY mi.item_id, mi.item_name, mc.category_name, mi.price
       ORDER BY total_revenue DESC
       LIMIT 20
     `).bind(...params).all()
