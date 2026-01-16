@@ -654,488 +654,381 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Old Palace Resort - Where Timeless Elegance Meets Tomorrow</title>
-    <meta name="description" content="Experience the future of luxury hospitality at Old Palace Resort. A five-star destination where heritage meets innovation.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <title>Old Palace Resort - Begin Your Experience</title>
+    <meta name="description" content="Welcome to Old Palace Resort. Where timeless elegance meets tomorrow.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        palace: {
-                            burgundy: '#8B1538',
-                            gold: '#D4AF37',
-                            cream: '#F5F1E8',
-                            dark: '#2D1B1F',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Montserrat', sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            background: #0a0a0a;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Cormorant Garamond', serif; }
         
-        .hero-gradient {
-            background: linear-gradient(135deg, #2D1B1F 0%, #1a0d11 50%, #0a0a0a 100%);
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
             position: relative;
         }
         
-        .gold-gradient {
-            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
+        /* Animated background */
+        .bg-animation {
+            position: absolute;
+            inset: 0;
+            opacity: 0.4;
+            z-index: 0;
         }
         
-        .text-gradient {
-            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #F5F1E8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .luxury-glow {
-            box-shadow: 0 0 40px rgba(212, 175, 55, 0.3), 0 0 80px rgba(212, 175, 55, 0.1);
-        }
-        
-        .card-hover {
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-12px) scale(1.02);
-            box-shadow: 0 30px 60px rgba(212, 175, 55, 0.2);
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-30px) rotate(5deg); }
-        }
-        
-        @keyframes pulse-gold {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 0.6; }
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: -1000px 0; }
-            100% { background-position: 1000px 0; }
-        }
-        
-        .shimmer {
-            background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
-            background-size: 1000px 100%;
-            animation: shimmer 3s infinite;
-        }
-        
-        .float-animation {
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
             animation: float 8s ease-in-out infinite;
         }
         
-        .pulse-gold {
-            animation: pulse-gold 3s ease-in-out infinite;
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: #8B1538;
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
         }
         
-        .glass-effect {
-            background: rgba(45, 27, 31, 0.7);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(212, 175, 55, 0.2);
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: #D4AF37;
+            bottom: -300px;
+            right: -300px;
+            animation-delay: 2s;
         }
         
-        .ornamental {
-            position: relative;
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: #2D1B1F;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: 4s;
         }
         
-        .ornamental::before,
-        .ornamental::after {
-            content: '✦';
-            color: #D4AF37;
-            font-size: 1.5rem;
-            opacity: 0.5;
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, -50px) scale(1.1); }
         }
         
-        .ornamental::before {
-            margin-right: 1rem;
-        }
-        
-        .ornamental::after {
-            margin-left: 1rem;
-        }
-        
-        /* Futuristic grid background */
-        .cyber-grid {
+        /* Grid background */
+        .grid {
+            position: absolute;
+            inset: 0;
             background-image: 
                 linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
             background-size: 50px 50px;
+            z-index: 0;
+        }
+        
+        /* Main content */
+        .container {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 2rem;
+            max-width: 800px;
+        }
+        
+        /* Logo */
+        .logo {
+            margin-bottom: 4rem;
+            animation: fadeInDown 1s ease-out;
+        }
+        
+        .emblem {
+            display: inline-block;
+            position: relative;
+            margin-bottom: 2rem;
+        }
+        
+        .emblem-circle {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8B1538 0%, #2D1B1F 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid #D4AF37;
+            box-shadow: 
+                0 0 60px rgba(212, 175, 55, 0.4),
+                0 0 120px rgba(139, 21, 56, 0.2),
+                inset 0 0 40px rgba(212, 175, 55, 0.1);
+            position: relative;
+            animation: glow 3s ease-in-out infinite;
+        }
+        
+        .emblem-ring {
+            position: absolute;
+            inset: -20px;
+            border: 2px solid rgba(212, 175, 55, 0.3);
+            border-radius: 50%;
+            animation: rotate 20s linear infinite;
+        }
+        
+        .emblem-text {
+            font-family: 'Cormorant Garamond', serif;
+            color: #D4AF37;
+            font-size: 4rem;
+            font-weight: 700;
+            text-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { 
+                box-shadow: 
+                    0 0 60px rgba(212, 175, 55, 0.4),
+                    0 0 120px rgba(139, 21, 56, 0.2),
+                    inset 0 0 40px rgba(212, 175, 55, 0.1);
+            }
+            50% { 
+                box-shadow: 
+                    0 0 80px rgba(212, 175, 55, 0.6),
+                    0 0 160px rgba(139, 21, 56, 0.3),
+                    inset 0 0 60px rgba(212, 175, 55, 0.2);
+            }
+        }
+        
+        .brand-name {
+            font-family: 'Cormorant Garamond', serif;
+            color: #D4AF37;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            margin-bottom: 0.5rem;
+        }
+        
+        .brand-subtitle {
+            color: rgba(212, 175, 55, 0.6);
+            font-size: 0.875rem;
+            letter-spacing: 0.5em;
+            font-weight: 300;
+        }
+        
+        /* Tagline */
+        .tagline {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: #F5F1E8;
+            margin-bottom: 4rem;
+            line-height: 1.4;
+            animation: fadeIn 1.5s ease-out 0.5s backwards;
+        }
+        
+        .tagline-highlight {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #F5F1E8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+        
+        /* Button */
+        .cta-button {
+            display: inline-block;
+            padding: 1.75rem 4rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: #2D1B1F;
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
+            border-radius: 9999px;
+            box-shadow: 
+                0 10px 40px rgba(212, 175, 55, 0.4),
+                0 0 60px rgba(212, 175, 55, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.05em;
+            animation: fadeInUp 1s ease-out 1s backwards;
+        }
+        
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+        
+        .cta-button:hover::before {
+            transform: translateX(100%);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow: 
+                0 20px 60px rgba(212, 175, 55, 0.6),
+                0 0 100px rgba(212, 175, 55, 0.3);
+        }
+        
+        .cta-button:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+        
+        /* Decorative stars */
+        .stars {
+            position: absolute;
+            color: #D4AF37;
+            opacity: 0.4;
+            animation: twinkle 2s ease-in-out infinite;
+        }
+        
+        .star-1 {
+            top: 20%;
+            left: 10%;
+            font-size: 1.5rem;
+            animation-delay: 0s;
+        }
+        
+        .star-2 {
+            top: 30%;
+            right: 15%;
+            font-size: 1rem;
+            animation-delay: 0.7s;
+        }
+        
+        .star-3 {
+            bottom: 25%;
+            left: 15%;
+            font-size: 1.2rem;
+            animation-delay: 1.4s;
+        }
+        
+        .star-4 {
+            bottom: 20%;
+            right: 10%;
+            font-size: 1.8rem;
+            animation-delay: 2.1s;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.6; }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .emblem-circle {
+                width: 140px;
+                height: 140px;
+            }
+            
+            .emblem-text {
+                font-size: 3rem;
+            }
+            
+            .brand-name {
+                font-size: 1.5rem;
+            }
+            
+            .tagline {
+                font-size: 1.75rem;
+            }
+            
+            .cta-button {
+                padding: 1.5rem 3rem;
+                font-size: 1.125rem;
+            }
+            
+            .star-1, .star-2, .star-3, .star-4 {
+                display: none;
+            }
         }
     </style>
 </head>
-<body class="bg-black text-white">
-    <!-- Navigation -->
-    <nav class="fixed top-0 w-full glass-effect z-[1001] border-b border-palace-gold/20">
-        <div class="max-w-7xl mx-auto px-6 lg:px-8">
-            <div class="flex justify-between items-center h-24">
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-gradient-to-br from-palace-gold to-yellow-600 rounded-full flex items-center justify-center luxury-glow">
-                            <span class="text-palace-dark font-bold text-xl">OP</span>
-                        </div>
-                        <div>
-                            <div class="text-palace-gold font-bold text-lg tracking-wider" style="font-family: 'Cormorant Garamond', serif;">OLD PALACE</div>
-                            <div class="text-palace-gold/60 text-xs tracking-widest">RESORT</div>
-                        </div>
-                    </div>
+<body>
+    <!-- Animated background -->
+    <div class="bg-animation">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+    
+    <!-- Grid overlay -->
+    <div class="grid"></div>
+    
+    <!-- Decorative stars -->
+    <div class="stars star-1">✦</div>
+    <div class="stars star-2">✦</div>
+    <div class="stars star-3">✦</div>
+    <div class="stars star-4">✦</div>
+    
+    <!-- Main content -->
+    <div class="container">
+        <!-- Logo/Emblem -->
+        <div class="logo">
+            <div class="emblem">
+                <div class="emblem-ring"></div>
+                <div class="emblem-circle">
+                    <div class="emblem-text">OP</div>
                 </div>
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#experience" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Experience</a>
-                    <a href="#dining" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Dining</a>
-                    <a href="#wellness" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Wellness</a>
-                    <a href="#contact" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Contact</a>
-                    <a href="/admin/login" class="px-6 py-2.5 gold-gradient text-palace-dark rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transform hover:scale-105 transition">
-                        Guest Portal
-                    </a>
-                </div>
-                <button class="md:hidden text-palace-gold" onclick="toggleMobileMenu()">
-                    <i class="fas fa-bars text-2xl"></i>
-                </button>
             </div>
-        </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="pt-32 pb-24 px-6 hero-gradient relative overflow-hidden min-h-screen flex items-center cyber-grid">
-        <!-- Animated background elements -->
-        <div class="absolute inset-0 opacity-20">
-            <div class="absolute top-20 left-10 w-96 h-96 bg-palace-gold rounded-full blur-[150px] pulse-gold"></div>
-            <div class="absolute bottom-20 right-10 w-[500px] h-[500px] bg-palace-burgundy rounded-full blur-[200px] pulse-gold" style="animation-delay: 1.5s;"></div>
-            <div class="absolute top-1/2 left-1/2 w-64 h-64 bg-palace-gold/30 rounded-full blur-[100px]"></div>
+            <div class="brand-name">OLD PALACE</div>
+            <div class="brand-subtitle">RESORT</div>
         </div>
         
-        <!-- Decorative lines -->
-        <div class="absolute top-0 left-0 w-full h-1 gold-gradient shimmer"></div>
-        <div class="absolute bottom-0 left-0 w-full h-1 gold-gradient shimmer" style="animation-delay: 1.5s;"></div>
-        
-        <div class="max-w-7xl mx-auto relative z-10 w-full">
-            <div class="grid lg:grid-cols-2 gap-16 items-center">
-                <div class="text-center lg:text-left">
-                    <!-- Ornamental badge -->
-                    <div class="inline-flex items-center gap-2 mb-8 px-6 py-3 glass-effect rounded-full border border-palace-gold/30">
-                        <span class="w-2 h-2 bg-palace-gold rounded-full animate-pulse"></span>
-                        <span class="text-palace-gold text-sm font-medium tracking-wider">EST. 1924</span>
-                    </div>
-                    
-                    <h1 class="text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight" style="font-family: 'Cormorant Garamond', serif;">
-                        Where <span class="text-gradient">Timeless</span>
-                        <br/>Elegance
-                        <br/>Meets <span class="text-gradient">Tomorrow</span>
-                    </h1>
-                    
-                    <p class="text-xl md:text-2xl text-palace-cream/70 mb-12 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                        Step into a world where heritage and innovation intertwine. Experience unparalleled luxury at Egypt's most prestigious resort destination.
-                    </p>
-                    
-                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
-                        <a href="#experience" class="group relative px-10 py-5 gold-gradient text-palace-dark rounded-xl font-bold text-lg shadow-2xl hover:shadow-palace-gold/50 transition-all overflow-hidden">
-                            <span class="relative z-10 flex items-center justify-center gap-2">
-                                <i class="fas fa-crown"></i>
-                                Explore Experience
-                            </span>
-                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                        </a>
-                        <a href="#contact" class="px-10 py-5 glass-effect text-palace-gold rounded-xl font-bold text-lg border-2 border-palace-gold/30 hover:border-palace-gold transition-all flex items-center justify-center gap-2">
-                            <i class="fas fa-phone-alt"></i>
-                            Reserve Now
-                        </a>
-                    </div>
-                    
-                    <div class="flex items-center gap-8 text-palace-cream/60 text-sm justify-center lg:justify-start flex-wrap">
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-star text-palace-gold"></i>
-                            <span>5-Star Luxury</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-award text-palace-gold"></i>
-                            <span>Award Winning</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <i class="fas fa-globe text-palace-gold"></i>
-                            <span>Global Recognition</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Hero Visual -->
-                <div class="float-animation relative">
-                    <div class="glass-effect rounded-3xl p-12 border-2 border-palace-gold/30 shadow-2xl luxury-glow relative overflow-hidden">
-                        <!-- Shimmer effect -->
-                        <div class="absolute inset-0 shimmer"></div>
-                        
-                        <!-- Main emblem -->
-                        <div class="relative z-10">
-                            <div class="text-center mb-8">
-                                <div class="inline-block relative mb-6">
-                                    <!-- Rotating ring -->
-                                    <div class="absolute inset-0 -m-8 rounded-full border-4 border-palace-gold/20" style="animation: spin 20s linear infinite;"></div>
-                                    <div class="absolute inset-0 -m-6 rounded-full border-2 border-palace-gold/40 animate-pulse"></div>
-                                    
-                                    <!-- Central emblem -->
-                                    <div class="relative w-64 h-64 rounded-full bg-gradient-to-br from-palace-burgundy via-palace-dark to-black shadow-2xl flex items-center justify-center border-4 border-palace-gold/50 card-hover">
-                                        <div class="text-center">
-                                            <div class="text-palace-gold text-7xl mb-2" style="font-family: 'Cormorant Garamond', serif;">OP</div>
-                                            <div class="text-palace-gold text-xs tracking-[0.3em]">OLD PALACE</div>
-                                            <div class="text-palace-gold/60 text-[10px] tracking-[0.2em] mt-1">RESORT</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Decorative stars -->
-                                    <div class="absolute -top-4 -right-4 text-palace-gold text-2xl animate-pulse">✦</div>
-                                    <div class="absolute -bottom-4 -left-4 text-palace-gold text-xl animate-pulse" style="animation-delay: 0.5s;">✦</div>
-                                    <div class="absolute top-1/2 -left-8 text-palace-gold/50 text-sm animate-pulse" style="animation-delay: 1s;">✦</div>
-                                    <div class="absolute top-1/2 -right-8 text-palace-gold/50 text-sm animate-pulse" style="animation-delay: 1.5s;">✦</div>
-                                </div>
-                                
-                                <h3 class="text-3xl font-bold text-palace-gold mb-3 ornamental" style="font-family: 'Cormorant Garamond', serif;">
-                                    Your Digital Gateway
-                                </h3>
-                                <p class="text-lg text-palace-cream/60">Scan. Experience. Indulge.</p>
-                            </div>
-                            
-                            <!-- Service grid -->
-                            <div class="grid grid-cols-3 gap-4 pt-8 border-t border-palace-gold/20">
-                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
-                                    <i class="fas fa-utensils text-3xl text-palace-gold mb-2"></i>
-                                    <p class="text-xs font-semibold text-palace-cream/80">Fine Dining</p>
-                                </div>
-                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
-                                    <i class="fas fa-spa text-3xl text-palace-gold mb-2"></i>
-                                    <p class="text-xs font-semibold text-palace-cream/80">Wellness</p>
-                                </div>
-                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
-                                    <i class="fas fa-concierge-bell text-3xl text-palace-gold mb-2"></i>
-                                    <p class="text-xs font-semibold text-palace-cream/80">Concierge</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <style>
-                    @keyframes spin {
-                        from { transform: rotate(0deg); }
-                        to { transform: rotate(360deg); }
-                    }
-                </style>
-            </div>
-        </div>
-    </section>
-
-    <!-- Experience Section -->
-    <section id="experience" class="py-24 px-6 relative cyber-grid" style="background: linear-gradient(180deg, #0a0a0a 0%, #1a0d11 50%, #0a0a0a 100%);">
-        <div class="max-w-7xl mx-auto relative z-10">
-            <div class="text-center mb-20">
-                <h2 class="text-5xl md:text-6xl font-bold text-white mb-6 ornamental" style="font-family: 'Cormorant Garamond', serif;">
-                    <span class="text-gradient">The Palace</span> Experience
-                </h2>
-                <p class="text-xl text-palace-cream/60 max-w-2xl mx-auto">
-                    Immerse yourself in a symphony of luxury, where every detail whispers sophistication
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature Card 1 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-utensils text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Culinary Artistry</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        Savor world-class cuisine crafted by Michelin-starred chefs. From Mediterranean delicacies to authentic Egyptian flavors.
-                    </p>
-                    <a href="#dining" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        Explore Menus <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-
-                <!-- Feature Card 2 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-spa text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Holistic Wellness</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        Rejuvenate your body and soul at our state-of-the-art spa. Ancient therapies meet modern luxury.
-                    </p>
-                    <a href="#wellness" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        View Treatments <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-
-                <!-- Feature Card 3 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-swimmer text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Private Beach</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        Exclusive access to pristine shores. Crystal waters, golden sands, and personalized beach service.
-                    </p>
-                    <a href="#experience" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        Discover More <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-
-                <!-- Feature Card 4 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-robot text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Smart Concierge</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        AI-powered assistance at your fingertips. Instant service requests, real-time updates, personalized recommendations.
-                    </p>
-                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        Learn More <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-
-                <!-- Feature Card 5 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-moon text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Signature Suites</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        Bespoke accommodations with breathtaking views. Every suite a masterpiece of design and comfort.
-                    </p>
-                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        View Suites <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-
-                <!-- Feature Card 6 -->
-                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
-                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
-                        <i class="fas fa-landmark text-3xl text-palace-dark"></i>
-                    </div>
-                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Heritage Tours</h3>
-                    <p class="text-palace-cream/70 leading-relaxed mb-6">
-                        Curated experiences showcasing Egypt's rich history. VIP access to iconic landmarks and hidden gems.
-                    </p>
-                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
-                        Plan Your Journey <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="py-32 px-6 relative overflow-hidden" style="background: linear-gradient(135deg, #8B1538 0%, #2D1B1F 100%);">
-        <div class="absolute inset-0">
-            <div class="absolute inset-0 opacity-30 cyber-grid"></div>
-            <div class="absolute top-0 left-0 w-full h-full">
-                <div class="absolute top-20 left-10 w-64 h-64 bg-palace-gold/20 rounded-full blur-[100px] pulse-gold"></div>
-                <div class="absolute bottom-20 right-10 w-96 h-96 bg-palace-gold/10 rounded-full blur-[150px] pulse-gold" style="animation-delay: 2s;"></div>
-            </div>
+        <!-- Tagline -->
+        <div class="tagline">
+            Where <span class="tagline-highlight">Timeless Elegance</span><br/>
+            Meets Tomorrow
         </div>
         
-        <div class="max-w-5xl mx-auto text-center relative z-10">
-            <h2 class="text-5xl md:text-7xl font-bold text-white mb-8 ornamental" style="font-family: 'Cormorant Garamond', serif;">
-                Begin Your <span class="text-palace-gold">Palace</span> Journey
-            </h2>
-            <p class="text-2xl text-palace-cream/80 mb-12 max-w-3xl mx-auto">
-                Reserve your place in paradise. Limited availability for the most discerning travelers.
-            </p>
-            <div class="flex flex-col sm:flex-row gap-6 justify-center">
-                <a href="#contact" class="group relative px-12 py-6 gold-gradient text-palace-dark rounded-xl font-bold text-xl shadow-2xl hover:shadow-palace-gold/50 transition-all overflow-hidden">
-                    <span class="relative z-10 flex items-center justify-center gap-3">
-                        <i class="fas fa-calendar-check"></i>
-                        Book Your Stay
-                    </span>
-                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                </a>
-                <a href="tel:+20123456789" class="px-12 py-6 glass-effect text-white rounded-xl font-bold text-xl border-2 border-palace-gold/30 hover:border-palace-gold transition-all flex items-center justify-center gap-3">
-                    <i class="fas fa-phone-alt"></i>
-                    +20 123 456 789
-                </a>
-            </div>
-            <p class="mt-8 text-palace-cream/50 text-sm">
-                <i class="fas fa-headset mr-2"></i>Dedicated concierge available 24/7
-            </p>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-16 px-6 glass-effect border-t border-palace-gold/20">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid md:grid-cols-4 gap-12 mb-12">
-                <div class="col-span-2">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-12 h-12 gold-gradient rounded-full flex items-center justify-center">
-                            <span class="text-palace-dark font-bold text-xl">OP</span>
-                        </div>
-                        <div>
-                            <div class="text-palace-gold font-bold text-lg tracking-wider" style="font-family: 'Cormorant Garamond', serif;">OLD PALACE</div>
-                            <div class="text-palace-gold/60 text-xs tracking-widest">RESORT</div>
-                        </div>
-                    </div>
-                    <p class="text-palace-cream/60 mb-6">
-                        Where timeless elegance meets tomorrow. Experience the pinnacle of luxury hospitality in Egypt's most prestigious resort.
-                    </p>
-                    <div class="flex gap-4">
-                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
-                            <i class="fab fa-instagram"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
-                            <i class="fab fa-twitter"></i>
-                        </a>
-                    </div>
-                </div>
-                <div>
-                    <h4 class="text-palace-gold font-bold mb-4" style="font-family: 'Cormorant Garamond', serif;">Quick Links</h4>
-                    <ul class="space-y-2 text-palace-cream/60">
-                        <li><a href="#experience" class="hover:text-palace-gold transition">Experience</a></li>
-                        <li><a href="#dining" class="hover:text-palace-gold transition">Dining</a></li>
-                        <li><a href="#wellness" class="hover:text-palace-gold transition">Wellness</a></li>
-                        <li><a href="/admin/login" class="hover:text-palace-gold transition">Guest Portal</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="text-palace-gold font-bold mb-4" style="font-family: 'Cormorant Garamond', serif;">Contact</h4>
-                    <ul class="space-y-2 text-palace-cream/60 text-sm">
-                        <li><i class="fas fa-map-marker-alt text-palace-gold mr-2"></i>Hurghada, Egypt</li>
-                        <li><i class="fas fa-phone text-palace-gold mr-2"></i>+20 123 456 789</li>
-                        <li><i class="fas fa-envelope text-palace-gold mr-2"></i>info@oldpalaceresort.com</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-palace-gold/20 pt-8 text-center">
-                <p class="text-palace-cream/40 text-sm">
-                    © 2026 Old Palace Resort. All rights reserved. | Crafted with excellence for the discerning traveler.
-                </p>
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        function toggleMobileMenu() {
-            const menu = document.getElementById('mobileMenu');
-            menu.classList.toggle('hidden');
-        }
-    </script>
+        <!-- CTA Button -->
+        <a href="/hotel/paradise-resort" class="cta-button">
+            Begin Your Experience
+        </a>
+    </div>
 </body>
 </html>
   `)
