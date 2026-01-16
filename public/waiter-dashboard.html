@@ -1364,17 +1364,25 @@
                 
                 if (data.success) {
                     console.log('Items added, response:', data.order);
+                    console.log('Items in response:', data.order.items);
                     currentOrder = data.order;
                     closeMenuModal();
                     
-                    // Refresh data
+                    // Refresh data with cache busting
                     console.log('Refreshing tables and orders...');
                     await loadTables();
                     await loadOrders();
                     console.log('Orders after refresh:', orders.length);
                     
+                    // Find the updated waiter order
+                    const updatedWaiterOrder = orders.find(o => 
+                        o.order_id === currentOrder.order_id && o.source === 'waiter'
+                    );
+                    console.log('Updated waiter order from orders array:', updatedWaiterOrder);
+                    console.log('Items in updated order:', updatedWaiterOrder?.items);
+                    
                     // Small delay to ensure data is fully loaded
-                    await new Promise(resolve => setTimeout(resolve, 200));
+                    await new Promise(resolve => setTimeout(resolve, 300));
                     
                     // Re-render the modal with updated data
                     console.log('Reopening modal for table:', currentTable.table_id);

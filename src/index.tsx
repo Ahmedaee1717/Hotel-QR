@@ -74455,39 +74455,51 @@ app.post('/api/waiter/add-items', async (c) => {
     }
     
     let currentItems = order.items ? JSON.parse(order.items) : []
+    console.log('[ADD-ITEMS] Starting with currentItems:', JSON.stringify(currentItems))
+    console.log('[ADD-ITEMS] Incoming items to add:', JSON.stringify(items))
     
     // Add new items
     for (const newItem of items) {
       const itemId = String(newItem.item_id)
+      console.log('[ADD-ITEMS] Processing item:', itemId, 'quantity:', newItem.quantity)
       let itemDetails = null
       
       // Check if this is an extra charge item (starts with 'rm_' or is a string)
       if (itemId.startsWith('rm_')) {
         // Extra charge item from menu_items table
         const numericId = itemId.replace('rm_', '')
+        console.log('[ADD-ITEMS] Looking up rm_ item, numeric ID:', numericId)
         itemDetails = await DB.prepare(`
           SELECT item_id, item_name, price as cost
           FROM menu_items
           WHERE item_id = ?
         `).bind(numericId).first()
         
+        console.log('[ADD-ITEMS] rm_ item lookup result:', JSON.stringify(itemDetails))
+        
         if (itemDetails) {
           itemDetails.item_id = itemId // Keep the rm_ prefix
         }
       } else {
         // Regular set menu item from alacarte_menu_items
+        console.log('[ADD-ITEMS] Looking up regular item from alacarte_menu_items, item_id:', newItem.item_id)
         itemDetails = await DB.prepare(`
           SELECT item_id, item_name, cost_to_hotel as cost
           FROM alacarte_menu_items
           WHERE item_id = ?
         `).bind(newItem.item_id).first()
+        
+        console.log('[ADD-ITEMS] Regular item lookup result:', JSON.stringify(itemDetails))
       }
       
       if (itemDetails) {
+        console.log('[ADD-ITEMS] Item found! Adding:', JSON.stringify(itemDetails))
         const existing = currentItems.find(i => i.item_id === newItem.item_id)
         if (existing) {
+          console.log('[ADD-ITEMS] Item already exists, incrementing quantity')
           existing.quantity += newItem.quantity
         } else {
+          console.log('[ADD-ITEMS] New item, pushing to currentItems')
           currentItems.push({
             item_id: itemDetails.item_id,
             item_name: itemDetails.item_name,
@@ -74495,11 +74507,18 @@ app.post('/api/waiter/add-items', async (c) => {
             quantity: newItem.quantity
           })
         }
+      } else {
+        console.error('[ADD-ITEMS] ❌ Item NOT FOUND in database! item_id:', itemId)
       }
     }
     
+    console.log('[ADD-ITEMS] Final currentItems after loop:', JSON.stringify(currentItems))
+    
     // Calculate total
     const totalCost = currentItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0)
+    
+    console.log('[ADD-ITEMS] Before update - currentItems:', JSON.stringify(currentItems))
+    console.log('[ADD-ITEMS] Before update - totalCost:', totalCost)
     
     // Update order
     await DB.prepare(`
@@ -74508,13 +74527,28 @@ app.post('/api/waiter/add-items', async (c) => {
       WHERE order_id = ?
     `).bind(JSON.stringify(currentItems), totalCost, order_id).run()
     
+    console.log('[ADD-ITEMS] After update - returning currentItems length:', currentItems.length)
+    
+    const responseOrder = {
+      order_id: order.order_id,
+      table_id: order.table_id,
+      restaurant_id: order.restaurant_id,
+      waiter_id: order.waiter_id,
+      guest_name: order.guest_name,
+      room_number: order.room_number,
+      party_size: order.party_size,
+      items: currentItems,
+      total_cost: totalCost,
+      status: order.status,
+      created_at: order.created_at,
+      updated_at: new Date().toISOString()
+    }
+    
+    console.log('[ADD-ITEMS] Response order items length:', responseOrder.items.length)
+    
     return c.json({
       success: true,
-      order: {
-        ...order,
-        items: currentItems,
-        total_cost: totalCost
-      }
+      order: responseOrder
     })
   } catch (error) {
     console.error('Add items error:', error)
