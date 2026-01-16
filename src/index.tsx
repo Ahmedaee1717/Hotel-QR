@@ -67508,27 +67508,42 @@ app.get('/admin/restaurant/:offering_id', (c) => {
       // Handle menu image file selection
       let uploadedMenuImages = [];
       
+      // Click upload area to trigger file input
+      document.getElementById('uploadArea')?.addEventListener('click', function() {
+        document.getElementById('menuImageFile')?.click();
+      });
+      
       document.getElementById('menuImageFile')?.addEventListener('change', function(e) {
         const files = e.target.files;
         if (!files || files.length === 0) return;
         
-        const imagePreview = document.getElementById('imagePreview');
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+        const uploadPreview = document.getElementById('uploadPreview');
         const imageCount = document.getElementById('imageCount');
-        const menuImageUrls = document.getElementById('menuImageUrls');
         
         uploadedMenuImages = Array.from(files);
         
-        if (imagePreview) {
-          imagePreview.classList.remove('hidden');
-          imageCount.textContent = uploadedMenuImages.length + ' image(s) selected';
-        }
+        // Hide placeholder, show preview
+        if (uploadPlaceholder) uploadPlaceholder.classList.add('hidden');
+        if (uploadPreview) uploadPreview.classList.remove('hidden');
+        if (imageCount) imageCount.textContent = uploadedMenuImages.length;
+        
+        console.log('✅ Selected', uploadedMenuImages.length, 'menu images');
       });
       
       // Clear image upload
       window.clearImageUpload = function() {
         uploadedMenuImages = [];
-        document.getElementById('menuImageFile').value = '';
-        document.getElementById('imagePreview')?.classList.add('hidden');
+        const fileInput = document.getElementById('menuImageFile');
+        if (fileInput) fileInput.value = '';
+        
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+        const uploadPreview = document.getElementById('uploadPreview');
+        
+        if (uploadPlaceholder) uploadPlaceholder.classList.remove('hidden');
+        if (uploadPreview) uploadPreview.classList.add('hidden');
+        
+        console.log('🗑️ Cleared menu images');
       };
       
       // Handle menu upload form submission
