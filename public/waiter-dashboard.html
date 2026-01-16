@@ -1271,14 +1271,23 @@
                         orderForSeating = tableOrder;
                         
                         // Check if guest is NOT seated:
-                        // - No checked_in_at timestamp
-                        // - Status is NOT 'checked_in' or 'seated'
+                        // For KITCHEN orders: Need checked_in_at timestamp
+                        // For WAITER orders: Status != 'pending' means seated (waiter seated them)
                         const hasCheckedInTimestamp = !!tableOrder.checked_in_at;
-                        const hasCheckedInStatus = tableOrder.status === 'checked_in' || tableOrder.status === 'seated';
+                        const isWaiterOrder = tableOrder.source === 'waiter';
                         
-                        isNotSeated = !hasCheckedInTimestamp && !hasCheckedInStatus;
+                        if (isWaiterOrder) {
+                            // Waiter orders: seated unless status is 'pending'
+                            isNotSeated = tableOrder.status === 'pending';
+                        } else {
+                            // Kitchen orders: need explicit check-in
+                            const hasCheckedInStatus = tableOrder.status === 'checked_in' || tableOrder.status === 'seated';
+                            isNotSeated = !hasCheckedInTimestamp && !hasCheckedInStatus;
+                        }
+                        
                         seatedBy = tableOrder.checked_in_by;
                         
+                        console.log('[Confirm Seated Check] source:', tableOrder.source);
                         console.log('[Confirm Seated Check] checked_in_at:', tableOrder.checked_in_at);
                         console.log('[Confirm Seated Check] status:', tableOrder.status);
                         console.log('[Confirm Seated Check] isNotSeated:', isNotSeated);
