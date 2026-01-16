@@ -74739,28 +74739,72 @@ app.post('/api/waiter/confirm-seated', async (c) => {
   
   try {
     const body = await c.req.json()
-    const { voucher_id, waiter_id, waiter_name } = body
+    const { voucher_id, order_id, order_type, waiter_id, waiter_name } = body
     
-    if (!voucher_id) {
-      return c.json({ success: false, error: 'Missing voucher_id' }, 400)
+    console.log('[Confirm Seated] Received:', { voucher_id, order_id, order_type })
+    
+    if (!voucher_id && !order_id) {
+      return c.json({ success: false, error: 'Missing voucher_id or order_id' }, 400)
     }
     
-    // Update voucher with checked_in status
-    await DB.prepare(`
-      UPDATE alacarte_vouchers
-      SET checked_in_at = CURRENT_TIMESTAMP,
-          checked_in_by = ?,
-          status = 'checked_in'
-      WHERE voucher_id = ? AND property_id = ?
-    `).bind(waiter_name || waiter_id || 'Waiter', voucher_id, property_id).run()
+    const staffName = waiter_name || waiter_id || 'Waiter'
+    let updateSuccess = false
     
-    return c.json({ 
-      success: true,
-      message: 'Guest marked as seated'
-    })
+    // Try kitchen order (alacarte_vouchers) first if voucher_id provided
+    if (voucher_id) {
+      console.log('[Confirm Seated] Updating kitchen order (voucher):', voucher_id)
+      const voucherResult = await DB.prepare(`
+        UPDATE alacarte_vouchers
+        SET checked_in_at = CURRENT_TIMESTAMP,
+            checked_in_by = ?,
+            status = 'checked_in'
+        WHERE voucher_id = ? AND property_id = ?
+      `).bind(staffName, voucher_id, property_id).run()
+      
+      if (voucherResult.meta.changes > 0) {
+        console.log('[Confirm Seated] Kitchen order updated successfully')
+        updateSuccess = true
+      }
+    }
+    
+    // Try waiter order if order_id provided OR if voucher update failed
+    if (!updateSuccess && (order_id || voucher_id)) {
+      const waiterOrderId = order_id || voucher_id
+      console.log('[Confirm Seated] Attempting waiter order update:', waiterOrderId)
+      
+      try {
+        // NOTE: waiter_orders table may not have checked_in_at columns yet
+        // Try to update if columns exist, silently fail if not
+        const waiterResult = await DB.prepare(`
+          UPDATE waiter_orders
+          SET status = 'seated'
+          WHERE order_id = ?
+        `).bind(waiterOrderId).run()
+        
+        if (waiterResult.meta.changes > 0) {
+          console.log('[Confirm Seated] Waiter order status updated to seated')
+          updateSuccess = true
+        }
+      } catch (waiterError) {
+        console.log('[Confirm Seated] Waiter order update failed (table may not have checked_in columns yet):', waiterError.message)
+      }
+    }
+    
+    if (updateSuccess) {
+      return c.json({ 
+        success: true,
+        message: 'Guest marked as seated'
+      })
+    } else {
+      console.log('[Confirm Seated] No orders were updated')
+      return c.json({ 
+        success: false, 
+        error: 'Order not found or already seated' 
+      }, 404)
+    }
   } catch (error) {
-    console.error('Confirm seated error:', error)
-    return c.json({ success: false, error: 'Failed to confirm seated' }, 500)
+    console.error('[Confirm Seated] Error:', error)
+    return c.json({ success: false, error: 'Failed to confirm seated: ' + error.message }, 500)
   }
 })
 

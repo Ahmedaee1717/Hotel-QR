@@ -1231,22 +1231,65 @@
                 }
                 
                 // Show action buttons for ALL orders
-                // Add "Confirm Seated" button for kitchen orders that haven't been checked in
-                const isKitchenOrder = currentTable && currentTable.kitchen_order;
-                const kitchenOrder = isKitchenOrder ? orders.find(o => o.order_id === currentTable.current_order?.order_id) : null;
-                const isNotSeated = kitchenOrder && !kitchenOrder.checked_in_at;
+                // Add "Confirm Seated" button for ANY order that hasn't been checked in
+                const currentOrderData = currentOrder || currentTable?.current_order;
+                let isNotSeated = false;
+                let voucherId = null;
+                let seatedBy = null;
+                let orderForSeating = null;
                 
-                let buttonsHTML = '<div class="grid grid-cols-2 gap-3 mt-6" id="orderActionButtons">';
+                console.log('[Confirm Seated Check] currentTable:', currentTable);
+                console.log('[Confirm Seated Check] currentOrder:', currentOrder);
                 
-                // If kitchen order and not seated yet, show CONFIRM SEATED button prominently
+                // Check BOTH kitchen orders AND waiter orders for seating status
+                if (currentTable && currentTable.current_order) {
+                    const tableOrder = orders.find(o => o.order_id === currentTable.current_order.order_id);
+                    console.log('[Confirm Seated Check] Found order:', tableOrder);
+                    
+                    if (tableOrder) {
+                        orderForSeating = tableOrder;
+                        isNotSeated = !tableOrder.checked_in_at;
+                        seatedBy = tableOrder.checked_in_by;
+                        
+                        // Extract voucher ID for API call
+                        if (tableOrder.source === 'kitchen') {
+                            voucherId = tableOrder.order_id.replace('kitchen-', '');
+                        } else if (tableOrder.source === 'waiter') {
+                            voucherId = tableOrder.order_id; // Waiter order ID
+                        }
+                        
+                        console.log('[Confirm Seated Check] isNotSeated:', isNotSeated, 'voucherId:', voucherId);
+                    }
+                }
+                
+                let buttonsHTML = '';
+                
+                // Show CONFIRM SEATED button prominently at top if not yet seated
                 if (isNotSeated) {
                     buttonsHTML += `
-                        <button onclick="confirmGuestSeated()" class="col-span-2 bg-green-600 hover:bg-green-700 text-white py-6 rounded-xl font-black text-lg shadow-lg animate-pulse">
-                            <i class="fas fa-chair mr-2"></i>🪑 CONFIRM GUEST SEATED
-                        </button>
+                        <div class="mb-4 p-4 bg-yellow-50 border-3 border-yellow-500 rounded-xl shadow-lg">
+                            <div class="text-center mb-3">
+                                <p class="font-black text-yellow-900 text-lg mb-1">⏳ GUEST NOT YET SEATED</p>
+                                <p class="text-sm text-yellow-800 font-semibold">Click below when guest arrives at table</p>
+                            </div>
+                            <button onclick="confirmGuestSeated()" class="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-xl font-black text-xl shadow-2xl transform hover:scale-105 transition-all">
+                                <i class="fas fa-chair mr-2"></i>🪑 CONFIRM GUEST SEATED NOW
+                            </button>
+                        </div>
+                    `;
+                } else if (orderForSeating && orderForSeating.checked_in_at) {
+                    // Already seated - show confirmation (works for BOTH kitchen and waiter orders)
+                    buttonsHTML += `
+                        <div class="mb-4 p-3 bg-green-50 border-2 border-green-500 rounded-xl text-center">
+                            <p class="font-bold text-green-900 text-lg">
+                                <i class="fas fa-check-circle mr-2"></i>✅ Guest Confirmed Seated
+                            </p>
+                            <p class="text-xs text-green-700 mt-1">Seated by: ${seatedBy || 'Staff'}</p>
+                        </div>
                     `;
                 }
                 
+                buttonsHTML += '<div class="grid grid-cols-2 gap-3 mt-6" id="orderActionButtons">';
                 buttonsHTML += `
                     <button onclick="showMenuModal()" class="bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-bold">
                         <i class="fas fa-plus-circle mr-2"></i>Add Items
@@ -1363,8 +1406,12 @@
         }
         
         async function confirmGuestSeated() {
-            if (!currentTable || !currentTable.kitchen_order) {
-                alert('This is not a kitchen order');
+            console.log('[confirmGuestSeated] Starting...');
+            console.log('[confirmGuestSeated] currentTable:', currentTable);
+            console.log('[confirmGuestSeated] currentOrder:', currentOrder);
+            
+            if (!currentTable || !currentTable.current_order) {
+                alert('No active order found for this table');
                 return;
             }
             
@@ -1373,13 +1420,38 @@
             }
             
             try {
-                const kitchenOrder = orders.find(o => o.order_id === currentTable.current_order?.order_id);
-                if (!kitchenOrder) {
-                    alert('Kitchen order not found');
+                // Find the order for this table
+                const tableOrder = orders.find(o => o.order_id === currentTable.current_order.order_id);
+                console.log('[confirmGuestSeated] Found order:', tableOrder);
+                
+                if (!tableOrder) {
+                    alert('Order not found');
                     return;
                 }
                 
-                const voucherId = kitchenOrder.order_id.replace('kitchen-', '');
+                // Prepare request based on order type
+                let requestBody = {
+                    waiter_id: currentWaiter.id,
+                    waiter_name: currentWaiter.name
+                };
+                
+                if (tableOrder.source === 'kitchen') {
+                    // Kitchen order - send voucher_id
+                    requestBody.voucher_id = tableOrder.order_id.replace('kitchen-', '');
+                    console.log('[confirmGuestSeated] Kitchen order, voucher_id:', requestBody.voucher_id);
+                } else if (tableOrder.source === 'waiter') {
+                    // Waiter order - send order_id
+                    requestBody.order_id = tableOrder.order_id;
+                    requestBody.order_type = 'waiter';
+                    console.log('[confirmGuestSeated] Waiter order, order_id:', requestBody.order_id);
+                } else {
+                    // Fallback - try both
+                    requestBody.voucher_id = tableOrder.order_id;
+                    requestBody.order_id = tableOrder.order_id;
+                    console.log('[confirmGuestSeated] Unknown source, sending both IDs');
+                }
+                
+                console.log('[confirmGuestSeated] Sending request:', requestBody);
                 
                 const response = await fetch('/api/waiter/confirm-seated', {
                     method: 'POST',
@@ -1387,17 +1459,14 @@
                         'Content-Type': 'application/json',
                         'X-Property-ID': propertyId
                     },
-                    body: JSON.stringify({
-                        voucher_id: voucherId,
-                        waiter_id: currentWaiter.id,
-                        waiter_name: currentWaiter.name
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 const data = await response.json();
+                console.log('[confirmGuestSeated] Response:', data);
                 
                 if (data.success) {
-                    showToast('Guest marked as seated!', 'success');
+                    showToast('✅ Guest marked as seated!', 'success');
                     playNotificationSound('item_added');
                     closeTableModal();
                     await loadTables();
@@ -1408,7 +1477,7 @@
                     alert('Failed to confirm seated: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Confirm seated error:', error);
+                console.error('[confirmGuestSeated] Error:', error);
                 alert('Failed to confirm guest seated');
             }
         }
