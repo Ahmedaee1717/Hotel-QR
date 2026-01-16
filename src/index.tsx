@@ -74584,6 +74584,12 @@ app.get('/api/waiter/tables', async (c) => {
   const { restaurant, property } = c.req.query()
   
   try {
+    // Calculate date range for active orders
+    const today = new Date().toISOString().split('T')[0]
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + 7)
+    const maxDateStr = maxDate.toISOString().split('T')[0]
+    
     // Get all tables for restaurant with position data
     const tables = await DB.prepare(`
       SELECT 
@@ -74602,28 +74608,37 @@ app.get('/api/waiter/tables', async (c) => {
       ORDER BY CAST(rt.table_number AS INTEGER)
     `).bind(restaurant).all()
     
-    // Get waiter orders
+    // Get waiter orders (only pending/confirmed - not yet dining)
     const waiterOrders = await DB.prepare(`
-      SELECT table_id, order_id, guest_name, party_size, status
+      SELECT table_id, order_id, guest_name, party_size, status, waiter_id
       FROM waiter_orders
       WHERE restaurant_id = ? 
-        AND status IN ('pending', 'confirmed', 'preparing', 'ready')
+        AND status IN ('pending', 'confirmed')
     `).bind(restaurant).all()
     
-    // Get kitchen bookings (alacarte_vouchers) - show all active
+    // Get kitchen bookings (already dining) - with booking details
     const kitchenBookings = await DB.prepare(`
       SELECT 
-        table_number,
-        special_requests,
-        party_size,
-        status,
-        voucher_id
-      FROM alacarte_vouchers
-      WHERE restaurant_id = ?
-        AND property_id = ?
-        AND status IN ('confirmed', 'preparing', 'ready', 'served')
-      LIMIT 50
-    `).bind(restaurant, property_id).all()
+        av.table_number,
+        av.special_requests,
+        av.party_size,
+        av.status,
+        av.voucher_id,
+        av.reservation_date,
+        av.reservation_time,
+        av.preorder_item_ids,
+        av.created_at,
+        av.created_by_staff_id,
+        u.first_name as staff_first_name,
+        u.last_name as staff_last_name
+      FROM alacarte_vouchers av
+      LEFT JOIN users u ON av.created_by_staff_id = u.user_id
+      WHERE av.restaurant_id = ?
+        AND av.property_id = ?
+        AND av.status IN ('confirmed', 'preparing', 'ready')
+        AND av.reservation_date BETWEEN ? AND ?
+      ORDER BY av.reservation_date, av.reservation_time
+    `).bind(restaurant, property_id, today, maxDateStr).all()
     
     // Create maps for quick lookup
     const waiterOrderMap = new Map()
@@ -74642,7 +74657,21 @@ app.get('/api/waiter/tables', async (c) => {
             guestName = match[1].trim()
           }
         }
-        kitchenBookingMap.set(kb.table_number, { ...kb, guest_name: guestName })
+        
+        // Parse items for display
+        const preorderItems = kb.preorder_item_ids ? JSON.parse(kb.preorder_item_ids) : []
+        
+        // Get booked by info
+        const bookedBy = kb.staff_first_name 
+          ? `${kb.staff_first_name} ${kb.staff_last_name || ''}`.trim()
+          : 'Front Desk'
+        
+        kitchenBookingMap.set(kb.table_number, { 
+          ...kb, 
+          guest_name: guestName,
+          items_count: preorderItems.length,
+          booked_by: bookedBy
+        })
       }
     }
     
@@ -74660,7 +74689,7 @@ app.get('/api/waiter/tables', async (c) => {
         rotation: t.rotation || 0
       }
       
-      // Check waiter order first
+      // Check waiter order first (seated but not yet dining)
       const waiterOrder = waiterOrderMap.get(t.table_id)
       if (waiterOrder) {
         return {
@@ -74675,7 +74704,7 @@ app.get('/api/waiter/tables', async (c) => {
         }
       }
       
-      // Check kitchen booking
+      // Check kitchen booking (already dining)
       const kitchenBooking = kitchenBookingMap.get(t.table_number)
       if (kitchenBooking) {
         return {
@@ -74685,7 +74714,11 @@ app.get('/api/waiter/tables', async (c) => {
             guest_name: kitchenBooking.guest_name,
             party_size: kitchenBooking.party_size,
             status: kitchenBooking.status,
-            source: 'kitchen'
+            source: 'kitchen',
+            reservation_date: kitchenBooking.reservation_date,
+            reservation_time: kitchenBooking.reservation_time,
+            items_count: kitchenBooking.items_count,
+            booked_by: kitchenBooking.booked_by
           }
         }
       }

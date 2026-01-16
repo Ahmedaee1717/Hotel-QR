@@ -482,7 +482,6 @@
             await loadFloorElements();
             await loadWalls();
             await loadTextures();
-            await loadKitchenOrders();
             await loadOrders();
             await loadMenuItems();
             renderFloorPlan();
@@ -491,7 +490,6 @@
             // Auto-refresh every 30 seconds
             setInterval(async () => {
                 await loadTables();
-                await loadKitchenOrders();
                 await loadOrders();
                 renderFloorPlan();
                 updateStats();
@@ -540,21 +538,7 @@
             }
         }
 
-        async function loadKitchenOrders() {
-            try {
-                const response = await fetch(`/api/kitchen/orders/${restaurantId}?property=${propertyId}`, {
-                    headers: { 'X-Property-ID': propertyId }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    kitchenOrders = data.orders || [];
-                    console.log('Loaded kitchen orders:', kitchenOrders.length);
-                }
-            } catch (error) {
-                console.error('Failed to load kitchen orders:', error);
-                kitchenOrders = [];
-            }
-        }
+        // REMOVED: loadKitchenOrders - kitchen orders now included in tables API
 
         async function loadTables() {
             try {
@@ -564,13 +548,7 @@
                 const data = await response.json();
                 if (data.success) {
                     tables = data.tables || [];
-                    // Merge with kitchen order data
-                    tables.forEach(table => {
-                        const kitchenOrder = kitchenOrders.find(o => o.table_number === table.table_number);
-                        if (kitchenOrder) {
-                            table.kitchen_order = kitchenOrder;
-                        }
-                    });
+                    // No need to merge - API already returns everything
                 }
             } catch (error) {
                 console.error('Failed to load tables:', error);
@@ -672,26 +650,32 @@
                     tableEl.style.borderRadius = '8px';
                 }
                 
-                // Determine table status
+                // Determine table status based on current_order
                 let status = 'free';
                 let statusColor = '#10b981'; // green
                 let guestInfo = '';
                 
-                if (table.kitchen_order) {
-                    // Has order from kitchen (dining/preparing)
-                    status = 'dining';
-                    statusColor = '#ef4444'; // red
-                    guestInfo = extractGuestName(table.kitchen_order.special_requests);
-                } else if (table.current_order) {
-                    // Has waiter order (seated/ordering)
-                    if (table.current_order.status === 'pending') {
-                        status = 'seated';
-                        statusColor = '#eab308'; // yellow
-                    } else {
-                        status = 'ordering';
-                        statusColor = '#3b82f6'; // blue
+                if (table.current_order) {
+                    guestInfo = table.current_order.guest_name || 'Guest';
+                    
+                    // Color based on source and status
+                    if (table.current_order.source === 'kitchen') {
+                        // Kitchen orders - dining (red for confirmed/preparing/ready)
+                        status = 'dining';
+                        statusColor = '#ef4444'; // red
+                    } else if (table.current_order.source === 'waiter') {
+                        // Waiter orders - color by status
+                        if (table.current_order.status === 'pending') {
+                            status = 'seated';
+                            statusColor = '#eab308'; // yellow - just seated
+                        } else if (table.current_order.status === 'confirmed') {
+                            status = 'ordering';
+                            statusColor = '#3b82f6'; // blue - order confirmed
+                        } else {
+                            status = 'preparing';
+                            statusColor = '#f97316'; // orange - being prepared
+                        }
                     }
-                    guestInfo = table.current_order.guest_name;
                 }
                 
                 tableEl.style.backgroundColor = 'white';
@@ -863,15 +847,15 @@
             const existingButtons = document.querySelectorAll('#orderItemsList ~ .grid');
             existingButtons.forEach(btn => btn.remove());
             
-            // Check if table has kitchen order (dining)
-            if (currentTable.kitchen_order) {
-                // Show kitchen order details with ADD ITEMS option
+            // Check if table has an order
+            if (currentTable.current_order) {
+                // Show order details
                 document.getElementById('guestSeatingSection').classList.add('hidden');
                 document.getElementById('currentOrderSection').classList.remove('hidden');
                 
-                const order = currentTable.kitchen_order;
-                document.getElementById('currentGuestName').textContent = extractGuestName(order.special_requests) || 'Guest';
-                document.getElementById('currentPartySize').textContent = order.party_size;
+                const order = currentTable.current_order;
+                document.getElementById('currentGuestName').textContent = order.guest_name || 'Guest';
+                document.getElementById('currentPartySize').textContent = order.party_size || '?';
                 
                 const statusColors = {
                     pending: 'bg-yellow-500',
@@ -882,23 +866,24 @@
                 document.getElementById('currentOrderStatus').className = `px-3 py-1 rounded-full text-sm font-bold text-white ${statusColors[order.status] || 'bg-gray-500'}`;
                 document.getElementById('currentOrderStatus').textContent = order.status.toUpperCase();
                 
-                // Render dishes from kitchen order
+                // Show items or placeholder
                 const container = document.getElementById('orderItemsList');
-                container.innerHTML = order.dishes.map(dish => `
-                    <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                        <div class="flex-1">
-                            <div class="font-bold dark-text">${dish.item_name}</div>
-                            <div class="text-xs text-slate-400">${dish.extraCharge ? '💰 Extra Charge' : '✓ Set Menu'}</div>
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <span class="w-8 text-center font-bold dark-text">${dish.quantity}</span>
-                        </div>
-                    </div>
-                `).join('');
                 
-                // CHANGED: Show Add Items, Send to Kitchen, and Clear Table buttons for kitchen orders
+                if (order.source === 'kitchen') {
+                    // Kitchen order - can't modify existing items, but can add new ones
+                    container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">Kitchen order - view in kitchen dashboard</div>';
+                } else {
+                    // Waiter order - show items
+                    if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
+                        renderOrderItems();
+                    } else {
+                        container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
+                    }
+                }
+                
+                // Show action buttons for ALL orders
                 const buttonsHTML = `
-                    <div class="grid grid-cols-2 gap-3 mt-6" id="kitchenOrderButtons">
+                    <div class="grid grid-cols-2 gap-3 mt-6" id="orderActionButtons">
                         <button onclick="showMenuModal()" class="bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-bold">
                             <i class="fas fa-plus-circle mr-2"></i>Add Items
                         </button>
@@ -915,30 +900,6 @@
                 `;
                 container.insertAdjacentHTML('afterend', buttonsHTML);
                 
-                // CHANGED: Show add items button for kitchen orders too
-                const addItemsBtn = document.querySelector('button[onclick="showMenuModal()"]');
-                if (addItemsBtn) addItemsBtn.style.display = 'block';
-                
-            } else if (currentTable.current_order) {
-                // Show current waiter order
-                currentOrder = currentTable.current_order;
-                document.getElementById('guestSeatingSection').classList.add('hidden');
-                document.getElementById('currentOrderSection').classList.remove('hidden');
-                document.getElementById('currentGuestName').textContent = currentOrder.guest_name;
-                document.getElementById('currentPartySize').textContent = currentOrder.party_size;
-                
-                const statusColors = {
-                    pending: 'bg-yellow-500',
-                    confirmed: 'bg-blue-500'
-                };
-                document.getElementById('currentOrderStatus').className = `px-3 py-1 rounded-full text-sm font-bold text-white ${statusColors[currentOrder.status]}`;
-                document.getElementById('currentOrderStatus').textContent = currentOrder.status.toUpperCase();
-                
-                // Show add items button
-                const addItemsBtn = document.querySelector('button[onclick="showMenuModal()"]');
-                if (addItemsBtn) addItemsBtn.style.display = 'block';
-                
-                renderOrderItems();
             } else {
                 // Show guest seating
                 document.getElementById('guestSeatingSection').classList.remove('hidden');
@@ -952,36 +913,62 @@
         }
 
         async function checkoutTable() {
-            if (!currentTable || !currentTable.kitchen_order) return;
+            if (!currentTable || !currentTable.current_order) return;
             
             if (!confirm('Checkout guests and clear this table?')) {
                 return;
             }
             
             try {
-                // Mark the voucher as served/used
-                const response = await fetch('/api/waiter/checkout-table', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Property-ID': propertyId
-                    },
-                    body: JSON.stringify({
-                        voucher_id: currentTable.kitchen_order.voucher_id
-                    })
-                });
+                const order = currentTable.current_order;
                 
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('✓ Table checked out successfully!');
-                    closeTableModal();
-                    await loadKitchenOrders();
-                    await loadTables();
-                    renderFloorPlan();
-                    updateStats();
+                // For kitchen orders, extract voucher_id from order_id (format: "kitchen-105")
+                if (order.source === 'kitchen') {
+                    const voucherId = order.order_id.replace('kitchen-', '');
+                    const response = await fetch('/api/waiter/checkout-table', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            voucher_id: voucherId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✓ Table checked out successfully!');
+                        closeTableModal();
+                        await loadTables();
+                        await loadOrders();
+                        renderFloorPlan();
+                        updateStats();
+                    } else {
+                        alert('Failed to checkout: ' + (data.error || 'Unknown error'));
+                    }
                 } else {
-                    alert('Failed to checkout: ' + (data.error || 'Unknown error'));
+                    // Waiter order - delete from waiter_orders
+                    const response = await fetch(`/api/waiter/order/${order.order_id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-Property-ID': propertyId
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✓ Table cleared successfully!');
+                        closeTableModal();
+                        await loadTables();
+                        await loadOrders();
+                        renderFloorPlan();
+                        updateStats();
+                    } else {
+                        alert('Failed to clear table: ' + (data.error || 'Unknown error'));
+                    }
                 }
             } catch (error) {
                 console.error('Checkout error:', error);
