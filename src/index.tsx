@@ -74669,30 +74669,47 @@ app.post('/api/waiter/update-item', async (c) => {
     const body = await c.req.json()
     const { order_id, item_id, quantity } = body
     
+    console.log('[UPDATE-ITEM] Request:', { order_id, item_id, quantity })
+    
     // Get current order
     const order = await DB.prepare(`
       SELECT * FROM waiter_orders WHERE order_id = ?
     `).bind(order_id).first()
     
     if (!order) {
+      console.log('[UPDATE-ITEM] Order not found:', order_id)
       return c.json({ success: false, error: 'Order not found' }, 404)
     }
     
     let currentItems = order.items ? JSON.parse(order.items) : []
+    console.log('[UPDATE-ITEM] Current items before update:', JSON.stringify(currentItems))
     
     if (quantity === 0) {
       // Remove item
-      currentItems = currentItems.filter(i => i.item_id !== item_id)
+      console.log('[UPDATE-ITEM] Removing item:', item_id)
+      const beforeLength = currentItems.length
+      currentItems = currentItems.filter(i => {
+        console.log('[UPDATE-ITEM] Comparing:', i.item_id, '!==', item_id, '=', i.item_id !== item_id)
+        return i.item_id !== item_id
+      })
+      const afterLength = currentItems.length
+      console.log('[UPDATE-ITEM] Items after filter:', beforeLength, '->', afterLength)
     } else {
       // Update quantity
       const item = currentItems.find(i => i.item_id === item_id)
       if (item) {
+        console.log('[UPDATE-ITEM] Updating quantity for:', item_id, 'to', quantity)
         item.quantity = quantity
+      } else {
+        console.log('[UPDATE-ITEM] Item not found in currentItems:', item_id)
       }
     }
     
+    console.log('[UPDATE-ITEM] Current items after update:', JSON.stringify(currentItems))
+    
     // Calculate total
     const totalCost = currentItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0)
+    console.log('[UPDATE-ITEM] New total cost:', totalCost)
     
     // Update order
     await DB.prepare(`
@@ -74700,6 +74717,8 @@ app.post('/api/waiter/update-item', async (c) => {
       SET items = ?, total_cost = ?, updated_at = CURRENT_TIMESTAMP
       WHERE order_id = ?
     `).bind(JSON.stringify(currentItems), totalCost, order_id).run()
+    
+    console.log('[UPDATE-ITEM] Database updated successfully')
     
     return c.json({
       success: true,
@@ -74710,7 +74729,7 @@ app.post('/api/waiter/update-item', async (c) => {
       }
     })
   } catch (error) {
-    console.error('Update item error:', error)
+    console.error('[UPDATE-ITEM] Error:', error)
     return c.json({ success: false, error: 'Failed to update item' }, 500)
   }
 })
