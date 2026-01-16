@@ -853,7 +853,14 @@
                 document.getElementById('guestSeatingSection').classList.add('hidden');
                 document.getElementById('currentOrderSection').classList.remove('hidden');
                 
+                // IMPORTANT: currentTable.current_order doesn't have items!
+                // We need to look up the FULL order from the orders array
                 const order = currentTable.current_order;
+                const fullOrder = orders.find(o => o.order_id === order.order_id || o.order_id === order.order_id);
+                
+                console.log('Table current_order:', order);
+                console.log('Full order from orders array:', fullOrder);
+                
                 document.getElementById('currentGuestName').textContent = order.guest_name || 'Guest';
                 document.getElementById('currentPartySize').textContent = order.party_size || '?';
                 
@@ -869,6 +876,9 @@
                 // Show items or placeholder
                 const container = document.getElementById('orderItemsList');
                 
+                // Use fullOrder if available (has items), otherwise use basic order info
+                const orderWithItems = fullOrder || order;
+                
                 if (order.source === 'kitchen') {
                     // Kitchen order - fetch full details from orders list and create temp waiter order for adding items
                     const fullKitchenOrder = orders.find(o => o.order_id === order.order_id);
@@ -876,12 +886,17 @@
                     // Check if there's ALSO a waiter order for this table (for extras)
                     const waiterOrderForTable = orders.find(o => 
                         o.source === 'waiter' && 
-                        o.table_number === currentTable.table_number
+                        String(o.table_number) === String(currentTable.table_number)
                     );
+                    
+                    console.log('Looking for waiter order for table:', currentTable.table_number);
+                    console.log('Found waiter order:', waiterOrderForTable);
+                    console.log('All orders:', orders.map(o => ({id: o.order_id, table: o.table_number, source: o.source})));
                     
                     // If there's already a waiter order, use it; otherwise create a temp one
                     if (waiterOrderForTable) {
                         currentOrder = waiterOrderForTable;
+                        console.log('Using existing waiter order with items:', waiterOrderForTable.items);
                     } else {
                         // Create a temporary waiter order structure so we can add extra items
                         currentOrder = {
@@ -944,8 +959,8 @@
                     container.innerHTML = itemsHTML || '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
                     
                 } else {
-                    // Waiter order - show items
-                    currentOrder = order;
+                    // Waiter order - use the FULL order from orders array
+                    currentOrder = orderWithItems;
                     if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
                         renderOrderItems();
                     } else {
