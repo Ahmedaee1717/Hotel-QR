@@ -1278,13 +1278,56 @@
                         </div>
                     `;
                 } else if (orderForSeating && orderForSeating.checked_in_at) {
-                    // Already seated - show confirmation (works for BOTH kitchen and waiter orders)
+                    // Already seated - show STATUS-AWARE message based on order state
+                    const orderStatus = orderForSeating.status || 'pending';
+                    const hasItems = currentOrder && currentOrder.items && currentOrder.items.length > 0;
+                    
+                    let statusDisplay = '';
+                    let statusClass = '';
+                    let nextAction = '';
+                    
+                    // Determine status and next action
+                    if (orderStatus === 'confirmed' || orderStatus === 'pending') {
+                        if (hasItems) {
+                            statusDisplay = '📋 READY TO ORDER';
+                            statusClass = 'bg-blue-50 border-blue-500 text-blue-900';
+                            nextAction = 'Click "Send to Kitchen" to place order';
+                        } else {
+                            statusDisplay = '🪑 SEATED - AWAITING ORDER';
+                            statusClass = 'bg-green-50 border-green-500 text-green-900';
+                            nextAction = 'Click "Add Items" to take their order';
+                        }
+                    } else if (orderStatus === 'preparing') {
+                        statusDisplay = '👨‍🍳 KITCHEN PREPARING';
+                        statusClass = 'bg-orange-50 border-orange-500 text-orange-900';
+                        nextAction = 'Waiting for kitchen...';
+                    } else if (orderStatus === 'ready') {
+                        statusDisplay = '✅ FOOD READY';
+                        statusClass = 'bg-green-50 border-green-500 text-green-900';
+                        nextAction = 'Deliver food to table';
+                    } else if (orderStatus === 'served') {
+                        statusDisplay = '🍽️ DINING';
+                        statusClass = 'bg-purple-50 border-purple-500 text-purple-900';
+                        nextAction = 'Guest is dining';
+                    } else if (orderStatus === 'checked_in' || orderStatus === 'seated') {
+                        statusDisplay = '🪑 SEATED';
+                        statusClass = 'bg-green-50 border-green-500 text-green-900';
+                        nextAction = hasItems ? 'Items added - send to kitchen' : 'Take their order';
+                    }
+                    
                     buttonsHTML += `
-                        <div class="mb-4 p-3 bg-green-50 border-2 border-green-500 rounded-xl text-center">
-                            <p class="font-bold text-green-900 text-lg">
-                                <i class="fas fa-check-circle mr-2"></i>✅ Guest Confirmed Seated
-                            </p>
-                            <p class="text-xs text-green-700 mt-1">Seated by: ${seatedBy || 'Staff'}</p>
+                        <div class="mb-4 p-4 ${statusClass} border-3 rounded-xl shadow-lg">
+                            <div class="text-center">
+                                <p class="font-black text-xl mb-2">
+                                    ${statusDisplay}
+                                </p>
+                                <p class="text-sm font-semibold mb-1">
+                                    ${nextAction}
+                                </p>
+                                <p class="text-xs opacity-75 mt-2">
+                                    Seated by: ${seatedBy || 'Staff'}
+                                </p>
+                            </div>
                         </div>
                     `;
                 }
