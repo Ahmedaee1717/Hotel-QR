@@ -73022,13 +73022,13 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                     // Detect new orders and play LOUD sound
                     if (lastOrderCount > 0 && newOrders.length > lastOrderCount) {
                         const newOrdersCount = newOrders.length - lastOrderCount;
-                        console.log(`[Kitchen Sound] ${newOrdersCount} NEW ORDER(S)!`);
+                        console.log('[Kitchen Sound] ' + newOrdersCount + ' NEW ORDER(S)!');
                         playKitchenSound('new_order');
                         
                         // Show visual alert
                         const alertDiv = document.createElement('div');
                         alertDiv.className = 'fixed top-20 right-6 bg-red-600 text-white px-8 py-4 rounded-lg shadow-2xl font-bold text-xl z-50 animate-pulse';
-                        alertDiv.innerHTML = \`<i class="fas fa-bell mr-2"></i>\${newOrdersCount} NEW ORDER(S)!\`;
+                        alertDiv.innerHTML = '<i class="fas fa-bell mr-2"></i>' + newOrdersCount + ' NEW ORDER(S)!';
                         document.body.appendChild(alertDiv);
                         setTimeout(() => alertDiv.remove(), 5000);
                     }
