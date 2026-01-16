@@ -878,10 +878,16 @@
                 
                 // Use fullOrder if available (has items), otherwise use basic order info
                 const orderWithItems = fullOrder || order;
+                console.log('orderWithItems for this table:', orderWithItems);
+                console.log('orderWithItems.items:', orderWithItems?.items);
                 
                 if (order.source === 'kitchen') {
                     // Kitchen order - fetch full details from orders list and create temp waiter order for adding items
                     const fullKitchenOrder = orders.find(o => o.order_id === order.order_id);
+                    
+                    console.log('=== KITCHEN ORDER DEBUG ===');
+                    console.log('order:', order);
+                    console.log('fullKitchenOrder:', fullKitchenOrder);
                     
                     // Check if there's ALSO a waiter order for this table (for extras)
                     const waiterOrderForTable = orders.find(o => 
@@ -911,13 +917,17 @@
                             status: 'pending',
                             source: 'waiter'
                         };
+                        console.log('Created temp waiter order');
                     }
                     
                     // Display both kitchen items AND waiter-added extras
                     let itemsHTML = '';
                     
+                    console.log('=== RENDERING ITEMS ===');
+                    
                     // Kitchen items (set menu)
                     if (fullKitchenOrder && fullKitchenOrder.items && fullKitchenOrder.items.length > 0) {
+                        console.log('Rendering', fullKitchenOrder.items.length, 'kitchen items');
                         itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Set Menu Items</div>';
                         itemsHTML += fullKitchenOrder.items.map(item => {
                             const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
@@ -936,13 +946,17 @@
                                 </div>
                             `;
                         }).join('');
+                    } else {
+                        console.log('No kitchen items found');
                     }
                     
                     // Waiter-added extras (show even if empty, so user knows they can add)
                     if (waiterOrderForTable) {
+                        console.log('Rendering waiter extras section. Items:', waiterOrderForTable.items);
                         itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
                         
                         if (waiterOrderForTable.items && waiterOrderForTable.items.length > 0) {
+                            console.log('Rendering', waiterOrderForTable.items.length, 'waiter items');
                             itemsHTML += waiterOrderForTable.items.map(item => {
                                 return `
                                     <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
@@ -957,19 +971,97 @@
                                 `;
                             }).join('');
                         } else {
+                            console.log('No waiter items, showing placeholder');
                             itemsHTML += '<div class="p-3 bg-slate-700 rounded-lg text-center text-slate-400 text-sm">Click "Add Items" to add extras</div>';
                         }
+                    } else {
+                        console.log('No waiter order found for this table');
                     }
                     
+                    console.log('Final itemsHTML length:', itemsHTML.length);
+                    console.log('Setting container.innerHTML...');
                     container.innerHTML = itemsHTML || '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
+                    console.log('Container innerHTML set. Container:', container);
                     
                 } else {
-                    // Waiter order - use the FULL order from orders array
-                    currentOrder = orderWithItems;
-                    if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
-                        renderOrderItems();
+                    // Waiter order - BUT check if there's also a kitchen order for this table!
+                    console.log('=== WAITER ORDER BRANCH ===');
+                    console.log('Current waiter order:', orderWithItems);
+                    
+                    // Look for kitchen order for the same table
+                    const kitchenOrderForTable = orders.find(o => 
+                        o.table_number == currentTable.table_number && 
+                        o.source === 'kitchen'
+                    );
+                    
+                    console.log('Kitchen order for this table?', kitchenOrderForTable);
+                    
+                    if (kitchenOrderForTable) {
+                        // DUAL DISPLAY: Show both kitchen items AND waiter items
+                        console.log('=== DUAL DISPLAY MODE ===');
+                        let itemsHTML = '';
+                        
+                        // Kitchen items (set menu)
+                        if (kitchenOrderForTable.items && kitchenOrderForTable.items.length > 0) {
+                            console.log('Rendering', kitchenOrderForTable.items.length, 'kitchen items');
+                            itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Set Menu Items</div>';
+                            itemsHTML += kitchenOrderForTable.items.map(item => {
+                                const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
+                                return `
+                                    <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg mb-2">
+                                        <div class="flex-1">
+                                            <div class="font-bold dark-text">${item.item_name}</div>
+                                            <div class="text-xs text-slate-400">
+                                                ${isExtraCharge ? '💰 Extra Charge' : '✓ Set Menu'}
+                                                ${item.cost > 0 ? ` - €${item.cost.toFixed(2)}` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                        }
+                        
+                        // Waiter-added extras
+                        currentOrder = orderWithItems;
+                        if (orderWithItems && orderWithItems.items && orderWithItems.items.length > 0) {
+                            console.log('Rendering', orderWithItems.items.length, 'waiter items');
+                            itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
+                            itemsHTML += orderWithItems.items.map(item => {
+                                return `
+                                    <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
+                                        <div class="flex-1">
+                                            <div class="font-bold dark-text">${item.item_name}</div>
+                                            <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                        } else {
+                            console.log('No waiter items yet, showing placeholder for extras');
+                            itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
+                            itemsHTML += '<div class="p-3 bg-slate-700 rounded-lg text-center text-slate-400 text-sm">Click "Add Items" to add extras</div>';
+                        }
+                        
+                        container.innerHTML = itemsHTML;
+                        
                     } else {
-                        container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
+                        // Pure waiter order (no kitchen order)
+                        currentOrder = orderWithItems;
+                        console.log('Pure waiter order, rendering items');
+                        
+                        if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
+                            console.log('Calling renderOrderItems with', currentOrder.items.length, 'items');
+                            renderOrderItems();
+                        } else {
+                            console.log('No items in currentOrder, showing placeholder');
+                            container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
+                        }
                     }
                 }
                 
