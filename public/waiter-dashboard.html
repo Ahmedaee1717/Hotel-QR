@@ -110,6 +110,36 @@
             font-size: 20px;
             font-weight: bold;
         }
+        
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateX(400px);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 9999;
+            max-width: 90%;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .toast i {
+            font-size: 20px;
+        }
     </style>
 </head>
 <body>
@@ -385,6 +415,9 @@
             </div>
         </div>
     </div>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
 
     <script>
         // Global state
@@ -404,6 +437,38 @@
         const urlParams = new URLSearchParams(window.location.search);
         const restaurantId = urlParams.get('restaurant') || '2';
         const propertyId = urlParams.get('property') || '1';
+
+        // Toast notification system
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            const icon = type === 'success' ? 'fa-check-circle' : 
+                        type === 'error' ? 'fa-exclamation-circle' : 
+                        'fa-info-circle';
+            
+            const bgGradient = type === 'success' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
+                              type === 'error' ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' :
+                              'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+            
+            toast.style.background = bgGradient;
+            toast.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Auto-remove after 2 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
 
         // Initialize
         window.addEventListener('DOMContentLoaded', async () => {
@@ -1435,7 +1500,8 @@
                     console.log('Reopening modal for table:', currentTable.table_id);
                     await openTableModal(currentTable.table_id);
                     
-                    alert('✓ Items added successfully!');
+                    // Show smooth toast notification instead of alert
+                    showToast('Items added successfully!');
                 } else {
                     alert('Failed to add items: ' + (data.error || 'Unknown error'));
                 }
