@@ -871,28 +871,43 @@
                 
                 if (order.source === 'kitchen') {
                     // Kitchen order - fetch full details from orders list and create temp waiter order for adding items
-                    const fullOrder = orders.find(o => o.order_id === order.order_id);
+                    const fullKitchenOrder = orders.find(o => o.order_id === order.order_id);
                     
-                    // Create a temporary waiter order structure so we can add extra items
-                    // Kitchen orders can't be modified directly, but we can create a parallel waiter order
-                    currentOrder = {
-                        order_id: null, // Will be created when first item is added
-                        table_id: currentTable.table_id,
-                        restaurant_id: restaurantId,
-                        waiter_id: currentWaiter.id,
-                        guest_name: order.guest_name,
-                        party_size: order.party_size,
-                        items: [], // Start with empty items for extras
-                        total_cost: 0,
-                        status: 'pending',
-                        source: 'waiter'
-                    };
+                    // Check if there's ALSO a waiter order for this table (for extras)
+                    const waiterOrderForTable = orders.find(o => 
+                        o.source === 'waiter' && 
+                        o.table_number === currentTable.table_number
+                    );
                     
-                    if (fullOrder && fullOrder.items && fullOrder.items.length > 0) {
-                        container.innerHTML = fullOrder.items.map(item => {
+                    // If there's already a waiter order, use it; otherwise create a temp one
+                    if (waiterOrderForTable) {
+                        currentOrder = waiterOrderForTable;
+                    } else {
+                        // Create a temporary waiter order structure so we can add extra items
+                        currentOrder = {
+                            order_id: null, // Will be created when first item is added
+                            table_id: currentTable.table_id,
+                            restaurant_id: restaurantId,
+                            waiter_id: currentWaiter.id,
+                            guest_name: order.guest_name,
+                            party_size: order.party_size,
+                            items: [], // Start with empty items for extras
+                            total_cost: 0,
+                            status: 'pending',
+                            source: 'waiter'
+                        };
+                    }
+                    
+                    // Display both kitchen items AND waiter-added extras
+                    let itemsHTML = '';
+                    
+                    // Kitchen items (set menu)
+                    if (fullKitchenOrder && fullKitchenOrder.items && fullKitchenOrder.items.length > 0) {
+                        itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Set Menu Items</div>';
+                        itemsHTML += fullKitchenOrder.items.map(item => {
                             const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
                             return `
-                                <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                                <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg mb-2">
                                     <div class="flex-1">
                                         <div class="font-bold dark-text">${item.item_name}</div>
                                         <div class="text-xs text-slate-400">
@@ -906,9 +921,28 @@
                                 </div>
                             `;
                         }).join('');
-                    } else {
-                        container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items in this order</div>';
                     }
+                    
+                    // Waiter-added extras
+                    if (waiterOrderForTable && waiterOrderForTable.items && waiterOrderForTable.items.length > 0) {
+                        itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
+                        itemsHTML += waiterOrderForTable.items.map(item => {
+                            return `
+                                <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
+                                    <div class="flex-1">
+                                        <div class="font-bold dark-text">${item.item_name}</div>
+                                        <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                    
+                    container.innerHTML = itemsHTML || '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
+                    
                 } else {
                     // Waiter order - show items
                     currentOrder = order;
