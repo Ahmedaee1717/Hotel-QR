@@ -73245,6 +73245,17 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                             ' <span class="ml-2"><i class="fas fa-users mr-1"></i>' + (order.total_party_size || order.party_size || 0) + ' guests</span>' +
                         '</div>' +
                         
+                        // SEATED STATUS - PROMINENT DISPLAY
+                        (order.checked_in_at ? 
+                            '<div class="mt-2 mb-2 inline-block px-6 py-2 bg-green-500 text-white font-black text-lg rounded-full shadow-lg">' +
+                                '<i class="fas fa-chair mr-2"></i>🪑 SEATED' +
+                            '</div>'
+                        : 
+                            '<div class="mt-2 mb-2 inline-block px-6 py-2 bg-yellow-400 text-gray-900 font-black text-lg rounded-full shadow-lg animate-pulse">' +
+                                '<i class="fas fa-hourglass-half mr-2"></i>⏳ NOT YET SEATED' +
+                            '</div>'
+                        ) +
+                        
                         // TWO DISTINCT TIMES - Side by Side
                         '<div class="grid grid-cols-2 gap-4 mt-3 pt-3 border-t-2 border-gray-200">' +
                             // LEFT: Table Booking Time (Reservation)
@@ -73482,18 +73493,21 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         v.special_requests,
         v.status,
         v.created_at,
+        v.checked_in_at,
+        v.checked_in_by,
         dp.primary_guest_name as pass_guest_name,
         dp.pass_reference
       FROM alacarte_vouchers v
       LEFT JOIN digital_passes dp ON v.pass_id = dp.pass_id
       WHERE v.restaurant_id = ?
         AND v.property_id = ?
-        AND v.status IN ('confirmed', 'preparing', 'ready', 'served')
+        AND v.status IN ('confirmed', 'preparing', 'ready', 'served', 'checked_in')
         ${dateCondition}
       ORDER BY 
         v.reservation_date ASC,
         CASE v.status 
           WHEN 'confirmed' THEN 1
+          WHEN 'checked_in' THEN 1
           WHEN 'preparing' THEN 2
           WHEN 'ready' THEN 3
           WHEN 'served' THEN 4
@@ -74715,6 +74729,38 @@ app.post('/api/waiter/seat-guests', async (c) => {
   } catch (error) {
     console.error('Seat guests error:', error)
     return c.json({ success: false, error: 'Failed to seat guests' }, 500)
+  }
+})
+
+// Confirm guests are seated (for kitchen orders/vouchers)
+app.post('/api/waiter/confirm-seated', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const body = await c.req.json()
+    const { voucher_id, waiter_id, waiter_name } = body
+    
+    if (!voucher_id) {
+      return c.json({ success: false, error: 'Missing voucher_id' }, 400)
+    }
+    
+    // Update voucher with checked_in status
+    await DB.prepare(`
+      UPDATE alacarte_vouchers
+      SET checked_in_at = CURRENT_TIMESTAMP,
+          checked_in_by = ?,
+          status = 'checked_in'
+      WHERE voucher_id = ? AND property_id = ?
+    `).bind(waiter_name || waiter_id || 'Waiter', voucher_id, property_id).run()
+    
+    return c.json({ 
+      success: true,
+      message: 'Guest marked as seated'
+    })
+  } catch (error) {
+    console.error('Confirm seated error:', error)
+    return c.json({ success: false, error: 'Failed to confirm seated' }, 500)
   }
 })
 

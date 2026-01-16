@@ -1231,21 +1231,36 @@
                 }
                 
                 // Show action buttons for ALL orders
-                const buttonsHTML = `
-                    <div class="grid grid-cols-2 gap-3 mt-6" id="orderActionButtons">
-                        <button onclick="showMenuModal()" class="bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-bold">
-                            <i class="fas fa-plus-circle mr-2"></i>Add Items
+                // Add "Confirm Seated" button for kitchen orders that haven't been checked in
+                const isKitchenOrder = currentTable && currentTable.kitchen_order;
+                const kitchenOrder = isKitchenOrder ? orders.find(o => o.order_id === currentTable.current_order?.order_id) : null;
+                const isNotSeated = kitchenOrder && !kitchenOrder.checked_in_at;
+                
+                let buttonsHTML = '<div class="grid grid-cols-2 gap-3 mt-6" id="orderActionButtons">';
+                
+                // If kitchen order and not seated yet, show CONFIRM SEATED button prominently
+                if (isNotSeated) {
+                    buttonsHTML += `
+                        <button onclick="confirmGuestSeated()" class="col-span-2 bg-green-600 hover:bg-green-700 text-white py-6 rounded-xl font-black text-lg shadow-lg animate-pulse">
+                            <i class="fas fa-chair mr-2"></i>🪑 CONFIRM GUEST SEATED
                         </button>
-                        <button onclick="closeTableModal()" class="bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold">
-                            <i class="fas fa-times mr-2"></i>Cancel
-                        </button>
-                        <button onclick="sendToKitchen()" class="bg-orange-600 hover:bg-orange-700 text-white py-4 rounded-xl font-bold">
-                            <i class="fas fa-paper-plane mr-2"></i>Send to Kitchen
-                        </button>
-                        <button onclick="checkoutTable()" class="btn-accent text-black py-4 rounded-xl font-bold">
-                            <i class="fas fa-check-circle mr-2"></i>Checkout & Clear
-                        </button>
-                    </div>
+                    `;
+                }
+                
+                buttonsHTML += `
+                    <button onclick="showMenuModal()" class="bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-bold">
+                        <i class="fas fa-plus-circle mr-2"></i>Add Items
+                    </button>
+                    <button onclick="closeTableModal()" class="bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold">
+                        <i class="fas fa-times mr-2"></i>Cancel
+                    </button>
+                    <button onclick="sendToKitchen()" class="bg-orange-600 hover:bg-orange-700 text-white py-4 rounded-xl font-bold">
+                        <i class="fas fa-paper-plane mr-2"></i>Send to Kitchen
+                    </button>
+                    <button onclick="checkoutTable()" class="btn-accent text-black py-4 rounded-xl font-bold">
+                        <i class="fas fa-check-circle mr-2"></i>Checkout & Clear
+                    </button>
+                </div>
                 `;
                 container.insertAdjacentHTML('afterend', buttonsHTML);
                 
@@ -1259,6 +1274,143 @@
             }
             
             document.getElementById('tableDetailModal').classList.remove('hidden');
+        }
+
+        async function checkoutTable() {
+            if (!currentTable || !currentTable.current_order) return;
+            
+            if (!confirm('Checkout guests and clear this table?')) {
+                return;
+            }
+            
+            try {
+                console.log('[checkoutTable] Starting checkout for table:', currentTable.table_number);
+                
+                // Find ALL orders for this table (both kitchen and waiter)
+                const tableNumber = currentTable.table_number;
+                const kitchenOrderForTable = orders.find(o => 
+                    String(o.table_number) === String(tableNumber) && 
+                    o.source === 'kitchen'
+                );
+                const waiterOrderForTable = orders.find(o => 
+                    String(o.table_number) === String(tableNumber) && 
+                    o.source === 'waiter'
+                );
+                
+                console.log('[checkoutTable] Found orders - Kitchen:', kitchenOrderForTable?.order_id, 'Waiter:', waiterOrderForTable?.order_id);
+                
+                let kitchenSuccess = true;
+                let waiterSuccess = true;
+                
+                // Checkout kitchen order if it exists
+                if (kitchenOrderForTable) {
+                    console.log('[checkoutTable] Checking out kitchen order:', kitchenOrderForTable.order_id);
+                    const voucherId = kitchenOrderForTable.order_id.replace('kitchen-', '');
+                    const response = await fetch('/api/waiter/checkout-table', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            voucher_id: voucherId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    kitchenSuccess = data.success;
+                    if (!kitchenSuccess) {
+                        console.error('[checkoutTable] Kitchen checkout failed:', data.error);
+                    }
+                }
+                
+                // Delete waiter order if it exists
+                if (waiterOrderForTable) {
+                    console.log('[checkoutTable] Deleting waiter order:', waiterOrderForTable.order_id);
+                    const response = await fetch(`/api/waiter/order/${waiterOrderForTable.order_id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-Property-ID': propertyId
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    waiterSuccess = data.success;
+                    if (!waiterSuccess) {
+                        console.error('[checkoutTable] Waiter order deletion failed:', data.error);
+                    }
+                }
+                
+                // Show result
+                if (kitchenSuccess && waiterSuccess) {
+                    console.log('[checkoutTable] All orders cleared successfully');
+                    alert('✓ Table checked out and cleared successfully!');
+                    closeTableModal();
+                    await loadTables();
+                    await loadOrders();
+                    renderFloorPlan();
+                    updateStats();
+                } else {
+                    const errors = [];
+                    if (!kitchenSuccess) errors.push('kitchen order');
+                    if (!waiterSuccess) errors.push('waiter order');
+                    alert(`Failed to clear ${errors.join(' and ')}`);
+                }
+            } catch (error) {
+                console.error('[checkoutTable] Error:', error);
+                alert('Failed to checkout table');
+            }
+        }
+        
+        async function confirmGuestSeated() {
+            if (!currentTable || !currentTable.kitchen_order) {
+                alert('This is not a kitchen order');
+                return;
+            }
+            
+            if (!confirm('Confirm that guest is now seated?')) {
+                return;
+            }
+            
+            try {
+                const kitchenOrder = orders.find(o => o.order_id === currentTable.current_order?.order_id);
+                if (!kitchenOrder) {
+                    alert('Kitchen order not found');
+                    return;
+                }
+                
+                const voucherId = kitchenOrder.order_id.replace('kitchen-', '');
+                
+                const response = await fetch('/api/waiter/confirm-seated', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Property-ID': propertyId
+                    },
+                    body: JSON.stringify({
+                        voucher_id: voucherId,
+                        waiter_id: currentWaiter.id,
+                        waiter_name: currentWaiter.name
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('Guest marked as seated!', 'success');
+                    playNotificationSound('item_added');
+                    closeTableModal();
+                    await loadTables();
+                    await loadOrders();
+                    renderFloorPlan();
+                    updateStats();
+                } else {
+                    alert('Failed to confirm seated: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Confirm seated error:', error);
+                alert('Failed to confirm guest seated');
+            }
         }
 
         async function checkoutTable() {
