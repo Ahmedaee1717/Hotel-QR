@@ -9645,6 +9645,13 @@ Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "
       WHERE menu_id = ? AND parsing_status = 'processing'
     `).bind(JSON.stringify(parsed), parsed.categories.length, totalItems, menu_id).run()
 
+    // CRITICAL: Update restaurant_menus.ocr_status to 'completed' so menu appears in menu-display
+    await DB.prepare(`
+      UPDATE restaurant_menus 
+      SET ocr_status = 'completed', ocr_processed_at = CURRENT_TIMESTAMP
+      WHERE menu_id = ?
+    `).bind(menu_id).run()
+
     return c.json({
       success: true,
       message: `Menu parsed! Found ${parsed.categories.length} categories with ${totalItems} items`,
@@ -9661,6 +9668,13 @@ Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "
       SET parsing_status = 'failed', error_message = ?
       WHERE menu_id = ? AND parsing_status = 'processing'
     `).bind(error.message, menu_id).run()
+    
+    // Update restaurant_menus status
+    await DB.prepare(`
+      UPDATE restaurant_menus 
+      SET ocr_status = 'failed'
+      WHERE menu_id = ?
+    `).bind(menu_id).run()
     
     return c.json({ error: 'Menu parsing failed: ' + error.message }, 500)
   }
@@ -10237,11 +10251,13 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
     }
     
     // Get menus with their categories and items
+    // Handle both numeric (2) and string (h2, H2) offering IDs
+    const numericId = /^[hH]/.test(String(offering_id)) ? String(offering_id).substring(1) : String(offering_id)
     const menus = await DB.prepare(`
       SELECT * FROM restaurant_menus
-      WHERE offering_id = ? AND ocr_status = 'completed'
+      WHERE (offering_id = ? OR offering_id = ?) AND ocr_status = 'completed'
       ORDER BY display_order, created_at
-    `).bind(offering_id).all()
+    `).bind(offering_id, numericId).all()
     
     const menusWithContent = []
     
