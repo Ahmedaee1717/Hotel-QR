@@ -70985,11 +70985,21 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       no_allergies_confirmed
     } = body
     
-    console.log('📱 Guest QR booking:', { room_number, guest_name, party_size, restaurant_id })
+    console.log('📱 Guest QR booking:', { room_number, guest_name, party_size, restaurant_id, table_id })
     
     // Validate required fields
     if (!room_number || !guest_name || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Get table_number from table_id if provided
+    let actual_table_number = null
+    if (table_id) {
+      const table = await DB.prepare(`
+        SELECT table_number FROM restaurant_tables WHERE table_id = ?
+      `).bind(table_id).first()
+      actual_table_number = table?.table_number || table_id
+      console.log('📍 Table lookup:', { table_id, table_number: actual_table_number })
     }
     
     // Look up or create a digital pass for this room
@@ -71065,8 +71075,11 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       quantity: i.quantity || 1
     }))
     
-    // Build special requests with allergy info
-    let special_requests = `📱 Guest order via QR code\nRoom: ${room_number}, Guest: ${guest_name}`
+    // Build special requests with allergy and table info
+    let special_requests = `📱 Guest order via QR code\nGuest: ${guest_name}, Room: ${room_number}`
+    if (actual_table_number) {
+      special_requests += `\nTable: ${actual_table_number}`
+    }
     if (allergy_info && allergy_info.trim()) {
       special_requests = `⚠️ ALLERGIES/DIETARY RESTRICTIONS: ${allergy_info}\n\n${special_requests}`
     } else if (no_allergies_confirmed) {
@@ -71101,7 +71114,7 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       reservation_date,
       reservation_time,
       party_size,
-      room_number, // Use room as table reference
+      actual_table_number, // Use the looked-up table_number
       JSON.stringify(preorder_items),
       special_requests,
       'confirmed'
