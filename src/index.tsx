@@ -73246,7 +73246,9 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                         '</div>' +
                         
                         // SEATED STATUS - PROMINENT DISPLAY
-                        (order.checked_in_at ? 
+                        // For kitchen orders: check checked_in_at
+                        // For waiter orders: automatically marked as seated (waiter seated them)
+                        ((order.checked_in_at || order.source === 'waiter') ? 
                             '<div class="mt-2 mb-2 inline-block px-6 py-2 bg-green-500 text-white font-black text-lg rounded-full shadow-lg">' +
                                 '<i class="fas fa-chair mr-2"></i>🪑 SEATED' +
                             '</div>'
