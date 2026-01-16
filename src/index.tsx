@@ -74512,7 +74512,7 @@ app.get('/api/waiter/orders', async (c) => {
       FROM waiter_orders wo
       INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       WHERE wo.restaurant_id = ?
-        AND wo.status IN ('pending', 'confirmed', 'preparing', 'ready')
+        AND wo.status IN ('pending', 'confirmed', 'seated', 'preparing', 'ready')
         AND DATE(wo.created_at) BETWEEN ? AND ?
     `
     
