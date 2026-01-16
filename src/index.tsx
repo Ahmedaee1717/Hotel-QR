@@ -9849,6 +9849,17 @@ app.post('/api/admin/restaurant/menu-categories/:category_id/items', async (c) =
   }
 })
 
+// Menu Edit Page - Simple redirect to API data for now
+app.get('/admin/restaurant/menu/:menu_id/edit', async (c) => {
+  const { menu_id } = c.req.param()
+  return c.redirect('/api/restaurant/menus/' + menu_id + '/items')
+})
+
+// Menu Translate Page - Simple message for now
+app.get('/admin/restaurant/menu/:menu_id/translate', async (c) => {
+  const { menu_id } = c.req.param()
+  return c.html('<html><body><h1>Translation feature coming soon</h1><p>Menu ID: ' + menu_id + '</p><a href="javascript:history.back()">Go Back</a></body></html>')
+})
 // Translate all menu items in a category
 app.post('/api/admin/restaurant/menu-categories/:category_id/translate', async (c) => {
   const { category_id } = c.req.param()
