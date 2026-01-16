@@ -1313,7 +1313,7 @@
 
         async function confirmMenuSelection() {
             const itemsToAdd = Object.entries(selectedMenuItems).map(([item_id, quantity]) => ({
-                item_id,
+                item_id: `rm_${item_id}`,  // Add rm_ prefix for extra charge items
                 quantity
             }));
             
