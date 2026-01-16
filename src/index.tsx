@@ -9852,7 +9852,8 @@ app.post('/api/admin/restaurant/menu-categories/:category_id/items', async (c) =
 // Menu Edit Page - Simple redirect to API data for now
 app.get('/admin/restaurant/menu/:menu_id/edit', async (c) => {
   const { menu_id } = c.req.param()
-  return c.redirect('/api/restaurant/menus/' + menu_id + '/items')
+  const restaurant_id = c.req.query('restaurant_id') || ''
+  return c.redirect('/menu-editor.html?menu_id=' + menu_id + (restaurant_id ? '&restaurant_id=' + restaurant_id : ''))
 })
 
 // Menu Translate Page - Simple message for now
@@ -67442,7 +67443,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       // Menu helper functions
       window.viewMenu = async function(menuId) {
-        window.location.href = '/admin/restaurant/menu/' + menuId + '/edit';
+        window.location.href = '/admin/restaurant/menu/' + menuId + '/edit?restaurant_id=' + offeringId;
       };
       
       window.deleteMenu = async function(menuId, menuName) {

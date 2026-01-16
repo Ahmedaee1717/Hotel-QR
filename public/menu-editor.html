@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="bg-gradient-to-r from-blue-700 to-indigo-700 text-white py-4 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <button onclick="goBack()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg">
+                        <i class="fas fa-arrow-left mr-2"></i>Back
+                    </button>
+                    <h1 class="text-2xl font-bold" id="pageTitle">Menu Editor</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Menu Categories & Items</h2>
+                <button onclick="addCategory()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">
+                    <i class="fas fa-plus mr-2"></i>Add Category
+                </button>
+            </div>
+            
+            <div id="categoriesList" class="space-y-4">
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                    <p>Loading menu...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      const menuId = urlParams.get('menu_id');
+      const restaurantId = urlParams.get('restaurant_id');
+      
+      if (!menuId) {
+        document.getElementById('categoriesList').innerHTML = 
+          '<div class="text-center py-12 text-red-500"><h2 class="text-xl font-bold">Error: No menu ID provided</h2></div>';
+      }
+      
+      function goBack() {
+        if (restaurantId) {
+          window.location.href = '/admin/restaurant/' + restaurantId;
+        } else {
+          window.history.back();
+        }
+      }
+      
+      async function loadMenu() {
+        try {
+          const response = await fetch('/api/restaurant/menus/' + menuId + '/items');
+          const data = await response.json();
+          
+          if (!data.success) {
+            throw new Error(data.error || 'Failed to load menu');
+          }
+          
+          // Update page title
+          document.getElementById('pageTitle').textContent = 'Edit Menu #' + menuId;
+          
+          const container = document.getElementById('categoriesList');
+          
+          if (!data.categories || data.categories.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">' +
+              '<i class="fas fa-utensils text-6xl mb-4 opacity-50"></i>' +
+              '<p class="text-lg">No categories yet</p>' +
+              '<p class="text-sm mt-2">Click "Add Category" to get started</p>' +
+              '</div>';
+            return;
+          }
+          
+          container.innerHTML = data.categories.map(function(category) {
+            var html = '<div class="border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition">';
+            html += '<div class="flex justify-between items-center mb-3">';
+            html += '<h3 class="text-lg font-bold text-gray-900">' + category.category_name + '</h3>';
+            html += '<div class="flex gap-2">';
+            html += '<button onclick="addItem(' + category.category_id + ')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition">';
+            html += '<i class="fas fa-plus mr-1"></i>Add Item</button>';
+            html += '<button onclick="editCategory(' + category.category_id + ', &quot;' + category.category_name.replace(/"/g, '&quot;') + '&quot;)" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition">';
+            html += '<i class="fas fa-edit"></i></button>';
+            html += '<button onclick="deleteCategory(' + category.category_id + ', &quot;' + category.category_name.replace(/"/g, '&quot;') + '&quot;)" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition">';
+            html += '<i class="fas fa-trash"></i></button>';
+            html += '</div></div>';
+            
+            if (category.items && category.items.length > 0) {
+              html += '<div class="space-y-2">';
+              category.items.forEach(function(item) {
+                html += '<div class="flex justify-between items-center bg-gray-50 p-3 rounded hover:bg-gray-100 transition">';
+                html += '<div class="flex-1">';
+                html += '<div class="font-semibold text-gray-900">' + item.item_name + '</div>';
+                if (item.description) {
+                  html += '<div class="text-sm text-gray-600">' + item.description + '</div>';
+                }
+                html += '<div class="text-xs text-gray-500 mt-1">';
+                if (item.is_vegetarian) html += '<span class="mr-2">🌱 Vegetarian</span>';
+                if (item.is_vegan) html += '<span class="mr-2">🌿 Vegan</span>';
+                if (item.is_gluten_free) html += '<span class="mr-2">🌾 Gluten-Free</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="flex items-center gap-3">';
+                html += '<span class="font-bold text-green-700 text-lg">$' + (item.price || 0).toFixed(2) + '</span>';
+                html += '<button onclick="editItem(' + item.item_id + ')" class="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded text-sm transition">';
+                html += '<i class="fas fa-edit"></i></button>';
+                html += '<button onclick="deleteItem(' + item.item_id + ')" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm transition">';
+                html += '<i class="fas fa-trash"></i></button>';
+                html += '</div></div>';
+              });
+              html += '</div>';
+            } else {
+              html += '<p class="text-sm text-gray-500 italic">No items in this category - click "Add Item" to add one</p>';
+            }
+            
+            html += '</div>';
+            return html;
+          }).join('');
+          
+          console.log('✅ Loaded', data.categories.length, 'categories');
+        } catch (error) {
+          console.error('Error loading menu:', error);
+          document.getElementById('categoriesList').innerHTML = 
+            '<div class="text-center py-12 text-red-500">' +
+            '<i class="fas fa-exclamation-circle text-5xl mb-4"></i>' +
+            '<p class="text-lg font-semibold">Error loading menu</p>' +
+            '<p class="text-sm mt-2">' + error.message + '</p>' +
+            '</div>';
+        }
+      }
+      
+      async function addCategory() {
+        const name = prompt('Enter category name (e.g., "Appetizers", "Main Course", "Desserts"):');
+        if (!name || !name.trim()) return;
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/menus/' + menuId + '/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category_name: name.trim() })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            alert('✅ Category "' + name + '" added successfully!');
+            await loadMenu();
+          } else {
+            alert('❌ Failed to add category: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          alert('❌ Error: ' + error.message);
+        }
+      }
+      
+      async function editCategory(categoryId, currentName) {
+        const name = prompt('Edit category name:', currentName);
+        if (!name || !name.trim() || name === currentName) return;
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category_name: name.trim() })
+          });
+          
+          if (response.ok) {
+            alert('✅ Category updated!');
+            await loadMenu();
+          } else {
+            alert('❌ Failed to update category');
+          }
+        } catch (error) {
+          alert('❌ Error: ' + error.message);
+        }
+      }
+      
+      async function deleteCategory(categoryId, name) {
+        if (!confirm('Delete category "' + name + '" and ALL its items? This cannot be undone.')) return;
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId, {
+            method: 'DELETE'
+          });
+          
+          if (response.ok) {
+            alert('✅ Category deleted!');
+            await loadMenu();
+          } else {
+            alert('❌ Failed to delete category');
+          }
+        } catch (error) {
+          alert('❌ Error: ' + error.message);
+        }
+      }
+      
+      async function addItem(categoryId) {
+        const name = prompt('Enter item name:');
+        if (!name || !name.trim()) return;
+        
+        const price = prompt('Enter price (e.g., 12.99):');
+        if (price === null) return;
+        
+        const description = prompt('Enter description (optional):') || '';
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/menu-categories/' + categoryId + '/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              item_name: name.trim(),
+              description: description.trim(),
+              price: parseFloat(price) || 0
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            alert('✅ Item "' + name + '" added successfully!');
+            await loadMenu();
+          } else {
+            alert('❌ Failed to add item: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          alert('❌ Error: ' + error.message);
+        }
+      }
+      
+      async function editItem(itemId) {
+        alert('Edit item feature coming soon! Item ID: ' + itemId);
+        // TODO: Create a modal form for editing item details
+      }
+      
+      async function deleteItem(itemId) {
+        if (!confirm('Delete this item?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/restaurant/menu-items/' + itemId, {
+            method: 'DELETE'
+          });
+          
+          if (response.ok) {
+            alert('✅ Item deleted!');
+            await loadMenu();
+          } else {
+            alert('❌ Failed to delete item');
+          }
+        } catch (error) {
+          alert('❌ Error: ' + error.message);
+        }
+      }
+      
+      // Load menu on page load
+      if (menuId) {
+        loadMenu();
+      }
+    </script>
+</body>
+</html>
