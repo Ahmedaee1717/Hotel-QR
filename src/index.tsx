@@ -74827,11 +74827,26 @@ app.get('/api/waiter/orders', async (c) => {
         for (const item of preorderItems) {
           if (!item || !item.item_id) continue
           
-          const menuItem = await DB.prepare(`
-            SELECT item_name, cost_to_hotel as cost
-            FROM alacarte_menu_items
-            WHERE item_id = ?
-          `).bind(item.item_id).first()
+          const itemId = String(item.item_id)
+          let menuItem = null
+          
+          // Check if this is an extra charge item (starts with 'rm_' or is a string)
+          if (itemId.startsWith('rm_')) {
+            // Extra charge item from menu_items table
+            const numericId = itemId.replace('rm_', '')
+            menuItem = await DB.prepare(`
+              SELECT item_name, price as cost
+              FROM menu_items
+              WHERE item_id = ?
+            `).bind(numericId).first()
+          } else {
+            // Regular set menu item from alacarte_menu_items
+            menuItem = await DB.prepare(`
+              SELECT item_name, cost_to_hotel as cost
+              FROM alacarte_menu_items
+              WHERE item_id = ?
+            `).bind(item.item_id).first()
+          }
           
           if (menuItem) {
             items.push({

@@ -870,8 +870,30 @@
                 const container = document.getElementById('orderItemsList');
                 
                 if (order.source === 'kitchen') {
-                    // Kitchen order - can't modify existing items, but can add new ones
-                    container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">Kitchen order - view in kitchen dashboard</div>';
+                    // Kitchen order - fetch full details from orders list
+                    const fullOrder = orders.find(o => o.order_id === order.order_id);
+                    
+                    if (fullOrder && fullOrder.items && fullOrder.items.length > 0) {
+                        container.innerHTML = fullOrder.items.map(item => {
+                            const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
+                            return `
+                                <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                                    <div class="flex-1">
+                                        <div class="font-bold dark-text">${item.item_name}</div>
+                                        <div class="text-xs text-slate-400">
+                                            ${isExtraCharge ? '💰 Extra Charge' : '✓ Set Menu'}
+                                            ${item.cost > 0 ? ` - €${item.cost.toFixed(2)}` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items in this order</div>';
+                    }
                 } else {
                     // Waiter order - show items
                     if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
