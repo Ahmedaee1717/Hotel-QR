@@ -859,9 +859,13 @@
             
             document.getElementById('modalTableNumber').textContent = currentTable.table_number;
             
+            // Clear any existing dynamic buttons first to prevent duplicates
+            const existingButtons = document.querySelectorAll('#orderItemsList ~ .grid');
+            existingButtons.forEach(btn => btn.remove());
+            
             // Check if table has kitchen order (dining)
             if (currentTable.kitchen_order) {
-                // Show kitchen order details with checkout option
+                // Show kitchen order details with ADD ITEMS option
                 document.getElementById('guestSeatingSection').classList.add('hidden');
                 document.getElementById('currentOrderSection').classList.remove('hidden');
                 
@@ -892,21 +896,28 @@
                     </div>
                 `).join('');
                 
-                // Change buttons to show checkout instead of add items
+                // CHANGED: Show Add Items, Send to Kitchen, and Clear Table buttons for kitchen orders
                 const buttonsHTML = `
-                    <div class="grid grid-cols-2 gap-3 mt-6">
-                        <button onclick="checkoutTable()" class="btn-accent text-black py-4 rounded-xl font-bold">
-                            <i class="fas fa-check-circle mr-2"></i>Checkout & Clear
+                    <div class="grid grid-cols-2 gap-3 mt-6" id="kitchenOrderButtons">
+                        <button onclick="showMenuModal()" class="bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-xl font-bold">
+                            <i class="fas fa-plus-circle mr-2"></i>Add Items
                         </button>
                         <button onclick="closeTableModal()" class="bg-slate-700 hover:bg-slate-600 text-white py-4 rounded-xl font-bold">
                             <i class="fas fa-times mr-2"></i>Cancel
+                        </button>
+                        <button onclick="sendToKitchen()" class="bg-orange-600 hover:bg-orange-700 text-white py-4 rounded-xl font-bold">
+                            <i class="fas fa-paper-plane mr-2"></i>Send to Kitchen
+                        </button>
+                        <button onclick="checkoutTable()" class="btn-accent text-black py-4 rounded-xl font-bold">
+                            <i class="fas fa-check-circle mr-2"></i>Checkout & Clear
                         </button>
                     </div>
                 `;
                 container.insertAdjacentHTML('afterend', buttonsHTML);
                 
-                // Hide add items button
-                document.querySelector('button[onclick="showMenuModal()"]').style.display = 'none';
+                // CHANGED: Show add items button for kitchen orders too
+                const addItemsBtn = document.querySelector('button[onclick="showMenuModal()"]');
+                if (addItemsBtn) addItemsBtn.style.display = 'block';
                 
             } else if (currentTable.current_order) {
                 // Show current waiter order
@@ -924,7 +935,8 @@
                 document.getElementById('currentOrderStatus').textContent = currentOrder.status.toUpperCase();
                 
                 // Show add items button
-                document.querySelector('button[onclick="showMenuModal()"]').style.display = 'block';
+                const addItemsBtn = document.querySelector('button[onclick="showMenuModal()"]');
+                if (addItemsBtn) addItemsBtn.style.display = 'block';
                 
                 renderOrderItems();
             } else {
@@ -1196,6 +1208,18 @@
                 console.error('Update item error:', error);
                 alert('Failed to update item');
             }
+        }
+
+        async function sendToKitchen() {
+            // For kitchen orders (existing dining guests), just send new items
+            if (currentTable && currentTable.kitchen_order) {
+                alert('Items will be added to the existing kitchen order!');
+                closeTableModal();
+                return;
+            }
+            
+            // For waiter orders, use existing sendOrderToKitchen
+            await sendOrderToKitchen();
         }
 
         async function sendOrderToKitchen() {
