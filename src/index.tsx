@@ -64636,6 +64636,13 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             setTodayDate();
             setCurrentTime();
             
+            // Reset submit button state
+            const submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-check-double mr-2"></i>Confirm Booking';
+            }
+            
             // Hide success modal
             safeAddClass('successModal', 'hidden');
             
