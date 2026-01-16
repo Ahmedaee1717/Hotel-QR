@@ -870,8 +870,23 @@
                 const container = document.getElementById('orderItemsList');
                 
                 if (order.source === 'kitchen') {
-                    // Kitchen order - fetch full details from orders list
+                    // Kitchen order - fetch full details from orders list and create temp waiter order for adding items
                     const fullOrder = orders.find(o => o.order_id === order.order_id);
+                    
+                    // Create a temporary waiter order structure so we can add extra items
+                    // Kitchen orders can't be modified directly, but we can create a parallel waiter order
+                    currentOrder = {
+                        order_id: null, // Will be created when first item is added
+                        table_id: currentTable.table_id,
+                        restaurant_id: restaurantId,
+                        waiter_id: currentWaiter.id,
+                        guest_name: order.guest_name,
+                        party_size: order.party_size,
+                        items: [], // Start with empty items for extras
+                        total_cost: 0,
+                        status: 'pending',
+                        source: 'waiter'
+                    };
                     
                     if (fullOrder && fullOrder.items && fullOrder.items.length > 0) {
                         container.innerHTML = fullOrder.items.map(item => {
@@ -896,6 +911,7 @@
                     }
                 } else {
                     // Waiter order - show items
+                    currentOrder = order;
                     if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
                         renderOrderItems();
                     } else {
@@ -1155,6 +1171,36 @@
             }
             
             try {
+                // If this is a new order (no order_id), we need to create it first
+                if (!currentOrder.order_id) {
+                    // This is a kitchen order table - create a new waiter order for extras
+                    const seatResponse = await fetch('/api/waiter/seat-guests', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            table_id: currentOrder.table_id,
+                            restaurant_id: currentOrder.restaurant_id,
+                            waiter_id: currentOrder.waiter_id,
+                            guest_name: currentOrder.guest_name,
+                            party_size: currentOrder.party_size,
+                            room_number: ''
+                        })
+                    });
+                    
+                    const seatData = await seatResponse.json();
+                    
+                    if (!seatData.success) {
+                        alert('Failed to create order: ' + (seatData.error || 'Unknown error'));
+                        return;
+                    }
+                    
+                    currentOrder.order_id = seatData.order.order_id;
+                }
+                
+                // Now add items to the order
                 const response = await fetch('/api/waiter/add-items', {
                     method: 'POST',
                     headers: {
@@ -1173,7 +1219,9 @@
                     currentOrder = data.order;
                     renderOrderItems();
                     closeMenuModal();
-                    loadOrders();
+                    await loadTables();
+                    await loadOrders();
+                    alert('✓ Items added successfully!');
                 } else {
                     alert('Failed to add items: ' + (data.error || 'Unknown error'));
                 }
