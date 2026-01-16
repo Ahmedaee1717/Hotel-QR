@@ -1251,10 +1251,15 @@
                 
                 if (data.success) {
                     currentOrder = data.order;
-                    renderOrderItems();
                     closeMenuModal();
+                    
+                    // Refresh data
                     await loadTables();
                     await loadOrders();
+                    
+                    // Re-render the modal with updated data
+                    await openTableModal(currentTable.table_id);
+                    
                     alert('✓ Items added successfully!');
                 } else {
                     alert('Failed to add items: ' + (data.error || 'Unknown error'));
