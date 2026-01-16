@@ -654,899 +654,478 @@ app.get('/', (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GuestConnect - The Complete Guest Experience Platform for Modern Hotels</title>
-    <meta name="description" content="Transform your hotel operations with GuestConnect. One QR code per room gives guests instant access to all services. From $49/month.">
+    <title>Old Palace Resort - Where Timeless Elegance Meets Tomorrow</title>
+    <meta name="description" content="Experience the future of luxury hospitality at Old Palace Resort. A five-star destination where heritage meets innovation.">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#016e8f',
-                        secondary: '#f6f2e9',
-                        accent: '#aecfb4',
+                        palace: {
+                            burgundy: '#8B1538',
+                            gold: '#D4AF37',
+                            cream: '#F5F1E8',
+                            dark: '#2D1B1F',
+                        }
                     }
                 }
             }
         }
     </script>
     <style>
-        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-        .gradient-hero { background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%); }
-        .gradient-text { background: linear-gradient(135deg, #016e8f 0%, #014a5e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .feature-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-        .feature-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(1, 110, 143, 0.15); }
-        .stat-card { transition: all 0.3s ease; }
-        .stat-card:hover { transform: scale(1.05); }
-        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
-        .float-animation { animation: float 6s ease-in-out infinite; }
-        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: #016e8f; cursor: pointer; border-radius: 50%; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-        .roi-slider::-moz-range-thumb { width: 24px; height: 24px; background: #016e8f; cursor: pointer; border-radius: 50%; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Montserrat', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background: #0a0a0a;
+        }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Cormorant Garamond', serif; }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #2D1B1F 0%, #1a0d11 50%, #0a0a0a 100%);
+            position: relative;
+        }
+        
+        .gold-gradient {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #D4AF37 100%);
+        }
+        
+        .text-gradient {
+            background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #F5F1E8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .luxury-glow {
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.3), 0 0 80px rgba(212, 175, 55, 0.1);
+        }
+        
+        .card-hover {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 30px 60px rgba(212, 175, 55, 0.2);
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(5deg); }
+        }
+        
+        @keyframes pulse-gold {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        
+        .shimmer {
+            background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
+            background-size: 1000px 100%;
+            animation: shimmer 3s infinite;
+        }
+        
+        .float-animation {
+            animation: float 8s ease-in-out infinite;
+        }
+        
+        .pulse-gold {
+            animation: pulse-gold 3s ease-in-out infinite;
+        }
+        
+        .glass-effect {
+            background: rgba(45, 27, 31, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+        
+        .ornamental {
+            position: relative;
+        }
+        
+        .ornamental::before,
+        .ornamental::after {
+            content: '✦';
+            color: #D4AF37;
+            font-size: 1.5rem;
+            opacity: 0.5;
+        }
+        
+        .ornamental::before {
+            margin-right: 1rem;
+        }
+        
+        .ornamental::after {
+            margin-left: 1rem;
+        }
+        
+        /* Futuristic grid background */
+        .cyber-grid {
+            background-image: 
+                linear-gradient(rgba(212, 175, 55, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(212, 175, 55, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
     </style>
 </head>
-<body class="bg-white">
+<body class="bg-black text-white">
     <!-- Navigation -->
-    <nav class="fixed top-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-200 z-[1001] shadow-sm">
+    <nav class="fixed top-0 w-full glass-effect z-[1001] border-b border-palace-gold/20">
         <div class="max-w-7xl mx-auto px-6 lg:px-8">
             <div class="flex justify-between items-center h-24">
-                <div class="flex items-center">
-                    <img src="/guestconnect-logo-transparent.png" alt="GuestConnect Logo" class="h-16 w-auto">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-gradient-to-br from-palace-gold to-yellow-600 rounded-full flex items-center justify-center luxury-glow">
+                            <span class="text-palace-dark font-bold text-xl">OP</span>
+                        </div>
+                        <div>
+                            <div class="text-palace-gold font-bold text-lg tracking-wider" style="font-family: 'Cormorant Garamond', serif;">OLD PALACE</div>
+                            <div class="text-palace-gold/60 text-xs tracking-widest">RESORT</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="hidden md:flex items-center space-x-6">
-                    <a href="#features" class="text-sm font-medium text-gray-700 hover:text-primary transition">Features</a>
-                    <a href="#pricing" class="text-sm font-medium text-gray-700 hover:text-primary transition">Pricing</a>
-                    <a href="#ai-chatbot" class="text-sm font-medium text-gray-700 hover:text-primary transition">AI Chatbot</a>
-                    <a href="/blog" class="text-sm font-medium text-gray-700 hover:text-primary transition">Blog</a>
-                    <a href="/admin/login" class="text-sm font-medium text-gray-700 hover:text-primary transition">Login</a>
-                    <a href="/face-scan-feature" class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transform hover:scale-105 transition border-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
-                        <img src="/onepass-logo.png" alt="OnePass" style="height: 16px; filter: brightness(0) invert(1);">
-                        <span>OnePass</span>
-                    </a>
-                    <a href="/superadmin/login" class="bg-primary text-white px-6 py-2.5 rounded-lg hover:bg-[#014a5e] transition text-sm font-semibold shadow-md hover:shadow-lg">
-                        Start Free Trial
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#experience" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Experience</a>
+                    <a href="#dining" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Dining</a>
+                    <a href="#wellness" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Wellness</a>
+                    <a href="#contact" class="text-sm font-medium text-palace-cream/80 hover:text-palace-gold transition">Contact</a>
+                    <a href="/admin/login" class="px-6 py-2.5 gold-gradient text-palace-dark rounded-lg font-bold text-sm shadow-lg hover:shadow-xl transform hover:scale-105 transition">
+                        Guest Portal
                     </a>
                 </div>
-                <!-- Mobile Menu Button -->
-                <button class="md:hidden text-gray-700" onclick="toggleMobileMenu()">
+                <button class="md:hidden text-palace-gold" onclick="toggleMobileMenu()">
                     <i class="fas fa-bars text-2xl"></i>
                 </button>
-            </div>
-        </div>
-        <!-- Mobile Menu -->
-        <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-200">
-            <div class="px-6 py-4 space-y-3">
-                <a href="#features" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Features</a>
-                <a href="#pricing" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Pricing</a>
-                <a href="#ai-chatbot" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">AI Chatbot</a>
-                <a href="/blog" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Blog</a>
-                <a href="/admin/login" class="block text-sm font-medium text-gray-700 hover:text-primary py-2">Login</a>
-                <a href="/face-scan-feature" class="flex items-center justify-center gap-2 text-white px-6 py-3 rounded-lg font-bold border-2 mb-2" style="background: linear-gradient(135deg, #1e3a5f 0%, #16304d 100%); border-color: #00d4aa;">
-                    <img src="/onepass-logo.png" alt="OnePass" style="height: 18px; filter: brightness(0) invert(1);">
-                    <span>OnePass</span>
-                </a>
-                <a href="/superadmin/login" class="block bg-primary text-white px-6 py-3 rounded-lg text-center font-semibold">Start Free Trial</a>
             </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section class="pt-32 pb-24 px-6 gradient-hero relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-20 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
-            <div class="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl"></div>
+    <section class="pt-32 pb-24 px-6 hero-gradient relative overflow-hidden min-h-screen flex items-center cyber-grid">
+        <!-- Animated background elements -->
+        <div class="absolute inset-0 opacity-20">
+            <div class="absolute top-20 left-10 w-96 h-96 bg-palace-gold rounded-full blur-[150px] pulse-gold"></div>
+            <div class="absolute bottom-20 right-10 w-[500px] h-[500px] bg-palace-burgundy rounded-full blur-[200px] pulse-gold" style="animation-delay: 1.5s;"></div>
+            <div class="absolute top-1/2 left-1/2 w-64 h-64 bg-palace-gold/30 rounded-full blur-[100px]"></div>
         </div>
-        <div class="max-w-7xl mx-auto relative z-10">
+        
+        <!-- Decorative lines -->
+        <div class="absolute top-0 left-0 w-full h-1 gold-gradient shimmer"></div>
+        <div class="absolute bottom-0 left-0 w-full h-1 gold-gradient shimmer" style="animation-delay: 1.5s;"></div>
+        
+        <div class="max-w-7xl mx-auto relative z-10 w-full">
             <div class="grid lg:grid-cols-2 gap-16 items-center">
-                <div class="text-white">
-                    <div class="inline-block mb-4 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
-                        <i class="fas fa-rocket mr-2"></i>Modern Guest Experience Platform
+                <div class="text-center lg:text-left">
+                    <!-- Ornamental badge -->
+                    <div class="inline-flex items-center gap-2 mb-8 px-6 py-3 glass-effect rounded-full border border-palace-gold/30">
+                        <span class="w-2 h-2 bg-palace-gold rounded-full animate-pulse"></span>
+                        <span class="text-palace-gold text-sm font-medium tracking-wider">EST. 1924</span>
                     </div>
-                    <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-                        One QR Code.<br/>
-                        <span class="text-accent">Everything Connected.</span>
+                    
+                    <h1 class="text-6xl md:text-7xl lg:text-8xl font-bold mb-8 leading-tight" style="font-family: 'Cormorant Garamond', serif;">
+                        Where <span class="text-gradient">Timeless</span>
+                        <br/>Elegance
+                        <br/>Meets <span class="text-gradient">Tomorrow</span>
                     </h1>
-                    <p class="text-xl md:text-2xl text-white/90 mb-8 leading-relaxed font-light">
-                        Give your guests instant access to all hotel services. No app downloads. No printed menus. Just scan and explore.
+                    
+                    <p class="text-xl md:text-2xl text-palace-cream/70 mb-12 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                        Step into a world where heritage and innovation intertwine. Experience unparalleled luxury at Egypt's most prestigious resort destination.
                     </p>
-                    <div class="flex flex-col sm:flex-row gap-4 mb-12">
-                        <a href="/superadmin/login" class="bg-white text-primary px-8 py-4 rounded-lg hover:bg-accent hover:text-white transition font-bold text-lg shadow-xl hover:shadow-2xl transform hover:scale-105 text-center">
-                            <i class="fas fa-rocket mr-2"></i>Start Free Trial
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
+                        <a href="#experience" class="group relative px-10 py-5 gold-gradient text-palace-dark rounded-xl font-bold text-lg shadow-2xl hover:shadow-palace-gold/50 transition-all overflow-hidden">
+                            <span class="relative z-10 flex items-center justify-center gap-2">
+                                <i class="fas fa-crown"></i>
+                                Explore Experience
+                            </span>
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                         </a>
-                        <a href="#demo" class="bg-white/10 backdrop-blur-sm text-white px-8 py-4 rounded-lg hover:bg-white/20 transition font-semibold text-lg border-2 border-white/30 text-center">
-                            <i class="fas fa-play-circle mr-2"></i>Watch Demo
+                        <a href="#contact" class="px-10 py-5 glass-effect text-palace-gold rounded-xl font-bold text-lg border-2 border-palace-gold/30 hover:border-palace-gold transition-all flex items-center justify-center gap-2">
+                            <i class="fas fa-phone-alt"></i>
+                            Reserve Now
                         </a>
                     </div>
-                    <div class="flex items-center gap-8 text-white/80 text-sm">
+                    
+                    <div class="flex items-center gap-8 text-palace-cream/60 text-sm justify-center lg:justify-start flex-wrap">
                         <div class="flex items-center gap-2">
-                            <i class="fas fa-check-circle text-accent"></i>
-                            <span>14-day free trial</span>
+                            <i class="fas fa-star text-palace-gold"></i>
+                            <span>5-Star Luxury</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <i class="fas fa-check-circle text-accent"></i>
-                            <span>No credit card required</span>
+                            <i class="fas fa-award text-palace-gold"></i>
+                            <span>Award Winning</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <i class="fas fa-check-circle text-accent"></i>
-                            <span>Setup in 5 minutes</span>
+                            <i class="fas fa-globe text-palace-gold"></i>
+                            <span>Global Recognition</span>
                         </div>
                     </div>
                 </div>
-                <div class="float-animation">
-                    <div class="bg-gradient-to-br from-white to-secondary/30 rounded-3xl shadow-2xl p-10 border-2 border-accent/20 backdrop-blur-sm relative overflow-hidden group hover:shadow-3xl transition-all duration-500">
-                        <!-- Decorative corner elements -->
-                        <div class="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
-                        <div class="absolute bottom-0 left-0 w-32 h-32 bg-primary/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                
+                <!-- Hero Visual -->
+                <div class="float-animation relative">
+                    <div class="glass-effect rounded-3xl p-12 border-2 border-palace-gold/30 shadow-2xl luxury-glow relative overflow-hidden">
+                        <!-- Shimmer effect -->
+                        <div class="absolute inset-0 shimmer"></div>
                         
-                        <div class="text-center mb-8 relative z-10">
-                            <!-- Circular QR Code with animated ring -->
-                            <div class="relative inline-block mb-6">
-                                <!-- Animated outer ring -->
-                                <div class="absolute inset-0 -m-4 rounded-full border-4 border-accent/30 animate-spin-slow"></div>
-                                <div class="absolute inset-0 -m-6 rounded-full border-2 border-primary/20 animate-pulse"></div>
-                                
-                                <!-- Circular QR Code container -->
-                                <div class="relative w-56 h-56 rounded-full bg-gradient-to-br from-white to-secondary shadow-xl flex items-center justify-center border-4 border-accent group-hover:scale-105 transition-transform duration-500">
-                                    <img src="/guestconnect-logo.png" alt="QR Code" class="w-44 h-44 rounded-full p-2">
+                        <!-- Main emblem -->
+                        <div class="relative z-10">
+                            <div class="text-center mb-8">
+                                <div class="inline-block relative mb-6">
+                                    <!-- Rotating ring -->
+                                    <div class="absolute inset-0 -m-8 rounded-full border-4 border-palace-gold/20" style="animation: spin 20s linear infinite;"></div>
+                                    <div class="absolute inset-0 -m-6 rounded-full border-2 border-palace-gold/40 animate-pulse"></div>
+                                    
+                                    <!-- Central emblem -->
+                                    <div class="relative w-64 h-64 rounded-full bg-gradient-to-br from-palace-burgundy via-palace-dark to-black shadow-2xl flex items-center justify-center border-4 border-palace-gold/50 card-hover">
+                                        <div class="text-center">
+                                            <div class="text-palace-gold text-7xl mb-2" style="font-family: 'Cormorant Garamond', serif;">OP</div>
+                                            <div class="text-palace-gold text-xs tracking-[0.3em]">OLD PALACE</div>
+                                            <div class="text-palace-gold/60 text-[10px] tracking-[0.2em] mt-1">RESORT</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Decorative stars -->
+                                    <div class="absolute -top-4 -right-4 text-palace-gold text-2xl animate-pulse">✦</div>
+                                    <div class="absolute -bottom-4 -left-4 text-palace-gold text-xl animate-pulse" style="animation-delay: 0.5s;">✦</div>
+                                    <div class="absolute top-1/2 -left-8 text-palace-gold/50 text-sm animate-pulse" style="animation-delay: 1s;">✦</div>
+                                    <div class="absolute top-1/2 -right-8 text-palace-gold/50 text-sm animate-pulse" style="animation-delay: 1.5s;">✦</div>
                                 </div>
                                 
-                                <!-- Decorative dots -->
-                                <div class="absolute -top-2 -right-2 w-6 h-6 bg-accent rounded-full animate-bounce shadow-lg"></div>
-                                <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-primary rounded-full animate-bounce shadow-lg" style="animation-delay: 0.3s;"></div>
+                                <h3 class="text-3xl font-bold text-palace-gold mb-3 ornamental" style="font-family: 'Cormorant Garamond', serif;">
+                                    Your Digital Gateway
+                                </h3>
+                                <p class="text-lg text-palace-cream/60">Scan. Experience. Indulge.</p>
                             </div>
                             
-                            <h3 class="text-3xl font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">Scan to Explore</h3>
-                            <p class="text-lg text-gray-600 font-medium">Room 305 - Paradise Resort</p>
-                            <div class="mt-4 inline-flex items-center gap-2 text-sm text-gray-500">
-                                <i class="fas fa-qrcode text-primary"></i>
-                                <span>Point your camera at the QR code</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Service cards grid with enhanced effects -->
-                        <div class="grid grid-cols-3 gap-4 pt-8 border-t-2 border-accent/20 relative z-10">
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-utensils text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Restaurants</p>
-                            </div>
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-umbrella-beach text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Beach</p>
-                            </div>
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-spa text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Spa</p>
-                            </div>
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-concierge-bell text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Room Service</p>
-                            </div>
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-hiking text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Activities</p>
-                            </div>
-                            <div class="service-card text-center p-4 bg-white rounded-xl hover:bg-gradient-to-br hover:from-primary hover:to-[#014a5e] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 hover:shadow-xl border-2 border-gray-100 hover:border-accent group/card">
-                                <i class="fas fa-info-circle text-3xl text-primary mb-2 group-hover/card:text-white transition-colors"></i>
-                                <p class="text-sm font-bold text-gray-700 group-hover/card:text-white transition-colors">Info</p>
+                            <!-- Service grid -->
+                            <div class="grid grid-cols-3 gap-4 pt-8 border-t border-palace-gold/20">
+                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
+                                    <i class="fas fa-utensils text-3xl text-palace-gold mb-2"></i>
+                                    <p class="text-xs font-semibold text-palace-cream/80">Fine Dining</p>
+                                </div>
+                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
+                                    <i class="fas fa-spa text-3xl text-palace-gold mb-2"></i>
+                                    <p class="text-xs font-semibold text-palace-cream/80">Wellness</p>
+                                </div>
+                                <div class="text-center p-4 glass-effect rounded-xl hover:bg-palace-burgundy/30 transition-all cursor-pointer transform hover:scale-105 border border-palace-gold/10 hover:border-palace-gold/30">
+                                    <i class="fas fa-concierge-bell text-3xl text-palace-gold mb-2"></i>
+                                    <p class="text-xs font-semibold text-palace-cream/80">Concierge</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Add custom animations -->
                 <style>
-                    @keyframes spin-slow {
+                    @keyframes spin {
                         from { transform: rotate(0deg); }
                         to { transform: rotate(360deg); }
-                    }
-                    .animate-spin-slow {
-                        animation: spin-slow 20s linear infinite;
                     }
                 </style>
             </div>
         </div>
     </section>
 
-    <!-- Platform Benefits Section -->
-    <section class="py-20 px-6 bg-gradient-to-br from-gray-50 via-white to-secondary relative overflow-hidden">
-        <!-- Decorative elements -->
-        <div class="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-0 left-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
-        
+    <!-- Experience Section -->
+    <section id="experience" class="py-24 px-6 relative cyber-grid" style="background: linear-gradient(180deg, #0a0a0a 0%, #1a0d11 50%, #0a0a0a 100%);">
         <div class="max-w-7xl mx-auto relative z-10">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                    Why Hotel Managers Choose <span class="gradient-text">GuestConnect</span>
-                </h2>
-                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-                    Real benefits that transform your hotel operations from day one
-                </p>
-            </div>
-            
-            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <!-- Benefit Card 1 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        2 Hours
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Setup Time</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">From installation to first guest using the system. No technical expertise needed.</p>
-                </div>
-
-                <!-- Benefit Card 2 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        Zero
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">App Download Required</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Guests scan QR code and access everything instantly. No app store friction.</p>
-                </div>
-
-                <!-- Benefit Card 3 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        &lt;3 Sec
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">AI Response Time</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Lightning-fast AI chatbot answers guest questions instantly, 24/7.</p>
-                </div>
-
-                <!-- Benefit Card 4 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        50+
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Languages Supported</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Communicate with international guests in their native language automatically.</p>
-                </div>
-
-                <!-- Benefit Card 5 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        All-in-One
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Unified Platform</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Replace multiple systems with one QR code. Room service, spa, restaurant, activities.</p>
-                </div>
-
-                <!-- Benefit Card 6 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        24/7
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Guest Support</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">AI-powered assistance never sleeps. Handle guest requests at any time of day.</p>
-                </div>
-
-                <!-- Benefit Card 7 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        Real-Time
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Analytics Dashboard</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Track bookings, revenue, and guest satisfaction with live insights.</p>
-                </div>
-
-                <!-- Benefit Card 8 -->
-                <div class="group bg-white rounded-3xl p-8 border-2 border-gray-100 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl hover:-translate-y-2">
-                    <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg">
-                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                        </svg>
-                    </div>
-                    <div class="text-4xl font-bold text-primary mb-3 group-hover:scale-105 transition-transform">
-                        Secure
-                    </div>
-                    <div class="text-gray-600 font-semibold mb-2">Cloud-Based System</div>
-                    <p class="text-sm text-gray-500 leading-relaxed">Enterprise-grade security with automatic backups and data encryption.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Problem Section -->
-    <section class="py-24 px-6 bg-white">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Stop Losing Revenue to <span class="gradient-text">Outdated Systems</span>
-                </h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                    Your guests expect modern experiences. Paper menus, phone calls, and scattered services don't cut it anymore.
-                </p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="p-8 bg-red-50 border-2 border-red-200 rounded-xl">
-                    <div class="text-red-500 text-4xl mb-4"><i class="fas fa-phone-slash"></i></div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Front Desk Overload</h3>
-                    <p class="text-gray-600">Staff spending hours answering the same questions about restaurant hours, spa bookings, and amenities.</p>
-                </div>
-                <div class="p-8 bg-red-50 border-2 border-red-200 rounded-xl">
-                    <div class="text-red-500 text-4xl mb-4"><i class="fas fa-file-invoice"></i></div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Printing Costs</h3>
-                    <p class="text-gray-600">Thousands spent monthly on menus, brochures, and info cards that are outdated the moment they're printed.</p>
-                </div>
-                <div class="p-8 bg-red-50 border-2 border-red-200 rounded-xl">
-                    <div class="text-red-500 text-4xl mb-4"><i class="fas fa-money-bill-wave"></i></div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Missed Revenue</h3>
-                    <p class="text-gray-600">Guests don't know about your spa, activities, or premium services. You're leaving money on the table.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Mobile Showcase Section -->
-    <section class="py-24 px-6 bg-gradient-to-br from-gray-50 to-white">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    See GuestConnect in <span class="gradient-text">Action</span>
-                </h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                    Experience how guests interact with your hotel through our beautiful mobile app
-                </p>
-            </div>
-            
-            <div class="grid lg:grid-cols-2 gap-12 items-center">
-                <!-- Mobile Mockup -->
-                <div class="flex justify-center">
-                    <div class="relative">
-                        <!-- iPhone Mockup -->
-                        <div class="relative w-[280px] h-[570px] bg-gray-900 rounded-[45px] p-3 shadow-2xl">
-                            <!-- Notch -->
-                            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-gray-900 rounded-b-3xl z-10"></div>
-                            <!-- Screen -->
-                            <div class="relative w-full h-full bg-white rounded-[35px] overflow-hidden">
-                                <div id="mobileScreenCarousel" class="w-full h-full"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Screenshots Info -->
-                <div>
-                    <div id="showcaseDetails" class="space-y-6">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                    <div class="flex gap-4 mt-8">
-                        <button id="prevScreenshot" class="w-12 h-12 bg-gray-200 hover:bg-gray-300 rounded-full flex items-center justify-center transition">
-                            <i class="fas fa-chevron-left text-gray-700"></i>
-                        </button>
-                        <button id="nextScreenshot" class="w-12 h-12 bg-primary hover:bg-[#014a61] text-white rounded-full flex items-center justify-center transition">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section id="features" class="py-24 px-6 bg-white">
-        <div class="max-w-7xl mx-auto">
             <div class="text-center mb-20">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Everything Your Hotel Needs in <span class="gradient-text">One Platform</span>
+                <h2 class="text-5xl md:text-6xl font-bold text-white mb-6 ornamental" style="font-family: 'Cormorant Garamond', serif;">
+                    <span class="text-gradient">The Palace</span> Experience
                 </h2>
-                <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                    From room service to beach bookings, spa reservations to restaurant management—GuestConnect handles it all.
+                <p class="text-xl text-palace-cream/60 max-w-2xl mx-auto">
+                    Immerse yourself in a symphony of luxury, where every detail whispers sophistication
                 </p>
             </div>
+            
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature Cards -->
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-qrcode text-white text-2xl"></i>
+                <!-- Feature Card 1 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-utensils text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Smart QR System</h3>
-                    <p class="text-gray-600 leading-relaxed">Unique QR per room. Track scans, measure engagement, identify top-performing services.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Culinary Artistry</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        Savor world-class cuisine crafted by Michelin-starred chefs. From Mediterranean delicacies to authentic Egyptian flavors.
+                    </p>
+                    <a href="#dining" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        Explore Menus <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-concierge-bell text-white text-2xl"></i>
+
+                <!-- Feature Card 2 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-spa text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Room Service Menus</h3>
-                    <p class="text-gray-600 leading-relaxed">Beautiful digital menu cards. Guests browse your offerings instantly. No printed menus needed.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Holistic Wellness</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        Rejuvenate your body and soul at our state-of-the-art spa. Ancient therapies meet modern luxury.
+                    </p>
+                    <a href="#wellness" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        View Treatments <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-utensils text-white text-2xl"></i>
+
+                <!-- Feature Card 3 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-swimmer text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Restaurant Management</h3>
-                    <p class="text-gray-600 leading-relaxed">Table reservations, live capacity tracking, multiple restaurants, staff dashboard.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Private Beach</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        Exclusive access to pristine shores. Crystal waters, golden sands, and personalized beach service.
+                    </p>
+                    <a href="#experience" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        Discover More <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-umbrella-beach text-white text-2xl"></i>
+
+                <!-- Feature Card 4 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-robot text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Beach Booking System</h3>
-                    <p class="text-gray-600 leading-relaxed">Zone-based sunbed reservations, live occupancy maps, premium areas, automated check-ins.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Smart Concierge</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        AI-powered assistance at your fingertips. Instant service requests, real-time updates, personalized recommendations.
+                    </p>
+                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        Learn More <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-spa text-white text-2xl"></i>
+
+                <!-- Feature Card 5 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-moon text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Spa & Wellness</h3>
-                    <p class="text-gray-600 leading-relaxed">Treatment bookings, package deals, therapist schedules, automated confirmations.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Signature Suites</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        Bespoke accommodations with breathtaking views. Every suite a masterpiece of design and comfort.
+                    </p>
+                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        View Suites <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-hiking text-white text-2xl"></i>
+
+                <!-- Feature Card 6 -->
+                <div class="card-hover glass-effect rounded-3xl p-10 border-2 border-palace-gold/20 group">
+                    <div class="w-20 h-20 gold-gradient rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform shadow-2xl">
+                        <i class="fas fa-landmark text-3xl text-palace-dark"></i>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Activity Marketplace</h3>
-                    <p class="text-gray-600 leading-relaxed">Connect local vendors, commission management, automated payments, vendor dashboards.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-robot text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">AI Chatbot (24/7)</h3>
-                    <p class="text-gray-600 leading-relaxed">Powered by GPT-4. Answers guest questions instantly in 35 languages. Reduces front desk calls by 60%.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-chart-line text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Real-Time Analytics</h3>
-                    <p class="text-gray-600 leading-relaxed">Revenue tracking, booking rates, guest engagement metrics, staff performance dashboards.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-language text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">35-Language Auto-Translation</h3>
-                    <p class="text-gray-600 leading-relaxed">Translate your menus, info pages, and offerings to 35 languages in seconds. Powered by AI. One click, instant translations.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-info-circle text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Info Pages & FAQs</h3>
-                    <p class="text-gray-600 leading-relaxed">Hotel policies, WiFi passwords, check-out times, local tips—all organized beautifully.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-users-cog text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Staff Dashboards</h3>
-                    <p class="text-gray-600 leading-relaxed">Front desk, restaurant, spa, vendors—everyone has their own portal with role-based access.</p>
-                </div>
-                <div class="feature-card p-8 bg-secondary rounded-2xl border-2 border-accent/20">
-                    <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-5">
-                        <i class="fas fa-palette text-white text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">Full Brand Control</h3>
-                    <p class="text-gray-600 leading-relaxed">Your colors, logo, fonts, style. Every screen matches your brand identity perfectly.</p>
+                    <h3 class="text-3xl font-bold text-palace-gold mb-4" style="font-family: 'Cormorant Garamond', serif;">Heritage Tours</h3>
+                    <p class="text-palace-cream/70 leading-relaxed mb-6">
+                        Curated experiences showcasing Egypt's rich history. VIP access to iconic landmarks and hidden gems.
+                    </p>
+                    <a href="#contact" class="inline-flex items-center gap-2 text-palace-gold hover:text-palace-cream transition group-hover:translate-x-2 transform duration-300">
+                        Plan Your Journey <i class="fas fa-arrow-right"></i>
+                    </a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Pricing Section -->
-    <section id="pricing" class="py-24 px-6 bg-gradient-to-br from-primary/5 to-accent/10">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                    Simple, Transparent <span class="gradient-text">Pricing</span>
-                </h2>
-                <p class="text-xl text-gray-600 max-w-2xl mx-auto">Choose the plan that fits your hotel. Upgrade or downgrade anytime.</p>
-            </div>
-            <div class="grid md:grid-cols-4 gap-8 max-w-7xl mx-auto">
-                <!-- Free Trial -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-accent transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Free Trial</h3>
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$0</div>
-                        <div class="text-gray-600">14 days</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Up to 20 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">All core features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Basic analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Email support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition">Start Trial</a>
-                </div>
-                <!-- Basic -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-accent hover:border-primary transition transform hover:scale-105">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Basic</h3>
-                        <div class="text-5xl font-bold text-primary mb-2">$49</div>
-                        <div class="text-gray-600">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Up to 50 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">QR codes & Room Service</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Restaurant bookings</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Basic analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Priority support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-primary text-white py-3 rounded-lg font-semibold hover:bg-[#014a5e] transition shadow-lg">Get Started</a>
-                </div>
-                <!-- Pro -->
-                <div class="bg-primary text-white rounded-2xl p-8 border-4 border-accent transform scale-105 shadow-2xl relative">
-                    <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-accent text-primary px-4 py-1 rounded-full text-sm font-bold">MOST POPULAR</div>
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold mb-2">Pro</h3>
-                        <div class="text-5xl font-bold mb-2">$149</div>
-                        <div class="text-white/80">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Up to 150 rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>All Basic features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Beach & Spa booking</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Activity marketplace</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>AI Chatbot (24/7)</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>Advanced analytics</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-accent mt-1"></i><span>24/7 Priority support</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-white text-primary py-3 rounded-lg font-semibold hover:bg-accent hover:text-white transition shadow-xl">Get Started</a>
-                </div>
-                <!-- Enterprise -->
-                <div class="bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-primary transition">
-                    <div class="text-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
-                        <div class="text-5xl font-bold text-gray-900 mb-2">$499</div>
-                        <div class="text-gray-600">per month</div>
-                    </div>
-                    <ul class="space-y-3 mb-8">
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Unlimited rooms</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">All Pro features</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Custom integrations</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">White-label options</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Dedicated account manager</span></li>
-                        <li class="flex items-start gap-3"><i class="fas fa-check text-primary mt-1"></i><span class="text-gray-600">Custom training</span></li>
-                    </ul>
-                    <a href="/superadmin/login" class="block w-full text-center bg-gray-900 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 transition">Contact Sales</a>
-                </div>
+    <!-- CTA Section -->
+    <section class="py-32 px-6 relative overflow-hidden" style="background: linear-gradient(135deg, #8B1538 0%, #2D1B1F 100%);">
+        <div class="absolute inset-0">
+            <div class="absolute inset-0 opacity-30 cyber-grid"></div>
+            <div class="absolute top-0 left-0 w-full h-full">
+                <div class="absolute top-20 left-10 w-64 h-64 bg-palace-gold/20 rounded-full blur-[100px] pulse-gold"></div>
+                <div class="absolute bottom-20 right-10 w-96 h-96 bg-palace-gold/10 rounded-full blur-[150px] pulse-gold" style="animation-delay: 2s;"></div>
             </div>
         </div>
-    </section>
-
-    <!-- GuestConnect AI Showcase -->
-    <section id="ai-chatbot" class="py-24 px-6 bg-gradient-to-br from-primary via-[#014a5e] to-[#012936] relative overflow-hidden">
-        <!-- Animated background particles -->
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-20 left-10 w-64 h-64 bg-accent rounded-full blur-3xl animate-pulse"></div>
-            <div class="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
-            <div class="absolute top-1/2 left-1/2 w-80 h-80 bg-accent rounded-full blur-3xl animate-pulse" style="animation-delay: 2s;"></div>
-        </div>
-
-        <div class="max-w-7xl mx-auto relative z-10">
-            <!-- Header -->
-            <div class="text-center mb-16">
-                <div class="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm px-6 py-3 rounded-full border border-accent/30 mb-6">
-                    <svg class="w-6 h-6 text-accent animate-spin" style="animation-duration: 3s;" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span class="text-white font-semibold">POWERED BY ADVANCED AI</span>
-                </div>
-                <h2 class="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-                    Meet <span class="text-accent">GuestConnect AI</span><br>Your 24/7 Guest Assistant
-                </h2>
-                <p class="text-2xl text-white/80 max-w-3xl mx-auto leading-relaxed">
-                    An intelligent chatbot that understands your guests, answers questions instantly, and creates unforgettable experiences—all without human intervention.
-                </p>
-            </div>
-
-            <!-- Main Interactive Demo Card -->
-            <div class="grid lg:grid-cols-2 gap-12 mb-16">
-                <!-- Chat Demo -->
-                <div class="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl border-4 border-accent/30 overflow-hidden transform hover:scale-105 transition-all duration-300">
-                    <!-- Chat Header -->
-                    <div class="bg-gradient-to-r from-primary to-[#014a5e] px-8 py-6 flex items-center gap-4">
-                        <div class="w-14 h-14 bg-accent rounded-full flex items-center justify-center shadow-lg">
-                            <svg class="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
-                                <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <h3 class="text-2xl font-bold text-white">Hotel Assistant</h3>
-                            <div class="flex items-center gap-2 text-accent text-sm">
-                                <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
-                                <span>Online • Always ready to help</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Chat Messages -->
-                    <div class="p-8 space-y-6 bg-gradient-to-b from-gray-50 to-white min-h-[500px] flex flex-col">
-                        <!-- Guest Message -->
-                        <div class="flex gap-3 animate-fade-in">
-                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
-                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-4 max-w-xs shadow-sm">
-                                <p class="text-gray-800">Hi! What time does the spa open tomorrow?</p>
-                                <span class="text-xs text-gray-400 mt-2 block">10:23 AM</span>
-                            </div>
-                        </div>
-
-                        <!-- AI Response -->
-                        <div class="flex gap-3 justify-end animate-fade-in" style="animation-delay: 0.5s;">
-                            <div class="bg-gradient-to-r from-primary to-[#014a5e] text-white rounded-2xl rounded-tr-none px-6 py-4 max-w-xs shadow-lg">
-                                <p class="leading-relaxed">Good morning! 🌅 Our Tranquility Spa opens at 8:00 AM and closes at 9:00 PM. Would you like me to book a treatment for you?</p>
-                                <span class="text-xs text-accent mt-2 block">10:23 AM</span>
-                            </div>
-                            <div class="w-10 h-10 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
-                                <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <!-- Guest Message -->
-                        <div class="flex gap-3 animate-fade-in" style="animation-delay: 1s;">
-                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
-                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-4 max-w-xs shadow-sm">
-                                <p class="text-gray-800">Yes please! Do you have any availability for a couples massage around 2 PM?</p>
-                                <span class="text-xs text-gray-400 mt-2 block">10:24 AM</span>
-                            </div>
-                        </div>
-
-                        <!-- AI Response -->
-                        <div class="flex gap-3 justify-end animate-fade-in" style="animation-delay: 1.5s;">
-                            <div class="bg-gradient-to-r from-primary to-[#014a5e] text-white rounded-2xl rounded-tr-none px-6 py-4 max-w-xs shadow-lg">
-                                <p class="leading-relaxed">Perfect! 💆‍♀️ I found availability for a 90-minute Couples Paradise Massage at 2:00 PM tomorrow. The session includes aromatherapy and costs $280. Shall I confirm this booking for you?</p>
-                                <span class="text-xs text-accent mt-2 block">10:24 AM</span>
-                            </div>
-                            <div class="w-10 h-10 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
-                                <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <!-- Typing Indicator -->
-                        <div class="flex gap-3 mt-auto animate-fade-in" style="animation-delay: 2s;">
-                            <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">G</div>
-                            <div class="bg-gray-100 rounded-2xl rounded-tl-none px-6 py-3 shadow-sm">
-                                <div class="flex gap-2">
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s;"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Chat Input -->
-                    <div class="border-t-2 border-gray-100 px-8 py-6 bg-white">
-                        <div class="flex gap-4">
-                            <input type="text" placeholder="Ask anything... (This is a demo)" class="flex-1 px-6 py-4 rounded-xl border-2 border-gray-200 focus:border-primary focus:outline-none text-gray-400 cursor-not-allowed" disabled>
-                            <button class="bg-gradient-to-r from-primary to-[#014a5e] text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition cursor-not-allowed opacity-60" disabled>
-                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AI Features & Benefits -->
-                <div class="space-y-6">
-                    <!-- Feature Card 1 -->
-                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
-                        <div class="flex items-start gap-6">
-                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                            </div>
-                            <div class="flex-1">
-                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Instant Responses, 24/7</h3>
-                                <p class="text-gray-600 leading-relaxed text-lg">No more waiting. GuestConnect AI answers guest questions in under 3 seconds—whether it's 3 AM or checkout rush hour. Always available, always accurate.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Feature Card 2 -->
-                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
-                        <div class="flex items-start gap-6">
-                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                                </svg>
-                            </div>
-                            <div class="flex-1">
-                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Intelligent & Context-Aware</h3>
-                                <p class="text-gray-600 leading-relaxed text-lg">Powered by advanced AI, our chatbot understands context, remembers conversations, and provides personalized recommendations based on guest preferences and history.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Feature Card 3 -->
-                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
-                        <div class="flex items-start gap-6">
-                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                            <div class="flex-1">
-                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Automated Bookings & Upsells</h3>
-                                <p class="text-gray-600 leading-relaxed text-lg">More than just Q&A—the AI proactively suggests spa treatments, restaurant reservations, and activities, driving significant additional revenue for your property.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Feature Card 4 -->
-                    <div class="bg-white/95 backdrop-blur-lg rounded-2xl p-8 border-2 border-accent/20 hover:border-accent/50 transition shadow-xl transform hover:translate-x-2 hover:shadow-2xl">
-                        <div class="flex items-start gap-6">
-                            <div class="w-16 h-16 bg-gradient-to-br from-primary to-[#014a5e] rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                                <svg class="w-9 h-9 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>
-                                </svg>
-                            </div>
-                            <div class="flex-1">
-                                <h3 class="text-2xl font-bold text-gray-900 mb-3">Multilingual Support</h3>
-                                <p class="text-gray-600 leading-relaxed text-lg">Communicate seamlessly with international guests in 50+ languages. Break down language barriers and provide exceptional service to every visitor.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Stats Section -->
-            <div class="grid md:grid-cols-4 gap-6 mb-16">
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
-                    <div class="text-5xl font-bold text-accent mb-3">90%</div>
-                    <p class="text-white/80 text-lg">Of inquiries handled automatically</p>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
-                    <div class="text-5xl font-bold text-accent mb-3">&lt;3s</div>
-                    <p class="text-white/80 text-lg">Average response time</p>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
-                    <div class="text-5xl font-bold text-accent mb-3">24/7</div>
-                    <p class="text-white/80 text-lg">Always online, never sleeps</p>
-                </div>
-                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-accent/30 text-center transform hover:scale-105 transition">
-                    <div class="text-5xl font-bold text-accent mb-3">50+</div>
-                    <p class="text-white/80 text-lg">Languages supported</p>
-                </div>
-            </div>
-
-            <!-- CTA -->
-            <div class="text-center">
-                <a href="/superadmin/login" class="inline-flex items-center gap-4 bg-accent text-primary px-12 py-6 rounded-2xl font-bold text-2xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition">
-                    <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
-                        <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/>
-                    </svg>
-                    <span>Experience GuestConnect AI Today</span>
-                </a>
-                <p class="text-white/70 mt-6 text-lg">Start your 14-day free trial • No credit card required</p>
-            </div>
-        </div>
-
-        <!-- Add custom animations -->
-        <style>
-            @keyframes fade-in {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            .animate-fade-in {
-                animation: fade-in 0.5s ease-out forwards;
-            }
-        </style>
-    </section>
-
-    <!-- Final CTA -->
-    <section class="py-24 px-6 bg-secondary">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-                Ready to Transform Your Hotel?
+        
+        <div class="max-w-5xl mx-auto text-center relative z-10">
+            <h2 class="text-5xl md:text-7xl font-bold text-white mb-8 ornamental" style="font-family: 'Cormorant Garamond', serif;">
+                Begin Your <span class="text-palace-gold">Palace</span> Journey
             </h2>
-            <p class="text-2xl text-gray-600 mb-12">Start your 14-day free trial. No credit card required.</p>
-            <div class="flex flex-col sm:flex-row gap-6 justify-center mb-8">
-                <a href="/superadmin/login" class="bg-primary text-white px-12 py-5 rounded-xl hover:bg-[#014a5e] transition font-bold text-xl shadow-2xl hover:shadow-3xl transform hover:scale-105">
-                    <i class="fas fa-rocket mr-3"></i>Start Free Trial
+            <p class="text-2xl text-palace-cream/80 mb-12 max-w-3xl mx-auto">
+                Reserve your place in paradise. Limited availability for the most discerning travelers.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-6 justify-center">
+                <a href="#contact" class="group relative px-12 py-6 gold-gradient text-palace-dark rounded-xl font-bold text-xl shadow-2xl hover:shadow-palace-gold/50 transition-all overflow-hidden">
+                    <span class="relative z-10 flex items-center justify-center gap-3">
+                        <i class="fas fa-calendar-check"></i>
+                        Book Your Stay
+                    </span>
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                 </a>
-                <a href="#demo" class="bg-white text-primary border-4 border-primary px-12 py-5 rounded-xl hover:bg-primary hover:text-white transition font-bold text-xl">
-                    <i class="fas fa-play-circle mr-3"></i>Watch Demo
+                <a href="tel:+20123456789" class="px-12 py-6 glass-effect text-white rounded-xl font-bold text-xl border-2 border-palace-gold/30 hover:border-palace-gold transition-all flex items-center justify-center gap-3">
+                    <i class="fas fa-phone-alt"></i>
+                    +20 123 456 789
                 </a>
             </div>
-            <div class="flex items-center justify-center gap-8 text-gray-600">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">14-day free trial</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">No credit card</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-check-circle text-primary text-xl"></i>
-                    <span class="font-semibold">Cancel anytime</span>
-                </div>
-            </div>
+            <p class="mt-8 text-palace-cream/50 text-sm">
+                <i class="fas fa-headset mr-2"></i>Dedicated concierge available 24/7
+            </p>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-16 px-6">
+    <footer class="py-16 px-6 glass-effect border-t border-palace-gold/20">
         <div class="max-w-7xl mx-auto">
             <div class="grid md:grid-cols-4 gap-12 mb-12">
-                <div class="md:col-span-2">
-                    <img src="/guestconnect-logo.png" alt="GuestConnect Logo" class="h-16 w-auto mb-6 brightness-0 invert">
-                    <p class="text-white/70 leading-relaxed max-w-md mb-6">
-                        The complete guest experience platform for modern hotels. Transform your operations with one QR code per room.
+                <div class="col-span-2">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-12 h-12 gold-gradient rounded-full flex items-center justify-center">
+                            <span class="text-palace-dark font-bold text-xl">OP</span>
+                        </div>
+                        <div>
+                            <div class="text-palace-gold font-bold text-lg tracking-wider" style="font-family: 'Cormorant Garamond', serif;">OLD PALACE</div>
+                            <div class="text-palace-gold/60 text-xs tracking-widest">RESORT</div>
+                        </div>
+                    </div>
+                    <p class="text-palace-cream/60 mb-6">
+                        Where timeless elegance meets tomorrow. Experience the pinnacle of luxury hospitality in Egypt's most prestigious resort.
                     </p>
                     <div class="flex gap-4">
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
+                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
                             <i class="fab fa-facebook-f"></i>
                         </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-twitter"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
-                            <i class="fab fa-linkedin-in"></i>
-                        </a>
-                        <a href="#" class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center hover:bg-primary transition">
+                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
                             <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 glass-effect rounded-full flex items-center justify-center text-palace-gold hover:bg-palace-gold hover:text-palace-dark transition">
+                            <i class="fab fa-twitter"></i>
                         </a>
                     </div>
                 </div>
                 <div>
-                    <h4 class="font-bold text-white mb-6 text-lg">Product</h4>
-                    <ul class="space-y-4 text-white/70">
-                        <li><a href="#features" class="hover:text-primary transition">Features</a></li>
-                        <li><a href="#pricing" class="hover:text-primary transition">Pricing</a></li>
-                        <li><a href="#ai-chatbot" class="hover:text-primary transition">AI Chatbot</a></li>
-                        <li><a href="#demo" class="hover:text-primary transition">Demo</a></li>
+                    <h4 class="text-palace-gold font-bold mb-4" style="font-family: 'Cormorant Garamond', serif;">Quick Links</h4>
+                    <ul class="space-y-2 text-palace-cream/60">
+                        <li><a href="#experience" class="hover:text-palace-gold transition">Experience</a></li>
+                        <li><a href="#dining" class="hover:text-palace-gold transition">Dining</a></li>
+                        <li><a href="#wellness" class="hover:text-palace-gold transition">Wellness</a></li>
+                        <li><a href="/admin/login" class="hover:text-palace-gold transition">Guest Portal</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold text-white mb-6 text-lg">Access</h4>
-                    <ul class="space-y-4 text-white/70">
-                        <li><a href="/admin/login" class="hover:text-primary transition">Hotel Admin</a></li>
-                        <li><a href="/vendor/login" class="hover:text-primary transition">Vendor Portal</a></li>
-                        <li><a href="/superadmin/login" class="hover:text-primary transition">Platform Admin</a></li>
+                    <h4 class="text-palace-gold font-bold mb-4" style="font-family: 'Cormorant Garamond', serif;">Contact</h4>
+                    <ul class="space-y-2 text-palace-cream/60 text-sm">
+                        <li><i class="fas fa-map-marker-alt text-palace-gold mr-2"></i>Hurghada, Egypt</li>
+                        <li><i class="fas fa-phone text-palace-gold mr-2"></i>+20 123 456 789</li>
+                        <li><i class="fas fa-envelope text-palace-gold mr-2"></i>info@oldpalaceresort.com</li>
                     </ul>
                 </div>
             </div>
-            <div class="pt-8 border-t border-white/10 text-center text-white/50 text-sm">
-                <p>&copy; 2025 GuestConnect. All rights reserved. Transforming hospitality, one QR code at a time.</p>
+            <div class="border-t border-palace-gold/20 pt-8 text-center">
+                <p class="text-palace-cream/40 text-sm">
+                    © 2026 Old Palace Resort. All rights reserved. | Crafted with excellence for the discerning traveler.
+                </p>
             </div>
         </div>
     </footer>
@@ -1556,80 +1135,11 @@ app.get('/', (c) => {
             const menu = document.getElementById('mobileMenu');
             menu.classList.toggle('hidden');
         }
-        
-        // Mobile Showcase Carousel
-        let showcaseScreenshots = [];
-        let currentScreenshotIndex = 0;
-        
-        async function loadShowcase() {
-            try {
-                const response = await fetch('/api/showcase/active');
-                showcaseScreenshots = await response.json();
-                
-                if (showcaseScreenshots.length > 0) {
-                    displayScreenshot(0);
-                } else {
-                    document.getElementById('mobileScreenCarousel').innerHTML = '<div class="flex items-center justify-center h-full bg-gray-100"><p class="text-gray-500">No screenshots available</p></div>';
-                }
-            } catch (error) {
-                console.error('Load showcase error:', error);
-            }
-        }
-        
-        function displayScreenshot(index) {
-            if (!showcaseScreenshots || showcaseScreenshots.length === 0) return;
-            
-            currentScreenshotIndex = index;
-            const screenshot = showcaseScreenshots[index];
-            
-            // Update mobile screen
-            document.getElementById('mobileScreenCarousel').innerHTML = 
-                '<img src="' + screenshot.image_url + '" alt="' + screenshot.title + '" class="w-full h-full object-cover">';
-            
-            // Update details
-            document.getElementById('showcaseDetails').innerHTML = 
-                '<div>' +
-                    '<div class="flex items-center gap-3 mb-4">' +
-                        '<span class="text-sm font-bold text-primary bg-blue-50 px-3 py-1 rounded-full">' + (index + 1) + ' of ' + showcaseScreenshots.length + '</span>' +
-                    '</div>' +
-                    '<h3 class="text-3xl font-bold text-gray-900 mb-4">' + screenshot.title + '</h3>' +
-                    '<p class="text-lg text-gray-600 leading-relaxed">' + (screenshot.description || '') + '</p>' +
-                '</div>';
-        }
-        
-        document.getElementById('prevScreenshot')?.addEventListener('click', () => {
-            const newIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : showcaseScreenshots.length - 1;
-            displayScreenshot(newIndex);
-        });
-        
-        document.getElementById('nextScreenshot')?.addEventListener('click', () => {
-            const newIndex = currentScreenshotIndex < showcaseScreenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
-            displayScreenshot(newIndex);
-        });
-        
-        // Auto-rotate every 5 seconds
-        setInterval(() => {
-            if (showcaseScreenshots.length > 0) {
-                const newIndex = currentScreenshotIndex < showcaseScreenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
-                displayScreenshot(newIndex);
-            }
-        }, 5000);
-        
-        // Initialize showcase on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            loadShowcase();
-        });
     </script>
 </body>
 </html>
   `)
 })
-
-// ============================================
-// PUBLIC BLOG ROUTES
-// ============================================
-
-// Blog listing page
 app.get('/blog', async (c) => {
   const { DB } = c.env
   
