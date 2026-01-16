@@ -810,20 +810,36 @@
                     
                     // Color based on source and status
                     if (table.current_order.source === 'kitchen') {
-                        // Kitchen orders - dining (red for confirmed/preparing/ready)
-                        status = 'dining';
-                        statusColor = '#ef4444'; // red
+                        // Kitchen orders - always show as occupied (red/yellow)
+                        const orderStatus = table.current_order.status;
+                        
+                        // Check if guest has been seated
+                        if (table.current_order.checked_in_at) {
+                            // Guest is seated - show red (dining)
+                            status = 'dining';
+                            statusColor = '#ef4444'; // red - guest is seated and dining
+                        } else {
+                            // Guest not yet seated - show yellow (booked)
+                            status = 'booked';
+                            statusColor = '#eab308'; // yellow - booked but not seated
+                        }
                     } else if (table.current_order.source === 'waiter') {
                         // Waiter orders - color by status
-                        if (table.current_order.status === 'pending') {
+                        const orderStatus = table.current_order.status;
+                        
+                        if (orderStatus === 'pending' || orderStatus === 'seated') {
                             status = 'seated';
                             statusColor = '#eab308'; // yellow - just seated
-                        } else if (table.current_order.status === 'confirmed') {
+                        } else if (orderStatus === 'confirmed' || orderStatus === 'preparing') {
                             status = 'ordering';
-                            statusColor = '#3b82f6'; // blue - order confirmed
+                            statusColor = '#ef4444'; // red - order in progress
+                        } else if (orderStatus === 'ready' || orderStatus === 'served') {
+                            status = 'dining';
+                            statusColor = '#ef4444'; // red - dining
                         } else {
-                            status = 'preparing';
-                            statusColor = '#f97316'; // orange - being prepared
+                            // Default for any other status - show as occupied
+                            status = 'occupied';
+                            statusColor = '#eab308'; // yellow
                         }
                     }
                 }
