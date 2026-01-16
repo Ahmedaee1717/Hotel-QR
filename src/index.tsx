@@ -74346,12 +74346,12 @@ app.get('/api/waiter/tables', async (c) => {
       ORDER BY CAST(rt.table_number AS INTEGER)
     `).bind(restaurant).all()
     
-    // Get waiter orders (only pending/confirmed - not yet dining)
+    // Get waiter orders (only pending/confirmed/seated - not yet cleared)
     const waiterOrders = await DB.prepare(`
       SELECT table_id, order_id, guest_name, party_size, status, waiter_id
       FROM waiter_orders
       WHERE restaurant_id = ? 
-        AND status IN ('pending', 'confirmed')
+        AND status IN ('pending', 'confirmed', 'seated', 'preparing', 'ready')
     `).bind(restaurant).all()
     
     // Get kitchen bookings (already dining) - with booking details
@@ -74367,13 +74367,15 @@ app.get('/api/waiter/tables', async (c) => {
         av.preorder_item_ids,
         av.created_at,
         av.created_by_staff_id,
+        av.checked_in_at,
+        av.checked_in_by,
         u.first_name as staff_first_name,
         u.last_name as staff_last_name
       FROM alacarte_vouchers av
       LEFT JOIN users u ON av.created_by_staff_id = u.user_id
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
-        AND av.status IN ('confirmed', 'preparing', 'ready')
+        AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
         AND av.reservation_date BETWEEN ? AND ?
       ORDER BY av.reservation_date, av.reservation_time
     `).bind(restaurant, property_id, today, maxDateStr).all()
@@ -74539,11 +74541,13 @@ app.get('/api/waiter/orders', async (c) => {
         av.reservation_time,
         av.reservation_date,
         av.created_at,
+        av.checked_in_at,
+        av.checked_in_by,
         'kitchen' as source
       FROM alacarte_vouchers av
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
-        AND av.status IN ('confirmed', 'preparing', 'ready')
+        AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
         AND av.reservation_date BETWEEN ? AND ?
       ORDER BY av.reservation_date DESC, av.created_at DESC
       LIMIT 50
