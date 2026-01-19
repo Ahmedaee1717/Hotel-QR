@@ -63830,6 +63830,13 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 });
                 const setMenuData = await setMenuResponse.json();
                 
+                // Store restaurant currency for price display
+                if (setMenuData.restaurant && setMenuData.restaurant.currency) {
+                    window.restaurantCurrency = setMenuData.restaurant.currency;
+                } else {
+                    window.restaurantCurrency = 'USD'; // Default fallback
+                }
+                
                 // Load RESTAURANT MENU (extra charge)
                 const restaurantMenuResponse = await fetch('/api/restaurant/' + restaurantId + '/menu-display?language=en');
                 const restaurantMenuData = await restaurantMenuResponse.json();
@@ -64004,8 +64011,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 }
                 
                 // Price display for extra charge items
-                const priceDisplay = item.extraCharge && item.cost_to_hotel > 0 ? 
-                    '<span class="text-amber-600 font-bold">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                // Price display for extra charge OR premium items
+                const shouldShowPrice = (item.extraCharge || item.is_premium) && item.cost_to_hotel > 0;
+                const currencySymbol = window.restaurantCurrency === 'EGP' ? 'EGP ' : 
+                                       window.restaurantCurrency === 'USD' ? '$' : '€';
+                const priceDisplay = shouldShowPrice ? 
+                    '<span class="text-amber-600 font-bold">' + currencySymbol + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 const borderClass = isSelected ? 'border-accent-color' : 'border-gray-200';
                 const premiumBadge = item.is_premium ? '<span class="inline-block bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium mt-1"><i class="fas fa-star mr-1"></i>Premium</span>' : '';
@@ -70867,7 +70878,7 @@ app.get('/api/alacarte/menu/:restaurant_id', async (c) => {
 
   try {
     const restaurant = await DB.prepare(`
-      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar
+      SELECT offering_id, title_en, title_ar, short_description_en, short_description_ar, currency
       FROM hotel_offerings
       WHERE offering_id = ? AND property_id = ? AND offering_type IN ('restaurant', 'room_service')
     `).bind(restaurant_id, property_id).first()
