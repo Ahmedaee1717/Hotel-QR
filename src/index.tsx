@@ -71492,7 +71492,9 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
       const table = await DB.prepare(`
         SELECT table_number FROM restaurant_tables WHERE table_id = ?
       `).bind(table_id).first()
-      actual_table_number = table?.table_number || table_id
+      // CRITICAL: Only use table_number if table exists, otherwise NULL
+      // DO NOT fall back to table_id (which might be room_number)
+      actual_table_number = table?.table_number || null
       console.log('📍 Table lookup:', { table_id, table_number: actual_table_number })
     }
     
