@@ -74055,15 +74055,13 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         quantity: quantityMap[dish.originalId] || 1
       }))
       
-      // Extract guest name from special_requests for QR bookings
-      let guest_name = order.pass_guest_name
+      // Extract guest name from special_requests (for all bookings)
+      let guest_name = order.pass_guest_name || 'Guest'
       
-      // Check if this is a QR booking (pass_reference starts with QR-)
-      if (order.pass_reference && order.pass_reference.startsWith('QR-')) {
-        // Parse special_requests to extract guest name only
-        const specialReq = order.special_requests || ''
-        
-        // Extract guest name from "Guest: XXXX"
+      // Always try to extract guest name from special_requests if available
+      const specialReq = order.special_requests || ''
+      if (specialReq) {
+        // Extract guest name from "Guest: XXXX" pattern
         const guestMatch = specialReq.match(/Guest:\s*([^,\n]+)/)
         if (guestMatch) {
           guest_name = guestMatch[1].trim()

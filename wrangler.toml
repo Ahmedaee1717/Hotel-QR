@@ -1,0 +1,9 @@
+name = "oldpalaceresort"
+compatibility_date = "2025-12-06"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "webapp-production"
+database_id = "a0237b95-a68c-46c3-a9b8-0d21bd181fac"
