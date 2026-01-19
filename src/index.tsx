@@ -74055,23 +74055,16 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
         quantity: quantityMap[dish.originalId] || 1
       }))
       
-      // Extract guest name and room from special_requests for QR bookings
+      // Extract guest name from special_requests for QR bookings
       let guest_name = order.pass_guest_name
-      let display_table = order.table_number
       
       // Check if this is a QR booking (pass_reference starts with QR-)
       if (order.pass_reference && order.pass_reference.startsWith('QR-')) {
-        // Parse special_requests to extract guest name and room
+        // Parse special_requests to extract guest name only
         const specialReq = order.special_requests || ''
         
-        // Extract room number from "Room: XXXX"
-        const roomMatch = specialReq.match(/Room:\s*([^,\n]+)/)
-        if (roomMatch) {
-          display_table = 'Room ' + roomMatch[1].trim()
-        }
-        
         // Extract guest name from "Guest: XXXX"
-        const guestMatch = specialReq.match(/Guest:\s*([^\n]+)/)
+        const guestMatch = specialReq.match(/Guest:\s*([^,\n]+)/)
         if (guestMatch) {
           guest_name = guestMatch[1].trim()
         }
@@ -74080,7 +74073,8 @@ app.get('/api/kitchen/orders/:restaurant_id', async (c) => {
       return {
         ...order,
         guest_name,
-        table_number: display_table,
+        // Use actual table_number from database, NOT room number!
+        table_number: order.table_number,
         dishes: dishesWithQuantity
       }
     }))
