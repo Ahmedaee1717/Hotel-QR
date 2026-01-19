@@ -64010,7 +64010,6 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     limitButton = '<button onclick="toggleCustomLimit(' + itemIdEscaped + ')" class="text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-lg font-medium hover:bg-blue-200 transition"><i class="fas fa-sliders-h mr-1"></i>Limit</button>';
                 }
                 
-                // Price display for extra charge items
                 // Price display for extra charge OR premium items
                 const shouldShowPrice = (item.extraCharge || item.is_premium) && item.cost_to_hotel > 0;
                 const currencySymbol = window.restaurantCurrency === 'EGP' ? 'EGP ' : 
