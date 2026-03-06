@@ -12821,6 +12821,68 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
   }
 })
 
+// Admin: Migrate chatbot_conversations table to add takeover columns
+app.post('/api/admin/chatbot/migrate-takeover-columns', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    // Add is_ai_paused column
+    try {
+      await DB.prepare(`
+        ALTER TABLE chatbot_conversations 
+        ADD COLUMN is_ai_paused INTEGER DEFAULT 0
+      `).run()
+      console.log('✅ Added is_ai_paused column')
+    } catch (e) {
+      console.log('Column is_ai_paused might already exist:', e.message)
+    }
+    
+    // Add admin_takeover_at column
+    try {
+      await DB.prepare(`
+        ALTER TABLE chatbot_conversations 
+        ADD COLUMN admin_takeover_at DATETIME
+      `).run()
+      console.log('✅ Added admin_takeover_at column')
+    } catch (e) {
+      console.log('Column admin_takeover_at might already exist:', e.message)
+    }
+    
+    // Add admin_takeover_by column
+    try {
+      await DB.prepare(`
+        ALTER TABLE chatbot_conversations 
+        ADD COLUMN admin_takeover_by TEXT
+      `).run()
+      console.log('✅ Added admin_takeover_by column')
+    } catch (e) {
+      console.log('Column admin_takeover_by might already exist:', e.message)
+    }
+    
+    // Add admin_takeover_ended_at column
+    try {
+      await DB.prepare(`
+        ALTER TABLE chatbot_conversations 
+        ADD COLUMN admin_takeover_ended_at DATETIME
+      `).run()
+      console.log('✅ Added admin_takeover_ended_at column')
+    } catch (e) {
+      console.log('Column admin_takeover_ended_at might already exist:', e.message)
+    }
+    
+    return c.json({
+      success: true,
+      message: 'Migration completed successfully. Takeover columns added to chatbot_conversations table.'
+    })
+  } catch (error) {
+    console.error('Migration error:', error)
+    return c.json({ 
+      error: 'Migration failed', 
+      details: error.message 
+    }, 500)
+  }
+})
+
 // API: Auto-sync hotel data into chatbot knowledge base
 app.post('/api/admin/chatbot/sync-knowledge', async (c) => {
   const { DB } = c.env
