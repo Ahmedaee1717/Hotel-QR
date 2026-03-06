@@ -18211,30 +18211,59 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       
       if (tier) {
         tierId = tier.tier_id
+        console.log('Found existing tier:', tierId)
       } else {
-        // No tiers exist, create a default Standard tier
-        console.log('No tiers found for property', propertyId, '- creating default tier')
+        // No tiers exist, try to create a default Standard tier
+        console.log('No tiers found for property', propertyId, '- attempting to create default tier')
         
-        const createTierResult = await DB.prepare(`
-          INSERT INTO all_inclusive_tiers (
-            property_id, tier_name, tier_description, tier_color, 
-            display_order, is_active
-          ) VALUES (?, 'Standard', 'Standard All-Inclusive Package', '#3B82F6', 1, 1)
-        `).bind(propertyId).run()
-        
-        tierId = createTierResult.meta.last_row_id
-        console.log('Created default tier with ID:', tierId)
+        try {
+          // Make sure all_inclusive_tiers table exists without foreign keys
+          await DB.prepare(`
+            CREATE TABLE IF NOT EXISTS all_inclusive_tiers (
+              tier_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              property_id INTEGER NOT NULL,
+              tier_name TEXT NOT NULL,
+              tier_description TEXT,
+              tier_color TEXT DEFAULT '#3B82F6',
+              display_order INTEGER DEFAULT 1,
+              is_active INTEGER DEFAULT 1,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `).run()
+          
+          const createTierResult = await DB.prepare(`
+            INSERT INTO all_inclusive_tiers (
+              property_id, tier_name, tier_description, tier_color, 
+              display_order, is_active
+            ) VALUES (?, 'Standard', 'Standard All-Inclusive Package', '#3B82F6', 1, 1)
+          `).bind(parseInt(propertyId)).run()
+          
+          tierId = createTierResult.meta.last_row_id
+          console.log('Created default tier with ID:', tierId)
+        } catch (createError) {
+          console.error('Failed to create tier:', createError)
+          // Try to use any existing tier from tier_id = 1 onwards
+          for (let testId = 1; testId <= 10; testId++) {
+            const existingTier = await DB.prepare(`
+              SELECT tier_id FROM all_inclusive_tiers WHERE tier_id = ?
+            `).bind(testId).first()
+            
+            if (existingTier) {
+              tierId = existingTier.tier_id
+              console.log('Using existing tier_id:', tierId)
+              break
+            }
+          }
+        }
       }
     } catch (tierError) {
       console.error('Tier lookup/create error:', tierError)
-      // Last resort: use tier_id = 1 (should exist in most cases)
-      tierId = 1
     }
     
     if (!tierId) {
       return c.json({ 
         success: false, 
-        error: 'Unable to assign tier to digital pass. Please create a tier first in All-Inclusive settings.'
+        error: 'Unable to assign tier to digital pass. Please configure All-Inclusive tiers first in the admin settings, or contact support.'
       }, 400)
     }
     
