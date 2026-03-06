@@ -47649,10 +47649,10 @@ app.get('/admin/dashboard', (c) => {
             
             <!-- Tab Navigation -->
             <div class="flex gap-2 mb-6 border-b border-gray-200">
-              <button onclick="switchPassTab('search')" id="searchTabBtn" class="px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600">
+              <button onclick="switchGuestPassTab('search')" id="searchTabBtn" class="px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600">
                 <i class="fas fa-search mr-2"></i>Search Existing
               </button>
-              <button onclick="switchPassTab('create')" id="createTabBtn" class="px-4 py-2 font-semibold text-gray-500 hover:text-gray-700">
+              <button onclick="switchGuestPassTab('create')" id="createTabBtn" class="px-4 py-2 font-semibold text-gray-500 hover:text-gray-700">
                 <i class="fas fa-plus mr-2"></i>Create New Pass
               </button>
             </div>
@@ -47754,21 +47754,28 @@ app.get('/admin/dashboard', (c) => {
         if (modal) modal.remove();
       };
       
-      window.switchPassTab = function(tab) {
+      window.switchGuestPassTab = function(tab) {
         // Update button styles
         const searchBtn = document.getElementById('searchTabBtn');
         const createBtn = document.getElementById('createTabBtn');
+        const searchTab = document.getElementById('searchPassTab');
+        const createTab = document.getElementById('createPassTab');
+        
+        // Check if elements exist (modal context)
+        if (!searchBtn || !createBtn || !searchTab || !createTab) {
+          return;
+        }
         
         if (tab === 'search') {
           searchBtn.className = 'px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600';
           createBtn.className = 'px-4 py-2 font-semibold text-gray-500 hover:text-gray-700';
-          document.getElementById('searchPassTab').classList.remove('hidden');
-          document.getElementById('createPassTab').classList.add('hidden');
+          searchTab.classList.remove('hidden');
+          createTab.classList.add('hidden');
         } else {
           createBtn.className = 'px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600';
           searchBtn.className = 'px-4 py-2 font-semibold text-gray-500 hover:text-gray-700';
-          document.getElementById('searchPassTab').classList.add('hidden');
-          document.getElementById('createPassTab').classList.remove('hidden');
+          searchTab.classList.add('hidden');
+          createTab.classList.remove('hidden');
         }
       };
       
@@ -56861,11 +56868,13 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // Switch between pass management tabs
       window.switchPassTab = function(tabName) {
         // Update tab buttons
+        const activeTab = document.getElementById('pass-tab-' + tabName);
+        if (!activeTab) return; // Guard clause
+        
         document.querySelectorAll('.pass-tab-btn').forEach(btn => {
           btn.style.borderColor = 'transparent';
           btn.style.color = '#6B7280'; // gray-500
         });
-        const activeTab = document.getElementById('pass-tab-' + tabName);
         activeTab.style.borderColor = '#016e8f';
         activeTab.style.color = '#016e8f';
         
@@ -56873,7 +56882,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         document.querySelectorAll('.pass-tab-content').forEach(content => {
           content.classList.add('hidden');
         });
-        document.getElementById('pass-content-' + tabName).classList.remove('hidden');
+        const contentTab = document.getElementById('pass-content-' + tabName);
+        if (contentTab) {
+          contentTab.classList.remove('hidden');
+        }
         
         // Load data for the tab
         if (tabName === 'tiers') {
