@@ -11681,20 +11681,35 @@ app.post('/api/chatbot/chat', async (c) => {
     let convId = conversation_id
     if (!convId) {
       const convResult = await DB.prepare(`
-        INSERT INTO chatbot_conversations (property_id, session_id, is_ai_paused)
-        VALUES (?, ?, 0)
+        INSERT INTO chatbot_conversations (property_id, session_id)
+        VALUES (?, ?)
       `).bind(property_id, session_id).run()
       convId = convResult.meta.last_row_id
     }
     
-    // CHECK IF ADMIN HAS TAKEN OVER THE CONVERSATION
+    // CHECK IF ADMIN HAS TAKEN OVER THE CONVERSATION (with fallback for old schema)
     const conversation = await DB.prepare(`
-      SELECT conversation_id, is_ai_paused, admin_takeover_by
-      FROM chatbot_conversations
+      SELECT conversation_id FROM chatbot_conversations
       WHERE session_id = ? AND property_id = ?
     `).bind(session_id, property_id).first()
     
-    if (conversation && conversation.is_ai_paused === 1) {
+    // Try to check if AI is paused (column might not exist in old schemas)
+    let isAIPaused = false
+    try {
+      const pauseCheck = await DB.prepare(`
+        SELECT is_ai_paused FROM chatbot_conversations
+        WHERE session_id = ? AND property_id = ?
+      `).bind(session_id, property_id).first()
+      
+      if (pauseCheck && pauseCheck.is_ai_paused === 1) {
+        isAIPaused = true
+      }
+    } catch (e) {
+      // Column doesn't exist yet, ignore
+      console.log('is_ai_paused column not found, skipping check')
+    }
+    
+    if (isAIPaused) {
       // Admin has taken over - don't respond with AI
       // Just store the user message and return a holding response
       await DB.prepare(`
@@ -12657,14 +12672,19 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
   }
   
   try {
-    // Mark session as taken over by admin (set is_ai_paused = 1)
-    await DB.prepare(`
-      UPDATE chatbot_conversations
-      SET is_ai_paused = 1,
-          admin_takeover_at = CURRENT_TIMESTAMP,
-          admin_takeover_by = ?
-      WHERE session_id = ?
-    `).bind(admin_id || 'admin', session_id).run()
+    // Try to mark session as taken over by admin
+    try {
+      await DB.prepare(`
+        UPDATE chatbot_conversations
+        SET is_ai_paused = 1,
+            admin_takeover_at = CURRENT_TIMESTAMP,
+            admin_takeover_by = ?
+        WHERE session_id = ?
+      `).bind(admin_id || 'admin', session_id).run()
+    } catch (updateError) {
+      // Columns might not exist, that's okay - continue anyway
+      console.log('Could not update takeover columns (might not exist yet):', updateError.message)
+    }
     
     // Insert admin message
     await DB.prepare(`
@@ -12678,7 +12698,7 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
     })
   } catch (error) {
     console.error('Send admin message error:', error)
-    return c.json({ error: 'Failed to send message' }, 500)
+    return c.json({ error: 'Failed to send message', details: error.message }, 500)
   }
 })
 
@@ -12692,13 +12712,18 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
   }
   
   try {
-    // Resume AI (set is_ai_paused = 0)
-    await DB.prepare(`
-      UPDATE chatbot_conversations
-      SET is_ai_paused = 0,
-          admin_takeover_ended_at = CURRENT_TIMESTAMP
-      WHERE session_id = ?
-    `).bind(session_id).run()
+    // Try to resume AI
+    try {
+      await DB.prepare(`
+        UPDATE chatbot_conversations
+        SET is_ai_paused = 0,
+            admin_takeover_ended_at = CURRENT_TIMESTAMP
+        WHERE session_id = ?
+      `).bind(session_id).run()
+    } catch (updateError) {
+      // Columns might not exist, that's okay
+      console.log('Could not update takeover columns (might not exist yet):', updateError.message)
+    }
     
     // Add system message
     await DB.prepare(`
@@ -12712,7 +12737,7 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
     })
   } catch (error) {
     console.error('End takeover error:', error)
-    return c.json({ error: 'Failed to end takeover' }, 500)
+    return c.json({ error: 'Failed to end takeover', details: error.message }, 500)
   }
 })
 
