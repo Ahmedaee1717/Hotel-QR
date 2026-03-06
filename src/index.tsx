@@ -18181,8 +18181,21 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
     // Generate QR secret (for secure QR code generation)
     const qrSecret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
     
-    // Get default tier (Standard) or use ID 1 if not found
-    let tierId = 1
+    // Validate property exists
+    const propertyExists = await DB.prepare(`
+      SELECT property_id FROM properties WHERE property_id = ?
+    `).bind(propertyId).first()
+    
+    if (!propertyExists) {
+      console.error('Property does not exist:', propertyId)
+      return c.json({ 
+        success: false, 
+        error: 'Invalid property ID. Please contact support.'
+      }, 400)
+    }
+    
+    // Get default tier (Standard) or use NULL if not found (no foreign key constraint)
+    let tierId = null
     try {
       const tier = await DB.prepare(`
         SELECT tier_id FROM all_inclusive_tiers 
@@ -18192,12 +18205,23 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       
       if (tier) {
         tierId = tier.tier_id
+      } else {
+        // Try to get any tier for this property
+        const anyTier = await DB.prepare(`
+          SELECT tier_id FROM all_inclusive_tiers 
+          WHERE property_id = ?
+          LIMIT 1
+        `).bind(propertyId).first()
+        
+        if (anyTier) {
+          tierId = anyTier.tier_id
+        }
       }
     } catch (tierError) {
-      console.error('Tier lookup error (using default):', tierError)
+      console.error('Tier lookup error:', tierError)
     }
     
-    // Ensure table exists
+    // Ensure table exists (without strict foreign keys)
     await DB.prepare(`
       CREATE TABLE IF NOT EXISTS digital_passes (
         pass_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18207,6 +18231,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
         room_number TEXT NOT NULL,
         guest_pin TEXT NOT NULL,
         guest_access_token TEXT NOT NULL,
+        qr_secret TEXT NOT NULL,
         guest_email TEXT,
         guest_phone TEXT,
         num_adults INTEGER DEFAULT 2,
@@ -18219,7 +18244,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       )
     `).run()
     
-    // Insert new digital pass
+    // Insert new digital pass (tier_id can be NULL)
     const passResult = await DB.prepare(`
       INSERT INTO digital_passes (
         property_id, pass_reference, primary_guest_name, 
@@ -18228,7 +18253,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
         valid_from, valid_until, pass_status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
     `).bind(
-      propertyId,
+      parseInt(propertyId), // Ensure it's an integer
       passReference,
       guest_name,
       room_number,
@@ -18237,7 +18262,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       qrSecret,
       num_adults || 2,
       num_children || 0,
-      tierId,
+      tierId, // Can be NULL
       valid_from,
       valid_until
     ).run()
