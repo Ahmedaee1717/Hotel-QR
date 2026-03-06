@@ -11720,48 +11720,42 @@ app.post('/api/chatbot/chat', async (c) => {
     
     // Get or create conversation
     let convId = conversation_id
+    let isAIPaused = false
+    
     if (!convId) {
       const convResult = await DB.prepare(`
         INSERT INTO chatbot_conversations (property_id, session_id)
         VALUES (?, ?)
       `).bind(property_id, session_id).run()
       convId = convResult.meta.last_row_id
-    }
-    
-    // CHECK IF ADMIN HAS TAKEN OVER THE CONVERSATION (with fallback for old schema)
-    const conversation = await DB.prepare(`
-      SELECT conversation_id FROM chatbot_conversations
-      WHERE session_id = ? AND property_id = ?
-    `).bind(session_id, property_id).first()
-    
-    // Try to check if AI is paused (column might not exist in old schemas)
-    let isAIPaused = false
-    try {
-      const pauseCheck = await DB.prepare(`
-        SELECT is_ai_paused FROM chatbot_conversations
-        WHERE session_id = ? AND property_id = ?
-      `).bind(session_id, property_id).first()
-      
-      if (pauseCheck && pauseCheck.is_ai_paused === 1) {
-        isAIPaused = true
+    } else {
+      // Check if admin has taken over (only for existing conversations)
+      try {
+        const conv = await DB.prepare(`
+          SELECT is_ai_paused FROM chatbot_conversations
+          WHERE conversation_id = ? AND session_id = ? AND property_id = ?
+        `).bind(convId, session_id, property_id).first()
+        
+        if (conv && conv.is_ai_paused === 1) {
+          isAIPaused = true
+        }
+      } catch (e) {
+        console.log('is_ai_paused column not found, skipping check')
       }
-    } catch (e) {
-      // Column doesn't exist yet, ignore
-      console.log('is_ai_paused column not found, skipping check')
     }
     
+    // If admin has taken over, block AI response
     if (isAIPaused) {
-      // Admin has taken over - don't respond with AI
-      // Just store the user message and return a holding response
+      // Store the user message
       await DB.prepare(`
-        INSERT INTO chatbot_messages (session_id, role, content, created_at)
+        INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
         VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
-      `).bind(session_id, message).run()
+      `).bind(convId, message).run()
       
       return c.json({
         success: true,
         response: 'A staff member is currently assisting you. They will respond shortly.',
-        conversation_id: conversation.conversation_id,
+        conversation_id: convId,
         is_staff_responding: true
       })
     }
