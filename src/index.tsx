@@ -18178,6 +18178,9 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
     // Generate guest access token
     const guestAccessToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
     
+    // Generate QR secret (for secure QR code generation)
+    const qrSecret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    
     // Get default tier (Standard) or use ID 1 if not found
     let tierId = 1
     try {
@@ -18220,10 +18223,10 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
     const passResult = await DB.prepare(`
       INSERT INTO digital_passes (
         property_id, pass_reference, primary_guest_name, 
-        room_number, guest_pin, guest_access_token,
+        room_number, guest_pin, guest_access_token, qr_secret,
         num_adults, num_children, tier_id,
         valid_from, valid_until, pass_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
     `).bind(
       propertyId,
       passReference,
@@ -18231,6 +18234,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       room_number,
       guestPin,
       guestAccessToken,
+      qrSecret,
       num_adults || 2,
       num_children || 0,
       tierId,
