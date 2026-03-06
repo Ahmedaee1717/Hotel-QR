@@ -16,6 +16,18 @@ app.use('/api/*', cors())
 // Serve static HTML files from public directory
 app.use('*.html', serveStatic({ root: './' }))
 
+// Waiter Dashboard (needs ASSETS fetch for Cloudflare Pages)
+app.get('/waiter-dashboard.html', async (c) => {
+  const response = await c.env.ASSETS.fetch(new URL('/waiter-dashboard.html', c.req.url))
+  return c.html(await response.text())
+})
+
+// Menu Editor (needs ASSETS fetch for Cloudflare Pages)
+app.get('/menu-editor.html', async (c) => {
+  const response = await c.env.ASSETS.fetch(new URL('/menu-editor.html', c.req.url))
+  return c.html(await response.text())
+})
+
 // ============================================
 // GUEST DIGITAL PASS ROUTES (Priority routes - must be first)
 // ============================================
@@ -9059,6 +9071,38 @@ app.get('/api/admin/restaurant/:offering_id/menus', async (c) => {
   }
 })
 
+// Admin: Upload image to blob storage (for menu images)
+app.post('/api/admin/upload-image', async (c) => {
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file')
+    
+    if (!file || !(file instanceof File)) {
+      return c.json({ success: false, error: 'No file provided' }, 400)
+    }
+    
+    // For Cloudflare Pages, we need to upload to R2 or external storage
+    // For now, generate a data URL (base64) as a temporary solution
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    const base64 = buffer.toString('base64')
+    const mimeType = file.type || 'image/jpeg'
+    const dataUrl = `data:${mimeType};base64,${base64}`
+    
+    // In production, you would upload to R2 and return the public URL:
+    // const url = await uploadToR2(buffer, file.name, c.env.R2_BUCKET)
+    
+    return c.json({
+      success: true,
+      url: dataUrl,
+      message: 'Image uploaded successfully'
+    })
+  } catch (error) {
+    console.error('Image upload error:', error)
+    return c.json({ success: false, error: 'Failed to upload image: ' + error.message }, 500)
+  }
+})
+
 // Upload and process menu image (with OCR)
 app.post('/api/admin/restaurant/:offering_id/menus', async (c) => {
   const { DB } = c.env
@@ -9202,77 +9246,15 @@ Please provide a complete, accurate transcription that preserves the menu's layo
       ) VALUES (?, ?, ?, 'ocr', CURRENT_TIMESTAMP)
     `).bind(menu_id, menu.base_language, extractedText).run()
     
-    // Auto-translate to all supported languages
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ar', 'zh']
-    const languagesToTranslate = supportedLanguages.filter(lang => lang !== menu.base_language)
-    
-    // Get language information for all languages
-    const languages = await DB.prepare(`
-      SELECT language_code, language_name_en, language_name_native 
-      FROM supported_languages 
-      WHERE language_code IN (${languagesToTranslate.map(() => '?').join(',')})
-    `).bind(...languagesToTranslate).all()
-    
-    // Translate to each language
-    const translationResults = []
-    for (const lang of languages.results) {
-      try {
-        // Call OpenAI for translation
-        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${c.env.OPENAI_API_KEY || 'sk-proj-demo'}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{
-              role: 'system',
-              content: `You are a professional restaurant menu translator. Translate the menu to ${lang.language_name_en} (${lang.language_name_native}). Maintain:
-- Section headers and structure
-- Accurate food terminology
-- Cultural appropriateness
-- Price formatting
-- Professional tone
-
-Provide ONLY the translated text, preserving the exact format and structure.`
-            }, {
-              role: 'user',
-              content: extractedText
-            }],
-            max_tokens: 4000,
-            temperature: 0.3
-          })
-        })
-        
-        if (openaiResponse.ok) {
-          const translationResult = await openaiResponse.json()
-          const translatedText = translationResult.choices[0].message.content
-          
-          // Store translation
-          await DB.prepare(`
-            INSERT OR REPLACE INTO restaurant_menu_translations (
-              menu_id, language_code, translated_text, translation_method, translated_at
-            ) VALUES (?, ?, ?, 'auto', CURRENT_TIMESTAMP)
-          `).bind(menu_id, lang.language_code, translatedText).run()
-          
-          translationResults.push({ language: lang.language_code, success: true })
-        } else {
-          translationResults.push({ language: lang.language_code, success: false })
-        }
-      } catch (error) {
-        console.error(`Auto-translate to ${lang.language_code} failed:`, error)
-        translationResults.push({ language: lang.language_code, success: false, error: error.message })
-      }
-    }
+    // REMOVED: Auto-translate to all languages (causes timeout)
+    // Translation is now done on-demand via /translate endpoint
     
     return c.json({ 
       success: true, 
       extracted_text: extractedText,
-      message: 'OCR processing completed successfully for ' + imageUrls.length + ' image(s). Auto-translated to ' + translationResults.filter(r => r.success).length + ' languages.',
+      message: 'OCR processing completed successfully for ' + imageUrls.length + ' image(s)',
       images_processed: imageUrls.length,
-      auto_translated: true,
-      translation_results: translationResults
+      auto_translated: false
     })
   } catch (error) {
     // Update status to failed
@@ -9520,12 +9502,18 @@ Extract:
 1. Categories (Appetizers, Main Course, Desserts, Beverages, etc.)
 2. For each item: name, description, price, currency, dietary info (vegetarian/vegan/gluten-free), spice level, allergens
 
-IMPORTANT: For spice_level, ONLY use these exact values: "none", "mild", "medium", "hot", "extra_hot"
+CRITICAL RULES:
+- Return ONLY valid, parseable JSON - no comments, no trailing commas
+- For spice_level, ONLY use: "none", "mild", "medium", "hot", "extra_hot"
+- If price is unclear, use 0
+- If allergens are unclear, use empty array []
+- Keep descriptions under 100 characters
+- DO NOT add trailing commas in arrays or objects
 
 Menu Text:
 ${menu.extracted_text}
 
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON in this exact format (NO trailing commas):
 {
   "categories": [
     {
@@ -9546,9 +9534,7 @@ Return ONLY valid JSON in this exact format:
       ]
     }
   ]
-}
-
-Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "extra_hot"`
+}`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -9559,24 +9545,74 @@ Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a menu parsing expert. Return only valid JSON.' },
+          { role: 'system', content: 'You are a menu parsing expert. Return only valid JSON with NO trailing commas.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.3,
-        max_tokens: 3000
+        temperature: 0.2,
+        max_tokens: 8000  // Increased to handle large menus
       })
     })
 
     const data = await response.json()
-    const aiResponse = data.choices[0].message.content.trim()
     
-    // Parse AI response
+    // Check if response was truncated
+    if (data.choices[0].finish_reason === 'length') {
+      throw new Error('AI response was truncated due to length. The menu is too large. Please upload fewer images or a smaller menu.')
+    }
+    
+    let aiResponse = data.choices[0].message.content.trim()
+    
+    // Remove markdown code blocks if present
+    aiResponse = aiResponse.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+    
+    // Parse AI response - extract JSON object
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
+      console.error('AI Response:', aiResponse)
       throw new Error('AI did not return valid JSON')
     }
     
-    const parsed = JSON.parse(jsonMatch[0])
+    let jsonString = jsonMatch[0]
+    
+    // Clean common JSON formatting issues from AI responses
+    // 1. Remove trailing commas before closing brackets/braces (multiple passes)
+    let prevLength = 0
+    while (prevLength !== jsonString.length) {
+      prevLength = jsonString.length
+      jsonString = jsonString.replace(/,(\s*[}\]])/g, '$1')
+    }
+    // 2. Remove comments (// or /* */)
+    jsonString = jsonString.replace(/\/\/.*$/gm, '')
+    jsonString = jsonString.replace(/\/\*[\s\S]*?\*\//g, '')
+    // 3. Fix multiple commas
+    jsonString = jsonString.replace(/,\s*,+/g, ',')
+    // 4. Fix missing commas between array elements (common AI error)
+    jsonString = jsonString.replace(/\}\s*\{/g, '},{')
+    jsonString = jsonString.replace(/\]\s*\[/g, '],[')
+    // 5. Remove any weird unicode characters
+    jsonString = jsonString.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    
+    let parsed
+    try {
+      parsed = JSON.parse(jsonString)
+    } catch (parseError) {
+      // Log detailed error information
+      console.error('JSON Parse Error. Raw response:', aiResponse.substring(0, 1000) + '...')
+      console.error('Extracted JSON (before cleaning):', jsonMatch[0].substring(0, 500) + '...')
+      console.error('Cleaned JSON (after cleaning):', jsonString.substring(0, 500) + '...')
+      console.error('Error at position:', parseError.message)
+      
+      // Try to extract the problematic section
+      const errorMatch = parseError.message.match(/position (\d+)/)
+      if (errorMatch) {
+        const errorPos = parseInt(errorMatch[1])
+        const contextStart = Math.max(0, errorPos - 100)
+        const contextEnd = Math.min(jsonString.length, errorPos + 100)
+        console.error('Context around error:', jsonString.substring(contextStart, contextEnd))
+      }
+      
+      throw new Error('Failed to parse AI response as JSON: ' + parseError.message)
+    }
     
     // Save parsed data to database
     let totalItems = 0
@@ -9661,22 +9697,36 @@ Remember: spice_level must be EXACTLY one of: "none", "mild", "medium", "hot", "
 
   } catch (error) {
     console.error('Menu parsing error:', error)
+    console.error('Error stack:', error.stack)
+    
+    const errorMessage = error.message || 'Unknown error'
     
     // Update log with error
-    await DB.prepare(`
-      UPDATE menu_parsing_logs 
-      SET parsing_status = 'failed', error_message = ?
-      WHERE menu_id = ? AND parsing_status = 'processing'
-    `).bind(error.message, menu_id).run()
+    try {
+      await DB.prepare(`
+        UPDATE menu_parsing_logs 
+        SET parsing_status = 'failed', error_message = ?
+        WHERE menu_id = ? AND parsing_status = 'processing'
+      `).bind(errorMessage, menu_id).run()
+    } catch (dbError) {
+      console.error('Failed to update parsing log:', dbError)
+    }
     
     // Update restaurant_menus status
-    await DB.prepare(`
-      UPDATE restaurant_menus 
-      SET ocr_status = 'failed'
-      WHERE menu_id = ?
-    `).bind(menu_id).run()
+    try {
+      await DB.prepare(`
+        UPDATE restaurant_menus 
+        SET ocr_status = 'failed'
+        WHERE menu_id = ?
+      `).bind(menu_id).run()
+    } catch (dbError) {
+      console.error('Failed to update menu status:', dbError)
+    }
     
-    return c.json({ error: 'Menu parsing failed: ' + error.message }, 500)
+    return c.json({ 
+      error: 'Menu parsing failed: ' + errorMessage,
+      details: error.stack || errorMessage
+    }, 500)
   }
 })
 
@@ -17842,6 +17892,268 @@ app.post('/api/guest/link-pass', async (c) => {
   }
 })
 
+// Guest: Request pass link by name (for guests who don't have PIN)
+app.post('/api/guest/request-pass-link', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const { guest_name, page_url } = await c.req.json()
+  
+  if (!guest_name) {
+    return c.json({ error: 'Guest name required' }, 400)
+  }
+  
+  try {
+    // Insert request into pass_link_requests table (create if not exists)
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS pass_link_requests (
+        request_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        property_id INTEGER NOT NULL,
+        guest_name TEXT NOT NULL,
+        page_url TEXT,
+        request_status TEXT DEFAULT 'pending',
+        linked_pass_reference TEXT,
+        linked_by_staff_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        resolved_at DATETIME
+      )
+    `).run()
+    
+    // Insert the request
+    const result = await DB.prepare(`
+      INSERT INTO pass_link_requests (property_id, guest_name, page_url, request_status)
+      VALUES (?, ?, ?, 'pending')
+    `).bind(propertyId, guest_name, page_url || '').run()
+    
+    return c.json({
+      success: true,
+      message: 'Request sent to front desk',
+      request_id: result.meta.last_row_id
+    })
+    
+  } catch (error) {
+    console.error('Request pass link error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to send request. Please try again.' 
+    }, 500)
+  }
+})
+
+// Admin: Get pending pass link requests
+app.get('/api/admin/pass-link-requests', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    const requests = await DB.prepare(`
+      SELECT 
+        r.*,
+        u.first_name as linked_by_first_name,
+        u.last_name as linked_by_last_name
+      FROM pass_link_requests r
+      LEFT JOIN users u ON r.linked_by_staff_id = u.user_id
+      WHERE r.property_id = ?
+      ORDER BY 
+        CASE r.request_status 
+          WHEN 'pending' THEN 1 
+          WHEN 'completed' THEN 2 
+          ELSE 3 
+        END,
+        r.created_at DESC
+      LIMIT 50
+    `).bind(propertyId).all()
+    
+    return c.json({
+      success: true,
+      requests: requests.results || []
+    })
+    
+  } catch (error) {
+    console.error('Get pass link requests error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to load requests',
+      requests: []
+    }, 500)
+  }
+})
+
+// Admin: Link guest name request to digital pass
+app.post('/api/admin/link-guest-to-pass', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const userId = c.req.header('X-User-ID')
+  const { request_id, pass_reference } = await c.req.json()
+  
+  if (!request_id || !pass_reference) {
+    return c.json({ error: 'Request ID and Pass Reference required' }, 400)
+  }
+  
+  try {
+    // Verify pass exists
+    const pass = await DB.prepare(`
+      SELECT pass_id, pass_reference, primary_guest_name, room_number
+      FROM digital_passes
+      WHERE pass_reference = ? AND property_id = ?
+    `).bind(pass_reference, propertyId).first()
+    
+    if (!pass) {
+      return c.json({ error: 'Pass not found' }, 404)
+    }
+    
+    // Update request status
+    await DB.prepare(`
+      UPDATE pass_link_requests
+      SET request_status = 'completed',
+          linked_pass_reference = ?,
+          linked_by_staff_id = ?,
+          resolved_at = CURRENT_TIMESTAMP
+      WHERE request_id = ? AND property_id = ?
+    `).bind(pass_reference, userId || null, request_id, propertyId).run()
+    
+    return c.json({
+      success: true,
+      message: 'Guest linked to pass successfully',
+      pass: {
+        pass_reference: pass.pass_reference,
+        guest_name: pass.primary_guest_name,
+        room_number: pass.room_number
+      }
+    })
+    
+  } catch (error) {
+    console.error('Link guest to pass error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to link guest. Please try again.' 
+    }, 500)
+  }
+})
+
+// Admin: Get guest lookup requests (alias for pass-link-requests)
+app.get('/api/admin/guest-lookup-requests', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || c.req.query('property_id') || '1'
+  
+  try {
+    const requests = await DB.prepare(`
+      SELECT 
+        r.*,
+        u.first_name as linked_by_first_name,
+        u.last_name as linked_by_last_name
+      FROM pass_link_requests r
+      LEFT JOIN users u ON r.linked_by_staff_id = u.user_id
+      WHERE r.property_id = ?
+      ORDER BY 
+        CASE r.request_status 
+          WHEN 'pending' THEN 1 
+          WHEN 'completed' THEN 2 
+          ELSE 3 
+        END,
+        r.created_at DESC
+      LIMIT 100
+    `).bind(propertyId).all()
+    
+    return c.json({
+      success: true,
+      requests: requests.results || []
+    })
+    
+  } catch (error) {
+    console.error('Get guest lookup requests error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to load requests',
+      requests: []
+    }, 500)
+  }
+})
+
+// Admin: Update guest lookup request status (dismiss, etc.)
+app.patch('/api/admin/guest-lookup-requests/:request_id', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const requestId = c.req.param('request_id')
+  const { status } = await c.req.json()
+  
+  if (!status || !['pending', 'completed', 'dismissed'].includes(status)) {
+    return c.json({ error: 'Invalid status' }, 400)
+  }
+  
+  try {
+    await DB.prepare(`
+      UPDATE pass_link_requests
+      SET request_status = ?,
+          resolved_at = CASE WHEN ? != 'pending' THEN CURRENT_TIMESTAMP ELSE resolved_at END
+      WHERE request_id = ? AND property_id = ?
+    `).bind(status, status, requestId, propertyId).run()
+    
+    return c.json({
+      success: true,
+      message: 'Request status updated'
+    })
+    
+  } catch (error) {
+    console.error('Update request status error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to update request status' 
+    }, 500)
+  }
+})
+
+// Admin: Search for digital passes by room number or PIN
+app.get('/api/admin/search-digital-pass', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.query('property_id') || '1'
+  const query = c.req.query('query') || ''
+  
+  if (!query || query.length < 2) {
+    return c.json({ 
+      success: false, 
+      error: 'Search query too short',
+      passes: []
+    }, 400)
+  }
+  
+  try {
+    // Search by room number or guest PIN
+    const passes = await DB.prepare(`
+      SELECT 
+        p.pass_id,
+        p.pass_reference,
+        p.primary_guest_name,
+        p.room_number,
+        p.guest_pin,
+        p.valid_from,
+        p.valid_until,
+        p.pass_status,
+        t.tier_name,
+        t.tier_color
+      FROM digital_passes p
+      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+      WHERE p.property_id = ? 
+        AND p.pass_status = 'active'
+        AND (p.room_number LIKE ? OR p.guest_pin LIKE ?)
+      ORDER BY p.pass_id DESC
+      LIMIT 20
+    `).bind(propertyId, '%' + query + '%', '%' + query + '%').all()
+    
+    return c.json({
+      success: true,
+      passes: passes.results || []
+    })
+    
+  } catch (error) {
+    console.error('Search digital pass error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to search passes',
+      passes: []
+    }, 500)
+  }
+})
+
 // Guest: Lookup pass by room number (for front desk)
 app.get('/api/guest/lookup-room', async (c) => {
   const { DB } = c.env
@@ -19886,6 +20198,40 @@ app.post('/api/admin/feedback/forms/:form_id/set-homepage', async (c) => {
   }
 })
 
+// PUBLIC: Get property branding colors for forms
+app.get('/api/property/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  
+  try {
+    const property = await DB.prepare(`
+      SELECT property_id, name, slug, primary_color, secondary_color, logo_url
+      FROM properties
+      WHERE property_id = ? AND status = 'active'
+    `).bind(property_id).first()
+    
+    if (!property) {
+      return c.json({ success: false, error: 'Property not found' }, 404)
+    }
+    
+    return c.json({ 
+      success: true, 
+      property: {
+        property_id: property.property_id,
+        name: property.name,
+        slug: property.slug,
+        primary_color: property.primary_color || '#972626',
+        secondary_color: property.secondary_color || '#681529',
+        logo_url: property.logo_url || 'https://i.ibb.co/qY4qM71S/e58193ed-70c9-4458-ad64-f6fb9bfd6a12.jpg'
+      }
+    })
+    
+  } catch (error) {
+    console.error('Property API error:', error)
+    return c.json({ success: false, error: 'Failed to load property' }, 500)
+  }
+})
+
 // PUBLIC: Get feedback form for guest (by form_id)
 app.get('/api/feedback/forms/:form_id', async (c) => {
   const { DB } = c.env
@@ -21003,8 +21349,53 @@ app.get('/hotel/:property_slug', async (c) => {
     .pass-link-button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+<style>
+    .pass-link-bar {
+        background: linear-gradient(135deg, #016e8f 0%, #01567a 100%);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
     }
-</style>
+    .pass-link-input {
+        border: 2px solid #e5e7eb;
+        background: white;
+    }
+    .pass-link-input:focus {
+        outline: none;
+        border-color: #016e8f;
+        box-shadow: 0 0 0 3px rgba(1, 110, 143, 0.1);
+    }
+    .pass-link-button {
+        background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
+        color: white;
+        transition: all 0.2s;
+    }
+    .pass-link-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+    }
+    .pass-link-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .link-mode-toggle {
+        display: inline-flex;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 0.5rem;
+        padding: 0.25rem;
+    }
+    .link-mode-option {
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    .link-mode-option.active {
+        background: white;
+        color: #016e8f;
+    }
+    </style>
 <div id="passLinkBarUnlinked" class="pass-link-bar py-3">
     <div class="max-w-7xl mx-auto px-4">
         <div class="flex items-center gap-3">
@@ -21014,21 +21405,53 @@ app.get('/hotel/:property_slug', async (c) => {
                 </div>
                 <span class="font-semibold hidden sm:inline">OnePass</span>
             </div>
-            <div class="flex-1 flex items-center gap-2">
-                <input type="text" id="passReferenceInput" placeholder="Enter your 6-digit PIN (e.g., 123456)" class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm" maxlength="6" inputmode="numeric" pattern="[0-9]*">
-                <button onclick="linkGuestPass()" id="linkPassButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
-                    <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
-                </button>
+            <div class="flex-1">
+                <!-- Mode Toggle -->
+                <div class="link-mode-toggle mb-2">
+                    <div class="link-mode-option active" id="pinModeBtn" onclick="switchLinkMode('pin')">
+                        <i class="fas fa-key mr-1"></i> PIN
+                    </div>
+                    <div class="link-mode-option" id="nameModeBtn" onclick="switchLinkMode('name')">
+                        <i class="fas fa-user mr-1"></i> Name
+                    </div>
+                </div>
+                
+                <!-- Input Fields -->
+                <div class="flex items-center gap-2">
+                    <div id="pinInputContainer" class="flex-1 flex items-center gap-2">
+                        <input type="text" id="passReferenceInput" placeholder="Enter your 6-digit PIN (e.g., 123456)" class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                        <button onclick="linkGuestPass()" id="linkPassButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
+                            <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
+                        </button>
+                    </div>
+                    
+                    <div id="nameInputContainer" class="hidden flex-1 flex items-center gap-2">
+                        <input type="text" id="guestNameInput" placeholder="Enter your full name (e.g., John Smith)" class="pass-link-input flex-1 px-4 py-2 rounded-lg text-sm">
+                        <button onclick="requestPassLink()" id="requestLinkButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
+                            <i class="fas fa-bell mr-2"></i><span class="hidden sm:inline">Request Link</span><span class="sm:hidden">Request</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             <button onclick="togglePassInfo()" class="text-white hover:text-gray-100 transition-colors"><i class="fas fa-info-circle text-xl"></i></button>
         </div>
         <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
-            <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>What is this?</p>
-            <p class="mb-2">Link your OnePass digital pass using your 6-digit PIN to enjoy seamless booking and instant access to your guest portal.</p>
-            <p class="text-xs opacity-80">Your PIN was provided at check-in (e.g., 123456)</p>
+            <div id="pinModeInfo">
+                <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Link with PIN</p>
+                <p class="mb-2">Link your OnePass digital pass using your 6-digit PIN to enjoy seamless booking and instant access to your guest portal.</p>
+                <p class="text-xs opacity-80">Your PIN was provided at check-in (e.g., 123456)</p>
+            </div>
+            <div id="nameModeInfo" class="hidden">
+                <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Request Pass Link</p>
+                <p class="mb-2">Don't have your PIN? Enter your name and the front desk will help link your pass within a few minutes.</p>
+                <p class="text-xs opacity-80">Front desk staff will be notified of your request</p>
+            </div>
         </div>
         <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i><span id="passLinkErrorMessage"></span>
+        </div>
+        <div id="passLinkSuccess" class="hidden mt-2 bg-green-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
+            <i class="fas fa-check-circle mr-2"></i><span id="passLinkSuccessMessage"></span>
         </div>
     </div>
 </div>
@@ -32789,10 +33212,7 @@ app.get('/admin/beach-map-designer', (c) => {
         }
         
         async function saveLayout() {
-            if (spots.length === 0 && zones.length === 0) {
-                alert('⚠️ Please add at least one spot or zone to the beach');
-                return;
-            }
+            // Allow saving empty layout (for clearing the beach)
             
             try {
                 // Delete all existing spots
@@ -32859,11 +33279,13 @@ app.get('/admin/beach-map-designer', (c) => {
         }
         
         function clearAll() {
-            if (confirm('Clear all spots? This cannot be undone.')) {
+            if (confirm('Clear all spots and zones? This cannot be undone.')) {
                 spots = [];
+                zones = [];
                 selectedSpot = null;
                 spotDetails.classList.add('hidden');
                 renderSpots();
+                renderZones();
             }
         }
         
@@ -40848,6 +41270,9 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="setFrontDeskView('service-requests')" id="viewServiceRequestsBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
                         <i class="fas fa-concierge-bell mr-2"></i>Service Requests
                     </button>
+                    <button onclick="setFrontDeskView('guest-lookup')" id="viewGuestLookupBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
+                        <i class="fas fa-address-card mr-2"></i>Guest Pass Requests
+                    </button>
                     
                     <div class="ml-auto flex gap-2">
                         <input type="date" id="frontDeskDateFilter" class="px-3 py-2 border rounded-lg" onchange="loadFrontDeskData()">
@@ -40926,6 +41351,35 @@ app.get('/admin/dashboard', (c) => {
                 <div class="col-span-2 text-center text-gray-400 py-8">
                     <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
                     <p>Loading service requests...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Guest Pass Lookup Requests View -->
+        <div id="guestLookupViewContainer" style="display: none;">
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-bold">
+                        <i class="fas fa-address-card mr-3 text-purple-600"></i>
+                        Guest Pass Lookup Requests
+                    </h3>
+                    <button onclick="loadGuestLookupRequests()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
+                <p class="text-gray-600 mb-4">Guests who requested their digital pass by entering their name</p>
+            </div>
+            
+            <!-- Pending Requests -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h4 class="text-xl font-bold mb-4">
+                    <i class="fas fa-clock mr-2 text-yellow-600"></i>Pending Requests
+                </h4>
+                <div id="guestLookupRequestsList" class="space-y-4">
+                    <div class="text-center text-gray-400 py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+                        <p>Loading guest lookup requests...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -45802,8 +46256,8 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Question Type Modal -->
-    <div id="questionTypeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[1001] p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+    <div id="questionTypeModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative z-[10000]">
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-xl">
                 <h3 class="text-xl font-bold">Choose Question Type</h3>
             </div>
@@ -45853,8 +46307,8 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- Question Creation Modal -->
-    <div id="questionCreationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[60] p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+    <div id="questionCreationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-[9999] p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative z-[10000]">
             <div class="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-xl">
                 <h3 class="text-2xl font-bold"><i class="fas fa-plus-circle mr-2"></i>Create New Question</h3>
                 <p class="text-sm text-purple-100 mt-1">Fill in the details below</p>
@@ -46472,10 +46926,10 @@ app.get('/admin/dashboard', (c) => {
         currentFrontDeskView = view;
         
         // Update button styles
-        ['All', 'Feedback', 'Chatbot', 'Urgent', 'ServiceRequests'].forEach(v => {
+        ['All', 'Feedback', 'Chatbot', 'Urgent', 'ServiceRequests', 'GuestLookup'].forEach(v => {
           const btn = document.getElementById('view' + v + 'Btn');
           if (btn) {
-            if (v.toLowerCase() === view || (v === 'All' && view === 'all') || (v === 'ServiceRequests' && view === 'service-requests')) {
+            if (v.toLowerCase() === view || (v === 'All' && view === 'all') || (v === 'ServiceRequests' && view === 'service-requests') || (v === 'GuestLookup' && view === 'guest-lookup')) {
               btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
             } else {
               btn.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
@@ -46483,16 +46937,22 @@ app.get('/admin/dashboard', (c) => {
           }
         });
         
-        // Show/hide appropriate view
+        // Hide all views first
+        const feedGrid = document.getElementById('frontdeskFeedGrid');
+        const serviceView = document.getElementById('serviceRequestsViewContainer');
+        const guestLookupView = document.getElementById('guestLookupViewContainer');
+        if (feedGrid) feedGrid.style.display = 'none';
+        if (serviceView) serviceView.style.display = 'none';
+        if (guestLookupView) guestLookupView.style.display = 'none';
+        
+        // Show appropriate view
         if (view === 'service-requests') {
-          const feedGrid = document.getElementById('frontdeskFeedGrid');
-          if (feedGrid) feedGrid.style.display = 'none';
           showServiceRequestsView();
+        } else if (view === 'guest-lookup') {
+          if (guestLookupView) guestLookupView.style.display = 'block';
+          loadGuestLookupRequests();
         } else {
-          const feedGrid = document.getElementById('frontdeskFeedGrid');
           if (feedGrid) feedGrid.style.display = 'grid';
-          const serviceView = document.getElementById('serviceRequestsViewContainer');
-          if (serviceView) serviceView.style.display = 'none';
           loadFrontDeskData();
         }
       };
@@ -46989,6 +47449,315 @@ app.get('/admin/dashboard', (c) => {
       
       // ========================================
       // END SERVICE REQUESTS FUNCTIONS
+      // ========================================
+      
+      // ========================================
+      // GUEST LOOKUP REQUESTS FUNCTIONS
+      // ========================================
+      
+      let allGuestLookupRequests = [];
+      
+      window.loadGuestLookupRequests = async function() {
+        try {
+          const response = await fetch('/api/admin/guest-lookup-requests?property_id=' + propertyId);
+          const data = await response.json();
+          
+          if (data.success) {
+            allGuestLookupRequests = data.requests || [];
+            renderGuestLookupRequests(allGuestLookupRequests);
+          }
+        } catch (error) {
+          console.error('Load guest lookup requests error:', error);
+          document.getElementById('guestLookupRequestsList').innerHTML = \`
+            <div class="text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error loading guest lookup requests</p>
+            </div>
+          \`;
+        }
+      };
+      
+      function renderGuestLookupRequests(requests) {
+        const container = document.getElementById('guestLookupRequestsList');
+        
+        // Filter pending requests only
+        const pending = requests.filter(r => r.request_status === 'pending');
+        
+        if (!pending || pending.length === 0) {
+          container.innerHTML = \`
+            <div class="text-center text-gray-400 py-8">
+              <i class="fas fa-inbox text-4xl mb-3"></i>
+              <p>No pending guest lookup requests</p>
+              <p class="text-sm mt-2">Guests can request their pass from the front desk page</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        container.innerHTML = pending.map(req => {
+          const timeAgo = getTimeAgo(new Date(req.created_at));
+          
+          return \`
+            <div class="bg-white rounded-lg shadow border-l-4 border-purple-500 p-6 hover:shadow-lg transition-shadow">
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                    <i class="fas fa-user text-2xl text-purple-600"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-bold text-gray-800">\${req.guest_name}</h4>
+                    <p class="text-sm text-gray-500">
+                      <i class="fas fa-clock mr-1"></i>\${timeAgo}
+                    </p>
+                  </div>
+                </div>
+                <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-bold">
+                  <i class="fas fa-clock mr-1"></i>PENDING
+                </span>
+              </div>
+              
+              <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="grid grid-cols-1 gap-3 text-sm">
+                  <div>
+                    <span class="text-gray-500">Request ID:</span>
+                    <span class="font-medium text-gray-800 ml-2">#\${req.request_id}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500">Guest Name:</span>
+                    <span class="font-medium text-gray-800 ml-2">\${req.guest_name}</span>
+                  </div>
+                  \${req.page_url ? \`
+                    <div>
+                      <span class="text-gray-500">Requested From:</span>
+                      <span class="font-medium text-gray-800 ml-2 text-xs truncate">\${req.page_url}</span>
+                    </div>
+                  \` : ''}
+                </div>
+              </div>
+              
+              <div class="flex gap-3">
+                <button onclick="openLinkPassModal(\${req.request_id}, '\${req.guest_name.replace(/'/g, "\\'")}')" 
+                        class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors">
+                  <i class="fas fa-link mr-2"></i>Link to Digital Pass
+                </button>
+                <button onclick="dismissGuestRequest(\${req.request_id})" 
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors">
+                  <i class="fas fa-times mr-2"></i>Dismiss
+                </button>
+              </div>
+            </div>
+          \`;
+        }).join('');
+      }
+      
+      function getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + ' years ago';
+        
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + ' months ago';
+        
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + ' days ago';
+        
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + ' hours ago';
+        
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + ' minutes ago';
+        
+        return Math.floor(seconds) + ' seconds ago';
+      }
+      
+      window.openLinkPassModal = function(requestId, guestName) {
+        // Show a modal to search for digital pass
+        const modal = document.createElement('div');
+        modal.id = 'linkPassModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = \`
+          <div class="bg-white rounded-lg shadow-2xl p-6 max-w-lg w-full mx-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-2xl font-bold text-gray-800">
+                <i class="fas fa-link mr-2 text-purple-600"></i>Link Digital Pass
+              </h3>
+              <button onclick="closeLinkPassModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+            
+            <div class="bg-purple-50 rounded-lg p-4 mb-6">
+              <p class="text-sm text-gray-700">
+                <strong>Guest:</strong> \${guestName}
+              </p>
+            </div>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">
+                Search by Room Number or Guest PIN
+              </label>
+              <input type="text" id="passSearchInput" 
+                     class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
+                     placeholder="Enter room number (e.g., 101) or 6-digit PIN"
+                     oninput="searchDigitalPass(this.value)">
+            </div>
+            
+            <div id="passSearchResults" class="mb-4 max-h-64 overflow-y-auto">
+              <div class="text-center text-gray-400 py-8">
+                <i class="fas fa-search text-4xl mb-3"></i>
+                <p>Enter room number or PIN to search</p>
+              </div>
+            </div>
+            
+            <div class="flex gap-3">
+              <button onclick="closeLinkPassModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
+                Cancel
+              </button>
+            </div>
+          </div>
+        \`;
+        document.body.appendChild(modal);
+        
+        // Store current request ID for later use
+        window.currentLinkRequestId = requestId;
+        window.currentLinkGuestName = guestName;
+      };
+      
+      window.closeLinkPassModal = function() {
+        const modal = document.getElementById('linkPassModal');
+        if (modal) modal.remove();
+      };
+      
+      window.searchDigitalPass = async function(query) {
+        const resultsContainer = document.getElementById('passSearchResults');
+        
+        if (!query || query.length < 2) {
+          resultsContainer.innerHTML = \`
+            <div class="text-center text-gray-400 py-8">
+              <i class="fas fa-search text-4xl mb-3"></i>
+              <p>Enter room number or PIN to search</p>
+            </div>
+          \`;
+          return;
+        }
+        
+        try {
+          resultsContainer.innerHTML = \`
+            <div class="text-center text-gray-400 py-8">
+              <i class="fas fa-spinner fa-spin text-4xl mb-3"></i>
+              <p>Searching...</p>
+            </div>
+          \`;
+          
+          const response = await fetch('/api/admin/search-digital-pass?property_id=' + propertyId + '&query=' + encodeURIComponent(query));
+          const data = await response.json();
+          
+          if (data.success && data.passes && data.passes.length > 0) {
+            resultsContainer.innerHTML = data.passes.map(pass => \`
+              <div class="bg-gray-50 rounded-lg p-4 mb-3 border-2 border-gray-200 hover:border-purple-500 cursor-pointer transition-colors"
+                   onclick="confirmLinkPass('\${pass.pass_reference}', '\${pass.primary_guest_name}', '\${pass.room_number}')">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-bold text-gray-800">\${pass.primary_guest_name}</p>
+                    <p class="text-sm text-gray-600">
+                      <i class="fas fa-door-open mr-1"></i>Room \${pass.room_number}
+                      <span class="mx-2">•</span>
+                      <i class="fas fa-key mr-1"></i>\${pass.guest_pin}
+                    </p>
+                    <p class="text-sm text-gray-500">
+                      \${pass.tier_name || 'Standard'} Tier
+                      <span class="mx-2">•</span>
+                      Valid: \${new Date(pass.valid_from).toLocaleDateString()} - \${new Date(pass.valid_until).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <i class="fas fa-chevron-right text-gray-400"></i>
+                </div>
+              </div>
+            \`).join('');
+          } else {
+            resultsContainer.innerHTML = \`
+              <div class="text-center text-gray-400 py-8">
+                <i class="fas fa-search text-4xl mb-3"></i>
+                <p>No digital passes found</p>
+                <p class="text-sm mt-2">Try a different room number or PIN</p>
+              </div>
+            \`;
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+          resultsContainer.innerHTML = \`
+            <div class="text-center text-red-500 py-8">
+              <i class="fas fa-exclamation-triangle text-4xl mb-3"></i>
+              <p>Error searching for passes</p>
+            </div>
+          \`;
+        }
+      };
+      
+      window.confirmLinkPass = function(passReference, guestName, roomNumber) {
+        if (confirm(\`Link this guest to:\n\n\${guestName}\nRoom \${roomNumber}\n\nAre you sure?\`)) {
+          linkGuestToPass(window.currentLinkRequestId, passReference);
+        }
+      };
+      
+      async function linkGuestToPass(requestId, passReference) {
+        try {
+          const response = await fetch('/api/admin/link-guest-to-pass', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({
+              request_id: requestId,
+              pass_reference: passReference
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            closeLinkPassModal();
+            alert('✅ Guest successfully linked to digital pass!');
+            loadGuestLookupRequests(); // Refresh the list
+          } else {
+            alert('Failed to link guest: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Link error:', error);
+          alert('Error linking guest to pass');
+        }
+      }
+      
+      window.dismissGuestRequest = async function(requestId) {
+        if (!confirm('Dismiss this guest lookup request?')) return;
+        
+        try {
+          const response = await fetch('/api/admin/guest-lookup-requests/' + requestId, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({ status: 'dismissed' })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            loadGuestLookupRequests(); // Refresh the list
+          } else {
+            alert('Failed to dismiss request');
+          }
+        } catch (error) {
+          console.error('Dismiss error:', error);
+          alert('Error dismissing request');
+        }
+      };
+      
+      // ========================================
+      // END GUEST LOOKUP REQUESTS FUNCTIONS
       // ========================================
       
       // ========================================
@@ -61535,17 +62304,6 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
       // Menu Content
       html += '<div class="max-w-6xl mx-auto px-4 py-8">';
       
-      // Extra Charge Notice Banner
-      html += '<div class="mb-8 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-6 shadow-lg">';
-      html += '<div class="flex items-start gap-4">';
-      html += '<i class="fas fa-exclamation-circle text-red-600 text-3xl mt-1"></i>';
-      html += '<div>';
-      html += '<h3 class="font-bold text-red-800 text-xl mb-2">⚠️ À La Carte Menu - Extra Charges Apply</h3>';
-      html += '<p class="text-gray-700">All items on this menu are available for order but will incur <strong>additional charges</strong> beyond your package. Prices are displayed next to each item.</p>';
-      html += '</div>';
-      html += '</div>';
-      html += '</div>';
-      
       // Column layout based on settings
       const colsClass = d.columns_count === 2 ? 'md:grid-cols-2' : d.columns_count === 3 ? 'md:grid-cols-3' : '';
       const gapClass = d.item_spacing === 'compact' ? 'gap-4' : d.item_spacing === 'spacious' ? 'gap-8' : 'gap-6';
@@ -61588,7 +62346,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
             html += '<div class="flex justify-between items-baseline gap-4">';
             html += '<div class="flex items-center gap-2 flex-wrap">';
             html += '<h4 class="menu-item-name">' + item.item_name + '</h4>';
-            html += '<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold border border-red-300" style="white-space: nowrap;">💳 EXTRA CHARGE</span>';
+            // EXTRA CHARGE label removed - this is the main menu
             html += '</div>';
             
             if (d.show_prices && item.price && d.price_position === 'right') {
@@ -63295,8 +64053,41 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         <input type="date" id="bookingDate" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-bold mb-2">Time *</label>
-                        <input type="time" id="bookingTime" class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target" required>
+                        <label class="block text-sm font-bold mb-2">
+                            <i class="fas fa-clock mr-2"></i>Time *
+                        </label>
+                        <div class="flex gap-2 items-center">
+                            <select id="bookingHour" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target bg-white text-lg font-semibold" required>
+                                <option value="">Hour</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                                <option value="13">13</option>
+                                <option value="14">14</option>
+                                <option value="15">15</option>
+                                <option value="16">16</option>
+                                <option value="17">17</option>
+                                <option value="18">18</option>
+                                <option value="19">19</option>
+                                <option value="20">20</option>
+                                <option value="21">21</option>
+                                <option value="22">22</option>
+                                <option value="23">23</option>
+                            </select>
+                            <span class="text-2xl font-bold text-gray-400">:</span>
+                            <select id="bookingMinute" class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-accent-color focus:ring-2 focus:ring-accent-color/20 transition touch-target bg-white text-lg font-semibold" required>
+                                <option value="">Min</option>
+                                <option value="00">00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                            </select>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>Select hour and minute
+                        </p>
                     </div>
                 </div>
             </div>
@@ -63595,8 +64386,17 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         function setCurrentTime() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('bookingTime').value = hours + ':' + minutes;
+            const minutes = String(Math.floor(now.getMinutes() / 15) * 15).padStart(2, '0'); // Round to nearest 15 min
+            document.getElementById('bookingHour').value = hours;
+            document.getElementById('bookingMinute').value = minutes;
+        }
+        
+        // Helper function to get the combined booking time
+        function getBookingTime() {
+            const hour = document.getElementById('bookingHour').value;
+            const minute = document.getElementById('bookingMinute').value;
+            if (!hour || !minute) return '';
+            return hour + ':' + minute;
         }
         
         // Handle allergy declaration radio buttons
@@ -64148,8 +64948,8 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         alert('Please select a date');
                         return;
                     }
-                    if (!document.getElementById('bookingTime').value) {
-                        alert('Please select a time');
+                    if (!getBookingTime()) {
+                        alert('Please select both hour and minute');
                         return;
                     }
                 } else if (currentStep === 2) {
@@ -64225,7 +65025,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const roomNumber = document.getElementById('roomNumber').value;
             const partySize = document.getElementById('partySize').value;
             const date = document.getElementById('bookingDate').value;
-            const time = document.getElementById('bookingTime').value;
+            const time = getBookingTime();
             
             const itemsList = Object.values(selectedItems).map(s => \`
                 <div class="flex items-start justify-between py-2 border-b">
@@ -64267,7 +65067,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 
                 // Get the selected date and time for availability checking
                 const selectedDate = document.getElementById('bookingDate').value;
-                const selectedTime = document.getElementById('bookingTime').value;
+                const selectedTime = getBookingTime();
                 
                 // Update the floor plan info display
                 const dateObj = new Date(selectedDate);
@@ -64503,6 +65303,23 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 tableEl.style.cursor = isReserved ? 'not-allowed' : 'pointer';
                 tableEl.style.zIndex = '10';
                 
+                // Apply rotation if table has rotation property
+                const rotation = table.rotation && table.rotation !== 0 ? table.rotation : 0;
+                if (rotation !== 0) {
+                    tableEl.style.transform = 'rotate(' + rotation + 'deg)';
+                    tableEl.style.transformOrigin = 'center center';
+                }
+                
+                // Preserve rotation on hover (if not reserved)
+                if (!isReserved) {
+                    tableEl.onmouseover = function() {
+                        this.style.transform = 'scale(1.05) rotate(' + rotation + 'deg)';
+                    };
+                    tableEl.onmouseout = function() {
+                        this.style.transform = 'scale(1) rotate(' + rotation + 'deg)';
+                    };
+                }
+                
                 tableEl.innerHTML = 
                     '<div class=\"font-bold\" style=\"margin-bottom: 2px;\">' + table.table_number + '</div>' +
                     '<div class=\"text-gray-600\" style=\"font-size: ' + (isMobile ? '9px' : '11px') + ';\"><i class=\"fas fa-user\"></i> ' + table.capacity + '</div>' +
@@ -64550,14 +65367,15 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     room_number: document.getElementById('roomNumber').value,
                     party_size: parseInt(document.getElementById('partySize').value),
                     reservation_date: document.getElementById('bookingDate').value,
-                    reservation_time: document.getElementById('bookingTime').value,
+                    reservation_time: getBookingTime(),
                     restaurant_id: selectedRestaurant.offering_id,
                     table_id: selectedTableId, // Include selected table
                     staff_id: selectedStaffId, // Track staff member creating booking
                     items: Object.values(selectedItems).map(s => ({
                         item_id: s.item.item_id,
                         quantity: s.quantity,
-                        custom_limit: s.customLimit
+                        custom_limit: s.customLimit,
+                        is_extra_charge: s.item.extraCharge || s.item.is_premium || false
                     })),
                     allergy_info: hasAllergiesRadio ? allergyDetails : null,
                     no_allergies_confirmed: !hasAllergiesRadio
@@ -67529,7 +68347,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
 
       // Menu helper functions
       window.viewMenu = async function(menuId) {
-        window.location.href = '/admin/restaurant/menu/' + menuId + '/edit?restaurant_id=' + offeringId;
+        window.location.href = '/admin/restaurant/menu/' + menuId + '/edit?restaurant_id=' + numericOfferingId;
       };
       
       window.deleteMenu = async function(menuId, menuName) {
@@ -68623,13 +69441,32 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 const tableDiv = document.createElement('div');
                 tableDiv.id = 'table-' + table.table_id;
                 tableDiv.className = 'absolute cursor-pointer transition-all ' + 
-                    (isReserved ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105') + ' ' +
+                    (isReserved ? 'opacity-50 cursor-not-allowed' : '') + ' ' +
                     (isSelected ? 'ring-4 ring-blue-500' : '');
                 
                 tableDiv.style.left = (table.position_x * 0.8) + 'px';
                 tableDiv.style.top = (table.position_y * 0.8) + 'px';
                 tableDiv.style.width = (table.width * 0.8) + 'px';
                 tableDiv.style.height = (table.height * 0.8) + 'px';
+                
+                // Apply rotation if specified
+                const rotation = table.rotation && table.rotation !== 0 ? table.rotation : 0;
+                if (rotation !== 0) {
+                    tableDiv.style.transform = 'rotate(' + rotation + 'deg)';
+                    tableDiv.style.transformOrigin = 'center center';
+                }
+                
+                // Add hover effect that preserves rotation
+                if (!isReserved) {
+                    tableDiv.onmouseover = () => {
+                        const rotateTransform = rotation !== 0 ? ' rotate(' + rotation + 'deg)' : '';
+                        tableDiv.style.transform = 'scale(1.05)' + rotateTransform;
+                    };
+                    tableDiv.onmouseout = () => {
+                        const rotateTransform = rotation !== 0 ? ' rotate(' + rotation + 'deg)' : '';
+                        tableDiv.style.transform = 'scale(1)' + rotateTransform;
+                    };
+                }
                 
                 const bgColor = isReserved ? '#EF4444' : (isSelected ? '#3B82F6' : '#10B981');
                 
@@ -68664,7 +69501,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         async function confirmBooking() {
             const date = document.getElementById('bookingDate').value;
-            const time = document.getElementById('bookingTime').value;
+            const time = getBookingTime();
             const adults = document.getElementById('numAdults').value;
             const children = document.getElementById('numChildren').value;
             
@@ -68924,7 +69761,18 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             selectedDate = document.getElementById('bookingDate').value;
             loadTables();
         });
-        document.getElementById('bookingTime').addEventListener('change', loadTables);
+        // Update for both hour and minute dropdowns (if they exist)
+        const bookingHour = document.getElementById('bookingHour');
+        const bookingMinute = document.getElementById('bookingMinute');
+        const bookingTime = document.getElementById('bookingTime');
+        
+        if (bookingHour && bookingMinute) {
+            bookingHour.addEventListener('change', loadTables);
+            bookingMinute.addEventListener('change', loadTables);
+        } else if (bookingTime) {
+            bookingTime.addEventListener('change', loadTables);
+        }
+        
         document.getElementById('numAdults').addEventListener('change', renderTables);
         document.getElementById('numChildren').addEventListener('change', renderTables);
         
@@ -69155,31 +70003,29 @@ app.get('/admin/restaurant/:offering_id', (c) => {
               
               const parseData = await parseResponse.json();
               
+              if (!parseResponse.ok || !parseData.success) {
+                console.error('Parse structure failed:', parseData);
+                throw new Error(parseData.error || parseData.details || 'Failed to parse menu structure');
+              }
+              
               // Complete
               if (progressBar) progressBar.style.width = '100%';
               if (progressText) progressText.textContent = 'Complete!';
               
-              if (parseData.success) {
-                alert('✅ Menu uploaded and processed successfully!\\n\\n' + 
-                      'Categories: ' + (parseData.categories_created || 0) + '\\n' +
-                      'Items: ' + (parseData.items_created || 0));
-                
-                // Reset form
-                uploadForm.reset();
-                if (typeof window.clearImageUpload === 'function') {
-                  window.clearImageUpload();
-                }
-                
-                // Reload menus
-                if (typeof window.loadMenus === 'function') {
-                  await window.loadMenus();
-                }
-              } else {
-                alert('⚠️ Menu created but parsing had issues.\\n\\n' + 
-                      'You can edit it manually or try uploading again.');
-                if (typeof window.loadMenus === 'function') {
-                  await window.loadMenus();
-                }
+              // Success!
+              alert('✅ Menu uploaded and processed successfully!\\n\\n' + 
+                    'Categories: ' + (parseData.categories || 0) + '\\n' +
+                    'Items: ' + (parseData.items || 0));
+              
+              // Reset form
+              uploadForm.reset();
+              if (typeof window.clearImageUpload === 'function') {
+                window.clearImageUpload();
+              }
+              
+              // Reload menus
+              if (typeof window.loadMenus === 'function') {
+                await window.loadMenus();
               }
               
               // Hide progress after 2 seconds
@@ -69474,16 +70320,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             <div id="setMenuContainer"></div>
         </div>
 
-        <!-- RESTAURANT MENU (Extra Charge) -->
-        <div id="restaurantMenuSection" class="bg-white rounded-lg shadow-lg p-6 mb-6 border-2 border-red-200">
+        <!-- RESTAURANT MENU -->
+        <div id="restaurantMenuSection" class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-2xl font-bold"><i class="fas fa-concierge-bell mr-2 text-primary"></i>Restaurant Menu</h2>
-                <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-bold border border-red-300">
-                    <i class="fas fa-credit-card mr-1"></i>EXTRA CHARGE
-                </span>
-            </div>
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p class="text-red-800 font-semibold"><i class="fas fa-info-circle mr-2"></i>These items are not included in your voucher and will be charged separately.</p>
             </div>
             
             <!-- Restaurant Menu Category Tabs -->
@@ -69672,11 +70512,19 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             if (!tabsContainer) return;
             
             const setCategories = Object.keys(setMenuByCategory)
-                .filter(cat => categoryConfig[cat])
-                .sort((a, b) => (categoryConfig[a]?.order || 999) - (categoryConfig[b]?.order || 999));
+                .sort((a, b) => {
+                    const orderA = categoryConfig[a]?.order || 999;
+                    const orderB = categoryConfig[b]?.order || 999;
+                    return orderA - orderB;
+                });
             
             tabsContainer.innerHTML = setCategories.map((category, index) => {
-                const config = categoryConfig[category];
+                const config = categoryConfig[category] || { 
+                    emoji: '🍽️', 
+                    label: category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+                    i18n: category,
+                    order: 999
+                };
                 const isFirst = index === 0;
                 const activeClass = isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600';
                 return '<button onclick="showSetMenuCategory(\\'' + category + '\\')" class="set-menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span>' + config.label + '</span></button>';
@@ -69693,8 +70541,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             if (!tabsContainer || !section) return;
             
             const restaurantCategories = Object.keys(restaurantMenuByCategory)
-                .filter(cat => categoryConfig[cat])
-                .sort((a, b) => (categoryConfig[a]?.order || 999) - (categoryConfig[b]?.order || 999));
+                .sort((a, b) => {
+                    const orderA = categoryConfig[a]?.order || 999;
+                    const orderB = categoryConfig[b]?.order || 999;
+                    return orderA - orderB;
+                });
             
             // Hide section if no restaurant menu
             if (restaurantCategories.length === 0) {
@@ -69703,7 +70554,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             }
             
             tabsContainer.innerHTML = restaurantCategories.map((category, index) => {
-                const config = categoryConfig[category];
+                const config = categoryConfig[category] || { 
+                    emoji: '🍽️', 
+                    label: category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+                    i18n: category,
+                    order: 999
+                };
                 const isFirst = index === 0;
                 const activeClass = isFirst ? 'border-primary text-primary' : 'border-transparent text-gray-600';
                 return '<button onclick="showRestaurantMenuCategory(\\'' + category + '\\')" class="restaurant-menu-tab px-4 py-3 font-semibold whitespace-nowrap border-b-2 ' + activeClass + '">' + config.emoji + ' <span>' + config.label + '</span></button>';
@@ -70083,7 +70939,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 let quantityControls = '';
                 if (quantity > 0) {
-                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
+                    quantityControls = '<button onclick="decreaseItemQuantity(\\'' + item.item_id + '\\', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
                                       'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
                                       '<i class="fas fa-minus"></i>' +
                                       '</button>' +
@@ -70147,7 +71003,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 
                 let quantityControls = '';
                 if (quantity > 0) {
-                    quantityControls = '<button onclick="decreaseItemQuantity(' + item.item_id + ', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
+                    quantityControls = '<button onclick="decreaseItemQuantity(\\'' + item.item_id + '\\', &quot;' + item.category + '&quot;, ' + (item.extraCharge ? 'true' : 'false') + ')" ' +
                                       'class="w-10 h-10 rounded-lg bg-gray-200 hover:bg-gray-300 font-bold transition-colors">' +
                                       '<i class="fas fa-minus"></i>' +
                                       '</button>' +
@@ -70405,6 +71261,14 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 tableDiv.style.top = (table.position_y * 0.8) + 'px';
                 tableDiv.style.width = (table.width * 0.8) + 'px';
                 tableDiv.style.height = (table.height * 0.8) + 'px';
+                
+                // Apply rotation if specified
+                const rotation = table.rotation && table.rotation !== 0 ? table.rotation : 0;
+                if (rotation !== 0) {
+                    tableDiv.style.transform = 'rotate(' + rotation + 'deg)';
+                    tableDiv.style.transformOrigin = 'center center';
+                }
+                
                 tableDiv.style.border = isSelected ? '3px solid #10B981' : '2px solid #D1D5DB';
                 tableDiv.style.borderRadius = table.shape === 'circle' ? '50%' : '8px';
                 tableDiv.style.background = isSelected ? '#D1FAE5' : (canFit ? '#FFFFFF' : '#FEE2E2');
@@ -70428,13 +71292,15 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     };
                     tableDiv.onmouseover = function() {
                         if (!isSelected) {
-                            this.style.transform = 'scale(1.05)';
+                            const rotateTransform = rotation !== 0 ? ' rotate(' + rotation + 'deg)' : '';
+                            this.style.transform = 'scale(1.05)' + rotateTransform;
                             this.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                         }
                     };
                     tableDiv.onmouseout = function() {
                         if (!isSelected) {
-                            this.style.transform = 'scale(1)';
+                            const rotateTransform = rotation !== 0 ? ' rotate(' + rotation + 'deg)' : '';
+                            this.style.transform = 'scale(1)' + rotateTransform;
                             this.style.boxShadow = 'none';
                         }
                     };
@@ -71310,6 +72176,30 @@ app.get('/api/alacarte/voucher/:voucher_code', async (c) => {
   }
 })
 
+// DEBUG: Check property_id for a specific voucher
+app.get('/api/debug/voucher/:voucher_id', async (c) => {
+  const { voucher_id } = c.req.param()
+  const { DB } = c.env
+  
+  try {
+    const voucher = await DB.prepare(`
+      SELECT voucher_id, voucher_code, property_id, restaurant_id, table_number, special_requests, 
+             party_size, reservation_date, reservation_time
+      FROM alacarte_vouchers
+      WHERE voucher_id = ?
+    `).bind(voucher_id).first()
+    
+    return c.json({
+      success: true,
+      voucher,
+      property_id_type: typeof voucher?.property_id,
+      property_id_value: voucher?.property_id
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error.message })
+  }
+})
+
 // Front Desk Manual À La Carte Booking
 app.post('/api/front-desk/alacarte-booking', async (c) => {
   const { DB } = c.env
@@ -71331,6 +72221,8 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       allergy_info,
       no_allergies_confirmed
     } = body
+    
+    console.log('[Front Desk Booking] property_id:', property_id, 'type:', typeof property_id)
     
     // Validate required fields (pass_reference is OPTIONAL for walk-in guests)
     if (!guest_name || !room_number || !party_size || !reservation_date || !reservation_time || !restaurant_id || !items || items.length === 0) {
@@ -71384,9 +72276,9 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
     
     // Get item IDs and quantities
-    // Add rm_ prefix for extra-charge menu items to track upsells in analytics
+    // Item IDs already have rm_ prefix for extra-charge items (added by front-end)
     const preorder_items = items.map(i => ({
-      item_id: `rm_${i.item_id}`,
+      item_id: i.item_id, // Use as-is - rm_ prefix already added by front-end for extra-charge
       quantity: i.quantity || 1
     }))
     
@@ -71419,6 +72311,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
     }
     
     // Create voucher (with or without pass)
+    console.log('[Front Desk Booking] About to INSERT with property_id:', property_id)
     await DB.prepare(`
       INSERT INTO alacarte_vouchers (
         property_id,
@@ -71453,6 +72346,7 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       staff_id || null, // Staff member creating the booking (NULL if not provided)
       'confirmed'
     ).run()
+    console.log('[Front Desk Booking] INSERT completed for voucher:', voucher_code)
     
     return c.json({
       success: true,
@@ -71576,9 +72470,9 @@ app.post('/api/front-desk/guest-alacarte-booking', async (c) => {
     const voucher_code = `MEAL-${reservation_date.replace(/-/g, '')}-${random}`
     
     // Get item IDs and quantities
-    // Add rm_ prefix for extra-charge menu items to track upsells in analytics
+    // Guest ordering items don't have rm_ prefix (they're all set menu), but we'll keep the code simple
     const preorder_items = items.map(i => ({
-      item_id: `rm_${i.item_id}`,
+      item_id: i.item_id, // Use as-is
       quantity: i.quantity || 1
     }))
     
@@ -73230,18 +74124,31 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         <!-- Filters and View Tabs - DARK MODE -->
         <div class="dark-card rounded-lg shadow-lg p-4 mb-6">
             <div class="flex flex-wrap items-center gap-4 mb-4">
+                <!-- Quick Date Filters -->
+                <div class="flex items-center gap-2 border-r border-slate-600 pr-4">
+                    <button onclick="setQuickDate('yesterday')" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg font-semibold transition">
+                        <i class="fas fa-arrow-left mr-1"></i>Yesterday
+                    </button>
+                    <button onclick="setQuickDate('today')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition">
+                        <i class="fas fa-calendar-day mr-1"></i>Today
+                    </button>
+                    <button onclick="setQuickDate('tomorrow')" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg font-semibold transition">
+                        <i class="fas fa-arrow-right mr-1"></i>Tomorrow
+                    </button>
+                </div>
+                
                 <!-- View Mode Toggle -->
                 <div class="flex items-center gap-2">
                     <label class="font-medium dark-text">View:</label>
                     <select id="viewMode" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500">
+                        <option value="date">📆 By Date</option>
+                        <option value="upcoming">📅 All Upcoming</option>
                         <option value="all">📋 All Orders</option>
-                        <option value="upcoming">📅 All Upcoming Orders</option>
-                        <option value="date">📆 Specific Date</option>
                     </select>
                 </div>
                 
-                <!-- Date Filter (hidden by default) -->
-                <div id="dateFilterContainer" class="hidden flex items-center gap-2">
+                <!-- Date Filter (shown by default) -->
+                <div id="dateFilterContainer" class="flex items-center gap-2">
                     <label class="font-medium dark-text">Date:</label>
                     <input type="date" id="filterDate" class="px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
                 </div>
@@ -73261,12 +74168,13 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             </div>
             
             <!-- View Tabs -->
-            <div class="flex gap-2 border-b border-gray-200">
-                <button onclick="switchView('orders')" id="tabOrders" class="px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600">
+            <div class="flex gap-2 border-b-2 border-gray-300 bg-gray-50 rounded-t-lg">
+                <button onclick="switchView('orders')" id="tabOrders" class="px-6 py-4 font-bold text-lg border-b-4 border-blue-600 bg-white text-blue-600 rounded-tl-lg transition-all shadow-sm">
                     <i class="fas fa-list mr-2"></i>Orders by Guest
                 </button>
-                <button onclick="switchView('items')" id="tabItems" class="px-6 py-3 font-semibold text-gray-600 hover:text-blue-600">
-                    <i class="fas fa-utensils mr-2"></i>Items Summary
+                <button onclick="switchView('items')" id="tabItems" class="px-6 py-4 font-bold text-lg text-gray-600 hover:text-blue-600 hover:bg-white transition-all hover:shadow-sm">
+                    <i class="fas fa-clipboard-list mr-2"></i>Items Summary
+                    <span class="ml-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">📊 VIEW</span>
                 </button>
             </div>
         </div>
@@ -73301,8 +74209,29 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         const propertyId = '${property_id}';
         let orders = [];
         let currentView = 'orders'; // 'orders' or 'items'
-        let viewMode = 'upcoming'; // 'upcoming' or 'date'
+        let viewMode = 'date'; // Default to 'date' to show today's orders
         let selectedDate = new Date().toISOString().split('T')[0]; // Today
+        
+        // Quick date navigation
+        window.setQuickDate = function(period) {
+            const today = new Date();
+            let targetDate = new Date();
+            
+            if (period === 'yesterday') {
+                targetDate.setDate(today.getDate() - 1);
+            } else if (period === 'today') {
+                targetDate = today;
+            } else if (period === 'tomorrow') {
+                targetDate.setDate(today.getDate() + 1);
+            }
+            
+            selectedDate = targetDate.toISOString().split('T')[0];
+            document.getElementById('filterDate').value = selectedDate;
+            document.getElementById('viewMode').value = 'date';
+            viewMode = 'date';
+            document.getElementById('dateFilterContainer').classList.remove('hidden');
+            loadOrders();
+        }
         
         // Sound notification system for kitchen
         let audioContext = null;
@@ -73369,6 +74298,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
         document.addEventListener('DOMContentLoaded', () => {
             initAudio(); // Initialize audio on page load
             document.getElementById('filterDate').value = selectedDate;
+            document.getElementById('viewMode').value = 'date'; // Set to date mode by default
             
             // View mode toggle
             document.getElementById('viewMode').addEventListener('change', (e) => {
@@ -73423,8 +74353,9 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
             if (view === 'orders') {
                 ordersView.classList.remove('hidden');
                 itemsView.classList.add('hidden');
-                tabOrders.className = 'px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600';
-                tabItems.className = 'px-6 py-3 font-semibold text-gray-600 hover:text-blue-600';
+                tabOrders.className = 'px-6 py-4 font-bold text-lg border-b-4 border-blue-600 bg-white text-blue-600 rounded-tl-lg transition-all shadow-sm';
+                tabItems.className = 'px-6 py-4 font-bold text-lg text-gray-600 hover:text-blue-600 hover:bg-white transition-all hover:shadow-sm';
+                tabItems.innerHTML = '<i class="fas fa-clipboard-list mr-2"></i>Items Summary<span class="ml-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">📊 VIEW</span>';
                 if (orders.length === 0) {
                     emptyState.classList.remove('hidden');
                 } else {
@@ -73434,8 +74365,9 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 ordersView.classList.add('hidden');
                 itemsView.classList.remove('hidden');
                 emptyState.classList.add('hidden');
-                tabOrders.className = 'px-6 py-3 font-semibold text-gray-600 hover:text-blue-600';
-                tabItems.className = 'px-6 py-3 font-semibold border-b-2 border-blue-600 text-blue-600';
+                tabOrders.className = 'px-6 py-4 font-bold text-lg text-gray-600 hover:text-blue-600 hover:bg-white transition-all hover:shadow-sm';
+                tabItems.className = 'px-6 py-4 font-bold text-lg border-b-4 border-blue-600 bg-white text-blue-600 transition-all shadow-sm';
+                tabItems.innerHTML = '<i class="fas fa-clipboard-list mr-2"></i>Items Summary<span class="ml-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">✓ ACTIVE</span>';
                 renderItemsSummary();
             }
         }
@@ -73568,7 +74500,7 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 
                 const isNew = order.status === 'confirmed';
                 
-                // Format order placed time for display
+                // Format order placed time for display (Egypt timezone)
                 let orderPlacedDateStr = '--';
                 let orderPlacedTimeStr = '--:--';
                 if (order.created_at) {
@@ -73577,11 +74509,13 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                         orderPlacedTimeStr = orderDate.toLocaleTimeString('en-US', { 
                             hour: '2-digit', 
                             minute: '2-digit', 
-                            hour12: true 
+                            hour12: true,
+                            timeZone: 'Africa/Cairo'
                         });
                         orderPlacedDateStr = orderDate.toLocaleDateString('en-US', { 
                             month: 'short', 
-                            day: 'numeric' 
+                            day: 'numeric',
+                            timeZone: 'Africa/Cairo'
                         });
                     } catch (e) {
                         console.error('Error parsing created_at:', e);
@@ -73591,8 +74525,17 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                 let dishesHtml = '';
                 // Use grouped_dishes if available (from grouping), otherwise use dishes
                 const dishesToRender = order.grouped_dishes || order.dishes || [];
-                if (dishesToRender.length > 0) {
-                    dishesHtml = dishesToRender.map(dish => 
+                
+                // Sort dishes by category: starter → soup → main → dessert
+                const sortedDishes = [...dishesToRender].sort((a, b) => {
+                    const categoryOrder = {starter: 1, soup: 2, main: 3, dessert: 4, salad: 5};
+                    const orderA = categoryOrder[a.category] || 10;
+                    const orderB = categoryOrder[b.category] || 10;
+                    return orderA - orderB;
+                });
+                
+                if (sortedDishes.length > 0) {
+                    dishesHtml = sortedDishes.map(dish => 
                         '<div class="bg-white rounded-lg p-3 border border-gray-200">' +
                             '<div class="flex items-start gap-2">' +
                                 '<div class="flex-shrink-0 w-10 h-10 ' + 
@@ -73603,10 +74546,12 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                                     '"></i>' +
                                 '</div>' +
                                 '<div class="flex-1 min-w-0">' +
-                                    '<p class="font-bold text-gray-900 truncate">' + 
-                                    (dish.item_name || 'Unknown Item') + 
-                                    (dish.quantity > 1 ? ' <span class="text-blue-600">x' + dish.quantity + '</span>' : '') +
-                                    '</p>' +
+                                    '<div class="flex items-center justify-between gap-2">' +
+                                        '<p class="font-bold text-gray-900 flex-1 break-words">' + 
+                                        (dish.item_name || 'Unknown Item') +
+                                        '</p>' +
+                                        (dish.quantity > 1 ? '<span class="text-blue-600 font-bold text-lg flex-shrink-0">×' + dish.quantity + '</span>' : '') +
+                                    '</div>' +
                                     '<p class="text-sm text-gray-500">' + (dish.category || '') + 
                                     (dish.extraCharge ? ' <span class="text-amber-600 font-semibold"><i class="fas fa-coins"></i> Extra Charge</span>' : '') +
                                     (dish.is_premium ? ' <span class="text-orange-600"><i class="fas fa-star"></i> Premium</span>' : '') +
@@ -73841,15 +74786,17 @@ app.get('/kitchen/alacarte/:restaurant_id', async (c) => {
                             count: 0
                         };
                     }
-                    itemCounts[key].count++;
+                    // Add the quantity of this dish (not just increment by 1)
+                    itemCounts[key].count += (dish.quantity || 1);
                 });
             });
             
             // Sort by category and count
+            // Category order: starter → main → dessert → others
             const items = Object.values(itemCounts).sort((a, b) => {
-                const categoryOrder = {salad: 1, starter: 2, main: 3, dessert: 4};
-                const orderA = categoryOrder[a.category] || 5;
-                const orderB = categoryOrder[b.category] || 5;
+                const categoryOrder = {starter: 1, soup: 2, main: 3, dessert: 4, salad: 5};
+                const orderA = categoryOrder[a.category] || 10;
+                const orderB = categoryOrder[b.category] || 10;
                 if (orderA !== orderB) return orderA - orderB;
                 return b.count - a.count;
             });
@@ -74244,6 +75191,160 @@ app.post('/api/kitchen/order-status', async (c) => {
 })
 
 // API: Delete order
+// Get single kitchen order with items
+app.get('/api/kitchen/order/:voucher_id', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { voucher_id } = c.req.param()
+  const { DB } = c.env
+  
+  try {
+    // Fetch voucher details
+    const voucher = await DB.prepare(`
+      SELECT 
+        v.voucher_id,
+        v.voucher_code,
+        v.pass_id,
+        v.tier_id,
+        v.meal_number,
+        v.restaurant_id,
+        v.reservation_date,
+        v.reservation_time,
+        v.party_size,
+        v.table_number,
+        v.preorder_item_ids,
+        v.special_requests,
+        v.status,
+        v.created_at,
+        v.checked_in_at,
+        v.checked_in_by,
+        p.primary_guest_name,
+        p.room_number
+      FROM alacarte_vouchers v
+      LEFT JOIN digital_passes p ON v.pass_id = p.pass_id
+      WHERE v.voucher_id = ? AND v.property_id = ?
+    `).bind(voucher_id, property_id).first()
+    
+    if (!voucher) {
+      return c.json({ success: false, error: 'Order not found' }, 404)
+    }
+    
+    // Parse preorder items
+    const itemsData = voucher.preorder_item_ids ? JSON.parse(voucher.preorder_item_ids) : []
+    
+    // Separate into set menu items and extra-charge items
+    const setMenuIds = []
+    const extraChargeIds = []
+    const quantityMap = {}
+    
+    for (const item of itemsData) {
+      if (typeof item === 'object' && item.item_id) {
+        quantityMap[item.item_id] = item.quantity || 1
+        if (String(item.item_id).startsWith('rm_')) {
+          extraChargeIds.push({ original: item.item_id, numeric: item.item_id.replace('rm_', '') })
+        } else {
+          setMenuIds.push(item.item_id)
+        }
+      } else {
+        quantityMap[item] = 1
+        if (String(item).startsWith('rm_')) {
+          extraChargeIds.push({ original: item, numeric: String(item).replace('rm_', '') })
+        } else {
+          setMenuIds.push(item)
+        }
+      }
+    }
+    
+    const dishes = []
+    
+    // Fetch set menu items
+    if (setMenuIds.length > 0) {
+      const placeholders = setMenuIds.map(() => '?').join(',')
+      const setMenuItems = await DB.prepare(`
+        SELECT item_id, item_name, category, cost_to_hotel, is_premium
+        FROM alacarte_menu_items
+        WHERE item_id IN (${placeholders})
+      `).bind(...setMenuIds).all()
+      
+      for (const item of setMenuItems.results) {
+        dishes.push({
+          item_id: item.item_id,
+          originalId: item.item_id,
+          item_name: item.item_name,
+          category: item.category,
+          cost: item.cost_to_hotel || 0,
+          quantity: quantityMap[item.item_id] || 1,
+          extraCharge: false,
+          is_premium: item.is_premium
+        })
+      }
+    }
+    
+    // Fetch extra-charge items
+    if (extraChargeIds.length > 0) {
+      const numericIds = extraChargeIds.map(e => e.numeric)
+      const placeholders = numericIds.map(() => '?').join(',')
+      const extraItems = await DB.prepare(`
+        SELECT item_id, item_name, category, price
+        FROM menu_items
+        WHERE item_id IN (${placeholders})
+      `).bind(...numericIds).all()
+      
+      for (const item of extraItems.results) {
+        const original = extraChargeIds.find(e => e.numeric === String(item.item_id))?.original
+        dishes.push({
+          item_id: original || `rm_${item.item_id}`,
+          originalId: original || `rm_${item.item_id}`,
+          item_name: item.item_name,
+          category: item.category,
+          cost: item.price || 0,
+          quantity: quantityMap[original] || quantityMap[`rm_${item.item_id}`] || 1,
+          extraCharge: true,
+          is_premium: false
+        })
+      }
+    }
+    
+    // Extract guest name and room number
+    let guest_name = voucher.primary_guest_name || 'Guest'
+    let room_number = voucher.room_number || null
+    
+    if (!voucher.primary_guest_name && voucher.special_requests) {
+      const guestMatch = voucher.special_requests.match(/Guest:\s*([^,\n]+)/)
+      if (guestMatch) {
+        guest_name = guestMatch[1].trim()
+      }
+      
+      const roomMatch = voucher.special_requests.match(/Room:\s*(\d+)/)
+      if (roomMatch) {
+        room_number = roomMatch[1]
+      }
+    }
+    
+    return c.json({
+      success: true,
+      order: {
+        voucher_id: voucher.voucher_id,
+        voucher_code: voucher.voucher_code,
+        guest_name: guest_name,
+        room_number: room_number,
+        party_size: voucher.party_size,
+        table_number: voucher.table_number,
+        reservation_date: voucher.reservation_date,
+        reservation_time: voucher.reservation_time,
+        status: voucher.status,
+        checked_in_at: voucher.checked_in_at,
+        checked_in_by: voucher.checked_in_by,
+        special_requests: voucher.special_requests,
+        dishes: dishes,
+        source: 'kitchen'
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching kitchen order:', error)
+    return c.json({ success: false, error: 'Failed to fetch order' }, 500)
+  }
+})
+
 app.delete('/api/kitchen/order/:voucher_id', async (c) => {
   const property_id = c.req.header('X-Property-ID') || '1'
   const { voucher_id } = c.req.param()
@@ -74714,9 +75815,10 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
   const property_id = c.req.header('X-Property-ID') || '1'
   
   try {
-    // Get extra charge items from menu_items table (the REAL restaurant menu with prices)
-    // These have IDs that get prefixed with "rm_" when ordered
-    const items = await DB.prepare(`
+    // Get BOTH extra charge items from menu_items AND premium items from alacarte_menu_items
+    
+    // 1. Get extra charge items from menu_items table (the REAL restaurant menu with prices)
+    const menuItems = await DB.prepare(`
       SELECT 
         mi.item_id,
         mi.item_name,
@@ -74724,7 +75826,8 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
         mi.description,
         mi.price as cost_to_hotel,
         0 as is_premium,
-        mi.is_available
+        mi.is_available,
+        'menu_items' as source_table
       FROM menu_items mi
       LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id
       LEFT JOIN restaurant_menus rm ON mc.menu_id = rm.menu_id
@@ -74734,10 +75837,36 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
       ORDER BY mc.display_order, mi.display_order, mi.item_name
     `).bind(restaurant_id).all()
     
+    // 2. Get premium items from alacarte_menu_items table (extra charge within set menu)
+    const premiumItems = await DB.prepare(`
+      SELECT 
+        item_id,
+        item_name,
+        category,
+        description,
+        cost_to_hotel,
+        1 as is_premium,
+        is_available,
+        'alacarte_menu_items' as source_table
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ?
+        AND is_available = 1
+        AND is_premium = 1
+        AND cost_to_hotel > 0
+      ORDER BY category, display_order, item_name
+    `).bind(restaurant_id).all()
+    
+    // Combine both lists
+    const allItems = [...(menuItems.results || []), ...(premiumItems.results || [])]
+    
     return c.json({
       success: true,
-      items: items.results,
-      count: items.results.length
+      items: allItems,
+      count: allItems.length,
+      breakdown: {
+        menu_items: menuItems.results.length,
+        premium_items: premiumItems.results.length
+      }
     })
   } catch (error) {
     console.error('Get menu items error:', error)
@@ -74914,17 +76043,18 @@ app.get('/api/waiter/tables', async (c) => {
 app.get('/api/waiter/orders', async (c) => {
   const { DB } = c.env
   const property_id = c.req.header('X-Property-ID') || '1'
-  const { restaurant, waiter, property, date } = c.req.query()
+  const { restaurant, waiter, property, date, start_date, end_date } = c.req.query()
   
   try {
-    // Calculate date range: today to 7 days in future
+    // Calculate date range
     const today = new Date().toISOString().split('T')[0]
     const maxDate = new Date()
     maxDate.setDate(maxDate.getDate() + 7)
     const maxDateStr = maxDate.toISOString().split('T')[0]
     
-    // Use specific date if provided, otherwise use today
-    const filterDate = date || today
+    // Determine start and end dates
+    let startDateFilter = start_date || date || today
+    let endDateFilter = end_date || date || maxDateStr
     
     // Get waiter orders (if waiter=0, get all)
     let waiterOrdersQuery = `
@@ -74946,7 +76076,7 @@ app.get('/api/waiter/orders', async (c) => {
         AND DATE(wo.created_at) BETWEEN ? AND ?
     `
     
-    const waiterOrdersParams = [restaurant, today, maxDateStr]
+    const waiterOrdersParams = [restaurant, startDateFilter, endDateFilter]
     
     // Filter by waiter if specified and not 0
     if (waiter && waiter !== '0') {
@@ -74981,7 +76111,7 @@ app.get('/api/waiter/orders', async (c) => {
         AND av.reservation_date BETWEEN ? AND ?
       ORDER BY av.reservation_date DESC, av.created_at DESC
       LIMIT 50
-    `).bind(restaurant, property_id, today, maxDateStr).all()
+    `).bind(restaurant, property_id, startDateFilter, endDateFilter).all()
     
     // Parse waiter orders
     const formattedWaiterOrders = waiterOrders.results.map(o => ({
@@ -75074,6 +76204,82 @@ app.get('/api/waiter/orders', async (c) => {
   }
 })
 
+// Get single waiter order with items
+app.get('/api/waiter/order/:order_id', async (c) => {
+  const { DB } = c.env
+  const { order_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  
+  try {
+    // Fetch order details
+    const orderResult = await DB.prepare(`
+      SELECT 
+        wo.order_id,
+        wo.table_id,
+        wo.restaurant_id,
+        wo.waiter_id,
+        wo.guest_name,
+        wo.party_size,
+        wo.items,
+        wo.total_cost,
+        wo.status,
+        wo.created_at,
+        rt.table_number
+      FROM waiter_orders wo
+      LEFT JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+      WHERE wo.order_id = ?
+    `).bind(order_id).first()
+    
+    if (!orderResult) {
+      return c.json({ success: false, error: 'Order not found' }, 404)
+    }
+    
+    // Parse items
+    const items = orderResult.items ? JSON.parse(orderResult.items) : []
+    
+    // Fetch item details
+    const itemIds = items.map(i => i.item_id.replace('rm_', ''))
+    const dishes = []
+    
+    if (itemIds.length > 0) {
+      const placeholders = itemIds.map(() => '?').join(',')
+      const itemsData = await DB.prepare(`
+        SELECT item_id, item_name, price as cost
+        FROM menu_items
+        WHERE item_id IN (${placeholders})
+      `).bind(...itemIds).all()
+      
+      // Map items with quantities
+      for (const item of items) {
+        const itemId = item.item_id.replace('rm_', '')
+        const itemData = itemsData.results.find(i => i.item_id.toString() === itemId)
+        if (itemData) {
+          dishes.push({
+            item_id: item.item_id,
+            originalId: item.item_id,
+            item_name: itemData.item_name,
+            cost: itemData.cost || 0,
+            quantity: item.quantity || 1
+          })
+        }
+      }
+    }
+    
+    return c.json({
+      success: true,
+      order: {
+        ...orderResult,
+        items: undefined, // Remove raw JSON
+        dishes: dishes,
+        source: 'waiter'
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching waiter order:', error)
+    return c.json({ success: false, error: 'Failed to fetch order' }, 500)
+  }
+})
+
 // Delete/cancel order
 app.delete('/api/waiter/order/:order_id', async (c) => {
   const { DB } = c.env
@@ -75146,7 +76352,7 @@ app.post('/api/waiter/seat-guests', async (c) => {
         total_cost,
         status,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 'seated', CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, '[]', 0, 'pending', CURRENT_TIMESTAMP)
     `).bind(table_id, restaurant_id, waiter_id, guest_name, room_number || null, party_size).run()
     
     const order = await DB.prepare(`
@@ -75618,3 +76824,4 @@ export default {
 }
 
 // Force refresh: Fri Jan 16 22:41:22 UTC 2026
+// Cache bust 1768912514

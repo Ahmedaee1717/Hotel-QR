@@ -18,6 +18,7 @@ export default defineConfig({
         '/staff-unified-scanner.html',
         '/vendor-dashboard.html',
         '/vendor-login.html',
+        '/waiter-dashboard.html',
         '/welcome.html',
         '/guestconnect-logo.png',
         '/guestconnect-logo-small.png',

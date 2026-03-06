@@ -3,64 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feedback Form</title>
+    <title>Guest Feedback</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        .star-rating { display: flex; gap: 0.5rem; font-size: 2rem; flex-direction: row-reverse; justify-content: flex-end; }
-        .star { cursor: pointer; color: #d1d5db; transition: color 0.2s; }
-        .star.active { color: #fbbf24; }
-        .star:hover, .star:hover ~ .star { color: #fbbf24; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes slideOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(-100px); }
+        }
+        
+        .question-enter {
+            animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .question-exit {
+            animation: slideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .star-rating {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 2.5rem;
+            flex-direction: row-reverse;
+            justify-content: center;
+        }
+        
+        .star {
+            cursor: pointer;
+            color: #d1d5db;
+            transition: all 0.2s;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        
+        .star.active {
+            color: #fbbf24;
+            transform: scale(1.1);
+        }
+        
+        .star:hover,
+        .star:hover ~ .star {
+            color: #fbbf24;
+            transform: scale(1.15);
+        }
+        
+        .bg-overlay {
+            background-image: url('https://bynder.onthebeach.co.uk/cdn-cgi/image/width=1400,quality=70,fit=cover,format=auto/m/3364882f3b8452c1/original/Old-Palace-General-view-15.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        
+        .bg-overlay::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(3px);
+        }
+        
+        .progress-bar-fill {
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .btn-primary {
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            transform: translateX(-5px);
+        }
+        
+        .scale-input {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .scale-input button {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.5rem;
+            border: 2px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+        
+        .scale-input button:hover {
+            transform: scale(1.1);
+            border-color: var(--primary-color, #972626);
+        }
+        
+        .scale-input button.active {
+            background: var(--primary-color, #972626);
+            border-color: var(--primary-color, #972626);
+            color: white;
+            transform: scale(1.15);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .choice-option {
+            padding: 1rem 1.5rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.75rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .choice-option:hover {
+            border-color: var(--primary-color, #972626);
+            transform: translateX(5px);
+        }
+        
+        .choice-option.active {
+            border-color: var(--primary-color, #972626);
+            background: var(--primary-color, #972626);
+            color: white;
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-purple-50 to-indigo-50 min-h-screen">
-    <div class="container mx-auto px-4 py-8 max-w-2xl">
-        <div id="loading" class="text-center py-12">
-            <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
-            <p class="text-gray-600">Loading form...</p>
+<body class="bg-overlay min-h-screen relative overflow-x-hidden">
+    <!-- Loading State -->
+    <div id="loading" class="fixed inset-0 flex items-center justify-center z-50 bg-white">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin text-6xl mb-4" style="color: var(--primary-color, #972626)"></i>
+            <p class="text-gray-600 text-lg">Loading your feedback form...</p>
         </div>
+    </div>
 
-        <div id="formContainer" class="hidden">
+    <!-- Main Container -->
+    <div id="formContainer" class="hidden relative z-10 min-h-screen flex items-center justify-center py-8 px-4">
+        <div class="w-full max-w-2xl">
+            <!-- Header with Logo -->
+            <div class="text-center mb-8 fade-in">
+                <img id="hotelLogo" 
+                     src="https://i.ibb.co/qY4qM71S/e58193ed-70c9-4458-ad64-f6fb9bfd6a12.jpg" 
+                     alt="Hotel Logo" 
+                     class="h-24 mx-auto mb-4 rounded-xl shadow-lg object-contain"
+                     style="max-width: 200px;">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2" id="formName"></h1>
+                <p class="text-gray-600" id="formDescription"></p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-8 fade-in">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-gray-700">Progress</span>
+                    <span class="text-sm font-medium text-gray-700" id="progressText">0%</span>
+                </div>
+                <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                    <div id="progressBar" class="progress-bar-fill h-full rounded-full" 
+                         style="width: 0%; background: var(--primary-color, #972626);"></div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    Question <span id="currentQuestion">0</span> of <span id="totalQuestions">0</span>
+                </p>
+            </div>
+
+            <!-- Question Card -->
             <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8">
-                    <h1 class="text-3xl font-bold mb-2" id="formName"></h1>
-                    <p class="text-purple-100" id="formDescription"></p>
-                    <p class="text-sm text-purple-200 mt-2" id="propertyName"></p>
-                </div>
+                <div class="p-8 md:p-12">
+                    <!-- Question Content -->
+                    <div id="questionContent" class="min-h-[400px] flex flex-col justify-between">
+                        <!-- Dynamic question will be inserted here -->
+                    </div>
 
-                <div class="p-8">
-                    <form id="feedbackForm" class="space-y-6">
-                        <div id="guestInfoSection" class="space-y-4 pb-6 border-b">
-                            <h3 class="text-lg font-bold text-gray-900">Your Information</h3>
-                            <div id="guestFields"></div>
-                        </div>
-
-                        <div id="questionsSection" class="space-y-6"></div>
-
-                        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all">
-                            <i class="fas fa-paper-plane mr-2"></i>Submit Feedback
+                    <!-- Navigation Buttons -->
+                    <div class="flex justify-between items-center mt-8 pt-6 border-t">
+                        <button id="prevBtn" 
+                                class="btn-secondary px-6 py-3 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 transition-all flex items-center gap-2"
+                                style="display: none;">
+                            <i class="fas fa-arrow-left"></i>
+                            Previous
                         </button>
-                    </form>
+                        
+                        <button id="nextBtn" 
+                                class="btn-primary px-8 py-4 rounded-xl font-bold text-white ml-auto flex items-center gap-2"
+                                style="background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #681529));">
+                            Next
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                        
+                        <button id="submitBtn" 
+                                class="btn-primary px-8 py-4 rounded-xl font-bold text-white ml-auto items-center gap-2"
+                                style="display: none; background: linear-gradient(135deg, var(--primary-color, #972626), var(--secondary-color, #681529));">
+                            <i class="fas fa-paper-plane"></i>
+                            Submit Feedback
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div id="thankYouMessage" class="hidden">
-            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
-                <div class="mb-6">
-                    <i class="fas fa-check-circle text-6xl text-green-500"></i>
-                </div>
-                <h2 class="text-3xl font-bold text-gray-900 mb-4" id="thankYouText"></h2>
-                <p class="text-gray-600 mb-6">We appreciate you taking the time to share your thoughts.</p>
+            <!-- Footer -->
+            <div class="text-center mt-6 text-sm text-gray-600 fade-in">
+                <p id="propertyName"></p>
             </div>
         </div>
+    </div>
 
-        <div id="errorMessage" class="hidden">
-            <div class="bg-white rounded-2xl shadow-2xl p-12 text-center">
-                <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">Form Not Available</h2>
-                <p class="text-gray-600" id="errorText"></p>
+    <!-- Thank You Screen -->
+    <div id="thankYouScreen" class="hidden fixed inset-0 flex items-center justify-center z-50 bg-white">
+        <div class="text-center px-6 max-w-lg fade-in">
+            <div class="mb-8">
+                <i class="fas fa-check-circle text-8xl text-green-500 mb-4"></i>
             </div>
+            <h2 class="text-4xl font-bold text-gray-900 mb-4" id="thankYouText">Thank You!</h2>
+            <p class="text-xl text-gray-600 mb-8">We truly appreciate you taking the time to share your feedback with us.</p>
+            <div class="bg-gray-100 rounded-xl p-6">
+                <p class="text-gray-700">Your responses help us improve our services and create better experiences for all our guests.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Screen -->
+    <div id="errorScreen" class="hidden fixed inset-0 flex items-center justify-center z-50 bg-white">
+        <div class="text-center px-6 max-w-lg">
+            <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-6"></i>
+            <h2 class="text-3xl font-bold text-gray-900 mb-4">Form Not Available</h2>
+            <p class="text-gray-600" id="errorText"></p>
         </div>
     </div>
 

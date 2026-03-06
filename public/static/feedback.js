@@ -1,8 +1,18 @@
+// Feedback Form - One Question at a Time with Animations
 let formData = null;
-// Extract form ID from URL path: /feedback/9004 -> 9004
+let currentStep = 0;
+let totalSteps = 0;
+let responses = {};
+let brandColors = {
+    primary: '#972626',
+    secondary: '#681529'
+};
+
+// Extract form ID from URL
 const pathParts = window.location.pathname.split('/');
 const formId = pathParts[pathParts.length - 1];
 
+// Load form data and branding
 async function loadForm() {
     try {
         const res = await fetch('/api/feedback/forms/' + formId);
@@ -12,96 +22,280 @@ async function loadForm() {
 
         formData = data.form;
         
+        // Load property branding colors
+        await loadPropertyBranding(formData.property_id);
+        
+        // Set form metadata
         document.getElementById('formName').textContent = formData.form_name;
         document.getElementById('formDescription').textContent = formData.form_description || '';
         document.getElementById('propertyName').textContent = formData.property_name;
 
-        const guestFields = document.getElementById('guestFields');
-        const fields = [];
-        
-        if (formData.require_room_number) {
-            fields.push('<div><label class="block text-sm font-semibold mb-2">Room Number *</label><input type="text" name="room_number" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="e.g., 303"></div>');
-        }
-        if (formData.require_guest_name) {
-            fields.push('<div><label class="block text-sm font-semibold mb-2">Your Name *</label><input type="text" name="guest_name" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Full name"></div>');
-        }
-        if (formData.require_email) {
-            fields.push('<div><label class="block text-sm font-semibold mb-2">Email *</label><input type="email" name="guest_email" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="your@email.com"></div>');
-        }
-        if (formData.require_phone) {
-            fields.push('<div><label class="block text-sm font-semibold mb-2">Phone *</label><input type="tel" name="guest_phone" required class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="+1234567890"></div>');
-        }
+        // Calculate total steps (guest info fields + questions)
+        totalSteps = 0;
+        if (formData.require_room_number) totalSteps++;
+        if (formData.require_guest_name) totalSteps++;
+        if (formData.require_email) totalSteps++;
+        if (formData.require_phone) totalSteps++;
+        totalSteps += formData.questions.length;
 
-        guestFields.innerHTML = fields.join('');
+        document.getElementById('totalQuestions').textContent = totalSteps;
 
-        const questionsSection = document.getElementById('questionsSection');
-        questionsSection.innerHTML = formData.questions.map((q, idx) => {
-            let inputHtml = '';
-            
-            switch(q.question_type) {
-                case 'text':
-                    inputHtml = '<input type="text" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + ' class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Your answer">';
-                    break;
-                case 'textarea':
-                    inputHtml = '<textarea name="q_' + q.question_id + '" rows="4" ' + (q.is_required ? 'required' : '') + ' class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-600" placeholder="Your answer"></textarea>';
-                    break;
-                case 'rating':
-                    inputHtml = '<div class="star-rating" data-question="' + q.question_id + '">';
-                    for (let i = 5; i >= 1; i--) {
-                        inputHtml += '<span class="star" data-value="' + i + '" onclick="setRating(' + q.question_id + ', ' + i + ')">★</span>';
-                    }
-                    inputHtml += '</div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
-                    break;
-                case 'scale':
-                    inputHtml = '<div class="flex justify-between items-center gap-2">';
-                    for (let i = 1; i <= 10; i++) {
-                        inputHtml += '<button type="button" onclick="setScale(' + q.question_id + ', ' + i + ')" class="scale-btn w-12 h-12 border-2 rounded-lg font-bold hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all" data-question="' + q.question_id + '" data-value="' + i + '">' + i + '</button>';
-                    }
-                    inputHtml += '</div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
-                    break;
-                case 'multiple_choice':
-                    const options = q.options || [];
-                    inputHtml = '<div class="space-y-2">';
-                    options.forEach(opt => {
-                        inputHtml += '<label class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-purple-50 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="' + opt + '" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5 text-purple-600"><span class="flex-1">' + opt + '</span></label>';
-                    });
-                    inputHtml += '</div>';
-                    break;
-                case 'yes_no':
-                    inputHtml = '<div class="flex gap-4">';
-                    inputHtml += '<label class="flex-1 flex items-center justify-center space-x-2 p-4 border-2 rounded-lg hover:bg-green-50 hover:border-green-600 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="Yes" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5"><span class="font-semibold">Yes</span></label>';
-                    inputHtml += '<label class="flex-1 flex items-center justify-center space-x-2 p-4 border-2 rounded-lg hover:bg-red-50 hover:border-red-600 cursor-pointer transition-all"><input type="radio" name="q_' + q.question_id + '" value="No" ' + (q.is_required ? 'required' : '') + ' class="w-5 h-5"><span class="font-semibold">No</span></label>';
-                    inputHtml += '</div>';
-                    break;
-                case 'nps':
-                    inputHtml = '<div class="space-y-3"><div class="flex justify-between text-sm text-gray-600 mb-2"><span>Not at all likely</span><span>Extremely likely</span></div><div class="grid grid-cols-11 gap-2">';
-                    for (let i = 0; i <= 10; i++) {
-                        inputHtml += '<button type="button" onclick="setNPS(' + q.question_id + ', ' + i + ')" class="nps-btn aspect-square border-2 rounded-lg font-bold hover:bg-purple-600 hover:text-white hover:border-purple-600 transition-all" data-question="' + q.question_id + '" data-value="' + i + '">' + i + '</button>';
-                    }
-                    inputHtml += '</div></div><input type="hidden" name="q_' + q.question_id + '" ' + (q.is_required ? 'required' : '') + '>';
-                    break;
-            }
-
-            return '<div class="bg-gray-50 p-6 rounded-xl"><label class="block mb-4"><span class="text-lg font-semibold text-gray-900">' + (idx + 1) + '. ' + q.question_text + (q.is_required ? '<span class="text-red-500">*</span>' : '') + '</span></label>' + inputHtml + '</div>';
-        }).join('');
-
+        // Start the form
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('formContainer').classList.remove('hidden');
-
+        
+        setupEventListeners();
+        renderCurrentStep();
+        
     } catch (error) {
         console.error('Load form error:', error);
         document.getElementById('loading').classList.add('hidden');
-        document.getElementById('errorMessage').classList.remove('hidden');
+        document.getElementById('errorScreen').classList.remove('hidden');
         document.getElementById('errorText').textContent = error.message || 'This form is not available';
     }
 }
 
+// Load property branding colors from admin settings
+async function loadPropertyBranding(propertyId) {
+    try {
+        const res = await fetch('/api/property/' + propertyId);
+        const data = await res.json();
+        
+        if (data.success && data.property) {
+            brandColors.primary = data.property.primary_color || '#972626';
+            brandColors.secondary = data.property.secondary_color || '#681529';
+            
+            // Apply brand colors to CSS variables
+            document.documentElement.style.setProperty('--primary-color', brandColors.primary);
+            document.documentElement.style.setProperty('--secondary-color', brandColors.secondary);
+        }
+    } catch (error) {
+        console.error('Failed to load branding:', error);
+    }
+}
+
+// Render current step
+function renderCurrentStep() {
+    const questionContent = document.getElementById('questionContent');
+    const currentQuestionNum = document.getElementById('currentQuestion');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Update progress
+    currentQuestionNum.textContent = currentStep + 1;
+    const progressPercent = ((currentStep + 1) / totalSteps) * 100;
+    progressBar.style.width = progressPercent + '%';
+    progressText.textContent = Math.round(progressPercent) + '%';
+
+    // Show/hide navigation buttons
+    prevBtn.style.display = currentStep > 0 ? 'flex' : 'none';
+    nextBtn.style.display = currentStep < totalSteps - 1 ? 'flex' : 'none';
+    submitBtn.style.display = currentStep === totalSteps - 1 ? 'flex' : 'none';
+
+    // Get current question data
+    let stepIndex = 0;
+    let questionHTML = '';
+
+    // Guest info fields
+    if (formData.require_room_number && stepIndex === currentStep) {
+        questionHTML = renderGuestInfoField('room_number', 'Room Number', 'text', 'e.g., 303', true);
+    } else if (formData.require_room_number) stepIndex++;
+
+    if (formData.require_guest_name && stepIndex === currentStep) {
+        questionHTML = renderGuestInfoField('guest_name', 'Your Name', 'text', 'Full name', true);
+    } else if (formData.require_guest_name) stepIndex++;
+
+    if (formData.require_email && stepIndex === currentStep) {
+        questionHTML = renderGuestInfoField('guest_email', 'Email Address', 'email', 'your@email.com', true);
+    } else if (formData.require_email) stepIndex++;
+
+    if (formData.require_phone && stepIndex === currentStep) {
+        questionHTML = renderGuestInfoField('guest_phone', 'Phone Number', 'tel', '+1234567890', true);
+    } else if (formData.require_phone) stepIndex++;
+
+    // Form questions
+    const questionIndex = currentStep - stepIndex;
+    if (questionIndex >= 0 && questionIndex < formData.questions.length) {
+        const question = formData.questions[questionIndex];
+        questionHTML = renderQuestion(question, questionIndex);
+    }
+
+    // Animate transition
+    questionContent.classList.add('question-exit');
+    setTimeout(() => {
+        questionContent.innerHTML = questionHTML;
+        questionContent.classList.remove('question-exit');
+        questionContent.classList.add('question-enter');
+        setTimeout(() => {
+            questionContent.classList.remove('question-enter');
+        }, 400);
+    }, 400);
+}
+
+// Render guest info field
+function renderGuestInfoField(fieldName, label, type, placeholder, required) {
+    const value = responses[fieldName] || '';
+    return `
+        <div class="flex-1 flex flex-col justify-center">
+            <div class="mb-8">
+                <div class="text-sm font-semibold text-gray-500 mb-2">GUEST INFORMATION</div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">${label}${required ? '<span class="text-red-500">*</span>' : ''}</h2>
+                <p class="text-gray-600">Please provide your ${label.toLowerCase()} to help us serve you better.</p>
+            </div>
+            <input 
+                type="${type}" 
+                id="currentAnswer" 
+                value="${value}"
+                class="w-full px-6 py-4 text-xl border-2 rounded-xl focus:ring-4 focus:ring-opacity-50 transition-all"
+                style="border-color: ${brandColors.primary}; focus:ring-color: ${brandColors.primary};"
+                placeholder="${placeholder}"
+                ${required ? 'required' : ''}
+                autofocus>
+        </div>
+    `;
+}
+
+// Render question based on type
+function renderQuestion(question, index) {
+    let inputHTML = '';
+    const savedAnswer = responses['q_' + question.question_id] || '';
+
+    switch (question.question_type) {
+        case 'text':
+            inputHTML = `
+                <input 
+                    type="text" 
+                    id="currentAnswer" 
+                    value="${savedAnswer}"
+                    class="w-full px-6 py-4 text-xl border-2 rounded-xl focus:ring-4 focus:ring-opacity-50"
+                    style="border-color: ${brandColors.primary};"
+                    placeholder="Type your answer here..."
+                    ${question.is_required ? 'required' : ''}
+                    autofocus>
+            `;
+            break;
+
+        case 'textarea':
+            inputHTML = `
+                <textarea 
+                    id="currentAnswer" 
+                    rows="5"
+                    class="w-full px-6 py-4 text-lg border-2 rounded-xl focus:ring-4 focus:ring-opacity-50 resize-none"
+                    style="border-color: ${brandColors.primary};"
+                    placeholder="Share your thoughts..."
+                    ${question.is_required ? 'required' : ''}
+                    autofocus>${savedAnswer}</textarea>
+            `;
+            break;
+
+        case 'rating':
+            inputHTML = `
+                <div class="star-rating" id="currentAnswer" data-question="${question.question_id}">
+                    ${[5, 4, 3, 2, 1].map(i => `
+                        <span class="star ${parseInt(savedAnswer) >= i ? 'active' : ''}" 
+                              data-value="${i}" 
+                              onclick="setRating(${question.question_id}, ${i})">★</span>
+                    `).join('')}
+                </div>
+                <input type="hidden" id="ratingValue" value="${savedAnswer}">
+            `;
+            break;
+
+        case 'scale':
+            inputHTML = `
+                <div class="scale-input" id="currentAnswer">
+                    ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => `
+                        <button type="button" 
+                                class="scale-btn ${parseInt(savedAnswer) === i ? 'active' : ''}"
+                                data-value="${i}"
+                                onclick="setScale(${question.question_id}, ${i})">${i}</button>
+                    `).join('')}
+                </div>
+                <div class="flex justify-between text-sm text-gray-500 mt-3">
+                    <span>Not at all</span>
+                    <span>Extremely</span>
+                </div>
+                <input type="hidden" id="scaleValue" value="${savedAnswer}">
+            `;
+            break;
+
+        case 'multiple_choice':
+            const options = question.options || [];
+            inputHTML = `
+                <div class="space-y-3" id="currentAnswer">
+                    ${options.map(opt => `
+                        <div class="choice-option ${savedAnswer === opt ? 'active' : ''}"
+                             data-value="${opt}"
+                             onclick="selectChoice(this, '${opt}')">
+                            ${opt}
+                        </div>
+                    `).join('')}
+                </div>
+                <input type="hidden" id="choiceValue" value="${savedAnswer}">
+            `;
+            break;
+
+        case 'yes_no':
+            inputHTML = `
+                <div class="grid grid-cols-2 gap-4" id="currentAnswer">
+                    <div class="choice-option ${savedAnswer === 'Yes' ? 'active' : ''}"
+                         data-value="Yes"
+                         onclick="selectChoice(this, 'Yes')">
+                        <i class="fas fa-check-circle text-3xl mb-2"></i>
+                        <div class="text-xl font-bold">Yes</div>
+                    </div>
+                    <div class="choice-option ${savedAnswer === 'No' ? 'active' : ''}"
+                         data-value="No"
+                         onclick="selectChoice(this, 'No')">
+                        <i class="fas fa-times-circle text-3xl mb-2"></i>
+                        <div class="text-xl font-bold">No</div>
+                    </div>
+                </div>
+                <input type="hidden" id="choiceValue" value="${savedAnswer}">
+            `;
+            break;
+
+        case 'nps':
+            inputHTML = `
+                <div class="scale-input" id="currentAnswer" style="max-width: 100%;">
+                    ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => `
+                        <button type="button" 
+                                class="scale-btn ${parseInt(savedAnswer) === i ? 'active' : ''}"
+                                data-value="${i}"
+                                onclick="setScale(${question.question_id}, ${i})">${i}</button>
+                    `).join('')}
+                </div>
+                <div class="flex justify-between text-sm text-gray-500 mt-3">
+                    <span>Not at all likely</span>
+                    <span>Extremely likely</span>
+                </div>
+                <input type="hidden" id="scaleValue" value="${savedAnswer}">
+            `;
+            break;
+    }
+
+    return `
+        <div class="flex-1 flex flex-col justify-center">
+            <div class="mb-8">
+                <div class="text-sm font-semibold text-gray-500 mb-2">QUESTION ${index + 1}</div>
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+                    ${question.question_text}
+                    ${question.is_required ? '<span class="text-red-500">*</span>' : ''}
+                </h2>
+            </div>
+            ${inputHTML}
+        </div>
+    `;
+}
+
+// Rating functions
 function setRating(questionId, value) {
     const container = document.querySelector('.star-rating[data-question="' + questionId + '"]');
     const stars = container.querySelectorAll('.star');
-    const input = document.querySelector('input[name="q_' + questionId + '"]');
-    
-    input.value = value;
+    document.getElementById('ratingValue').value = value;
     
     stars.forEach(star => {
         if (parseInt(star.dataset.value) <= value) {
@@ -113,95 +307,176 @@ function setRating(questionId, value) {
 }
 
 function setScale(questionId, value) {
-    const input = document.querySelector('input[name="q_' + questionId + '"]');
-    const buttons = document.querySelectorAll('button[data-question="' + questionId + '"]');
-    
-    input.value = value;
+    const buttons = document.querySelectorAll('.scale-btn');
+    document.getElementById('scaleValue').value = value;
     
     buttons.forEach(btn => {
         if (parseInt(btn.dataset.value) === value) {
-            btn.classList.add('bg-purple-600', 'text-white', 'border-purple-600');
+            btn.classList.add('active');
         } else {
-            btn.classList.remove('bg-purple-600', 'text-white', 'border-purple-600');
+            btn.classList.remove('active');
         }
     });
 }
 
-function setNPS(questionId, value) {
-    const input = document.querySelector('input[name="q_' + questionId + '"]');
-    const buttons = document.querySelectorAll('button.nps-btn[data-question="' + questionId + '"]');
-    
-    input.value = value;
-    
-    buttons.forEach(btn => {
-        if (parseInt(btn.dataset.value) === value) {
-            btn.classList.add('bg-purple-600', 'text-white', 'border-purple-600');
-        } else {
-            btn.classList.remove('bg-purple-600', 'text-white', 'border-purple-600');
-        }
-    });
+function selectChoice(element, value) {
+    const container = element.parentElement;
+    const options = container.querySelectorAll('.choice-option');
+    options.forEach(opt => opt.classList.remove('active'));
+    element.classList.add('active');
+    document.getElementById('choiceValue').value = value;
 }
 
-document.getElementById('feedbackForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+// Save current answer
+function saveCurrentAnswer() {
+    const answerInput = document.getElementById('currentAnswer');
+    const ratingValue = document.getElementById('ratingValue');
+    const scaleValue = document.getElementById('scaleValue');
+    const choiceValue = document.getElementById('choiceValue');
+
+    let stepIndex = 0;
     
-    const formElement = e.target;
-    const submitBtn = formElement.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
-    
-    try {
-        const formDataObj = new FormData(formElement);
-        
-        const submission = {
-            form_id: formId,
-            room_number: formDataObj.get('room_number'),
-            guest_name: formDataObj.get('guest_name'),
-            guest_email: formDataObj.get('guest_email'),
-            guest_phone: formDataObj.get('guest_phone'),
-            submission_source: 'web',
-            answers: []
-        };
-        
-        formData.questions.forEach(q => {
-            const value = formDataObj.get('q_' + q.question_id);
-            if (value) {
-                const answer = {
-                    question_id: q.question_id,
-                    answer_text: null,
-                    answer_numeric: null
-                };
-                
-                if (['rating', 'scale', 'nps'].includes(q.question_type)) {
-                    answer.answer_numeric = parseFloat(value);
-                } else {
-                    answer.answer_text = value;
-                }
-                
-                submission.answers.push(answer);
-            }
-        });
-        
-        const res = await fetch('/api/feedback/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submission)
-        });
-        
-        const data = await res.json();
-        
-        if (!data.success) throw new Error(data.error || 'Failed to submit');
-        
-        document.getElementById('formContainer').classList.add('hidden');
-        document.getElementById('thankYouMessage').classList.remove('hidden');
-        document.getElementById('thankYouText').textContent = formData.thank_you_message || 'Thank you for your feedback!';
-        
-    } catch (error) {
-        console.error('Submit error:', error);
-        alert('Failed to submit feedback. Please try again.');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit Feedback';
+    // Guest info fields
+    if (formData.require_room_number) {
+        if (stepIndex === currentStep) {
+            responses.room_number = answerInput.value;
+            return true;
+        }
+        stepIndex++;
     }
-});
+    
+    if (formData.require_guest_name) {
+        if (stepIndex === currentStep) {
+            responses.guest_name = answerInput.value;
+            return true;
+        }
+        stepIndex++;
+    }
+    
+    if (formData.require_email) {
+        if (stepIndex === currentStep) {
+            responses.guest_email = answerInput.value;
+            return true;
+        }
+        stepIndex++;
+    }
+    
+    if (formData.require_phone) {
+        if (stepIndex === currentStep) {
+            responses.guest_phone = answerInput.value;
+            return true;
+        }
+        stepIndex++;
+    }
 
-loadForm();
+    // Form questions
+    const questionIndex = currentStep - stepIndex;
+    if (questionIndex >= 0 && questionIndex < formData.questions.length) {
+        const question = formData.questions[questionIndex];
+        const questionKey = 'q_' + question.question_id;
+        
+        if (ratingValue) {
+            responses[questionKey] = ratingValue.value;
+        } else if (scaleValue) {
+            responses[questionKey] = scaleValue.value;
+        } else if (choiceValue) {
+            responses[questionKey] = choiceValue.value;
+        } else if (answerInput) {
+            responses[questionKey] = answerInput.value;
+        }
+        
+        // Validate required fields
+        if (question.is_required && !responses[questionKey]) {
+            alert('This question is required. Please provide an answer.');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Setup navigation handlers (called after form loads)
+function setupEventListeners() {
+    // Navigation handlers
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (currentStep > 0) {
+            saveCurrentAnswer();
+            currentStep--;
+            renderCurrentStep();
+        }
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        if (saveCurrentAnswer() && currentStep < totalSteps - 1) {
+            currentStep++;
+            renderCurrentStep();
+        }
+    });
+
+    // Submit form
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+        if (!saveCurrentAnswer()) return;
+        
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
+        
+        try {
+            const submission = {
+                form_id: formId,
+                room_number: responses.room_number,
+                guest_name: responses.guest_name,
+                guest_email: responses.guest_email,
+                guest_phone: responses.guest_phone,
+                submission_source: 'web',
+                answers: []
+            };
+            
+            formData.questions.forEach(q => {
+                const value = responses['q_' + q.question_id];
+                if (value) {
+                    const answer = {
+                        question_id: q.question_id,
+                        answer_text: null,
+                        answer_numeric: null
+                    };
+                    
+                    if (['rating', 'scale', 'nps'].includes(q.question_type)) {
+                        answer.answer_numeric = parseFloat(value);
+                    } else {
+                        answer.answer_text = value;
+                    }
+                    
+                    submission.answers.push(answer);
+                }
+            });
+            
+            const res = await fetch('/api/feedback/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submission)
+            });
+            
+            const data = await res.json();
+            
+            if (!data.success) throw new Error(data.error || 'Failed to submit');
+            
+            document.getElementById('formContainer').classList.add('hidden');
+            document.getElementById('thankYouScreen').classList.remove('hidden');
+            document.getElementById('thankYouText').textContent = formData.thank_you_message || 'Thank You!';
+            
+        } catch (error) {
+            console.error('Submit error:', error);
+            alert('Failed to submit feedback. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Submit Feedback';
+        }
+    });
+}
+
+// Start loading when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadForm);
+} else {
+    loadForm();
+}

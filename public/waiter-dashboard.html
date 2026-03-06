@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Waiter Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -272,33 +273,177 @@
 
         <!-- Orders View -->
         <div id="ordersView" class="hidden p-4">
-            <!-- Date Filter -->
-            <div class="mb-4 flex items-center gap-4 bg-slate-800 p-4 rounded-lg">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-calendar text-yellow-500"></i>
-                    <label class="dark-text font-medium">Filter by Date:</label>
+            <!-- ULTRA-SMOOTH DATE FILTERS - YEAR 2070 EXPERIENCE -->
+            <div class="mb-6 space-y-4">
+                <!-- Quick Date Buttons -->
+                <div class="flex gap-2 overflow-x-auto pb-2">
+                    <button onclick="quickFilterDate('today')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="today">
+                        <i class="fas fa-calendar-day mr-2"></i>Today
+                    </button>
+                    <button onclick="quickFilterDate('yesterday')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="yesterday">
+                        <i class="fas fa-arrow-left mr-2"></i>Yesterday
+                    </button>
+                    <button onclick="quickFilterDate('tomorrow')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="tomorrow">
+                        <i class="fas fa-arrow-right mr-2"></i>Tomorrow
+                    </button>
+                    <button onclick="quickFilterDate('this_week')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="this_week">
+                        <i class="fas fa-calendar-week mr-2"></i>This Week
+                    </button>
+                    <button onclick="quickFilterDate('last_week')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="last_week">
+                        <i class="fas fa-history mr-2"></i>Last Week
+                    </button>
+                    <button onclick="quickFilterDate('this_month')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="this_month">
+                        <i class="fas fa-calendar-alt mr-2"></i>This Month
+                    </button>
+                    <button onclick="quickFilterDate('all')" 
+                            class="quick-filter-btn px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all transform hover:scale-105 active:scale-95"
+                            data-filter="all">
+                        <i class="fas fa-infinity mr-2"></i>All Time
+                    </button>
                 </div>
-                <input 
-                    type="date" 
-                    id="orderDateFilter" 
-                    class="px-4 py-2 rounded-lg bg-slate-700 text-white border border-slate-600 focus:border-yellow-500 focus:outline-none"
-                    onchange="filterOrdersByDate()"
-                />
-                <button 
-                    onclick="resetDateFilter()" 
-                    class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
-                >
-                    <i class="fas fa-redo mr-2"></i>Show All
-                </button>
-                <div class="flex-1 text-right">
-                    <span class="dark-text-muted text-sm" id="dateRangeInfo">Today + 7 days</span>
+                
+                <!-- Status Filters -->
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="toggleStatusFilter('all')" 
+                            class="status-filter-btn px-5 py-2 rounded-full font-semibold transition-all transform hover:scale-105 active:scale-95"
+                            data-status="all">
+                        <i class="fas fa-check-double mr-2"></i>All <span class="badge-count ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs font-bold">0</span>
+                    </button>
+                    <button onclick="toggleStatusFilter('pending')" 
+                            class="status-filter-btn px-5 py-2 rounded-full font-semibold transition-all transform hover:scale-105 active:scale-95"
+                            data-status="pending">
+                        <i class="fas fa-clock mr-2"></i>Pending <span class="badge-count ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs font-bold">0</span>
+                    </button>
+                    <button onclick="toggleStatusFilter('in_progress')" 
+                            class="status-filter-btn px-5 py-2 rounded-full font-semibold transition-all transform hover:scale-105 active:scale-95"
+                            data-status="in_progress">
+                        <i class="fas fa-fire mr-2"></i>In Progress <span class="badge-count ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs font-bold">0</span>
+                    </button>
+                    <button onclick="toggleStatusFilter('completed')" 
+                            class="status-filter-btn px-5 py-2 rounded-full font-semibold transition-all transform hover:scale-105 active:scale-95"
+                            data-status="completed">
+                        <i class="fas fa-check mr-2"></i>Completed <span class="badge-count ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs font-bold">0</span>
+                    </button>
+                    <button onclick="toggleStatusFilter('cancelled')" 
+                            class="status-filter-btn px-5 py-2 rounded-full font-semibold transition-all transform hover:scale-105 active:scale-95"
+                            data-status="cancelled">
+                        <i class="fas fa-times mr-2"></i>Cancelled <span class="badge-count ml-2 px-2 py-0.5 rounded-full bg-white/20 text-xs font-bold">0</span>
+                    </button>
+                </div>
+                
+                <!-- Current Filter Info -->
+                <div class="flex items-center justify-between bg-slate-800/50 rounded-lg px-4 py-3">
+                    <span class="dark-text-muted text-sm">
+                        <i class="fas fa-filter mr-2 text-yellow-500"></i>
+                        Showing: <span id="filterInfoText" class="font-semibold text-white">Today's Orders</span>
+                    </span>
+                    <button onclick="resetAllFilters()" class="text-sm text-yellow-500 hover:text-yellow-400 font-semibold">
+                        <i class="fas fa-redo mr-1"></i>Reset All
+                    </button>
                 </div>
             </div>
             
+            <!-- Orders List with Auto-Grouping by Date -->
             <div class="space-y-4" id="ordersList">
-                <!-- Loaded dynamically -->
+                <!-- Loaded dynamically with smooth animations -->
+            </div>
+            
+            <!-- Empty State -->
+            <div id="ordersEmptyState" class="hidden text-center py-16">
+                <i class="fas fa-clipboard-list text-6xl text-slate-600 mb-4"></i>
+                <p class="text-xl text-slate-400 font-medium">No Orders Found</p>
+                <p class="text-slate-500 mt-2">Try adjusting your filters</p>
             </div>
         </div>
+        
+        <!-- CSS for Ultra-Smooth Animations -->
+        <style>
+            .quick-filter-btn {
+                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                color: #e2e8f0;
+                border: 2px solid #475569;
+            }
+            
+            .quick-filter-btn.active {
+                background: linear-gradient(135deg, #D4AF37 0%, #B8961E 100%);
+                color: #000;
+                border-color: #D4AF37;
+                box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+            }
+            
+            .status-filter-btn {
+                background: #1e293b;
+                color: #94a3b8;
+                border: 2px solid #334155;
+            }
+            
+            .status-filter-btn.active {
+                color: #fff;
+                border-color: currentColor;
+            }
+            
+            .status-filter-btn[data-status="pending"].active {
+                background: #f59e0b;
+                border-color: #f59e0b;
+            }
+            
+            .status-filter-btn[data-status="in_progress"].active {
+                background: #ef4444;
+                border-color: #ef4444;
+            }
+            
+            .status-filter-btn[data-status="completed"].active {
+                background: #10b981;
+                border-color: #10b981;
+            }
+            
+            .status-filter-btn[data-status="cancelled"].active {
+                background: #6b7280;
+                border-color: #6b7280;
+            }
+            
+            .status-filter-btn[data-status="all"].active {
+                background: #3b82f6;
+                border-color: #3b82f6;
+                color: #fff;
+            }
+            
+            .order-group {
+                animation: slideIn 0.3s ease-out;
+            }
+            
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .order-card {
+                transition: all 0.2s ease;
+            }
+            
+            .order-card:hover {
+                transform: translateX(4px);
+                box-shadow: 0 8px 24px rgba(212, 175, 55, 0.2);
+            }
+        </style>
     </div>
 
     <!-- Table Detail Modal -->
@@ -445,8 +590,9 @@
         let restaurantTextures = null;
         
         const urlParams = new URLSearchParams(window.location.search);
-        const restaurantId = urlParams.get('restaurant') || '2';
-        const propertyId = urlParams.get('property') || '1';
+        // Case-insensitive parameter retrieval
+        const restaurantId = urlParams.get('restaurant') || urlParams.get('Restaurant') || '2';
+        const propertyId = urlParams.get('property') || urlParams.get('Property') || '1';
         
         // Sound notification system
         let audioContext = null;
@@ -860,12 +1006,20 @@
                 tableEl.style.transition = 'all 0.2s';
                 tableEl.style.boxShadow = `0 4px 6px rgba(0,0,0,0.1)`;
                 
+                // Apply rotation if specified
+                if (table.rotation && table.rotation !== 0) {
+                    tableEl.style.transform = `rotate(${table.rotation}deg)`;
+                    tableEl.style.transformOrigin = 'center center';
+                }
+                
                 tableEl.onmouseover = () => {
-                    tableEl.style.transform = 'scale(1.05)';
+                    const rotation = table.rotation && table.rotation !== 0 ? ` rotate(${table.rotation}deg)` : '';
+                    tableEl.style.transform = `scale(1.05)${rotation}`;
                     tableEl.style.boxShadow = `0 8px 12px rgba(0,0,0,0.2)`;
                 };
                 tableEl.onmouseout = () => {
-                    tableEl.style.transform = 'scale(1)';
+                    const rotation = table.rotation && table.rotation !== 0 ? ` rotate(${table.rotation}deg)` : '';
+                    tableEl.style.transform = `scale(1)${rotation}`;
                     tableEl.style.boxShadow = `0 4px 6px rgba(0,0,0,0.1)`;
                 };
                 
@@ -916,7 +1070,7 @@
                 };
                 
                 return `
-                    <div class="dark-card rounded-lg p-4 order-item border-l-4 ${order.source === 'kitchen' ? 'border-purple-500' : 'border-teal-500'}">
+                    <div class="dark-card rounded-lg p-4 order-item border-l-4 ${order.source === 'kitchen' ? 'border-purple-500' : 'border-teal-500'} cursor-pointer hover:scale-[1.02] transition-transform" onclick="openTableFromOrder('${order.table_id}', event)">
                         <div class="flex items-center justify-between mb-3">
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-1">
@@ -931,7 +1085,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="px-3 py-1 rounded-full text-xs font-bold text-white ${statusColors[order.status]}">${order.status.toUpperCase()}</span>
                                 <button 
-                                    onclick="deleteOrder('${order.order_id}', '${order.guest_name}')" 
+                                    onclick="event.stopPropagation(); deleteOrder('${order.order_id}', '${order.guest_name}')" 
                                     class="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
                                     title="Delete Order"
                                 >
@@ -940,16 +1094,19 @@
                             </div>
                         </div>
                         <div class="space-y-1">
-                            ${order.items.map(item => `
+                            ${order.items && order.items.length > 0 ? order.items.map(item => `
                                 <div class="flex justify-between text-sm">
                                     <span class="dark-text">${item.quantity}x ${item.item_name}</span>
                                     <span class="dark-text-muted">€${(item.cost * item.quantity).toFixed(2)}</span>
                                 </div>
-                            `).join('')}
+                            `).join('') : '<div class="text-sm dark-text-muted italic">No items yet</div>'}
                         </div>
                         <div class="flex justify-between items-center mt-3 pt-3 border-t border-slate-600">
                             <span class="font-bold dark-text">Total:</span>
-                            <span class="font-bold text-lg" style="color: var(--accent);">€${order.total_cost.toFixed(2)}</span>
+                            <span class="font-bold text-lg" style="color: var(--accent);">€${order.total_cost ? order.total_cost.toFixed(2) : '0.00'}</span>
+                        </div>
+                        <div class="text-xs dark-text-muted mt-2 text-center opacity-70">
+                            <i class="fas fa-hand-pointer mr-1"></i>Click to view/edit table
                         </div>
                     </div>
                 `;
@@ -1006,6 +1163,27 @@
             // Show/hide views
             document.getElementById('tablesView').classList.toggle('hidden', tab !== 'tables');
             document.getElementById('ordersView').classList.toggle('hidden', tab !== 'orders');
+            
+            // Initialize orders view when opened
+            if (tab === 'orders') {
+                // Set today as default filter
+                setTimeout(() => {
+                    quickFilterDate('today');
+                }, 100);
+            }
+        }
+
+        // Helper function to open table from orders list
+        function openTableFromOrder(tableId, event) {
+            if (event) event.stopPropagation();
+            
+            // Switch to tables tab first
+            switchTab('tables');
+            
+            // Small delay to ensure tables are loaded
+            setTimeout(() => {
+                openTableModal(tableId);
+            }, 100);
         }
 
         async function openTableModal(tableId) {
@@ -1024,13 +1202,7 @@
                 document.getElementById('guestSeatingSection').classList.add('hidden');
                 document.getElementById('currentOrderSection').classList.remove('hidden');
                 
-                // IMPORTANT: currentTable.current_order doesn't have items!
-                // We need to look up the FULL order from the orders array
                 const order = currentTable.current_order;
-                const fullOrder = orders.find(o => o.order_id === order.order_id || o.order_id === order.order_id);
-                
-                console.log('Table current_order:', order);
-                console.log('Full order from orders array:', fullOrder);
                 
                 document.getElementById('currentGuestName').textContent = order.guest_name || 'Guest';
                 document.getElementById('currentPartySize').textContent = order.party_size || '?';
@@ -1038,233 +1210,124 @@
                 const statusColors = {
                     pending: 'bg-yellow-500',
                     confirmed: 'bg-blue-500',
+                    seated: 'bg-blue-500',
                     preparing: 'bg-orange-500',
                     ready: 'bg-green-500'
                 };
                 document.getElementById('currentOrderStatus').className = `px-3 py-1 rounded-full text-sm font-bold text-white ${statusColors[order.status] || 'bg-gray-500'}`;
                 document.getElementById('currentOrderStatus').textContent = order.status.toUpperCase();
                 
-                // Show items or placeholder
+                // Fetch the full order details with items
                 const container = document.getElementById('orderItemsList');
+                container.innerHTML = '<div class="text-center py-4 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Loading items...</div>';
                 
-                // Use fullOrder if available (has items), otherwise use basic order info
-                const orderWithItems = fullOrder || order;
-                console.log('orderWithItems for this table:', orderWithItems);
-                console.log('orderWithItems.items:', orderWithItems?.items);
-                
-                if (order.source === 'kitchen') {
-                    // Kitchen order - fetch full details from orders list and create temp waiter order for adding items
-                    const fullKitchenOrder = orders.find(o => o.order_id === order.order_id);
+                try {
+                    // Fetch order details from API
+                    let orderDetails = null;
                     
-                    console.log('=== KITCHEN ORDER DEBUG ===');
-                    console.log('order:', order);
-                    console.log('fullKitchenOrder:', fullKitchenOrder);
-                    
-                    // Check if there's ALSO a waiter order for this table (for extras)
-                    const waiterOrderForTable = orders.find(o => 
-                        o.source === 'waiter' && 
-                        String(o.table_number) === String(currentTable.table_number)
-                    );
-                    
-                    console.log('Looking for waiter order for table:', currentTable.table_number);
-                    console.log('All orders:', orders.map(o => ({id: o.order_id, table: o.table_number, source: o.source, items_count: o.items?.length || 0})));
-                    console.log('Found waiter order:', waiterOrderForTable);
-                    
-                    // If there's already a waiter order, use it; otherwise create a temp one
-                    if (waiterOrderForTable) {
-                        currentOrder = waiterOrderForTable;
-                        console.log('Using existing waiter order with items:', waiterOrderForTable.items);
+                    if (order.source === 'kitchen') {
+                        // Fetch kitchen order details
+                        const kitchenOrderId = order.order_id.replace('kitchen-', '');
+                        const response = await fetch(`/api/kitchen/order/${kitchenOrderId}`, {
+                            headers: { 'X-Property-ID': propertyId }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            orderDetails = data.order;
+                        }
                     } else {
-                        // Create a temporary waiter order structure so we can add extra items
-                        currentOrder = {
-                            order_id: null, // Will be created when first item is added
-                            table_id: currentTable.table_id,
-                            restaurant_id: restaurantId,
-                            waiter_id: currentWaiter.id,
-                            guest_name: order.guest_name,
-                            party_size: order.party_size,
-                            items: [], // Start with empty items for extras
-                            total_cost: 0,
-                            status: 'pending',
-                            source: 'waiter'
-                        };
-                        console.log('Created temp waiter order');
+                        // Fetch waiter order details
+                        const response = await fetch(`/api/waiter/order/${order.order_id}?property=${propertyId}`, {
+                            headers: { 'X-Property-ID': propertyId }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            orderDetails = data.order;
+                        }
                     }
                     
-                    // Display both kitchen items AND waiter-added extras
-                    let itemsHTML = '';
-                    
-                    console.log('=== RENDERING ITEMS ===');
-                    
-                    // Kitchen items (set menu)
-                    if (fullKitchenOrder && fullKitchenOrder.items && fullKitchenOrder.items.length > 0) {
-                        console.log('Rendering', fullKitchenOrder.items.length, 'kitchen items');
-                        itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Set Menu Items</div>';
-                        itemsHTML += fullKitchenOrder.items.map(item => {
-                            const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
+                    if (orderDetails && orderDetails.dishes && orderDetails.dishes.length > 0) {
+                        // Render items
+                        let itemsHTML = '';
+                        
+                        if (order.source === 'kitchen') {
+                            itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Kitchen Order</div>';
+                        }
+                        
+                        // Show allergy information if present
+                        if (orderDetails.special_requests && 
+                            (orderDetails.special_requests.includes('ALLERGIES') || 
+                             orderDetails.special_requests.includes('🚨'))) {
+                            // Extract allergy info
+                            const allergyMatch = orderDetails.special_requests.match(/ALLERGIES\/DIETARY RESTRICTIONS:([^\n]+)/);
+                            if (allergyMatch) {
+                                const allergyInfo = allergyMatch[1].trim();
+                                itemsHTML += `
+                                    <div class="mb-3 p-3 bg-red-900/30 border-2 border-red-500 rounded-lg">
+                                        <div class="flex items-center gap-2 text-red-400 font-bold mb-1">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <span>ALLERGY ALERT</span>
+                                        </div>
+                                        <div class="text-sm text-red-300">${allergyInfo}</div>
+                                    </div>
+                                `;
+                            }
+                        } else if (orderDetails.special_requests && orderDetails.special_requests.includes('NO ALLERGIES CONFIRMED')) {
+                            itemsHTML += `
+                                <div class="mb-3 p-2 bg-green-900/20 border border-green-500/30 rounded">
+                                    <div class="text-xs text-green-400">✓ No Allergies Confirmed</div>
+                                </div>
+                            `;
+                        }
+                        
+                        // Sort dishes by category: starter → soup → main → dessert
+                        const sortedDishes = [...orderDetails.dishes].sort((a, b) => {
+                            const categoryOrder = {starter: 1, soup: 2, main: 3, dessert: 4, salad: 5};
+                            const orderA = categoryOrder[a.category] || 10;
+                            const orderB = categoryOrder[b.category] || 10;
+                            return orderA - orderB;
+                        });
+                        
+                        itemsHTML += sortedDishes.map(item => {
+                            const isExtraCharge = String(item.item_id || item.originalId || '').startsWith('rm_') || item.cost > 0;
                             return `
                                 <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg mb-2">
                                     <div class="flex-1">
                                         <div class="font-bold dark-text">${item.item_name}</div>
                                         <div class="text-xs text-slate-400">
-                                            ${isExtraCharge ? '💰 Extra Charge' : '✓ Set Menu'}
-                                            ${item.cost > 0 ? ` - €${item.cost.toFixed(2)}` : ''}
+                                            ${isExtraCharge ? '💰 Extra Charge - €' + (item.cost || 0).toFixed(2) : '✓ Set Menu (Included)'}
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-4">
                                         <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
+                                        ${item.cost > 0 ? `<span class="font-bold text-amber-400">€${(item.cost * item.quantity).toFixed(2)}</span>` : ''}
                                     </div>
                                 </div>
                             `;
                         }).join('');
-                    } else {
-                        console.log('No kitchen items found');
-                    }
-                    
-                    // Waiter-added extras (show even if empty, so user knows they can add)
-                    if (waiterOrderForTable) {
-                        console.log('Rendering waiter extras section. Items:', waiterOrderForTable.items);
-                        itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
-                        
-                        if (waiterOrderForTable.items && waiterOrderForTable.items.length > 0) {
-                            console.log('Rendering', waiterOrderForTable.items.length, 'waiter items');
-                            itemsHTML += waiterOrderForTable.items.map(item => {
-                                return `
-                                    <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
-                                        <div class="flex-1">
-                                            <div class="font-bold dark-text">${item.item_name}</div>
-                                            <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <button onclick="adjustOrderItemQty('${item.item_id}', -1)" class="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white rounded">
-                                                <i class="fas fa-minus text-xs"></i>
-                                            </button>
-                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
-                                            <button onclick="adjustOrderItemQty('${item.item_id}', 1)" class="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white rounded">
-                                                <i class="fas fa-plus text-xs"></i>
-                                            </button>
-                                            <span class="font-bold text-green-400 ml-2">€${(item.cost * item.quantity).toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('');
-                        } else {
-                            console.log('No waiter items, showing placeholder');
-                            itemsHTML += '<div class="p-3 bg-slate-700 rounded-lg text-center text-slate-400 text-sm">Click "Add Items" to add extras</div>';
-                        }
-                    } else {
-                        console.log('No waiter order found for this table');
-                    }
-                    
-                    console.log('Final itemsHTML length:', itemsHTML.length);
-                    console.log('Setting container.innerHTML...');
-                    container.innerHTML = itemsHTML || '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
-                    console.log('Container innerHTML set. Container:', container);
-                    
-                } else {
-                    // Waiter order - BUT check if there's also a kitchen order for this table!
-                    // v2 - Fixed dual display
-                    console.log('=== WAITER ORDER BRANCH V2 ===');
-                    console.log('Current waiter order:', orderWithItems);
-                    
-                    // Look for kitchen order for the same table
-                    const kitchenOrderForTable = orders.find(o => 
-                        o.table_number == currentTable.table_number && 
-                        o.source === 'kitchen'
-                    );
-                    
-                    console.log('Kitchen order for this table?', kitchenOrderForTable);
-                    
-                    if (kitchenOrderForTable) {
-                        // DUAL DISPLAY: Show both kitchen items AND waiter items
-                        console.log('=== DUAL DISPLAY MODE ===');
-                        let itemsHTML = '';
-                        
-                        // Kitchen items (set menu)
-                        if (kitchenOrderForTable.items && kitchenOrderForTable.items.length > 0) {
-                            console.log('Rendering', kitchenOrderForTable.items.length, 'kitchen items');
-                            itemsHTML += '<div class="mb-3 text-xs font-bold text-purple-400 uppercase tracking-wide">🍽️ Set Menu Items</div>';
-                            itemsHTML += kitchenOrderForTable.items.map(item => {
-                                const isExtraCharge = String(item.item_id).startsWith('rm_') || item.cost > 0;
-                                return `
-                                    <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg mb-2">
-                                        <div class="flex-1">
-                                            <div class="font-bold dark-text">${item.item_name}</div>
-                                            <div class="text-xs text-slate-400">
-                                                ${isExtraCharge ? '💰 Extra Charge' : '✓ Set Menu'}
-                                                ${item.cost > 0 ? ` - €${item.cost.toFixed(2)}` : ''}
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-4">
-                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('');
-                        }
-                        
-                        // Waiter-added extras
-                        currentOrder = orderWithItems;
-                        if (orderWithItems && orderWithItems.items && orderWithItems.items.length > 0) {
-                            console.log('Rendering', orderWithItems.items.length, 'waiter items');
-                            itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
-                            itemsHTML += orderWithItems.items.map(item => {
-                                return `
-                                    <div class="flex items-center justify-between p-3 bg-slate-700 rounded-lg mb-2 border-2 border-green-500/30">
-                                        <div class="flex-1">
-                                            <div class="font-bold dark-text">${item.item_name}</div>
-                                            <div class="text-xs text-green-400">💰 Extra Charge - €${(item.cost || 0).toFixed(2)}</div>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <button onclick="adjustOrderItemQty('${item.item_id}', -1)" class="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white rounded">
-                                                <i class="fas fa-minus text-xs"></i>
-                                            </button>
-                                            <span class="w-8 text-center font-bold dark-text">×${item.quantity}</span>
-                                            <button onclick="adjustOrderItemQty('${item.item_id}', 1)" class="w-8 h-8 bg-slate-600 hover:bg-slate-500 text-white rounded">
-                                                <i class="fas fa-plus text-xs"></i>
-                                            </button>
-                                            <span class="font-bold text-green-400 ml-2">€${(item.cost * item.quantity).toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('');
-                        } else {
-                            console.log('No waiter items yet, showing placeholder for extras');
-                            itemsHTML += '<div class="mt-4 mb-3 text-xs font-bold text-green-400 uppercase tracking-wide">➕ Waiter-Added Extras</div>';
-                            itemsHTML += '<div class="p-3 bg-slate-700 rounded-lg text-center text-slate-400 text-sm">Click "Add Items" to add extras</div>';
-                        }
                         
                         container.innerHTML = itemsHTML;
-                        
+                        currentOrder = orderDetails;
                     } else {
-                        // Pure waiter order (no kitchen order)
-                        currentOrder = orderWithItems;
-                        console.log('Pure waiter order, rendering items');
-                        
-                        if (currentOrder && currentOrder.items && currentOrder.items.length > 0) {
-                            console.log('Calling renderOrderItems with', currentOrder.items.length, 'items');
-                            renderOrderItems();
-                        } else {
-                            console.log('No items in currentOrder, showing placeholder');
-                            container.innerHTML = '<div class="p-4 bg-slate-800 rounded-lg text-center text-slate-400">No items yet</div>';
-                        }
+                        container.innerHTML = '<div class="text-center py-8 text-slate-400">No items yet</div>';
                     }
+                } catch (error) {
+                    console.error('Failed to fetch order details:', error);
+                    container.innerHTML = '<div class="text-center py-4 text-red-400">Failed to load items</div>';
                 }
                 
-                // Show action buttons for ALL orders
-                // Add "Confirm Seated" button for ANY order that hasn't been checked in
-                const currentOrderData = currentOrder || currentTable?.current_order;
+                // Determine buttons to show
+                console.log('[Confirm Seated Check] currentOrder:', currentOrder);
+                
+                // Initialize seating check variables
                 let isNotSeated = false;
                 let voucherId = null;
                 let seatedBy = null;
                 let orderForSeating = null;
                 
-                console.log('[Confirm Seated Check] currentTable:', currentTable);
-                console.log('[Confirm Seated Check] currentOrder:', currentOrder);
-                
                 // Check BOTH kitchen orders AND waiter orders for seating status
                 if (currentTable && currentTable.current_order) {
-                    const tableOrder = orders.find(o => o.order_id === currentTable.current_order.order_id);
+                    const tableOrder = allOrdersCache.find(o => o.order_id === currentTable.current_order.order_id);
                     console.log('[Confirm Seated Check] Found order:', tableOrder);
                     
                     if (tableOrder) {
@@ -1419,17 +1482,41 @@
             
             try {
                 console.log('[checkoutTable] Starting checkout for table:', currentTable.table_number);
+                console.log('[checkoutTable] Current table:', currentTable);
+                console.log('[checkoutTable] All orders cache:', allOrdersCache);
+                console.log('[checkoutTable] Orders cache length:', allOrdersCache.length);
                 
                 // Find ALL orders for this table (both kitchen and waiter)
                 const tableNumber = currentTable.table_number;
-                const kitchenOrderForTable = orders.find(o => 
-                    String(o.table_number) === String(tableNumber) && 
-                    o.source === 'kitchen'
-                );
-                const waiterOrderForTable = orders.find(o => 
-                    String(o.table_number) === String(tableNumber) && 
-                    o.source === 'waiter'
-                );
+                
+                // SIMPLIFIED: Use current_order from table data directly
+                const currentOrderOnTable = currentTable.current_order;
+                console.log('[checkoutTable] Current order on table:', currentOrderOnTable);
+                
+                let kitchenOrderForTable = null;
+                let waiterOrderForTable = null;
+                
+                if (currentOrderOnTable) {
+                    if (currentOrderOnTable.source === 'kitchen') {
+                        kitchenOrderForTable = currentOrderOnTable;
+                    } else if (currentOrderOnTable.source === 'waiter') {
+                        waiterOrderForTable = currentOrderOnTable;
+                    }
+                }
+                
+                // Fallback: Also search in cache
+                if (!kitchenOrderForTable) {
+                    kitchenOrderForTable = allOrdersCache.find(o => 
+                        String(o.table_number) === String(tableNumber) && 
+                        o.source === 'kitchen'
+                    );
+                }
+                if (!waiterOrderForTable) {
+                    waiterOrderForTable = allOrdersCache.find(o => 
+                        String(o.table_number) === String(tableNumber) && 
+                        o.source === 'waiter'
+                    );
+                }
                 
                 console.log('[checkoutTable] Found orders - Kitchen:', kitchenOrderForTable?.order_id, 'Waiter:', waiterOrderForTable?.order_id);
                 
@@ -1512,7 +1599,7 @@
             
             try {
                 // Find the order for this table
-                const tableOrder = orders.find(o => o.order_id === currentTable.current_order.order_id);
+                const tableOrder = allOrdersCache.find(o => o.order_id === currentTable.current_order.order_id);
                 console.log('[confirmGuestSeated] Found order:', tableOrder);
                 
                 if (!tableOrder) {
@@ -1570,92 +1657,6 @@
             } catch (error) {
                 console.error('[confirmGuestSeated] Error:', error);
                 alert('Failed to confirm guest seated');
-            }
-        }
-
-        async function checkoutTable() {
-            if (!currentTable || !currentTable.current_order) return;
-            
-            if (!confirm('Checkout guests and clear this table?')) {
-                return;
-            }
-            
-            try {
-                console.log('[checkoutTable] Starting checkout for table:', currentTable.table_number);
-                
-                // Find ALL orders for this table (both kitchen and waiter)
-                const tableNumber = currentTable.table_number;
-                const kitchenOrderForTable = orders.find(o => 
-                    String(o.table_number) === String(tableNumber) && 
-                    o.source === 'kitchen'
-                );
-                const waiterOrderForTable = orders.find(o => 
-                    String(o.table_number) === String(tableNumber) && 
-                    o.source === 'waiter'
-                );
-                
-                console.log('[checkoutTable] Found orders - Kitchen:', kitchenOrderForTable?.order_id, 'Waiter:', waiterOrderForTable?.order_id);
-                
-                let kitchenSuccess = true;
-                let waiterSuccess = true;
-                
-                // Checkout kitchen order if it exists
-                if (kitchenOrderForTable) {
-                    console.log('[checkoutTable] Checking out kitchen order:', kitchenOrderForTable.order_id);
-                    const voucherId = kitchenOrderForTable.order_id.replace('kitchen-', '');
-                    const response = await fetch('/api/waiter/checkout-table', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Property-ID': propertyId
-                        },
-                        body: JSON.stringify({
-                            voucher_id: voucherId
-                        })
-                    });
-                    
-                    const data = await response.json();
-                    kitchenSuccess = data.success;
-                    if (!kitchenSuccess) {
-                        console.error('[checkoutTable] Kitchen checkout failed:', data.error);
-                    }
-                }
-                
-                // Delete waiter order if it exists
-                if (waiterOrderForTable) {
-                    console.log('[checkoutTable] Deleting waiter order:', waiterOrderForTable.order_id);
-                    const response = await fetch(`/api/waiter/order/${waiterOrderForTable.order_id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'X-Property-ID': propertyId
-                        }
-                    });
-                    
-                    const data = await response.json();
-                    waiterSuccess = data.success;
-                    if (!waiterSuccess) {
-                        console.error('[checkoutTable] Waiter order deletion failed:', data.error);
-                    }
-                }
-                
-                // Show result
-                if (kitchenSuccess && waiterSuccess) {
-                    console.log('[checkoutTable] All orders cleared successfully');
-                    alert('✓ Table checked out and cleared successfully!');
-                    closeTableModal();
-                    await loadTables();
-                    await loadOrders();
-                    renderFloorPlan();
-                    updateStats();
-                } else {
-                    const errors = [];
-                    if (!kitchenSuccess) errors.push('kitchen order');
-                    if (!waiterSuccess) errors.push('waiter order');
-                    alert(`Failed to clear ${errors.join(' and ')}`);
-                }
-            } catch (error) {
-                console.error('[checkoutTable] Error:', error);
-                alert('Failed to checkout table');
             }
         }
 
@@ -1732,7 +1733,15 @@
                 return;
             }
             
-            container.innerHTML = currentOrder.items.map(item => `
+            // Sort items by category: starter → soup → main → dessert
+            const sortedItems = [...currentOrder.items].sort((a, b) => {
+                const categoryOrder = {starter: 1, soup: 2, main: 3, dessert: 4, salad: 5};
+                const orderA = categoryOrder[a.category] || 10;
+                const orderB = categoryOrder[b.category] || 10;
+                return orderA - orderB;
+            });
+            
+            container.innerHTML = sortedItems.map(item => `
                 <div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                     <div class="flex-1">
                         <div class="font-bold dark-text">${item.item_name}</div>
@@ -1767,21 +1776,25 @@
             
             grid.innerHTML = menuItems.map(item => {
                 const qty = selectedMenuItems[item.item_id] || 0;
+                const premiumBadge = item.is_premium ? '<span class="inline-block bg-orange-500 text-white px-2 py-1 rounded text-xs font-bold ml-2"><i class="fas fa-star mr-1"></i>PREMIUM</span>' : '';
                 
                 return `
-                    <div class="dark-card rounded-lg p-4">
+                    <div class="dark-card rounded-lg p-4 ${item.is_premium ? 'border-2 border-orange-500' : ''}">
                         <div class="mb-3">
-                            <div class="font-bold dark-text text-lg">${item.item_name}</div>
+                            <div class="font-bold dark-text text-lg flex items-center flex-wrap">
+                                ${item.item_name}
+                                ${premiumBadge}
+                            </div>
                             <div class="text-sm dark-text-muted">${item.category || ''}</div>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span class="font-bold text-lg" style="color: var(--accent);">€${item.cost_to_hotel.toFixed(2)}</span>
+                            <span class="font-bold text-lg" style="color: ${item.is_premium ? '#f97316' : 'var(--accent)'};">€${item.cost_to_hotel.toFixed(2)}</span>
                             <div class="flex items-center gap-2">
                                 <button onclick="adjustMenuItemQty('${item.item_id}', -1)" class="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-lg ${qty === 0 ? 'opacity-50' : ''}">
                                     <i class="fas fa-minus"></i>
                                 </button>
                                 <span class="w-10 text-center font-bold dark-text text-lg">${qty}</span>
-                                <button onclick="adjustMenuItemQty('${item.item_id}', 1)" class="w-10 h-10 btn-accent text-black rounded-lg font-bold">
+                                <button onclick="adjustMenuItemQty('${item.item_id}', 1)" class="w-10 h-10 ${item.is_premium ? 'bg-orange-500 hover:bg-orange-600' : 'btn-accent'} text-${item.is_premium ? 'white' : 'black'} rounded-lg font-bold">
                                     <i class="fas fa-plus"></i>
                                 </button>
                             </div>
@@ -1904,7 +1917,7 @@
             }
         }
 
-        async function adjustOrderItemQty(itemId, delta) {
+        window.adjustOrderItemQty = async function(itemId, delta) {
             console.log('[adjustOrderItemQty] Called with:', { itemId, delta });
             
             // Update in current order
@@ -2034,64 +2047,448 @@
                 alert('Failed to clear table');
             }
         }
-        // Date filter functions
-        function filterOrdersByDate() {
-            const dateInput = document.getElementById('orderDateFilter');
-            const selectedDate = dateInput.value;
+        
+        // ============================================
+        // ULTRA-SMOOTH YEAR 2070 FILTERING SYSTEM
+        // ============================================
+        let currentDateFilter = 'today';
+        let currentStatusFilter = 'all';
+        let allOrdersCache = [];
+        
+        // Quick date filter - INSTANT response
+        window.quickFilterDate = function(period) {
+            currentDateFilter = period;
             
-            if (selectedDate) {
-                loadOrders(selectedDate);
+            // Update button states with smooth animation
+            document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-filter="${period}"]`)?.classList.add('active');
+            
+            // Update info text
+            const infoTexts = {
+                'today': "Today's Orders",
+                'yesterday': "Yesterday's Orders",
+                'tomorrow': "Tomorrow's Orders",
+                'this_week': "This Week's Orders",
+                'last_week': "Last Week's Orders",
+                'this_month': "This Month's Orders",
+                'all': "All Orders"
+            };
+            document.getElementById('filterInfoText').textContent = infoTexts[period];
+            
+            // Calculate date range
+            const today = new Date();
+            let startDate = null;
+            let endDate = null;
+            
+            switch(period) {
+                case 'today':
+                    startDate = endDate = today.toISOString().split('T')[0];
+                    break;
+                case 'yesterday':
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    startDate = endDate = yesterday.toISOString().split('T')[0];
+                    break;
+                case 'tomorrow':
+                    const tomorrow = new Date(today);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    startDate = endDate = tomorrow.toISOString().split('T')[0];
+                    break;
+                case 'this_week':
+                    const weekStart = new Date(today);
+                    weekStart.setDate(today.getDate() - today.getDay());
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekStart.getDate() + 6);
+                    startDate = weekStart.toISOString().split('T')[0];
+                    endDate = weekEnd.toISOString().split('T')[0];
+                    break;
+                case 'last_week':
+                    const lastWeekStart = new Date(today);
+                    lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
+                    const lastWeekEnd = new Date(lastWeekStart);
+                    lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+                    startDate = lastWeekStart.toISOString().split('T')[0];
+                    endDate = lastWeekEnd.toISOString().split('T')[0];
+                    break;
+                case 'this_month':
+                    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    startDate = monthStart.toISOString().split('T')[0];
+                    endDate = monthEnd.toISOString().split('T')[0];
+                    break;
+                case 'all':
+                    startDate = endDate = null;
+                    break;
             }
+            
+            // Load orders with date range
+            loadOrdersWithFilters(startDate, endDate);
         }
         
-        function resetDateFilter() {
-            const dateInput = document.getElementById('orderDateFilter');
-            dateInput.value = '';
-            loadOrders();
+        // Status filter toggle - BUTTERY SMOOTH
+        window.toggleStatusFilter = function(status) {
+            currentStatusFilter = status;
+            
+            // Update button states
+            document.querySelectorAll('.status-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`.status-filter-btn[data-status="${status}"]`)?.classList.add('active');
+            
+            // Render filtered orders instantly (no API call needed)
+            renderFilteredOrders();
         }
         
-        // Update loadOrders to accept date parameter
-        async function loadOrders(date = null) {
+        // Reset all filters
+        window.resetAllFilters = function() {
+            currentDateFilter = 'today';
+            currentStatusFilter = 'all';
+            quickFilterDate('today');
+            toggleStatusFilter('all');
+        }
+        
+        // Load orders with date range
+        async function loadOrdersWithFilters(startDate, endDate) {
             try {
                 let url = `/api/waiter/orders?restaurant=${restaurantId}&waiter=0&property=${propertyId}`;
-                if (date) {
-                    url += `&date=${date}`;
+                if (startDate) {
+                    url += `&start_date=${startDate}`;
                 }
-                // Add cache-busting timestamp
+                if (endDate) {
+                    url += `&end_date=${endDate}`;
+                }
                 url += `&_t=${Date.now()}`;
                 
                 const response = await fetch(url, {
                     headers: { 
                         'X-Property-ID': propertyId,
-                        'Cache-Control': 'no-cache, no-store, must-revalidate',
-                        'Pragma': 'no-cache'
+                        'Cache-Control': 'no-cache'
                     }
                 });
                 const data = await response.json();
                 if (data.success) {
-                    const newOrders = data.orders || [];
+                    allOrdersCache = data.orders || [];
+                    orders = allOrdersCache; // Keep orders array in sync
                     
-                    // Detect new orders and play sound
-                    if (lastOrderCount > 0 && newOrders.length > lastOrderCount) {
-                        const newOrdersCount = newOrders.length - lastOrderCount;
-                        console.log(`[Sound] ${newOrdersCount} new order(s) detected!`);
+                    // Detect new orders
+                    if (lastOrderCount > 0 && allOrdersCache.length > lastOrderCount) {
+                        const newCount = allOrdersCache.length - lastOrderCount;
                         playNotificationSound('new_order');
-                        showToast(`${newOrdersCount} new order(s)!`, 'info');
+                        showToast(`${newCount} new order(s)!`, 'info');
                     }
+                    lastOrderCount = allOrdersCache.length;
                     
-                    lastOrderCount = newOrders.length;
-                    orders = newOrders;
-                    console.log('Loaded orders:', orders.length, orders);
-                    renderOrders();
+                    // Update status counts
+                    updateStatusCounts();
                     
-                    // Update date range info
-                    if (data.date_range) {
-                        document.getElementById('dateRangeInfo').textContent = 
-                            `${data.date_range.from} to ${data.date_range.to}`;
-                    }
+                    // Render with current status filter
+                    renderFilteredOrders();
                 }
             } catch (error) {
                 console.error('Failed to load orders:', error);
+            }
+        }
+        
+        // Update status filter counts
+        function updateStatusCounts() {
+            const counts = {
+                all: allOrdersCache.length,
+                pending: 0,
+                in_progress: 0,
+                completed: 0,
+                cancelled: 0
+            };
+            
+            allOrdersCache.forEach(order => {
+                const status = order.status || 'pending';
+                if (status === 'pending' || status === 'confirmed') counts.pending++;
+                else if (status === 'preparing' || status === 'ready') counts.in_progress++;
+                else if (status === 'served' || status === 'paid') counts.completed++;
+                else if (status === 'cancelled') counts.cancelled++;
+            });
+            
+            // Update badge counts with smooth animation
+            Object.keys(counts).forEach(status => {
+                const badge = document.querySelector(`.status-filter-btn[data-status="${status}"] .badge-count`);
+                if (badge) {
+                    badge.textContent = counts[status];
+                    if (counts[status] > 0) {
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Render filtered orders with grouping by date
+        function renderFilteredOrders() {
+            const container = document.getElementById('ordersList');
+            const emptyState = document.getElementById('ordersEmptyState');
+            
+            // Filter orders by status
+            let filtered = allOrdersCache;
+            if (currentStatusFilter !== 'all') {
+                filtered = allOrdersCache.filter(order => {
+                    const status = order.status || 'pending';
+                    if (currentStatusFilter === 'pending') {
+                        return status === 'pending' || status === 'confirmed';
+                    } else if (currentStatusFilter === 'in_progress') {
+                        return status === 'preparing' || status === 'ready';
+                    } else if (currentStatusFilter === 'completed') {
+                        return status === 'served' || status === 'paid';
+                    } else if (currentStatusFilter === 'cancelled') {
+                        return status === 'cancelled';
+                    }
+                    return true;
+                });
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            // Group by date
+            const grouped = {};
+            filtered.forEach(order => {
+                const date = order.reservation_date || order.created_at?.split('T')[0] || 'Unknown';
+                if (!grouped[date]) {
+                    grouped[date] = [];
+                }
+                grouped[date].push(order);
+            });
+            
+            // Render groups
+            let html = '';
+            const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+            
+            sortedDates.forEach(date => {
+                const dateObj = new Date(date + 'T00:00:00');
+                const isToday = date === new Date().toISOString().split('T')[0];
+                const dateLabel = isToday ? 'Today' : dateObj.toLocaleDateString('en-US', { 
+                    weekday: 'short', 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                
+                html += `
+                    <div class="order-group">
+                        <div class="flex items-center gap-3 mb-3">
+                            <h3 class="text-xl font-bold text-white">${dateLabel}</h3>
+                            <span class="px-3 py-1 rounded-full bg-slate-700 text-slate-300 text-sm font-semibold">
+                                ${grouped[date].length} order${grouped[date].length > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <div class="space-y-3">
+                `;
+                
+                grouped[date].forEach(order => {
+                    const status = order.status || 'pending';
+                    const statusConfig = {
+                        'pending': { bg: 'bg-gradient-to-r from-yellow-500 to-yellow-600', border: 'border-yellow-500', icon: 'fa-clock', text: 'PENDING' },
+                        'confirmed': { bg: 'bg-gradient-to-r from-blue-500 to-blue-600', border: 'border-blue-500', icon: 'fa-check-circle', text: 'CONFIRMED' },
+                        'preparing': { bg: 'bg-gradient-to-r from-orange-500 to-orange-600', border: 'border-orange-500', icon: 'fa-fire', text: 'PREPARING' },
+                        'ready': { bg: 'bg-gradient-to-r from-green-500 to-green-600', border: 'border-green-500', icon: 'fa-bell', text: 'READY' },
+                        'served': { bg: 'bg-gradient-to-r from-purple-500 to-purple-600', border: 'border-purple-500', icon: 'fa-utensils', text: 'SERVED' },
+                        'paid': { bg: 'bg-gradient-to-r from-emerald-500 to-emerald-600', border: 'border-emerald-500', icon: 'fa-dollar-sign', text: 'PAID' },
+                        'cancelled': { bg: 'bg-gradient-to-r from-gray-500 to-gray-600', border: 'border-gray-500', icon: 'fa-times-circle', text: 'CANCELLED' }
+                    };
+                    const config = statusConfig[status] || statusConfig['pending'];
+                    
+                    html += `
+                        <div class="order-card bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-2xl border-l-[6px] ${config.border} cursor-pointer hover:shadow-2xl hover:scale-[1.01] transition-all duration-300 shadow-lg"
+                             onclick="viewOrderDetails('${order.order_id}')">
+                            <!-- Header -->
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <div class="w-10 h-10 rounded-full ${config.bg} flex items-center justify-center shadow-lg">
+                                            <i class="fas fa-user text-white text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-white text-lg">${order.guest_name || 'Guest'}</div>
+                                            <div class="text-slate-400 text-xs">Order #${order.order_id?.toString().slice(-6) || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-4 text-sm mt-2 flex-wrap">
+                                        <span class="bg-slate-700/50 px-3 py-1.5 rounded-lg text-slate-300 font-medium">
+                                            <i class="fas fa-chair mr-2 text-amber-400"></i>Table ${order.table_number || '-'}
+                                        </span>
+                                        <span class="bg-slate-700/50 px-3 py-1.5 rounded-lg text-slate-300 font-medium">
+                                            <i class="fas fa-users mr-2 text-blue-400"></i>${order.party_size || 0} guests
+                                        </span>
+                                        ${order.reservation_time ? `
+                                            <span class="bg-slate-700/50 px-3 py-1.5 rounded-lg text-slate-300 font-medium">
+                                                <i class="fas fa-clock mr-2 text-green-400"></i>${order.reservation_time}
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <span class="${config.bg} text-white px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap shadow-lg flex items-center gap-2">
+                                        <i class="fas ${config.icon}"></i>
+                                        ${config.text}
+                                    </span>
+                                    <button onclick="event.stopPropagation(); clearOrderFromList('${order.order_id}', '${order.table_number}', '${order.source}')" 
+                                            class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-lg flex items-center gap-2 justify-center transition-all">
+                                        <i class="fas fa-trash"></i>
+                                        Clear Table
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Items -->
+                            ${order.items && order.items.length > 0 ? `
+                                <div class="mt-4 pt-4 border-t border-slate-700/50">
+                                    <div class="space-y-2">
+                                        ${order.items.map(item => `
+                                            <div class="flex justify-between items-center bg-slate-700/30 px-3 py-2 rounded-lg">
+                                                <span class="text-slate-200 font-medium">
+                                                    <span class="bg-amber-500 text-white px-2 py-0.5 rounded-md text-xs font-bold mr-2">${item.quantity}x</span>
+                                                    ${item.item_name}
+                                                </span>
+                                                ${item.cost > 0 ? `<span class="text-amber-400 font-bold text-sm">€${(item.cost * item.quantity).toFixed(2)}</span>` : '<span class="text-green-400 font-bold text-xs">INCLUDED</span>'}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    ${order.total_cost > 0 ? `
+                                        <div class="flex justify-between items-center mt-4 pt-3 border-t border-slate-600">
+                                            <span class="font-bold text-white text-lg">Total:</span>
+                                            <span class="font-bold text-2xl bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">€${order.total_cost.toFixed(2)}</span>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : '<div class="text-sm text-slate-500 italic mt-3 text-center py-3 bg-slate-800/50 rounded-lg">No items ordered yet</div>'}
+                            
+                            <!-- Click hint -->
+                            <div class="mt-4 pt-3 border-t border-slate-700/50 text-center">
+                                <span class="text-slate-400 text-xs font-medium">
+                                    <i class="fas fa-hand-pointer mr-1"></i>
+                                    Click to view/edit order
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Clear order from orders list
+        window.clearOrderFromList = async function(orderId, tableNumber, source) {
+            if (!confirm(`Clear table ${tableNumber}? This will remove the order and free the table.`)) {
+                return;
+            }
+            
+            try {
+                console.log('[clearOrderFromList] Clearing order:', orderId, 'Source:', source);
+                
+                let success = false;
+                
+                if (source === 'kitchen') {
+                    // Kitchen order - call checkout API
+                    const voucherId = orderId.replace('kitchen-', '');
+                    const response = await fetch('/api/waiter/checkout-table', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Property-ID': propertyId
+                        },
+                        body: JSON.stringify({
+                            voucher_id: voucherId
+                        })
+                    });
+                    const data = await response.json();
+                    success = data.success;
+                } else {
+                    // Waiter order - call delete API
+                    const response = await fetch(`/api/waiter/order/${orderId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'X-Property-ID': propertyId
+                        }
+                    });
+                    const data = await response.json();
+                    success = data.success;
+                }
+                
+                if (success) {
+                    alert(`✓ Table ${tableNumber} cleared successfully!`);
+                    await loadTables();
+                    await loadOrders();
+                    renderFloorPlan();
+                    updateStats();
+                } else {
+                    alert('Failed to clear table');
+                }
+            } catch (error) {
+                console.error('[clearOrderFromList] Error:', error);
+                alert('Failed to clear table');
+            }
+        }
+        
+        // View order details - open the table modal
+        window.viewOrderDetails = function(orderId) {
+            // Find the order
+            const order = allOrdersCache.find(o => o.order_id == orderId);
+            if (!order) {
+                console.error('Order not found:', orderId);
+                return;
+            }
+            
+            // Find table by table_id or table_number
+            let table = null;
+            
+            if (order.table_id) {
+                // Find by table_id (for waiter orders)
+                table = tables.find(t => t.table_id === order.table_id);
+            } else if (order.table_number) {
+                // Find by table_number (for kitchen orders)
+                table = tables.find(t => String(t.table_number) === String(order.table_number));
+            }
+            
+            if (!table) {
+                alert(`Cannot open table: Table ${order.table_number || 'unknown'} not found`);
+                return;
+            }
+            
+            // Switch to tables tab and open the modal
+            switchTab('tables');
+            setTimeout(() => {
+                openTableModal(table.table_id);
+            }, 100);
+        }
+        
+        // OLD FUNCTIONS - Keep for backward compatibility
+        function filterOrdersByDate() {
+            quickFilterDate('today');
+        }
+        
+        function resetDateFilter() {
+            resetAllFilters();
+        }
+        
+        // Update loadOrders to use new filtering system
+        async function loadOrders(date = null) {
+            // Use new filtering system instead
+            if (date) {
+                // Single date filter
+                loadOrdersWithFilters(date, date);
+            } else {
+                // Use current filter
+                quickFilterDate(currentDateFilter);
             }
         }
         
