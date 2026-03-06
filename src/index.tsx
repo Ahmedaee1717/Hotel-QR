@@ -44113,6 +44113,210 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- Settings Tab -->
         <div id="settingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-6">
+                <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6"><i class="fas fa-eye mr-2 text-indigo-600"></i>Menu Visibility Settings</h2>
+                <p class="text-gray-600 mb-6">Toggle which sidebar menu items are visible. Hidden items can be re-enabled at any time.</p>
+                
+                <!-- Core Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+                        <i class="fas fa-folder text-blue-500 mr-2"></i>Core
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-concierge-bell w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Front Desk</span>
+                            </div>
+                            <input type="checkbox" data-menu="frontdesk" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-qrcode w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">QR Code</span>
+                            </div>
+                            <input type="checkbox" data-menu="qrcode" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-chart-line w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Analytics</span>
+                            </div>
+                            <input type="checkbox" data-menu="analytics" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-comments w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Feedback</span>
+                            </div>
+                            <input type="checkbox" data-menu="feedback" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-users-cog w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">User Management</span>
+                            </div>
+                            <input type="checkbox" data-menu="users" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Content Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+                        <i class="fas fa-folder text-purple-500 mr-2"></i>Content
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-utensils w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Offerings</span>
+                            </div>
+                            <input type="checkbox" data-menu="offerings" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-receipt w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">À La Carte Vouchers</span>
+                            </div>
+                            <input type="checkbox" data-menu="alacarte" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-layer-group w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Sections</span>
+                            </div>
+                            <input type="checkbox" data-menu="customsections" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-file-alt w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Info Pages</span>
+                            </div>
+                            <input type="checkbox" data-menu="infopages" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-hiking w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Activities</span>
+                            </div>
+                            <input type="checkbox" data-menu="activities" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Services Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+                        <i class="fas fa-folder text-green-500 mr-2"></i>Services
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-door-open w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Rooms</span>
+                            </div>
+                            <input type="checkbox" data-menu="rooms" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-utensils w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">F&B (Restaurants)</span>
+                            </div>
+                            <input type="checkbox" data-menu="restaurants" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-store w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Vendors</span>
+                            </div>
+                            <input type="checkbox" data-menu="vendors" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-umbrella-beach w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Beach</span>
+                            </div>
+                            <input type="checkbox" data-menu="beach" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-phone w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Callbacks</span>
+                            </div>
+                            <input type="checkbox" data-menu="callbacks" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-concierge-bell w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Service Types</span>
+                            </div>
+                            <input type="checkbox" data-menu="servicetypes" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- AI & Advanced Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+                        <i class="fas fa-folder text-orange-500 mr-2"></i>AI & Advanced
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-robot w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">AI Chatbot</span>
+                            </div>
+                            <input type="checkbox" data-menu="chatbot" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-key w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Code</span>
+                            </div>
+                            <input type="checkbox" data-menu="regcode" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Help & Support Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+                        <i class="fas fa-folder text-gray-500 mr-2"></i>Help & Support
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-book w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Documentation</span>
+                            </div>
+                            <input type="checkbox" data-menu="documentation" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">Tutorials</span>
+                            </div>
+                            <input type="checkbox" data-menu="tutorials" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                        <label class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-question-circle w-5 text-gray-600"></i>
+                                <span class="font-medium text-gray-700">FAQ</span>
+                            </div>
+                            <input type="checkbox" data-menu="faq" class="menu-visibility-toggle w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" checked />
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Save Button -->
+                <div class="flex justify-end mt-6 pt-4 border-t">
+                    <button onclick="saveMenuVisibility()" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">
+                        <i class="fas fa-save mr-2"></i>Save Menu Settings
+                    </button>
+                </div>
+            </div>
+            
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6">
                 <h2 class="text-xl md:text-2xl font-bold mb-4 md:mb-6"><i class="fas fa-cog mr-2 text-purple-600"></i>Hotel Design Settings</h2>
                 
@@ -53895,6 +54099,7 @@ app.get('/admin/dashboard', (c) => {
         btn.addEventListener('click', () => {
           if (btn.dataset.tab === 'settings') {
             loadSeasonalSettings();
+            loadMenuVisibilitySettings(); // Load menu visibility settings
           }
           if (btn.dataset.tab === 'beach') {
             // Setup color pickers when beach tab is clicked
@@ -53903,6 +54108,87 @@ app.get('/admin/dashboard', (c) => {
               updateColorPreview();
             }, 100);
           }
+        });
+      });
+      
+      // ========== MENU VISIBILITY SETTINGS ==========
+      
+      const MENU_VISIBILITY_KEY = 'admin_menu_visibility';
+      
+      // Load menu visibility settings
+      function loadMenuVisibilitySettings() {
+        const savedSettings = localStorage.getItem(MENU_VISIBILITY_KEY);
+        if (savedSettings) {
+          try {
+            const settings = JSON.parse(savedSettings);
+            
+            // Update checkboxes
+            document.querySelectorAll('.menu-visibility-toggle').forEach(checkbox => {
+              const menuName = checkbox.dataset.menu;
+              if (settings[menuName] !== undefined) {
+                checkbox.checked = settings[menuName];
+              }
+            });
+          } catch (e) {
+            console.error('Error loading menu visibility settings:', e);
+          }
+        }
+      }
+      
+      // Save menu visibility settings
+      window.saveMenuVisibility = function() {
+        const settings = {};
+        
+        document.querySelectorAll('.menu-visibility-toggle').forEach(checkbox => {
+          const menuName = checkbox.dataset.menu;
+          settings[menuName] = checkbox.checked;
+        });
+        
+        localStorage.setItem(MENU_VISIBILITY_KEY, JSON.stringify(settings));
+        
+        // Apply the visibility changes
+        applyMenuVisibility(settings);
+        
+        alert('✅ Menu visibility settings saved! The sidebar has been updated.');
+      };
+      
+      // Apply menu visibility based on settings
+      function applyMenuVisibility(settings = null) {
+        if (!settings) {
+          const saved = localStorage.getItem(MENU_VISIBILITY_KEY);
+          if (saved) {
+            settings = JSON.parse(saved);
+          }
+        }
+        
+        if (!settings) return;
+        
+        // Apply visibility to each menu item
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+          const tabName = btn.dataset.tab;
+          if (settings[tabName] !== undefined) {
+            if (settings[tabName]) {
+              btn.style.display = ''; // Show
+            } else {
+              btn.style.display = 'none'; // Hide
+            }
+          }
+        });
+      }
+      
+      // Apply menu visibility on page load
+      applyMenuVisibility();
+      
+      // Add change listeners to checkboxes for real-time preview (optional)
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.menu-visibility-toggle').forEach(checkbox => {
+          checkbox.addEventListener('change', () => {
+            const menuName = checkbox.dataset.menu;
+            const btn = document.querySelector(\`[data-tab="\${menuName}"]\`);
+            if (btn) {
+              btn.style.display = checkbox.checked ? '' : 'none';
+            }
+          });
         });
       });
 
