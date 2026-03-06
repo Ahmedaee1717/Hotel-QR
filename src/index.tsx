@@ -11642,6 +11642,47 @@ function extractGuestName(message: string): string | null {
   return null
 }
 
+// Get new messages for guest (for polling admin messages)
+app.get('/api/chatbot/messages', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const session_id = c.req.query('session_id')
+    const after_id = parseInt(c.req.query('after_id') || '0')
+    const property_id = c.req.query('property_id')
+    
+    if (!session_id || !property_id) {
+      return c.json({ error: 'Missing required parameters' }, 400)
+    }
+    
+    // Get conversation_id from session_id
+    const conv = await DB.prepare(`
+      SELECT conversation_id FROM chatbot_conversations 
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, property_id).first()
+    
+    if (!conv) {
+      return c.json({ success: true, messages: [] })
+    }
+    
+    // Fetch new messages (admin and system only, after the given ID)
+    const messages = await DB.prepare(`
+      SELECT message_id, role, content, created_at
+      FROM chatbot_messages
+      WHERE conversation_id = ? AND message_id > ? AND role IN ('admin', 'system')
+      ORDER BY created_at ASC
+    `).bind(conv.conversation_id, after_id).all()
+    
+    return c.json({
+      success: true,
+      messages: messages.results || []
+    })
+  } catch (error) {
+    console.error('Fetch messages error:', error)
+    return c.json({ error: 'Failed to fetch messages' }, 500)
+  }
+})
+
 app.post('/api/chatbot/chat', async (c) => {
   const { DB } = c.env
   
@@ -27395,11 +27436,15 @@ app.get('/hotel/:property_slug', async (c) => {
               chatWindow.classList.toggle('hidden');
               if (!chatWindow.classList.contains('hidden')) {
                 chatInput.focus();
+                startMessagePolling(); // Start polling when chat opens
+              } else {
+                stopMessagePolling(); // Stop polling when chat closes
               }
             });
             
             closeChatBtn.addEventListener('click', () => {
               chatWindow.classList.add('hidden');
+              stopMessagePolling(); // Stop polling when chat closes
             });
             
             // Add message to chat
@@ -27409,9 +27454,10 @@ app.get('/hotel/:property_slug', async (c) => {
               return text.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
             }
             
-            function addMessage(text, role, autoSpeak = false, language = 'en') {
+            function addMessage(text, role, autoSpeak = false, language = 'en', messageId = null) {
               const messageDiv = document.createElement('div');
               messageDiv.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+              if (messageId) messageDiv.dataset.messageId = messageId;
               
               const bubble = document.createElement('div');
               if (role === 'user') {
@@ -27419,6 +27465,16 @@ app.get('/hotel/:property_slug', async (c) => {
                 bubble.className = 'text-white px-4 py-2 rounded-2xl rounded-tr-none max-w-[80%]';
                 bubble.style.background = 'linear-gradient(to right, ' + primaryColor + ', ' + adjustColor(primaryColor, -20) + ')';
                 bubble.textContent = text; // User messages are plain text
+              } else if (role === 'admin') {
+                // Admin messages - purple gradient style
+                bubble.className = 'text-white px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+                bubble.style.background = 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)';
+                bubble.innerHTML = text.replace(/\\n/g, '<br>');
+                // Add staff badge
+                const badge = document.createElement('span');
+                badge.className = 'inline-block bg-white bg-opacity-20 text-xs px-2 py-1 rounded-full mr-2';
+                badge.innerHTML = '<i class="fas fa-headset mr-1"></i>Staff';
+                bubble.insertBefore(badge, bubble.firstChild);
               } else {
                 bubble.className = 'bg-white border border-gray-200 text-gray-800 px-4 py-2 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
                 // Bot messages can have markdown links
@@ -27469,6 +27525,54 @@ app.get('/hotel/:property_slug', async (c) => {
               messageDiv.appendChild(bubble);
               chatMessages.appendChild(messageDiv);
               chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Track last message ID to prevent duplicates
+            let lastMessageId = 0;
+            let messagePollInterval = null;
+            
+            // Poll for new messages from admin
+            async function checkForNewMessages() {
+              if (!chatSessionId) return;
+              
+              try {
+                const response = await fetch('/api/chatbot/messages?session_id=' + chatSessionId + '&after_id=' + lastMessageId + '&property_id=' + window.propertyData.property_id);
+                const data = await response.json();
+                
+                if (data.success && data.messages && data.messages.length > 0) {
+                  data.messages.forEach(msg => {
+                    // Skip if already displayed
+                    if (document.querySelector('[data-message-id="' + msg.message_id + '"]')) return;
+                    
+                    // Add message based on role
+                    if (msg.role === 'admin') {
+                      addMessage(msg.content, 'admin', false, 'en', msg.message_id);
+                    } else if (msg.role === 'system') {
+                      addMessage(msg.content, 'assistant', false, 'en', msg.message_id);
+                    }
+                    
+                    // Update last message ID
+                    if (msg.message_id > lastMessageId) {
+                      lastMessageId = msg.message_id;
+                    }
+                  });
+                }
+              } catch (error) {
+                console.error('Message polling error:', error);
+              }
+            }
+            
+            // Start/stop polling when chat window opens/closes
+            function startMessagePolling() {
+              if (messagePollInterval) return;
+              messagePollInterval = setInterval(checkForNewMessages, 3000); // Poll every 3 seconds
+            }
+            
+            function stopMessagePolling() {
+              if (messagePollInterval) {
+                clearInterval(messagePollInterval);
+                messagePollInterval = null;
+              }
             }
             
             // Send message
@@ -27577,6 +27681,15 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 if (data.success) {
                   chatConversationId = data.conversation_id;
+                  
+                  // Track message IDs to prevent duplicates
+                  if (data.user_message_id && data.user_message_id > lastMessageId) {
+                    lastMessageId = data.user_message_id;
+                  }
+                  if (data.assistant_message_id && data.assistant_message_id > lastMessageId) {
+                    lastMessageId = data.assistant_message_id;
+                  }
+                  
                   addMessage(data.response, 'assistant', fromVoiceInput, language);
                 } else if (response.status === 429) {
                   addMessage(data.message || 'Rate limit exceeded. Please try again later.', 'assistant', fromVoiceInput, language);
