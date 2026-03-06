@@ -18178,14 +18178,43 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
     // Generate guest access token
     const guestAccessToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
     
-    // Get default tier (Standard)
-    const tier = await DB.prepare(`
-      SELECT tier_id FROM all_inclusive_tiers 
-      WHERE property_id = ? AND tier_name = 'Standard'
-      LIMIT 1
-    `).bind(propertyId).first()
+    // Get default tier (Standard) or use ID 1 if not found
+    let tierId = 1
+    try {
+      const tier = await DB.prepare(`
+        SELECT tier_id FROM all_inclusive_tiers 
+        WHERE property_id = ? AND tier_name = 'Standard'
+        LIMIT 1
+      `).bind(propertyId).first()
+      
+      if (tier) {
+        tierId = tier.tier_id
+      }
+    } catch (tierError) {
+      console.error('Tier lookup error (using default):', tierError)
+    }
     
-    const tierId = tier?.tier_id || 1
+    // Ensure table exists
+    await DB.prepare(`
+      CREATE TABLE IF NOT EXISTS digital_passes (
+        pass_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        property_id INTEGER NOT NULL,
+        pass_reference TEXT UNIQUE NOT NULL,
+        primary_guest_name TEXT NOT NULL,
+        room_number TEXT NOT NULL,
+        guest_pin TEXT NOT NULL,
+        guest_access_token TEXT NOT NULL,
+        guest_email TEXT,
+        guest_phone TEXT,
+        num_adults INTEGER DEFAULT 2,
+        num_children INTEGER DEFAULT 0,
+        tier_id INTEGER,
+        valid_from DATE NOT NULL,
+        valid_until DATE NOT NULL,
+        pass_status TEXT DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
     
     // Insert new digital pass
     const passResult = await DB.prepare(`
@@ -18229,9 +18258,16 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
     
   } catch (error) {
     console.error('Create and link pass error:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      propertyId,
+      guest_name,
+      room_number
+    })
     return c.json({ 
       success: false, 
-      error: 'Failed to create digital pass. Please try again.' 
+      error: 'Failed to create digital pass: ' + (error.message || 'Unknown error')
     }, 500)
   }
 })
