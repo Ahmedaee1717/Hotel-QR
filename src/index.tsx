@@ -12644,12 +12644,32 @@ app.get('/api/admin/chatbot/messages/:session_id', async (c) => {
   const propertyId = c.req.header('X-Property-ID') || c.req.query('property_id') || '1'
   
   try {
+    // Get conversation_id from session_id first
+    const conversation = await DB.prepare(`
+      SELECT conversation_id FROM chatbot_conversations
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, propertyId).first()
+    
+    if (!conversation) {
+      return c.json({
+        success: true,
+        messages: [],
+        warning: 'Conversation not found'
+      })
+    }
+    
+    // Get messages using conversation_id
     const messages = await DB.prepare(`
-      SELECT message_id, session_id, role, content, created_at
+      SELECT 
+        message_id,
+        conversation_id,
+        role,
+        content,
+        created_at
       FROM chatbot_messages
-      WHERE session_id = ?
+      WHERE conversation_id = ?
       ORDER BY created_at ASC
-    `).bind(session_id).all()
+    `).bind(conversation.conversation_id).all()
     
     return c.json({
       success: true,
@@ -12657,7 +12677,11 @@ app.get('/api/admin/chatbot/messages/:session_id', async (c) => {
     })
   } catch (error) {
     console.error('Get chatbot messages error:', error)
-    return c.json({ error: 'Failed to get messages' }, 500)
+    return c.json({ 
+      error: 'Failed to get messages',
+      details: error.message,
+      session_id: session_id
+    }, 500)
   }
 })
 
@@ -12672,6 +12696,16 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
   }
   
   try {
+    // Get conversation_id from session_id
+    const conversation = await DB.prepare(`
+      SELECT conversation_id FROM chatbot_conversations
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, propertyId).first()
+    
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found' }, 404)
+    }
+    
     // Try to mark session as taken over by admin
     try {
       await DB.prepare(`
@@ -12686,11 +12720,11 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
       console.log('Could not update takeover columns (might not exist yet):', updateError.message)
     }
     
-    // Insert admin message
+    // Insert admin message using conversation_id
     await DB.prepare(`
-      INSERT INTO chatbot_messages (session_id, role, content, created_at)
+      INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
       VALUES (?, 'admin', ?, CURRENT_TIMESTAMP)
-    `).bind(session_id, message).run()
+    `).bind(conversation.conversation_id, message).run()
     
     return c.json({
       success: true,
@@ -12705,6 +12739,7 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
 // Admin: End takeover and resume AI
 app.post('/api/admin/chatbot/end-takeover', async (c) => {
   const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
   const { session_id } = await c.req.json()
   
   if (!session_id) {
@@ -12712,6 +12747,16 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
   }
   
   try {
+    // Get conversation_id from session_id
+    const conversation = await DB.prepare(`
+      SELECT conversation_id FROM chatbot_conversations
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, propertyId).first()
+    
+    if (!conversation) {
+      return c.json({ error: 'Conversation not found' }, 404)
+    }
+    
     // Try to resume AI
     try {
       await DB.prepare(`
@@ -12725,11 +12770,11 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
       console.log('Could not update takeover columns (might not exist yet):', updateError.message)
     }
     
-    // Add system message
+    // Add system message using conversation_id
     await DB.prepare(`
-      INSERT INTO chatbot_messages (session_id, role, content, created_at)
+      INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
       VALUES (?, 'system', 'AI chatbot has resumed responding to your messages.', CURRENT_TIMESTAMP)
-    `).bind(session_id).run()
+    `).bind(conversation.conversation_id).run()
     
     return c.json({
       success: true,
