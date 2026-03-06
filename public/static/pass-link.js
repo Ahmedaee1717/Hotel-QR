@@ -1,5 +1,7 @@
 // Guest Pass Link Functionality
 const PASS_SESSION_KEY = 'guestPassSession';
+const PASS_REQUEST_KEY = 'guestPassRequest';
+let statusCheckInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
   loadPassSession();
@@ -11,6 +13,9 @@ document.addEventListener('DOMContentLoaded', function() {
       requestPassLink();
     }
   });
+  
+  // Check for pending request
+  checkPendingRequest();
 });
 
 function loadPassSession() {
@@ -28,6 +33,78 @@ function loadPassSession() {
     }
   }
   showUnlinkedState();
+}
+
+// Check if there's a pending request and start polling
+async function checkPendingRequest() {
+  const pendingRequest = localStorage.getItem(PASS_REQUEST_KEY);
+  if (pendingRequest) {
+    try {
+      const data = JSON.parse(pendingRequest);
+      if (data.request_id) {
+        console.log('Found pending request, checking status...');
+        await checkRequestStatus(data.request_id);
+        startStatusPolling(data.request_id);
+      }
+    } catch (e) {
+      console.error('Invalid pending request data');
+      localStorage.removeItem(PASS_REQUEST_KEY);
+    }
+  }
+}
+
+// Check the status of a pass link request
+async function checkRequestStatus(requestId) {
+  try {
+    const propertyId = getPropertyId();
+    const response = await fetch(`/api/guest/check-pass-link-status/${requestId}?property_id=${propertyId}`, {
+      headers: {
+        'X-Property-ID': propertyId
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success && data.status === 'completed' && data.pass) {
+      // Pass has been linked! Save it and show linked state
+      console.log('Pass linked successfully!');
+      localStorage.setItem(PASS_SESSION_KEY, JSON.stringify({ guest: data.pass }));
+      localStorage.removeItem(PASS_REQUEST_KEY);
+      stopStatusPolling();
+      showLinkedState(data.pass);
+      window.dispatchEvent(new CustomEvent('passLinked', { detail: data.pass }));
+      
+      // Show success message
+      showSuccess('✅ Your pass has been linked! Welcome, ' + data.pass.full_name);
+    } else if (data.success && data.status === 'pending') {
+      console.log('Request still pending...');
+    }
+  } catch (error) {
+    console.error('Error checking request status:', error);
+  }
+}
+
+// Start polling for status updates
+function startStatusPolling(requestId) {
+  if (statusCheckInterval) {
+    clearInterval(statusCheckInterval);
+  }
+  
+  // Check every 5 seconds
+  statusCheckInterval = setInterval(() => {
+    checkRequestStatus(requestId);
+  }, 5000);
+  
+  console.log('Started status polling for request', requestId);
+}
+
+// Stop polling
+function stopStatusPolling() {
+  if (statusCheckInterval) {
+    clearInterval(statusCheckInterval);
+    statusCheckInterval = null;
+    console.log('Stopped status polling');
+  }
 }
 
 // Request pass link by name
@@ -68,8 +145,18 @@ async function requestPassLink() {
     
     const data = await response.json();
     
-    if (data.success) {
-      showSuccess('✅ Request sent! Front desk will link your pass shortly.');
+    if (data.success && data.request_id) {
+      // Save request ID for status checking
+      localStorage.setItem(PASS_REQUEST_KEY, JSON.stringify({
+        request_id: data.request_id,
+        guest_name: guestName,
+        timestamp: Date.now()
+      }));
+      
+      // Start polling for status
+      startStatusPolling(data.request_id);
+      
+      showSuccess('✅ Request sent! Front desk will link your pass shortly. This page will update automatically.');
       input.value = '';
     } else {
       showError(data.error || 'Failed to send request. Please try again.');
@@ -104,6 +191,8 @@ function showUnlinkedState() {
 function unlinkGuestPass() {
   if (confirm('Are you sure you want to unlink your pass?')) {
     localStorage.removeItem(PASS_SESSION_KEY);
+    localStorage.removeItem(PASS_REQUEST_KEY);
+    stopStatusPolling();
     showUnlinkedState();
     window.dispatchEvent(new Event('passUnlinked'));
     const input = document.getElementById('guestNameInput');

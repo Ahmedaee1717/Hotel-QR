@@ -17939,6 +17939,87 @@ app.post('/api/guest/request-pass-link', async (c) => {
   }
 })
 
+// Guest: Check pass link request status
+app.get('/api/guest/check-pass-link-status/:request_id', async (c) => {
+  const { DB } = c.env
+  const { request_id } = c.req.param()
+  const propertyId = c.req.header('X-Property-ID') || c.req.query('property_id') || '1'
+  
+  if (!request_id) {
+    return c.json({ error: 'Request ID required' }, 400)
+  }
+  
+  try {
+    const request = await DB.prepare(`
+      SELECT 
+        r.request_id,
+        r.request_status,
+        r.linked_pass_reference,
+        r.created_at,
+        r.resolved_at
+      FROM pass_link_requests r
+      WHERE r.request_id = ? AND r.property_id = ?
+    `).bind(request_id, propertyId).first()
+    
+    if (!request) {
+      return c.json({ error: 'Request not found' }, 404)
+    }
+    
+    // If completed, fetch the pass details
+    if (request.request_status === 'completed' && request.linked_pass_reference) {
+      const pass = await DB.prepare(`
+        SELECT 
+          p.pass_reference,
+          p.primary_guest_name,
+          p.room_number,
+          p.guest_pin,
+          p.guest_access_token,
+          p.num_adults,
+          p.num_children,
+          t.tier_display_name as tier_name,
+          t.tier_color
+        FROM digital_passes p
+        LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
+        WHERE p.pass_reference = ? AND p.property_id = ?
+      `).bind(request.linked_pass_reference, propertyId).first()
+      
+      if (pass) {
+        return c.json({
+          success: true,
+          status: 'completed',
+          pass: {
+            pass_reference: pass.pass_reference,
+            full_name: pass.primary_guest_name,
+            first_name: pass.primary_guest_name.split(' ')[0],
+            last_name: pass.primary_guest_name.split(' ').slice(1).join(' '),
+            room_number: pass.room_number,
+            guest_pin: pass.guest_pin,
+            guest_access_token: pass.guest_access_token,
+            num_adults: pass.num_adults,
+            num_children: pass.num_children,
+            tier_name: pass.tier_name || 'Standard',
+            tier_color: pass.tier_color || '#3B82F6'
+          }
+        })
+      }
+    }
+    
+    return c.json({
+      success: true,
+      status: request.request_status,
+      created_at: request.created_at,
+      resolved_at: request.resolved_at
+    })
+    
+  } catch (error) {
+    console.error('Check pass link status error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to check status' 
+    }, 500)
+  }
+})
+
 // Admin: Get pending pass link requests
 app.get('/api/admin/pass-link-requests', async (c) => {
   const { DB } = c.env
