@@ -5,15 +5,19 @@ let currentLinkMode = 'pin';
 document.addEventListener('DOMContentLoaded', function() {
   loadPassSession();
   
-  // Enter key handler
+  // Enter key handler for PIN input
   document.getElementById('passReferenceInput')?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (currentLinkMode === 'pin') {
-        linkGuestPass();
-      } else {
-        requestPassLink();
-      }
+      linkGuestPass();
+    }
+  });
+  
+  // Enter key handler for Name input
+  document.getElementById('guestNameInput')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      requestPassLink();
     }
   });
 });
@@ -43,35 +47,45 @@ function switchLinkMode(mode) {
   const nameBtn = document.getElementById('nameModeBtn');
   const pinModeInfo = document.getElementById('pinModeInfo');
   const nameModeInfo = document.getElementById('nameModeInfo');
-  const linkPassButton = document.getElementById('linkPassButton');
-  const requestLinkButton = document.getElementById('requestLinkButton');
-  const input = document.getElementById('passReferenceInput');
+  const pinInputContainer = document.getElementById('pinInputContainer');
+  const nameInputContainer = document.getElementById('nameInputContainer');
   
   if (mode === 'pin') {
+    // Update button styles
     pinBtn.classList.add('active');
     nameBtn.classList.remove('active');
+    
+    // Show/hide info panels
     if (pinModeInfo) pinModeInfo.classList.remove('hidden');
     if (nameModeInfo) nameModeInfo.classList.add('hidden');
-    if (linkPassButton) linkPassButton.classList.remove('hidden');
-    if (requestLinkButton) requestLinkButton.classList.add('hidden');
-    input.placeholder = 'Enter 6-digit PIN';
-    input.type = 'tel';
-    input.maxLength = 6;
+    
+    // Show/hide input containers
+    if (pinInputContainer) pinInputContainer.classList.remove('hidden');
+    if (nameInputContainer) nameInputContainer.classList.add('hidden');
+    
+    // Clear PIN input
+    const pinInput = document.getElementById('passReferenceInput');
+    if (pinInput) pinInput.value = '';
   } else {
+    // Update button styles
     pinBtn.classList.remove('active');
     nameBtn.classList.add('active');
+    
+    // Show/hide info panels
     if (pinModeInfo) pinModeInfo.classList.add('hidden');
     if (nameModeInfo) nameModeInfo.classList.remove('hidden');
-    if (linkPassButton) linkPassButton.classList.add('hidden');
-    if (requestLinkButton) requestLinkButton.classList.remove('hidden');
-    input.placeholder = 'Enter your full name';
-    input.type = 'text';
-    input.removeAttribute('maxLength');
+    
+    // Show/hide input containers
+    if (pinInputContainer) pinInputContainer.classList.add('hidden');
+    if (nameInputContainer) nameInputContainer.classList.remove('hidden');
+    
+    // Clear name input
+    const nameInput = document.getElementById('guestNameInput');
+    if (nameInput) nameInput.value = '';
   }
   
   hideError();
   hideSuccess();
-  input.value = '';
 }
 
 // Link pass with PIN
@@ -139,7 +153,7 @@ async function linkGuestPass() {
 
 // Request pass link by name
 async function requestPassLink() {
-  const input = document.getElementById('passReferenceInput');
+  const input = document.getElementById('guestNameInput');
   const button = document.getElementById('requestLinkButton');
   const guestName = input.value.trim();
   
