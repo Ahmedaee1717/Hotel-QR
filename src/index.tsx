@@ -21401,51 +21401,25 @@ app.get('/hotel/:property_slug', async (c) => {
         <div class="flex items-center gap-3">
             <div class="flex items-center gap-2 text-white min-w-fit">
                 <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                    <i class="fas fa-check text-sm" style="color: #016e8f;"></i>
+                    <i class="fas fa-user text-sm" style="color: #016e8f;"></i>
                 </div>
-                <span class="font-semibold hidden sm:inline">OnePass</span>
+                <span class="font-semibold hidden sm:inline">Link Your Pass</span>
             </div>
             <div class="flex-1">
-                <!-- Mode Toggle -->
-                <div class="link-mode-toggle mb-2">
-                    <div class="link-mode-option active" id="pinModeBtn" onclick="switchLinkMode('pin')">
-                        <i class="fas fa-key mr-1"></i> PIN
-                    </div>
-                    <div class="link-mode-option" id="nameModeBtn" onclick="switchLinkMode('name')">
-                        <i class="fas fa-user mr-1"></i> Name
-                    </div>
-                </div>
-                
-                <!-- Input Fields -->
+                <!-- Name Input -->
                 <div class="flex items-center gap-2">
-                    <div id="pinInputContainer" class="flex-1 flex items-center gap-2">
-                        <input type="text" id="passReferenceInput" placeholder="Enter your 6-digit PIN (e.g., 123456)" class="pass-link-input flex-1 px-4 py-2 rounded-lg font-mono text-sm" maxlength="6" inputmode="numeric" pattern="[0-9]*">
-                        <button onclick="linkGuestPass()" id="linkPassButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
-                            <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
-                        </button>
-                    </div>
-                    
-                    <div id="nameInputContainer" class="hidden flex-1 flex items-center gap-2">
-                        <input type="text" id="guestNameInput" placeholder="Enter your full name (e.g., John Smith)" class="pass-link-input flex-1 px-4 py-2 rounded-lg text-sm">
-                        <button onclick="requestPassLink()" id="requestLinkButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
-                            <i class="fas fa-bell mr-2"></i><span class="hidden sm:inline">Request Link</span><span class="sm:hidden">Request</span>
-                        </button>
-                    </div>
+                    <input type="text" id="guestNameInput" placeholder="Enter your full name (e.g., John Smith)" class="pass-link-input flex-1 px-4 py-2 rounded-lg text-sm">
+                    <button onclick="requestPassLink()" id="requestLinkButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
+                        <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
+                    </button>
                 </div>
             </div>
             <button onclick="togglePassInfo()" class="text-white hover:text-gray-100 transition-colors"><i class="fas fa-info-circle text-xl"></i></button>
         </div>
         <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
-            <div id="pinModeInfo">
-                <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Link with PIN</p>
-                <p class="mb-2">Link your OnePass digital pass using your 6-digit PIN to enjoy seamless booking and instant access to your guest portal.</p>
-                <p class="text-xs opacity-80">Your PIN was provided at check-in (e.g., 123456)</p>
-            </div>
-            <div id="nameModeInfo" class="hidden">
-                <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Request Pass Link</p>
-                <p class="mb-2">Don't have your PIN? Enter your name and the front desk will help link your pass within a few minutes.</p>
-                <p class="text-xs opacity-80">Front desk staff will be notified of your request</p>
-            </div>
+            <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Link Your Digital Pass</p>
+            <p class="mb-2">Enter your full name and our front desk team will link your OnePass digital pass within a few minutes.</p>
+            <p class="text-xs opacity-80">Once linked, you'll have instant access to all resort services and bookings</p>
         </div>
         <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
             <i class="fas fa-exclamation-circle mr-2"></i><span id="passLinkErrorMessage"></span>
