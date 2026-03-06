@@ -11681,10 +11681,33 @@ app.post('/api/chatbot/chat', async (c) => {
     let convId = conversation_id
     if (!convId) {
       const convResult = await DB.prepare(`
-        INSERT INTO chatbot_conversations (property_id, session_id)
-        VALUES (?, ?)
+        INSERT INTO chatbot_conversations (property_id, session_id, is_ai_paused)
+        VALUES (?, ?, 0)
       `).bind(property_id, session_id).run()
       convId = convResult.meta.last_row_id
+    }
+    
+    // CHECK IF ADMIN HAS TAKEN OVER THE CONVERSATION
+    const conversation = await DB.prepare(`
+      SELECT conversation_id, is_ai_paused, admin_takeover_by
+      FROM chatbot_conversations
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, property_id).first()
+    
+    if (conversation && conversation.is_ai_paused === 1) {
+      // Admin has taken over - don't respond with AI
+      // Just store the user message and return a holding response
+      await DB.prepare(`
+        INSERT INTO chatbot_messages (session_id, role, content, created_at)
+        VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
+      `).bind(session_id, message).run()
+      
+      return c.json({
+        success: true,
+        response: 'A staff member is currently assisting you. They will respond shortly.',
+        conversation_id: conversation.conversation_id,
+        is_staff_responding: true
+      })
     }
     
     // Get property info for personalization
@@ -12596,6 +12619,100 @@ app.post('/api/admin/chatbot/settings', async (c) => {
   } catch (error) {
     console.error('Update chatbot settings error:', error)
     return c.json({ error: 'Failed to update settings', details: error.message }, 500)
+  }
+})
+
+// Admin: Get chatbot conversation messages
+app.get('/api/admin/chatbot/messages/:session_id', async (c) => {
+  const { DB } = c.env
+  const { session_id } = c.req.param()
+  const propertyId = c.req.header('X-Property-ID') || c.req.query('property_id') || '1'
+  
+  try {
+    const messages = await DB.prepare(`
+      SELECT message_id, session_id, role, content, created_at
+      FROM chatbot_messages
+      WHERE session_id = ?
+      ORDER BY created_at ASC
+    `).bind(session_id).all()
+    
+    return c.json({
+      success: true,
+      messages: messages.results || []
+    })
+  } catch (error) {
+    console.error('Get chatbot messages error:', error)
+    return c.json({ error: 'Failed to get messages' }, 500)
+  }
+})
+
+// Admin: Send message as admin in chatbot conversation
+app.post('/api/admin/chatbot/send-message', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const { session_id, message, admin_id } = await c.req.json()
+  
+  if (!session_id || !message) {
+    return c.json({ error: 'Session ID and message required' }, 400)
+  }
+  
+  try {
+    // Mark session as taken over by admin (set is_ai_paused = 1)
+    await DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 1,
+          admin_takeover_at = CURRENT_TIMESTAMP,
+          admin_takeover_by = ?
+      WHERE session_id = ?
+    `).bind(admin_id || 'admin', session_id).run()
+    
+    // Insert admin message
+    await DB.prepare(`
+      INSERT INTO chatbot_messages (session_id, role, content, created_at)
+      VALUES (?, 'admin', ?, CURRENT_TIMESTAMP)
+    `).bind(session_id, message).run()
+    
+    return c.json({
+      success: true,
+      message: 'Message sent successfully'
+    })
+  } catch (error) {
+    console.error('Send admin message error:', error)
+    return c.json({ error: 'Failed to send message' }, 500)
+  }
+})
+
+// Admin: End takeover and resume AI
+app.post('/api/admin/chatbot/end-takeover', async (c) => {
+  const { DB } = c.env
+  const { session_id } = await c.req.json()
+  
+  if (!session_id) {
+    return c.json({ error: 'Session ID required' }, 400)
+  }
+  
+  try {
+    // Resume AI (set is_ai_paused = 0)
+    await DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 0,
+          admin_takeover_ended_at = CURRENT_TIMESTAMP
+      WHERE session_id = ?
+    `).bind(session_id).run()
+    
+    // Add system message
+    await DB.prepare(`
+      INSERT INTO chatbot_messages (session_id, role, content, created_at)
+      VALUES (?, 'system', 'AI chatbot has resumed responding to your messages.', CURRENT_TIMESTAMP)
+    `).bind(session_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'AI resumed successfully'
+    })
+  } catch (error) {
+    console.error('End takeover error:', error)
+    return c.json({ error: 'Failed to end takeover' }, 500)
   }
 })
 
@@ -47594,30 +47711,48 @@ app.get('/admin/dashboard', (c) => {
             </div>
           \`;
         } else if (type === 'chatbot') {
+          const isActive = !comm.ended_at; // Conversation is active if not ended
+          
           detailsDiv.innerHTML = \`
             <div class="space-y-4">
               <div class="flex items-start justify-between pb-4 border-b">
-                <div>
-                  <h4 class="text-lg font-bold text-gray-800">AI Chatbot Conversation</h4>
+                <div class="flex-1">
+                  <div class="flex items-center gap-3 mb-2">
+                    <h4 class="text-lg font-bold text-gray-800">AI Chatbot Conversation</h4>
+                    \${isActive ? 
+                      '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>LIVE</span>' : 
+                      '<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full">ENDED</span>'
+                    }
+                  </div>
                   <p class="text-sm text-gray-500">Session: \${comm.session_id}</p>
                   <p class="text-sm text-gray-500">\${new Date(comm.started_at).toLocaleString()}</p>
+                  \${comm.guest_name ? \`<p class="text-sm text-gray-700 mt-1"><strong>Guest:</strong> \${comm.guest_name}\${comm.room_number ? \` • Room \${comm.room_number}\` : ''}</p>\` : ''}
                 </div>
-                \${comm.has_complaint ? '<span class="px-3 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-lg">COMPLAINT</span>' : ''}
+                <div class="flex flex-col gap-2">
+                  \${comm.has_complaint ? '<span class="px-3 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-lg">COMPLAINT</span>' : ''}
+                  \${isActive ? \`
+                    <button onclick="takeOverConversation('\${comm.session_id}', '\${comm.guest_name || 'Guest'}', '\${comm.room_number || ''}')" 
+                            class="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 font-semibold shadow-lg transition-all transform hover:scale-105 flex items-center gap-2">
+                      <i class="fas fa-headset"></i>
+                      <span>Take Over Chat</span>
+                    </button>
+                  \` : ''}
+                </div>
               </div>
               
-              <div class="space-y-3 max-h-96 overflow-y-auto">
+              <div id="chatMessages_\${comm.session_id}" class="space-y-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
                 \${comm.messages && comm.messages.length > 0 ? comm.messages.map(msg => \`
-                  <div class="flex \${msg.role === 'user' ? 'justify-end' : 'justify-start'}">
-                    <div class="\${msg.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'} rounded-lg p-3 max-w-[80%]">
+                  <div class="flex \${msg.role === 'user' ? 'justify-end' : msg.role === 'admin' ? 'justify-start' : 'justify-start'}">
+                    <div class="\${msg.role === 'user' ? 'bg-blue-500 text-white' : msg.role === 'admin' ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'} rounded-lg p-3 max-w-[80%] shadow">
                       <div class="flex items-center gap-2 mb-1">
-                        <i class="fas \${msg.role === 'user' ? 'fa-user' : 'fa-robot'} text-xs"></i>
-                        <span class="text-xs font-semibold">\${msg.role === 'user' ? 'Guest' : 'AI Assistant'}</span>
-                        <span class="text-xs text-gray-500">\${new Date(msg.created_at).toLocaleTimeString()}</span>
+                        <i class="fas \${msg.role === 'user' ? 'fa-user' : msg.role === 'admin' ? 'fa-user-tie' : 'fa-robot'} text-xs"></i>
+                        <span class="text-xs font-semibold">\${msg.role === 'user' ? 'Guest' : msg.role === 'admin' ? 'Staff' : 'AI Assistant'}</span>
+                        <span class="text-xs opacity-75">\${new Date(msg.created_at).toLocaleTimeString()}</span>
                       </div>
-                      <p class="text-sm">\${msg.content}</p>
+                      <p class="text-sm whitespace-pre-wrap">\${msg.content}</p>
                     </div>
                   </div>
-                \`).join('') : '<p class="text-gray-500 text-sm">No messages</p>'}
+                \`).join('') : '<p class="text-gray-500 text-sm text-center py-4">No messages yet</p>'}
               </div>
               
               \${comm.complaint_summary ? \`
@@ -47661,6 +47796,245 @@ app.get('/admin/dashboard', (c) => {
           alert('Failed to save notes');
         }
       };
+      
+      // ========== LIVE CHAT TAKEOVER FUNCTIONS ==========
+      
+      let liveChatInterval = null;
+      let currentChatSession = null;
+      
+      window.takeOverConversation = function(sessionId, guestName, roomNumber) {
+        currentChatSession = {
+          sessionId,
+          guestName,
+          roomNumber
+        };
+        
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'liveChatModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = \`
+          <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <i class="fas fa-headset text-2xl"></i>
+                <div>
+                  <h3 class="font-bold text-lg">Live Chat Support</h3>
+                  <p class="text-sm opacity-90">
+                    \${guestName}\${roomNumber ? \` • Room \${roomNumber}\` : ''} • Session: \${sessionId.substring(0, 8)}...
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                  <span class="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                  LIVE
+                </span>
+                <button onclick="closeLiveChat()" class="text-white hover:text-gray-200 text-2xl">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Chat Messages -->
+            <div id="liveChatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+              <div class="text-center text-gray-400 py-8">
+                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                <p>Loading conversation...</p>
+              </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="border-t p-4 bg-white rounded-b-lg">
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3 text-sm">
+                <div class="flex items-start gap-2">
+                  <i class="fas fa-info-circle text-yellow-600 mt-0.5"></i>
+                  <div>
+                    <p class="font-semibold text-yellow-800 mb-1">AI Paused - You're in Control</p>
+                    <p class="text-yellow-700">The AI chatbot is now paused. You're responding directly to the guest. Click "End Takeover" to let AI resume.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex gap-2">
+                <textarea id="liveChatInput" 
+                          class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none resize-none" 
+                          rows="2" 
+                          placeholder="Type your message to the guest..."
+                          onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendLiveChatMessage();}"
+                ></textarea>
+                <div class="flex flex-col gap-2">
+                  <button onclick="sendLiveChatMessage()" 
+                          class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold flex items-center gap-2">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>Send</span>
+                  </button>
+                  <button onclick="endTakeover()" 
+                          class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold text-sm flex items-center gap-2">
+                    <i class="fas fa-robot"></i>
+                    <span>Resume AI</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        \`;
+        
+        document.body.appendChild(modal);
+        
+        // Load messages and start polling
+        loadLiveChatMessages();
+        startLiveChatPolling();
+      };
+      
+      window.closeLiveChat = function() {
+        const modal = document.getElementById('liveChatModal');
+        if (modal) {
+          if (confirm('Are you sure you want to close the live chat? The AI will not resume automatically.')) {
+            stopLiveChatPolling();
+            modal.remove();
+            currentChatSession = null;
+          }
+        }
+      };
+      
+      window.sendLiveChatMessage = async function() {
+        const input = document.getElementById('liveChatInput');
+        const message = input.value.trim();
+        
+        if (!message || !currentChatSession) return;
+        
+        input.disabled = true;
+        
+        try {
+          const response = await fetch('/api/admin/chatbot/send-message', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({
+              session_id: currentChatSession.sessionId,
+              message: message,
+              admin_id: localStorage.getItem('user_id') || 'admin'
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            input.value = '';
+            loadLiveChatMessages(); // Refresh messages
+          } else {
+            alert('Failed to send message: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Send message error:', error);
+          alert('Failed to send message. Please try again.');
+        } finally {
+          input.disabled = false;
+          input.focus();
+        }
+      };
+      
+      window.endTakeover = async function() {
+        if (!confirm('Resume AI chatbot? The AI will take over responding to the guest.')) {
+          return;
+        }
+        
+        try {
+          const response = await fetch('/api/admin/chatbot/end-takeover', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({
+              session_id: currentChatSession.sessionId
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert('✅ AI chatbot resumed! The conversation is now handled by AI.');
+            closeLiveChat();
+            loadFrontDeskData(); // Refresh main view
+          } else {
+            alert('Failed to resume AI: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('End takeover error:', error);
+          alert('Failed to resume AI. Please try again.');
+        }
+      };
+      
+      async function loadLiveChatMessages() {
+        if (!currentChatSession) return;
+        
+        try {
+          const response = await fetch(\`/api/admin/chatbot/messages/\${currentChatSession.sessionId}?property_id=\${propertyId}\`);
+          const data = await response.json();
+          
+          if (data.success && data.messages) {
+            renderLiveChatMessages(data.messages);
+          }
+        } catch (error) {
+          console.error('Load messages error:', error);
+        }
+      }
+      
+      function renderLiveChatMessages(messages) {
+        const container = document.getElementById('liveChatMessages');
+        if (!container) return;
+        
+        const wasScrolledToBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+        
+        container.innerHTML = messages.map(msg => \`
+          <div class="flex \${msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+            <div class="\${
+              msg.role === 'user' ? 'bg-blue-500 text-white' : 
+              msg.role === 'admin' ? 'bg-purple-500 text-white' : 
+              'bg-white border border-gray-300 text-gray-900'
+            } rounded-lg p-3 max-w-[75%] shadow-md">
+              <div class="flex items-center gap-2 mb-1">
+                <i class="fas \${
+                  msg.role === 'user' ? 'fa-user' : 
+                  msg.role === 'admin' ? 'fa-user-tie' : 
+                  'fa-robot'
+                } text-xs"></i>
+                <span class="text-xs font-semibold opacity-90">
+                  \${msg.role === 'user' ? 'Guest' : msg.role === 'admin' ? 'You (Staff)' : 'AI'}
+                </span>
+                <span class="text-xs opacity-75">\${new Date(msg.created_at).toLocaleTimeString()}</span>
+              </div>
+              <p class="text-sm whitespace-pre-wrap">\${msg.content}</p>
+            </div>
+          </div>
+        \`).join('');
+        
+        // Auto-scroll to bottom if was already at bottom
+        if (wasScrolledToBottom) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }
+      
+      function startLiveChatPolling() {
+        stopLiveChatPolling();
+        liveChatInterval = setInterval(() => {
+          loadLiveChatMessages();
+        }, 3000); // Poll every 3 seconds
+      }
+      
+      function stopLiveChatPolling() {
+        if (liveChatInterval) {
+          clearInterval(liveChatInterval);
+          liveChatInterval = null;
+        }
+      }
+      
+      // ========== END LIVE CHAT TAKEOVER FUNCTIONS ==========
       
       function formatTimeAgo(dateStr) {
         const date = new Date(dateStr);
