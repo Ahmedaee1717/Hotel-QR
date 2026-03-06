@@ -18154,6 +18154,88 @@ app.get('/api/admin/search-digital-pass', async (c) => {
   }
 })
 
+// Admin: Create new digital pass and link to guest request
+app.post('/api/admin/create-and-link-pass', async (c) => {
+  const { DB } = c.env
+  const propertyId = c.req.header('X-Property-ID') || '1'
+  const userId = c.req.header('X-User-ID')
+  const { request_id, guest_name, room_number, num_adults, num_children, valid_from, valid_until } = await c.req.json()
+  
+  if (!request_id || !guest_name || !room_number || !valid_from || !valid_until) {
+    return c.json({ error: 'Missing required fields' }, 400)
+  }
+  
+  try {
+    // Generate a unique 6-digit PIN
+    const guestPin = Math.floor(100000 + Math.random() * 900000).toString()
+    
+    // Generate pass reference (format: PASS-YYYYMMDD-XXXX)
+    const date = new Date()
+    const dateStr = date.toISOString().split('T')[0].replace(/-/g, '')
+    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase()
+    const passReference = `PASS-${dateStr}-${randomStr}`
+    
+    // Generate guest access token
+    const guestAccessToken = Math.random().toString(36).substring(2) + Date.now().toString(36)
+    
+    // Get default tier (Standard)
+    const tier = await DB.prepare(`
+      SELECT tier_id FROM all_inclusive_tiers 
+      WHERE property_id = ? AND tier_name = 'Standard'
+      LIMIT 1
+    `).bind(propertyId).first()
+    
+    const tierId = tier?.tier_id || 1
+    
+    // Insert new digital pass
+    const passResult = await DB.prepare(`
+      INSERT INTO digital_passes (
+        property_id, pass_reference, primary_guest_name, 
+        room_number, guest_pin, guest_access_token,
+        num_adults, num_children, tier_id,
+        valid_from, valid_until, pass_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+    `).bind(
+      propertyId,
+      passReference,
+      guest_name,
+      room_number,
+      guestPin,
+      guestAccessToken,
+      num_adults || 2,
+      num_children || 0,
+      tierId,
+      valid_from,
+      valid_until
+    ).run()
+    
+    // Update the guest lookup request
+    await DB.prepare(`
+      UPDATE pass_link_requests
+      SET request_status = 'completed',
+          linked_pass_reference = ?,
+          linked_by_staff_id = ?,
+          resolved_at = CURRENT_TIMESTAMP
+      WHERE request_id = ? AND property_id = ?
+    `).bind(passReference, userId || null, request_id, propertyId).run()
+    
+    return c.json({
+      success: true,
+      message: 'Digital pass created and linked successfully',
+      pass_reference: passReference,
+      guest_pin: guestPin,
+      room_number: room_number
+    })
+    
+  } catch (error) {
+    console.error('Create and link pass error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to create digital pass. Please try again.' 
+    }, 500)
+  }
+})
+
 // Guest: Lookup pass by room number (for front desk)
 app.get('/api/guest/lookup-room', async (c) => {
   const { DB } = c.env
@@ -47544,12 +47626,12 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openLinkPassModal = function(requestId, guestName) {
-        // Show a modal to search for digital pass
+        // Show a modal with two options: search existing or create new
         const modal = document.createElement('div');
         modal.id = 'linkPassModal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
         modal.innerHTML = \`
-          <div class="bg-white rounded-lg shadow-2xl p-6 max-w-lg w-full mx-4">
+          <div class="bg-white rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-2xl font-bold text-gray-800">
                 <i class="fas fa-link mr-2 text-purple-600"></i>Link Digital Pass
@@ -47565,24 +47647,88 @@ app.get('/admin/dashboard', (c) => {
               </p>
             </div>
             
-            <div class="mb-4">
-              <label class="block text-sm font-semibold text-gray-700 mb-2">
-                Search by Room Number or Guest PIN
-              </label>
-              <input type="text" id="passSearchInput" 
-                     class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
-                     placeholder="Enter room number (e.g., 101) or 6-digit PIN"
-                     oninput="searchDigitalPass(this.value)">
+            <!-- Tab Navigation -->
+            <div class="flex gap-2 mb-6 border-b border-gray-200">
+              <button onclick="switchPassTab('search')" id="searchTabBtn" class="px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600">
+                <i class="fas fa-search mr-2"></i>Search Existing
+              </button>
+              <button onclick="switchPassTab('create')" id="createTabBtn" class="px-4 py-2 font-semibold text-gray-500 hover:text-gray-700">
+                <i class="fas fa-plus mr-2"></i>Create New Pass
+              </button>
             </div>
             
-            <div id="passSearchResults" class="mb-4 max-h-64 overflow-y-auto">
-              <div class="text-center text-gray-400 py-8">
-                <i class="fas fa-search text-4xl mb-3"></i>
-                <p>Enter room number or PIN to search</p>
+            <!-- Search Tab -->
+            <div id="searchPassTab" class="tab-content">
+              <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                  Search by Room Number or Guest PIN
+                </label>
+                <input type="text" id="passSearchInput" 
+                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
+                       placeholder="Enter room number (e.g., 101) or 6-digit PIN"
+                       oninput="searchDigitalPass(this.value)">
+              </div>
+              
+              <div id="passSearchResults" class="mb-4 max-h-64 overflow-y-auto">
+                <div class="text-center text-gray-400 py-8">
+                  <i class="fas fa-search text-4xl mb-3"></i>
+                  <p>Enter room number or PIN to search</p>
+                </div>
               </div>
             </div>
             
-            <div class="flex gap-3">
+            <!-- Create New Pass Tab -->
+            <div id="createPassTab" class="tab-content hidden">
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Room Number <span class="text-red-500">*</span>
+                  </label>
+                  <input type="text" id="newPassRoomNumber" 
+                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
+                         placeholder="e.g., 101">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Number of Adults <span class="text-red-500">*</span>
+                  </label>
+                  <input type="number" id="newPassAdults" value="2" min="1" max="10"
+                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Check-in Date <span class="text-red-500">*</span>
+                  </label>
+                  <input type="date" id="newPassCheckIn" 
+                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Check-out Date <span class="text-red-500">*</span>
+                  </label>
+                  <input type="date" id="newPassCheckOut" 
+                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Number of Children
+                  </label>
+                  <input type="number" id="newPassChildren" value="0" min="0" max="10"
+                         class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                </div>
+              </div>
+              
+              <button onclick="createAndLinkNewPass()" id="createPassButton" 
+                      class="w-full px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors">
+                <i class="fas fa-plus-circle mr-2"></i>Create Pass & Link Guest
+              </button>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
               <button onclick="closeLinkPassModal()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">
                 Cancel
               </button>
@@ -47594,11 +47740,99 @@ app.get('/admin/dashboard', (c) => {
         // Store current request ID for later use
         window.currentLinkRequestId = requestId;
         window.currentLinkGuestName = guestName;
+        
+        // Set default dates
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 7);
+        document.getElementById('newPassCheckIn').value = today.toISOString().split('T')[0];
+        document.getElementById('newPassCheckOut').value = tomorrow.toISOString().split('T')[0];
       };
       
       window.closeLinkPassModal = function() {
         const modal = document.getElementById('linkPassModal');
         if (modal) modal.remove();
+      };
+      
+      window.switchPassTab = function(tab) {
+        // Update button styles
+        const searchBtn = document.getElementById('searchTabBtn');
+        const createBtn = document.getElementById('createTabBtn');
+        
+        if (tab === 'search') {
+          searchBtn.className = 'px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600';
+          createBtn.className = 'px-4 py-2 font-semibold text-gray-500 hover:text-gray-700';
+          document.getElementById('searchPassTab').classList.remove('hidden');
+          document.getElementById('createPassTab').classList.add('hidden');
+        } else {
+          createBtn.className = 'px-4 py-2 font-semibold text-purple-600 border-b-2 border-purple-600';
+          searchBtn.className = 'px-4 py-2 font-semibold text-gray-500 hover:text-gray-700';
+          document.getElementById('searchPassTab').classList.add('hidden');
+          document.getElementById('createPassTab').classList.remove('hidden');
+        }
+      };
+      
+      window.createAndLinkNewPass = async function() {
+        const roomNumber = document.getElementById('newPassRoomNumber').value.trim();
+        const adults = parseInt(document.getElementById('newPassAdults').value);
+        const children = parseInt(document.getElementById('newPassChildren').value);
+        const checkIn = document.getElementById('newPassCheckIn').value;
+        const checkOut = document.getElementById('newPassCheckOut').value;
+        const button = document.getElementById('createPassButton');
+        
+        // Validation
+        if (!roomNumber) {
+          alert('Please enter a room number');
+          return;
+        }
+        if (!checkIn || !checkOut) {
+          alert('Please select check-in and check-out dates');
+          return;
+        }
+        if (new Date(checkOut) <= new Date(checkIn)) {
+          alert('Check-out date must be after check-in date');
+          return;
+        }
+        
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating Pass...';
+        button.disabled = true;
+        
+        try {
+          // Create new digital pass
+          const response = await fetch('/api/admin/create-and-link-pass', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify({
+              request_id: window.currentLinkRequestId,
+              guest_name: window.currentLinkGuestName,
+              room_number: roomNumber,
+              num_adults: adults,
+              num_children: children,
+              valid_from: checkIn,
+              valid_until: checkOut
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            closeLinkPassModal();
+            alert('✅ Digital pass created and guest linked successfully!\\n\\nRoom: ' + roomNumber + '\\nPIN: ' + data.guest_pin);
+            loadGuestLookupRequests(); // Refresh the list
+          } else {
+            alert('Failed to create pass: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Create pass error:', error);
+          alert('Error creating digital pass');
+        } finally {
+          button.innerHTML = originalHTML;
+          button.disabled = false;
+        }
       };
       
       window.searchDigitalPass = async function(query) {
