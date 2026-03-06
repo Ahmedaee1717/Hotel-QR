@@ -18159,7 +18159,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
   const { DB } = c.env
   const propertyId = c.req.header('X-Property-ID') || '1'
   const userId = c.req.header('X-User-ID')
-  const { request_id, guest_name, room_number, num_adults, num_children, valid_from, valid_until } = await c.req.json()
+  const { request_id, guest_name, room_number, num_adults, num_children, valid_from, valid_until, tier_id } = await c.req.json()
   
   if (!request_id || !guest_name || !room_number || !valid_from || !valid_until) {
     return c.json({ error: 'Missing required fields' }, 400)
@@ -18194,73 +18194,86 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       }, 400)
     }
     
-    // Get or create a tier for this property
-    let tierId = null
-    try {
-      // First, try to find existing tier
+    // Use provided tier_id or find/create one
+    let finalTierId = tier_id ? parseInt(tier_id) : null
+    let tierName = null
+    
+    if (finalTierId) {
+      // Validate the provided tier exists and belongs to this property
       const tier = await DB.prepare(`
-        SELECT tier_id FROM all_inclusive_tiers 
-        WHERE property_id = ?
-        ORDER BY 
-          CASE tier_name 
-            WHEN 'Standard' THEN 1 
-            ELSE 2 
-          END
-        LIMIT 1
-      `).bind(propertyId).first()
+        SELECT tier_id, tier_display_name, tier_code 
+        FROM all_inclusive_tiers 
+        WHERE tier_id = ? AND property_id = ?
+      `).bind(finalTierId, propertyId).first()
       
-      if (tier) {
-        tierId = tier.tier_id
-        console.log('Found existing tier:', tierId)
-      } else {
-        // No tiers exist, try to create a default Standard tier
-        console.log('No tiers found for property', propertyId, '- attempting to create default tier')
+      if (!tier) {
+        return c.json({ 
+          success: false, 
+          error: 'Invalid tier selected. Please choose a valid tier or refresh the page.'
+        }, 400)
+      }
+      
+      tierName = tier.tier_display_name || tier.tier_code
+      console.log('Using selected tier:', finalTierId, tierName)
+    } else {
+      // No tier provided, try to find or create one
+      try {
+        // First, try to find existing tier
+        const tier = await DB.prepare(`
+          SELECT tier_id, tier_display_name, tier_code FROM all_inclusive_tiers 
+          WHERE property_id = ?
+          ORDER BY 
+            CASE tier_code 
+              WHEN 'Standard' THEN 1 
+              ELSE 2 
+            END
+          LIMIT 1
+        `).bind(propertyId).first()
         
-        try {
-          // Make sure all_inclusive_tiers table exists without foreign keys
-          await DB.prepare(`
-            CREATE TABLE IF NOT EXISTS all_inclusive_tiers (
-              tier_id INTEGER PRIMARY KEY AUTOINCREMENT,
-              property_id INTEGER NOT NULL,
-              tier_name TEXT NOT NULL,
-              tier_description TEXT,
-              tier_color TEXT DEFAULT '#3B82F6',
-              display_order INTEGER DEFAULT 1,
-              is_active INTEGER DEFAULT 1,
-              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-          `).run()
+        if (tier) {
+          finalTierId = tier.tier_id
+          tierName = tier.tier_display_name || tier.tier_code
+          console.log('Found existing tier:', finalTierId, tierName)
+        } else {
+          // No tiers exist, try to create a default Standard tier
+          console.log('No tiers found for property', propertyId, '- attempting to create default tier')
           
-          const createTierResult = await DB.prepare(`
-            INSERT INTO all_inclusive_tiers (
-              property_id, tier_name, tier_description, tier_color, 
-              display_order, is_active
-            ) VALUES (?, 'Standard', 'Standard All-Inclusive Package', '#3B82F6', 1, 1)
-          `).bind(parseInt(propertyId)).run()
-          
-          tierId = createTierResult.meta.last_row_id
-          console.log('Created default tier with ID:', tierId)
-        } catch (createError) {
-          console.error('Failed to create tier:', createError)
-          // Try to use any existing tier from tier_id = 1 onwards
-          for (let testId = 1; testId <= 10; testId++) {
-            const existingTier = await DB.prepare(`
-              SELECT tier_id FROM all_inclusive_tiers WHERE tier_id = ?
-            `).bind(testId).first()
+          try {
+            // Make sure all_inclusive_tiers table exists without foreign keys
+            await DB.prepare(`
+              CREATE TABLE IF NOT EXISTS all_inclusive_tiers (
+                tier_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                property_id INTEGER NOT NULL,
+                tier_code TEXT NOT NULL,
+                tier_display_name TEXT NOT NULL,
+                tier_description TEXT,
+                tier_color TEXT DEFAULT '#3B82F6',
+                display_order INTEGER DEFAULT 1,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+              )
+            `).run()
             
-            if (existingTier) {
-              tierId = existingTier.tier_id
-              console.log('Using existing tier_id:', tierId)
-              break
-            }
+            const createTierResult = await DB.prepare(`
+              INSERT INTO all_inclusive_tiers (
+                property_id, tier_code, tier_display_name, tier_description, 
+                tier_color, display_order, is_active
+              ) VALUES (?, 'Standard', 'Standard', 'Standard All-Inclusive Package', '#3B82F6', 1, 1)
+            `).bind(parseInt(propertyId)).run()
+            
+            finalTierId = createTierResult.meta.last_row_id
+            tierName = 'Standard'
+            console.log('Created default tier with ID:', finalTierId)
+          } catch (createError) {
+            console.error('Failed to create tier:', createError)
           }
         }
+      } catch (tierError) {
+        console.error('Tier lookup/create error:', tierError)
       }
-    } catch (tierError) {
-      console.error('Tier lookup/create error:', tierError)
     }
     
-    if (!tierId) {
+    if (!finalTierId) {
       return c.json({ 
         success: false, 
         error: 'Unable to assign tier to digital pass. Please configure All-Inclusive tiers first in the admin settings, or contact support.'
@@ -18308,7 +18321,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       qrSecret,
       num_adults || 2,
       num_children || 0,
-      parseInt(tierId), // Ensure it's an integer and not null
+      finalTierId, // Use the validated tier ID
       valid_from,
       valid_until
     ).run()
@@ -18328,7 +18341,8 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       message: 'Digital pass created and linked successfully',
       pass_reference: passReference,
       guest_pin: guestPin,
-      room_number: room_number
+      room_number: room_number,
+      tier_name: tierName || 'Standard'
     })
     
   } catch (error) {
@@ -47831,6 +47845,16 @@ app.get('/admin/dashboard', (c) => {
                   <input type="number" id="newPassChildren" value="0" min="0" max="10"
                          class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
                 </div>
+                
+                <div class="col-span-2">
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    All-Inclusive Tier <span class="text-red-500">*</span>
+                  </label>
+                  <select id="newPassTier" 
+                          class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none">
+                    <option value="">Loading tiers...</option>
+                  </select>
+                </div>
               </div>
               
               <button onclick="createAndLinkNewPass()" id="createPassButton" 
@@ -47858,6 +47882,9 @@ app.get('/admin/dashboard', (c) => {
         tomorrow.setDate(tomorrow.getDate() + 7);
         document.getElementById('newPassCheckIn').value = today.toISOString().split('T')[0];
         document.getElementById('newPassCheckOut').value = tomorrow.toISOString().split('T')[0];
+        
+        // Load available tiers
+        loadTiersForPassCreation();
       };
       
       window.closeLinkPassModal = function() {
@@ -47890,12 +47917,53 @@ app.get('/admin/dashboard', (c) => {
         }
       };
       
+      // Load available tiers for pass creation
+      window.loadTiersForPassCreation = async function() {
+        const tierSelect = document.getElementById('newPassTier');
+        if (!tierSelect) return;
+        
+        try {
+          const response = await fetch('/api/admin/all-inclusive/tiers', {
+            headers: { 'X-Property-ID': propertyId }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to load tiers');
+          }
+          
+          const data = await response.json();
+          const tiers = data.tiers || [];
+          
+          if (tiers.length === 0) {
+            tierSelect.innerHTML = '<option value="">No tiers available - will create Standard tier</option>';
+            return;
+          }
+          
+          // Populate tier dropdown
+          tierSelect.innerHTML = '<option value="">Select a tier...</option>' +
+            tiers.map(tier => 
+              \`<option value="\${tier.tier_id}" style="color: \${tier.tier_color || '#3B82F6'}">
+                \${tier.tier_display_name || tier.tier_code} - \${tier.tier_description || 'All-Inclusive Package'}
+              </option>\`
+            ).join('');
+          
+          // Select first tier by default
+          if (tiers.length > 0) {
+            tierSelect.value = tiers[0].tier_id;
+          }
+        } catch (error) {
+          console.error('Error loading tiers:', error);
+          tierSelect.innerHTML = '<option value="">Error loading tiers - will create Standard tier</option>';
+        }
+      };
+      
       window.createAndLinkNewPass = async function() {
         const roomNumber = document.getElementById('newPassRoomNumber').value.trim();
         const adults = parseInt(document.getElementById('newPassAdults').value);
         const children = parseInt(document.getElementById('newPassChildren').value);
         const checkIn = document.getElementById('newPassCheckIn').value;
         const checkOut = document.getElementById('newPassCheckOut').value;
+        const tierId = document.getElementById('newPassTier').value;
         const button = document.getElementById('createPassButton');
         
         // Validation
@@ -47931,7 +47999,8 @@ app.get('/admin/dashboard', (c) => {
               num_adults: adults,
               num_children: children,
               valid_from: checkIn,
-              valid_until: checkOut
+              valid_until: checkOut,
+              tier_id: tierId || null
             })
           });
           
@@ -47939,7 +48008,7 @@ app.get('/admin/dashboard', (c) => {
           
           if (data.success) {
             closeLinkPassModal();
-            alert('✅ Digital pass created and guest linked successfully!\\n\\nRoom: ' + roomNumber + '\\nPIN: ' + data.guest_pin);
+            alert('✅ Digital pass created and guest linked successfully!\\n\\nRoom: ' + roomNumber + '\\nPIN: ' + data.guest_pin + '\\nTier: ' + (data.tier_name || 'Standard'));
             loadGuestLookupRequests(); // Refresh the list
           } else {
             alert('Failed to create pass: ' + (data.error || 'Unknown error'));
