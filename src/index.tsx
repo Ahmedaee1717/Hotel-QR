@@ -18194,31 +18194,48 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       }, 400)
     }
     
-    // Get default tier (Standard) or use NULL if not found (no foreign key constraint)
+    // Get or create a tier for this property
     let tierId = null
     try {
+      // First, try to find existing tier
       const tier = await DB.prepare(`
         SELECT tier_id FROM all_inclusive_tiers 
-        WHERE property_id = ? AND tier_name = 'Standard'
+        WHERE property_id = ?
+        ORDER BY 
+          CASE tier_name 
+            WHEN 'Standard' THEN 1 
+            ELSE 2 
+          END
         LIMIT 1
       `).bind(propertyId).first()
       
       if (tier) {
         tierId = tier.tier_id
       } else {
-        // Try to get any tier for this property
-        const anyTier = await DB.prepare(`
-          SELECT tier_id FROM all_inclusive_tiers 
-          WHERE property_id = ?
-          LIMIT 1
-        `).bind(propertyId).first()
+        // No tiers exist, create a default Standard tier
+        console.log('No tiers found for property', propertyId, '- creating default tier')
         
-        if (anyTier) {
-          tierId = anyTier.tier_id
-        }
+        const createTierResult = await DB.prepare(`
+          INSERT INTO all_inclusive_tiers (
+            property_id, tier_name, tier_description, tier_color, 
+            display_order, is_active
+          ) VALUES (?, 'Standard', 'Standard All-Inclusive Package', '#3B82F6', 1, 1)
+        `).bind(propertyId).run()
+        
+        tierId = createTierResult.meta.last_row_id
+        console.log('Created default tier with ID:', tierId)
       }
     } catch (tierError) {
-      console.error('Tier lookup error:', tierError)
+      console.error('Tier lookup/create error:', tierError)
+      // Last resort: use tier_id = 1 (should exist in most cases)
+      tierId = 1
+    }
+    
+    if (!tierId) {
+      return c.json({ 
+        success: false, 
+        error: 'Unable to assign tier to digital pass. Please create a tier first in All-Inclusive settings.'
+      }, 400)
     }
     
     // Ensure table exists (without strict foreign keys)
@@ -18244,7 +18261,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       )
     `).run()
     
-    // Insert new digital pass (tier_id can be NULL)
+    // Insert new digital pass (tier_id is required)
     const passResult = await DB.prepare(`
       INSERT INTO digital_passes (
         property_id, pass_reference, primary_guest_name, 
@@ -18262,7 +18279,7 @@ app.post('/api/admin/create-and-link-pass', async (c) => {
       qrSecret,
       num_adults || 2,
       num_children || 0,
-      tierId, // Can be NULL
+      parseInt(tierId), // Ensure it's an integer and not null
       valid_from,
       valid_until
     ).run()
