@@ -51107,7 +51107,7 @@ app.get('/admin/dashboard', (c) => {
               contentArea.value = result.tableHTML;
             }
             
-            // Also add to visual builder if in visual mode
+            // Also add to visual builder
             const blockId = 'block-' + (++blockIdCounter);
             const tableBlock = {
               id: blockId,
@@ -51115,8 +51115,13 @@ app.get('/admin/dashboard', (c) => {
               content: { html: result.tableHTML }
             };
             contentBlocks.push(tableBlock);
+            
+            // Render blocks and sync
             renderContentBlocks();
             syncBlocksToHTML();
+            
+            console.log('✅ Table block added:', tableBlock);
+            console.log('Total blocks:', contentBlocks.length);
             
             alert('✅ Table imported successfully!' + String.fromCharCode(10) + result.rowCount + ' rows × ' + result.columnCount + ' columns');
             
@@ -51233,7 +51238,8 @@ app.get('/admin/dashboard', (c) => {
           list: 'from-green-100 to-green-200',
           table: 'from-orange-100 to-orange-200',
           callout: 'from-yellow-100 to-yellow-200',
-          divider: 'from-gray-100 to-gray-200'
+          divider: 'from-gray-100 to-gray-200',
+          html: 'from-purple-100 to-purple-200'
         };
         
         let blockHTML = '<div class="bg-gradient-to-r ' + blockTypeColors[block.type] + ' p-4 rounded-lg border-2 border-white shadow-md hover:shadow-lg transition-all" data-block-id="' + block.id + '">' +
@@ -51296,6 +51302,10 @@ app.get('/admin/dashboard', (c) => {
             break;
           case 'divider':
             blockHTML += '<hr class="border-gray-400">';
+            break;
+          case 'html':
+            // Custom HTML block (for imported tables, etc.)
+            blockHTML += block.content.html || '';
             break;
         }
         
