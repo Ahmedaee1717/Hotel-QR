@@ -50985,11 +50985,19 @@ app.get('/admin/dashboard', (c) => {
       }
 
       window.saveInfoPage = async function() {
+        // Sync visual builder to HTML first
+        syncBlocksToHTML();
+        
         const title = document.getElementById('infoPageTitle').value.trim();
         const content = document.getElementById('infoPageContent').value.trim();
         
-        if (!title || !content) {
-          alert('Please fill in title and content');
+        if (!title) {
+          alert('Please fill in the page title');
+          return;
+        }
+        
+        if (!content) {
+          alert('Please add some content to the page (use the content blocks above or switch to HTML editor)');
           return;
         }
         
