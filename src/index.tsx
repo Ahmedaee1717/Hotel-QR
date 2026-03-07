@@ -63713,7 +63713,7 @@ app.get('/my-bookings', async (c) => {
                             </div>
                             
                             <div class="flex flex-col gap-2">
-                                <button onclick="viewBookingDetails('\${booking.offering_id}')" class="text-\${typeColor}-600 hover:bg-\${typeColor}-50 p-2 rounded-lg transition-colors" title="View Details">
+                                <button onclick="viewBookingDetails('\${booking.type}', '\${booking.id}', '\${booking.offering_id || ""}')" class="text-\${typeColor}-600 hover:bg-\${typeColor}-50 p-2 rounded-lg transition-colors" title="View Details">
                                     <i class="fas fa-info-circle text-lg"></i>
                                 </button>
                                 \${!isPast ? \`
@@ -63767,8 +63767,16 @@ app.get('/my-bookings', async (c) => {
             renderBookings();
         }
         
-        function viewBookingDetails(offeringId) {
-            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyId + '&lang=en';
+        function viewBookingDetails(bookingType, bookingId, offeringId) {
+            if (bookingType === 'beach') {
+                // For beach bookings, redirect to beach confirmation page
+                window.location.href = '/beach-booking-confirmation/' + bookingId;
+            } else if (offeringId) {
+                // For other bookings with offering_id, go to offering detail page
+                window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyId + '&lang=en';
+            } else {
+                alert('Booking details not available');
+            }
         }
         
         async function cancelBooking(bookingId, bookingType) {
