@@ -51407,16 +51407,6 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openSimpleTableEditor = function(index, tableHTML) {
-        // Helper to escape HTML entities
-        const escapeHTML = (str) => {
-          return String(str || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-        };
-        
         // Parse table to extract data
         const parser = new DOMParser();
         const doc = parser.parseFromString(tableHTML, 'text/html');
@@ -51437,47 +51427,110 @@ app.get('/admin/dashboard', (c) => {
           });
         }
         
-        // Create simple grid editor
+        // Create modal container
         const modalDiv = document.createElement('div');
         modalDiv.id = 'htmlEditorModal';
         modalDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
         
-        let editorHTML = '<div style="background:white;padding:24px;border-radius:12px;width:100%;max-width:1200px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">';
-        editorHTML += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
-        editorHTML += '<div><h3 style="font-size:20px;font-weight:bold;color:#374151;margin-bottom:4px;">Edit Table</h3>';
-        editorHTML += '<p style="font-size:14px;color:#6B7280;">Click any cell to edit. Changes save automatically.</p></div>';
-        editorHTML += '<button onclick="window.closeHTMLEditor()" style="font-size:24px;color:#9CA3AF;background:none;border:none;cursor:pointer;">&times;</button>';
-        editorHTML += '</div>';
+        // Create modal content container
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'background:white;padding:24px;border-radius:12px;width:100%;max-width:1200px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);';
         
-        editorHTML += '<div style="overflow-x:auto;margin-bottom:16px;">';
-        editorHTML += '<table id="editableTable" style="width:100%;border-collapse:collapse;border:1px solid #D1D5DB;">';
+        // Header section
+        const headerDiv = document.createElement('div');
+        headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
         
-        // Header row
-        editorHTML += '<thead><tr style="background:linear-gradient(to right, #4ade80, #60a5fa, #a78bfa);">';
+        const titleDiv = document.createElement('div');
+        const title = document.createElement('h3');
+        title.textContent = 'Edit Table';
+        title.style.cssText = 'font-size:20px;font-weight:bold;color:#374151;margin-bottom:4px;';
+        titleDiv.appendChild(title);
+        
+        const subtitle = document.createElement('p');
+        subtitle.textContent = 'Click any cell to edit. Changes save automatically.';
+        subtitle.style.cssText = 'font-size:14px;color:#6B7280;';
+        titleDiv.appendChild(subtitle);
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '&times;';
+        closeBtn.onclick = window.closeHTMLEditor;
+        closeBtn.style.cssText = 'font-size:24px;color:#9CA3AF;background:none;border:none;cursor:pointer;';
+        
+        headerDiv.appendChild(titleDiv);
+        headerDiv.appendChild(closeBtn);
+        contentDiv.appendChild(headerDiv);
+        
+        // Table container
+        const tableContainer = document.createElement('div');
+        tableContainer.style.cssText = 'overflow-x:auto;margin-bottom:16px;';
+        
+        // Create table
+        const editTable = document.createElement('table');
+        editTable.id = 'editableTable';
+        editTable.style.cssText = 'width:100%;border-collapse:collapse;border:1px solid #D1D5DB;';
+        
+        // Create thead
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.style.cssText = 'background:linear-gradient(to right, #4ade80, #60a5fa, #a78bfa);';
+        
         headers.forEach((header, idx) => {
-          editorHTML += '<th contenteditable="true" data-row="-1" data-col="' + idx + '" style="padding:12px;border:1px solid #D1D5DB;text-align:left;font-weight:bold;color:#1F2937;min-width:150px;">' + escapeHTML(header) + '</th>';
+          const th = document.createElement('th');
+          th.contentEditable = 'true';
+          th.setAttribute('data-row', '-1');
+          th.setAttribute('data-col', idx.toString());
+          th.textContent = header;
+          th.style.cssText = 'padding:12px;border:1px solid #D1D5DB;text-align:left;font-weight:bold;color:#1F2937;min-width:150px;';
+          headerRow.appendChild(th);
         });
-        editorHTML += '</tr></thead>';
         
-        // Body rows
-        editorHTML += '<tbody>';
+        thead.appendChild(headerRow);
+        editTable.appendChild(thead);
+        
+        // Create tbody
+        const tbody = document.createElement('tbody');
         rows.forEach((row, rowIdx) => {
+          const tr = document.createElement('tr');
           const bgColor = rowIdx % 2 === 0 ? '#F9FAFB' : '#FFFFFF';
-          editorHTML += '<tr style="background:' + bgColor + ';">';
+          tr.style.cssText = 'background:' + bgColor + ';';
+          
           row.forEach((cell, colIdx) => {
-            editorHTML += '<td contenteditable="true" data-row="' + rowIdx + '" data-col="' + colIdx + '" style="padding:12px;border:1px solid #D1D5DB;color:#374151;min-width:150px;">' + escapeHTML(cell) + '</td>';
+            const td = document.createElement('td');
+            td.contentEditable = 'true';
+            td.setAttribute('data-row', rowIdx.toString());
+            td.setAttribute('data-col', colIdx.toString());
+            td.textContent = cell;
+            td.style.cssText = 'padding:12px;border:1px solid #D1D5DB;color:#374151;min-width:150px;';
+            tr.appendChild(td);
           });
-          editorHTML += '</tr>';
+          
+          tbody.appendChild(tr);
         });
-        editorHTML += '</tbody>';
-        editorHTML += '</table></div>';
         
-        editorHTML += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
-        editorHTML += '<button onclick="window.closeHTMLEditor()" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>';
-        editorHTML += '<button onclick="window.saveTableEdit(' + index + ')" style="padding:10px 20px;background:#8B5CF6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Changes</button>';
-        editorHTML += '</div></div>';
+        editTable.appendChild(tbody);
+        tableContainer.appendChild(editTable);
+        contentDiv.appendChild(tableContainer);
         
-        modalDiv.innerHTML = editorHTML;
+        // Footer buttons
+        const footerDiv = document.createElement('div');
+        footerDiv.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.onclick = window.closeHTMLEditor;
+        cancelBtn.style.cssText = 'padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save Changes';
+        saveBtn.onclick = function() { window.saveTableEdit(index); };
+        saveBtn.style.cssText = 'padding:10px 20px;background:#8B5CF6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;';
+        
+        footerDiv.appendChild(cancelBtn);
+        footerDiv.appendChild(saveBtn);
+        contentDiv.appendChild(footerDiv);
+        
+        // Assemble and append
+        modalDiv.appendChild(contentDiv);
         document.body.appendChild(modalDiv);
       }
       
