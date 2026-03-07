@@ -52416,10 +52416,12 @@ app.get('/admin/dashboard', (c) => {
           const response = await fetch('/api/hotel-offerings/' + propertyId);
           const data = await response.json();
           allOfferings = data.offerings || [];
-          displayOfferings();
           
-          // Also load custom sections for the dropdown
+          // Load custom sections for the dropdown FIRST
           await loadCustomSectionsDropdown();
+          
+          // Then display offerings (now customSections is populated)
+          displayOfferings();
           
           // Update filter buttons with custom section names
           updateAdminFilterButtons(adminPropertySettings);
