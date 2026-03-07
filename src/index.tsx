@@ -51535,16 +51535,6 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.saveTableEdit = function(index) {
-        // Helper to escape HTML entities
-        const escapeHTML = (str) => {
-          return String(str || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-        };
-        
         const table = document.getElementById('editableTable');
         const headers = [];
         const rows = [];
@@ -51563,39 +51553,61 @@ app.get('/admin/dashboard', (c) => {
           rows.push(row);
         });
         
-        // Rebuild HTML table with same styling as CSV import
-        let tableHTML = '<div class="overflow-x-auto shadow-lg rounded-lg border border-gray-200">\n';
-        tableHTML += '<table class="min-w-full bg-white">\n';
-        tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-gray-900">\n';
-        headers.forEach(header => {
-          tableHTML += '      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0">' + escapeHTML(header) + '</th>\n';
-        });
-        tableHTML += '    </tr>\n  </thead>\n';
-        tableHTML += '  <tbody>\n';
+        // Create a temporary container
+        const container = document.createElement('div');
+        container.className = 'overflow-x-auto shadow-lg rounded-lg border border-gray-200';
         
+        const tableEl = document.createElement('table');
+        tableEl.className = 'min-w-full bg-white';
+        
+        // Create thead
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.className = 'bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-gray-900';
+        
+        headers.forEach(header => {
+          const th = document.createElement('th');
+          th.className = 'px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0';
+          th.textContent = header;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        tableEl.appendChild(thead);
+        
+        // Create tbody
+        const tbody = document.createElement('tbody');
         rows.forEach((row, i) => {
           const firstCell = row[0]?.toLowerCase() || '';
-          let rowBgClass = 'bg-white';
+          let rowClass = 'bg-white hover:bg-indigo-50 transition-colors';
           
           if (firstCell.includes('news') || row[1]?.toLowerCase().includes('news')) {
-            rowBgClass = 'bg-yellow-50';
+            rowClass = 'bg-yellow-50 hover:bg-indigo-50 transition-colors';
           } else if (firstCell.includes('internal') || row[1]?.toLowerCase().includes('internal')) {
-            rowBgClass = 'bg-gray-100';
+            rowClass = 'bg-gray-100 hover:bg-indigo-50 transition-colors';
           } else if (firstCell.includes('entertainment') || firstCell.includes('intertirment') || row[1]?.toLowerCase().includes('entertain')) {
-            rowBgClass = 'bg-blue-50';
+            rowClass = 'bg-blue-50 hover:bg-indigo-50 transition-colors';
           } else if (i % 2 === 0) {
-            rowBgClass = 'bg-gray-50';
+            rowClass = 'bg-gray-50 hover:bg-indigo-50 transition-colors';
           }
           
-          tableHTML += '    <tr class="' + rowBgClass + ' hover:bg-indigo-50 transition-colors">\n';
+          const tr = document.createElement('tr');
+          tr.className = rowClass;
+          
           row.forEach((cell, idx) => {
-            const cellClass = idx === 0 ? 'font-semibold text-gray-900' : 'text-gray-800';
-            tableHTML += '      <td class="px-6 py-3 text-sm ' + cellClass + ' border-b border-gray-200">' + escapeHTML(cell) + '</td>\n';
+            const td = document.createElement('td');
+            const cellClass = idx === 0 ? 'px-6 py-3 text-sm font-semibold text-gray-900 border-b border-gray-200' : 'px-6 py-3 text-sm text-gray-800 border-b border-gray-200';
+            td.className = cellClass;
+            td.textContent = cell;
+            tr.appendChild(td);
           });
-          tableHTML += '    </tr>\n';
+          
+          tbody.appendChild(tr);
         });
+        tableEl.appendChild(tbody);
+        container.appendChild(tableEl);
         
-        tableHTML += '  </tbody>\n</table>\n</div>';
+        // Get HTML string from DOM
+        const tableHTML = container.outerHTML;
         
         // Update block
         const block = contentBlocks[index];
