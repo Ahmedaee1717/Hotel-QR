@@ -6803,13 +6803,14 @@ app.post('/api/admin/offerings', async (c) => {
     // Insert the offering first
     const result = await DB.prepare(`
       INSERT INTO hotel_offerings (
-        property_id, offering_type, title_en, short_description_en, full_description_en,
+        property_id, offering_type, custom_section_key, title_en, short_description_en, full_description_en,
         images, video_url, price, currency, duration_minutes, requires_booking, location,
         event_date, event_start_time, event_end_time, status, display_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?, ?, 'active', 0)
     `).bind(
       property_id,  // Use authenticated property_id
       data.offering_type,
+      data.custom_section_key || null,
       data.title_en,
       data.short_description_en,
       data.full_description_en,
@@ -10791,6 +10792,7 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           ho.status,
           ho.is_featured,
           ho.display_order,
+          ho.custom_section_key,
           ho.created_at
         FROM hotel_offerings ho
         WHERE ho.property_id = ?
@@ -10833,6 +10835,7 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
           a.status,
           a.is_featured,
           a.popularity_score as display_order,
+          NULL as custom_section_key,
           a.created_at
         FROM activities a
         JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
