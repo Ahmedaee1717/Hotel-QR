@@ -12741,18 +12741,20 @@ app.post('/api/admin/chatbot/send-message', async (c) => {
       return c.json({ error: 'Conversation not found' }, 404)
     }
     
-    // Try to mark session as taken over by admin
-    try {
-      await DB.prepare(`
-        UPDATE chatbot_conversations
-        SET is_ai_paused = 1,
-            admin_takeover_at = CURRENT_TIMESTAMP,
-            admin_takeover_by = ?
-        WHERE session_id = ?
-      `).bind(admin_id || 'admin', session_id).run()
-    } catch (updateError) {
-      // Columns might not exist, that's okay - continue anyway
-      console.log('Could not update takeover columns (might not exist yet):', updateError.message)
+    // Mark session as taken over by admin
+    const updateResult = await DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 1,
+          admin_takeover_at = CURRENT_TIMESTAMP,
+          admin_takeover_by = ?
+      WHERE session_id = ? AND property_id = ?
+    `).bind(admin_id || 'admin', session_id, propertyId).run()
+    
+    console.log('Admin takeover update result:', updateResult)
+    
+    if (!updateResult.success) {
+      console.error('Failed to set is_ai_paused to 1')
+      // Continue anyway - still send the admin message
     }
     
     // Insert admin message using conversation_id
@@ -12792,17 +12794,19 @@ app.post('/api/admin/chatbot/end-takeover', async (c) => {
       return c.json({ error: 'Conversation not found' }, 404)
     }
     
-    // Try to resume AI
-    try {
-      await DB.prepare(`
-        UPDATE chatbot_conversations
-        SET is_ai_paused = 0,
-            admin_takeover_ended_at = CURRENT_TIMESTAMP
-        WHERE session_id = ?
-      `).bind(session_id).run()
-    } catch (updateError) {
-      // Columns might not exist, that's okay
-      console.log('Could not update takeover columns (might not exist yet):', updateError.message)
+    // Resume AI - update the conversation
+    const updateResult = await DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 0,
+          admin_takeover_ended_at = CURRENT_TIMESTAMP
+      WHERE session_id = ? AND property_id = ?
+    `).bind(session_id, propertyId).run()
+    
+    console.log('Resume AI update result:', updateResult)
+    
+    if (!updateResult.success) {
+      console.error('Failed to update is_ai_paused to 0')
+      return c.json({ error: 'Failed to resume AI in database' }, 500)
     }
     
     // Add system message using conversation_id
@@ -12878,6 +12882,30 @@ app.post('/api/admin/chatbot/migrate-takeover-columns', async (c) => {
     console.error('Migration error:', error)
     return c.json({ 
       error: 'Migration failed', 
+      details: error.message 
+    }, 500)
+  }
+})
+
+// Admin: Reset all AI pauses (debug utility)
+app.post('/api/admin/chatbot/reset-all-pauses', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const result = await DB.prepare(`
+      UPDATE chatbot_conversations
+      SET is_ai_paused = 0
+      WHERE is_ai_paused = 1
+    `).run()
+    
+    return c.json({
+      success: true,
+      message: `Reset ${result.meta?.changes || 0} paused conversations to active`
+    })
+  } catch (error) {
+    console.error('Reset pauses error:', error)
+    return c.json({ 
+      error: 'Failed to reset pauses', 
       details: error.message 
     }, 500)
   }
