@@ -47931,9 +47931,11 @@ app.get('/admin/dashboard', (c) => {
           const btn = document.getElementById('view' + v + 'Btn');
           if (btn) {
             if (v.toLowerCase() === view || (v === 'All' && view === 'all') || (v === 'ServiceRequests' && view === 'service-requests') || (v === 'GuestLookup' && view === 'guest-lookup')) {
-              btn.className = 'px-4 py-2 bg-blue-600 text-white rounded-lg font-medium';
+              btn.className = 'px-4 py-2 text-white rounded-lg font-semibold shadow-md transition-all hover:shadow-lg';
+              btn.style.background = 'linear-gradient(135deg, #016e8f 0%, #014a5e 100%)';
             } else {
               btn.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium';
+              btn.style.background = ''; // Clear inline style
             }
           }
         });
