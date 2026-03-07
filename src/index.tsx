@@ -6587,6 +6587,120 @@ app.put('/api/admin/info-pages/:page_id', async (c) => {
   }
 })
 
+// Upload and parse CSV file for info pages (convert to styled table)
+app.post('/api/admin/info-pages/parse-xlsx', async (c) => {
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file')
+    
+    if (!file || !(file instanceof File)) {
+      return c.json({ error: 'No file uploaded' }, 400)
+    }
+    
+    // Read file as array buffer
+    const buffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(buffer)
+    const text = new TextDecoder('utf-8').decode(uint8Array)
+    
+    // Parse CSV (handle comma, tab, and semicolon separators)
+    const lines = text.split(/\r?\n/).filter(line => line.trim())
+    
+    if (lines.length === 0) {
+      return c.json({ error: 'Empty file' }, 400)
+    }
+    
+    // Detect separator (comma, tab, or semicolon)
+    let separator = ','
+    if (lines[0].includes('\t')) separator = '\t'
+    else if (lines[0].includes(';') && !lines[0].includes(',')) separator = ';'
+    
+    // Parse rows with proper CSV handling (quotes, escaped characters)
+    const rows = []
+    for (const line of lines) {
+      const cells = []
+      let currentCell = ''
+      let insideQuotes = false
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        const nextChar = line[i + 1]
+        
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            currentCell += '"'
+            i++ // Skip next quote
+          } else {
+            insideQuotes = !insideQuotes
+          }
+        } else if (char === separator && !insideQuotes) {
+          cells.push(currentCell.trim())
+          currentCell = ''
+        } else {
+          currentCell += char
+        }
+      }
+      cells.push(currentCell.trim())
+      rows.push(cells)
+    }
+    
+    // Generate styled HTML table with color coding based on content
+    let tableHTML = '<div class="overflow-x-auto shadow-lg rounded-lg border border-gray-200">\n'
+    tableHTML += '<table class="min-w-full bg-white">\n'
+    
+    // Header row with styling
+    if (rows.length > 0) {
+      tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-white">\n'
+      rows[0].forEach(cell => {
+        tableHTML += `      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-white/20 last:border-r-0">${cell || '&nbsp;'}</th>\n`
+      })
+      tableHTML += '    </tr>\n  </thead>\n'
+    }
+    
+    // Body rows with alternating colors and category-based styling
+    if (rows.length > 1) {
+      tableHTML += '  <tbody>\n'
+      for (let i = 1; i < rows.length; i++) {
+        const firstCell = rows[i][0]?.toLowerCase() || ''
+        
+        // Detect row type and apply color
+        let rowBgClass = 'bg-white'
+        let rowTextClass = 'text-gray-800'
+        
+        if (firstCell.includes('news') || rows[i][1]?.toLowerCase().includes('news')) {
+          rowBgClass = 'bg-yellow-50'
+        } else if (firstCell.includes('internal') || rows[i][1]?.toLowerCase().includes('internal')) {
+          rowBgClass = 'bg-gray-100'
+        } else if (firstCell.includes('entertainment') || firstCell.includes('intertirment') || rows[i][1]?.toLowerCase().includes('entertain')) {
+          rowBgClass = 'bg-blue-50'
+        } else if (i % 2 === 0) {
+          rowBgClass = 'bg-gray-50'
+        }
+        
+        tableHTML += `    <tr class="${rowBgClass} hover:bg-indigo-50 transition-colors">\n`
+        rows[i].forEach((cell, idx) => {
+          const cellClass = idx === 0 ? 'font-semibold text-gray-900' : rowTextClass
+          tableHTML += `      <td class="px-6 py-3 text-sm ${cellClass} border-b border-gray-200">${cell || '&nbsp;'}</td>\n`
+        })
+        tableHTML += '    </tr>\n'
+      }
+      tableHTML += '  </tbody>\n'
+    }
+    
+    tableHTML += '</table>\n</div>'
+    
+    return c.json({
+      success: true,
+      tableHTML: tableHTML,
+      rowCount: rows.length,
+      columnCount: rows[0]?.length || 0
+    })
+    
+  } catch (error) {
+    console.error('Parse CSV error:', error)
+    return c.json({ error: 'Failed to parse file: ' + error.message }, 500)
+  }
+})
+
 // Delete info page
 app.delete('/api/admin/info-pages/:page_id', async (c) => {
   const { DB } = c.env
@@ -44199,6 +44313,32 @@ app.get('/admin/dashboard', (c) => {
                                                 <p class="text-xs font-semibold">Divider</p>
                                             </button>
                                         </div>
+                                        
+                                        <!-- XLSX Upload Section -->
+                                        <div class="mt-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
+                                            <p class="text-sm font-bold text-indigo-700 mb-2 flex items-center">
+                                                <i class="fas fa-file-excel mr-2 text-green-600"></i>
+                                                Import Table from Excel/CSV:
+                                            </p>
+                                            <div class="flex gap-2 items-center">
+                                                <input type="file" id="xlsxFileInput" accept=".csv,.tsv,.txt" class="hidden">
+                                                <button type="button" onclick="document.getElementById('xlsxFileInput').click()" 
+                                                        class="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 text-sm font-semibold shadow-md flex items-center gap-2">
+                                                    <i class="fas fa-upload"></i>
+                                                    Choose CSV File
+                                                </button>
+                                                <span id="xlsxFileName" class="text-xs text-gray-600 italic">No file selected</span>
+                                                <button type="button" onclick="uploadXLSX()" id="xlsxUploadBtn" disabled
+                                                        class="ml-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold shadow-md flex items-center gap-2">
+                                                    <i class="fas fa-magic"></i>
+                                                    Convert to Table
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-gray-500 mt-2">
+                                                <i class="fas fa-info-circle mr-1"></i>
+                                                <strong>Export your Excel as CSV first:</strong> File → Save As → CSV (Comma delimited). First row = headers.
+                                            </p>
+                                        </div>
                                     </div>
                                     
                                     <!-- Content Blocks Container (Sortable Blocks!) -->
@@ -50915,6 +51055,85 @@ app.get('/admin/dashboard', (c) => {
         } catch (error) {
           console.error('Delete info page error:', error);
           alert('Failed to delete page');
+        }
+      }
+      
+      // Handle XLSX file selection
+      document.addEventListener('DOMContentLoaded', function() {
+        const fileInput = document.getElementById('xlsxFileInput');
+        if (fileInput) {
+          fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+              document.getElementById('xlsxFileName').textContent = file.name;
+              document.getElementById('xlsxUploadBtn').disabled = false;
+            } else {
+              document.getElementById('xlsxFileName').textContent = 'No file selected';
+              document.getElementById('xlsxUploadBtn').disabled = true;
+            }
+          });
+        }
+      });
+      
+      // Upload and convert XLSX to table
+      window.uploadXLSX = async function() {
+        const fileInput = document.getElementById('xlsxFileInput');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+          alert('Please select a file first');
+          return;
+        }
+        
+        const uploadBtn = document.getElementById('xlsxUploadBtn');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Converting...';
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const response = await fetchWithAuth('/api/admin/info-pages/parse-xlsx', {
+            method: 'POST',
+            body: formData
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            // Insert the table HTML into the page content
+            const contentArea = document.getElementById('infoPageContent');
+            if (contentArea.value) {
+              contentArea.value += '\\n\\n' + result.tableHTML;
+            } else {
+              contentArea.value = result.tableHTML;
+            }
+            
+            // Also add to visual builder if in visual mode
+            const blockId = 'block-' + (++blockIdCounter);
+            const tableBlock = {
+              id: blockId,
+              type: 'html',
+              content: { html: result.tableHTML }
+            };
+            contentBlocks.push(tableBlock);
+            renderContentBlocks();
+            syncBlocksToHTML();
+            
+            alert('✅ Table imported successfully!' + String.fromCharCode(10) + result.rowCount + ' rows × ' + result.columnCount + ' columns');
+            
+            // Reset file input
+            fileInput.value = '';
+            document.getElementById('xlsxFileName').textContent = 'No file selected';
+          } else {
+            alert('Failed to parse file: ' + (result.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Upload XLSX error:', error);
+          alert('Failed to upload file: ' + error.message);
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.innerHTML = '<i class="fas fa-magic"></i> Convert to Table';
         }
       }
 
