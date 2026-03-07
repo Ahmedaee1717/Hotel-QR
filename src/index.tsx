@@ -52393,6 +52393,7 @@ app.get('/admin/dashboard', (c) => {
 
       // Hotel Offerings Management
       let allOfferings = [];
+      let customSections = [];
       let currentOfferingFilter = 'all';
       
       async function loadOfferings() {
@@ -52422,6 +52423,10 @@ app.get('/admin/dashboard', (c) => {
         try {
           const response = await fetchWithAuth('/api/admin/custom-sections?property_id=' + propertyId);
           const data = await response.json();
+          
+          // Store custom sections for later use
+          customSections = data.sections || [];
+          
           const dropdown = document.getElementById('offeringType');
           
           // Remove any previously added custom section options
@@ -52459,8 +52464,17 @@ app.get('/admin/dashboard', (c) => {
             restaurant: 'bg-blue-100 text-blue-700',
             event: 'bg-purple-100 text-purple-700',
             spa: 'bg-green-100 text-green-700',
-            service: 'bg-gray-100 text-gray-700'
+            service: 'bg-gray-100 text-gray-700',
+            custom: 'bg-orange-100 text-orange-700'
           };
+          
+          // Display custom section name instead of "CUSTOM"
+          let displayType = o.offering_type || 'ACTIVITY';
+          if (o.offering_type === 'custom' && o.custom_section_key) {
+            // Find the section name from custom sections
+            const customSection = customSections.find(s => s.section_key === o.custom_section_key);
+            displayType = customSection ? customSection.section_name_en : o.custom_section_key;
+          }
           
           // Extract original ID (remove 'H' or 'A' prefix) - use original_id field first
           let originalId = o.original_id;
@@ -52475,7 +52489,7 @@ app.get('/admin/dashboard', (c) => {
                 <div>
                   <h3 class="font-bold text-lg">\${o.title_en || o.title || 'Untitled'}</h3>
                   <span class="inline-block px-2 py-1 rounded text-xs \${typeColors[o.offering_type] || typeColors.service}">
-                    \${o.offering_type ? o.offering_type.toUpperCase() : 'ACTIVITY'}
+                    \${displayType.toUpperCase()}
                   </span>
                 </div>
                 <div class="flex gap-2">
