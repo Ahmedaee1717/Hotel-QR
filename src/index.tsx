@@ -51407,6 +51407,16 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openSimpleTableEditor = function(index, tableHTML) {
+        // Helper to escape HTML entities
+        const escapeHTML = (str) => {
+          return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+        
         // Parse table to extract data
         const parser = new DOMParser();
         const doc = parser.parseFromString(tableHTML, 'text/html');
@@ -51445,7 +51455,7 @@ app.get('/admin/dashboard', (c) => {
         // Header row
         editorHTML += '<thead><tr style="background:linear-gradient(to right, #4ade80, #60a5fa, #a78bfa);">';
         headers.forEach((header, idx) => {
-          editorHTML += '<th contenteditable="true" data-row="-1" data-col="' + idx + '" style="padding:12px;border:1px solid #D1D5DB;text-align:left;font-weight:bold;color:#1F2937;min-width:150px;">' + header + '</th>';
+          editorHTML += '<th contenteditable="true" data-row="-1" data-col="' + idx + '" style="padding:12px;border:1px solid #D1D5DB;text-align:left;font-weight:bold;color:#1F2937;min-width:150px;">' + escapeHTML(header) + '</th>';
         });
         editorHTML += '</tr></thead>';
         
@@ -51455,7 +51465,7 @@ app.get('/admin/dashboard', (c) => {
           const bgColor = rowIdx % 2 === 0 ? '#F9FAFB' : '#FFFFFF';
           editorHTML += '<tr style="background:' + bgColor + ';">';
           row.forEach((cell, colIdx) => {
-            editorHTML += '<td contenteditable="true" data-row="' + rowIdx + '" data-col="' + colIdx + '" style="padding:12px;border:1px solid #D1D5DB;color:#374151;min-width:150px;">' + cell + '</td>';
+            editorHTML += '<td contenteditable="true" data-row="' + rowIdx + '" data-col="' + colIdx + '" style="padding:12px;border:1px solid #D1D5DB;color:#374151;min-width:150px;">' + escapeHTML(cell) + '</td>';
           });
           editorHTML += '</tr>';
         });
@@ -51472,6 +51482,16 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.saveTableEdit = function(index) {
+        // Helper to escape HTML entities
+        const escapeHTML = (str) => {
+          return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+        
         const table = document.getElementById('editableTable');
         const headers = [];
         const rows = [];
@@ -51495,7 +51515,7 @@ app.get('/admin/dashboard', (c) => {
         tableHTML += '<table class="min-w-full bg-white">\n';
         tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-gray-900">\n';
         headers.forEach(header => {
-          tableHTML += '      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0">' + header + '</th>\n';
+          tableHTML += '      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0">' + escapeHTML(header) + '</th>\n';
         });
         tableHTML += '    </tr>\n  </thead>\n';
         tableHTML += '  <tbody>\n';
@@ -51517,7 +51537,7 @@ app.get('/admin/dashboard', (c) => {
           tableHTML += '    <tr class="' + rowBgClass + ' hover:bg-indigo-50 transition-colors">\n';
           row.forEach((cell, idx) => {
             const cellClass = idx === 0 ? 'font-semibold text-gray-900' : 'text-gray-800';
-            tableHTML += '      <td class="px-6 py-3 text-sm ' + cellClass + ' border-b border-gray-200">' + cell + '</td>\n';
+            tableHTML += '      <td class="px-6 py-3 text-sm ' + cellClass + ' border-b border-gray-200">' + escapeHTML(cell) + '</td>\n';
           });
           tableHTML += '    </tr>\n';
         });
