@@ -7057,7 +7057,16 @@ app.delete('/api/admin/offerings/:offering_id', async (c) => {
       DELETE FROM restaurant_menus WHERE offering_id = ?
     `).bind(offering_id).run()
     
-    // 8. Finally delete the offering itself
+    // 8. Delete timeline_suggestions (My Perfect Week feature)
+    try {
+      await DB.prepare(`
+        DELETE FROM timeline_suggestions WHERE offering_id = ?
+      `).bind(offering_id).run()
+    } catch (e) {
+      console.log('Note: timeline_suggestions delete skipped (table may not exist or old schema):', e.message)
+    }
+    
+    // 9. Finally delete the offering itself
     const result = await DB.prepare(`
       DELETE FROM hotel_offerings WHERE offering_id = ?
     `).bind(offering_id).run()
