@@ -51388,22 +51388,27 @@ app.get('/admin/dashboard', (c) => {
         modalDiv.innerHTML = '<div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:900px;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
           '<h3 style="font-size:20px;font-weight:bold;color:#374151;">Edit HTML Content</h3>' +
-          '<button onclick="document.getElementById(\'htmlEditorModal\').remove()" style="font-size:24px;color:#9CA3AF;background:none;border:none;cursor:pointer;">&times;</button>' +
+          '<button onclick="window.closeHTMLEditor()" style="font-size:24px;color:#9CA3AF;background:none;border:none;cursor:pointer;">&times;</button>' +
           '</div>' +
           '<textarea id="htmlEditorTextarea" style="width:100%;height:400px;font-family:monospace;font-size:13px;padding:12px;border:1px solid #D1D5DB;border-radius:6px;resize:vertical;">' + escapedHTML + '</textarea>' +
           '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">' +
-          '<button onclick="document.getElementById(\'htmlEditorModal\').remove()" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>' +
+          '<button onclick="window.closeHTMLEditor()" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>' +
           '<button onclick="window.saveHTMLEdit(' + index + ')" style="padding:10px 20px;background:#8B5CF6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Changes</button>' +
           '</div>' +
           '</div>';
         document.body.appendChild(modalDiv);
       }
       
+      window.closeHTMLEditor = function() {
+        const modal = document.getElementById('htmlEditorModal');
+        if (modal) modal.remove();
+      }
+      
       window.saveHTMLEdit = function(index) {
         const textarea = document.getElementById('htmlEditorTextarea');
         const block = contentBlocks[index];
         block.content.html = textarea.value;
-        document.getElementById('htmlEditorModal').remove();
+        window.closeHTMLEditor();
         renderContentBlocks();
         syncBlocksToHTML();
       }
