@@ -6644,9 +6644,9 @@ app.post('/api/admin/info-pages/parse-csv', async (c) => {
     
     // Header row with styling
     if (rows.length > 0) {
-      tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-white">\n'
+      tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-gray-900">\n'
       rows[0].forEach(cell => {
-        tableHTML += `      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-white/20 last:border-r-0">${cell || '&nbsp;'}</th>\n`
+        tableHTML += `      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0">${cell || '&nbsp;'}</th>\n`
       })
       tableHTML += '    </tr>\n  </thead>\n'
     }
@@ -51381,6 +51381,13 @@ app.get('/admin/dashboard', (c) => {
       }
       
       window.openHTMLEditor = function(index, currentHTML) {
+        // Check if this is a table - if so, use simple table editor
+        if (currentHTML.includes('<table') && currentHTML.includes('</table>')) {
+          window.openSimpleTableEditor(index, currentHTML);
+          return;
+        }
+        
+        // For non-table HTML, use code editor
         const escapedHTML = currentHTML.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const modalDiv = document.createElement('div');
         modalDiv.id = 'htmlEditorModal';
@@ -51397,6 +51404,132 @@ app.get('/admin/dashboard', (c) => {
           '</div>' +
           '</div>';
         document.body.appendChild(modalDiv);
+      }
+      
+      window.openSimpleTableEditor = function(index, tableHTML) {
+        // Parse table to extract data
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(tableHTML, 'text/html');
+        const table = doc.querySelector('table');
+        
+        let headers = [];
+        let rows = [];
+        
+        if (table) {
+          const headerCells = table.querySelectorAll('thead th');
+          headerCells.forEach(th => headers.push(th.textContent.trim()));
+          
+          const bodyRows = table.querySelectorAll('tbody tr');
+          bodyRows.forEach(tr => {
+            const row = [];
+            tr.querySelectorAll('td').forEach(td => row.push(td.textContent.trim()));
+            rows.push(row);
+          });
+        }
+        
+        // Create simple grid editor
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'htmlEditorModal';
+        modalDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        
+        let editorHTML = '<div style="background:white;padding:24px;border-radius:12px;width:100%;max-width:1200px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">';
+        editorHTML += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+        editorHTML += '<div><h3 style="font-size:20px;font-weight:bold;color:#374151;margin-bottom:4px;">Edit Table</h3>';
+        editorHTML += '<p style="font-size:14px;color:#6B7280;">Click any cell to edit. Changes save automatically.</p></div>';
+        editorHTML += '<button onclick="window.closeHTMLEditor()" style="font-size:24px;color:#9CA3AF;background:none;border:none;cursor:pointer;">&times;</button>';
+        editorHTML += '</div>';
+        
+        editorHTML += '<div style="overflow-x:auto;margin-bottom:16px;">';
+        editorHTML += '<table id="editableTable" style="width:100%;border-collapse:collapse;border:1px solid #D1D5DB;">';
+        
+        // Header row
+        editorHTML += '<thead><tr style="background:linear-gradient(to right, #4ade80, #60a5fa, #a78bfa);">';
+        headers.forEach((header, idx) => {
+          editorHTML += '<th contenteditable="true" data-row="-1" data-col="' + idx + '" style="padding:12px;border:1px solid #D1D5DB;text-align:left;font-weight:bold;color:#1F2937;min-width:150px;">' + header + '</th>';
+        });
+        editorHTML += '</tr></thead>';
+        
+        // Body rows
+        editorHTML += '<tbody>';
+        rows.forEach((row, rowIdx) => {
+          const bgColor = rowIdx % 2 === 0 ? '#F9FAFB' : '#FFFFFF';
+          editorHTML += '<tr style="background:' + bgColor + ';">';
+          row.forEach((cell, colIdx) => {
+            editorHTML += '<td contenteditable="true" data-row="' + rowIdx + '" data-col="' + colIdx + '" style="padding:12px;border:1px solid #D1D5DB;color:#374151;min-width:150px;">' + cell + '</td>';
+          });
+          editorHTML += '</tr>';
+        });
+        editorHTML += '</tbody>';
+        editorHTML += '</table></div>';
+        
+        editorHTML += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
+        editorHTML += '<button onclick="window.closeHTMLEditor()" style="padding:10px 20px;background:#E5E7EB;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancel</button>';
+        editorHTML += '<button onclick="window.saveTableEdit(' + index + ')" style="padding:10px 20px;background:#8B5CF6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Changes</button>';
+        editorHTML += '</div></div>';
+        
+        modalDiv.innerHTML = editorHTML;
+        document.body.appendChild(modalDiv);
+      }
+      
+      window.saveTableEdit = function(index) {
+        const table = document.getElementById('editableTable');
+        const headers = [];
+        const rows = [];
+        
+        // Extract headers
+        table.querySelectorAll('thead th').forEach(th => {
+          headers.push(th.textContent.trim());
+        });
+        
+        // Extract body rows
+        table.querySelectorAll('tbody tr').forEach(tr => {
+          const row = [];
+          tr.querySelectorAll('td').forEach(td => {
+            row.push(td.textContent.trim());
+          });
+          rows.push(row);
+        });
+        
+        // Rebuild HTML table with same styling as CSV import
+        let tableHTML = '<div class="overflow-x-auto shadow-lg rounded-lg border border-gray-200">\n';
+        tableHTML += '<table class="min-w-full bg-white">\n';
+        tableHTML += '  <thead>\n    <tr class="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 text-gray-900">\n';
+        headers.forEach(header => {
+          tableHTML += '      <th class="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider border-r border-gray-300/40 last:border-r-0">' + header + '</th>\n';
+        });
+        tableHTML += '    </tr>\n  </thead>\n';
+        tableHTML += '  <tbody>\n';
+        
+        rows.forEach((row, i) => {
+          const firstCell = row[0]?.toLowerCase() || '';
+          let rowBgClass = 'bg-white';
+          
+          if (firstCell.includes('news') || row[1]?.toLowerCase().includes('news')) {
+            rowBgClass = 'bg-yellow-50';
+          } else if (firstCell.includes('internal') || row[1]?.toLowerCase().includes('internal')) {
+            rowBgClass = 'bg-gray-100';
+          } else if (firstCell.includes('entertainment') || firstCell.includes('intertirment') || row[1]?.toLowerCase().includes('entertain')) {
+            rowBgClass = 'bg-blue-50';
+          } else if (i % 2 === 0) {
+            rowBgClass = 'bg-gray-50';
+          }
+          
+          tableHTML += '    <tr class="' + rowBgClass + ' hover:bg-indigo-50 transition-colors">\n';
+          row.forEach((cell, idx) => {
+            const cellClass = idx === 0 ? 'font-semibold text-gray-900' : 'text-gray-800';
+            tableHTML += '      <td class="px-6 py-3 text-sm ' + cellClass + ' border-b border-gray-200">' + cell + '</td>\n';
+          });
+          tableHTML += '    </tr>\n';
+        });
+        
+        tableHTML += '  </tbody>\n</table>\n</div>';
+        
+        // Update block
+        const block = contentBlocks[index];
+        block.content.html = tableHTML;
+        window.closeHTMLEditor();
+        renderContentBlocks();
+        syncBlocksToHTML();
       }
       
       window.closeHTMLEditor = function() {
