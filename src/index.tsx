@@ -26388,6 +26388,17 @@ app.get('/hotel/:property_slug', async (c) => {
           
           console.log('✅ Content set, element HTML length:', contentEl.innerHTML.length);
           
+          // Fix table header text color for old tables
+          setTimeout(() => {
+            const tableHeaders = contentEl.querySelectorAll('table thead tr');
+            tableHeaders.forEach(tr => {
+              tr.style.color = '#111827'; // Force black/dark gray text
+              tr.querySelectorAll('th').forEach(th => {
+                th.style.color = '#111827';
+              });
+            });
+          }, 10);
+          
           // Apply custom colors from propertyData
           const primaryColor = propertyData.primary_color || '#3B82F6';
           const infoPageHeader = document.getElementById('infoPageHeader');
