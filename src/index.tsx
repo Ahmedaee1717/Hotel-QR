@@ -6588,22 +6588,17 @@ app.put('/api/admin/info-pages/:page_id', async (c) => {
 })
 
 // Upload and parse CSV file for info pages (convert to styled table)
-app.post('/api/admin/info-pages/parse-xlsx', async (c) => {
+app.post('/api/admin/info-pages/parse-csv', async (c) => {
   try {
-    const formData = await c.req.formData()
-    const file = formData.get('file')
+    const body = await c.req.json()
+    const { csvData, fileName } = body
     
-    if (!file || !(file instanceof File)) {
-      return c.json({ error: 'No file uploaded' }, 400)
+    if (!csvData) {
+      return c.json({ error: 'No CSV data provided' }, 400)
     }
     
-    // Read file as array buffer
-    const buffer = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(buffer)
-    const text = new TextDecoder('utf-8').decode(uint8Array)
-    
     // Parse CSV (handle comma, tab, and semicolon separators)
-    const lines = text.split(/\r?\n/).filter(line => line.trim())
+    const lines = csvData.split(/\r?\n/).filter(line => line.trim())
     
     if (lines.length === 0) {
       return c.json({ error: 'Empty file' }, 400)
@@ -51075,7 +51070,7 @@ app.get('/admin/dashboard', (c) => {
         }
       });
       
-      // Upload and convert XLSX to table
+      // Upload and convert CSV to table
       window.uploadXLSX = async function() {
         const fileInput = document.getElementById('xlsxFileInput');
         const file = fileInput.files[0];
@@ -51090,12 +51085,15 @@ app.get('/admin/dashboard', (c) => {
         uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Converting...';
         
         try {
-          const formData = new FormData();
-          formData.append('file', file);
+          // Read file as text
+          const text = await file.text();
           
-          const response = await fetchWithAuth('/api/admin/info-pages/parse-xlsx', {
+          const response = await fetchWithAuth('/api/admin/info-pages/parse-csv', {
             method: 'POST',
-            body: formData
+            body: JSON.stringify({
+              csvData: text,
+              fileName: file.name
+            })
           });
           
           const result = await response.json();
@@ -51129,7 +51127,7 @@ app.get('/admin/dashboard', (c) => {
             alert('Failed to parse file: ' + (result.error || 'Unknown error'));
           }
         } catch (error) {
-          console.error('Upload XLSX error:', error);
+          console.error('Upload CSV error:', error);
           alert('Failed to upload file: ' + error.message);
         } finally {
           uploadBtn.disabled = false;
