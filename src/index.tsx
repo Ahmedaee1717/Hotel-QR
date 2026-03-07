@@ -51474,6 +51474,10 @@ app.get('/admin/dashboard', (c) => {
             case 'divider':
               html += '<hr class="my-6 border-gray-300">' + String.fromCharCode(10);
               break;
+            case 'html':
+              // Custom HTML block (for imported tables, etc.)
+              html += (block.content.html || '') + String.fromCharCode(10);
+              break;
           }
         });
         
