@@ -42697,13 +42697,41 @@ app.get('/admin/dashboard', (c) => {
              ============================================= -->
         <div id="documentationTab" class="tab-content hidden">
             <div class="max-w-6xl mx-auto">
-                <!-- Header -->
-                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
-                    <h1 class="text-4xl font-bold mb-3 flex items-center gap-3">
-                        <i class="fas fa-book"></i>
-                        GuestConnect Documentation
-                    </h1>
-                    <p class="text-blue-100 text-lg">Complete guide to managing your property with GuestConnect</p>
+                <!-- Header with Search -->
+                <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl shadow-2xl p-8 mb-8 text-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+                    <div class="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+                    <div class="relative z-10">
+                        <h1 class="text-5xl font-bold mb-3 flex items-center gap-3">
+                            <i class="fas fa-book-open"></i>
+                            GuestConnect Documentation
+                        </h1>
+                        <p class="text-blue-100 text-xl mb-6">Your Complete Guide to Hotel Management Excellence</p>
+                        
+                        <!-- Search Bar -->
+                        <div class="relative max-w-2xl">
+                            <input type="text" id="docSearch" placeholder="🔍 Search documentation... (e.g., 'beach booking', 'QR code', 'chatbot')" 
+                                   class="w-full px-6 py-4 rounded-xl text-gray-800 text-lg shadow-xl border-2 border-white focus:outline-none focus:ring-4 focus:ring-white/30 transition-all"
+                                   onkeyup="filterDocumentation(this.value)">
+                            <div id="searchResults" class="absolute w-full mt-2 bg-white rounded-xl shadow-2xl max-h-96 overflow-y-auto hidden z-50"></div>
+                        </div>
+                        
+                        <!-- Quick Stats -->
+                        <div class="grid grid-cols-3 gap-4 mt-6">
+                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">50+</div>
+                                <div class="text-sm text-blue-100">Features Covered</div>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">100+</div>
+                                <div class="text-sm text-blue-100">Tutorials & Guides</div>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
+                                <div class="text-3xl font-bold">24/7</div>
+                                <div class="text-sm text-blue-100">Support Available</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Quick Navigation -->
