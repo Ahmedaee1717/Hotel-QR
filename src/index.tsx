@@ -33792,6 +33792,20 @@ app.get('/admin/beach-map-designer', (c) => {
             }
         }
         
+        async function loadBeachPhoto() {
+            try {
+                const response = await fetchWithAuth('/api/admin/beach/settings/' + propertyId);
+                const data = await response.json();
+                
+                if (data.success && data.settings && data.settings.beach_map_image_url) {
+                    canvas.style.backgroundImage = 'url(' + data.settings.beach_map_image_url + ')';
+                    console.log('🏖️ Loaded beach photo from database');
+                }
+            } catch (error) {
+                console.error('Load beach photo error:', error);
+            }
+        }
+        
         function setTool(tool) {
             currentTool = tool;
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -34190,12 +34204,44 @@ app.get('/admin/beach-map-designer', (c) => {
         };
         
         // Beach photo upload
-        document.getElementById('beachPhotoUpload').addEventListener('change', (e) => {
+        document.getElementById('beachPhotoUpload').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
+                // Show loading indicator
+                const canvas = document.getElementById('beachCanvas');
+                canvas.style.opacity = '0.5';
+                
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    canvas.style.backgroundImage = 'url(' + event.target.result + ')';
+                reader.onload = async (event) => {
+                    const base64Data = event.target.result;
+                    
+                    // Apply immediately as preview
+                    canvas.style.backgroundImage = 'url(' + base64Data + ')';
+                    canvas.style.opacity = '1';
+                    
+                    // Save to database
+                    try {
+                        const response = await fetchWithAuth('/api/admin/beach/settings', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                beach_map_image_url: base64Data,
+                                beach_booking_enabled: 1 // Ensure it's enabled
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            alert('✅ Beach photo uploaded and saved successfully!');
+                            console.log('🏖️ Beach photo saved to database');
+                        } else {
+                            alert('❌ Failed to save beach photo: ' + data.error);
+                            console.error('Save error:', data);
+                        }
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        alert('❌ Error uploading beach photo');
+                    }
                 };
                 reader.readAsDataURL(file);
             }
@@ -34204,6 +34250,7 @@ app.get('/admin/beach-map-designer', (c) => {
         // Initialize
         loadExistingSpots();
         loadExistingZones();
+        loadBeachPhoto();
     </script>
 </body>
 </html>
