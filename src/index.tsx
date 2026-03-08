@@ -42753,8 +42753,38 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                 </div>
 
-                <!-- Documentation Content -->
-                <div class="space-y-6">
+                <!-- Documentation Navigation Sidebar -->
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Sidebar -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-xl shadow-lg p-6 sticky top-4">
+                            <h3 class="font-bold text-lg mb-4 text-gray-800">📖 Contents</h3>
+                            <nav class="space-y-1 text-sm">
+                                <a href="#getting-started" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🚀 Getting Started</a>
+                                <a href="#property-management" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">⚙️ Property Management</a>
+                                <a href="#qr-codes" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">📱 QR Code System</a>
+                                <a href="#restaurants" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🍽️ F&B Management</a>
+                                <a href="#beach" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🏖️ Beach Services</a>
+                                <a href="#offerings" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">✨ Offerings</a>
+                                <a href="#info-pages" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">📄 Info Pages</a>
+                                <a href="#digital-pass" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🎫 Digital Guest Pass</a>
+                                <a href="#ai-automation" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🤖 AI & Automation</a>
+                                <a href="#communications" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">💬 Communications</a>
+                                <a href="#feedback" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">⭐ Feedback</a>
+                                <a href="#analytics" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">📊 Analytics</a>
+                                <a href="#biometric" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">👤 Biometric</a>
+                                <a href="#perfect-week" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">📅 Perfect Week</a>
+                                <a href="#advanced" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">⚡ Advanced</a>
+                                <a href="#troubleshooting" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🔧 Troubleshooting</a>
+                                <a href="#faq" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">❓ FAQ</a>
+                                <a href="#best-practices" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">💡 Best Practices</a>
+                                <a href="#technical" class="block px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-700 hover:text-blue-600 transition-colors">🔬 Technical</a>
+                            </nav>
+                        </div>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="lg:col-span-3 space-y-6">
                     
                     <!-- GETTING STARTED -->
                     <div id="getting-started" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
@@ -43008,8 +43038,862 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                     </div>
 
+                    <!-- PROPERTY MANAGEMENT -->
+                    <div id="property-management" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-cogs text-blue-600 mr-3"></i>Property Management
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-blue-900 flex items-center gap-2">
+                                    <i class="fas fa-hotel"></i> Property Settings & Logo Upload
+                                </h3>
+                                <p class="text-gray-700 mb-3">Configure your basic property information and branding:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Property Name:</strong> Your hotel/resort name displayed throughout the app</li>
+                                    <li><strong>Logo Upload:</strong> Upload high-resolution logo (PNG recommended for transparency)</li>
+                                    <li><strong>Contact Details:</strong> Phone, email, address for guest contact</li>
+                                    <li><strong>Social Media Links:</strong> Connect Instagram, Facebook, Twitter accounts</li>
+                                    <li><strong>Currency Settings:</strong> Set default currency (USD, EUR, GBP, etc.)</li>
+                                    <li><strong>Timezone:</strong> Configure property timezone for accurate booking times</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-blue-900 mb-2">📌 Pro Tip:</p>
+                                    <p class="text-sm text-gray-700">Upload a square logo (1000x1000px) for best results across all displays</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900 flex items-center gap-2">
+                                    <i class="fas fa-palette"></i> Homepage Layout Customization
+                                </h3>
+                                <p class="text-gray-700 mb-3">Customize the order and visibility of homepage sections:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Drag & Drop Reordering:</strong> Arrange sections (Restaurants, Events, Spa, etc.) in any order</li>
+                                    <li><strong>Section Visibility:</strong> Show/hide specific sections based on season or availability</li>
+                                    <li><strong>Custom Sections:</strong> Create unlimited custom sections (Amenities, Fitness, Kids Club, etc.)</li>
+                                    <li><strong>Section Icons:</strong> Choose from 1000+ FontAwesome icons for custom sections</li>
+                                    <li><strong>Color Schemes:</strong> Set background colors (solid or gradient) for each section</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-purple-900 mb-2">💡 Best Practice:</p>
+                                    <p class="text-sm text-gray-700">Place most popular offerings at the top (Restaurants, Beach) and less urgent items below (Info Pages)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR CODE SYSTEM -->
+                    <div id="qr-codes" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-qrcode text-purple-600 mr-3"></i>QR Code System
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900 flex items-center gap-2">
+                                    <i class="fas fa-paint-brush"></i> QR Code Designer & Customization
+                                </h3>
+                                <p class="text-gray-700 mb-3">Create beautiful branded QR codes that match your property design:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Logo Embedding:</strong> Upload your logo to display in center of QR code</li>
+                                    <li><strong>Color Customization:</strong> Change QR foreground/background colors to match brand</li>
+                                    <li><strong>Seasonal Decorations:</strong> Add Christmas, Summer, Halloween themes</li>
+                                    <li><strong>Custom Text:</strong> Add \"Scan Me\" or custom call-to-action in any language</li>
+                                    <li><strong>Size Options:</strong> Generate small (business card) to large (poster) sizes</li>
+                                    <li><strong>Export Formats:</strong> Download as PNG, SVG, or PDF for printing</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-purple-900 mb-2">⚠️ Important:</p>
+                                    <p class="text-sm text-gray-700">Always test QR codes before mass printing - scan with multiple devices to ensure readability</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-indigo-50 border-l-4 border-indigo-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-indigo-900 flex items-center gap-2">
+                                    <i class="fas fa-door-open"></i> Room-Specific QR Codes
+                                </h3>
+                                <p class="text-gray-700 mb-3">Generate unique QR codes for each room to track guest behavior:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Batch Generation:</strong> Create QR codes for rooms 101-999 in one click</li>
+                                    <li><strong>Room Tracking:</strong> See which rooms scan most and what they book</li>
+                                    <li><strong>Personalized Experience:</strong> Show room number when guest scans their code</li>
+                                    <li><strong>Download Pack:</strong> Export all room QR codes as ZIP file for printing</li>
+                                    <li><strong>Analytics per Room:</strong> Track scan rates, booking conversion by room</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-pink-50 border-l-4 border-pink-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-pink-900 flex items-center gap-2">
+                                    <i class="fas fa-language"></i> Multi-Language QR Codes
+                                </h3>
+                                <p class="text-gray-700 mb-3">Create QR codes that land on specific language versions:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Language-Specific URLs:</strong> Generate QR codes for English, Arabic, Russian, etc.</li>
+                                    <li><strong>Target Markets:</strong> Place Arabic QR codes in family suites, Russian in luxury wings</li>
+                                    <li><strong>Print Multiple Versions:</strong> Same design, different language parameters</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-teal-50 border-l-4 border-teal-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-teal-900 flex items-center gap-2">
+                                    <i class="fas fa-wifi"></i> NFC Tag Programming
+                                </h3>
+                                <p class="text-gray-700 mb-3">Modern contactless check-in with NFC stickers:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>NFC URL Encoder:</strong> Built-in tool to program NFC tags with your property URL</li>
+                                    <li><strong>Tap to Open:</strong> Guests tap phone to NFC tag - app opens instantly</li>
+                                    <li><strong>Room Key Integration:</strong> Embed NFC tags in room keycards</li>
+                                    <li><strong>Supported Tags:</strong> Works with NTAG213, NTAG215, NTAG216 chips</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-green-900 flex items-center gap-2">
+                                    <i class="fas fa-chart-line"></i> QR Code Analytics & Tracking
+                                </h3>
+                                <p class="text-gray-700 mb-3">Measure QR code performance and guest engagement:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Total Scans:</strong> Track daily, weekly, monthly scan volumes</li>
+                                    <li><strong>Location Heatmap:</strong> See which QR codes (lobby, pool, rooms) get most scans</li>
+                                    <li><strong>Time Analysis:</strong> Peak scanning hours and days</li>
+                                    <li><strong>Conversion Rates:</strong> From scan to booking completion percentage</li>
+                                    <li><strong>Device Types:</strong> iOS vs Android scan breakdown</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FOOD & BEVERAGE MANAGEMENT -->
+                    <div id=\"restaurants\" class=\"bg-white rounded-xl shadow-lg p-8 scroll-mt-4\">
+                        <h2 class=\"text-3xl font-bold mb-6 text-gray-800 border-b pb-3\">
+                            <i class=\"fas fa-utensils text-orange-600 mr-3\"></i>Food & Beverage Management
+                        </h2>
+                        
+                        <div class=\"space-y-6\">
+                            <div class=\"bg-orange-50 border-l-4 border-orange-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-orange-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-store\"></i> Restaurant Creation & Setup
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Add restaurants, bars, cafés with full details:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Basic Info:</strong> Name, cuisine type, dress code, ambiance description</li>
+                                    <li><strong>Operating Hours:</strong> Set different hours for breakfast, lunch, dinner</li>
+                                    <li><strong>Capacity:</strong> Total seats, table configurations</li>
+                                    <li><strong>Pricing Tier:</strong> $, $$, $$$, $$$$ to set guest expectations</li>
+                                    <li><strong>Photos:</strong> Upload multiple high-res images (dishes, ambiance, chef)</li>
+                                    <li><strong>Location:</strong> Precise directions (\"Ground Floor, Near Lobby\")</li>
+                                    <li><strong>Special Features:</strong> Outdoor seating, live music, kids menu, vegan options</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-red-50 border-l-4 border-red-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-red-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-drafting-compass\"></i> Interactive Floor Plan Designer
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Visual table layout designer with drag-and-drop interface:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Upload Floor Plan:</strong> Add your restaurant layout image as background</li>
+                                    <li><strong>Drag Tables:</strong> Place circular, square, rectangular tables anywhere</li>
+                                    <li><strong>Table Properties:</strong> Set capacity (2-12 guests), name (\"Window Table 5\")</li>
+                                    <li><strong>Special Zones:</strong> Mark VIP areas, outdoor terrace, bar seating</li>
+                                    <li><strong>Real-Time Preview:</strong> See exactly what guests see when booking</li>
+                                    <li><strong>Accessibility:</strong> Mark wheelchair-accessible tables</li>
+                                </ul>
+                                <div class=\"mt-4 p-4 bg-white rounded-lg\">
+                                    <p class=\"text-sm font-semibold text-red-900 mb-2\">🎯 Pro Tip:</p>
+                                    <p class=\"text-sm text-gray-700\">Use different table colors for VIP, standard, and bar seating to help guests choose</p>
+                                </div>
+                            </div>
+
+                            <div class=\"bg-yellow-50 border-l-4 border-yellow-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-yellow-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-magic\"></i> AI Texture Extraction from Photos
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Let AI detect table surfaces from restaurant photos:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Photo Upload:</strong> Take overhead photo of your restaurant floor</li>
+                                    <li><strong>AI Detection:</strong> System automatically detects all table surfaces</li>
+                                    <li><strong>Auto-Placement:</strong> Tables appear on floor plan in correct positions</li>
+                                    <li><strong>Manual Adjustment:</strong> Fine-tune AI results by dragging tables</li>
+                                    <li><strong>Time Saver:</strong> Setup 30-table restaurant in 5 minutes vs 30 minutes manually</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-green-50 border-l-4 border-green-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-green-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-calendar-check\"></i> Table Management & Reservations
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Complete reservation system with real-time availability:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Time Slots:</strong> 15-minute intervals or custom slot lengths</li>
+                                    <li><strong>Duration Control:</strong> Set typical meal duration (60min breakfast, 90min dinner)</li>
+                                    <li><strong>Overbooking Protection:</strong> Automatic blocking when restaurant is full</li>
+                                    <li><strong>Guest Details:</strong> Collect name, room number, phone, special requests</li>
+                                    <li><strong>Confirmation Codes:</strong> Unique booking reference for each reservation</li>
+                                    <li><strong>Reminder Notifications:</strong> Auto-send 2-hour before reminders (optional)</li>
+                                    <li><strong>Walk-In Management:</strong> Quick add walk-in guests to floor plan</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-blue-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-clock\"></i> Dining Session Scheduling
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Manage multiple dining periods and special events:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Session Templates:</strong> Create Breakfast (7-10am), Lunch (12-3pm), Dinner (6-10pm)</li>
+                                    <li><strong>Different Menus:</strong> Assign different menu PDFs per session</li>
+                                    <li><strong>Capacity Limits:</strong> Set max bookings per session (not just per time slot)</li>
+                                    <li><strong>Special Events:</strong> Create one-time events (New Year's Gala, Wine Tasting)</li>
+                                    <li><strong>Pricing Variations:</strong> Different prices for brunch vs dinner</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-purple-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-book-open\"></i> Menu Upload & Management
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Beautiful menu displays for guests:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>PDF Menus:</strong> Upload multi-page PDF menus (wine lists, dessert menus)</li>
+                                    <li><strong>Photo Galleries:</strong> Add individual dish photos with descriptions</li>
+                                    <li><strong>Multilingual Menus:</strong> Upload separate menus for each language</li>
+                                    <li><strong>Structured Menu System:</strong> Organize by categories (Appetizers, Mains, Desserts)</li>
+                                    <li><strong>Allergen Info:</strong> Mark dishes with dietary tags (🌱 Vegan, 🌾 Gluten-Free)</li>
+                                    <li><strong>Price Display:</strong> Show prices in multiple currencies automatically</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-teal-50 border-l-4 border-teal-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-teal-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-traffic-light\"></i> Real-Time Occupancy Status
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Show guests how busy the restaurant is RIGHT NOW:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Traffic Light System:</strong> 🟢 Quiet, 🟡 Moderate, 🟠 Busy, 🔴 Very Busy, ⚫ Full</li>
+                                    <li><strong>Manual Override:</strong> Staff can update status from front desk</li>
+                                    <li><strong>Auto-Calculation:</strong> System estimates based on current bookings</li>
+                                    <li><strong>Homepage Badge:</strong> Status shows on restaurant card before booking</li>
+                                    <li><strong>Guest Expectations:</strong> Reduces frustration when restaurant is crowded</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-pink-50 border-l-4 border-pink-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-pink-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-user-clock\"></i> Walk-In Guest Management
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Handle guests who arrive without reservation:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Quick Add Form:</strong> Input guest name, party size, table assignment</li>
+                                    <li><strong>Floor Plan Integration:</strong> Assign walk-in to available table on visual map</li>
+                                    <li><strong>Waitlist System:</strong> Queue walk-ins when all tables are occupied</li>
+                                    <li><strong>SMS Notifications:</strong> Text guest when their table is ready</li>
+                                    <li><strong>Print Confirmation:</strong> Generate walk-in booking code for guest records</li>
+                                </ul>
+                            </div>
+
+                            <div class=\"bg-indigo-50 border-l-4 border-indigo-600 p-6 rounded-r-lg\">
+                                <h3 class=\"text-xl font-bold mb-3 text-indigo-900 flex items-center gap-2\">
+                                    <i class=\"fas fa-clipboard-list\"></i> Waiter Order System
+                                </h3>
+                                <p class=\"text-gray-700 mb-3\">Streamline kitchen orders with digital order management:</p>
+                                <ul class=\"space-y-2 text-gray-700\">
+                                    <li><strong>Table-Side Ordering:</strong> Waiters select table and enter orders on tablet</li>
+                                    <li><strong>Menu Item Selection:</strong> Browse structured menu with search</li>
+                                    <li><strong>Special Requests:</strong> Add notes (\"No onions\", \"Extra spicy\", \"Allergy: nuts\")</li>
+                                    <li><strong>Kitchen Printer:</strong> Orders sent directly to kitchen receipt printer</li>
+                                    <li><strong>Order Status:</strong> Track Pending → Preparing → Ready → Served</li>
+                                    <li><strong>Bill Splitting:</strong> Divide check across multiple guests</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BEACH & OUTDOOR SERVICES -->
+                    <div id="beach" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-umbrella-beach text-blue-600 mr-3"></i>Beach & Outdoor Services
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-blue-900 flex items-center gap-2">
+                                    <i class="fas fa-map-marked-alt"></i> Beach Booking System Setup
+                                </h3>
+                                <p class="text-gray-700 mb-3">Complete beach rental management system:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Beach Map Upload:</strong> Add overhead photo or illustration of your beach area</li>
+                                    <li><strong>Zone Creation:</strong> Define areas (Front Row, VIP Section, Family Area)</li>
+                                    <li><strong>Item Placement:</strong> Add sunbeds (🏖️), umbrellas (☂️), cabanas (🏠)</li>
+                                    <li><strong>Numbering System:</strong> Assign spot numbers (1-100+) for easy identification</li>
+                                    <li><strong>Pricing Setup:</strong> Set prices per item, by zone, or package deals</li>
+                                    <li><strong>Booking Rules:</strong> Minimum duration, advance booking required, cancellation policy</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-cyan-50 border-l-4 border-cyan-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-cyan-900 flex items-center gap-2">
+                                    <i class="fas fa-mouse-pointer"></i> Interactive Beach Map Creation
+                                </h3>
+                                <p class="text-gray-700 mb-3">Let guests select exact spot they want:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Click-to-Select:</strong> Guests click on sunbed icons to choose their spot</li>
+                                    <li><strong>Visual Feedback:</strong> Available = 🟢 Green, Booked = 🔴 Red, Selected = 🟡 Yellow</li>
+                                    <li><strong>Zoom & Pan:</strong> Large beaches support pinch-to-zoom navigation</li>
+                                    <li><strong>Mobile Optimized:</strong> Works perfectly on phones and tablets</li>
+                                    <li><strong>Accessibility Labels:</strong> Show proximity to facilities (showers, bar, etc.)</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-teal-50 border-l-4 border-teal-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-teal-900 flex items-center gap-2">
+                                    <i class="fas fa-layer-group"></i> Zone Overlays & Organization
+                                </h3>
+                                <p class="text-gray-700 mb-3">Organize beach areas for better management:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>VIP Zones:</strong> Premium front-row spots with higher pricing</li>
+                                    <li><strong>Family Areas:</strong> Shallow water zones safe for kids</li>
+                                    <li><strong>Quiet Zones:</strong> Adult-only peaceful areas</li>
+                                    <li><strong>Shade vs Sun:</strong> Differentiate shaded spots from full sun exposure</li>
+                                    <li><strong>Accessibility Zones:</strong> Wheelchair-accessible beach paths and spots</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-green-900 flex items-center gap-2">
+                                    <i class="fas fa-sync-alt"></i> Real-Time Availability Updates
+                                </h3>
+                                <p class="text-gray-700 mb-3">Live synchronization across all devices:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Instant Updates:</strong> When guest books spot, map updates in real-time for all users</li>
+                                    <li><strong>No Double-Booking:</strong> First guest to click spot gets it, others see it turn red</li>
+                                    <li><strong>Check-In System:</strong> Mark spots as occupied when guest arrives</li>
+                                    <li><strong>Auto-Release:</strong> Free up spots after booking end time passes</li>
+                                    <li><strong>Staff Override:</strong> Beach staff can manually adjust any booking status</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-yellow-50 border-l-4 border-yellow-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-yellow-900 flex items-center gap-2">
+                                    <i class="fas fa-ticket-alt"></i> Booking Code Generation
+                                </h3>
+                                <p class="text-gray-700 mb-3">Unique confirmation codes for each beach booking:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Format:</strong> BCH-TIMESTAMP-RANDOMCODE (e.g., BCH-1234567890-A3B4C5)</li>
+                                    <li><strong>QR Code:</strong> Generate scannable QR code for beach staff to validate</li>
+                                    <li><strong>Printable Voucher:</strong> Guest can print confirmation with map showing their spot</li>
+                                    <li><strong>Email Confirmation:</strong> Auto-send booking details with code to guest email</li>
+                                    <li><strong>Check-In Validation:</strong> Staff scan code to confirm guest identity</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-orange-50 border-l-4 border-orange-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-orange-900 flex items-center gap-2">
+                                    <i class="fas fa-traffic-light"></i> Traffic Light Status System
+                                </h3>
+                                <p class="text-gray-700 mb-3">Visual capacity indicators for guests:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>🟢 QUIET:</strong> 0-25% occupied - \"Plenty of space available!\"</li>
+                                    <li><strong>🟡 MODERATE:</strong> 25-50% occupied - \"Good availability\"</li>
+                                    <li><strong>🟠 BUSY:</strong> 50-75% occupied - \"Limited spots remaining\"</li>
+                                    <li><strong>🔴 VERY BUSY:</strong> 75-95% occupied - \"Almost full\"</li>
+                                    <li><strong>⚫ FULL:</strong> 95-100% occupied - \"No availability\"</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OFFERINGS & SERVICES -->
+                    <div id="offerings" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-star text-purple-600 mr-3"></i>Offerings & Services
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900 flex items-center gap-2">
+                                    <i class="fas fa-list-ul"></i> Hotel Offerings Management
+                                </h3>
+                                <p class="text-gray-700 mb-3">Create any service or amenity your property offers:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Offering Types:</strong> Events, Spa/Wellness, Facilities, Amenities, Custom Categories</li>
+                                    <li><strong>Rich Descriptions:</strong> Title, short description (2-3 sentences), full details (paragraphs)</li>
+                                    <li><strong>Media Gallery:</strong> Multiple images + optional video (YouTube/direct MP4)</li>
+                                    <li><strong>Pricing Display:</strong> Show prices in property's default currency</li>
+                                    <li><strong>Duration:</strong> Indicate activity length (30 min massage, 2-hour tour)</li>
+                                    <li><strong>Location:</strong> Where guests can find it (\"Spa Level, Building B\")</li>
+                                    <li><strong>Booking Required:</strong> Toggle whether offering requires advance booking</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-pink-50 border-l-4 border-pink-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-pink-900 flex items-center gap-2">
+                                    <i class="fas fa-calendar-star"></i> Events & Entertainment
+                                </h3>
+                                <p class="text-gray-700 mb-3">Showcase live entertainment and special events:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Event Types:</strong> Live Music, DJ Night, Cultural Shows, Theme Parties</li>
+                                    <li><strong>Date & Time:</strong> Set specific date or recurring schedule (Every Friday)</li>
+                                    <li><strong>Venue:</strong> Link to specific location (Main Pool, Ballroom, Beach)</li>
+                                    <li><strong>Capacity Limits:</strong> Max attendees, ticket/reservation system</li>
+                                    <li><strong>Age Restrictions:</strong> Mark adult-only or family-friendly</li>
+                                    <li><strong>Dress Code:</strong> Casual, Smart Casual, Formal</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-teal-50 border-l-4 border-teal-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-teal-900 flex items-center gap-2">
+                                    <i class="fas fa-spa"></i> Spa & Wellness Services
+                                </h3>
+                                <p class="text-gray-700 mb-3">Complete spa menu with booking integration:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Treatment Types:</strong> Massage, Facial, Body Scrub, Hydrotherapy</li>
+                                    <li><strong>Duration Options:</strong> 30min, 60min, 90min, 120min sessions</li>
+                                    <li><strong>Therapist Selection:</strong> Guest can request specific therapist (optional)</li>
+                                    <li><strong>Add-Ons:</strong> Aromatherapy upgrade, hot stone addition</li>
+                                    <li><strong>Packages:</strong> Bundle multiple treatments at discounted rate</li>
+                                    <li><strong>Preparation Instructions:</strong> \"Arrive 15min early, avoid heavy meals\"</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-blue-900 flex items-center gap-2">
+                                    <i class="fas fa-hiking"></i> Activities & Excursions
+                                </h3>
+                                <p class="text-gray-700 mb-3">Outdoor adventures and recreational activities:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Water Sports:</strong> Diving, Snorkeling, Jet Ski, Parasailing</li>
+                                    <li><strong>Land Activities:</strong> Tennis, Golf, Horseback Riding, Hiking</li>
+                                    <li><strong>Tours:</strong> City Tours, Desert Safari, Historical Sites</li>
+                                    <li><strong>Difficulty Level:</strong> Easy, Moderate, Challenging, Expert</li>
+                                    <li><strong>Equipment Included:</strong> List what's provided vs what guest brings</li>
+                                    <li><strong>Weather Dependent:</strong> Mark activities that may cancel due to weather</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-orange-50 border-l-4 border-orange-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-orange-900 flex items-center gap-2">
+                                    <i class="fas fa-concierge-bell"></i> Room Service
+                                </h3>
+                                <p class="text-gray-700 mb-3">In-room dining with custom branding:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Custom Section:</strong> Unique icon, color scheme, description for room service</li>
+                                    <li><strong>Menu Upload:</strong> Breakfast, all-day dining, late-night snacks menus</li>
+                                    <li><strong>Operating Hours:</strong> 24/7 or specific hours (6am-11pm)</li>
+                                    <li><strong>Delivery Time:</strong> Expected wait time (30-45 minutes)</li>
+                                    <li><strong>Minimum Order:</strong> Optional minimum order amount</li>
+                                    <li><strong>Special Instructions:</strong> Room number, delivery preferences</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-indigo-50 border-l-4 border-indigo-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-indigo-900 flex items-center gap-2">
+                                    <i class="fas fa-puzzle-piece"></i> Custom Section Offerings (Amenities)
+                                </h3>
+                                <p class="text-gray-700 mb-3">Unlimited custom categories for any service type:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Fitness & Gym:</strong> Gym access, personal training, yoga classes</li>
+                                    <li><strong>Kids Club:</strong> Activities for children with schedule and age groups</li>
+                                    <li><strong>Business Center:</strong> Meeting rooms, printing, secretarial services</li>
+                                    <li><strong>Concierge Services:</strong> Car rental, airport transfer, tour booking</li>
+                                    <li><strong>Wellness Programs:</strong> Meditation, detox programs, nutrition consulting</li>
+                                    <li><strong>Pet Services:</strong> Pet sitting, grooming, veterinary contacts</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-indigo-900 mb-2">💡 Important:</p>
+                                    <p class="text-sm text-gray-700">When creating custom section offerings, make sure to select the correct custom section type (e.g., \"Amenities\") so they appear in the right place for guests!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INFORMATION PAGES -->
+                    <div id="info-pages" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-file-alt text-green-600 mr-3"></i>Information Pages
+                        </h2>
+                        
+                        <div class="space-y-6">
+                            <div class="bg-green-50 border-l-4 border-green-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-green-900 flex items-center gap-2">
+                                    <i class="fas fa-plus-circle"></i> Creating Info Pages
+                                </h3>
+                                <p class="text-gray-700 mb-3">Build informational content pages for guests:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Page Types:</strong> WiFi Info, Hotel Policies, Local Attractions, Emergency Contacts</li>
+                                    <li><strong>Icon Selection:</strong> Choose from 1000+ FontAwesome icons for visual identity</li>
+                                    <li><strong>Rich Text Editor:</strong> Format text with bold, italic, headings, lists</li>
+                                    <li><strong>Image Embedding:</strong> Add photos, maps, diagrams inline</li>
+                                    <li><strong>External Links:</strong> Link to Google Maps, websites, booking platforms</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-cyan-50 border-l-4 border-cyan-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-cyan-900 flex items-center gap-2">
+                                    <i class="fas fa-table"></i> CSV Table Import
+                                </h3>
+                                <p class="text-gray-700 mb-3">Import structured data from spreadsheets:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Use Cases:</strong> TV Channel Lists, Transportation Schedules, Price Lists</li>
+                                    <li><strong>CSV Format:</strong> Comma-separated values, first row = headers</li>
+                                    <li><strong>Auto-Formatting:</strong> System converts CSV to beautiful responsive table</li>
+                                    <li><strong>Search & Sort:</strong> Guests can search table content, sort columns</li>
+                                    <li><strong>Mobile Optimized:</strong> Tables scroll horizontally on small screens</li>
+                                    <li><strong>Update Anytime:</strong> Re-upload CSV to update table content instantly</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-cyan-900 mb-2">📋 Example CSV:</p>
+                                    <code class="text-xs block bg-gray-100 p-2 rounded mt-2">
+                                        Channel Number,Channel Name,Genre<br>
+                                        1,BBC News,News<br>
+                                        2,CNN International,News<br>
+                                        3,Discovery Channel,Documentary
+                                    </code>
+                                </div>
+                            </div>
+
+                            <div class="bg-purple-50 border-l-4 border-purple-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900 flex items-center gap-2">
+                                    <i class="fas fa-code"></i> HTML Block Editor
+                                </h3>
+                                <p class="text-gray-700 mb-3">Advanced users can add custom HTML content:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Full HTML Support:</strong> Add any valid HTML5 markup</li>
+                                    <li><strong>CSS Styling:</strong> Include inline styles or style tags</li>
+                                    <li><strong>JavaScript:</strong> Add interactive elements (calculators, forms)</li>
+                                    <li><strong>Embed Widgets:</strong> Weather widgets, Google Maps iframes, booking forms</li>
+                                    <li><strong>Edit Modal:</strong> Visual HTML editor with syntax highlighting (coming soon)</li>
+                                </ul>
+                                <div class="mt-4 p-4 bg-white rounded-lg">
+                                    <p class="text-sm font-semibold text-purple-900 mb-2">⚠️ Note:</p>
+                                    <p class="text-sm text-gray-700">HTML blocks are sanitized for security. Script tags and potentially harmful code will be removed.</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-yellow-50 border-l-4 border-yellow-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-yellow-900 flex items-center gap-2">
+                                    <i class="fas fa-language"></i> Multilingual Content
+                                </h3>
+                                <p class="text-gray-700 mb-3">Provide info pages in multiple languages:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Language Versions:</strong> Create separate versions for each supported language</li>
+                                    <li><strong>Auto-Translation Option:</strong> Use AI to translate English version to other languages</li>
+                                    <li><strong>Manual Override:</strong> Edit auto-translated content for cultural accuracy</li>
+                                    <li><strong>Language Switcher:</strong> Guests can switch languages and page updates accordingly</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-lg">
+                                <h3 class="text-xl font-bold mb-3 text-red-900 flex items-center gap-2">
+                                    <i class="fas fa-sort"></i> Page Ordering & Visibility
+                                </h3>
+                                <p class="text-gray-700 mb-3">Control how and when info pages appear:</p>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li><strong>Display Order:</strong> Set custom order for info pages (WiFi first, policies last)</li>
+                                    <li><strong>Show/Hide Toggle:</strong> Temporarily hide pages without deleting</li>
+                                    <li><strong>Featured Pages:</strong> Mark important pages to show with badge or at top</li>
+                                    <li><strong>Search Keywords:</strong> Add keywords so guests can find pages via search</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DIGITAL GUEST PASS SYSTEM -->
+                    <div id="digital-pass" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-id-card text-indigo-600 mr-3"></i>Digital Guest Pass System
+                        </h2>
+                        <div class="bg-indigo-50 p-6 rounded-lg mb-4">
+                            <p class="text-gray-700 mb-3"><strong>All-Inclusive Pass Creation:</strong> Generate digital passes for guests with QR codes, tier system (Silver/Gold/Platinum), benefit management, venue access control, à la carte voucher system, and self-service portal.</p>
+                            <p class="text-gray-700 mb-2"><strong>Tier Benefits:</strong> Assign offerings included in each tier (e.g., Gold gets 3 spa visits, Platinum unlimited).</p>
+                            <p class="text-gray-700"><strong>Voucher System:</strong> Generate single-use à la carte vouchers for specific services.</p>
+                        </div>
+                    </div>
+
+                    <!-- AI & AUTOMATION -->
+                    <div id="ai-automation" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-robot text-purple-600 mr-3"></i>AI & Automation
+                        </h2>
+                        <div class="space-y-4">
+                            <div class="bg-purple-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-purple-900">AI Chatbot Setup & Training</h3>
+                                <p class="text-gray-700 mb-2">Upload knowledge base documents (PDFs, text files), train RAG model on your property information, enable 24/7 guest assistance with natural language understanding.</p>
+                            </div>
+                            <div class="bg-pink-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-pink-900">AI Proofreading</h3>
+                                <p class="text-gray-700">Get 10 free AI proofreading uses per day. Click the wand icon (✨) next to text fields to improve grammar, clarity, and tone instantly.</p>
+                            </div>
+                            <div class="bg-indigo-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-indigo-900">Auto-Translation</h3>
+                                <p class="text-gray-700">Translate offerings to 30+ languages automatically: Arabic, Chinese, Spanish, French, German, Italian, Russian, Polish, Czech, Ukrainian, Japanese, Korean, Portuguese, Hindi, Turkish, Greek, Swedish, Norwegian, Danish, Romanian, Hungarian, Finnish, Croatian, Slovak, Bulgarian, Serbian, Slovenian, Thai, Indonesian, Vietnamese, Filipino, Malay.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GUEST COMMUNICATIONS -->
+                    <div id="communications" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-comments text-green-600 mr-3"></i>Guest Communications
+                        </h2>
+                        <div class="bg-green-50 p-6 rounded-lg">
+                            <p class="text-gray-700 mb-3"><strong>Front Desk Communication Hub:</strong> Centralized inbox for all guest interactions - service requests, callbacks, chat messages in one place.</p>
+                            <p class="text-gray-700 mb-3"><strong>Callback System:</strong> Guests request callback, staff receives notification, marks as resolved when handled.</p>
+                            <p class="text-gray-700 mb-3"><strong>Urgent Requests:</strong> Flag high-priority requests (medical emergency, room issue) for immediate attention.</p>
+                            <p class="text-gray-700"><strong>Response Time Target:</strong> Aim to respond within 10 minutes for excellent service ratings. System tracks average response time.</p>
+                        </div>
+                    </div>
+
+                    <!-- FEEDBACK & REVIEWS -->
+                    <div id="feedback" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-star text-yellow-600 mr-3"></i>Feedback & Reviews
+                        </h2>
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-yellow-900">Feedback Forms</h3>
+                                <p class="text-gray-700">Create custom feedback forms with star ratings (⭐⭐⭐⭐⭐), mood checks (😡😕😐🙂😍), text reviews, and photo uploads.</p>
+                            </div>
+                            <div class="bg-orange-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-orange-900">Response Management</h3>
+                                <p class="text-gray-700">Reply to guest reviews directly from admin dashboard. Public responses show on homepage (optional).</p>
+                            </div>
+                            <div class="bg-red-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-red-900">Sentiment Analysis</h3>
+                                <p class="text-gray-700">AI analyzes feedback text to categorize positive (😊), neutral (😐), and negative (😞) sentiments automatically. Track sentiment trends over time.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ANALYTICS & INSIGHTS -->
+                    <div id="analytics" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-chart-bar text-blue-600 mr-3"></i>Analytics & Insights
+                        </h2>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-blue-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-blue-900">Dashboard Overview</h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>📊 Total bookings today/week/month</li>
+                                    <li>💰 Revenue tracking by service</li>
+                                    <li>🔥 Most popular offerings</li>
+                                    <li>⏰ Peak booking times</li>
+                                    <li>⭐ Average feedback scores</li>
+                                </ul>
+                            </div>
+                            <div class="bg-indigo-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-indigo-900">Advanced Reports</h3>
+                                <ul class="space-y-2 text-gray-700">
+                                    <li>📈 Booking trends & forecasting</li>
+                                    <li>🎯 Conversion rates (scan → booking)</li>
+                                    <li>🌍 Guest demographics & nationalities</li>
+                                    <li>📱 Device types (iOS/Android breakdown)</li>
+                                    <li>📥 Export to CSV/Excel</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BIOMETRIC & FACIAL RECOGNITION -->
+                    <div id="biometric" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-user-shield text-red-600 mr-3"></i>Biometric & Facial Recognition
+                        </h2>
+                        <div class="bg-red-50 border-l-4 border-red-600 p-6 rounded-r-lg">
+                            <p class="text-red-900 font-bold mb-3">⚠️ PRIVACY FIRST - GDPR/BIPA Compliant</p>
+                            <p class="text-gray-700 mb-3">Facial recognition is <strong>completely optional</strong> and requires explicit guest consent. All biometric data is encrypted and deleted upon checkout or request.</p>
+                            <ul class="space-y-2 text-gray-700 mt-4">
+                                <li><strong>Guest Photo Capture:</strong> Optional during check-in for faster venue check-in</li>
+                                <li><strong>Recognition at Venues:</strong> Quick check-in at restaurants, spa, beach (if consent given)</li>
+                                <li><strong>Data Retention:</strong> Automatic deletion after checkout</li>
+                                <li><strong>Guest Control:</strong> Guests can opt-out anytime via profile settings</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- PERFECT WEEK PLANNER -->
+                    <div id="perfect-week" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-calendar-week text-pink-600 mr-3"></i>Perfect Week Planner
+                        </h2>
+                        <div class="bg-pink-50 p-6 rounded-lg">
+                            <p class="text-gray-700 mb-3"><strong>Stay Plan Creation:</strong> Guests create a visual timeline of their entire stay with all planned activities in one beautiful calendar view.</p>
+                            <p class="text-gray-700 mb-3"><strong>Smart Suggestions:</strong> AI suggests activities based on:</p>
+                            <ul class="space-y-1 text-gray-700 ml-6">
+                                <li>• Tier included benefits (Gold tier gets free spa suggestions)</li>
+                                <li>• Weather forecast (sunny = beach activities)</li>
+                                <li>• Popularity trends (what other guests loved)</li>
+                                <li>• Personal preferences (past bookings history)</li>
+                            </ul>
+                            <p class="text-gray-700 mt-3"><strong>One-Click Booking:</strong> Book directly from planner - seamless integration with all offerings.</p>
+                        </div>
+                    </div>
+
+                    <!-- ADVANCED FEATURES -->
+                    <div id="advanced" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-cog text-teal-600 mr-3"></i>Advanced Features
+                        </h2>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-teal-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-teal-900">User Management</h3>
+                                <ul class="space-y-2 text-gray-700 text-sm">
+                                    <li><strong>Roles:</strong> Admin, Manager, Front Desk, Staff, Waiter</li>
+                                    <li><strong>Permissions:</strong> Granular control over what each role can access</li>
+                                    <li><strong>Staff Tracking:</strong> Track who created/modified records</li>
+                                    <li><strong>Activity Logs:</strong> Audit trail of all admin actions</li>
+                                </ul>
+                            </div>
+                            <div class="bg-cyan-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-cyan-900">Customization</h3>
+                                <ul class="space-y-2 text-gray-700 text-sm">
+                                    <li><strong>Interactive Maps:</strong> Clickable property maps for navigation</li>
+                                    <li><strong>Seasonal Effects:</strong> Snow, leaves, fireworks animations</li>
+                                    <li><strong>Custom Widgets:</strong> Weather, countdown timers, announcements</li>
+                                    <li><strong>White-Label:</strong> Fully branded with your logo and colors</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TROUBLESHOOTING -->
+                    <div id="troubleshooting" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-tools text-orange-600 mr-3"></i>Troubleshooting
+                        </h2>
+                        <div class="space-y-4">
+                            <div class="bg-orange-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-orange-900">🔧 Common Issues & Solutions</h3>
+                                <div class="space-y-3 text-sm">
+                                    <div>
+                                        <p class="font-bold text-gray-800">QR Code Not Scanning</p>
+                                        <p class="text-gray-700">• Ensure sufficient contrast between foreground/background colors<br>• Try without logo first<br>• Test with multiple devices before printing</p>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-gray-800">Images Not Displaying</p>
+                                        <p class="text-gray-700">• Check image URLs are publicly accessible (not password-protected)<br>• Use HTTPS URLs<br>• Verify image format is supported (JPG, PNG, WebP, GIF)</p>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-gray-800">Booking Not Confirming</p>
+                                        <p class="text-gray-700">• Verify guest provided all required info (name, email, room number)<br>• Check if time slot is still available<br>• Ensure no overlapping bookings</p>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-gray-800">Translation Missing</p>
+                                        <p class="text-gray-700">• Click \"Auto-Translate\" button in Offerings Management<br>• Wait 30-60 seconds for AI to process<br>• Refresh page to see new translations</p>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-gray-800">Can't Delete Offering</p>
+                                        <p class="text-gray-700">• Check if offering has active bookings<br>• Must cancel/complete bookings first<br>• Or mark offering as inactive instead of deleting</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-yellow-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-yellow-900">🌐 Browser Compatibility</h3>
+                                <p class="text-gray-700">✅ Chrome 90+, Safari 14+, Firefox 88+, Edge 90+<br>✅ iOS Safari 14+, Chrome Mobile, Samsung Internet<br>⚠️ Internet Explorer 11 not supported</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FAQ -->
+                    <div id="faq" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-question-circle text-indigo-600 mr-3"></i>Frequently Asked Questions
+                        </h2>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">How many offerings can I create?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Unlimited! Create as many restaurants, activities, info pages as you need.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">Can guests book without an account?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Yes! Guests only need name and room number (or email). No registration required.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">How do I update menu prices?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Edit the restaurant offering, re-upload menu PDF or edit structured menu items.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">Can I customize homepage colors?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Yes! Settings → Homepage Customization to change colors, section order, visibility.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">Is guest data encrypted?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Yes! All data transmitted over HTTPS, stored in encrypted databases. GDPR/BIPA compliant.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">How do I handle cancellations?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Guests cancel from \"My Bookings\". Staff cancel from admin dashboard. Define policy in offering settings.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">Can I export booking data?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Yes! Analytics tab has CSV/Excel export. Download daily, weekly, monthly reports.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">What if two guests book same spot?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Real-time locking. First to confirm gets it, second sees \"Already booked\" and can choose another.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">Can I integrate with my PMS?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Yes! API documentation in Technical Reference. Contact support for integration help.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">How do I add staff users?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Settings → User Management → Add New User. Assign role and permissions.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">What about offline access?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">System requires internet. Guests need WiFi or mobile data to access and book.</p>
+                            </details>
+                            <details class="bg-gray-50 p-4 rounded-lg">
+                                <summary class="font-bold text-gray-800 cursor-pointer">How often is data backed up?</summary>
+                                <p class="text-gray-700 mt-2 text-sm">Automatic hourly backups. Data replicated across multiple data centers for redundancy.</p>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- BEST PRACTICES (Enhanced) -->
+                    <div id="best-practices" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
+                        <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
+                            <i class="fas fa-thumbs-up text-green-600 mr-3"></i>Best Practices
+                        </h2>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-green-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-green-900">✅ DO</h3>
+                                <ul class="text-sm text-gray-700 space-y-2">
+                                    <li>✓ Use high-resolution images (1920x1080+)</li>
+                                    <li>✓ Update availability daily</li>
+                                    <li>✓ Respond to feedback within 24 hours</li>
+                                    <li>✓ Test QR codes before mass printing</li>
+                                    <li>✓ Train all staff on system usage</li>
+                                    <li>✓ Use AI proofreading for descriptions</li>
+                                    <li>✓ Monitor analytics weekly</li>
+                                    <li>✓ Keep menus current with accurate prices</li>
+                                    <li>✓ Add seasonal offerings quarterly</li>
+                                    <li>✓ Backup QR codes digitally before printing</li>
+                                </ul>
+                            </div>
+                            <div class="bg-red-50 p-6 rounded-lg">
+                                <h3 class="text-xl font-bold mb-3 text-red-900">❌ DON'T</h3>
+                                <ul class="text-sm text-gray-700 space-y-2">
+                                    <li>✗ Use blurry or poorly lit photos</li>
+                                    <li>✗ Forget to update seasonal offerings</li>
+                                    <li>✗ Ignore guest feedback/complaints</li>
+                                    <li>✗ Overcomplicate descriptions with jargon</li>
+                                    <li>✗ Set unrealistic expectations</li>
+                                    <li>✗ Leave outdated info pages published</li>
+                                    <li>✗ Allow overbooking without backup plan</li>
+                                    <li>✗ Neglect mobile device testing</li>
+                                    <li>✗ Use same password for all staff</li>
+                                    <li>✗ Skip staff training sessions</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- TECHNICAL REFERENCE -->
-                    <div class="bg-white rounded-xl shadow-lg p-8">
+                    <div id="technical" class="bg-white rounded-xl shadow-lg p-8 scroll-mt-4">
                         <h2 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3">
                             <i class="fas fa-code text-gray-600 mr-3"></i>Technical Reference
                         </h2>
@@ -43047,7 +43931,11 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                     </div>
 
+                    </div>
+                    <!-- End Main Content Column -->
                 </div>
+                <!-- End Documentation Grid -->
+
             </div>
         </div>
 
@@ -58537,6 +59425,56 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         const section = document.getElementById(sectionId);
         if (section) {
           section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+      
+      // Filter documentation content by search term
+      window.filterDocumentation = function(searchTerm) {
+        searchTerm = searchTerm.toLowerCase().trim();
+        const sections = document.querySelectorAll('#documentationTab .bg-white.rounded-xl.shadow-lg');
+        const searchResults = document.getElementById('searchResults');
+        
+        if (searchTerm.length < 2) {
+          searchResults.classList.add('hidden');
+          sections.forEach(section => section.style.display = 'block');
+          return;
+        }
+        
+        // Build search results
+        const results = [];
+        sections.forEach(section => {
+          const sectionId = section.id || '';
+          const sectionTitle = section.querySelector('h2')?.textContent || '';
+          const sectionText = section.textContent.toLowerCase();
+          
+          if (sectionText.includes(searchTerm)) {
+            const matches = (sectionText.match(new RegExp(searchTerm, 'gi')) || []).length;
+            results.push({
+              id: sectionId,
+              title: sectionTitle,
+              matches: matches,
+              preview: section.querySelector('p')?.textContent.substring(0, 100) || ''
+            });
+          }
+        });
+        
+        // Display search results
+        if (results.length > 0) {
+          searchResults.innerHTML = results
+            .sort((a, b) => b.matches - a.matches)
+            .slice(0, 10)
+            .map(r => {
+              return '<a href="#' + r.id + '" onclick="filterDocumentation(\\'\\'); scrollToDocSection(\\'' + r.id + '\\'); return false;" class="block p-4 hover:bg-blue-50 border-b border-gray-200 cursor-pointer">' +
+                '<div class="font-semibold text-gray-800">' + r.title + '</div>' +
+                '<div class="text-sm text-gray-600">' + r.preview + '...</div>' +
+                '<div class="text-xs text-blue-600 mt-1">' + r.matches + ' match' + (r.matches > 1 ? 'es' : '') + '</div>' +
+                '</a>';
+            })
+            .join('');
+          searchResults.classList.remove('hidden');
+        } else {
+          searchResults.innerHTML = '<div class="p-4 text-gray-600 text-center">No results found</div>';
+          searchResults.classList.remove('hidden');
         }
       };
       
