@@ -13618,11 +13618,17 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
   try {
     // SECURITY: Get property_id from authenticated header, NOT from request body
     const property_id = getAuthenticatedPropertyId(c);
+    console.log('🔍 DEBUG: Received property_id from header:', property_id);
+    
     if (!property_id) {
+      console.error('❌ ERROR: property_id not found in header');
       return c.json({ error: 'Unauthorized: property_id not found' }, 401);
     }
     
     const body = await c.req.json()
+    console.log('📦 DEBUG: Request body keys:', Object.keys(body));
+    console.log('🏖️ DEBUG: beach_map_image_url length:', body.beach_map_image_url?.length || 0);
+    
     const {
       beach_booking_enabled,
       beach_map_image_url,
@@ -34221,6 +34227,10 @@ app.get('/admin/beach-map-designer', (c) => {
                     
                     // Save to database
                     try {
+                        console.log('🔧 DEBUG: Uploading beach photo...');
+                        console.log('📍 Property ID:', propertyId);
+                        console.log('📏 Base64 data length:', base64Data.length);
+                        
                         const response = await fetchWithAuth('/api/admin/beach/settings', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -34230,17 +34240,20 @@ app.get('/admin/beach-map-designer', (c) => {
                             })
                         });
                         
+                        console.log('📨 Response status:', response.status);
                         const data = await response.json();
+                        console.log('📦 Response data:', data);
+                        
                         if (data.success) {
                             alert('✅ Beach photo uploaded and saved successfully!');
                             console.log('🏖️ Beach photo saved to database');
                         } else {
-                            alert('❌ Failed to save beach photo: ' + data.error);
-                            console.error('Save error:', data);
+                            alert('❌ Failed to save beach photo: ' + (data.error || 'Unknown error'));
+                            console.error('❌ Save error:', data);
                         }
                     } catch (error) {
-                        console.error('Upload error:', error);
-                        alert('❌ Error uploading beach photo');
+                        console.error('❌ Upload error:', error);
+                        alert('❌ Error uploading beach photo: ' + error.message);
                     }
                 };
                 reader.readAsDataURL(file);
