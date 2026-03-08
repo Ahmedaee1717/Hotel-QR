@@ -36182,6 +36182,13 @@ app.get('/beach-booking/:property_id', async (c) => {
                         header.style.backgroundImage = 'linear-gradient(to right, ' + bgFrom + ', ' + bgTo + ')';
                     }
                     
+                    // Apply beach map background image if available
+                    const beachCanvas = document.getElementById('beachCanvas');
+                    if (beachCanvas && settings.beach_map_image_url) {
+                        beachCanvas.style.backgroundImage = 'url(' + settings.beach_map_image_url + ')';
+                        console.log('🏖️ Applied beach map image:', settings.beach_map_image_url);
+                    }
+                    
                     // Load and render time slots
                     renderTimeSlots(settings.time_slots);
                 }
@@ -47185,6 +47192,13 @@ app.get('/admin/dashboard', (c) => {
                         <label class="block font-medium mb-2">Max Duration (hours)</label>
                         <input type="number" id="maxDurationHours" value="12" min="1" max="24" class="w-full px-4 py-2 border rounded-lg">
                     </div>
+                    <div class="col-span-2">
+                        <label class="block font-medium mb-2">
+                            <i class="fas fa-image mr-2 text-blue-600"></i>Beach Map Image URL
+                        </label>
+                        <input type="url" id="beachMapImageUrl" placeholder="https://example.com/beach-map.jpg" class="w-full px-4 py-2 border rounded-lg">
+                        <p class="text-sm text-gray-600 mt-1">📍 Upload your beach layout image to a hosting service (Imgur, Cloudinary, etc.) and paste the URL here. This image will be shown to guests when they select beach spots.</p>
+                    </div>
                 </div>
                 <button onclick="saveBeachSettings()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                     <i class="fas fa-save mr-2"></i>Save Settings
@@ -54417,6 +54431,7 @@ app.get('/admin/dashboard', (c) => {
             safeSet('closingTime', s.closing_time || '18:00');
             safeSet('advanceBookingDays', s.advance_booking_days || 7);
             safeSet('maxDurationHours', s.max_booking_duration_hours || 12);
+            safeSet('beachMapImageUrl', s.beach_map_image_url || '');
             
             // Load card customization fields
             safeSet('beachCardTitle', s.card_title || 'Beach Booking');
@@ -54712,6 +54727,7 @@ app.get('/admin/dashboard', (c) => {
               closing_time: document.getElementById('closingTime').value,
               advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
               max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
+              beach_map_image_url: document.getElementById('beachMapImageUrl')?.value || null,
               // Preserve colors
               bg_color_from: bgColorFrom,
               bg_color_to: bgColorTo,
