@@ -13655,6 +13655,9 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
       time_slots
     } = body
     
+    console.log('🏖️ Backend received beach_map_image_url:', beach_map_image_url);
+    console.log('📦 Full body:', body);
+    
     // Check if settings exist
     const existing = await DB.prepare(`
       SELECT setting_id FROM beach_settings WHERE property_id = ?
@@ -13727,6 +13730,8 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
         time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]',
         property_id
       ).run()
+      
+      console.log('✅ Beach settings UPDATED with beach_map_image_url:', beach_map_image_url);
     } else {
       // Insert
       await DB.prepare(`
@@ -13771,6 +13776,8 @@ app.post('/api/admin/beach/settings', requirePermission('beach_settings'), async
         traffic_light_text_color || '#ffffff',
         time_slots || '[{"id":"half_day_am","name":"Morning","start":"08:00","end":"13:00"},{"id":"half_day_pm","name":"Afternoon","start":"13:00","end":"18:00"},{"id":"full_day","name":"Full Day","start":"08:00","end":"18:00"}]'
       ).run()
+      
+      console.log('✅ Beach settings INSERTED with beach_map_image_url:', beach_map_image_url);
     }
     
     return c.json({ success: true })
@@ -54717,41 +54724,48 @@ app.get('/admin/dashboard', (c) => {
           const daybedsDesc = document.getElementById('daybedsDesc')?.value || 'Ultimate Comfort';
           const buttonText = document.getElementById('buttonText')?.value || 'Book Your Spot Now';
           
+          const beachMapImageUrl = document.getElementById('beachMapImageUrl')?.value || null;
+          console.log('🏖️ Beach Map Image URL being sent:', beachMapImageUrl);
+          
+          const payload = {
+            beach_booking_enabled: document.getElementById('beachBookingEnabled').checked ? 1 : 0,
+            free_for_hotel_guests: document.getElementById('freeForGuests').checked ? 1 : 0,
+            opening_time: document.getElementById('openingTime').value,
+            closing_time: document.getElementById('closingTime').value,
+            advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
+            max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
+            beach_map_image_url: beachMapImageUrl,
+            // Preserve colors
+            bg_color_from: bgColorFrom,
+            bg_color_to: bgColorTo,
+            text_color: textColor,
+            button_color_from: buttonColorFrom,
+            button_color_to: buttonColorTo,
+            button_text_color: buttonTextColor,
+            traffic_light_text_color: trafficLightTextColor,
+            // Preserve text customization
+            card_title: cardTitle,
+            card_subtitle: cardSubtitle,
+            feature1_text: feature1Text,
+            feature2_text: feature2Text,
+            feature3_text: feature3Text,
+            umbrellas_label: umbrellasLabel,
+            umbrellas_desc: umbrellasDesc,
+            cabanas_label: cabanasLabel,
+            cabanas_desc: cabanasDesc,
+            loungers_label: loungersLabel,
+            loungers_desc: loungersDesc,
+            daybeds_label: daybedsLabel,
+            daybeds_desc: daybedsDesc,
+            button_text: buttonText
+          };
+          
+          console.log('📤 Sending beach settings payload:', payload);
+          
           const response = await fetchWithAuth('/api/admin/beach/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              beach_booking_enabled: document.getElementById('beachBookingEnabled').checked ? 1 : 0,
-              free_for_hotel_guests: document.getElementById('freeForGuests').checked ? 1 : 0,
-              opening_time: document.getElementById('openingTime').value,
-              closing_time: document.getElementById('closingTime').value,
-              advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
-              max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
-              beach_map_image_url: document.getElementById('beachMapImageUrl')?.value || null,
-              // Preserve colors
-              bg_color_from: bgColorFrom,
-              bg_color_to: bgColorTo,
-              text_color: textColor,
-              button_color_from: buttonColorFrom,
-              button_color_to: buttonColorTo,
-              button_text_color: buttonTextColor,
-              traffic_light_text_color: trafficLightTextColor,
-              // Preserve text customization
-              card_title: cardTitle,
-              card_subtitle: cardSubtitle,
-              feature1_text: feature1Text,
-              feature2_text: feature2Text,
-              feature3_text: feature3Text,
-              umbrellas_label: umbrellasLabel,
-              umbrellas_desc: umbrellasDesc,
-              cabanas_label: cabanasLabel,
-              cabanas_desc: cabanasDesc,
-              loungers_label: loungersLabel,
-              loungers_desc: loungersDesc,
-              daybeds_label: daybedsLabel,
-              daybeds_desc: daybedsDesc,
-              button_text: buttonText
-            })
+            body: JSON.stringify(payload)
           });
           
           const data = await response.json();
