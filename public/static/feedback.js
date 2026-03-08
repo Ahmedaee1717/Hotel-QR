@@ -74,6 +74,33 @@ async function loadPropertyBranding(propertyId) {
     }
 }
 
+// Helper function to calculate current step info
+function getCurrentStepInfo() {
+    let stepIndex = 0;
+    
+    // Count guest info fields that come before current step
+    if (formData.require_room_number) {
+        if (stepIndex === currentStep) return { type: 'room_number', questionIndex: null };
+        stepIndex++;
+    }
+    if (formData.require_guest_name) {
+        if (stepIndex === currentStep) return { type: 'guest_name', questionIndex: null };
+        stepIndex++;
+    }
+    if (formData.require_email) {
+        if (stepIndex === currentStep) return { type: 'guest_email', questionIndex: null };
+        stepIndex++;
+    }
+    if (formData.require_phone) {
+        if (stepIndex === currentStep) return { type: 'guest_phone', questionIndex: null };
+        stepIndex++;
+    }
+    
+    // We're on a question
+    const questionIndex = currentStep - stepIndex;
+    return { type: 'question', questionIndex: questionIndex };
+}
+
 // Render current step
 function renderCurrentStep() {
     const questionContent = document.getElementById('questionContent');
@@ -95,32 +122,22 @@ function renderCurrentStep() {
     nextBtn.style.display = currentStep < totalSteps - 1 ? 'flex' : 'none';
     submitBtn.style.display = currentStep === totalSteps - 1 ? 'flex' : 'none';
 
-    // Get current question data
-    let stepIndex = 0;
+    // Get current step info
+    const stepInfo = getCurrentStepInfo();
     let questionHTML = '';
 
-    // Guest info fields
-    if (formData.require_room_number && stepIndex === currentStep) {
+    // Render based on step type
+    if (stepInfo.type === 'room_number') {
         questionHTML = renderGuestInfoField('room_number', 'Room Number', 'text', 'e.g., 303', true);
-    } else if (formData.require_room_number) stepIndex++;
-
-    if (formData.require_guest_name && stepIndex === currentStep) {
+    } else if (stepInfo.type === 'guest_name') {
         questionHTML = renderGuestInfoField('guest_name', 'Your Name', 'text', 'Full name', true);
-    } else if (formData.require_guest_name) stepIndex++;
-
-    if (formData.require_email && stepIndex === currentStep) {
+    } else if (stepInfo.type === 'guest_email') {
         questionHTML = renderGuestInfoField('guest_email', 'Email Address', 'email', 'your@email.com', true);
-    } else if (formData.require_email) stepIndex++;
-
-    if (formData.require_phone && stepIndex === currentStep) {
+    } else if (stepInfo.type === 'guest_phone') {
         questionHTML = renderGuestInfoField('guest_phone', 'Phone Number', 'tel', '+1234567890', true);
-    } else if (formData.require_phone) stepIndex++;
-
-    // Form questions
-    const questionIndex = currentStep - stepIndex;
-    if (questionIndex >= 0 && questionIndex < formData.questions.length) {
-        const question = formData.questions[questionIndex];
-        questionHTML = renderQuestion(question, questionIndex);
+    } else if (stepInfo.type === 'question' && stepInfo.questionIndex >= 0 && stepInfo.questionIndex < formData.questions.length) {
+        const question = formData.questions[stepInfo.questionIndex];
+        questionHTML = renderQuestion(question, stepInfo.questionIndex);
     }
 
     // Animate transition
@@ -334,45 +351,30 @@ function saveCurrentAnswer() {
     const scaleValue = document.getElementById('scaleValue');
     const choiceValue = document.getElementById('choiceValue');
 
-    let stepIndex = 0;
+    // Get current step info
+    const stepInfo = getCurrentStepInfo();
     
     // Guest info fields
-    if (formData.require_room_number) {
-        if (stepIndex === currentStep) {
-            responses.room_number = answerInput.value;
-            return true;
-        }
-        stepIndex++;
+    if (stepInfo.type === 'room_number') {
+        responses.room_number = answerInput.value;
+        return true;
     }
-    
-    if (formData.require_guest_name) {
-        if (stepIndex === currentStep) {
-            responses.guest_name = answerInput.value;
-            return true;
-        }
-        stepIndex++;
+    if (stepInfo.type === 'guest_name') {
+        responses.guest_name = answerInput.value;
+        return true;
     }
-    
-    if (formData.require_email) {
-        if (stepIndex === currentStep) {
-            responses.guest_email = answerInput.value;
-            return true;
-        }
-        stepIndex++;
+    if (stepInfo.type === 'guest_email') {
+        responses.guest_email = answerInput.value;
+        return true;
     }
-    
-    if (formData.require_phone) {
-        if (stepIndex === currentStep) {
-            responses.guest_phone = answerInput.value;
-            return true;
-        }
-        stepIndex++;
+    if (stepInfo.type === 'guest_phone') {
+        responses.guest_phone = answerInput.value;
+        return true;
     }
 
     // Form questions
-    const questionIndex = currentStep - stepIndex;
-    if (questionIndex >= 0 && questionIndex < formData.questions.length) {
-        const question = formData.questions[questionIndex];
+    if (stepInfo.type === 'question' && stepInfo.questionIndex >= 0 && stepInfo.questionIndex < formData.questions.length) {
+        const question = formData.questions[stepInfo.questionIndex];
         const questionKey = 'q_' + question.question_id;
         
         if (ratingValue) {
