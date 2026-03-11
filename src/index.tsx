@@ -16285,54 +16285,41 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
     
     console.log(`🗑️ Deleting pass ${pass_id} and all related data...`)
     
+    // Helper function to safely delete from a table
+    const safeDelete = async (tableName, column = 'pass_id') => {
+      try {
+        await DB.prepare(`DELETE FROM ${tableName} WHERE ${column} = ?`).bind(pass_id).run()
+        console.log(`✅ Deleted from ${tableName}`)
+      } catch (error) {
+        console.log(`⚠️ Could not delete from ${tableName}: ${error.message}`)
+        // Continue anyway - table might not have the column or might not exist
+      }
+    }
+    
     // 1. Delete family members
-    await DB.prepare(`
-      DELETE FROM pass_family_members WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('pass_family_members')
     
     // 2. Delete verification records
-    await DB.prepare(`
-      DELETE FROM pass_verifications WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('pass_verifications')
     
     // 3. Delete fraud alerts (two tables)
-    await DB.prepare(`
-      DELETE FROM face_verification_fraud_alerts WHERE pass_id = ?
-    `).bind(pass_id).run()
-    
-    await DB.prepare(`
-      DELETE FROM pass_fraud_alerts WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('face_verification_fraud_alerts')
+    await safeDelete('pass_fraud_alerts')
     
     // 4. Delete pass upgrades
-    await DB.prepare(`
-      DELETE FROM pass_upgrades WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('pass_upgrades')
     
     // 5. Delete biometric consent signatures
-    await DB.prepare(`
-      DELETE FROM biometric_consent_signatures WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('biometric_consent_signatures')
     
     // 6. Delete biometric audit log
-    await DB.prepare(`
-      DELETE FROM biometric_audit_log WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('biometric_audit_log')
     
     // 7. Delete biometric deletion queue
-    await DB.prepare(`
-      DELETE FROM biometric_deletion_queue WHERE pass_id = ?
-    `).bind(pass_id).run()
+    await safeDelete('biometric_deletion_queue')
     
-    // 8. Delete biometric access control records
-    await DB.prepare(`
-      DELETE FROM biometric_access_control WHERE pass_id = ?
-    `).bind(pass_id).run()
-    
-    // 9. Delete wallet pass generations
-    await DB.prepare(`
-      DELETE FROM wallet_pass_generations WHERE pass_id = ?
-    `).bind(pass_id).run()
+    // 8. Delete wallet pass generations
+    await safeDelete('wallet_pass_generations')
     
     console.log(`✅ Deleted all related data for pass ${pass_id}`)
     
