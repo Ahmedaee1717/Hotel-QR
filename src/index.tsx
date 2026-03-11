@@ -42147,6 +42147,10 @@ app.get('/admin/dashboard', (c) => {
                     <i class="fas fa-concierge-bell mr-3 text-blue-600"></i>Front Desk & Concierge Center
                 </h2>
                 <p class="text-gray-600">Real-time guest communication monitoring - Feedback, Chatbot conversations, and urgent issues</p>
+                <p class="text-sm text-gray-500 mt-2 flex items-center gap-2">
+                    <i class="fas fa-circle text-green-500 animate-pulse"></i>
+                    <span>Live updates every 5 seconds • Last updated: <span id="lastUpdateTime">Just now</span></span>
+                </p>
             </div>
 
             <!-- Live Stats Cards -->
@@ -42237,9 +42241,14 @@ app.get('/admin/dashboard', (c) => {
                     
                     <div class="ml-auto flex gap-2">
                         <input type="date" id="frontDeskDateFilter" class="px-3 py-2 border rounded-lg" onchange="loadFrontDeskData()">
-                        <button onclick="loadFrontDeskData()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                            <i class="fas fa-sync-alt mr-2"></i>Refresh
+                        <button onclick="loadFrontDeskData()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+                            <i class="fas fa-circle text-red-500 animate-pulse"></i>
+                            <span>LIVE</span>
                         </button>
+                        <div class="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-600 flex items-center gap-2">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Auto-refreshing every 5 seconds</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -48973,7 +48982,12 @@ app.get('/admin/dashboard', (c) => {
           clickedButton.classList.add('tab-active');
         }
         
-        if (tab === 'frontdesk') loadFrontDeskData();
+        if (tab === 'frontdesk') {
+          loadFrontDeskData();
+          startFrontDeskAutoRefresh();
+        } else {
+          stopFrontDeskAutoRefresh();
+        }
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
@@ -49035,6 +49049,81 @@ app.get('/admin/dashboard', (c) => {
       // ========================================
       let currentFrontDeskView = 'all';
       let frontDeskAutoRefresh = null;
+      let lastStatsData = {}; // Track previous values to detect changes
+      let isFirstLoad = true; // Don't alert on first load
+      
+      // Start live auto-refresh (every 5 seconds)
+      function startFrontDeskAutoRefresh() {
+        console.log('🔴 LIVE: Starting Front Desk auto-refresh (5 seconds)');
+        stopFrontDeskAutoRefresh(); // Clear any existing interval
+        isFirstLoad = true; // Reset first load flag
+        
+        frontDeskAutoRefresh = setInterval(() => {
+          console.log('🔄 LIVE: Auto-refreshing front desk data...');
+          loadFrontDeskData();
+        }, 5000); // Refresh every 5 seconds
+        
+        // Also show live indicator
+        const refreshBtn = document.querySelector('[onclick="loadFrontDeskData()"]');
+        if (refreshBtn) {
+          refreshBtn.innerHTML = '<i class="fas fa-circle text-red-500 animate-pulse mr-2"></i>LIVE';
+          refreshBtn.className = 'px-4 py-2 bg-green-600 text-white rounded-lg font-bold';
+        }
+      }
+      
+      // Stop auto-refresh
+      function stopFrontDeskAutoRefresh() {
+        if (frontDeskAutoRefresh) {
+          console.log('🛑 LIVE: Stopping Front Desk auto-refresh');
+          clearInterval(frontDeskAutoRefresh);
+          frontDeskAutoRefresh = null;
+        }
+      }
+      
+      // Play notification sound for new urgent items
+      function playNotificationSound() {
+        try {
+          // Create a simple beep sound using Web Audio API
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.frequency.value = 800; // Frequency in Hz
+          oscillator.type = 'sine';
+          
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+          
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (error) {
+          console.log('Could not play notification sound:', error);
+        }
+      }
+      
+      // Show browser notification
+      function showBrowserNotification(title, message) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, {
+            body: message,
+            icon: '/favicon.ico',
+            badge: '/favicon.ico'
+          });
+        } else if ('Notification' in window && Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              new Notification(title, {
+                body: message,
+                icon: '/favicon.ico',
+                badge: '/favicon.ico'
+              });
+            }
+          });
+        }
+      }
       
       window.setFrontDeskView = function(view) {
         currentFrontDeskView = view;
@@ -49082,10 +49171,61 @@ app.get('/admin/dashboard', (c) => {
           const statsData = await statsResponse.json();
           
           if (statsData.success) {
-            document.getElementById('statTodayFeedback').textContent = statsData.stats.today_feedback || 0;
-            document.getElementById('statActiveChats').textContent = statsData.stats.active_chats || 0;
-            document.getElementById('statUrgentIssues').textContent = statsData.stats.urgent_issues || 0;
-            document.getElementById('statUnreadMessages').textContent = statsData.stats.unread_messages || 0;
+            const stats = statsData.stats;
+            const newTodayFeedback = stats.today_feedback || 0;
+            const newActiveChats = stats.active_chats || 0;
+            const newUrgentIssues = stats.urgent_issues || 0;
+            const newUnreadMessages = stats.unread_messages || 0;
+            
+            // Detect changes and alert if not first load
+            if (!isFirstLoad) {
+              // Check for new urgent issues
+              if (newUrgentIssues > (lastStatsData.urgent_issues || 0)) {
+                const delta = newUrgentIssues - (lastStatsData.urgent_issues || 0);
+                console.log('🚨 NEW URGENT ISSUE DETECTED:', delta, 'new urgent issue(s)');
+                playNotificationSound();
+                showBrowserNotification('🚨 New Urgent Issue!', delta + ' new urgent issue(s) require attention');
+                
+                // Pulse animation on urgent stat card
+                const urgentCard = document.getElementById('statUrgentIssues').closest('div');
+                if (urgentCard) {
+                  urgentCard.classList.add('animate-pulse');
+                  setTimeout(() => urgentCard.classList.remove('animate-pulse'), 3000);
+                }
+              }
+              
+              // Check for new unread messages
+              if (newUnreadMessages > (lastStatsData.unread_messages || 0)) {
+                const delta = newUnreadMessages - (lastStatsData.unread_messages || 0);
+                console.log('📬 NEW MESSAGE:', delta, 'new message(s)');
+                
+                // Pulse animation on unread stat card
+                const unreadCard = document.getElementById('statUnreadMessages').closest('div');
+                if (unreadCard) {
+                  unreadCard.classList.add('animate-pulse');
+                  setTimeout(() => unreadCard.classList.remove('animate-pulse'), 2000);
+                }
+              }
+            }
+            
+            // Update stats display
+            document.getElementById('statTodayFeedback').textContent = newTodayFeedback;
+            document.getElementById('statActiveChats').textContent = newActiveChats;
+            document.getElementById('statUrgentIssues').textContent = newUrgentIssues;
+            document.getElementById('statUnreadMessages').textContent = newUnreadMessages;
+            
+            // Save for next comparison
+            lastStatsData = {
+              today_feedback: newTodayFeedback,
+              active_chats: newActiveChats,
+              urgent_issues: newUrgentIssues,
+              unread_messages: newUnreadMessages
+            };
+            
+            if (isFirstLoad) {
+              isFirstLoad = false;
+              console.log('✅ First load complete, live monitoring active');
+            }
           }
           
           // Load service requests stats
@@ -49103,6 +49243,14 @@ app.get('/admin/dashboard', (c) => {
           
           if (feedData.success) {
             renderCommunicationsFeed(feedData.communications);
+            
+            // Update timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            const timestampEl = document.getElementById('lastUpdateTime');
+            if (timestampEl) {
+              timestampEl.textContent = timeStr;
+            }
           }
         } catch (error) {
           console.error('Front desk load error:', error);
@@ -49131,6 +49279,12 @@ app.get('/admin/dashboard', (c) => {
         feed.innerHTML = communications.map(comm => {
           const isUrgent = comm.is_urgent === 1;
           const isUnread = comm.is_read === 0;
+          
+          // Check if item is very recent (within last 30 seconds)
+          const createdTime = new Date(comm.created_at).getTime();
+          const now = Date.now();
+          const isVeryNew = (now - createdTime) < 30000; // 30 seconds
+          
           const typeIcon = comm.type === 'feedback' ? 'fa-comment-dots' : 
                           comm.type === 'chatbot' ? 'fa-robot' : 'fa-exclamation-circle';
           const typeColor = comm.type === 'feedback' ? 'blue' : 
@@ -49138,13 +49292,14 @@ app.get('/admin/dashboard', (c) => {
           
           return \`
             <div onclick="viewCommunicationDetails(\${comm.id}, '\${comm.type}')" 
-                 class="border-l-4 border-\${typeColor}-500 bg-white p-4 rounded-lg hover:shadow-md cursor-pointer transition-all \${isUnread ? 'bg-blue-50' : ''}">
+                 class="border-l-4 border-\${typeColor}-500 bg-white p-4 rounded-lg hover:shadow-md cursor-pointer transition-all \${isUnread ? 'bg-blue-50' : ''} \${isVeryNew ? 'animate-pulse shadow-lg' : ''}">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <i class="fas \${typeIcon} text-\${typeColor}-600"></i>
                   <span class="font-semibold text-sm">\${comm.type.toUpperCase()}</span>
+                  \${isVeryNew ? '<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-bold rounded animate-bounce">⚡ JUST NOW</span>' : ''}
                   \${isUrgent ? '<span class="ml-2 px-2 py-1 bg-red-100 text-red-800 text-xs font-bold rounded">URGENT</span>' : ''}
-                  \${isUnread ? '<span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded">NEW</span>' : ''}
+                  \${isUnread && !isVeryNew ? '<span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded">NEW</span>' : ''}
                 </div>
                 <span class="text-xs text-gray-500">\${formatTimeAgo(comm.created_at)}</span>
               </div>
