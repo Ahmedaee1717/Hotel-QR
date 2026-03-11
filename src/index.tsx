@@ -16281,6 +16281,9 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
     }
     
     // Delete all related records first (foreign key constraints)
+    // Order matters: delete child records before parent
+    
+    console.log(`🗑️ Deleting pass ${pass_id} and all related data...`)
     
     // 1. Delete family members
     await DB.prepare(`
@@ -16321,10 +16324,34 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
       DELETE FROM biometric_deletion_queue WHERE pass_id = ?
     `).bind(pass_id).run()
     
+    // 8. Delete biometric access control records
+    await DB.prepare(`
+      DELETE FROM biometric_access_control WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 9. Delete wallet pass generations
+    await DB.prepare(`
+      DELETE FROM wallet_pass_generations WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 10. Delete any facial recognition data
+    await DB.prepare(`
+      DELETE FROM facial_recognition_data WHERE pass_id = ?
+    `).bind(pass_id).run()
+    
+    // 11. Delete biometric DPIA records (if pass_id is used as subject_id)
+    await DB.prepare(`
+      DELETE FROM biometric_dpia WHERE subject_id = ?
+    `).bind(pass_id).run()
+    
+    console.log(`✅ Deleted all related data for pass ${pass_id}`)
+    
     // Finally delete the pass itself
     await DB.prepare(`
       DELETE FROM digital_passes WHERE pass_id = ? AND property_id = ?
     `).bind(pass_id, property_id).run()
+    
+    console.log(`✅ Successfully deleted pass ${pass_id}`)
     
     return c.json({ success: true })
   } catch (error) {
@@ -56727,9 +56754,14 @@ app.get('/admin/dashboard', (c) => {
           const formsRes = await fetch('/api/admin/feedback/forms/' + propertyId);
           const formsData = await formsRes.json();
           
+          console.log('📋 DEBUG: Forms data:', formsData);
+          console.log('📋 DEBUG: First form type:', formsData.forms[0]?.form_type);
+          
           if (formsData.success && formsData.forms.length > 0) {
             const formsList = document.getElementById('formsList');
-            formsList.innerHTML = formsData.forms.map(form => \`
+            formsList.innerHTML = formsData.forms.map(form => {
+              console.log('🔍 Processing form:', form.form_name, 'Type:', form.form_type, 'Show delete?', form.form_type !== 'mood_check');
+              return \`
               <div class="bg-white p-4 rounded-lg border hover:shadow-md transition-all">
                 <div class="flex justify-between items-start">
                   <div class="flex-1">
@@ -56783,7 +56815,8 @@ app.get('/admin/dashboard', (c) => {
                   </div>
                 </div>
               </div>
-            \`).join('');
+            \`;
+            }).join('');
           }
         } catch (error) {
           console.error('Load feedback error:', error);
