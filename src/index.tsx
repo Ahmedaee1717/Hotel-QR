@@ -20926,6 +20926,23 @@ app.delete('/api/admin/feedback/forms/:form_id', async (c) => {
   const { form_id } = c.req.param()
   
   try {
+    // 🛡️ PROTECTION: Check if this is a mood check form
+    const form = await DB.prepare(`
+      SELECT form_type, form_name FROM feedback_forms WHERE form_id = ?
+    `).bind(form_id).first()
+    
+    if (!form) {
+      return c.json({ error: 'Form not found' }, 404)
+    }
+    
+    // 🚫 PREVENT DELETION of mood check forms
+    if (form.form_type === 'mood_check') {
+      return c.json({ 
+        error: 'Mood Check forms cannot be deleted',
+        message: 'Mood Check forms are system forms and cannot be deleted. You can deactivate them instead.'
+      }, 403)
+    }
+    
     // Delete in correct order to respect foreign key constraints
     // 1. Delete all answers for submissions of this form
     await DB.prepare(`
@@ -20950,7 +20967,7 @@ app.delete('/api/admin/feedback/forms/:form_id', async (c) => {
       DELETE FROM feedback_forms WHERE form_id = ?
     `).bind(form_id).run()
     
-    console.log(`✅ Successfully deleted feedback form ${form_id} and all related data`)
+    console.log(`✅ Successfully deleted feedback form ${form_id} (${form.form_name}) and all related data`)
     
     return c.json({ success: true })
   } catch (error) {
@@ -56759,9 +56776,11 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="editForm(\${form.form_id})" class="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 whitespace-nowrap">
                       <i class="fas fa-edit mr-1"></i>Edit
                     </button>
-                    <button onclick="deleteForm(\${form.form_id}, '\${form.form_name.replace(/'/g, "\\\\'")}')" class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 whitespace-nowrap">
-                      <i class="fas fa-trash mr-1"></i>Delete
-                    </button>
+                    \${form.form_type !== 'mood_check' ? 
+                      '<button onclick="deleteForm(' + form.form_id + ', \\'' + form.form_name.replace(/'/g, "\\\\'") + '\\')" class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 whitespace-nowrap"><i class="fas fa-trash mr-1"></i>Delete</button>' 
+                      : 
+                      '<button disabled class="px-4 py-2 bg-gray-300 text-gray-500 text-sm rounded cursor-not-allowed whitespace-nowrap" title="Mood Check forms cannot be deleted"><i class="fas fa-lock mr-1"></i>Protected</button>'
+                    }
                   </div>
                 </div>
               </div>
