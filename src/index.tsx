@@ -48985,6 +48985,7 @@ app.get('/admin/dashboard', (c) => {
       let isFirstLoad = true; // Don't alert on first load
       let notificationAudio = null; // Store audio for continuous ringing
       let lastCommunicationsCount = 0; // Track total communications
+      let lastGuestPassRequestsCount = 0; // Track pending guest pass requests
       
       // Create persistent ringing sound
       function createRingingSound() {
@@ -49114,6 +49115,31 @@ app.get('/admin/dashboard', (c) => {
         // Ensure we're on the unified view
         window.setFrontDeskView('all');
       };
+      
+      // Update guest pass badge
+      function updateGuestPassBadge(count) {
+        const btn = document.getElementById('viewGuestLookupBtn');
+        if (!btn) return;
+        
+        // Remove existing badge if any
+        const existingBadge = btn.querySelector('.guest-pass-badge');
+        if (existingBadge) existingBadge.remove();
+        
+        if (count > 0) {
+          // Add red badge with count
+          const badge = document.createElement('span');
+          badge.className = 'guest-pass-badge absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse';
+          badge.textContent = count;
+          btn.style.position = 'relative';
+          btn.appendChild(badge);
+          
+          // Make button more prominent
+          btn.classList.add('ring-2', 'ring-red-500', 'ring-offset-2');
+        } else {
+          // Remove prominence
+          btn.classList.remove('ring-2', 'ring-red-500', 'ring-offset-2');
+        }
+      }
       
       // Start live auto-refresh (every 5 seconds)
       function startFrontDeskAutoRefresh() {
@@ -49404,6 +49430,41 @@ app.get('/admin/dashboard', (c) => {
             if (timestampEl) {
               timestampEl.textContent = timeStr;
             }
+          }
+          
+          // Load guest pass requests
+          const guestPassResponse = await fetch('/api/admin/guest-lookup-requests?property_id=' + propertyId);
+          const guestPassData = await guestPassResponse.json();
+          
+          if (guestPassData.success) {
+            const requests = guestPassData.requests || [];
+            const pendingRequests = requests.filter(r => r.request_status === 'pending');
+            const currentGuestPassCount = pendingRequests.length;
+            
+            // Update button badge
+            updateGuestPassBadge(currentGuestPassCount);
+            
+            // Detect NEW guest pass requests
+            if (!isFirstLoad && currentGuestPassCount > lastGuestPassRequestsCount) {
+              const newGuestPassCount = currentGuestPassCount - lastGuestPassRequestsCount;
+              console.log('👤 NEW GUEST PASS REQUEST:', newGuestPassCount, 'new request(s)');
+              
+              // Show dismissible modal with ringing sound
+              showNotificationModal(
+                '👤 New Guest Pass Request!',
+                newGuestPassCount + ' guest(s) requesting their digital pass. Click View Now to link their pass.',
+                'new'
+              );
+              
+              // Also show browser notification
+              showBrowserNotification(
+                '👤 New Guest Pass Request',
+                newGuestPassCount + ' guest(s) need their pass linked'
+              );
+            }
+            
+            // Save count for next comparison
+            lastGuestPassRequestsCount = currentGuestPassCount;
           }
         } catch (error) {
           console.error('Front desk load error:', error);
