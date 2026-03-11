@@ -48984,9 +48984,11 @@ app.get('/admin/dashboard', (c) => {
       let lastStatsData = {}; // Track previous values to detect changes
       let isFirstLoad = true; // Don't alert on first load
       let notificationAudio = null; // Store audio for continuous ringing
-      let lastCommunicationsCount = 0; // Track total communications
-      let lastGuestPassRequestsCount = 0; // Track pending guest pass requests
-      let lastServiceRequestsCount = 0; // Track pending service requests
+      
+      // Track seen items by their IDs to prevent duplicate notifications
+      let seenCommunicationIds = new Set(); // Track which communications we've alerted for
+      let seenGuestPassIds = new Set(); // Track which guest pass requests we've alerted for
+      let seenServiceRequestIds = new Set(); // Track which service requests we've alerted for
       
       // Create persistent ringing sound
       function createRingingSound() {
@@ -49401,7 +49403,9 @@ app.get('/admin/dashboard', (c) => {
           const serviceData = await serviceResponse.json();
           
           if (serviceData.success) {
-            const pendingCount = serviceData.counts?.pending || 0;
+            const allRequests = serviceData.requests || [];
+            const pendingRequests = allRequests.filter(r => r.status === 'pending');
+            const pendingCount = pendingRequests.length;
             
             // Update display
             document.getElementById('statServiceRequests').textContent = serviceData.total || 0;
@@ -49410,27 +49414,48 @@ app.get('/admin/dashboard', (c) => {
             // Update badge
             updateServiceRequestsBadge(pendingCount);
             
-            // Detect NEW service requests
-            if (!isFirstLoad && pendingCount > lastServiceRequestsCount) {
-              const newServiceCount = pendingCount - lastServiceRequestsCount;
-              console.log('🔔 NEW SERVICE REQUEST:', newServiceCount, 'new request(s)');
-              
-              // Show dismissible modal with ringing sound
-              showNotificationModal(
-                '🔔 New Service Request!',
-                newServiceCount + ' new service request(s) from guests. Click View Now to review.',
-                'new'
-              );
-              
-              // Also show browser notification
-              showBrowserNotification(
-                '🔔 New Service Request',
-                newServiceCount + ' guest(s) need assistance'
-              );
-            }
+            // Clean up seen IDs for requests that are no longer pending
+            const currentPendingIds = new Set(pendingRequests.map(r => r.request_id).filter(Boolean));
+            seenServiceRequestIds.forEach(id => {
+              if (!currentPendingIds.has(id)) {
+                seenServiceRequestIds.delete(id); // Remove from seen if no longer pending
+              }
+            });
             
-            // Save count for next comparison
-            lastServiceRequestsCount = pendingCount;
+            // Detect NEW service requests by checking IDs we haven't seen
+            if (!isFirstLoad) {
+              const newRequests = pendingRequests.filter(req => {
+                const reqId = req.request_id;
+                return reqId && !seenServiceRequestIds.has(reqId);
+              });
+              
+              if (newRequests.length > 0) {
+                console.log('🔔 NEW SERVICE REQUEST:', newRequests.length, 'new request(s)');
+                
+                // Mark these as seen
+                newRequests.forEach(req => {
+                  if (req.request_id) seenServiceRequestIds.add(req.request_id);
+                });
+                
+                // Show dismissible modal with ringing sound
+                showNotificationModal(
+                  '🔔 New Service Request!',
+                  newRequests.length + ' new service request(s) from guests. Click View Now to review.',
+                  'new'
+                );
+                
+                // Also show browser notification
+                showBrowserNotification(
+                  '🔔 New Service Request',
+                  newRequests.length + ' guest(s) need assistance'
+                );
+              }
+            } else {
+              // First load - mark all current requests as seen
+              pendingRequests.forEach(req => {
+                if (req.request_id) seenServiceRequestIds.add(req.request_id);
+              });
+            }
           }
           
           // Load communications feed
@@ -49439,41 +49464,53 @@ app.get('/admin/dashboard', (c) => {
           
           if (feedData.success) {
             const communications = feedData.communications || [];
-            const currentCount = communications.length;
             
-            // Detect NEW communications (not just urgent)
-            if (!isFirstLoad && currentCount > lastCommunicationsCount) {
-              const newCount = currentCount - lastCommunicationsCount;
-              console.log('🔔 NEW COMMUNICATION DETECTED:', newCount, 'new item(s)');
+            // Detect NEW communications by checking IDs we haven't seen
+            if (!isFirstLoad) {
+              const newItems = communications.filter(comm => {
+                const commId = comm.id || comm.submission_id;
+                return commId && !seenCommunicationIds.has(commId);
+              });
               
-              // Find the new items
-              const newItems = communications.slice(0, newCount);
-              const hasUrgent = newItems.some(item => item.is_urgent === 1);
-              
-              // Show dismissible modal with ringing sound
-              if (hasUrgent) {
-                showNotificationModal(
-                  '🚨 New Urgent Communication!',
-                  newCount + ' new communication(s) including URGENT items require immediate attention!',
-                  'urgent'
-                );
-              } else {
-                showNotificationModal(
-                  '🔔 New Communication Received',
-                  newCount + ' new communication(s) from guests require your attention',
-                  'new'
+              if (newItems.length > 0) {
+                console.log('🔔 NEW COMMUNICATION DETECTED:', newItems.length, 'new item(s)');
+                
+                // Mark these as seen
+                newItems.forEach(item => {
+                  const commId = item.id || item.submission_id;
+                  if (commId) seenCommunicationIds.add(commId);
+                });
+                
+                const hasUrgent = newItems.some(item => item.is_urgent === 1);
+                
+                // Show dismissible modal with ringing sound
+                if (hasUrgent) {
+                  showNotificationModal(
+                    '🚨 New Urgent Communication!',
+                    newItems.length + ' new communication(s) including URGENT items require immediate attention!',
+                    'urgent'
+                  );
+                } else {
+                  showNotificationModal(
+                    '🔔 New Communication Received',
+                    newItems.length + ' new communication(s) from guests require your attention',
+                    'new'
+                  );
+                }
+                
+                // Also show browser notification
+                showBrowserNotification(
+                  hasUrgent ? '🚨 New Urgent Communication!' : '🔔 New Communication',
+                  newItems.length + ' new item(s) - Click to view'
                 );
               }
-              
-              // Also show browser notification
-              showBrowserNotification(
-                hasUrgent ? '🚨 New Urgent Communication!' : '🔔 New Communication',
-                newCount + ' new item(s) - Click to view'
-              );
+            } else {
+              // First load - mark all current items as seen
+              communications.forEach(comm => {
+                const commId = comm.id || comm.submission_id;
+                if (commId) seenCommunicationIds.add(commId);
+              });
             }
-            
-            // Save count for next comparison
-            lastCommunicationsCount = currentCount;
             
             renderCommunicationsFeed(communications);
             
@@ -49493,32 +49530,52 @@ app.get('/admin/dashboard', (c) => {
           if (guestPassData.success) {
             const requests = guestPassData.requests || [];
             const pendingRequests = requests.filter(r => r.request_status === 'pending');
-            const currentGuestPassCount = pendingRequests.length;
             
             // Update button badge
-            updateGuestPassBadge(currentGuestPassCount);
+            updateGuestPassBadge(pendingRequests.length);
             
-            // Detect NEW guest pass requests
-            if (!isFirstLoad && currentGuestPassCount > lastGuestPassRequestsCount) {
-              const newGuestPassCount = currentGuestPassCount - lastGuestPassRequestsCount;
-              console.log('👤 NEW GUEST PASS REQUEST:', newGuestPassCount, 'new request(s)');
+            // Clean up seen IDs for requests that are no longer pending
+            const currentPendingIds = new Set(pendingRequests.map(r => r.request_id).filter(Boolean));
+            seenGuestPassIds.forEach(id => {
+              if (!currentPendingIds.has(id)) {
+                seenGuestPassIds.delete(id); // Remove from seen if no longer pending
+              }
+            });
+            
+            // Detect NEW guest pass requests by checking IDs we haven't seen
+            if (!isFirstLoad) {
+              const newRequests = pendingRequests.filter(req => {
+                const reqId = req.request_id;
+                return reqId && !seenGuestPassIds.has(reqId);
+              });
               
-              // Show dismissible modal with ringing sound
-              showNotificationModal(
-                '👤 New Guest Pass Request!',
-                newGuestPassCount + ' guest(s) requesting their digital pass. Click View Now to link their pass.',
-                'new'
-              );
-              
-              // Also show browser notification
-              showBrowserNotification(
-                '👤 New Guest Pass Request',
-                newGuestPassCount + ' guest(s) need their pass linked'
-              );
+              if (newRequests.length > 0) {
+                console.log('👤 NEW GUEST PASS REQUEST:', newRequests.length, 'new request(s)');
+                
+                // Mark these as seen
+                newRequests.forEach(req => {
+                  if (req.request_id) seenGuestPassIds.add(req.request_id);
+                });
+                
+                // Show dismissible modal with ringing sound
+                showNotificationModal(
+                  '👤 New Guest Pass Request!',
+                  newRequests.length + ' guest(s) requesting their digital pass. Click View Now to link their pass.',
+                  'new'
+                );
+                
+                // Also show browser notification
+                showBrowserNotification(
+                  '👤 New Guest Pass Request',
+                  newRequests.length + ' guest(s) need their pass linked'
+                );
+              }
+            } else {
+              // First load - mark all current requests as seen
+              pendingRequests.forEach(req => {
+                if (req.request_id) seenGuestPassIds.add(req.request_id);
+              });
             }
-            
-            // Save count for next comparison
-            lastGuestPassRequestsCount = currentGuestPassCount;
           }
         } catch (error) {
           console.error('Front desk load error:', error);
