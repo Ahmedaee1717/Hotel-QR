@@ -56778,8 +56778,7 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                     \${form.form_type !== 'mood_check' ? 
                       '<button onclick="deleteForm(' + form.form_id + ', \\'' + form.form_name.replace(/'/g, "\\\\'") + '\\')" class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 whitespace-nowrap"><i class="fas fa-trash mr-1"></i>Delete</button>' 
-                      : 
-                      '<button disabled class="px-4 py-2 bg-gray-300 text-gray-500 text-sm rounded cursor-not-allowed whitespace-nowrap" title="Mood Check forms cannot be deleted"><i class="fas fa-lock mr-1"></i>Protected</button>'
+                      : ''
                     }
                   </div>
                 </div>
