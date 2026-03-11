@@ -16334,16 +16334,6 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
       DELETE FROM wallet_pass_generations WHERE pass_id = ?
     `).bind(pass_id).run()
     
-    // 10. Delete any facial recognition data
-    await DB.prepare(`
-      DELETE FROM facial_recognition_data WHERE pass_id = ?
-    `).bind(pass_id).run()
-    
-    // 11. Delete biometric DPIA records (if pass_id is used as subject_id)
-    await DB.prepare(`
-      DELETE FROM biometric_dpia WHERE subject_id = ?
-    `).bind(pass_id).run()
-    
     console.log(`✅ Deleted all related data for pass ${pass_id}`)
     
     // Finally delete the pass itself
