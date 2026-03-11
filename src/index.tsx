@@ -48986,6 +48986,7 @@ app.get('/admin/dashboard', (c) => {
       let notificationAudio = null; // Store audio for continuous ringing
       let lastCommunicationsCount = 0; // Track total communications
       let lastGuestPassRequestsCount = 0; // Track pending guest pass requests
+      let lastServiceRequestsCount = 0; // Track pending service requests
       
       // Create persistent ringing sound
       function createRingingSound() {
@@ -49129,6 +49130,31 @@ app.get('/admin/dashboard', (c) => {
           // Add red badge with count
           const badge = document.createElement('span');
           badge.className = 'guest-pass-badge absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse';
+          badge.textContent = count;
+          btn.style.position = 'relative';
+          btn.appendChild(badge);
+          
+          // Make button more prominent
+          btn.classList.add('ring-2', 'ring-red-500', 'ring-offset-2');
+        } else {
+          // Remove prominence
+          btn.classList.remove('ring-2', 'ring-red-500', 'ring-offset-2');
+        }
+      }
+      
+      // Update service requests badge
+      function updateServiceRequestsBadge(count) {
+        const btn = document.getElementById('viewServiceRequestsBtn');
+        if (!btn) return;
+        
+        // Remove existing badge if any
+        const existingBadge = btn.querySelector('.service-request-badge');
+        if (existingBadge) existingBadge.remove();
+        
+        if (count > 0) {
+          // Add red badge with count
+          const badge = document.createElement('span');
+          badge.className = 'service-request-badge absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center animate-pulse';
           badge.textContent = count;
           btn.style.position = 'relative';
           btn.appendChild(badge);
@@ -49375,8 +49401,36 @@ app.get('/admin/dashboard', (c) => {
           const serviceData = await serviceResponse.json();
           
           if (serviceData.success) {
+            const pendingCount = serviceData.counts?.pending || 0;
+            
+            // Update display
             document.getElementById('statServiceRequests').textContent = serviceData.total || 0;
-            document.getElementById('statPendingRequests').textContent = serviceData.counts.pending || 0;
+            document.getElementById('statPendingRequests').textContent = pendingCount;
+            
+            // Update badge
+            updateServiceRequestsBadge(pendingCount);
+            
+            // Detect NEW service requests
+            if (!isFirstLoad && pendingCount > lastServiceRequestsCount) {
+              const newServiceCount = pendingCount - lastServiceRequestsCount;
+              console.log('🔔 NEW SERVICE REQUEST:', newServiceCount, 'new request(s)');
+              
+              // Show dismissible modal with ringing sound
+              showNotificationModal(
+                '🔔 New Service Request!',
+                newServiceCount + ' new service request(s) from guests. Click View Now to review.',
+                'new'
+              );
+              
+              // Also show browser notification
+              showBrowserNotification(
+                '🔔 New Service Request',
+                newServiceCount + ' guest(s) need assistance'
+              );
+            }
+            
+            // Save count for next comparison
+            lastServiceRequestsCount = pendingCount;
           }
           
           // Load communications feed
