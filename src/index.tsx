@@ -10428,62 +10428,96 @@ app.get('/api/restaurant/:offering_id/menu-display', async (c) => {
       ORDER BY display_order, created_at
     `).bind(offering_id, numericId).all()
     
+    // OPTIMIZATION: Batch fetch all data at once to avoid N+1 queries
+    const menuIds = menus.results.map(m => m.menu_id)
+    
+    // Fetch all translations, categories, and items in parallel
+    const [menuTranslations, allCategories, categoryTranslations] = await Promise.all([
+      // Get all menu translations
+      menuIds.length > 0 ? DB.prepare(`
+        SELECT * FROM restaurant_menu_translations
+        WHERE menu_id IN (${menuIds.map(() => '?').join(',')}) AND language_code = ?
+      `).bind(...menuIds, language).all() : { results: [] },
+      
+      // Get all categories
+      menuIds.length > 0 ? DB.prepare(`
+        SELECT * FROM menu_categories
+        WHERE menu_id IN (${menuIds.map(() => '?').join(',')})
+        ORDER BY display_order
+      `).bind(...menuIds).all() : { results: [] },
+      
+      // Get all category translations
+      menuIds.length > 0 ? DB.prepare(`
+        SELECT * FROM menu_category_translations
+        WHERE language_code = ?
+      `).bind(language).all() : { results: [] }
+    ])
+    
+    const categoryIds = allCategories.results.map(c => c.category_id)
+    
+    // Fetch all items and item translations in parallel
+    const [allItems, itemTranslations] = await Promise.all([
+      categoryIds.length > 0 ? DB.prepare(`
+        SELECT * FROM menu_items
+        WHERE category_id IN (${categoryIds.map(() => '?').join(',')}) AND is_available = 1
+        ORDER BY display_order
+      `).bind(...categoryIds).all() : { results: [] },
+      
+      categoryIds.length > 0 ? DB.prepare(`
+        SELECT * FROM menu_item_translations
+        WHERE language_code = ?
+      `).bind(language).all() : { results: [] }
+    ])
+    
+    // Create lookup maps for fast access
+    const menuTransMap = new Map(menuTranslations.results.map(t => [t.menu_id, t]))
+    const catTransMap = new Map(categoryTranslations.results.map(t => [t.category_id, t]))
+    const itemTransMap = new Map(itemTranslations.results.map(t => [t.item_id, t]))
+    const catsByMenu = new Map()
+    allCategories.results.forEach(cat => {
+      if (!catsByMenu.has(cat.menu_id)) catsByMenu.set(cat.menu_id, [])
+      catsByMenu.get(cat.menu_id).push(cat)
+    })
+    const itemsByCat = new Map()
+    allItems.results.forEach(item => {
+      if (!itemsByCat.has(item.category_id)) itemsByCat.set(item.category_id, [])
+      itemsByCat.get(item.category_id).push(item)
+    })
+    
     const menusWithContent = []
     
     for (const menu of menus.results) {
       // Get translated menu text if available
       let menuText = menu.extracted_text
-      const translation = await DB.prepare(`
-        SELECT translated_text FROM restaurant_menu_translations
-        WHERE menu_id = ? AND language_code = ?
-      `).bind(menu.menu_id, language).first()
-      
+      const translation = menuTransMap.get(menu.menu_id)
       if (translation && translation.translated_text) {
         menuText = translation.translated_text
       }
       
       // Get categories for this menu
-      const categories = await DB.prepare(`
-        SELECT * FROM menu_categories
-        WHERE menu_id = ?
-        ORDER BY display_order
-      `).bind(menu.menu_id).all()
-      
+      const categories = catsByMenu.get(menu.menu_id) || []
       const categoriesWithItems = []
       
-      for (const category of categories.results) {
+      for (const category of categories) {
         // Get translated category name/desc
         let catName = category.category_name
         let catDesc = category.category_description
         
-        const catTrans = await DB.prepare(`
-          SELECT * FROM menu_category_translations
-          WHERE category_id = ? AND language_code = ?
-        `).bind(category.category_id, language).first()
-        
+        const catTrans = catTransMap.get(category.category_id)
         if (catTrans) {
           catName = catTrans.category_name || catName
           catDesc = catTrans.category_description || catDesc
         }
         
         // Get items
-        const items = await DB.prepare(`
-          SELECT * FROM menu_items
-          WHERE category_id = ? AND is_available = 1
-          ORDER BY display_order
-        `).bind(category.category_id).all()
-        
+        const items = itemsByCat.get(category.category_id) || []
         const itemsWithTranslations = []
         
-        for (const item of items.results) {
+        for (const item of items) {
           let itemName = item.item_name
           let itemDesc = item.description
           
-          const itemTrans = await DB.prepare(`
-            SELECT * FROM menu_item_translations
-            WHERE item_id = ? AND language_code = ?
-          `).bind(item.item_id, language).first()
-          
+          const itemTrans = itemTransMap.get(item.item_id)
           if (itemTrans) {
             itemName = itemTrans.item_name || itemName
             itemDesc = itemTrans.description || itemDesc
@@ -65141,12 +65175,68 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(0.95); }
+      }
+      @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+      }
       .loading-spinner {
         animation: spin 1s linear infinite;
+      }
+      .float-animation {
+        animation: float 3s ease-in-out infinite;
+      }
+      .pulse-animation {
+        animation: pulse 2s ease-in-out infinite;
+      }
+      .shimmer {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 1000px 100%;
+        animation: shimmer 2s infinite linear;
       }
     </style>
 </head>
 <body class="antialiased">
+    <!-- Initial Page Loading Overlay (Shows immediately on page load) -->
+    <div id="initialLoadingOverlay" class="fixed inset-0 bg-gradient-to-br from-amber-50 via-white to-orange-50 z-[2000] flex items-center justify-center">
+      <div class="text-center px-6">
+        <!-- Animated Restaurant Icon -->
+        <div class="relative mb-8">
+          <div class="absolute inset-0 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full blur-3xl opacity-30 float-animation"></div>
+          <div class="relative bg-white rounded-full p-8 shadow-2xl pulse-animation">
+            <i class="fas fa-utensils text-6xl text-gradient bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text" style="background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+          </div>
+        </div>
+        
+        <!-- Loading Text -->
+        <h2 class="text-3xl font-bold text-gray-800 mb-3 font-serif">Preparing Your Menu</h2>
+        <p class="text-lg text-gray-600 mb-8">Crafting a delicious experience for you...</p>
+        
+        <!-- Animated Progress Dots -->
+        <div class="flex items-center justify-center gap-3 mb-8">
+          <div class="w-3 h-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+          <div class="w-3 h-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-bounce" style="animation-delay: 0.15s"></div>
+          <div class="w-3 h-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+          <div class="w-3 h-3 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full animate-bounce" style="animation-delay: 0.45s"></div>
+        </div>
+        
+        <!-- Shimmer Loading Bar -->
+        <div class="w-64 h-2 bg-gray-200 rounded-full overflow-hidden mx-auto">
+          <div class="h-full shimmer"></div>
+        </div>
+        
+        <!-- Fun Loading Messages -->
+        <p class="text-sm text-gray-500 mt-6 italic" id="loadingMessage">Selecting the finest ingredients...</p>
+      </div>
+    </div>
+    
     <!-- Translation Loading Overlay -->
     <div id="translationOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[1001] flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
@@ -65169,7 +65259,34 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
     let menuData = null;
     let designSettings = null;
     
+    // Fun loading messages that rotate
+    const loadingMessages = [
+      'Selecting the finest ingredients...',
+      'Preparing your culinary journey...',
+      'Heating up the kitchen...',
+      'Arranging the perfect presentation...',
+      'Adding the finishing touches...',
+      'Plating your delicious experience...',
+      'Garnishing with perfection...',
+      'Almost ready to serve...'
+    ];
+    
+    let messageIndex = 0;
+    const messageInterval = setInterval(() => {
+      const msgEl = document.getElementById('loadingMessage');
+      if (msgEl) {
+        messageIndex = (messageIndex + 1) % loadingMessages.length;
+        msgEl.style.opacity = '0';
+        setTimeout(() => {
+          msgEl.textContent = loadingMessages[messageIndex];
+          msgEl.style.opacity = '1';
+        }, 300);
+      }
+    }, 2000);
+    
     async function loadMenuData() {
+      const startTime = Date.now();
+      
       try {
         const response = await fetch('/api/restaurant/' + offeringId + '/menu-display?language=' + currentLanguage);
         const data = await response.json();
@@ -65179,13 +65296,42 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
           designSettings = data.design;
           applyDesignSettings();
           renderMenu();
-          // Hide loading overlay
-          document.getElementById('translationOverlay').classList.add('hidden');
+          
+          // Ensure loading shows for at least 800ms for smooth experience
+          const elapsedTime = Date.now() - startTime;
+          const minLoadingTime = 800;
+          const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+          
+          setTimeout(() => {
+            // Hide loading overlays with fade out
+            const initialOverlay = document.getElementById('initialLoadingOverlay');
+            const translationOverlay = document.getElementById('translationOverlay');
+            
+            if (initialOverlay) {
+              initialOverlay.style.transition = 'opacity 0.5s ease-out';
+              initialOverlay.style.opacity = '0';
+              setTimeout(() => {
+                initialOverlay.remove();
+                clearInterval(messageInterval);
+              }, 500);
+            }
+            
+            if (translationOverlay) {
+              translationOverlay.classList.add('hidden');
+            }
+          }, remainingTime);
         }
       } catch (error) {
         console.error('Failed to load menu:', error);
+        clearInterval(messageInterval);
+        
+        const initialOverlay = document.getElementById('initialLoadingOverlay');
+        if (initialOverlay) {
+          initialOverlay.remove();
+        }
+        
         document.getElementById('translationOverlay').classList.add('hidden');
-        document.getElementById('menuContainer').innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="text-center"><i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i><p class="text-xl text-gray-700">Failed to load menu</p></div></div>';
+        document.getElementById('menuContainer').innerHTML = '<div class="flex items-center justify-center min-h-screen"><div class="text-center"><i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i><p class="text-xl text-gray-700">Failed to load menu</p><button onclick="location.reload()" class="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Retry</button></div></div>';
       }
     }
     

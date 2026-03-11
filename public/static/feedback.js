@@ -22,6 +22,10 @@ async function loadForm() {
 
         formData = data.form;
         
+        console.log('✅ Form loaded:', formData);
+        console.log('✅ Questions count:', formData.questions ? formData.questions.length : 0);
+        console.log('✅ Questions:', formData.questions);
+        
         // Load property branding colors
         await loadPropertyBranding(formData.property_id);
         
@@ -78,26 +82,39 @@ async function loadPropertyBranding(propertyId) {
 function getCurrentStepInfo() {
     let stepIndex = 0;
     
+    console.log('📊 getCurrentStepInfo: currentStep =', currentStep);
+    console.log('📊 Guest fields required:', {
+        room_number: formData.require_room_number,
+        guest_name: formData.require_guest_name,
+        email: formData.require_email,
+        phone: formData.require_phone
+    });
+    
     // Count guest info fields that come before current step
     if (formData.require_room_number) {
+        console.log('  Check room_number: stepIndex =', stepIndex, 'vs currentStep =', currentStep);
         if (stepIndex === currentStep) return { type: 'room_number', questionIndex: null };
         stepIndex++;
     }
     if (formData.require_guest_name) {
+        console.log('  Check guest_name: stepIndex =', stepIndex, 'vs currentStep =', currentStep);
         if (stepIndex === currentStep) return { type: 'guest_name', questionIndex: null };
         stepIndex++;
     }
     if (formData.require_email) {
+        console.log('  Check email: stepIndex =', stepIndex, 'vs currentStep =', currentStep);
         if (stepIndex === currentStep) return { type: 'guest_email', questionIndex: null };
         stepIndex++;
     }
     if (formData.require_phone) {
+        console.log('  Check phone: stepIndex =', stepIndex, 'vs currentStep =', currentStep);
         if (stepIndex === currentStep) return { type: 'guest_phone', questionIndex: null };
         stepIndex++;
     }
     
     // We're on a question
     const questionIndex = currentStep - stepIndex;
+    console.log('📊 Final: stepIndex =', stepIndex, 'questionIndex =', questionIndex);
     return { type: 'question', questionIndex: questionIndex };
 }
 
@@ -124,6 +141,10 @@ function renderCurrentStep() {
 
     // Get current step info
     const stepInfo = getCurrentStepInfo();
+    console.log('🔍 DEBUG: currentStep =', currentStep);
+    console.log('🔍 DEBUG: stepInfo =', stepInfo);
+    console.log('🔍 DEBUG: formData.questions.length =', formData.questions.length);
+    
     let questionHTML = '';
 
     // Render based on step type
@@ -137,7 +158,13 @@ function renderCurrentStep() {
         questionHTML = renderGuestInfoField('guest_phone', 'Phone Number', 'tel', '+1234567890', true);
     } else if (stepInfo.type === 'question' && stepInfo.questionIndex >= 0 && stepInfo.questionIndex < formData.questions.length) {
         const question = formData.questions[stepInfo.questionIndex];
+        console.log('🔍 DEBUG: Rendering question:', question.question_text);
+        console.log('🔍 DEBUG: Question index:', stepInfo.questionIndex);
+        console.log('🔍 DEBUG: All questions:', formData.questions.map(q => q.question_text));
         questionHTML = renderQuestion(question, stepInfo.questionIndex);
+    } else {
+        console.error('❌ ERROR: Cannot find question for index', stepInfo.questionIndex);
+        console.error('❌ formData.questions:', formData.questions);
     }
 
     // Animate transition
