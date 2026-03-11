@@ -16296,6 +16296,9 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
       }
     }
     
+    // Delete all related data from ALL possible tables
+    // Using safeDelete() so it won't fail if table/column doesn't exist
+    
     // 1. Delete family members
     await safeDelete('pass_family_members')
     
@@ -16320,6 +16323,30 @@ app.delete('/api/admin/all-inclusive/passes/:pass_id', requirePermission('settin
     
     // 8. Delete wallet pass generations
     await safeDelete('wallet_pass_generations')
+    
+    // 9. Delete guest stay plans (guest_id references pass_id)
+    await safeDelete('guest_stay_plans', 'guest_id')
+    
+    // 10. Delete beach bookings (guest_id references digital_passes)
+    await safeDelete('beach_bookings', 'guest_id')
+    
+    // 11. Delete alacarte vouchers (pass_id column)
+    await safeDelete('alacarte_vouchers_new', 'pass_id')
+    
+    // 12. Delete guest consent changes
+    await safeDelete('guest_consent_changes')
+    
+    // 13. Delete guest portal sessions
+    await safeDelete('guest_portal_sessions')
+    
+    // 14. Delete NFC verifications (has ON DELETE CASCADE but safe to call)
+    await safeDelete('nfc_verifications')
+    
+    // 15. Delete NFC encodings
+    await safeDelete('nfc_encodings')
+    
+    // 16. Delete service requests
+    await safeDelete('service_requests')
     
     console.log(`✅ Deleted all related data for pass ${pass_id}`)
     
