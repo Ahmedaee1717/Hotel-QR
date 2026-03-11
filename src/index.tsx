@@ -48973,79 +48973,9 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
-      function showTab(tab, clickedButton) {
-        currentTab = tab;
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
-        document.getElementById(tab + 'Tab').classList.remove('hidden');
-        if (clickedButton) {
-          clickedButton.classList.add('tab-active');
-        }
-        
-        if (tab === 'frontdesk') {
-          loadFrontDeskData();
-          startFrontDeskAutoRefresh();
-        } else {
-          stopFrontDeskAutoRefresh();
-        }
-        if (tab === 'users') loadUsersManagement();
-        if (tab === 'qrcode') loadQRCode();
-        if (tab === 'analytics') {
-          console.log('📊 Analytics tab clicked!', {
-            loadAnalyticsType: typeof window.loadAnalytics,
-            loadAnalyticsExists: !!window.loadAnalytics
-          });
-          requestAnimationFrame(() => {
-            try {
-              if (typeof window.loadAnalytics === 'function') {
-                console.log('✅ Calling window.loadAnalytics()');
-                window.loadAnalytics()
-                  .then(() => console.log('✅ loadAnalytics completed successfully'))
-                  .catch(err => {
-                    console.error('❌ Analytics promise error:', err);
-                    console.error('Error stack:', err.stack);
-                  });
-              } else {
-                console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
-              }
-            } catch (syncError) {
-              console.error('❌ Synchronous error calling loadAnalytics:', syncError);
-              console.error('Sync error stack:', syncError.stack);
-            }
-          });
-        }
-        if (tab === 'rooms') loadRooms();
-        if (tab === 'vendors') loadVendors();
-        if (tab === 'regcode') loadRegCode();
-        if (tab === 'offerings') loadOfferings();
-        if (tab === 'alacarte') loadALaCarteVouchers();
-        if (tab === 'customsections') loadCustomSections();
-        if (tab === 'infopages') loadInfoPages();
-        if (tab === 'activities') loadActivities();
-        if (tab === 'callbacks') loadCallbacks();
-        if (tab === 'servicetypes') loadServiceTypes();
-        if (tab === 'settings') loadSettings();
-        if (tab === 'chatbot') loadChatbot();
-        if (tab === 'beach') loadBeachSettings();
-        if (tab === 'allinclusive') loadTiers();
-        if (tab === 'feedback') loadFeedbackTab();
-        if (tab === 'restaurants') { loadRestaurantsTab(); loadRoomService(); }
-      }
-      
-      // Add event listeners to sidebar buttons
-      document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const tab = this.getAttribute('data-tab');
-          console.log('🖱️ Sidebar button clicked:', tab);
-          showTab(tab, this);
-        });
-      });
-      
-      // Show the default tab on page load
-      showTab(currentTab);
-      
       // ========================================
-      // FRONT DESK / CONCIERGE FUNCTIONS
+      // FRONT DESK / CONCIERGE VARIABLES & FUNCTIONS
+      // (Must be declared BEFORE showTab function!)
       // ========================================
       let currentFrontDeskView = 'all';
       let frontDeskAutoRefresh = null;
@@ -49124,6 +49054,77 @@ app.get('/admin/dashboard', (c) => {
           });
         }
       }
+      
+      function showTab(tab, clickedButton) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => btn.classList.remove('tab-active'));
+        document.getElementById(tab + 'Tab').classList.remove('hidden');
+        if (clickedButton) {
+          clickedButton.classList.add('tab-active');
+        }
+        
+        if (tab === 'frontdesk') {
+          loadFrontDeskData();
+          startFrontDeskAutoRefresh();
+        } else {
+          stopFrontDeskAutoRefresh();
+        }
+        if (tab === 'users') loadUsersManagement();
+        if (tab === 'qrcode') loadQRCode();
+        if (tab === 'analytics') {
+          console.log('📊 Analytics tab clicked!', {
+            loadAnalyticsType: typeof window.loadAnalytics,
+            loadAnalyticsExists: !!window.loadAnalytics
+          });
+          requestAnimationFrame(() => {
+            try {
+              if (typeof window.loadAnalytics === 'function') {
+                console.log('✅ Calling window.loadAnalytics()');
+                window.loadAnalytics()
+                  .then(() => console.log('✅ loadAnalytics completed successfully'))
+                  .catch(err => {
+                    console.error('❌ Analytics promise error:', err);
+                    console.error('Error stack:', err.stack);
+                  });
+              } else {
+                console.error('❌ window.loadAnalytics is not a function!', typeof window.loadAnalytics);
+              }
+            } catch (syncError) {
+              console.error('❌ Synchronous error calling loadAnalytics:', syncError);
+              console.error('Sync error stack:', syncError.stack);
+            }
+          });
+        }
+        if (tab === 'rooms') loadRooms();
+        if (tab === 'vendors') loadVendors();
+        if (tab === 'regcode') loadRegCode();
+        if (tab === 'offerings') loadOfferings();
+        if (tab === 'alacarte') loadALaCarteVouchers();
+        if (tab === 'customsections') loadCustomSections();
+        if (tab === 'infopages') loadInfoPages();
+        if (tab === 'activities') loadActivities();
+        if (tab === 'callbacks') loadCallbacks();
+        if (tab === 'servicetypes') loadServiceTypes();
+        if (tab === 'settings') loadSettings();
+        if (tab === 'chatbot') loadChatbot();
+        if (tab === 'beach') loadBeachSettings();
+        if (tab === 'allinclusive') loadTiers();
+        if (tab === 'feedback') loadFeedbackTab();
+        if (tab === 'restaurants') { loadRestaurantsTab(); loadRoomService(); }
+      }
+      
+      // Add event listeners to sidebar buttons
+      document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const tab = this.getAttribute('data-tab');
+          console.log('🖱️ Sidebar button clicked:', tab);
+          showTab(tab, this);
+        });
+      });
+      
+      // Show the default tab on page load
+      showTab(currentTab);
       
       window.setFrontDeskView = function(view) {
         currentFrontDeskView = view;
