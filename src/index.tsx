@@ -20926,14 +20926,36 @@ app.delete('/api/admin/feedback/forms/:form_id', async (c) => {
   const { form_id } = c.req.param()
   
   try {
+    // Delete in correct order to respect foreign key constraints
+    // 1. Delete all answers for submissions of this form
+    await DB.prepare(`
+      DELETE FROM feedback_answers 
+      WHERE submission_id IN (
+        SELECT submission_id FROM feedback_submissions WHERE form_id = ?
+      )
+    `).bind(form_id).run()
+    
+    // 2. Delete all submissions for this form
+    await DB.prepare(`
+      DELETE FROM feedback_submissions WHERE form_id = ?
+    `).bind(form_id).run()
+    
+    // 3. Delete all questions for this form (should cascade, but doing explicitly)
+    await DB.prepare(`
+      DELETE FROM feedback_questions WHERE form_id = ?
+    `).bind(form_id).run()
+    
+    // 4. Finally delete the form itself
     await DB.prepare(`
       DELETE FROM feedback_forms WHERE form_id = ?
     `).bind(form_id).run()
     
+    console.log(`✅ Successfully deleted feedback form ${form_id} and all related data`)
+    
     return c.json({ success: true })
   } catch (error) {
     console.error('Delete form error:', error)
-    return c.json({ error: 'Failed to delete form' }, 500)
+    return c.json({ error: 'Failed to delete form: ' + error.message }, 500)
   }
 })
 
