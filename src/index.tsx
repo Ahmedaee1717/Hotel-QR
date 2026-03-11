@@ -35324,6 +35324,8 @@ app.get('/staff/verify-pass-old', (c) => {
         .confidence-meter { height: 24px; background: linear-gradient(to right, #ef4444, #f59e0b, #10b981); border-radius: 12px; transition: all 0.3s; }
         .scan-indicator { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-in; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -48981,6 +48983,137 @@ app.get('/admin/dashboard', (c) => {
       let frontDeskAutoRefresh = null;
       let lastStatsData = {}; // Track previous values to detect changes
       let isFirstLoad = true; // Don't alert on first load
+      let notificationAudio = null; // Store audio for continuous ringing
+      let lastCommunicationsCount = 0; // Track total communications
+      
+      // Create persistent ringing sound
+      function createRingingSound() {
+        if (notificationAudio) return notificationAudio;
+        
+        try {
+          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          notificationAudio = {
+            context: audioContext,
+            isPlaying: false,
+            intervalId: null
+          };
+          return notificationAudio;
+        } catch (error) {
+          console.log('Could not create audio context:', error);
+          return null;
+        }
+      }
+      
+      // Play continuous ringing sound (like a phone)
+      function startRingingSound() {
+        const audio = createRingingSound();
+        if (!audio || audio.isPlaying) return;
+        
+        audio.isPlaying = true;
+        
+        // Ring pattern: beep-beep-pause-beep-beep-pause
+        function playRingTone() {
+          try {
+            const oscillator = audio.context.createOscillator();
+            const gainNode = audio.context.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audio.context.destination);
+            
+            oscillator.frequency.value = 800; // 800 Hz tone
+            oscillator.type = 'sine';
+            
+            const now = audio.context.currentTime;
+            
+            // First beep
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.05);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.2);
+            
+            // Second beep
+            gainNode.gain.setValueAtTime(0, now + 0.3);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.35);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+            
+            oscillator.start(now);
+            oscillator.stop(now + 0.5);
+          } catch (error) {
+            console.log('Ring tone error:', error);
+          }
+        }
+        
+        // Play immediately
+        playRingTone();
+        
+        // Then repeat every 1.5 seconds
+        audio.intervalId = setInterval(playRingTone, 1500);
+      }
+      
+      // Stop ringing sound
+      function stopRingingSound() {
+        if (notificationAudio && notificationAudio.isPlaying) {
+          if (notificationAudio.intervalId) {
+            clearInterval(notificationAudio.intervalId);
+            notificationAudio.intervalId = null;
+          }
+          notificationAudio.isPlaying = false;
+        }
+      }
+      
+      // Show dismissible notification modal
+      function showNotificationModal(title, message, type = 'info') {
+        // Remove existing modal if any
+        const existing = document.getElementById('frontdeskNotificationModal');
+        if (existing) existing.remove();
+        
+        // Start ringing sound
+        startRingingSound();
+        
+        const iconClass = type === 'urgent' ? 'fa-exclamation-circle text-red-600' : 
+                         type === 'new' ? 'fa-bell text-blue-600' : 'fa-info-circle text-green-600';
+        
+        const modal = document.createElement('div');
+        modal.id = 'frontdeskNotificationModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] animate-fadeIn';
+        modal.innerHTML = '<div class="bg-white rounded-lg shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce">' +
+          '<div class="flex items-start gap-4 mb-4">' +
+            '<div class="flex-shrink-0">' +
+              '<i class="fas ' + iconClass + ' text-4xl animate-pulse"></i>' +
+            '</div>' +
+            '<div class="flex-1">' +
+              '<h3 class="text-xl font-bold text-gray-900 mb-2">' + title + '</h3>' +
+              '<p class="text-gray-700">' + message + '</p>' +
+            '</div>' +
+          '</div>' +
+          '<div class="flex gap-3 mt-6">' +
+            '<button onclick="dismissNotification()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">' +
+              '<i class="fas fa-check mr-2"></i>Dismiss' +
+            '</button>' +
+            '<button onclick="viewAllCommunications()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">' +
+              '<i class="fas fa-eye mr-2"></i>View Now' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+        
+        document.body.appendChild(modal);
+      }
+      
+      // Dismiss notification
+      window.dismissNotification = function() {
+        stopRingingSound();
+        const modal = document.getElementById('frontdeskNotificationModal');
+        if (modal) modal.remove();
+      };
+      
+      // View all communications
+      window.viewAllCommunications = function() {
+        stopRingingSound();
+        const modal = document.getElementById('frontdeskNotificationModal');
+        if (modal) modal.remove();
+        
+        // Ensure we're on the unified view
+        window.setFrontDeskView('all');
+      };
       
       // Start live auto-refresh (every 5 seconds)
       function startFrontDeskAutoRefresh() {
@@ -49007,30 +49140,6 @@ app.get('/admin/dashboard', (c) => {
           console.log('🛑 LIVE: Stopping Front Desk auto-refresh');
           clearInterval(frontDeskAutoRefresh);
           frontDeskAutoRefresh = null;
-        }
-      }
-      
-      // Play notification sound for new urgent items
-      function playNotificationSound() {
-        try {
-          // Create a simple beep sound using Web Audio API
-          const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
-          
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-          
-          oscillator.frequency.value = 800; // Frequency in Hz
-          oscillator.type = 'sine';
-          
-          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-          
-          oscillator.start(audioContext.currentTime);
-          oscillator.stop(audioContext.currentTime + 0.5);
-        } catch (error) {
-          console.log('Could not play notification sound:', error);
         }
       }
       
@@ -49184,7 +49293,13 @@ app.get('/admin/dashboard', (c) => {
               if (newUrgentIssues > (lastStatsData.urgent_issues || 0)) {
                 const delta = newUrgentIssues - (lastStatsData.urgent_issues || 0);
                 console.log('🚨 NEW URGENT ISSUE DETECTED:', delta, 'new urgent issue(s)');
-                playNotificationSound();
+                
+                showNotificationModal(
+                  '🚨 URGENT ISSUE ALERT!',
+                  delta + ' new URGENT issue(s) detected! Immediate response required.',
+                  'urgent'
+                );
+                
                 showBrowserNotification('🚨 New Urgent Issue!', delta + ' new urgent issue(s) require attention');
                 
                 // Pulse animation on urgent stat card
@@ -49243,7 +49358,44 @@ app.get('/admin/dashboard', (c) => {
           const feedData = await feedResponse.json();
           
           if (feedData.success) {
-            renderCommunicationsFeed(feedData.communications);
+            const communications = feedData.communications || [];
+            const currentCount = communications.length;
+            
+            // Detect NEW communications (not just urgent)
+            if (!isFirstLoad && currentCount > lastCommunicationsCount) {
+              const newCount = currentCount - lastCommunicationsCount;
+              console.log('🔔 NEW COMMUNICATION DETECTED:', newCount, 'new item(s)');
+              
+              // Find the new items
+              const newItems = communications.slice(0, newCount);
+              const hasUrgent = newItems.some(item => item.is_urgent === 1);
+              
+              // Show dismissible modal with ringing sound
+              if (hasUrgent) {
+                showNotificationModal(
+                  '🚨 New Urgent Communication!',
+                  newCount + ' new communication(s) including URGENT items require immediate attention!',
+                  'urgent'
+                );
+              } else {
+                showNotificationModal(
+                  '🔔 New Communication Received',
+                  newCount + ' new communication(s) from guests require your attention',
+                  'new'
+                );
+              }
+              
+              // Also show browser notification
+              showBrowserNotification(
+                hasUrgent ? '🚨 New Urgent Communication!' : '🔔 New Communication',
+                newCount + ' new item(s) - Click to view'
+              );
+            }
+            
+            // Save count for next comparison
+            lastCommunicationsCount = currentCount;
+            
+            renderCommunicationsFeed(communications);
             
             // Update timestamp
             const now = new Date();
