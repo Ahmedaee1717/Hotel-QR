@@ -21985,6 +21985,27 @@ app.post('/api/voice-assistant/function-call', async (c) => {
       const { request_details, priority, guest_phone } = func_args
       const { service_type_id, guest_info, property_id } = session_data
       
+      // Get pass_id from pass_reference
+      let pass_id = null
+      if (guest_info.pass_reference) {
+        const pass = await DB.prepare(`
+          SELECT pass_id FROM digital_passes WHERE pass_reference = ?
+        `).bind(guest_info.pass_reference).first()
+        
+        if (pass) {
+          pass_id = pass.pass_id
+        }
+      }
+      
+      console.log('Creating service request:', {
+        service_type_id,
+        pass_id,
+        guest_name: guest_info.full_name,
+        room_number: guest_info.room_number,
+        request_details,
+        priority
+      })
+      
       // Create the service request
       const result = await DB.prepare(`
         INSERT INTO service_requests (
@@ -21993,7 +22014,7 @@ app.post('/api/voice-assistant/function-call', async (c) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))
       `).bind(
         service_type_id,
-        guest_info.pass_id,
+        pass_id,
         guest_info.full_name,
         guest_info.room_number,
         guest_phone || guest_info.phone || '',
@@ -22001,6 +22022,8 @@ app.post('/api/voice-assistant/function-call', async (c) => {
         priority,
         property_id
       ).run()
+      
+      console.log('Service request created:', result.meta.last_row_id)
       
       return c.json({
         success: true,
