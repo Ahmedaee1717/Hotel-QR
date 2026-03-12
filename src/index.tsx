@@ -4599,8 +4599,9 @@ app.get('/api/admin/guest-relations', async (c) => {
   }
   
   try {
-    // Simplified query - get all passes first, then aggregate in separate queries
-    const passesQuery = `
+    // MUCH SIMPLER: Just get all passes with basic info, no aggregations
+    // Aggregations can be slow and cause issues - keep it simple!
+    let query = `
       SELECT 
         p.pass_id,
         p.pass_reference,
@@ -4620,11 +4621,20 @@ app.get('/api/admin/guest-relations', async (c) => {
       FROM digital_passes p
       LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
       WHERE p.property_id = ?
-      ORDER BY p.valid_from DESC
-      LIMIT 500
     `
     
-    const passes = await DB.prepare(passesQuery).bind(property_id).all()
+    const params = [property_id]
+    
+    // Add search filter in SQL (more efficient)
+    if (search) {
+      query += ` AND (p.primary_guest_name LIKE ? OR p.room_number LIKE ? OR p.contact_email LIKE ? OR p.contact_phone LIKE ?)`
+      const searchPattern = '%' + search + '%'
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern)
+    }
+    
+    query += ` ORDER BY p.valid_from DESC LIMIT 500`
+    
+    const passes = await DB.prepare(query).bind(...params).all()
     
     if (!passes.results || passes.results.length === 0) {
       return c.json({
@@ -4635,78 +4645,102 @@ app.get('/api/admin/guest-relations', async (c) => {
       })
     }
     
-    // Now enrich each pass with aggregated data
-    const enrichedGuests = []
+    // Get all pass IDs for batch queries
+    const passIds = passes.results.map(p => p.pass_id)
+    const rooms = passes.results.map(p => p.room_number).filter(r => r)
+    const emails = passes.results.map(p => p.contact_email).filter(e => e)
     
-    for (const pass of passes.results) {
-      // Apply search filter
-      if (search) {
-        const searchLower = search.toLowerCase()
-        const matchesSearch = 
-          (pass.primary_guest_name && pass.primary_guest_name.toLowerCase().includes(searchLower)) ||
-          (pass.room_number && pass.room_number.toLowerCase().includes(searchLower)) ||
-          (pass.contact_email && pass.contact_email.toLowerCase().includes(searchLower)) ||
-          (pass.contact_phone && pass.contact_phone.toLowerCase().includes(searchLower))
-        
-        if (!matchesSearch) continue
-      }
-      
-      // Count feedback
-      const feedbackCount = await DB.prepare(`
-        SELECT COUNT(*) as count
+    // Batch query for feedback counts by room/email
+    let feedbackData = {}
+    if (rooms.length > 0 || emails.length > 0) {
+      const feedbackQuery = `
+        SELECT 
+          COALESCE(room_number, guest_email) as identifier,
+          COUNT(*) as count,
+          MAX(sentiment_label) as latest_sentiment,
+          MAX(sentiment_score) as latest_score
         FROM feedback_submissions
-        WHERE property_id = ? 
-          AND (room_number = ? OR guest_email = ?)
-      `).bind(property_id, pass.room_number, pass.contact_email).first()
+        WHERE property_id = ?
+          AND (room_number IN (${rooms.map(() => '?').join(',')}) OR guest_email IN (${emails.map(() => '?').join(',')}))
+        GROUP BY identifier
+      `
+      const feedbackParams = [property_id, ...rooms, ...emails]
+      const feedbackResults = await DB.prepare(feedbackQuery).bind(...feedbackParams).all()
       
-      // Get latest feedback sentiment
-      const latestFeedback = await DB.prepare(`
-        SELECT sentiment_label, sentiment_score
-        FROM feedback_submissions
-        WHERE property_id = ? 
-          AND (room_number = ? OR guest_email = ?)
-        ORDER BY submitted_at DESC
-        LIMIT 1
-      `).bind(property_id, pass.room_number, pass.contact_email).first()
-      
-      // Count verifications
-      const verificationCount = await DB.prepare(`
-        SELECT COUNT(*) as count
+      feedbackResults.results?.forEach(row => {
+        feedbackData[row.identifier] = {
+          count: row.count || 0,
+          sentiment: row.latest_sentiment,
+          score: row.latest_score
+        }
+      })
+    }
+    
+    // Batch query for verification counts
+    let verificationData = {}
+    if (passIds.length > 0) {
+      const verificationQuery = `
+        SELECT pass_id, COUNT(*) as count
         FROM pass_verifications
-        WHERE pass_id = ?
-      `).bind(pass.pass_id).first()
+        WHERE pass_id IN (${passIds.map(() => '?').join(',')})
+        GROUP BY pass_id
+      `
+      const verificationResults = await DB.prepare(verificationQuery).bind(...passIds).all()
       
-      // Count service requests
-      const serviceRequestCount = await DB.prepare(`
-        SELECT COUNT(*) as count
+      verificationResults.results?.forEach(row => {
+        verificationData[row.pass_id] = row.count || 0
+      })
+    }
+    
+    // Batch query for service request counts
+    let serviceData = {}
+    if (passIds.length > 0) {
+      const serviceQuery = `
+        SELECT pass_id, COUNT(*) as count
         FROM service_requests
-        WHERE pass_id = ?
-      `).bind(pass.pass_id).first()
+        WHERE pass_id IN (${passIds.map(() => '?').join(',')})
+        GROUP BY pass_id
+      `
+      const serviceResults = await DB.prepare(serviceQuery).bind(...passIds).all()
       
-      const enrichedGuest = {
+      serviceResults.results?.forEach(row => {
+        serviceData[row.pass_id] = row.count || 0
+      })
+    }
+    
+    // Enrich passes with aggregated data
+    const enrichedGuests = passes.results.map(pass => {
+      const identifier = pass.room_number || pass.contact_email || ''
+      const feedback = feedbackData[identifier] || { count: 0, sentiment: null, score: null }
+      
+      return {
         ...pass,
-        feedback_count: feedbackCount?.count || 0,
-        latest_sentiment: latestFeedback?.sentiment_label || null,
-        avg_sentiment: latestFeedback?.sentiment_score || null,
-        verification_count: verificationCount?.count || 0,
-        service_request_count: serviceRequestCount?.count || 0,
-        chat_count: 0 // Can add later if needed
+        feedback_count: feedback.count,
+        latest_sentiment: feedback.sentiment,
+        avg_sentiment: feedback.score,
+        verification_count: verificationData[pass.pass_id] || 0,
+        service_request_count: serviceData[pass.pass_id] || 0,
+        chat_count: 0
       }
-      
-      // Apply feedback filter
-      if (has_feedback === 'true' && enrichedGuest.feedback_count === 0) continue
-      if (has_feedback === 'false' && enrichedGuest.feedback_count > 0) continue
-      
-      // Apply sentiment filter
-      if (sentiment && sentiment !== 'all' && enrichedGuest.latest_sentiment !== sentiment) continue
-      
-      enrichedGuests.push(enrichedGuest)
+    })
+    
+    // Apply filters
+    let filteredGuests = enrichedGuests
+    
+    if (has_feedback === 'true') {
+      filteredGuests = filteredGuests.filter(g => g.feedback_count > 0)
+    } else if (has_feedback === 'false') {
+      filteredGuests = filteredGuests.filter(g => g.feedback_count === 0)
+    }
+    
+    if (sentiment && sentiment !== 'all') {
+      filteredGuests = filteredGuests.filter(g => g.latest_sentiment === sentiment)
     }
     
     return c.json({
       success: true,
-      guests: enrichedGuests,
-      total: enrichedGuests.length,
+      guests: filteredGuests,
+      total: filteredGuests.length,
       date_range: { from: date_from, to: date_to }
     })
     
