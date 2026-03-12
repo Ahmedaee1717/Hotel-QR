@@ -21874,11 +21874,11 @@ app.post('/api/voice-assistant/session', async (c) => {
   const { DB } = c.env
   const { service_type_id, guest_info, property_id } = await c.req.json()
   
-  // Get OpenAI API key from environment
-  const OPENAI_API_KEY = c.env.OPENAI_API_KEY
+  // Get OpenAI API key from environment (VoiceCall secret)
+  const OPENAI_API_KEY = c.env.VoiceCall || c.env.OPENAI_API_KEY
   
   if (!OPENAI_API_KEY) {
-    return c.json({ success: false, error: 'OpenAI API key not configured' }, 500)
+    return c.json({ success: false, error: 'OpenAI API key not configured. Please add VoiceCall secret in Cloudflare.' }, 500)
   }
   
   try {
