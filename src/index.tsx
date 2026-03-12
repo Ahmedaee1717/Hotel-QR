@@ -22528,7 +22528,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     <!-- Info Button, Feedback Button, At Your Service Button & Language Selector - Top Right on Cover -->
                     <div class="absolute top-4 right-4 z-10 flex gap-2">
                         <!-- At Your Service Button -->
-                        <button id="serviceButton" onclick="openServiceMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2" style="background-color: var(--accent-color, #D4AF37);" title="At Your Service">
+                        <button id="serviceButton" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2" style="background-color: var(--accent-color, #D4AF37);" title="At Your Service">
                             <i class="fas fa-concierge-bell"></i>
                             <span class="hidden sm:inline">At Your Service</span>
                         </button>
@@ -29012,7 +29012,15 @@ app.get('/hotel/:property_slug', async (c) => {
         // ========================================
 
         // Load service types on page load
-        document.addEventListener('DOMContentLoaded', loadServiceTypes);
+        document.addEventListener('DOMContentLoaded', function() {
+            loadServiceTypes();
+            
+            // Attach event listener to service button
+            const serviceButton = document.getElementById('serviceButton');
+            if (serviceButton) {
+                serviceButton.addEventListener('click', window.openServiceMenu);
+            }
+        });
         </script>
     </body>
     </html>
