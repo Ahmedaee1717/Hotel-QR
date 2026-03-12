@@ -29080,7 +29080,12 @@ app.get('/hotel/:property_slug', async (c) => {
         }
         
         function handleOpenAIMessage(message) {
-            console.log('OpenAI message:', message.type);
+            console.log('📨 OpenAI message:', message.type);
+            
+            // Log EVERYTHING for debugging
+            if (message.type.includes('function')) {
+                console.log('🔥 FUNCTION-RELATED MESSAGE:', JSON.stringify(message, null, 2));
+            }
             
             switch (message.type) {
                 case 'response.created':
@@ -29117,6 +29122,25 @@ app.get('/hotel/:property_slug', async (c) => {
                     if (message.delta) {
                         playAudioChunk(message.delta);
                     }
+                    break;
+                    
+                case 'response.done':
+                    console.log('✅ AI response complete. Full response:', JSON.stringify(message, null, 2));
+                    // Check if there were any function calls
+                    if (message.response && message.response.output) {
+                        console.log('📦 Response output:', message.response.output);
+                        const hasFunctionCall = message.response.output.some(item => 
+                            item.type === 'function_call' || item.type === 'function_call_output'
+                        );
+                        if (!hasFunctionCall) {
+                            console.error('❌ AI DID NOT CALL ANY FUNCTION! Response contained:', 
+                                message.response.output.map(o => o.type).join(', '));
+                        }
+                    }
+                    break;
+                    
+                case 'response.function_call_arguments.delta':
+                    console.log('🔄 Function arguments building:', message);
                     break;
                     
                 case 'response.function_call_arguments.done':
