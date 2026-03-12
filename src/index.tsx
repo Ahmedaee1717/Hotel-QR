@@ -28601,7 +28601,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         '<div class="flex-1">' +
                             '<h4 class="text-lg font-bold text-gray-800 mb-1">🎙️ Speak to AI Assistant</h4>' +
                             '<p class="text-sm text-gray-600 mb-3">Prefer to talk? Call our AI assistant with natural voice - it\'s like speaking to our staff! Just describe what you need.</p>' +
-                            '<button onclick="startVoiceServiceRequest(' + serviceTypeId + ', \'' + service.service_name.replace(/'/g, "\\'") + '\')" ' +
+                            '<button onclick="startVoiceServiceRequest(' + serviceTypeId + ', &quot;' + service.service_name.replace(/"/g, '&quot;') + '&quot;)" ' +
                                 'class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2">' +
                                 '<i class="fas fa-phone-alt animate-pulse"></i>' +
                                 '<span>Start Voice Call</span>' +
