@@ -21917,20 +21917,27 @@ Your Task:
 2. Ask: "What can I help you with today?"
 3. Listen to their request
 4. IDENTIFY which service type ID matches (Housekeeping, Room Service, Maintenance, etc.)
-5. Say: "I understand you need [their request] for room ${guest_info.room_number}. Let me book that for you."
-6. Ask ONLY: "Is this urgent, high priority, or normal priority?"
-7. **IMMEDIATELY CALL create_service_request function** with:
+5. Ask ONLY: "Is this urgent, high priority, or normal priority?"
+6. **IMMEDIATELY after they answer priority, STOP TALKING and CALL the create_service_request function** with:
    - service_type_id: the matching ID number from the list above
    - request_details: exactly what they described
    - priority: their answer ('normal', 'high', or 'urgent')
-8. After function returns, say: "Perfect! Your request #[ID] has been created. Our team will assist you shortly!"
+7. **DO NOT say "I'll create that" or "Let me book that" - JUST CALL THE FUNCTION SILENTLY**
+8. After function returns successfully, THEN say: "Perfect! Your request #[ID] has been created. Our team will assist you shortly!"
 
 🚫 DO NOT ASK FOR:
 - Guest name (you already know: ${guest_info.full_name})
 - Room number (you already know: ${guest_info.room_number})  
 - Hotel name (they're already at the hotel)
 
-⚠️ CRITICAL: You MUST call create_service_request to actually book it. Verbal confirmation alone does NOT create the request!
+⚠️ CRITICAL WORKFLOW:
+Step 1: Ask what they need
+Step 2: Identify service type
+Step 3: Ask priority
+Step 4: CALL create_service_request (DO NOT TALK, JUST CALL THE FUNCTION)
+Step 5: After function succeeds, confirm with request number
+
+YOU MUST CALL THE FUNCTION - verbal confirmation alone does NOTHING!
 
 Communication Style:
 - Warm, professional, and friendly
@@ -21955,19 +21962,25 @@ Your Task:
 1. Greet "${guest_info.full_name}" warmly by name (DO NOT ask for their name or room)
 2. Ask: "What do you need for ${serviceType.service_name}?"
 3. Listen to their request details
-4. Say: "I understand you need [their request] for room ${guest_info.room_number}. Let me book that right away."
-5. Ask ONLY: "Is this urgent, high priority, or normal priority?"
-6. **IMMEDIATELY CALL create_service_request function** with:
+4. Ask ONLY: "Is this urgent, high priority, or normal priority?"
+5. **IMMEDIATELY after they answer priority, STOP TALKING and CALL the create_service_request function** with:
    - request_details: exactly what they described
    - priority: their answer ('normal', 'high', or 'urgent')
-7. After function returns, say: "Perfect! Your ${serviceType.service_name} request #[ID] has been created. Our team will assist you shortly!"
+6. **DO NOT say "I'll create that" or "Let me book that" - JUST CALL THE FUNCTION SILENTLY**
+7. After function returns successfully, THEN say: "Perfect! Your ${serviceType.service_name} request #[ID] has been created. Our team will assist you shortly!"
 
 🚫 DO NOT ASK FOR:
 - Guest name (you already know: ${guest_info.full_name})
 - Room number (you already know: ${guest_info.room_number})
 - Hotel name (they're already at the hotel)
 
-⚠️ CRITICAL: You MUST call create_service_request to actually book it. Verbal confirmation alone does NOT create the request!
+⚠️ CRITICAL WORKFLOW:
+Step 1: Ask what they need
+Step 2: Ask priority
+Step 3: CALL create_service_request (DO NOT TALK, JUST CALL THE FUNCTION)
+Step 4: After function succeeds, confirm with request number
+
+YOU MUST CALL THE FUNCTION - verbal confirmation alone does NOTHING!
 
 Communication Style:
 - Warm, professional, and friendly
@@ -21997,6 +22010,7 @@ Remember: You're here to make their stay better. Be helpful and efficient!`
           prefix_padding_ms: 300,
           silence_duration_ms: 500
         },
+        tool_choice: 'auto', // Allow AI to decide when to call function
         tools: [
           {
             type: 'function',
@@ -29077,8 +29091,10 @@ app.get('/hotel/:property_slug', async (c) => {
                     break;
                     
                 case 'response.function_call_arguments.done':
+                    console.log('🎯 Function call detected!', message);
                     // AI wants to call a function (create service request)
                     if (message.name === 'create_service_request') {
+                        console.log('✅ Calling handleServiceRequestCreation with args:', message.arguments);
                         handleServiceRequestCreation(JSON.parse(message.arguments));
                     }
                     break;
