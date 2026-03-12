@@ -4582,59 +4582,53 @@ app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
 
 // ============================================
 // GUEST RELATIONS & MARKETING API ROUTES
+// Updated: 2026-03-12 18:45 - FORCE REFRESH
 // ============================================
 
 // Get all guests with comprehensive profile data
 app.get('/api/admin/guest-relations', async (c) => {
+  console.log('🔵 Guest Relations API called')
+  
   const { DB } = c.env
   const property_id = c.req.query('property_id')
-  const date_from = c.req.query('date_from') || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0]
-  const date_to = c.req.query('date_to') || new Date().toISOString().split('T')[0]
-  const search = c.req.query('search') || ''
+  
+  console.log('🔵 Property ID:', property_id)
+  console.log('🔵 DB exists:', !!DB)
   
   if (!property_id) {
+    console.log('🔴 Missing property_id')
     return c.json({ error: 'Missing property_id' }, 400)
   }
   
   try {
-    // SIMPLE: Just get the passes with zero counts - aggregations can be added later
-    let query = `
+    console.log('🔵 Attempting to query digital_passes...')
+    
+    // ABSOLUTE SIMPLEST QUERY POSSIBLE
+    const passes = await DB.prepare(`
       SELECT 
-        p.pass_id,
-        p.pass_reference,
-        p.primary_guest_name,
-        p.room_number,
-        p.guest_pin,
-        p.contact_email,
-        p.contact_phone,
-        p.valid_from,
-        p.valid_until,
-        p.pass_status,
-        p.num_adults,
-        p.num_children,
-        t.tier_name,
-        t.tier_display_name,
-        t.tier_color
-      FROM digital_passes p
-      LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
-      WHERE p.property_id = ?
-    `
+        pass_id,
+        pass_reference,
+        primary_guest_name,
+        room_number,
+        contact_email,
+        contact_phone,
+        valid_from,
+        valid_until,
+        num_adults,
+        num_children
+      FROM digital_passes
+      WHERE property_id = ?
+      ORDER BY pass_id DESC
+      LIMIT 50
+    `).bind(property_id).all()
     
-    const params = [property_id]
+    console.log('🟢 Query successful, results:', passes.results?.length || 0)
     
-    if (search) {
-      query += ` AND (p.primary_guest_name LIKE ? OR p.room_number LIKE ? OR p.contact_email LIKE ? OR p.contact_phone LIKE ?)`
-      const searchPattern = '%' + search + '%'
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern)
-    }
-    
-    query += ` ORDER BY p.valid_from DESC LIMIT 100`
-    
-    const passes = await DB.prepare(query).bind(...params).all()
-    
-    // Return passes with zero counts for now - just get it working first
     const guests = (passes.results || []).map(pass => ({
       ...pass,
+      tier_name: null,
+      tier_display_name: null,
+      tier_color: null,
       feedback_count: 0,
       latest_sentiment: null,
       avg_sentiment: null,
@@ -4643,15 +4637,18 @@ app.get('/api/admin/guest-relations', async (c) => {
       chat_count: 0
     }))
     
+    console.log('🟢 Returning', guests.length, 'guests')
+    
     return c.json({
       success: true,
       guests: guests,
-      total: guests.length,
-      date_range: { from: date_from, to: date_to }
+      total: guests.length
     })
     
   } catch (error) {
-    console.error('Guest relations error:', error)
+    console.error('🔴 Guest relations error:', error)
+    console.error('🔴 Error message:', error.message)
+    console.error('🔴 Error stack:', error.stack)
     return c.json({ 
       success: false,
       error: 'Failed to fetch guest data',
