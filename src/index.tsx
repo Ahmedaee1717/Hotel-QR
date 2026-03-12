@@ -21903,93 +21903,56 @@ app.post('/api/voice-assistant/session', async (c) => {
     
     // Create instructions based on request type
     const instructions = isGeneralRequest ? 
-      `You are a friendly and professional hotel concierge assistant helping guests with any request.
+      `You are ${guest_info.full_name}'s hotel AI assistant for room ${guest_info.room_number}.
 
-Guest Information (ALREADY KNOWN - DO NOT ASK FOR THIS):
+GUEST INFO (DON'T ASK):
 - Name: ${guest_info.full_name}
-- Room Number: ${guest_info.room_number}
+- Room: ${guest_info.room_number}
 
-Available Services and their IDs:
-${allServiceTypes.results.map(st => `- ID ${st.service_type_id}: ${st.service_name} - ${st.description || 'Hotel service'}`).join('\n')}
+SERVICES & IDs:
+${allServiceTypes.results.map(st => `ID${st.service_type_id}=${st.service_name}`).join(', ')}
 
-Your Task:
-1. Greet "${guest_info.full_name}" warmly by name (DO NOT ask for their name or room - you already know it's room ${guest_info.room_number})
-2. Ask: "What can I help you with today?"
-3. Listen to their request
-4. IDENTIFY which service type ID matches (Housekeeping, Room Service, Maintenance, etc.)
-5. Ask ONLY: "Is this urgent, high priority, or normal priority?"
-6. **IMMEDIATELY after they answer priority, STOP TALKING and CALL the create_service_request function** with:
-   - service_type_id: the matching ID number from the list above
-   - request_details: exactly what they described
-   - priority: their answer ('normal', 'high', or 'urgent')
-7. **DO NOT say "I'll create that" or "Let me book that" - JUST CALL THE FUNCTION SILENTLY**
-8. After function returns successfully, THEN say: "Perfect! Your request #[ID] has been created. Our team will assist you shortly!"
+WORKFLOW (EXACTLY 3 STEPS):
+1. Say: "Hi ${guest_info.full_name}! What do you need?"
+2. They describe request → Ask: "Urgent, high, or normal priority?"
+3. They answer → IMMEDIATELY call create_service_request function
 
-🚫 DO NOT ASK FOR:
-- Guest name (you already know: ${guest_info.full_name})
-- Room number (you already know: ${guest_info.room_number})  
-- Hotel name (they're already at the hotel)
+FUNCTION CALL (MANDATORY):
+{
+  "service_type_id": [matching ID number],
+  "request_details": "[exactly what they said]",
+  "priority": "[their answer: urgent/high/normal]"
+}
 
-⚠️ CRITICAL WORKFLOW:
-Step 1: Ask what they need
-Step 2: Identify service type
-Step 3: Ask priority
-Step 4: CALL create_service_request (DO NOT TALK, JUST CALL THE FUNCTION)
-Step 5: After function succeeds, confirm with request number
-
-YOU MUST CALL THE FUNCTION - verbal confirmation alone does NOTHING!
-
-Communication Style:
-- Warm, professional, and friendly
-- Use natural conversational language  
-- Keep responses concise (1-3 sentences)
-- Show empathy and eagerness to help
-- Speak as if you're a real hotel staff member
-
-Remember: Identify the correct service type from their description and include it when creating the request!`
+RULES:
+- DON'T ask for name/room/hotel
+- DON'T say "let me create that" - JUST CALL THE FUNCTION
+- CALL FUNCTION = booking created
+- NO FUNCTION CALL = nothing happens`
     : 
-      `You are a friendly and professional hotel concierge assistant helping guests book services.
+      `You are ${guest_info.full_name}'s hotel AI assistant for ${serviceType.service_name} in room ${guest_info.room_number}.
 
-Guest Information (ALREADY KNOWN - DO NOT ASK FOR THIS):
+GUEST INFO (DON'T ASK):
 - Name: ${guest_info.full_name}
-- Room Number: ${guest_info.room_number}
+- Room: ${guest_info.room_number}
+- Service: ${serviceType.service_name}
 
-Current Service: ${serviceType.service_name}
-Service Description: ${serviceType.description || 'Standard hotel service'}
-Expected Response Time: ~${serviceType.estimated_response_minutes} minutes
+WORKFLOW (EXACTLY 3 STEPS):
+1. Say: "Hi ${guest_info.full_name}! What do you need for ${serviceType.service_name}?"
+2. They describe request → Ask: "Urgent, high, or normal priority?"
+3. They answer → IMMEDIATELY call create_service_request function
 
-Your Task:
-1. Greet "${guest_info.full_name}" warmly by name (DO NOT ask for their name or room)
-2. Ask: "What do you need for ${serviceType.service_name}?"
-3. Listen to their request details
-4. Ask ONLY: "Is this urgent, high priority, or normal priority?"
-5. **IMMEDIATELY after they answer priority, STOP TALKING and CALL the create_service_request function** with:
-   - request_details: exactly what they described
-   - priority: their answer ('normal', 'high', or 'urgent')
-6. **DO NOT say "I'll create that" or "Let me book that" - JUST CALL THE FUNCTION SILENTLY**
-7. After function returns successfully, THEN say: "Perfect! Your ${serviceType.service_name} request #[ID] has been created. Our team will assist you shortly!"
+FUNCTION CALL (MANDATORY):
+{
+  "request_details": "[exactly what they said]",
+  "priority": "[their answer: urgent/high/normal]"
+}
 
-🚫 DO NOT ASK FOR:
-- Guest name (you already know: ${guest_info.full_name})
-- Room number (you already know: ${guest_info.room_number})
-- Hotel name (they're already at the hotel)
-
-⚠️ CRITICAL WORKFLOW:
-Step 1: Ask what they need
-Step 2: Ask priority
-Step 3: CALL create_service_request (DO NOT TALK, JUST CALL THE FUNCTION)
-Step 4: After function succeeds, confirm with request number
-
-YOU MUST CALL THE FUNCTION - verbal confirmation alone does NOTHING!
-
-Communication Style:
-- Warm, professional, and friendly
-- Use natural conversational language
-- Keep responses concise (1-3 sentences)
-- Show empathy and eagerness to help
-- Speak as if you're a real hotel staff member
-
-Remember: You're here to make their stay better. Be helpful and efficient!`
+RULES:
+- DON'T ask for name/room/hotel  
+- DON'T say "let me create that" - JUST CALL THE FUNCTION
+- CALL FUNCTION = booking created
+- NO FUNCTION CALL = nothing happens`
 
 
     return c.json({
@@ -22199,6 +22162,72 @@ app.get('/api/admin/service-requests', async (c) => {
   } catch (error) {
     console.error('Get service requests error:', error)
     return c.json({ success: false, error: 'Failed to load service requests' }, 500)
+  }
+})
+
+// Save voice call transcript/log
+app.post('/api/voice-call-logs', async (c) => {
+  const { DB } = c.env
+  const { property_id, pass_reference, guest_name, room_number, service_type_id, transcript, duration_seconds } = await c.req.json()
+  
+  try {
+    console.log('💾 Saving voice call log:', { property_id, pass_reference, guest_name, room_number, service_type_id, transcript_length: transcript?.length })
+    
+    const result = await DB.prepare(`
+      INSERT INTO voice_call_logs (
+        property_id, pass_reference, guest_name, room_number, 
+        service_type_id, transcript, duration_seconds, call_timestamp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      property_id,
+      pass_reference,
+      guest_name,
+      room_number,
+      service_type_id || null,
+      transcript,
+      duration_seconds || 0
+    ).run()
+    
+    console.log('✅ Voice call log saved! ID:', result.meta.last_row_id)
+    
+    return c.json({
+      success: true,
+      log_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('❌ Save voice call log error:', error)
+    return c.json({ success: false, error: 'Failed to save call log' }, 500)
+  }
+})
+
+// Get voice call logs for admin
+app.get('/api/admin/voice-call-logs', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    const logs = await DB.prepare(`
+      SELECT 
+        vcl.*,
+        st.service_name,
+        st.service_icon,
+        st.service_color
+      FROM voice_call_logs vcl
+      LEFT JOIN service_types st ON vcl.service_type_id = st.service_type_id
+      WHERE vcl.property_id = ?
+        AND DATE(vcl.call_timestamp) = ?
+      ORDER BY vcl.call_timestamp DESC
+    `).bind(property_id, date).all()
+    
+    return c.json({
+      success: true,
+      logs: logs.results,
+      total: logs.results.length
+    })
+  } catch (error) {
+    console.error('Get voice call logs error:', error)
+    return c.json({ success: false, error: 'Failed to load call logs' }, 500)
   }
 })
 
@@ -29255,6 +29284,36 @@ app.get('/hotel/:property_slug', async (c) => {
         
         function endVoiceCall() {
             voiceCallActive = false;
+            
+            // Save transcript to backend before closing
+            const session = getGuestSession();
+            const propertyId = getPropertyId();
+            const transcript = document.getElementById('voiceTranscript')?.innerText || voiceCallData.transcript || '';
+            
+            if (transcript && transcript.trim().length > 0) {
+                console.log('💾 Saving voice call transcript before closing...');
+                fetch('/api/voice-call-logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        property_id: propertyId,
+                        pass_reference: session?.pass_reference,
+                        guest_name: session?.full_name,
+                        room_number: session?.room_number,
+                        service_type_id: voiceCallData.serviceTypeId,
+                        transcript: transcript,
+                        duration_seconds: 0 // We can track this if needed
+                    })
+                }).then(res => res.json())
+                  .then(data => {
+                      if (data.success) {
+                          console.log('✅ Voice call transcript saved! Log ID:', data.log_id);
+                      } else {
+                          console.error('❌ Failed to save transcript:', data.error);
+                      }
+                  })
+                  .catch(err => console.error('❌ Error saving transcript:', err));
+            }
             
             // Close WebSocket
             if (voiceCallData.ws) {
