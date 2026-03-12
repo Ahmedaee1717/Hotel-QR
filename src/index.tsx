@@ -21882,17 +21882,56 @@ app.post('/api/voice-assistant/session', async (c) => {
   }
   
   try {
-    // Get service type details
-    const serviceType = await DB.prepare(`
-      SELECT * FROM service_types WHERE service_type_id = ? AND property_id = ?
-    `).bind(service_type_id, property_id).first()
+    // Get service type details (if specified)
+    let serviceType = null
+    let isGeneralRequest = !service_type_id
     
-    if (!serviceType) {
-      return c.json({ success: false, error: 'Service type not found' }, 404)
+    if (service_type_id) {
+      serviceType = await DB.prepare(`
+        SELECT * FROM service_types WHERE service_type_id = ? AND property_id = ?
+      `).bind(service_type_id, property_id).first()
+      
+      if (!serviceType) {
+        return c.json({ success: false, error: 'Service type not found' }, 404)
+      }
     }
     
-    // Create instructions for the AI assistant
-    const instructions = `You are a friendly and professional hotel concierge assistant helping guests book services.
+    // Get all available service types for general requests
+    const allServiceTypes = await DB.prepare(`
+      SELECT service_type_id, service_name, description FROM service_types WHERE property_id = ?
+    `).bind(property_id).all()
+    
+    // Create instructions based on request type
+    const instructions = isGeneralRequest ? 
+      `You are a friendly and professional hotel concierge assistant helping guests with any request.
+
+Guest Information:
+- Name: ${guest_info.full_name}
+- Room: ${guest_info.room_number}
+
+Available Services:
+${allServiceTypes.results.map(st => `- ${st.service_name}: ${st.description || 'Hotel service'}`).join('\n')}
+
+Your Task:
+1. Greet the guest warmly by name
+2. Ask what they need help with today
+3. IDENTIFY which service type their request belongs to based on what they describe
+4. Listen carefully to their request details
+5. Confirm the details back to them (what they need, room number, any special requests)
+6. Ask if they need it urgently (normal, high, or urgent priority)
+7. Once confirmed, call the create_service_request function with the correct service_type_id
+8. Tell them their request has been created and the team will assist shortly
+
+Communication Style:
+- Warm, professional, and friendly
+- Use natural conversational language  
+- Keep responses concise (1-3 sentences)
+- Show empathy and eagerness to help
+- Speak as if you're a real hotel staff member
+
+Remember: Identify the correct service type from their description and include it when creating the request!`
+    : 
+      `You are a friendly and professional hotel concierge assistant helping guests book services.
 
 Guest Information:
 - Name: ${guest_info.full_name}
@@ -21920,6 +21959,7 @@ Communication Style:
 
 Remember: You're here to make their stay better. Be helpful and efficient!`
 
+
     return c.json({
       success: true,
       session_config: {
@@ -21946,6 +21986,10 @@ Remember: You're here to make their stay better. Be helpful and efficient!`
             parameters: {
               type: 'object',
               properties: {
+                service_type_id: {
+                  type: 'number',
+                  description: 'The ID of the service type (required for general requests). Match the guest request to one of the available services.'
+                },
                 request_details: {
                   type: 'string',
                   description: 'Detailed description of what the guest needs'
@@ -21982,8 +22026,19 @@ app.post('/api/voice-assistant/function-call', async (c) => {
   
   if (function_name === 'create_service_request') {
     try {
-      const { request_details, priority, guest_phone } = func_args
-      const { service_type_id, guest_info, property_id } = session_data
+      const { service_type_id: ai_service_type_id, request_details, priority, guest_phone } = func_args
+      const { service_type_id: session_service_type_id, guest_info, property_id } = session_data
+      
+      // Use AI-provided service_type_id if available, otherwise use session one
+      const final_service_type_id = ai_service_type_id || session_service_type_id
+      
+      if (!final_service_type_id) {
+        console.error('❌ No service type ID provided')
+        return c.json({ 
+          success: false, 
+          error: 'Service type must be specified' 
+        }, 400)
+      }
       
       // Get pass_id from pass_reference
       let pass_id = null
@@ -21999,7 +22054,7 @@ app.post('/api/voice-assistant/function-call', async (c) => {
       
       console.log('🎤 Creating voice service request:', {
         property_id,
-        service_type_id,
+        service_type_id: final_service_type_id,
         pass_id,
         guest_name: guest_info.full_name,
         room_number: guest_info.room_number,
@@ -22017,7 +22072,7 @@ app.post('/api/voice-assistant/function-call', async (c) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       `).bind(
         property_id,
-        service_type_id,
+        final_service_type_id,
         pass_id,
         guest_info.full_name,
         guest_info.room_number,
@@ -28577,7 +28632,26 @@ app.get('/hotel/:property_slug', async (c) => {
             }
             
             console.log('✅ Rendering', serviceTypes.length, 'services');
-            content.innerHTML = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+            
+            // Big AI Call Button at the top
+            content.innerHTML = 
+                '<div class="mb-6">' +
+                    '<button onclick="startGeneralVoiceCall()" class="w-full p-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all transform">' +
+                        '<div class="flex items-center justify-center gap-4">' +
+                            '<div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center animate-pulse">' +
+                                '<i class="fas fa-phone-volume text-3xl"></i>' +
+                            '</div>' +
+                            '<div class="text-left">' +
+                                '<div class="text-2xl font-bold mb-1">📞 Call AI Assistant</div>' +
+                                '<div class="text-sm opacity-90">Speak naturally - our AI will help with any request!</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</button>' +
+                '</div>' +
+                '<div class="mb-4 text-center">' +
+                    '<p class="text-gray-600 font-medium">Or select a specific service below:</p>' +
+                '</div>' +
+                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
                 serviceTypes.map(service => {
                     return '<button onclick="showServiceRequestForm(' + service.service_type_id + ')" class="p-6 border-2 rounded-xl hover:shadow-lg transition-all text-left group" style="border-color: ' + service.service_color + '20; background: ' + service.service_color + '05;">' +
                         '<div class="flex items-start gap-4">' +
@@ -28781,6 +28855,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 voiceCallData.ringingSound.close();
                 voiceCallData.ringingSound = null;
             }
+        }
+        
+        // General voice call - AI identifies the service type
+        window.startGeneralVoiceCall = async function() {
+            // Use service_type_id = null to indicate general request
+            // The AI will identify what service is needed
+            await startVoiceServiceRequest(null, 'General Request');
         }
         
         async function startVoiceServiceRequest(serviceTypeId, serviceName) {
