@@ -28701,7 +28701,10 @@ app.get('/hotel/:property_slug', async (c) => {
             ws: null,
             audioContext: null,
             mediaStream: null,
-            sessionConfig: null
+            sessionConfig: null,
+            audioQueue: [],
+            isPlayingAudio: false,
+            nextStartTime: 0
         };
         
         async function startVoiceServiceRequest(serviceTypeId, serviceName) {
@@ -28853,6 +28856,12 @@ app.get('/hotel/:property_slug', async (c) => {
             console.log('OpenAI message:', message.type);
             
             switch (message.type) {
+                case 'response.created':
+                    // New response starting - reset audio timing
+                    voiceCallData.nextStartTime = voiceCallData.audioContext ? voiceCallData.audioContext.currentTime : 0;
+                    console.log('New AI response starting');
+                    break;
+                    
                 case 'conversation.item.created':
                     if (message.item.type === 'message' && message.item.role === 'assistant') {
                         // AI is responding
@@ -28916,10 +28925,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const audioBuffer = voiceCallData.audioContext.createBuffer(1, float32.length, 24000);
                 audioBuffer.getChannelData(0).set(float32);
                 
+                // Calculate when this chunk should start playing
+                const now = voiceCallData.audioContext.currentTime;
+                const startTime = Math.max(now, voiceCallData.nextStartTime);
+                
+                // Schedule this chunk to play
                 const source = voiceCallData.audioContext.createBufferSource();
                 source.buffer = audioBuffer;
                 source.connect(voiceCallData.audioContext.destination);
-                source.start();
+                source.start(startTime);
+                
+                // Update next start time for seamless playback
+                voiceCallData.nextStartTime = startTime + audioBuffer.duration;
+                
             } catch (error) {
                 console.error('Audio playback error:', error);
             }
