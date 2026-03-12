@@ -28458,6 +28458,24 @@ app.get('/hotel/:property_slug', async (c) => {
 
         <script>
         let serviceTypes = [];
+        
+        // Get guest session helper
+        function getGuestSession() {
+            const session = localStorage.getItem('guestPassSession');
+            if (session) {
+                try {
+                    return JSON.parse(session).guest;
+                } catch (e) {
+                    return null;
+                }
+            }
+            return null;
+        }
+        
+        // Get property ID helper
+        function getPropertyId() {
+            return '${propertyId}';
+        }
 
         async function loadServiceTypes() {
             try {
