@@ -25361,7 +25361,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 loadHomepageFeedbackForm();
                 
                 // Load service types now that propertyData is available
-                loadServiceTypes();
+                if (window.loadServiceTypes) {
+                    window.loadServiceTypes();
+                }
                 
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
@@ -28480,7 +28482,7 @@ app.get('/hotel/:property_slug', async (c) => {
             return window.propertyData?.property_id || '1';
         }
 
-        async function loadServiceTypes() {
+        window.loadServiceTypes = async function() {
             try {
                 const propertyId = getPropertyId();
                 const response = await fetch('/api/service-types?property_id=' + propertyId);
