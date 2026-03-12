@@ -21869,6 +21869,156 @@ app.post('/api/service-requests', async (c) => {
   }
 })
 
+// OpenAI Voice Assistant API for Service Requests
+app.post('/api/voice-assistant/session', async (c) => {
+  const { DB } = c.env
+  const { service_type_id, guest_info, property_id } = await c.req.json()
+  
+  // Get OpenAI API key from environment
+  const OPENAI_API_KEY = c.env.OPENAI_API_KEY
+  
+  if (!OPENAI_API_KEY) {
+    return c.json({ success: false, error: 'OpenAI API key not configured' }, 500)
+  }
+  
+  try {
+    // Get service type details
+    const serviceType = await DB.prepare(`
+      SELECT * FROM service_types WHERE service_type_id = ? AND property_id = ?
+    `).bind(service_type_id, property_id).first()
+    
+    if (!serviceType) {
+      return c.json({ success: false, error: 'Service type not found' }, 404)
+    }
+    
+    // Create instructions for the AI assistant
+    const instructions = `You are a friendly and professional hotel concierge assistant helping guests book services.
+
+Guest Information:
+- Name: ${guest_info.full_name}
+- Room: ${guest_info.room_number}
+
+Current Service: ${serviceType.service_name}
+Service Description: ${serviceType.description || 'Standard hotel service'}
+Expected Response Time: ~${serviceType.estimated_response_minutes} minutes
+
+Your Task:
+1. Greet the guest warmly by name
+2. Ask them to describe what they need for ${serviceType.service_name}
+3. Listen carefully to their request details
+4. Confirm the details back to them (what they need, room number, any special requests)
+5. Ask if they need it urgently (normal, high, or urgent priority)
+6. Once confirmed, tell them you're creating the request
+7. Provide them with encouragement that the team will assist them shortly
+
+Communication Style:
+- Warm, professional, and friendly
+- Use natural conversational language
+- Keep responses concise (1-3 sentences)
+- Show empathy and eagerness to help
+- Speak as if you're a real hotel staff member
+
+Remember: You're here to make their stay better. Be helpful and efficient!`
+
+    return c.json({
+      success: true,
+      session_config: {
+        model: 'gpt-4o-realtime-preview-2024-12-17',
+        modalities: ['text', 'audio'],
+        instructions: instructions,
+        voice: 'alloy', // Can be: alloy, echo, fable, onyx, nova, shimmer
+        input_audio_format: 'pcm16',
+        output_audio_format: 'pcm16',
+        input_audio_transcription: {
+          model: 'whisper-1'
+        },
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.5,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 500
+        },
+        tools: [
+          {
+            type: 'function',
+            name: 'create_service_request',
+            description: 'Creates a service request when the guest confirms their booking',
+            parameters: {
+              type: 'object',
+              properties: {
+                request_details: {
+                  type: 'string',
+                  description: 'Detailed description of what the guest needs'
+                },
+                priority: {
+                  type: 'string',
+                  enum: ['normal', 'high', 'urgent'],
+                  description: 'Priority level of the request'
+                },
+                guest_phone: {
+                  type: 'string',
+                  description: 'Guest phone number if provided (optional)'
+                }
+              },
+              required: ['request_details', 'priority']
+            }
+          }
+        ]
+      },
+      api_key: OPENAI_API_KEY,
+      guest_info: guest_info,
+      service_type_id: service_type_id
+    })
+  } catch (error) {
+    console.error('Voice session error:', error)
+    return c.json({ success: false, error: 'Failed to create voice session' }, 500)
+  }
+})
+
+// Handle voice assistant function calls
+app.post('/api/voice-assistant/function-call', async (c) => {
+  const { DB } = c.env
+  const { function_name, arguments: func_args, session_data } = await c.req.json()
+  
+  if (function_name === 'create_service_request') {
+    try {
+      const { request_details, priority, guest_phone } = func_args
+      const { service_type_id, guest_info, property_id } = session_data
+      
+      // Create the service request
+      const result = await DB.prepare(`
+        INSERT INTO service_requests (
+          service_type_id, pass_id, guest_name, room_number, guest_phone,
+          request_details, priority, status, property_id, requested_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))
+      `).bind(
+        service_type_id,
+        guest_info.pass_id,
+        guest_info.full_name,
+        guest_info.room_number,
+        guest_phone || guest_info.phone || '',
+        request_details,
+        priority,
+        property_id
+      ).run()
+      
+      return c.json({
+        success: true,
+        request_id: result.meta.last_row_id,
+        message: `Service request #${result.meta.last_row_id} has been created successfully! Our team will assist you shortly.`
+      })
+    } catch (error) {
+      console.error('Function call error:', error)
+      return c.json({ 
+        success: false, 
+        error: 'Failed to create service request' 
+      }, 500)
+    }
+  }
+  
+  return c.json({ success: false, error: 'Unknown function' }, 400)
+})
+
 // Get service requests for admin (Front Desk)
 app.get('/api/admin/service-requests', async (c) => {
   const { DB } = c.env
@@ -28322,7 +28472,7 @@ app.get('/hotel/:property_slug', async (c) => {
             }
         }
 
-        function openServiceMenu() {
+        window.openServiceMenu = function() {
             const guest = getGuestSession();
             if (!guest) {
                 alert('Please link your guest pass first to request services');
@@ -28335,7 +28485,7 @@ app.get('/hotel/:property_slug', async (c) => {
             renderServiceTypes();
         }
 
-        function closeServiceMenu() {
+        window.closeServiceMenu = function() {
             // Re-enable body scroll
             document.body.style.overflow = '';
             
@@ -28487,7 +28637,7 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         // ========================================
-        // AI VOICE CALL FUNCTIONS
+        // AI VOICE CALL FUNCTIONS - OpenAI Realtime API
         // ========================================
         
         let voiceCallActive = false;
@@ -28495,7 +28645,11 @@ app.get('/hotel/:property_slug', async (c) => {
             serviceTypeId: null,
             serviceName: '',
             transcript: '',
-            isMuted: false
+            isMuted: false,
+            ws: null,
+            audioContext: null,
+            mediaStream: null,
+            sessionConfig: null
         };
         
         async function startVoiceServiceRequest(serviceTypeId, serviceName) {
@@ -28508,128 +28662,226 @@ app.get('/hotel/:property_slug', async (c) => {
             // Update status
             updateVoiceStatus('Connecting to AI Assistant...', 'Please wait while we establish the connection');
             
-            // Simulate connection (in production, this would connect to OpenAI Realtime API)
-            setTimeout(() => {
-                connectToAIVoice();
-            }, 1500);
+            // Get session configuration from backend
+            try {
+                const guest = getGuestSession();
+                const propertyId = getPropertyId();
+                
+                const response = await fetch('/api/voice-assistant/session', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        service_type_id: serviceTypeId,
+                        guest_info: guest,
+                        property_id: propertyId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    voiceCallData.sessionConfig = data;
+                    await connectToOpenAIRealtime(data);
+                } else {
+                    updateVoiceStatus('❌ Connection Failed', data.error || 'Please try the form instead.');
+                }
+            } catch (error) {
+                console.error('Session creation error:', error);
+                updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
+            }
         }
         
-        function connectToAIVoice() {
+        async function connectToOpenAIRealtime(sessionData) {
             if (!voiceCallActive) return;
             
-            const guest = getGuestSession();
-            
-            // Update status to connected
-            updateVoiceStatus('Connected! Speak Now', 'I\'m your AI assistant. How can I help with your ' + voiceCallData.serviceName + ' request?');
-            
-            // Show mute button
-            document.getElementById('muteBtn').classList.remove('hidden');
-            
-            // Change icon to indicate listening
-            document.getElementById('voiceIcon').className = 'fas fa-microphone-alt text-white text-4xl animate-pulse';
-            
-            // In production, this would use OpenAI Realtime API
-            // For now, show a demo flow
-            simulateAIConversation(guest);
-        }
-        
-        function simulateAIConversation(guest) {
-            // This simulates an AI conversation
-            // In production, replace with actual OpenAI Realtime API integration
-            
-            const conversationSteps = [
-                {
-                    delay: 2000,
-                    aiSpeech: 'Hello ' + (guest.full_name || 'there') + '! I understand you need ' + voiceCallData.serviceName + '. Could you please describe what you need?',
-                    showTranscript: true
-                },
-                {
-                    delay: 5000,
-                    userSpeech: '[Guest speaking...]',
-                    showTranscript: true
-                },
-                {
-                    delay: 8000,
-                    aiSpeech: 'I understand. Let me confirm: you need ' + voiceCallData.serviceName + ' service for room ' + (guest.room_number || 'your room') + '. Is that correct?',
-                    showTranscript: true
-                },
-                {
-                    delay: 10000,
-                    userSpeech: '[Guest confirms...]',
-                    showTranscript: true
-                },
-                {
-                    delay: 12000,
-                    aiSpeech: 'Perfect! I\'m booking this service request for you now. Our team will be there shortly!',
-                    showTranscript: true,
-                    action: 'book'
-                }
-            ];
-            
-            conversationSteps.forEach((step) => {
-                if (!voiceCallActive) return;
+            try {
+                // Request microphone permission
+                voiceCallData.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 24000
+                    } 
+                });
                 
-                setTimeout(() => {
-                    if (!voiceCallActive) return;
+                // Create audio context
+                voiceCallData.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                
+                // Connect to OpenAI Realtime API via WebSocket
+                const ws = new WebSocket(
+                    'wss://api.openai.com/v1/realtime?model=' + sessionData.session_config.model,
+                    ['realtime', 'openai-insecure-api-key.' + sessionData.api_key]
+                );
+                
+                voiceCallData.ws = ws;
+                
+                ws.onopen = () => {
+                    console.log('✅ Connected to OpenAI Realtime API');
                     
-                    if (step.aiSpeech) {
-                        addToTranscript('AI Assistant', step.aiSpeech);
-                    } else if (step.userSpeech) {
-                        addToTranscript('You', step.userSpeech);
-                    }
+                    // Send session update with instructions
+                    ws.send(JSON.stringify({
+                        type: 'session.update',
+                        session: sessionData.session_config
+                    }));
                     
-                    if (step.action === 'book') {
-                        // Auto-book the service
-                        setTimeout(() => {
-                            if (voiceCallActive) {
-                                autoBookServiceFromVoice();
-                            }
-                        }, 2000);
+                    updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
+                    document.getElementById('muteBtn').classList.remove('hidden');
+                    document.getElementById('voiceIcon').className = 'fas fa-microphone-alt text-white text-4xl animate-pulse';
+                    
+                    // Start streaming audio
+                    streamAudioToOpenAI(ws);
+                };
+                
+                ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    handleOpenAIMessage(message);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
+                };
+                
+                ws.onclose = () => {
+                    console.log('WebSocket closed');
+                    if (voiceCallActive) {
+                        endVoiceCall();
                     }
-                }, step.delay);
-            });
+                };
+                
+            } catch (error) {
+                console.error('Realtime connection error:', error);
+                updateVoiceStatus('❌ Microphone Error', 'Please allow microphone access and try again.');
+            }
         }
         
-        function addToTranscript(speaker, text) {
-            const transcriptDiv = document.getElementById('voiceTranscript');
-            const transcriptText = transcriptDiv.querySelector('p');
+        function streamAudioToOpenAI(ws) {
+            const audioContext = voiceCallData.audioContext;
+            const mediaStream = voiceCallData.mediaStream;
             
-            transcriptDiv.classList.remove('hidden');
+            const source = audioContext.createMediaStreamSource(mediaStream);
+            const processor = audioContext.createScriptProcessor(4096, 1, 1);
             
-            const entry = '<strong>' + speaker + ':</strong> ' + text + '<br><br>';
-            transcriptText.innerHTML += entry;
+            source.connect(processor);
+            processor.connect(audioContext.destination);
             
-            // Scroll to bottom
-            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+            processor.onaudioprocess = (e) => {
+                if (!voiceCallActive || voiceCallData.isMuted) return;
+                
+                const inputData = e.inputBuffer.getChannelData(0);
+                
+                // Convert Float32Array to Int16Array (PCM16)
+                const pcm16 = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    pcm16[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                }
+                
+                // Convert to base64
+                const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(pcm16.buffer)));
+                
+                // Send audio to OpenAI
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'input_audio_buffer.append',
+                        audio: base64Audio
+                    }));
+                }
+            };
         }
         
-        function updateVoiceStatus(title, subtitle) {
-            const statusDiv = document.getElementById('voiceStatus');
-            statusDiv.innerHTML = 
-                '<h3 class="text-xl font-bold text-gray-800 mb-2">' + title + '</h3>' +
-                '<p class="text-gray-600 text-sm">' + subtitle + '</p>';
+        function handleOpenAIMessage(message) {
+            console.log('OpenAI message:', message.type);
+            
+            switch (message.type) {
+                case 'conversation.item.created':
+                    if (message.item.type === 'message' && message.item.role === 'assistant') {
+                        // AI is responding
+                        console.log('AI responding...');
+                    }
+                    break;
+                    
+                case 'response.audio_transcript.delta':
+                    // Update transcript with AI speech
+                    if (message.delta) {
+                        addToTranscript('AI Assistant', message.delta, true);
+                    }
+                    break;
+                    
+                case 'conversation.item.input_audio_transcription.completed':
+                    // Update transcript with user speech
+                    if (message.transcript) {
+                        addToTranscript('You', message.transcript);
+                    }
+                    break;
+                    
+                case 'response.audio.delta':
+                    // Play audio response from AI
+                    if (message.delta) {
+                        playAudioChunk(message.delta);
+                    }
+                    break;
+                    
+                case 'response.function_call_arguments.done':
+                    // AI wants to call a function (create service request)
+                    if (message.name === 'create_service_request') {
+                        handleServiceRequestCreation(JSON.parse(message.arguments));
+                    }
+                    break;
+                    
+                case 'error':
+                    console.error('OpenAI error:', message.error);
+                    updateVoiceStatus('❌ Error', message.error.message || 'Something went wrong');
+                    break;
+            }
         }
         
-        async function autoBookServiceFromVoice() {
+        function playAudioChunk(base64Audio) {
+            if (!voiceCallData.audioContext) return;
+            
+            try {
+                const binaryString = atob(base64Audio);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const pcm16 = new Int16Array(bytes.buffer);
+                const float32 = new Float32Array(pcm16.length);
+                for (let i = 0; i < pcm16.length; i++) {
+                    float32[i] = pcm16[i] / 32768.0;
+                }
+                
+                const audioBuffer = voiceCallData.audioContext.createBuffer(1, float32.length, 24000);
+                audioBuffer.getChannelData(0).set(float32);
+                
+                const source = voiceCallData.audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(voiceCallData.audioContext.destination);
+                source.start();
+            } catch (error) {
+                console.error('Audio playback error:', error);
+            }
+        }
+        
+        async function handleServiceRequestCreation(args) {
+            console.log('Creating service request:', args);
+            
             const guest = getGuestSession();
             const propertyId = getPropertyId();
             
-            // Create service request automatically
-            const data = {
-                service_type_id: voiceCallData.serviceTypeId,
-                pass_id: guest.pass_id,
-                guest_name: guest.full_name,
-                room_number: guest.room_number,
-                guest_phone: guest.phone || '',
-                request_details: 'Request made via AI Voice Assistant for ' + voiceCallData.serviceName,
-                priority: 'normal'
-            };
-            
             try {
-                const response = await fetch('/api/service-requests', {
+                const response = await fetch('/api/voice-assistant/function-call', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-Property-ID': propertyId},
-                    body: JSON.stringify(data)
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        function_name: 'create_service_request',
+                        arguments: args,
+                        session_data: {
+                            service_type_id: voiceCallData.serviceTypeId,
+                            guest_info: guest,
+                            property_id: propertyId
+                        }
+                    })
                 });
                 
                 const result = await response.json();
@@ -28645,6 +28897,17 @@ app.get('/hotel/:property_slug', async (c) => {
                         confetti({particleCount: 100, spread: 70, origin: {y: 0.6}});
                     }
                     
+                    // Send function result back to OpenAI
+                    if (voiceCallData.ws) {
+                        voiceCallData.ws.send(JSON.stringify({
+                            type: 'conversation.item.create',
+                            item: {
+                                type: 'function_call_output',
+                                output: JSON.stringify(result)
+                            }
+                        }));
+                    }
+                    
                     // Auto-close after 3 seconds
                     setTimeout(() => {
                         endVoiceCall();
@@ -28654,9 +28917,40 @@ app.get('/hotel/:property_slug', async (c) => {
                     updateVoiceStatus('❌ Booking Failed', 'Please try again or use the form.');
                 }
             } catch (error) {
-                console.error('Voice booking error:', error);
-                updateVoiceStatus('❌ Connection Error', 'Please try again or use the form.');
+                console.error('Service request creation error:', error);
+                updateVoiceStatus('❌ Booking Error', 'Please try again or use the form.');
             }
+        }
+        
+        function addToTranscript(speaker, text, isDelta = false) {
+            const transcriptDiv = document.getElementById('voiceTranscript');
+            const transcriptText = transcriptDiv.querySelector('p');
+            
+            transcriptDiv.classList.remove('hidden');
+            
+            if (isDelta) {
+                // Append to last message if it's from the same speaker
+                const lastEntry = transcriptText.innerHTML.split('<br><br>').slice(-1)[0];
+                if (lastEntry.includes('<strong>' + speaker + ':</strong>')) {
+                    transcriptText.innerHTML = transcriptText.innerHTML.slice(0, -8) + text;
+                } else {
+                    const entry = '<strong>' + speaker + ':</strong> ' + text;
+                    transcriptText.innerHTML += entry;
+                }
+            } else {
+                const entry = '<strong>' + speaker + ':</strong> ' + text + '<br><br>';
+                transcriptText.innerHTML += entry;
+            }
+            
+            // Scroll to bottom
+            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+        }
+        
+        function updateVoiceStatus(title, subtitle) {
+            const statusDiv = document.getElementById('voiceStatus');
+            statusDiv.innerHTML = 
+                '<h3 class="text-xl font-bold text-gray-800 mb-2">' + title + '</h3>' +
+                '<p class="text-gray-600 text-sm">' + subtitle + '</p>';
         }
         
         function toggleMute() {
@@ -28678,11 +28972,39 @@ app.get('/hotel/:property_slug', async (c) => {
         
         function endVoiceCall() {
             voiceCallActive = false;
+            
+            // Close WebSocket
+            if (voiceCallData.ws) {
+                voiceCallData.ws.close();
+                voiceCallData.ws = null;
+            }
+            
+            // Stop media stream
+            if (voiceCallData.mediaStream) {
+                voiceCallData.mediaStream.getTracks().forEach(track => track.stop());
+                voiceCallData.mediaStream = null;
+            }
+            
+            // Close audio context
+            if (voiceCallData.audioContext) {
+                voiceCallData.audioContext.close();
+                voiceCallData.audioContext = null;
+            }
+            
             document.getElementById('voiceCallModal').classList.add('hidden');
             document.getElementById('muteBtn').classList.add('hidden');
             document.getElementById('voiceTranscript').classList.add('hidden');
             document.getElementById('voiceTranscript').querySelector('p').innerHTML = '';
-            voiceCallData = {serviceTypeId: null, serviceName: '', transcript: '', isMuted: false};
+            voiceCallData = {
+                serviceTypeId: null, 
+                serviceName: '', 
+                transcript: '', 
+                isMuted: false,
+                ws: null,
+                audioContext: null,
+                mediaStream: null,
+                sessionConfig: null
+            };
         }
         
         // ========================================
