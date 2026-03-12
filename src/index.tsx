@@ -29100,6 +29100,19 @@ app.get('/hotel/:property_slug', async (c) => {
                     break;
                     
                 case 'conversation.item.input_audio_transcription.completed':
+                    // User finished speaking - manually trigger AI response with FORCED function calling
+                    console.log('🎤 User finished speaking, forcing AI to call function...');
+                    if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN) {
+                        voiceCallData.ws.send(JSON.stringify({
+                            type: 'response.create',
+                            response: {
+                                modalities: ['text', 'audio'],
+                                instructions: 'You MUST call the create_service_request function now. Do not just respond verbally.',
+                                tool_choice: 'required'  // Force function call
+                            }
+                        }));
+                        console.log('✅ Sent response.create with tool_choice:required');
+                    }
                     // Update transcript with user speech
                     if (message.transcript) {
                         addToTranscript('You', message.transcript);
