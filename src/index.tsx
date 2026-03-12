@@ -28861,6 +28861,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     break;
                     
                 case 'response.audio_transcript.delta':
+                case 'response.output_audio_transcript.delta':
                     // Update transcript with AI speech
                     if (message.delta) {
                         addToTranscript('AI Assistant', message.delta, true);
@@ -28875,6 +28876,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     break;
                     
                 case 'response.audio.delta':
+                case 'response.output_audio.delta':
                     // Play audio response from AI
                     if (message.delta) {
                         playAudioChunk(message.delta);
