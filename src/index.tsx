@@ -28485,26 +28485,46 @@ app.get('/hotel/:property_slug', async (c) => {
         window.loadServiceTypes = async function() {
             try {
                 const propertyId = getPropertyId();
+                console.log('📡 Loading service types for property:', propertyId);
                 const response = await fetch('/api/service-types?property_id=' + propertyId);
                 const data = await response.json();
+                console.log('📥 Service types response:', data);
                 if (data.success) {
                     serviceTypes = data.service_types;
+                    console.log('✅ Loaded', serviceTypes.length, 'service types');
+                } else {
+                    console.error('❌ Failed to load service types:', data);
                 }
             } catch (error) {
-                console.error('Load service types error:', error);
+                console.error('💥 Load service types error:', error);
             }
         }
 
         window.openServiceMenu = function() {
+            console.log('🔔 Service button clicked!');
             const guest = getGuestSession();
+            console.log('👤 Guest session:', guest);
+            
             if (!guest) {
+                console.log('❌ No guest session found');
                 alert('Please link your guest pass first to request services');
                 return;
             }
+            
+            console.log('✅ Opening service modal...');
+            console.log('📦 Service types loaded:', serviceTypes.length);
+            
             // Prevent body scroll
             document.body.style.overflow = 'hidden';
             
-            document.getElementById('serviceModal').classList.remove('hidden');
+            const modal = document.getElementById('serviceModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                console.log('✅ Modal opened');
+            } else {
+                console.error('❌ Modal element not found!');
+            }
+            
             renderServiceTypes();
         }
 
@@ -28516,12 +28536,21 @@ app.get('/hotel/:property_slug', async (c) => {
         }
 
         function renderServiceTypes() {
+            console.log('🎨 Rendering service types, count:', serviceTypes.length);
             const content = document.getElementById('serviceModalContent');
+            
+            if (!content) {
+                console.error('❌ serviceModalContent element not found!');
+                return;
+            }
+            
             if (serviceTypes.length === 0) {
+                console.log('⚠️ No service types available');
                 content.innerHTML = '<p class="text-gray-500 text-center py-8">No services available at this time.</p>';
                 return;
             }
             
+            console.log('✅ Rendering', serviceTypes.length, 'services');
             content.innerHTML = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
                 serviceTypes.map(service => {
                     return '<button onclick="showServiceRequestForm(' + service.service_type_id + ')" class="p-6 border-2 rounded-xl hover:shadow-lg transition-all text-left group" style="border-color: ' + service.service_color + '20; background: ' + service.service_color + '05;">' +
