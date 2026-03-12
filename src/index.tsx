@@ -28719,6 +28719,10 @@ app.get('/hotel/:property_slug', async (c) => {
                 const guest = getGuestSession();
                 const propertyId = getPropertyId();
                 
+                console.log('🔌 Creating voice session for service:', serviceTypeId, serviceName);
+                console.log('👤 Guest info:', guest);
+                console.log('🏨 Property ID:', propertyId);
+                
                 const response = await fetch('/api/voice-assistant/session', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -28729,16 +28733,20 @@ app.get('/hotel/:property_slug', async (c) => {
                     })
                 });
                 
+                console.log('📡 Session response status:', response.status);
                 const data = await response.json();
+                console.log('📦 Session data:', data);
                 
                 if (data.success) {
+                    console.log('✅ Session created, connecting to OpenAI...');
                     voiceCallData.sessionConfig = data;
                     await connectToOpenAIRealtime(data);
                 } else {
+                    console.error('❌ Session creation failed:', data.error);
                     updateVoiceStatus('❌ Connection Failed', data.error || 'Please try the form instead.');
                 }
             } catch (error) {
-                console.error('Session creation error:', error);
+                console.error('💥 Session creation error:', error);
                 updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
             }
         }
