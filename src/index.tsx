@@ -45765,6 +45765,188 @@ app.get('/admin/dashboard', (c) => {
             </div>
         </div>
 
+        <!-- Edit Service Type Modal -->
+        <div id="editServiceTypeModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[1001] flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+                <!-- Modal Header -->
+                <div class="px-6 py-4 border-b sticky top-0 z-10 rounded-t-2xl" style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold text-white">
+                            <i class="fas fa-edit mr-2"></i>Edit Service Type
+                        </h3>
+                        <button onclick="closeEditServiceTypeModal()" class="text-white hover:bg-white/20 rounded-full p-2 transition-all">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6 space-y-6">
+                    <form id="editServiceTypeForm" onsubmit="submitEditServiceType(event)" class="space-y-4">
+                        <input type="hidden" id="editServiceTypeId" />
+                        
+                        <!-- Service Name -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-2" style="color: var(--accent-color, #D4AF37);"></i>Service Name *
+                            </label>
+                            <input type="text" id="editServiceName" required 
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                   placeholder="e.g., Housekeeping, Maintenance, Room Service" />
+                        </div>
+                        
+                        <!-- Icon & Color Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-icons mr-2" style="color: var(--accent-color, #D4AF37);"></i>Icon
+                                </label>
+                                <select id="editServiceIcon" 
+                                       class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all">
+                                    <optgroup label="Service Icons">
+                                        <option value="fa-concierge-bell">🛎️ Concierge Bell</option>
+                                        <option value="fa-broom">🧹 Broom (Housekeeping)</option>
+                                        <option value="fa-tools">🔧 Tools (Maintenance)</option>
+                                        <option value="fa-wrench">🔩 Wrench</option>
+                                        <option value="fa-hammer">🔨 Hammer</option>
+                                        <option value="fa-tshirt">👕 T-Shirt (Laundry)</option>
+                                        <option value="fa-bed">🛏️ Bed</option>
+                                        <option value="fa-couch">🛋️ Couch</option>
+                                        <option value="fa-bath">🛁 Bath</option>
+                                        <option value="fa-shower">🚿 Shower</option>
+                                        <option value="fa-toilet">🚽 Toilet</option>
+                                    </optgroup>
+                                    <optgroup label="Food & Beverage">
+                                        <option value="fa-utensils">🍴 Utensils</option>
+                                        <option value="fa-pizza-slice">🍕 Pizza</option>
+                                        <option value="fa-hamburger">🍔 Hamburger</option>
+                                        <option value="fa-coffee">☕ Coffee</option>
+                                        <option value="fa-wine-glass">🍷 Wine Glass</option>
+                                        <option value="fa-cocktail">🍸 Cocktail</option>
+                                        <option value="fa-ice-cream">🍦 Ice Cream</option>
+                                        <option value="fa-apple-alt">🍎 Apple</option>
+                                    </optgroup>
+                                    <optgroup label="Transportation">
+                                        <option value="fa-car">🚗 Car</option>
+                                        <option value="fa-taxi">🚕 Taxi</option>
+                                        <option value="fa-shuttle-van">🚐 Shuttle Van</option>
+                                        <option value="fa-bus">🚌 Bus</option>
+                                        <option value="fa-plane">✈️ Plane</option>
+                                        <option value="fa-ship">🚢 Ship</option>
+                                    </optgroup>
+                                    <optgroup label="Activities">
+                                        <option value="fa-swimming-pool">🏊 Swimming Pool</option>
+                                        <option value="fa-dumbbell">🏋️ Dumbbell (Gym)</option>
+                                        <option value="fa-spa">🧖 Spa</option>
+                                        <option value="fa-massage">💆 Massage</option>
+                                        <option value="fa-umbrella-beach">🏖️ Beach</option>
+                                        <option value="fa-hiking">🥾 Hiking</option>
+                                        <option value="fa-skiing">⛷️ Skiing</option>
+                                        <option value="fa-bicycle">🚴 Bicycle</option>
+                                    </optgroup>
+                                    <optgroup label="Communication">
+                                        <option value="fa-phone">📞 Phone</option>
+                                        <option value="fa-envelope">✉️ Envelope</option>
+                                        <option value="fa-comment">💬 Comment</option>
+                                        <option value="fa-bell">🔔 Bell</option>
+                                        <option value="fa-info-circle">ℹ️ Info</option>
+                                        <option value="fa-question-circle">❓ Question</option>
+                                    </optgroup>
+                                    <optgroup label="Medical & Safety">
+                                        <option value="fa-first-aid">🩹 First Aid</option>
+                                        <option value="fa-hospital">🏥 Hospital</option>
+                                        <option value="fa-heart">❤️ Heart</option>
+                                        <option value="fa-shield-alt">🛡️ Shield</option>
+                                        <option value="fa-fire-extinguisher">🧯 Fire Extinguisher</option>
+                                    </optgroup>
+                                    <optgroup label="Technology">
+                                        <option value="fa-wifi">📶 WiFi</option>
+                                        <option value="fa-tv">📺 TV</option>
+                                        <option value="fa-plug">🔌 Plug</option>
+                                        <option value="fa-lightbulb">💡 Lightbulb</option>
+                                        <option value="fa-thermometer-half">🌡️ Temperature</option>
+                                        <option value="fa-fan">🌀 Fan</option>
+                                    </optgroup>
+                                    <optgroup label="General">
+                                        <option value="fa-star">⭐ Star</option>
+                                        <option value="fa-key">🔑 Key</option>
+                                        <option value="fa-lock">🔒 Lock</option>
+                                        <option value="fa-shopping-bag">🛍️ Shopping Bag</option>
+                                        <option value="fa-gift">🎁 Gift</option>
+                                        <option value="fa-calendar">📅 Calendar</option>
+                                        <option value="fa-clock">🕐 Clock</option>
+                                        <option value="fa-map-marked-alt">🗺️ Map</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                    <i class="fas fa-palette mr-2" style="color: var(--accent-color, #D4AF37);"></i>Service Color
+                                </label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="editServiceColor" value="#D4AF37"
+                                           class="h-12 w-16 border-2 border-gray-300 rounded-lg cursor-pointer" />
+                                    <input type="text" id="editServiceColorHex" value="#D4AF37"
+                                           class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 transition-all"
+                                           placeholder="#D4AF37" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Description -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-align-left mr-2" style="color: var(--accent-color, #D4AF37);"></i>Description
+                            </label>
+                            <textarea id="editServiceDescription" rows="3"
+                                      class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                                      placeholder="Brief description of this service type..."></textarea>
+                        </div>
+                        
+                        <!-- Response Time -->
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-clock mr-2" style="color: var(--accent-color, #D4AF37);"></i>Estimated Response Time (minutes)
+                            </label>
+                            <input type="number" id="editServiceResponseTime" value="30" min="1" max="1440"
+                                   class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all" />
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div class="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
+                            <p class="text-sm font-semibold text-gray-600 mb-3">Preview:</p>
+                            <div class="bg-white rounded-lg shadow p-4 border-2" id="editServicePreview" style="border-color: #D4AF3720;">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl" 
+                                         id="editPreviewIcon" style="background-color: #D4AF3720; color: #D4AF37;">
+                                        <i class="fas fa-concierge-bell"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-gray-800" id="editPreviewName">Service Name</h4>
+                                        <p class="text-sm text-gray-500">Response: ~<span id="editPreviewTime">30</span> min</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="closeEditServiceTypeModal()"
+                                    class="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all">
+                                <i class="fas fa-times mr-2"></i>Cancel
+                            </button>
+                            <button type="submit"
+                                    class="flex-1 px-6 py-3 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                                    style="background: linear-gradient(135deg, var(--primary-color, #972626) 0%, var(--secondary-color, #6B1529) 100%);">
+                                <i class="fas fa-check mr-2"></i>Update Service Type
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Settings Tab -->
         <div id="settingsTab" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-6">
@@ -52025,7 +52207,121 @@ app.get('/admin/dashboard', (c) => {
       };
       
       window.editServiceType = async function(serviceTypeId) {
-        alert('Edit functionality coming soon. Service ID: ' + serviceTypeId);
+        try {
+          // Fetch service type details
+          const response = await fetch('/api/admin/service-types?property_id=' + propertyId);
+          const data = await response.json();
+          
+          if (!data.success) {
+            alert('Failed to load service types');
+            return;
+          }
+          
+          // Find the specific service type
+          const service = data.service_types.find(s => s.service_type_id === serviceTypeId);
+          
+          if (!service) {
+            alert('Service type not found');
+            return;
+          }
+          
+          // Populate the edit form
+          document.getElementById('editServiceTypeId').value = service.service_type_id;
+          document.getElementById('editServiceName').value = service.service_name;
+          document.getElementById('editServiceIcon').value = service.service_icon;
+          document.getElementById('editServiceColor').value = service.service_color;
+          document.getElementById('editServiceColorHex').value = service.service_color;
+          document.getElementById('editServiceDescription').value = service.description || '';
+          document.getElementById('editServiceResponseTime').value = service.estimated_response_minutes;
+          
+          // Update preview
+          updateEditServicePreview();
+          
+          // Setup event listeners for preview updates
+          document.getElementById('editServiceName').addEventListener('input', updateEditServicePreview);
+          document.getElementById('editServiceIcon').addEventListener('change', updateEditServicePreview);
+          document.getElementById('editServiceColor').addEventListener('input', function(e) {
+            document.getElementById('editServiceColorHex').value = e.target.value;
+            updateEditServicePreview();
+          });
+          document.getElementById('editServiceColorHex').addEventListener('input', function(e) {
+            document.getElementById('editServiceColor').value = e.target.value;
+            updateEditServicePreview();
+          });
+          document.getElementById('editServiceResponseTime').addEventListener('input', updateEditServicePreview);
+          
+          // Show the modal
+          document.getElementById('editServiceTypeModal').classList.remove('hidden');
+          
+        } catch (error) {
+          console.error('Edit service type error:', error);
+          alert('Error loading service type details');
+        }
+      };
+      
+      window.closeEditServiceTypeModal = function() {
+        document.getElementById('editServiceTypeModal').classList.add('hidden');
+        document.getElementById('editServiceTypeForm').reset();
+      };
+      
+      function updateEditServicePreview() {
+        const name = document.getElementById('editServiceName').value || 'Service Name';
+        const icon = document.getElementById('editServiceIcon').value || 'fa-concierge-bell';
+        const color = document.getElementById('editServiceColor').value || '#D4AF37';
+        const responseTime = document.getElementById('editServiceResponseTime').value || '30';
+        
+        document.getElementById('editPreviewName').textContent = name;
+        document.getElementById('editPreviewTime').textContent = responseTime;
+        document.getElementById('editPreviewIcon').innerHTML = '<i class="fas ' + icon + '"></i>';
+        document.getElementById('editPreviewIcon').style.backgroundColor = color + '20';
+        document.getElementById('editPreviewIcon').style.color = color;
+        document.getElementById('editServicePreview').style.borderColor = color + '20';
+      }
+      
+      window.submitEditServiceType = async function(event) {
+        event.preventDefault();
+        
+        const serviceTypeId = document.getElementById('editServiceTypeId').value;
+        const serviceData = {
+          service_name: document.getElementById('editServiceName').value,
+          service_icon: document.getElementById('editServiceIcon').value,
+          service_color: document.getElementById('editServiceColor').value,
+          description: document.getElementById('editServiceDescription').value,
+          estimated_response_minutes: parseInt(document.getElementById('editServiceResponseTime').value)
+        };
+        
+        try {
+          const response = await fetch('/api/admin/service-types/' + serviceTypeId, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Property-ID': propertyId
+            },
+            body: JSON.stringify(serviceData)
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            closeEditServiceTypeModal();
+            loadServiceTypes();
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-[1001] flex items-center gap-3';
+            successDiv.innerHTML = '<i class="fas fa-check-circle text-2xl"></i><div><p class="font-bold">Service Type Updated!</p><p class="text-sm">' + serviceData.service_name + ' has been updated successfully.</p></div>';
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+              successDiv.remove();
+            }, 3000);
+          } else {
+            alert('Failed to update service type: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          console.error('Update service type error:', error);
+          alert('Error updating service type');
+        }
       };
       
       window.deleteServiceType = async function(serviceTypeId) {
