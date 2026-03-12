@@ -28474,7 +28474,7 @@ app.get('/hotel/:property_slug', async (c) => {
         
         // Get property ID helper
         function getPropertyId() {
-            return '${propertyId}';
+            return ${property.property_id};
         }
 
         async function loadServiceTypes() {
