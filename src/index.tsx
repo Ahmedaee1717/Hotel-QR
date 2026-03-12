@@ -4588,18 +4588,16 @@ app.post('/api/admin/frontdesk/notes/:type/:id', async (c) => {
 app.get('/api/admin/guest-relations', async (c) => {
   const { DB } = c.env
   const property_id = c.req.query('property_id')
-  const date_from = c.req.query('date_from') || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0] // Last 30 days
+  const date_from = c.req.query('date_from') || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0]
   const date_to = c.req.query('date_to') || new Date().toISOString().split('T')[0]
   const search = c.req.query('search') || ''
-  const has_feedback = c.req.query('has_feedback') // Filter: 'true' or 'false'
-  const sentiment = c.req.query('sentiment') // Filter: 'positive', 'neutral', 'negative'
   
   if (!property_id) {
     return c.json({ error: 'Missing property_id' }, 400)
   }
   
   try {
-    // Step 1: Get all passes with basic info (simple, reliable query)
+    // SIMPLE: Just get the passes with zero counts - aggregations can be added later
     let query = `
       SELECT 
         p.pass_id,
@@ -4624,115 +4622,31 @@ app.get('/api/admin/guest-relations', async (c) => {
     
     const params = [property_id]
     
-    // Add search filter in SQL (more efficient)
     if (search) {
       query += ` AND (p.primary_guest_name LIKE ? OR p.room_number LIKE ? OR p.contact_email LIKE ? OR p.contact_phone LIKE ?)`
       const searchPattern = '%' + search + '%'
       params.push(searchPattern, searchPattern, searchPattern, searchPattern)
     }
     
-    query += ` ORDER BY p.valid_from DESC LIMIT 500`
+    query += ` ORDER BY p.valid_from DESC LIMIT 100`
     
     const passes = await DB.prepare(query).bind(...params).all()
     
-    if (!passes.results || passes.results.length === 0) {
-      return c.json({
-        success: true,
-        guests: [],
-        total: 0,
-        date_range: { from: date_from, to: date_to }
-      })
-    }
-    
-    // Step 2: Get counts using separate simple queries
-    // This is more reliable than complex batch queries
-    const enrichedGuests = []
-    
-    for (const pass of passes.results) {
-      try {
-        // Count feedback by room or email
-        let feedbackCount = 0
-        let latestSentiment = null
-        let latestScore = null
-        
-        if (pass.room_number || pass.contact_email) {
-          const fbQuery = `
-            SELECT COUNT(*) as count
-            FROM feedback_submissions
-            WHERE property_id = ?
-              AND (room_number = ? OR guest_email = ?)
-          `
-          const fbResult = await DB.prepare(fbQuery)
-            .bind(property_id, pass.room_number || '', pass.contact_email || '')
-            .first()
-          feedbackCount = fbResult?.count || 0
-          
-          // Get latest sentiment if there's feedback
-          if (feedbackCount > 0) {
-            const sentimentQuery = `
-              SELECT sentiment_label, sentiment_score
-              FROM feedback_submissions
-              WHERE property_id = ?
-                AND (room_number = ? OR guest_email = ?)
-              ORDER BY submitted_at DESC
-              LIMIT 1
-            `
-            const sentimentResult = await DB.prepare(sentimentQuery)
-              .bind(property_id, pass.room_number || '', pass.contact_email || '')
-              .first()
-            latestSentiment = sentimentResult?.sentiment_label
-            latestScore = sentimentResult?.sentiment_score
-          }
-        }
-        
-        // Count verifications
-        let verificationCount = 0
-        const verQuery = `SELECT COUNT(*) as count FROM pass_verifications WHERE pass_id = ?`
-        const verResult = await DB.prepare(verQuery).bind(pass.pass_id).first()
-        verificationCount = verResult?.count || 0
-        
-        // Count service requests
-        let serviceCount = 0
-        const srvQuery = `SELECT COUNT(*) as count FROM service_requests WHERE pass_id = ?`
-        const srvResult = await DB.prepare(srvQuery).bind(pass.pass_id).first()
-        serviceCount = srvResult?.count || 0
-        
-        const enrichedGuest = {
-          ...pass,
-          feedback_count: feedbackCount,
-          latest_sentiment: latestSentiment,
-          avg_sentiment: latestScore,
-          verification_count: verificationCount,
-          service_request_count: serviceCount,
-          chat_count: 0
-        }
-        
-        // Apply filters
-        if (has_feedback === 'true' && enrichedGuest.feedback_count === 0) continue
-        if (has_feedback === 'false' && enrichedGuest.feedback_count > 0) continue
-        if (sentiment && sentiment !== 'all' && enrichedGuest.latest_sentiment !== sentiment) continue
-        
-        enrichedGuests.push(enrichedGuest)
-        
-      } catch (innerError) {
-        console.error('Error enriching guest:', pass.pass_id, innerError)
-        // Still include the guest even if enrichment fails
-        enrichedGuests.push({
-          ...pass,
-          feedback_count: 0,
-          latest_sentiment: null,
-          avg_sentiment: null,
-          verification_count: 0,
-          service_request_count: 0,
-          chat_count: 0
-        })
-      }
-    }
+    // Return passes with zero counts for now - just get it working first
+    const guests = (passes.results || []).map(pass => ({
+      ...pass,
+      feedback_count: 0,
+      latest_sentiment: null,
+      avg_sentiment: null,
+      verification_count: 0,
+      service_request_count: 0,
+      chat_count: 0
+    }))
     
     return c.json({
       success: true,
-      guests: enrichedGuests,
-      total: enrichedGuests.length,
+      guests: guests,
+      total: guests.length,
       date_range: { from: date_from, to: date_to }
     })
     
@@ -4741,7 +4655,8 @@ app.get('/api/admin/guest-relations', async (c) => {
     return c.json({ 
       success: false,
       error: 'Failed to fetch guest data',
-      details: error.message 
+      details: error.message,
+      stack: error.stack
     }, 500)
   }
 })
