@@ -25360,6 +25360,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 // Load feedback form for homepage (if exists)
                 loadHomepageFeedbackForm();
                 
+                // Load service types now that propertyData is available
+                loadServiceTypes();
+                
                 // Load hotel offerings with language
                 const offeringsResponse = await fetch(\`/api/hotel-offerings/\${propertyData.property_id}?lang=\${currentLanguage}\`);
                 const offeringsData = await offeringsResponse.json();
@@ -29029,10 +29032,8 @@ app.get('/hotel/:property_slug', async (c) => {
         // END AI VOICE CALL FUNCTIONS
         // ========================================
 
-        // Load service types on page load
+        // Service button setup on page load
         document.addEventListener('DOMContentLoaded', function() {
-            loadServiceTypes();
-            
             // Attach event listener to service button
             const serviceButton = document.getElementById('serviceButton');
             if (serviceButton) {
