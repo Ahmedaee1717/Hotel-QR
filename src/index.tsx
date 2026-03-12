@@ -22178,11 +22178,129 @@ app.post('/api/voice-call-logs', async (c) => {
       duration_seconds || 0
     ).run()
     
-    console.log('✅ Voice call log saved! ID:', result.meta.last_row_id)
+    const log_id = result.meta.last_row_id
+    console.log('✅ Voice call log saved! ID:', log_id)
+    
+    // CRITICAL NEW FEATURE: Auto-extract service request from transcript using AI
+    if (transcript && transcript.trim().length > 20) {
+      console.log('🤖 Auto-extracting service request from transcript...')
+      
+      try {
+        // Use OpenAI to parse the transcript
+        const OPENAI_API_KEY = c.env.VoiceCall || c.env.OPENAI_API_KEY
+        
+        if (!OPENAI_API_KEY) {
+          console.error('❌ No OpenAI API key available for transcript parsing')
+          return c.json({ success: true, log_id })
+        }
+        
+        // Get available service types
+        const serviceTypes = await DB.prepare(`
+          SELECT service_type_id, service_name, description FROM service_types WHERE property_id = ?
+        `).bind(property_id).all()
+        
+        // Call GPT-4 to extract details
+        const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: `Extract service request details from this hotel voice call transcript.
+
+Available services:
+${serviceTypes.results.map(st => `- ID ${st.service_type_id}: ${st.service_name}`).join('\n')}
+
+Return JSON:
+{
+  "service_type_id": number (matching ID above),
+  "request_details": "what guest needs",
+  "priority": "normal|high|urgent"
+}
+
+If no clear request, return null.`
+              },
+              {
+                role: 'user',
+                content: transcript
+              }
+            ],
+            response_format: { type: 'json_object' }
+          })
+        })
+        
+        const gptData = await gptResponse.json()
+        console.log('🤖 GPT extraction response:', gptData)
+        
+        if (gptData.choices && gptData.choices[0]?.message?.content) {
+          const extracted = JSON.parse(gptData.choices[0].message.content)
+          
+          if (extracted && extracted.service_type_id && extracted.request_details) {
+            console.log('✅ Extracted request:', extracted)
+            
+            // Get pass_id from pass_reference
+            let pass_id = null
+            if (pass_reference) {
+              const pass = await DB.prepare(`
+                SELECT pass_id FROM digital_passes WHERE pass_reference = ?
+              `).bind(pass_reference).first()
+              
+              if (pass) pass_id = pass.pass_id
+            }
+            
+            // Create service request automatically
+            const serviceResult = await DB.prepare(`
+              INSERT INTO service_requests (
+                property_id, service_type_id, pass_id, guest_name, room_number,
+                guest_phone, request_details, priority, status, source
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'voice_call')
+            `).bind(
+              property_id,
+              extracted.service_type_id,
+              pass_id,
+              guest_name,
+              room_number,
+              null,
+              extracted.request_details,
+              extracted.priority || 'normal'
+            ).run()
+            
+            const request_id = serviceResult.meta.last_row_id
+            console.log('✅ AUTO-CREATED service request from voice call! ID:', request_id)
+            
+            // Update voice call log with the created request_id
+            await DB.prepare(`
+              UPDATE voice_call_logs 
+              SET auto_created_request_id = ?
+              WHERE log_id = ?
+            `).bind(request_id, log_id).run()
+            
+            return c.json({
+              success: true,
+              log_id,
+              auto_created_request: {
+                request_id,
+                service_type_id: extracted.service_type_id,
+                request_details: extracted.request_details,
+                priority: extracted.priority
+              }
+            })
+          }
+        }
+      } catch (extractError) {
+        console.error('❌ Auto-extraction error (non-fatal):', extractError)
+        // Don't fail the whole request - transcript is still saved
+      }
+    }
     
     return c.json({
       success: true,
-      log_id: result.meta.last_row_id
+      log_id
     })
   } catch (error) {
     console.error('❌ Save voice call log error:', error)
