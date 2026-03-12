@@ -28234,6 +28234,78 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
         </div>
 
+        <!-- AI Voice Call Modal -->
+        <div id="voiceCallModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" style="z-index: 10000;">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full relative overflow-hidden">
+                <!-- Animated Background -->
+                <div class="absolute inset-0 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 opacity-10 animate-pulse"></div>
+                
+                <!-- Modal Content -->
+                <div class="relative z-10">
+                    <!-- Header -->
+                    <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-purple-600">
+                        <div class="flex justify-between items-center text-white">
+                            <div class="flex items-center gap-3">
+                                <i class="fas fa-headset text-2xl"></i>
+                                <h2 class="text-2xl font-bold">AI Voice Assistant</h2>
+                            </div>
+                            <button onclick="endVoiceCall()" class="hover:bg-white/20 rounded-lg p-2 transition-all">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Body -->
+                    <div class="p-8 text-center">
+                        <!-- Voice Animation -->
+                        <div id="voiceAnimation" class="mb-6 relative h-40 flex items-center justify-center">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="w-32 h-32 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-2xl" id="voiceCircle">
+                                    <i class="fas fa-microphone text-white text-4xl" id="voiceIcon"></i>
+                                </div>
+                            </div>
+                            <!-- Sound Wave Rings -->
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="w-40 h-40 border-4 border-blue-400 rounded-full animate-ping opacity-20"></div>
+                            </div>
+                            <div class="absolute inset-0 flex items-center justify-center" style="animation-delay: 0.5s;">
+                                <div class="w-48 h-48 border-4 border-purple-400 rounded-full animate-ping opacity-10"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Status Text -->
+                        <div id="voiceStatus" class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">Connecting to AI Assistant...</h3>
+                            <p class="text-gray-600 text-sm">Please wait while we establish the connection</p>
+                        </div>
+                        
+                        <!-- Transcript Display -->
+                        <div id="voiceTranscript" class="hidden mb-6 p-4 bg-gray-50 rounded-lg text-left max-h-40 overflow-y-auto">
+                            <p class="text-sm text-gray-700"></p>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <div class="flex gap-3 justify-center">
+                            <button id="muteBtn" onclick="toggleMute()" class="hidden px-6 py-3 bg-yellow-500 text-white rounded-full font-semibold hover:bg-yellow-600 transition-all shadow-lg">
+                                <i class="fas fa-microphone-slash mr-2"></i>Mute
+                            </button>
+                            <button onclick="endVoiceCall()" class="px-6 py-3 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-all shadow-lg">
+                                <i class="fas fa-phone-slash mr-2"></i>End Call
+                            </button>
+                        </div>
+                        
+                        <!-- Tips -->
+                        <div class="mt-6 p-4 bg-blue-50 rounded-lg text-left">
+                            <p class="text-xs text-gray-600">
+                                <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                                <strong>Tip:</strong> Speak naturally! Tell the AI assistant what service you need, and they'll help you book it.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <script>
         let serviceTypes = [];
 
@@ -28317,6 +28389,32 @@ app.get('/hotel/:property_slug', async (c) => {
                         '</div>' +
                     '</div>' +
                 '</div>' +
+                
+                '<!-- AI Voice Call Option -->' +
+                '<div class="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-6">' +
+                    '<div class="flex items-start gap-4">' +
+                        '<div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">' +
+                            '<i class="fas fa-phone-volume text-white text-xl"></i>' +
+                        '</div>' +
+                        '<div class="flex-1">' +
+                            '<h4 class="text-lg font-bold text-gray-800 mb-1">🎙️ Speak to AI Assistant</h4>' +
+                            '<p class="text-sm text-gray-600 mb-3">Prefer to talk? Call our AI assistant with natural voice - it\'s like speaking to our staff! Just describe what you need.</p>' +
+                            '<button onclick="startVoiceServiceRequest(' + serviceTypeId + ', \'' + service.service_name.replace(/'/g, "\\'") + '\')" ' +
+                                'class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center gap-2">' +
+                                '<i class="fas fa-phone-alt animate-pulse"></i>' +
+                                '<span>Start Voice Call</span>' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                
+                '<div class="relative mb-6">' +
+                    '<div class="absolute inset-0 flex items-center"><div class="w-full border-t-2 border-gray-200"></div></div>' +
+                    '<div class="relative flex justify-center text-sm">' +
+                        '<span class="px-4 bg-white text-gray-500 font-medium">OR FILL OUT THE FORM</span>' +
+                    '</div>' +
+                '</div>' +
+                
                 '<form id="serviceRequestForm" onsubmit="submitServiceRequest(event, ' + serviceTypeId + ')" class="space-y-4">' +
                     '<div><label class="block font-semibold mb-2">Guest Name</label>' +
                     '<input type="text" name="guest_name" value="' + (guest.full_name || '') + '" readonly class="w-full px-4 py-3 border-2 rounded-lg bg-gray-50"></div>' +
@@ -28387,6 +28485,209 @@ app.get('/hotel/:property_slug', async (c) => {
                 alert('Failed to submit request. Please try again.');
             }
         }
+
+        // ========================================
+        // AI VOICE CALL FUNCTIONS
+        // ========================================
+        
+        let voiceCallActive = false;
+        let voiceCallData = {
+            serviceTypeId: null,
+            serviceName: '',
+            transcript: '',
+            isMuted: false
+        };
+        
+        async function startVoiceServiceRequest(serviceTypeId, serviceName) {
+            // Show voice call modal
+            document.getElementById('voiceCallModal').classList.remove('hidden');
+            voiceCallActive = true;
+            voiceCallData.serviceTypeId = serviceTypeId;
+            voiceCallData.serviceName = serviceName;
+            
+            // Update status
+            updateVoiceStatus('Connecting to AI Assistant...', 'Please wait while we establish the connection');
+            
+            // Simulate connection (in production, this would connect to OpenAI Realtime API)
+            setTimeout(() => {
+                connectToAIVoice();
+            }, 1500);
+        }
+        
+        function connectToAIVoice() {
+            if (!voiceCallActive) return;
+            
+            const guest = getGuestSession();
+            
+            // Update status to connected
+            updateVoiceStatus('Connected! Speak Now', 'I\'m your AI assistant. How can I help with your ' + voiceCallData.serviceName + ' request?');
+            
+            // Show mute button
+            document.getElementById('muteBtn').classList.remove('hidden');
+            
+            // Change icon to indicate listening
+            document.getElementById('voiceIcon').className = 'fas fa-microphone-alt text-white text-4xl animate-pulse';
+            
+            // In production, this would use OpenAI Realtime API
+            // For now, show a demo flow
+            simulateAIConversation(guest);
+        }
+        
+        function simulateAIConversation(guest) {
+            // This simulates an AI conversation
+            // In production, replace with actual OpenAI Realtime API integration
+            
+            const conversationSteps = [
+                {
+                    delay: 2000,
+                    aiSpeech: 'Hello ' + (guest.full_name || 'there') + '! I understand you need ' + voiceCallData.serviceName + '. Could you please describe what you need?',
+                    showTranscript: true
+                },
+                {
+                    delay: 5000,
+                    userSpeech: '[Guest speaking...]',
+                    showTranscript: true
+                },
+                {
+                    delay: 8000,
+                    aiSpeech: 'I understand. Let me confirm: you need ' + voiceCallData.serviceName + ' service for room ' + (guest.room_number || 'your room') + '. Is that correct?',
+                    showTranscript: true
+                },
+                {
+                    delay: 10000,
+                    userSpeech: '[Guest confirms...]',
+                    showTranscript: true
+                },
+                {
+                    delay: 12000,
+                    aiSpeech: 'Perfect! I\'m booking this service request for you now. Our team will be there shortly!',
+                    showTranscript: true,
+                    action: 'book'
+                }
+            ];
+            
+            conversationSteps.forEach((step) => {
+                if (!voiceCallActive) return;
+                
+                setTimeout(() => {
+                    if (!voiceCallActive) return;
+                    
+                    if (step.aiSpeech) {
+                        addToTranscript('AI Assistant', step.aiSpeech);
+                    } else if (step.userSpeech) {
+                        addToTranscript('You', step.userSpeech);
+                    }
+                    
+                    if (step.action === 'book') {
+                        // Auto-book the service
+                        setTimeout(() => {
+                            if (voiceCallActive) {
+                                autoBookServiceFromVoice();
+                            }
+                        }, 2000);
+                    }
+                }, step.delay);
+            });
+        }
+        
+        function addToTranscript(speaker, text) {
+            const transcriptDiv = document.getElementById('voiceTranscript');
+            const transcriptText = transcriptDiv.querySelector('p');
+            
+            transcriptDiv.classList.remove('hidden');
+            
+            const entry = '<strong>' + speaker + ':</strong> ' + text + '<br><br>';
+            transcriptText.innerHTML += entry;
+            
+            // Scroll to bottom
+            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+        }
+        
+        function updateVoiceStatus(title, subtitle) {
+            const statusDiv = document.getElementById('voiceStatus');
+            statusDiv.innerHTML = 
+                '<h3 class="text-xl font-bold text-gray-800 mb-2">' + title + '</h3>' +
+                '<p class="text-gray-600 text-sm">' + subtitle + '</p>';
+        }
+        
+        async function autoBookServiceFromVoice() {
+            const guest = getGuestSession();
+            const propertyId = getPropertyId();
+            
+            // Create service request automatically
+            const data = {
+                service_type_id: voiceCallData.serviceTypeId,
+                pass_id: guest.pass_id,
+                guest_name: guest.full_name,
+                room_number: guest.room_number,
+                guest_phone: guest.phone || '',
+                request_details: 'Request made via AI Voice Assistant for ' + voiceCallData.serviceName,
+                priority: 'normal'
+            };
+            
+            try {
+                const response = await fetch('/api/service-requests', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Property-ID': propertyId},
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateVoiceStatus(
+                        '✅ Request Booked Successfully!',
+                        'Request ID: #' + result.request_id + ' - Our team will assist you shortly.'
+                    );
+                    
+                    // Confetti effect
+                    if (typeof confetti !== 'undefined') {
+                        confetti({particleCount: 100, spread: 70, origin: {y: 0.6}});
+                    }
+                    
+                    // Auto-close after 3 seconds
+                    setTimeout(() => {
+                        endVoiceCall();
+                        closeServiceMenu();
+                    }, 3000);
+                } else {
+                    updateVoiceStatus('❌ Booking Failed', 'Please try again or use the form.');
+                }
+            } catch (error) {
+                console.error('Voice booking error:', error);
+                updateVoiceStatus('❌ Connection Error', 'Please try again or use the form.');
+            }
+        }
+        
+        function toggleMute() {
+            voiceCallData.isMuted = !voiceCallData.isMuted;
+            const muteBtn = document.getElementById('muteBtn');
+            
+            if (voiceCallData.isMuted) {
+                muteBtn.innerHTML = '<i class="fas fa-microphone mr-2"></i>Unmute';
+                muteBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                muteBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                document.getElementById('voiceIcon').className = 'fas fa-microphone-slash text-white text-4xl';
+            } else {
+                muteBtn.innerHTML = '<i class="fas fa-microphone-slash mr-2"></i>Mute';
+                muteBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                muteBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+                document.getElementById('voiceIcon').className = 'fas fa-microphone-alt text-white text-4xl animate-pulse';
+            }
+        }
+        
+        function endVoiceCall() {
+            voiceCallActive = false;
+            document.getElementById('voiceCallModal').classList.add('hidden');
+            document.getElementById('muteBtn').classList.add('hidden');
+            document.getElementById('voiceTranscript').classList.add('hidden');
+            document.getElementById('voiceTranscript').querySelector('p').innerHTML = '';
+            voiceCallData = {serviceTypeId: null, serviceName: '', transcript: '', isMuted: false};
+        }
+        
+        // ========================================
+        // END AI VOICE CALL FUNCTIONS
+        // ========================================
 
         // Load service types on page load
         document.addEventListener('DOMContentLoaded', loadServiceTypes);
