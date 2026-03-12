@@ -21997,33 +21997,36 @@ app.post('/api/voice-assistant/function-call', async (c) => {
         }
       }
       
-      console.log('Creating service request:', {
+      console.log('🎤 Creating voice service request:', {
+        property_id,
         service_type_id,
         pass_id,
         guest_name: guest_info.full_name,
         room_number: guest_info.room_number,
+        guest_phone: guest_phone || null,
         request_details,
-        priority
+        priority: priority || 'normal',
+        status: 'pending'
       })
       
-      // Create the service request
+      // Create the service request - SAME FORMAT AS REGULAR FORM
       const result = await DB.prepare(`
         INSERT INTO service_requests (
-          service_type_id, pass_id, guest_name, room_number, guest_phone,
-          request_details, priority, status, property_id, requested_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'))
+          property_id, service_type_id, pass_id, guest_name, room_number,
+          guest_phone, request_details, priority, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       `).bind(
+        property_id,
         service_type_id,
         pass_id,
         guest_info.full_name,
         guest_info.room_number,
-        guest_phone || guest_info.phone || '',
+        guest_phone || null,
         request_details,
-        priority,
-        property_id
+        priority || 'normal'
       ).run()
       
-      console.log('Service request created:', result.meta.last_row_id)
+      console.log('✅ Voice service request created! ID:', result.meta.last_row_id)
       
       return c.json({
         success: true,
@@ -22031,10 +22034,10 @@ app.post('/api/voice-assistant/function-call', async (c) => {
         message: `Service request #${result.meta.last_row_id} has been created successfully! Our team will assist you shortly.`
       })
     } catch (error) {
-      console.error('Function call error:', error)
+      console.error('❌ Voice function call error:', error)
       return c.json({ 
         success: false, 
-        error: 'Failed to create service request' 
+        error: 'Failed to create service request: ' + error.message 
       }, 500)
     }
   }
