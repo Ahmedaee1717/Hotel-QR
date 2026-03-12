@@ -28704,8 +28704,58 @@ app.get('/hotel/:property_slug', async (c) => {
             sessionConfig: null,
             audioQueue: [],
             isPlayingAudio: false,
-            nextStartTime: 0
+            nextStartTime: 0,
+            ringingSound: null
         };
+        
+        function playRingingSound() {
+            // Create audio context for ringing if not exists
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create oscillator for ringing tone (double beep pattern)
+            const playBeep = (startTime, frequency) => {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.4);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + 0.4);
+            };
+            
+            // Play ring pattern every 2 seconds
+            let time = audioCtx.currentTime;
+            for (let i = 0; i < 10; i++) { // 10 rings max (20 seconds)
+                playBeep(time, 480);
+                playBeep(time + 0.5, 480);
+                time += 2;
+            }
+            
+            voiceCallData.ringingSound = audioCtx;
+            
+            // Stop after 20 seconds
+            setTimeout(() => {
+                if (voiceCallData.ringingSound) {
+                    voiceCallData.ringingSound.close();
+                    voiceCallData.ringingSound = null;
+                }
+            }, 20000);
+        }
+        
+        function stopRingingSound() {
+            if (voiceCallData.ringingSound) {
+                voiceCallData.ringingSound.close();
+                voiceCallData.ringingSound = null;
+            }
+        }
         
         async function startVoiceServiceRequest(serviceTypeId, serviceName) {
             // Show voice call modal
@@ -28714,8 +28764,9 @@ app.get('/hotel/:property_slug', async (c) => {
             voiceCallData.serviceTypeId = serviceTypeId;
             voiceCallData.serviceName = serviceName;
             
-            // Update status
+            // Update status and play ringing sound
             updateVoiceStatus('Connecting to AI Assistant...', 'Please wait while we establish the connection');
+            playRingingSound();
             
             // Get session configuration from backend
             try {
@@ -28746,10 +28797,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     await connectToOpenAIRealtime(data);
                 } else {
                     console.error('❌ Session creation failed:', data.error);
+                    stopRingingSound();
                     updateVoiceStatus('❌ Connection Failed', data.error || 'Please try the form instead.');
                 }
             } catch (error) {
                 console.error('💥 Session creation error:', error);
+                stopRingingSound();
                 updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
             }
         }
@@ -28781,6 +28834,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 ws.onopen = () => {
                     console.log('✅ Connected to OpenAI Realtime API');
                     
+                    // Stop ringing sound
+                    stopRingingSound();
+                    
                     // Send session update with instructions
                     ws.send(JSON.stringify({
                         type: 'session.update',
@@ -28802,6 +28858,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
+                    stopRingingSound();
                     updateVoiceStatus('❌ Connection Error', 'Please try the form instead.');
                 };
                 
@@ -28814,6 +28871,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 
             } catch (error) {
                 console.error('Realtime connection error:', error);
+                stopRingingSound();
                 updateVoiceStatus('❌ Microphone Error', 'Please allow microphone access and try again.');
             }
         }
@@ -28901,7 +28959,10 @@ app.get('/hotel/:property_slug', async (c) => {
                     
                 case 'error':
                     console.error('OpenAI error:', message.error);
-                    updateVoiceStatus('❌ Error', message.error.message || 'Something went wrong');
+                    // Ignore non-critical API warnings like session.type
+                    if (message.error && message.error.code !== 'missing_required_parameter') {
+                        updateVoiceStatus('❌ Error', message.error.message || 'Something went wrong');
+                    }
                     break;
             }
         }
