@@ -4599,7 +4599,8 @@ app.get('/api/admin/guest-relations', async (c) => {
   }
   
   try {
-    let query = `
+    // Simplified query - get all passes first, then aggregate in separate queries
+    const passesQuery = `
       SELECT 
         p.pass_id,
         p.pass_reference,
@@ -4615,75 +4616,97 @@ app.get('/api/admin/guest-relations', async (c) => {
         p.num_children,
         t.tier_name,
         t.tier_display_name,
-        t.tier_color,
-        -- Feedback aggregation
-        COUNT(DISTINCT f.submission_id) as feedback_count,
-        MAX(f.submitted_at) as last_feedback_date,
-        AVG(CASE WHEN f.sentiment_label IS NOT NULL THEN f.sentiment_score ELSE NULL END) as avg_sentiment,
-        MAX(f.sentiment_label) as latest_sentiment,
-        -- Chat aggregation
-        COUNT(DISTINCT cc.conversation_id) as chat_count,
-        -- Service request aggregation
-        COUNT(DISTINCT sr.request_id) as service_request_count,
-        -- Verification aggregation (activities)
-        COUNT(DISTINCT pv.verification_id) as verification_count,
-        MAX(pv.verified_at) as last_activity_date
+        t.tier_color
       FROM digital_passes p
       LEFT JOIN all_inclusive_tiers t ON p.tier_id = t.tier_id
-      LEFT JOIN feedback_submissions f ON (f.room_number = p.room_number OR f.guest_email = p.contact_email) 
-        AND f.property_id = p.property_id
-        AND DATE(f.submitted_at) BETWEEN ? AND ?
-      LEFT JOIN chatbot_conversations cc ON cc.property_id = p.property_id 
-        AND DATE(cc.last_activity) BETWEEN ? AND ?
-      LEFT JOIN service_requests sr ON sr.pass_id = p.pass_id
-        AND DATE(sr.requested_at) BETWEEN ? AND ?
-      LEFT JOIN pass_verifications pv ON pv.pass_id = p.pass_id
-        AND DATE(pv.verified_at) BETWEEN ? AND ?
       WHERE p.property_id = ?
-        AND DATE(p.valid_from) <= ?
-        AND DATE(p.valid_until) >= ?
+      ORDER BY p.valid_from DESC
+      LIMIT 500
     `
     
-    const params = [
-      date_from, date_to,  // feedback date range
-      date_from, date_to,  // chat date range
-      date_from, date_to,  // service request date range
-      date_from, date_to,  // verification date range
-      property_id,
-      date_to,            // pass valid_from check
-      date_from          // pass valid_until check
-    ]
+    const passes = await DB.prepare(passesQuery).bind(property_id).all()
     
-    // Add search filter
-    if (search) {
-      query += ` AND (p.primary_guest_name LIKE ? OR p.room_number LIKE ? OR p.contact_email LIKE ? OR p.contact_phone LIKE ?)`
-      const searchPattern = '%' + search + '%'
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern)
+    if (!passes.results || passes.results.length === 0) {
+      return c.json({
+        success: true,
+        guests: [],
+        total: 0,
+        date_range: { from: date_from, to: date_to }
+      })
     }
     
-    query += ` GROUP BY p.pass_id`
+    // Now enrich each pass with aggregated data
+    const enrichedGuests = []
     
-    // Add having clauses for filters
-    if (has_feedback === 'true') {
-      query += ` HAVING feedback_count > 0`
-    } else if (has_feedback === 'false') {
-      query += ` HAVING feedback_count = 0`
-    }
-    
-    query += ` ORDER BY p.valid_from DESC LIMIT 500`
-    
-    const guests = await DB.prepare(query).bind(...params).all()
-    
-    // Filter by sentiment if requested (post-query filter since it's on aggregated data)
-    let filteredGuests = guests.results || []
-    if (sentiment && sentiment !== 'all') {
-      filteredGuests = filteredGuests.filter(g => g.latest_sentiment === sentiment)
+    for (const pass of passes.results) {
+      // Apply search filter
+      if (search) {
+        const searchLower = search.toLowerCase()
+        const matchesSearch = 
+          (pass.primary_guest_name && pass.primary_guest_name.toLowerCase().includes(searchLower)) ||
+          (pass.room_number && pass.room_number.toLowerCase().includes(searchLower)) ||
+          (pass.contact_email && pass.contact_email.toLowerCase().includes(searchLower)) ||
+          (pass.contact_phone && pass.contact_phone.toLowerCase().includes(searchLower))
+        
+        if (!matchesSearch) continue
+      }
+      
+      // Count feedback
+      const feedbackCount = await DB.prepare(`
+        SELECT COUNT(*) as count
+        FROM feedback_submissions
+        WHERE property_id = ? 
+          AND (room_number = ? OR guest_email = ?)
+      `).bind(property_id, pass.room_number, pass.contact_email).first()
+      
+      // Get latest feedback sentiment
+      const latestFeedback = await DB.prepare(`
+        SELECT sentiment_label, sentiment_score
+        FROM feedback_submissions
+        WHERE property_id = ? 
+          AND (room_number = ? OR guest_email = ?)
+        ORDER BY submitted_at DESC
+        LIMIT 1
+      `).bind(property_id, pass.room_number, pass.contact_email).first()
+      
+      // Count verifications
+      const verificationCount = await DB.prepare(`
+        SELECT COUNT(*) as count
+        FROM pass_verifications
+        WHERE pass_id = ?
+      `).bind(pass.pass_id).first()
+      
+      // Count service requests
+      const serviceRequestCount = await DB.prepare(`
+        SELECT COUNT(*) as count
+        FROM service_requests
+        WHERE pass_id = ?
+      `).bind(pass.pass_id).first()
+      
+      const enrichedGuest = {
+        ...pass,
+        feedback_count: feedbackCount?.count || 0,
+        latest_sentiment: latestFeedback?.sentiment_label || null,
+        avg_sentiment: latestFeedback?.sentiment_score || null,
+        verification_count: verificationCount?.count || 0,
+        service_request_count: serviceRequestCount?.count || 0,
+        chat_count: 0 // Can add later if needed
+      }
+      
+      // Apply feedback filter
+      if (has_feedback === 'true' && enrichedGuest.feedback_count === 0) continue
+      if (has_feedback === 'false' && enrichedGuest.feedback_count > 0) continue
+      
+      // Apply sentiment filter
+      if (sentiment && sentiment !== 'all' && enrichedGuest.latest_sentiment !== sentiment) continue
+      
+      enrichedGuests.push(enrichedGuest)
     }
     
     return c.json({
       success: true,
-      guests: filteredGuests,
-      total: filteredGuests.length,
+      guests: enrichedGuests,
+      total: enrichedGuests.length,
       date_range: { from: date_from, to: date_to }
     })
     
