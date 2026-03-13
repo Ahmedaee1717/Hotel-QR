@@ -29352,27 +29352,46 @@ app.get('/hotel/:property_slug', async (c) => {
                         // Step 2: Process with Chat Completions API (with function calling)
                         voiceCallData.chatHistory.push({ role: 'user', content: userText });
                         
+                        const requestBody = {
+                            model: sessionData.model || 'gpt-4o-mini',
+                            messages: [
+                                { role: 'system', content: sessionData.system_instructions },
+                                ...voiceCallData.chatHistory
+                            ],
+                            temperature: sessionData.temperature || 0.6,
+                            max_tokens: sessionData.max_tokens || 300
+                        };
+                        
+                        // Only add tools if they exist
+                        if (sessionData.tools && sessionData.tools.length > 0) {
+                            requestBody.tools = sessionData.tools;
+                            requestBody.tool_choice = sessionData.tool_choice || 'auto';
+                        }
+                        
+                        console.log('📤 Sending to OpenAI:', {
+                            model: requestBody.model,
+                            messageCount: requestBody.messages.length,
+                            hasTools: !!requestBody.tools,
+                            toolCount: requestBody.tools?.length
+                        });
+                        
                         const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
                             method: 'POST',
                             headers: {
                                 'Authorization': 'Bearer ' + sessionData.api_key,
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify({
-                                model: sessionData.model || 'gpt-4o-mini',
-                                messages: [
-                                    { role: 'system', content: sessionData.system_instructions },
-                                    ...voiceCallData.chatHistory
-                                ],
-                                tools: sessionData.tools,
-                                tool_choice: sessionData.tool_choice,
-                                temperature: sessionData.temperature || 0.6,
-                                max_tokens: sessionData.max_tokens || 300
-                            })
+                            body: JSON.stringify(requestBody)
                         });
                         
                         const chatData = await chatResponse.json();
                         console.log('🤖 AI response:', chatData);
+                        
+                        if (chatData.error) {
+                            console.error('❌ OpenAI error:', chatData.error);
+                            updateVoiceStatus('❌ Error', chatData.error.message || 'AI service error');
+                            return;
+                        }
                         
                         if (chatData.choices && chatData.choices[0]) {
                             const message = chatData.choices[0].message;
