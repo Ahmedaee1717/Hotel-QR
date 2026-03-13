@@ -1084,7 +1084,43 @@
                                     </span>
                                 </div>
                                 <div class="text-sm dark-text-muted">${order.guest_name} • ${order.party_size} guests</div>
-                                ${order.reservation_date ? `<div class="text-xs dark-text-muted mt-1"><i class="fas fa-calendar mr-1"></i>${order.reservation_date}</div>` : ''}
+                                ${order.reservation_date && order.reservation_time ? (() => {
+                                    const reservationDateTime = new Date(`${order.reservation_date} ${order.reservation_time}`);
+                                    const now = new Date();
+                                    const diffMs = reservationDateTime - now;
+                                    const diffMins = Math.round(diffMs / 60000);
+                                    
+                                    let timeDisplay;
+                                    if (diffMins > 60) {
+                                        // Future reservation
+                                        timeDisplay = `📅 ${reservationDateTime.toLocaleString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })} <span class="text-green-400">(in ${Math.floor(diffMins / 60)}h ${Math.abs(diffMins % 60)}m)</span>`;
+                                    } else if (diffMins > 0) {
+                                        timeDisplay = `⏰ <span class="text-yellow-400 font-bold">Arriving in ${diffMins} min</span>`;
+                                    } else if (diffMins > -30) {
+                                        timeDisplay = `✅ <span class="text-green-400">Arrived ${Math.abs(diffMins)} min ago</span>`;
+                                    } else {
+                                        timeDisplay = `📅 ${reservationDateTime.toLocaleString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })}`;
+                                    }
+                                    return `<div class="text-xs mt-1" style="color: #94a3b8;">${timeDisplay}</div>`;
+                                })() : order.created_at ? (() => {
+                                    const createdDate = new Date(order.created_at);
+                                    const now = new Date();
+                                    const diffMs = now - createdDate;
+                                    const diffMins = Math.floor(diffMs / 60000);
+                                    let timeDisplay;
+                                    if (diffMins < 1) {
+                                        timeDisplay = '🆕 Just now (Walk-in)';
+                                    } else if (diffMins < 60) {
+                                        timeDisplay = `🚶 ${diffMins} min ago (Walk-in)`;
+                                    } else {
+                                        timeDisplay = `🚶 ${Math.floor(diffMins / 60)}h ${diffMins % 60}m ago (Walk-in)`;
+                                    }
+                                    return `<div class="text-xs dark-text-muted mt-1">${timeDisplay}</div>`;
+                                })() : ''}
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="px-3 py-1 rounded-full text-xs font-bold text-white ${statusColors[order.status]}">${order.status.toUpperCase()}</span>
