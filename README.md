@@ -1961,3 +1961,78 @@ npm run deploy:prod
 ---
 
 **Built with ❤️ using Hono + Cloudflare Workers + D1 Database**
+
+---
+
+## 🎙️ AI Voice Call Assistant - COMPLETE & FIXED ✅
+
+### Latest Fix (Commit: 0ebb6c7)
+The Voice Call AI assistant has been **completely fixed** to work as a proper hotel concierge:
+
+**Problem:** AI was asking "Which hotel are you in?", "What's your ZIP code?", "Is this for a car or appliance?"
+
+**Solution:** Comprehensive rewrite with explicit hotel context and knowledge base integration.
+
+### What Was Fixed:
+
+1. **Expanded Knowledge Base**: 20 → 50 chunks of hotel information
+2. **Explicit Hotel Context**: AI knows it's at Old Palace Resort from the start
+3. **Pre-Known Guest Information**: Guest name and room number are in instructions
+4. **10 Absolute Rules**: Prevent wrong questions (location, ZIP, cars, appliances)
+5. **Natural Conversation Flow**: Changed tool_choice from 'required' to 'auto'
+
+### How It Works Now:
+
+**Greeting:**
+```
+AI: "Hello [Guest Name], this is AI Concierge. How can I help you today?"
+```
+
+**Example Conversation:**
+```
+You: "I need maintenance"
+AI: "What needs attention in your room? AC, plumbing, lights, or something else?"
+You: "The AC is not working"
+AI: "Is this urgent, high priority, or normal?"
+You: "Urgent"
+AI: "I've submitted your maintenance request for room [X]. Our team will assist shortly."
+```
+
+### What AI Knows:
+✅ Hotel name (Old Palace Resort)  
+✅ Guest name and room number  
+✅ All hotel facilities from knowledge base  
+✅ All available services  
+✅ This is a hotel room request (not external)
+
+### What AI NEVER Asks:
+❌ "Which hotel are you in?"  
+❌ "What's your ZIP code?"  
+❌ "Is this for a car or home appliance?"  
+❌ "What's your location?"
+
+### Testing the Voice AI:
+1. Go to: https://www.oldpalaceresort.online/hotel/paradise-resort
+2. Enter PIN: **123456** (Guest: Alia, Room: 12)
+3. Click: **"At Your Service"** button (red/orange button in header)
+4. Click: **"Call AI Assistant"** button (blue phone icon at top)
+5. Allow microphone access
+6. Say: **"I need maintenance"**
+
+The AI will immediately understand you need hotel room maintenance and guide you through the process without asking for your location or hotel name.
+
+### Technical Implementation:
+- **Endpoint**: `/api/voice-assistant/session` (lines 21903-21998)
+- **Knowledge Base**: 50 chunks from `chatbot_chunks` table
+- **Model**: `gpt-4o-realtime-preview-2024-12-17`
+- **Voice**: `alloy`
+- **Temperature**: `0.6` (focused and deterministic)
+- **Max Tokens**: `150` (concise responses)
+
+### Why This Works:
+1. **Explicit Context**: AI instructions include hotel name from the start
+2. **Pre-Known Info**: Guest details are in system prompt, not questions
+3. **Knowledge Base**: 50 chunks provide comprehensive hotel information
+4. **Clear Rules**: 10 absolute rules prevent irrelevant questions
+5. **Natural Flow**: 'auto' tool_choice allows conversation before function call
+
