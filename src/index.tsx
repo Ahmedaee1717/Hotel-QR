@@ -22002,7 +22002,9 @@ ${hotelContext}
     return c.json({
       success: true,
       session_config: {
-        // Only include updatable session parameters - no type or modalities
+        type: 'realtime',  // REQUIRED: OpenAI Realtime API requires type: 'realtime'
+        model: 'gpt-4o-realtime-preview-2024-12-17',
+        modalities: ['text', 'audio'],
         instructions: instructions,
         voice: 'alloy', // Can be: alloy, echo, fable, onyx, nova, shimmer
         temperature: 0.6, // Lower temperature = more focused and deterministic
