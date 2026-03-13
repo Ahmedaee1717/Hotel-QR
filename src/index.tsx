@@ -76495,7 +76495,26 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </div>
 
     <script>
-        // Reference GLOBAL variables from first script block
+        // ===== GLOBAL TRANSLATION VARIABLES (must be first!) =====
+        if (!window.languageNames) {
+            window.languageNames = {
+                'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
+                'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
+                'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
+                'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
+                'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+                'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
+                'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
+                'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
+                'ms': 'Malay'
+            };
+        }
+        if (!window.currentLanguage) {
+            window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        }
+        if (!window.translationCache) {
+            window.translationCache = new Map();
+        }
         
         // Helper function to get translated text (must be defined first)
         function getTranslatedText(text) {
