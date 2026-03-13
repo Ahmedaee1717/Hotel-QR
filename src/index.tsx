@@ -22001,9 +22001,10 @@ ${hotelContext}
 
     return c.json({
       success: true,
+      model: 'gpt-4o-realtime-preview-2024-12-17', // For WebSocket URL
+      modalities: ['text', 'audio'], // For WebSocket URL
       session_config: {
-        model: 'gpt-4o-realtime-preview-2024-12-17',
-        modalities: ['text', 'audio'],
+        // ONLY updatable session parameters (per OpenAI Realtime API spec)
         instructions: instructions,
         voice: 'alloy', // Can be: alloy, echo, fable, onyx, nova, shimmer
         temperature: 0.6, // Lower temperature = more focused and deterministic
@@ -29272,8 +29273,9 @@ app.get('/hotel/:property_slug', async (c) => {
                 voiceCallData.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
                 
                 // Connect to OpenAI Realtime API via WebSocket
+                const model = sessionData.model || 'gpt-4o-realtime-preview-2024-12-17';
                 const ws = new WebSocket(
-                    'wss://api.openai.com/v1/realtime?model=' + sessionData.session_config.model,
+                    'wss://api.openai.com/v1/realtime?model=' + model,
                     ['realtime', 'openai-insecure-api-key.' + sessionData.api_key]
                 );
                 
