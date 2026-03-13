@@ -22388,6 +22388,121 @@ app.patch('/api/admin/service-requests/:request_id', async (c) => {
   }
 })
 
+// Admin: Voice Call Logs HTML Page
+app.get('/admin/voice-call-logs', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  const date = c.req.query('date') || new Date().toISOString().split('T')[0]
+  
+  try {
+    const logs = await DB.prepare(
+      'SELECT vcl.*, st.service_name, st.service_icon, st.service_color ' +
+      'FROM voice_call_logs vcl ' +
+      'LEFT JOIN service_types st ON vcl.service_type_id = st.service_type_id ' +
+      'WHERE vcl.property_id = ? AND DATE(vcl.call_timestamp) = ? ' +
+      'ORDER BY vcl.call_timestamp DESC'
+    ).bind(property_id, date).all()
+    
+    const logsHtml = logs.results.map(log => {
+      const timestamp = new Date(log.call_timestamp)
+      const timeStr = timestamp.toLocaleTimeString()
+      const serviceColor = log.service_color || '#6B7280'
+      const serviceName = log.service_name || 'General Request'
+      const serviceIcon = log.service_icon || 'fa-question-circle'
+      const hasRequest = log.auto_created_request_id
+      const guestName = log.guest_name || 'Unknown Guest'
+      const roomNumber = log.room_number || 'N/A'
+      const passRef = log.pass_reference || 'No Pass'
+      const transcript = (log.transcript || 'No transcript available').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      
+      return '<div class="bg-white rounded-lg shadow-md p-6 border-l-4 mb-4" style="border-left-color: ' + serviceColor + ';">' +
+          '<div class="flex items-start justify-between mb-4">' +
+            '<div class="flex items-center gap-3">' +
+              '<div class="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl" style="background: ' + serviceColor + ';">' +
+                '<i class="fas ' + serviceIcon + '"></i>' +
+              '</div>' +
+              '<div>' +
+                '<h4 class="text-lg font-bold text-gray-900">' + guestName + '</h4>' +
+                '<p class="text-sm text-gray-600">Room ' + roomNumber + ' - ' + passRef + '</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="text-right">' +
+              '<div class="text-sm font-semibold" style="color: ' + serviceColor + ';">' +
+                '<i class="fas ' + serviceIcon + ' mr-1"></i>' + serviceName +
+              '</div>' +
+              '<div class="text-xs text-gray-500 mt-1">' +
+                '<i class="fas fa-clock mr-1"></i>' + timeStr +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="bg-gray-50 rounded-lg p-3 mb-3">' +
+            '<p class="text-sm text-gray-700 whitespace-pre-wrap">' + transcript + '</p>' +
+          '</div>' +
+          (hasRequest ?
+            '<div class="flex items-center gap-2">' +
+              '<span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">' +
+                '<i class="fas fa-check-circle mr-1"></i>Service Request Created (#' + hasRequest + ')' +
+              '</span>' +
+            '</div>'
+          :
+            '<div class="flex items-center gap-2">' +
+              '<span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full">' +
+                '<i class="fas fa-info-circle mr-1"></i>No Service Request' +
+              '</span>' +
+            '</div>'
+          ) +
+        '</div>'
+    }).join('')
+    
+    const html = '<!DOCTYPE html><html lang="en"><head>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<title>Voice Call Transcripts</title>' +
+      '<script src="https://cdn.tailwindcss.com"></script>' +
+      '<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">' +
+      '</head><body class="bg-gray-100">' +
+      '<div class="container mx-auto px-4 py-8">' +
+        '<div class="bg-white rounded-lg shadow-lg p-6 mb-6">' +
+          '<div class="flex items-center justify-between mb-4">' +
+            '<div>' +
+              '<h1 class="text-3xl font-bold text-gray-900">' +
+                '<i class="fas fa-phone-volume mr-3 text-green-600"></i>Voice Call Transcripts' +
+              '</h1>' +
+              '<p class="text-gray-600 mt-2">All guest AI voice assistant calls with transcripts</p>' +
+            '</div>' +
+            '<a href="/admin/dashboard" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">' +
+              '<i class="fas fa-arrow-left mr-2"></i>Back to Dashboard' +
+            '</a>' +
+          '</div>' +
+          '<div class="flex items-center gap-4 mt-4">' +
+            '<label class="text-sm font-semibold text-gray-700">Date:</label>' +
+            '<input type="date" id="dateFilter" value="' + date + '" class="px-3 py-2 border rounded-lg" onchange="window.location.href=' + "'/admin/voice-call-logs?property_id=" + property_id + "&date=' + this.value" + '">' +
+            '<button onclick="location.reload()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">' +
+              '<i class="fas fa-sync-alt mr-2"></i>Refresh' +
+            '</button>' +
+            '<div class="ml-auto text-sm text-gray-600">' +
+              '<i class="fas fa-phone mr-2"></i>' + logs.results.length + ' calls today' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="space-y-4">' +
+          (logs.results.length === 0 ?
+            '<div class="bg-white rounded-lg shadow-md p-12 text-center">' +
+              '<i class="fas fa-phone-slash text-6xl text-gray-300 mb-4"></i>' +
+              '<p class="text-xl text-gray-500">No voice calls on this date</p>' +
+            '</div>'
+          : logsHtml) +
+        '</div>' +
+      '</div>' +
+      '</body></html>'
+    
+    return c.html(html)
+  } catch (error) {
+    console.error('Voice call logs page error:', error)
+    return c.html('<h1>Error loading voice call logs</h1>', 500)
+  }
+})
+
 // Admin: Get all service types
 app.get('/api/admin/service-types', async (c) => {
   const { DB } = c.env
@@ -43356,6 +43471,9 @@ app.get('/admin/dashboard', (c) => {
                     <button onclick="setFrontDeskView('guest-lookup')" id="viewGuestLookupBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium">
                         <i class="fas fa-address-card mr-2"></i>Guest Pass Requests
                     </button>
+                    <a href="/admin/voice-call-logs?property_id=1" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                        <i class="fas fa-phone-volume mr-2"></i>Voice Call Transcripts
+                    </a>
                     
                     <div class="ml-auto flex gap-2">
                         <input type="date" id="frontDeskDateFilter" class="px-3 py-2 border rounded-lg" onchange="loadFrontDeskData()">
