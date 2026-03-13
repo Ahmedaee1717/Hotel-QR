@@ -27993,8 +27993,8 @@ app.get('/hotel/:property_slug', async (c) => {
             <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
               <div class="flex gap-2">
                 <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
-                <button id="voiceInputBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" title="Voice Input">
-                  <i class="fas fa-microphone"></i>
+                <button id="callServiceBtn" class="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center hover:scale-105 transition shadow-lg" title="Call Service">
+                  <i class="fas fa-phone text-lg"></i>
                 </button>
                 <button id="sendChatBtn" class="w-12 h-12 rounded-full text-white flex items-center justify-center hover:scale-105 transition" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                   <i class="fas fa-paper-plane"></i>
@@ -28016,7 +28016,7 @@ app.get('/hotel/:property_slug', async (c) => {
           const chatMessages = document.getElementById('chatMessages');
           const chatInput = document.getElementById('chatInput');
           const sendChatBtn = document.getElementById('sendChatBtn');
-          const voiceInputBtn = document.getElementById('voiceInputBtn');
+          const callServiceBtn = document.getElementById('callServiceBtn');
           
           let chatConversationId = null;
           let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -28231,13 +28231,20 @@ app.get('/hotel/:property_slug', async (c) => {
             }
           }
           
-          // Voice input button handler
-          if (voiceInputBtn) {
-            voiceInputBtn.addEventListener('click', () => {
-              if (isRecording) {
-                stopRecording();
+          // Call service button handler - opens At Your Service modal
+          if (callServiceBtn) {
+            callServiceBtn.addEventListener('click', () => {
+              console.log('📞 Call button clicked from chat!');
+              // Close chat window
+              if (chatbotWidget) {
+                chatbotWidget.classList.add('hidden');
+              }
+              // Open service modal
+              if (window.openServiceMenu) {
+                window.openServiceMenu();
               } else {
-                startRecording();
+                console.error('❌ openServiceMenu function not found!');
+                alert('Service menu is not available. Please try again.');
               }
             });
           }
