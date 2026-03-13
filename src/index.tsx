@@ -22002,9 +22002,9 @@ ${hotelContext}
     return c.json({
       success: true,
       model: 'gpt-4o-realtime-preview-2024-12-17', // For WebSocket URL
-      modalities: ['text', 'audio'], // For WebSocket URL
       session_config: {
-        // ONLY updatable session parameters (per OpenAI Realtime API spec)
+        // Updatable session parameters (per OpenAI Realtime API spec)
+        modalities: ['text', 'audio'], // MUST be in session config
         instructions: instructions,
         voice: 'alloy', // Can be: alloy, echo, fable, onyx, nova, shimmer
         temperature: 0.6, // Lower temperature = more focused and deterministic
