@@ -76585,6 +76585,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                         const cacheKey = targetLanguage + ':' + text.trim();
                         const translation = translations[idx] || text;
                         translationCache.set(cacheKey, translation);
+                        
+                        // Debug logging for first 3 translations
+                        if (idx < 3) {
+                            console.log('💾 Cached:', text.substring(0, 40), '→', translation.substring(0, 40));
+                        }
                     });
                     
                     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
