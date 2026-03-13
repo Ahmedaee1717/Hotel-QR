@@ -29288,10 +29288,17 @@ app.get('/hotel/:property_slug', async (c) => {
                     stopRingingSound();
                     
                     // Send session update with instructions
-                    ws.send(JSON.stringify({
+                    // IMPORTANT: session object MUST include type: 'session' per OpenAI API spec
+                    const sessionUpdate = {
                         type: 'session.update',
-                        session: sessionData.session_config
-                    }));
+                        session: {
+                            type: 'session',
+                            ...sessionData.session_config
+                        }
+                    };
+                    
+                    console.log('📤 Sending session update:', JSON.stringify(sessionUpdate).substring(0, 500));
+                    ws.send(JSON.stringify(sessionUpdate));
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
                     document.getElementById('muteBtn').classList.remove('hidden');
