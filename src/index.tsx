@@ -21930,73 +21930,68 @@ app.post('/api/voice-assistant/session', async (c) => {
     
     // Create instructions based on request type
     const instructions = isGeneralRequest ? 
-      `YOU ARE THE AI CONCIERGE AT ${hotelName} - A LUXURY HOTEL
+      `YOU ARE NADIA - PERSONAL CONCIERGE AT ${hotelName}
 
-=== GUEST INFORMATION (ALREADY KNOWN - DO NOT ASK) ===
+=== GUEST INFORMATION (ALREADY KNOWN) ===
 Guest Name: ${guest_info.full_name}
 Room Number: ${guest_info.room_number}
-Current Location: Inside ${hotelName}
+Current Location: ${hotelName}
 
-=== YOUR IDENTITY & ROLE ===
-You are ${chatbotName}, the AI concierge working AT ${hotelName}.
-You help guests with hotel services: room maintenance, housekeeping, dining reservations, spa bookings, activities, and general requests.
+=== YOUR IDENTITY ===
+You are Nadia, the personal AI concierge at ${hotelName}.
+Your role is to provide warm, personalized hospitality and assist with any hotel service request.
+You represent the highest standard of 5-star hotel service.
 
 === COMPLETE HOTEL KNOWLEDGE BASE ===
 ${hotelContext}
 
-=== AVAILABLE HOTEL SERVICES ===
+=== AVAILABLE SERVICES ===
 ${allServiceTypes.results.map(st => `- ${st.service_name} (ID: ${st.service_type_id})`).join('\\n')}
 
-=== CONVERSATION WORKFLOW ===
-1. GREETING (say once): "Hello ${guest_info.full_name}, this is ${chatbotName}. How can I help you today?"
-2. LISTEN to the guest's request carefully
-3. ASK PRIORITY: "Is this urgent, high priority, or normal?"
-4. CALL FUNCTION: create_service_request with all details
-5. CONFIRM: "I've submitted request #[ID] for room ${guest_info.room_number}. Our team will assist you shortly."
+=== CONVERSATION FLOW ===
+1. WARM GREETING: "Hello ${guest_info.full_name}, I'm Nadia, your personal concierge. How may I assist you today?"
+2. LISTEN attentively to their request
+3. ASK PRIORITY: "How urgent is this? Urgent, high priority, or normal?"
+4. CREATE REQUEST: Use create_service_request function with complete details
+5. CONFIRM: "I've arranged this for you - request #[ID]. Our team will attend to room ${guest_info.room_number} shortly."
 
-=== ABSOLUTE RULES - NEVER BREAK THESE ===
-1. The guest is INSIDE ${hotelName} in room ${guest_info.room_number}
-2. NEVER ask: "What's your location?" "ZIP code?" "Which hotel are you in?" "Are you at ${hotelName}?"
-3. NEVER ask: "Is this for a car?" "Home appliance?" "Your house?"
-4. "Maintenance" ALWAYS means HOTEL ROOM maintenance (AC, TV, plumbing, lights, furniture)
-5. ALL services are FOR THE GUEST'S HOTEL ROOM at ${hotelName}
-6. DO NOT repeat greetings or ask multiple questions at once
-7. Use the hotel knowledge base above to answer questions about facilities, amenities, policies
-8. ONLY use the create_service_request function - no other functions exist
-9. Be concise, professional, and helpful
-10. If asked about the hotel, use the knowledge base information provided above`
+=== CORE PRINCIPLES ===
+1. The guest is INSIDE ${hotelName}, room ${guest_info.room_number} - you already know this
+2. NEVER ask: location, ZIP code, "which hotel?", "where are you?"
+3. NEVER ask: "Is this for a car?" "home appliance?"
+4. "Maintenance" = hotel room maintenance (AC, TV, plumbing, lights, etc.)
+5. ALL services are for the guest's hotel room
+6. Be warm, professional, and efficient
+7. Use hotel knowledge base to answer facility questions
+8. ONLY use create_service_request function`
     : 
-      `YOU ARE THE AI CONCIERGE AT ${hotelName} - HANDLING A SPECIFIC SERVICE REQUEST
+      `YOU ARE NADIA - PERSONAL CONCIERGE FOR ${serviceType.service_name}
 
-=== GUEST INFORMATION (ALREADY KNOWN - DO NOT ASK) ===
+=== GUEST INFORMATION (ALREADY KNOWN) ===
 Guest Name: ${guest_info.full_name}
 Room Number: ${guest_info.room_number}
-Current Location: Inside ${hotelName}
-Service Type: ${serviceType.service_name}
+Service Requested: ${serviceType.service_name}
 
-=== YOUR IDENTITY & ROLE ===
-You are ${chatbotName}, the AI concierge at ${hotelName}.
-The guest has specifically requested ${serviceType.service_name} for their hotel room.
+=== YOUR IDENTITY ===
+You are Nadia, personal concierge at ${hotelName}.
+The guest has specifically requested ${serviceType.service_name}.
 
-=== COMPLETE HOTEL KNOWLEDGE BASE ===
+=== HOTEL KNOWLEDGE BASE ===
 ${hotelContext}
 
-=== CONVERSATION WORKFLOW ===
-1. GREETING (say once): "Hello ${guest_info.full_name}, ${serviceType.service_name} for room ${guest_info.room_number}. What do you need help with?"
-2. LISTEN to specific details about their ${serviceType.service_name} request
-3. ASK PRIORITY: "Is this urgent, high priority, or normal?"
-4. CALL FUNCTION: create_service_request with all details
-5. CONFIRM: "I've submitted your ${serviceType.service_name} request #[ID]. Our team will assist you shortly."
+=== CONVERSATION FLOW ===
+1. GREETING: "Hello ${guest_info.full_name}, I'm Nadia. I understand you need ${serviceType.service_name} for room ${guest_info.room_number}. Please tell me what you need."
+2. LISTEN to specific details
+3. ASK PRIORITY: "How urgent is this?"
+4. CREATE REQUEST: Use create_service_request with details
+5. CONFIRM: "All arranged - request #[ID]. Our team will assist you shortly."
 
-=== ABSOLUTE RULES - NEVER BREAK THESE ===
-1. The guest is INSIDE ${hotelName} in room ${guest_info.room_number}
-2. NEVER ask: "What's your location?" "ZIP code?" "Which hotel?" "Where are you?"
-3. NEVER ask: "Is this for a car?" "Appliance?" "Your home?"
-4. This is a ${serviceType.service_name} request for THE HOTEL ROOM at ${hotelName}
-5. DO NOT repeat greetings or ask clarifying questions about location
-6. Use the hotel knowledge base above to answer questions
-7. ONLY use the create_service_request function
-8. Be concise, professional, and helpful`
+=== CORE PRINCIPLES ===
+1. Guest is IN the hotel, room ${guest_info.room_number}
+2. NEVER ask about location or "which hotel?"
+3. This is ${serviceType.service_name} for the HOTEL ROOM
+4. Be warm, professional, efficient
+5. Use hotel knowledge base for questions`
 
 
     // NEW SIMPLE APPROACH: Return config for Whisper + Chat Completions + TTS
@@ -28859,11 +28854,14 @@ app.get('/hotel/:property_slug', async (c) => {
                 <!-- Modal Content -->
                 <div class="relative z-10">
                     <!-- Header -->
-                    <div class="p-6 border-b bg-gradient-to-r from-blue-500 to-purple-600">
+                    <div class="p-6 border-b bg-gradient-to-r from-red-600 to-red-800">
                         <div class="flex justify-between items-center text-white">
                             <div class="flex items-center gap-3">
-                                <i class="fas fa-headset text-2xl"></i>
-                                <h2 class="text-2xl font-bold">AI Voice Assistant</h2>
+                                <i class="fas fa-concierge-bell text-2xl"></i>
+                                <div>
+                                    <h2 class="text-2xl font-bold">Nadia, Your Concierge</h2>
+                                    <p class="text-xs text-red-100">Personal assistance in any language</p>
+                                </div>
                             </div>
                             <button onclick="endVoiceCall()" class="hover:bg-white/20 rounded-lg p-2 transition-all">
                                 <i class="fas fa-times text-xl"></i>
@@ -28876,23 +28874,23 @@ app.get('/hotel/:property_slug', async (c) => {
                         <!-- Voice Animation -->
                         <div id="voiceAnimation" class="mb-6 relative h-40 flex items-center justify-center">
                             <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="w-32 h-32 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center shadow-2xl" id="voiceCircle">
+                                <div class="w-32 h-32 bg-gradient-to-br from-red-500 to-red-700 rounded-full flex items-center justify-center shadow-2xl" id="voiceCircle">
                                     <i class="fas fa-microphone text-white text-4xl" id="voiceIcon"></i>
                                 </div>
                             </div>
                             <!-- Sound Wave Rings -->
                             <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="w-40 h-40 border-4 border-blue-400 rounded-full animate-ping opacity-20"></div>
+                                <div class="w-40 h-40 border-4 border-red-400 rounded-full animate-ping opacity-20"></div>
                             </div>
                             <div class="absolute inset-0 flex items-center justify-center" style="animation-delay: 0.5s;">
-                                <div class="w-48 h-48 border-4 border-purple-400 rounded-full animate-ping opacity-10"></div>
+                                <div class="w-48 h-48 border-4 border-amber-400 rounded-full animate-ping opacity-10"></div>
                             </div>
                         </div>
                         
                         <!-- Status Text -->
                         <div id="voiceStatus" class="mb-6">
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Connecting to AI Assistant...</h3>
-                            <p class="text-gray-600 text-sm">Please wait while we establish the connection</p>
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">Connecting to Nadia...</h3>
+                            <p class="text-gray-600 text-sm">Please wait while we connect you</p>
                         </div>
                         
                         <!-- Transcript Display -->
@@ -29025,7 +29023,7 @@ app.get('/hotel/:property_slug', async (c) => {
             
             console.log('✅ Rendering', serviceTypes.length, 'services');
             
-            // Elegant AI Call Button at the top
+            // Elegant Nadia Voice Assistant Button
             content.innerHTML = 
                 '<div class="mb-8">' +
                     '<button onclick="startGeneralVoiceCall()" class="group relative w-full overflow-hidden bg-gradient-to-br from-red-600 via-red-700 to-red-900 text-white rounded-2xl shadow-2xl hover:shadow-[0_20px_60px_rgba(185,28,28,0.4)] transition-all duration-300 transform hover:scale-[1.02]">' +
@@ -29039,16 +29037,15 @@ app.get('/hotel/:property_slug', async (c) => {
                                 '<div class="flex items-center gap-5">' +
                                     '<div class="relative">' +
                                         '<div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform duration-300">' +
-                                            '<i class="fas fa-phone-volume text-2xl text-white"></i>' +
+                                            '<i class="fas fa-concierge-bell text-2xl text-white"></i>' +
                                         '</div>' +
                                         '<div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>' +
                                     '</div>' +
                                     '<div class="text-left">' +
-                                        '<div class="text-2xl font-bold mb-1 flex items-center gap-2">' +
-                                            '<span>AI Voice Assistant</span>' +
-                                            '<span class="text-amber-300 text-sm font-normal px-2 py-1 bg-white/10 rounded-full">Premium</span>' +
+                                        '<div class="text-2xl font-bold mb-1">' +
+                                            '<span>Call Nadia, Your Personal Concierge</span>' +
                                         '</div>' +
-                                        '<div class="text-sm text-red-100">Speak naturally - instant assistance in any language</div>' +
+                                        '<div class="text-sm text-red-100">Available 24/7 • Speak in any language • Instant assistance</div>' +
                                     '</div>' +
                                 '</div>' +
                                 '<div class="hidden sm:block">' +
