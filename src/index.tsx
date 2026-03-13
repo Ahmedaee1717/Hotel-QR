@@ -29513,7 +29513,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     transcriptText.innerHTML += entry;
                     // Update plain text
                     if (voiceCallData.transcript) {
-                        voiceCallData.transcript += '\n\n';
+                        voiceCallData.transcript += ' ';
                     }
                     voiceCallData.transcript += speaker + ': ' + text;
                 }
@@ -29522,7 +29522,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 transcriptText.innerHTML += entry;
                 // Update plain text
                 if (voiceCallData.transcript) {
-                    voiceCallData.transcript += '\n\n';
+                    voiceCallData.transcript += ' ';
                 }
                 voiceCallData.transcript += speaker + ': ' + text;
             }
