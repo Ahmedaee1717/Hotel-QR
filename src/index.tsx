@@ -7512,6 +7512,104 @@ app.delete('/api/admin/vendors/:vendor_id/remove', async (c) => {
   }
 })
 
+// Batch translation API - translates multiple texts in a single request
+app.post('/api/translate-batch', async (c) => {
+  try {
+    const body = await c.req.json()
+    const { texts, target_language } = body
+    
+    console.log('🚀 BATCH translation request:', texts.length, 'items to', target_language)
+    
+    if (!texts || !Array.isArray(texts) || texts.length === 0) {
+      return c.json({ error: 'Missing texts array' }, 400)
+    }
+    
+    if (!target_language) {
+      return c.json({ error: 'Missing target_language' }, 400)
+    }
+    
+    // For English, return as-is
+    if (target_language === 'en' || target_language === 'English') {
+      return c.json({ translations: texts })
+    }
+    
+    const apiKey = c.env.OPENAI_API_KEY
+    
+    if (!apiKey) {
+      console.log('⚠️ No OpenAI API key, returning original texts')
+      return c.json({ translations: texts })
+    }
+    
+    // Create numbered list format for better preservation
+    const numberedText = texts.map((text, idx) => `${idx + 1}. ${text}`).join('\n')
+    
+    const systemPrompt = `You are a professional translator. Translate the following numbered list to ${target_language}. 
+CRITICAL: Preserve the exact numbering (1., 2., 3., etc.) and return the COMPLETE list with ALL ${texts.length} items.
+Return ONLY the translated numbered list, nothing else.`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: numberedText }
+        ],
+        temperature: 0.3,
+        max_tokens: 8000
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ OpenAI API error:', errorText)
+      return c.json({ translations: texts })
+    }
+    
+    const data = await response.json()
+    const translatedText = data.choices[0]?.message?.content || ''
+    
+    // Parse numbered list back into array
+    const lines = translatedText.split('\n').filter(line => line.trim())
+    const translations = []
+    
+    for (let i = 0; i < texts.length; i++) {
+      const lineNumber = i + 1
+      const pattern = new RegExp(`^${lineNumber}[\\.\\)\\-]\\s*(.+)$`)
+      
+      let found = false
+      for (const line of lines) {
+        const match = line.match(pattern)
+        if (match) {
+          translations.push(match[1].trim())
+          found = true
+          break
+        }
+      }
+      
+      if (!found) {
+        console.warn(`⚠️ Could not find translation for item ${lineNumber}`)
+        translations.push(texts[i])
+      }
+    }
+    
+    console.log('✅ BATCH translation complete:', translations.length, 'items')
+    
+    return c.json({ translations })
+    
+  } catch (error) {
+    console.error('❌ Batch translation error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+
+
+
 // Get all activities (Admin)
 app.get('/api/admin/activities', async (c) => {
   const { DB } = c.env
@@ -76399,13 +76497,14 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         }
         
         // Parallel translation function - translates ALL menu items at once
+        // Parallel translation function - translates ALL menu items in ONE batch request
         async function translateAllMenuItems(targetLanguage) {
             if (targetLanguage === 'en') {
                 if (typeof translationCache !== 'undefined') translationCache.clear();
                 return;
             }
             
-            console.log('🚀 Starting PARALLEL translation to:', languageNames[targetLanguage]);
+            console.log('🚀 Starting BATCH translation to:', languageNames[targetLanguage]);
             const startTime = Date.now();
             
             // Collect ALL unique texts from both menus
@@ -76436,45 +76535,61 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             const textsArray = Array.from(allTexts);
             const categoriesArray = Array.from(allCategories);
-            const totalItems = textsArray.length + categoriesArray.length;
+            const allItemsToTranslate = [...textsArray, ...categoriesArray];
             
-            console.log('📊 Items to translate:', totalItems, '(', textsArray.length, 'items +', categoriesArray.length, 'categories)');
+            console.log('📊 Items to translate:', allItemsToTranslate.length, '(', textsArray.length, 'items +', categoriesArray.length, 'categories)');
             
-            // Translate ALL items in parallel (Promise.all)
-            const translationPromises = [...textsArray, ...categoriesArray].map(async (text) => {
+            // Check cache first
+            const uncachedTexts = [];
+            const textIndexMap = new Map();
+            
+            allItemsToTranslate.forEach((text, idx) => {
                 const cacheKey = targetLanguage + ':' + text;
-                if (translationCache.has(cacheKey)) {
-                    return { original: text, translated: translationCache.get(cacheKey) };
+                if (!translationCache.has(cacheKey)) {
+                    uncachedTexts.push(text);
+                    textIndexMap.set(text, idx);
                 }
-                
-                try {
-                    const response = await fetch('/api/translate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            text: text,
-                            target_language: languageNames[targetLanguage]
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const translated = data.translation || text;
-                        translationCache.set(cacheKey, translated);
-                        return { original: text, translated };
-                    }
-                } catch (error) {
-                    console.warn('Translation error for:', text, error);
-                }
-                
-                return { original: text, translated: text };
             });
             
-            await Promise.all(translationPromises);
+            if (uncachedTexts.length === 0) {
+                console.log('✅ All items already in cache!');
+                return;
+            }
             
-            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-            console.log('✅ Parallel translation complete!', totalItems, 'items in', duration, 'seconds');
+            console.log('📤 Sending BATCH request for', uncachedTexts.length, 'uncached items...');
+            
+            try {
+                // ONE batch request for ALL texts
+                const response = await fetch('/api/translate-batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        texts: uncachedTexts,
+                        target_language: languageNames[targetLanguage]
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const translations = data.translations || [];
+                    
+                    // Cache all translations
+                    uncachedTexts.forEach((text, idx) => {
+                        const cacheKey = targetLanguage + ':' + text;
+                        const translation = translations[idx] || text;
+                        translationCache.set(cacheKey, translation);
+                    });
+                    
+                    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                    console.log('✅ BATCH translation complete!', allItemsToTranslate.length, 'items in', duration, 'seconds (1 API call)');
+                } else {
+                    console.error('❌ Batch translation failed:', response.status);
+                }
+            } catch (error) {
+                console.error('❌ Batch translation error:', error);
+            }
         }
+
         
         // DEBUG: restaurant_id = ${restaurant_id}, offering_id = ${offering_id}
         // DEBUG: setMenu.results.length = ${setMenu.results?.length || 0}
