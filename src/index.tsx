@@ -74108,6 +74108,21 @@ app.get('/admin/restaurant/:offering_id', (c) => {
     </div>
 
     <script>
+      // ===== GLOBAL TRANSLATION VARIABLES (must be first!) =====
+      window.languageNames = {
+          'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
+          'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
+          'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
+          'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
+          'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
+          'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
+          'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
+          'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
+          'ms': 'Malay'
+      };
+      window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+      window.translationCache = new Map();
+      
       const offeringId = '${offering_id}';  // Can be 'h2', 'H2', or '2'
       const propertyId = localStorage.getItem('property_id') || '1';
       const userId = localStorage.getItem('user_id') || '1';
@@ -75527,25 +75542,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         document.getElementById('bookingDate').min = new Date().toISOString().split('T')[0];
         
         // ============= TRANSLATION SYSTEM =============
+        // Global variables already defined at top of page (window.languageNames, window.currentLanguage, window.translationCache)
         const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
-        
-        // GLOBAL variables (accessible across script blocks)
-        window.languageNames = {
-            'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
-            'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
-            'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
-            'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
-            'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
-            'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
-            'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
-            'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
-            'ms': 'Malay'
-        };
-        
-        window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        
-        window.translationCache = new Map();
-        
         
         // Populate language selector
         function populateLanguageSelector() {
