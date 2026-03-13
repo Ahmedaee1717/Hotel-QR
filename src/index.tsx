@@ -21980,6 +21980,8 @@ CRITICAL RULES:
         modalities: ['text', 'audio'],
         instructions: instructions,
         voice: 'alloy', // Can be: alloy, echo, fable, onyx, nova, shimmer
+        temperature: 0.6, // Lower temperature = more focused and deterministic
+        max_response_output_tokens: 150, // Shorter, more concise responses
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
         input_audio_transcription: {
