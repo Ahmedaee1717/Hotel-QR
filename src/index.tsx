@@ -28982,6 +28982,18 @@ app.get('/hotel/:property_slug', async (c) => {
             renderServiceTypes();
         }
 
+        // Open service modal from chat widget
+        window.openServiceModalFromChat = function() {
+            console.log('📞 Call button clicked from chat!');
+            // Close chat widget first
+            const chatWidget = document.getElementById('chatWidget');
+            if (chatWidget) {
+                chatWidget.classList.add('hidden');
+            }
+            // Open service modal
+            window.openServiceMenu();
+        }
+
         window.closeServiceMenu = function() {
             // Re-enable body scroll
             document.body.style.overflow = '';
@@ -50350,6 +50362,9 @@ app.get('/admin/dashboard', (c) => {
         <div class="p-3 border-t">
             <div class="flex gap-2">
                 <input type="text" id="widgetChatInput" placeholder="Type your message..." class="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                <button onclick="openServiceModalFromChat()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all" title="Voice Call">
+                    <i class="fas fa-phone"></i>
+                </button>
                 <button onclick="sendWidgetMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                     <i class="fas fa-paper-plane"></i>
                 </button>
