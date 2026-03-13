@@ -504,7 +504,7 @@
                                 <span class="font-bold dark-text" id="currentPartySize">-</span>
                             </div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="dark-text-muted">Order Time:</span>
+                                <span class="dark-text-muted">Reservation:</span>
                                 <span class="font-bold dark-text" id="currentOrderTime">-</span>
                             </div>
                             <div class="flex items-center justify-between">
@@ -1211,8 +1211,44 @@
                 document.getElementById('currentGuestName').textContent = order.guest_name || 'Guest';
                 document.getElementById('currentPartySize').textContent = order.party_size || '?';
                 
-                // Format and display order time
-                if (order.created_at) {
+                // Show RESERVATION TIME (when guest is scheduled to arrive) or order creation time
+                if (order.reservation_date && order.reservation_time) {
+                    // Kitchen order with reservation
+                    const reservationDateTime = `${order.reservation_date} ${order.reservation_time}`;
+                    const reservationDate = new Date(reservationDateTime);
+                    const now = new Date();
+                    
+                    // Check if reservation is in the future, today, or past
+                    const diffMs = reservationDate - now;
+                    const diffMins = Math.round(diffMs / 60000);
+                    
+                    let timeText;
+                    if (diffMins > 60) {
+                        // Future reservation (more than 1 hour away)
+                        timeText = `📅 ${reservationDate.toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })} (in ${Math.floor(diffMins / 60)}h ${Math.abs(diffMins % 60)}m)`;
+                    } else if (diffMins > 0) {
+                        // Arriving soon
+                        timeText = `⏰ Arriving in ${diffMins} min`;
+                    } else if (diffMins > -30) {
+                        // Recently arrived or currently dining
+                        timeText = `✅ Arrived ${Math.abs(diffMins)} min ago`;
+                    } else {
+                        // Past reservation
+                        timeText = `📅 ${reservationDate.toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}`;
+                    }
+                    document.getElementById('currentOrderTime').textContent = timeText;
+                } else if (order.created_at) {
+                    // Walk-in order (no reservation) - show when order was created
                     const orderDate = new Date(order.created_at);
                     const now = new Date();
                     const diffMs = now - orderDate;
@@ -1220,20 +1256,11 @@
                     
                     let timeText;
                     if (diffMins < 1) {
-                        timeText = 'Just now';
+                        timeText = '🆕 Just now (Walk-in)';
                     } else if (diffMins < 60) {
-                        timeText = `${diffMins} min ago`;
-                    } else if (diffMins < 1440) { // Less than 24 hours
-                        const hours = Math.floor(diffMins / 60);
-                        timeText = `${hours}h ${diffMins % 60}m ago`;
+                        timeText = `🚶 ${diffMins} min ago (Walk-in)`;
                     } else {
-                        // Show date and time for older orders
-                        timeText = orderDate.toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
+                        timeText = `🚶 ${Math.floor(diffMins / 60)}h ${diffMins % 60}m ago (Walk-in)`;
                     }
                     document.getElementById('currentOrderTime').textContent = timeText;
                 } else {
