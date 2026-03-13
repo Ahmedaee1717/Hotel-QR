@@ -75462,86 +75462,192 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         }
         
         // Change language
-        window.changeLanguage = function() {
-            const selector = document.getElementById('languageSelector');
-            const newLang = selector.value;
-            console.log('🌐 Changing language to:', newLang);
-            localStorage.setItem('preferredLanguage', newLang);
-            window.location.reload();
+        // ========== PARALLEL TRANSLATION SYSTEM FOR GUEST QR MENU ==========
+        
+        // Loading animation functions
+        function showTranslationLoading() {
+            const overlay = document.createElement('div');
+            overlay.id = 'translationLoadingOverlay';
+            overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+            overlay.style.background = 'rgba(0,0,0,0.4)';
+            overlay.style.backdropFilter = 'blur(8px)';
+            
+            const container = document.createElement('div');
+            container.className = 'bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md mx-4 transform transition-all duration-300';
+            container.style.transform = 'scale(0.95)';
+            
+            container.innerHTML = '\
+                <div class="relative w-32 h-32 mx-auto mb-6">
+                    <div class="absolute inset-0 rounded-full" style="background: linear-gradient(135deg, var(--primary-color), #7a1f1f); opacity: 0.2; animation: pulse 2s ease-in-out infinite;"></div>
+                    <div class="absolute inset-2 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, var(--primary-color), var(--accent-color));">
+                        <i class="fas fa-globe text-white text-5xl" style="animation: rotate 3s linear infinite;"></i>
+                    </div>
+                    <div class="absolute inset-0" style="animation: rotate 4s linear infinite;">
+                        <div class="absolute top-0 left-1/2 w-3 h-3 rounded-full -ml-1.5" style="background: var(--accent-color);"></div>
+                    </div>
+                    <div class="absolute inset-0" style="animation: rotate-reverse 3s linear infinite;">
+                        <div class="absolute bottom-0 left-1/2 w-3 h-3 rounded-full -ml-1.5" style="background: var(--accent-color);"></div>
+                    </div>
+                </div>
+                <h3 class="text-2xl font-bold mb-2" style="color: var(--primary-color);">Translating Menu</h3>
+                <p class="text-gray-600 mb-4">Please wait while we translate the menu for you...</p>
+                <div class="flex justify-center gap-2">
+                    <div class="w-3 h-3 rounded-full" style="background: var(--primary-color); animation: bounce1 1.4s ease-in-out infinite;"></div>
+                    <div class="w-3 h-3 rounded-full" style="background: #7a1f1f; animation: bounce2 1.4s ease-in-out infinite;"></div>
+                    <div class="w-3 h-3 rounded-full" style="background: var(--accent-color); animation: bounce3 1.4s ease-in-out infinite;"></div>
+                </div>
+                <style>
+                    @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                    @keyframes rotate-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+                    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.2; } 50% { transform: scale(1.05); opacity: 0.3; } }
+                    @keyframes bounce1 { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
+                    @keyframes bounce2 { 0%, 80%, 100% { transform: translateY(0); } 45% { transform: translateY(-10px); } }
+                    @keyframes bounce3 { 0%, 80%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+                </style>
+            `;
+            
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+            setTimeout(() => { container.style.transform = 'scale(1)'; }, 10);
         }
         
-        // Translate text using API
-        async function translateText(text, targetLanguage) {
-            // Skip if no text, English, or whitespace-only
-            if (!text || targetLanguage === 'en') return text;
-            
-            const trimmedText = text.trim();
-            if (!trimmedText) return text; // Skip whitespace-only
-            
-            const cacheKey = targetLanguage + ':' + trimmedText;
-            if (translationCache.has(cacheKey)) {
-                return translationCache.get(cacheKey);
+        function hideTranslationLoading() {
+            const overlay = document.getElementById('translationLoadingOverlay');
+            if (overlay) {
+                const container = overlay.querySelector('.bg-white');
+                if (container) container.style.transform = 'scale(0.95)';
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 300);
             }
+        }
+        
+        // Parallel translation function - translates ALL items at once
+        async function translateAllMenuItems(targetLanguage) {
+            if (targetLanguage === 'en') {
+                translationCache.clear();
+                return;
+            }
+            
+            console.log('🚀 Starting PARALLEL translation to:', languageNames[targetLanguage]);
+            const startTime = Date.now();
+            
+            // Collect ALL unique texts from both menus
+            const allTexts = new Set();
+            const allCategories = new Set();
+            
+            // Collect from SET MENU
+            Object.keys(setMenuByCategory).forEach(category => {
+                allCategories.add(category);
+                setMenuByCategory[category].forEach(item => {
+                    if (item.item_name) allTexts.add(item.item_name);
+                    if (item.description) allTexts.add(item.description);
+                });
+            });
+            
+            // Collect from RESTAURANT MENU
+            Object.keys(restaurantMenuByCategory).forEach(category => {
+                allCategories.add(category);
+                restaurantMenuByCategory[category].forEach(item => {
+                    if (item.item_name) allTexts.add(item.item_name);
+                    if (item.description) allTexts.add(item.description);
+                });
+            });
+            
+            const textsArray = Array.from(allTexts);
+            const categoriesArray = Array.from(allCategories);
+            const totalItems = textsArray.length + categoriesArray.length;
+            
+            console.log('📊 Items to translate:', totalItems, '(', textsArray.length, 'items +', categoriesArray.length, 'categories)');
+            
+            // Translate ALL items in parallel (Promise.all)
+            const translationPromises = [...textsArray, ...categoriesArray].map(async (text) => {
+                const cacheKey = targetLanguage + ':' + text;
+                if (translationCache.has(cacheKey)) {
+                    return { original: text, translated: translationCache.get(cacheKey) };
+                }
+                
+                try {
+                    const response = await fetch('/api/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: text,
+                            target_language: languageNames[targetLanguage]
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const translated = data.translation || text;
+                        translationCache.set(cacheKey, translated);
+                        return { original: text, translated };
+                    }
+                } catch (error) {
+                    console.warn('Translation error for:', text, error);
+                }
+                
+                return { original: text, translated: text };
+            });
+            
+            await Promise.all(translationPromises);
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log('✅ Parallel translation complete!', totalItems, 'items in', duration, 'seconds');
+        }
+        
+        // Change language with parallel translation
+        window.changeLanguage = async function() {
+            const selector = document.getElementById('languageSelector');
+            const newLanguage = selector.value;
+            
+            console.log('🌐 Language changed to:', newLanguage);
+            localStorage.setItem('preferredLanguage', newLanguage);
+            currentLanguage = newLanguage;
+            
+            // Show loading animation
+            showTranslationLoading();
             
             try {
-                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                // Translate ALL menu items in parallel
+                await translateAllMenuItems(newLanguage);
                 
-                console.log('🔄 Translating:', trimmedText.substring(0, 40), '→', targetLangName);
+                // Re-render current categories to show translations
+                const activeSetTab = document.querySelector('#setMenuTabs button.border-primary');
+                if (activeSetTab) {
+                    const category = activeSetTab.textContent.trim();
+                    showSetMenuCategory(category);
+                }
                 
-                const response = await fetch('/api/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: trimmedText,
-                        target_language: targetLangName
-                    })
+                const activeRestaurantTab = document.querySelector('#restaurantMenuTabs button.border-primary');
+                if (activeRestaurantTab) {
+                    const category = activeRestaurantTab.textContent.trim();
+                    showRestaurantMenuCategory(category);
+                }
+                
+                // Translate page elements
+                document.querySelectorAll('[data-i18n-key]').forEach(el => {
+                    const originalText = el.getAttribute('data-original') || el.textContent;
+                    el.setAttribute('data-original', originalText);
+                    const cacheKey = currentLanguage + ':' + originalText.trim();
+                    if (translationCache.has(cacheKey)) {
+                        el.textContent = translationCache.get(cacheKey);
+                    }
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    const translated = data.translation || trimmedText;
-                    translationCache.set(cacheKey, translated);
-                    console.log('✅ Got translation:', translated.substring(0, 40));
-                    return translated;
-                } else {
-                    const errorText = await response.text();
-                    console.error('❌ Translation failed:', response.status, errorText);
-                }
-            } catch (error) {
-                console.warn('⚠️ Translation error:', error.message);
+            } finally {
+                // Hide loading animation
+                hideTranslationLoading();
             }
-            
-            return trimmedText;
+        };
+        
+        // Helper function to get translated text
+        function getTranslatedText(text) {
+            if (!text || currentLanguage === 'en') return text;
+            const cacheKey = currentLanguage + ':' + text.trim();
+            return translationCache.get(cacheKey) || text;
         }
         
-        // Translate page
-        async function translatePage() {
-            if (currentLanguage === 'en') return;
-            
-            console.log('🌐 Translating page to:', currentLanguage);
-            
-            // Translate all elements with data-i18n
-            const elements = document.querySelectorAll('[data-i18n]');
-            for (const el of elements) {
-                const originalText = el.textContent.trim();
-                if (originalText) {
-                    const translated = await translateText(originalText, currentLanguage);
-                    el.textContent = translated;
-                }
-            }
-            
-            // Translate elements with data-i18n-key (restaurant title, description, location)
-            const keyElements = document.querySelectorAll('[data-i18n-key]');
-            for (const el of keyElements) {
-                const originalText = el.textContent.trim();
-                if (originalText) {
-                    const translated = await translateText(originalText, currentLanguage);
-                    el.textContent = translated;
-                }
-            }
-            
-            console.log('✅ Page translation complete');
-        }
+        
         
         // Initialize translation and menu
         async function initializePage() {
@@ -76801,12 +76907,16 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
                 const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
+                // Use translated text
+                const translatedName = getTranslatedText(item.item_name);
+                const translatedDesc = getTranslatedText(item.description || '');
+                
                 return \`
                 <div class="border rounded-lg p-4 mb-3 border-green-200 bg-green-50">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
-                            <h4 class="font-bold text-lg mb-1">\${item.item_name}</h4>
-                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
+                            <h4 class="font-bold text-lg mb-1">\${translatedName}</h4>
+                            <p class="text-gray-600 text-sm mb-2">\${translatedDesc}</p>
                             \${priceDisplay}
                         </div>
                         <div class="ml-4 flex items-center gap-2">
@@ -76865,15 +76975,19 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
                 const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-amber-600 font-bold text-lg">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
+                // Use translated text
+                const translatedName = getTranslatedText(item.item_name);
+                const translatedDesc = getTranslatedText(item.description || '');
+                
                 return \`
                 <div class="border-2 rounded-lg p-4 mb-3 border-gray-200 bg-white hover:border-amber-300 hover:shadow-md transition-all">
                     <div class="flex items-start justify-between">
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-1 flex-wrap">
-                                <h4 class="font-bold text-lg text-gray-800">\${item.item_name}</h4>
+                                <h4 class="font-bold text-lg text-gray-800">\${translatedName}</h4>
                                 \${priceDisplay}
                             </div>
-                            <p class="text-gray-600 text-sm mb-2">\${item.description || ''}</p>
+                            <p class="text-gray-600 text-sm mb-2">\${translatedDesc}</p>
                         </div>
                         <div class="ml-4 flex items-center gap-2">
                             \${quantityControls}
