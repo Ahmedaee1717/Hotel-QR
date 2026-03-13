@@ -76398,6 +76398,84 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             return translationCache.get(cacheKey) || text;
         }
         
+        // Parallel translation function - translates ALL menu items at once
+        async function translateAllMenuItems(targetLanguage) {
+            if (targetLanguage === 'en') {
+                if (typeof translationCache !== 'undefined') translationCache.clear();
+                return;
+            }
+            
+            console.log('🚀 Starting PARALLEL translation to:', languageNames[targetLanguage]);
+            const startTime = Date.now();
+            
+            // Collect ALL unique texts from both menus
+            const allTexts = new Set();
+            const allCategories = new Set();
+            
+            // Collect from SET MENU
+            if (typeof setMenuByCategory !== 'undefined') {
+                Object.keys(setMenuByCategory).forEach(category => {
+                    allCategories.add(category);
+                    setMenuByCategory[category].forEach(item => {
+                        if (item.item_name) allTexts.add(item.item_name);
+                        if (item.description) allTexts.add(item.description);
+                    });
+                });
+            }
+            
+            // Collect from RESTAURANT MENU
+            if (typeof restaurantMenuByCategory !== 'undefined') {
+                Object.keys(restaurantMenuByCategory).forEach(category => {
+                    allCategories.add(category);
+                    restaurantMenuByCategory[category].forEach(item => {
+                        if (item.item_name) allTexts.add(item.item_name);
+                        if (item.description) allTexts.add(item.description);
+                    });
+                });
+            }
+            
+            const textsArray = Array.from(allTexts);
+            const categoriesArray = Array.from(allCategories);
+            const totalItems = textsArray.length + categoriesArray.length;
+            
+            console.log('📊 Items to translate:', totalItems, '(', textsArray.length, 'items +', categoriesArray.length, 'categories)');
+            
+            // Translate ALL items in parallel (Promise.all)
+            const translationPromises = [...textsArray, ...categoriesArray].map(async (text) => {
+                const cacheKey = targetLanguage + ':' + text;
+                if (translationCache.has(cacheKey)) {
+                    return { original: text, translated: translationCache.get(cacheKey) };
+                }
+                
+                try {
+                    const response = await fetch('/api/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: text,
+                            target_language: languageNames[targetLanguage]
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const translated = data.translation || text;
+                        translationCache.set(cacheKey, translated);
+                        return { original: text, translated };
+                    }
+                } catch (error) {
+                    console.warn('Translation error for:', text, error);
+                }
+                
+                return { original: text, translated: text };
+            });
+            
+            await Promise.all(translationPromises);
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            console.log('✅ Parallel translation complete!', totalItems, 'items in', duration, 'seconds');
+        }
+        
         // DEBUG: restaurant_id = ${restaurant_id}, offering_id = ${offering_id}
         // DEBUG: setMenu.results.length = ${setMenu.results?.length || 0}
         // DEBUG: restaurantMenu.menus.length = ${restaurantMenu.menus?.length || 0}
