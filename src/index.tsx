@@ -29288,16 +29288,14 @@ app.get('/hotel/:property_slug', async (c) => {
                     stopRingingSound();
                     
                     // Send session update with instructions
-                    // IMPORTANT: session object MUST include type: 'session' per OpenAI API spec
+                    // NOTE: session object should NOT have a 'type' field - only the event wrapper has type: 'session.update'
                     const sessionUpdate = {
                         type: 'session.update',
-                        session: {
-                            type: 'session',
-                            ...sessionData.session_config
-                        }
+                        session: sessionData.session_config  // NO type field inside session
                     };
                     
-                    console.log('📤 Sending session update:', JSON.stringify(sessionUpdate).substring(0, 500));
+                    console.log('📤 Sending session update (first 800 chars):', JSON.stringify(sessionUpdate).substring(0, 800));
+                    console.log('📝 Instructions included:', sessionData.session_config.instructions ? 'YES' : 'NO');
                     ws.send(JSON.stringify(sessionUpdate));
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
