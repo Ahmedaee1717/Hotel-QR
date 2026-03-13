@@ -29259,6 +29259,9 @@ app.get('/hotel/:property_slug', async (c) => {
         async function connectToOpenAIRealtime(sessionData) {
             if (!voiceCallActive) return;
             
+            // Store sessionData in voiceCallData so handleOpenAIMessage can access it
+            voiceCallData.sessionData = sessionData;
+            
             try {
                 // Request microphone permission
                 voiceCallData.mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -29366,17 +29369,17 @@ app.get('/hotel/:property_slug', async (c) => {
                 console.log('✅ Session created, updating with our configuration...');
                 console.log('📝 Session ID:', message.session?.id);
                 
-                if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN && sessionData.session_config) {
+                if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN && voiceCallData.sessionData?.session_config) {
                     // Send session.update with the session ID
                     const sessionUpdatePayload = {
                         type: 'session.update',
                         session: {
-                            ...sessionData.session_config
+                            ...voiceCallData.sessionData.session_config
                         }
                     };
                     
                     console.log('📤 Sending session.update after session.created');
-                    console.log('🔧 Config keys:', Object.keys(sessionData.session_config));
+                    console.log('🔧 Config keys:', Object.keys(voiceCallData.sessionData.session_config));
                     voiceCallData.ws.send(JSON.stringify(sessionUpdatePayload));
                 }
             }
