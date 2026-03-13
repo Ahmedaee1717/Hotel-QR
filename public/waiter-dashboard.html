@@ -2180,7 +2180,11 @@
             
             switch(period) {
                 case 'today':
-                    startDate = endDate = today.toISOString().split('T')[0];
+                    startDate = today.toISOString().split('T')[0];
+                    // Include future orders (next 7 days)
+                    const futureDate = new Date(today);
+                    futureDate.setDate(today.getDate() + 7);
+                    endDate = futureDate.toISOString().split('T')[0];
                     break;
                 case 'yesterday':
                     const yesterday = new Date(today);
