@@ -77673,8 +77673,13 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         // Set minimum date to today
         document.getElementById('bookingDate').min = new Date().toISOString().split('T')[0];
         
-        // ============= TRANSLATION SYSTEM =============
+        // ============= TRANSLATION SYSTEM (uses global variables) =============
         const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
+        
+        // Reference global variables
+        const languageNames = window.languageNames;
+        let currentLanguage = window.currentLanguage;
+        const translationCache = window.translationCache;
         
         // Populate language selector
         function populateLanguageSelector() {
