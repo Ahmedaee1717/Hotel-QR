@@ -70129,7 +70129,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 if (menuTranslations[cacheKey]) continue;
                 
                 try {
-                    const response = await fetch('/api/admin/translate-text', {
+                    const response = await fetch('/api/translate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -70139,7 +70139,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     });
                     
                     const data = await response.json();
-                    if (data.success && data.translation) {
+                    if (data.translation) {
                         menuTranslations[cacheKey] = data.translation;
                     }
                 } catch (error) {
