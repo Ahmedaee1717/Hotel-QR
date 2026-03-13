@@ -70107,8 +70107,84 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             // If we have menu items loaded, translate them
             if (menuItems.length > 0 && selectedRestaurant) {
-                await translateMenuItems();
-                renderMenuItems();
+                // Show loading overlay
+                showTranslationLoading();
+                
+                try {
+                    await translateMenuItems();
+                    renderMenuItems();
+                } finally {
+                    // Hide loading overlay
+                    hideTranslationLoading();
+                }
+            }
+        }
+        
+        function showTranslationLoading() {
+            const overlay = document.createElement('div');
+            overlay.id = 'translationLoadingOverlay';
+            overlay.innerHTML = 
+                '<div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]" style="animation: fadeIn 0.3s;">' +
+                    '<div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center" style="animation: slideUp 0.4s;">' +
+                        '<div class="mb-6">' +
+                            '<!-- Animated Globe -->' +
+                            '<div class="relative w-24 h-24 mx-auto">' +
+                                '<div class="absolute inset-0 rounded-full" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); animation: pulse 2s infinite;"></div>' +
+                                '<div class="absolute inset-2 bg-white rounded-full flex items-center justify-center">' +
+                                    '<i class="fas fa-language text-4xl" style="color: var(--primary-color); animation: rotate 3s linear infinite;"></i>' +
+                                '</div>' +
+                                '<!-- Orbiting dots -->' +
+                                '<div class="absolute inset-0" style="animation: rotate 4s linear infinite;">' +
+                                    '<div class="absolute top-0 left-1/2 w-3 h-3 rounded-full" style="background: var(--accent-color); transform: translateX(-50%);"></div>' +
+                                '</div>' +
+                                '<div class="absolute inset-0" style="animation: rotate 4s linear infinite reverse;">' +
+                                    '<div class="absolute bottom-0 left-1/2 w-3 h-3 rounded-full" style="background: var(--accent-color); transform: translateX(-50%);"></div>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<h3 class="text-2xl font-bold mb-2" style="color: var(--primary-color);">Translating Menu</h3>' +
+                        '<p class="text-gray-600 mb-4">Please wait while we translate the menu items...</p>' +
+                        '<div class="flex items-center justify-center gap-2">' +
+                            '<div class="w-2 h-2 rounded-full" style="background: var(--accent-color); animation: bounce 1s infinite;"></div>' +
+                            '<div class="w-2 h-2 rounded-full" style="background: var(--accent-color); animation: bounce 1s infinite 0.2s;"></div>' +
+                            '<div class="w-2 h-2 rounded-full" style="background: var(--accent-color); animation: bounce 1s infinite 0.4s;"></div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<style>' +
+                    '@keyframes fadeIn {' +
+                        'from { opacity: 0; }' +
+                        'to { opacity: 1; }' +
+                    '}' +
+                    '@keyframes slideUp {' +
+                        'from { transform: translateY(20px); opacity: 0; }' +
+                        'to { transform: translateY(0); opacity: 1; }' +
+                    '}' +
+                    '@keyframes rotate {' +
+                        'from { transform: rotate(0deg); }' +
+                        'to { transform: rotate(360deg); }' +
+                    '}' +
+                    '@keyframes pulse {' +
+                        '0%, 100% { transform: scale(1); opacity: 0.8; }' +
+                        '50% { transform: scale(1.05); opacity: 0.6; }' +
+                    '}' +
+                    '@keyframes bounce {' +
+                        '0%, 100% { transform: translateY(0); }' +
+                        '50% { transform: translateY(-10px); }' +
+                    '}' +
+                    '@keyframes fadeOut {' +
+                        'from { opacity: 1; }' +
+                        'to { opacity: 0; }' +
+                    '}' +
+                '</style>';
+            document.body.appendChild(overlay);
+        }
+        
+        function hideTranslationLoading() {
+            const overlay = document.getElementById('translationLoadingOverlay');
+            if (overlay) {
+                overlay.style.animation = 'fadeOut 0.3s';
+                setTimeout(() => overlay.remove(), 300);
             }
         }
         
@@ -70119,14 +70195,24 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 return;
             }
             
-            console.log('🔄 Translating menu items to', currentLanguage);
+            console.log('🔄 Translating', menuItems.length, 'items to', currentLanguage);
             
-            // Translate each menu item
-            for (const item of menuItems) {
+            // Get items that need translation
+            const itemsToTranslate = menuItems.filter(item => {
                 const cacheKey = item.item_id + '_' + currentLanguage;
-                
-                // Skip if already translated
-                if (menuTranslations[cacheKey]) continue;
+                return !menuTranslations[cacheKey];
+            });
+            
+            if (itemsToTranslate.length === 0) {
+                console.log('✅ All items already translated (cached)');
+                return;
+            }
+            
+            console.log('📡 Translating', itemsToTranslate.length, 'new items...');
+            
+            // Translate ALL items in PARALLEL for speed
+            const translationPromises = itemsToTranslate.map(async (item) => {
+                const cacheKey = item.item_id + '_' + currentLanguage;
                 
                 try {
                     const response = await fetch('/api/translate', {
@@ -70145,9 +70231,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 } catch (error) {
                     console.error('Translation error for item', item.item_id, error);
                 }
-            }
+            });
             
-            console.log('✅ Translation complete');
+            // Wait for ALL translations to complete
+            await Promise.all(translationPromises);
+            
+            console.log('✅ Translation complete:', Object.keys(menuTranslations).length, 'total cached');
         }
         
         function getItemName(item) {
