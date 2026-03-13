@@ -82235,17 +82235,21 @@ app.get('/api/waiter/orders', async (c) => {
   const { restaurant, waiter, property, date, start_date, end_date } = c.req.query()
   
   try {
-    // Calculate date range
-    const today = new Date().toISOString().split('T')[0]
-    const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + 7)
+    // Calculate date range - show PAST 30 days to FUTURE 7 days
+    const today = new Date()
+    const minDate = new Date(today)
+    minDate.setDate(minDate.getDate() - 30) // Past 30 days
+    const minDateStr = minDate.toISOString().split('T')[0]
+    
+    const maxDate = new Date(today)
+    maxDate.setDate(maxDate.getDate() + 7) // Future 7 days
     const maxDateStr = maxDate.toISOString().split('T')[0]
     
     // Determine start and end dates
-    let startDateFilter = start_date || date || today
+    let startDateFilter = start_date || date || minDateStr // Default to 30 days ago
     let endDateFilter = end_date || date || maxDateStr
     
-    // Get waiter orders (if waiter=0, get all)
+    // Get waiter orders (if waiter=0, get all) - INCLUDE ALL STATUSES
     let waiterOrdersQuery = `
       SELECT 
         wo.order_id,
@@ -82261,7 +82265,6 @@ app.get('/api/waiter/orders', async (c) => {
       FROM waiter_orders wo
       INNER JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       WHERE wo.restaurant_id = ?
-        AND wo.status IN ('pending', 'confirmed', 'seated', 'preparing', 'ready')
         AND DATE(wo.created_at) BETWEEN ? AND ?
     `
     
