@@ -29025,23 +29025,45 @@ app.get('/hotel/:property_slug', async (c) => {
             
             console.log('✅ Rendering', serviceTypes.length, 'services');
             
-            // Big AI Call Button at the top
+            // Elegant AI Call Button at the top
             content.innerHTML = 
-                '<div class="mb-6">' +
-                    '<button onclick="startGeneralVoiceCall()" class="w-full p-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all transform">' +
-                        '<div class="flex items-center justify-center gap-4">' +
-                            '<div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center animate-pulse">' +
-                                '<i class="fas fa-phone-volume text-3xl"></i>' +
-                            '</div>' +
-                            '<div class="text-left">' +
-                                '<div class="text-2xl font-bold mb-1">📞 Call AI Assistant</div>' +
-                                '<div class="text-sm opacity-90">Speak naturally - our AI will help with any request!</div>' +
+                '<div class="mb-8">' +
+                    '<button onclick="startGeneralVoiceCall()" class="group relative w-full overflow-hidden bg-gradient-to-br from-red-600 via-red-700 to-red-900 text-white rounded-2xl shadow-2xl hover:shadow-[0_20px_60px_rgba(185,28,28,0.4)] transition-all duration-300 transform hover:scale-[1.02]">' +
+                        // Animated shine effect
+                        '<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>' +
+                        // Golden accent border
+                        '<div class="absolute inset-0 rounded-2xl border-2 border-amber-400/30"></div>' +
+                        // Content
+                        '<div class="relative p-8">' +
+                            '<div class="flex items-center justify-between">' +
+                                '<div class="flex items-center gap-5">' +
+                                    '<div class="relative">' +
+                                        '<div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform duration-300">' +
+                                            '<i class="fas fa-phone-volume text-2xl text-white"></i>' +
+                                        '</div>' +
+                                        '<div class="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>' +
+                                    '</div>' +
+                                    '<div class="text-left">' +
+                                        '<div class="text-2xl font-bold mb-1 flex items-center gap-2">' +
+                                            '<span>AI Voice Assistant</span>' +
+                                            '<span class="text-amber-300 text-sm font-normal px-2 py-1 bg-white/10 rounded-full">Premium</span>' +
+                                        '</div>' +
+                                        '<div class="text-sm text-red-100">Speak naturally - instant assistance in any language</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="hidden sm:block">' +
+                                    '<i class="fas fa-chevron-right text-2xl text-amber-300 group-hover:translate-x-1 transition-transform"></i>' +
+                                '</div>' +
                             '</div>' +
                         '</div>' +
                     '</button>' +
                 '</div>' +
-                '<div class="mb-4 text-center">' +
-                    '<p class="text-gray-600 font-medium">Or select a specific service below:</p>' +
+                '<div class="mb-6">' +
+                    '<div class="flex items-center gap-3 mb-6">' +
+                        '<div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>' +
+                        '<p class="text-gray-600 font-medium text-sm uppercase tracking-wider">Or Choose a Service</p>' +
+                        '<div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>' +
+                    '</div>' +
                 '</div>' +
                 '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
                 serviceTypes.map(service => {
