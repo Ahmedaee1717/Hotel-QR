@@ -2,6 +2,46 @@
 
 A complete, production-ready resort activity booking platform with QR code entry, real-time availability, multi-language support, and comprehensive admin/vendor management.
 
+## 🎙️ **MAJOR VOICE AI UPDATE (2026-03-13)**
+
+### The Problem with OpenAI Realtime API
+After extensive debugging, we discovered that OpenAI's Realtime API is **buggy and unreliable**:
+- Complex session management with inconsistent error messages
+- "Missing required parameter: 'session.type'" errors even when following docs
+- Fragile WebSocket connection requiring specific order of operations
+- Limited documentation and frequent API changes
+
+### The Solution: Proven Architecture
+We replaced the complex Realtime API with a **simple, reliable approach** using the same pattern that powers the successful text chat:
+
+**NEW ARCHITECTURE:**
+1. **Whisper API** (speech-to-text) - ✅ Works perfectly, no bugs
+2. **Chat Completions API** (AI logic with function calling) - ✅ Already working in text chat!
+3. **TTS API** (text-to-speech) - ✅ Simple and reliable
+
+**How it Works:**
+1. Guest holds button → Records audio
+2. Whisper transcribes speech to text
+3. Chat Completions processes with full hotel context + function calling
+4. AI calls `create_service_request` function when ready
+5. TTS speaks response back to guest
+
+**Benefits:**
+- ✅ Uses proven, stable APIs
+- ✅ Same reliable function calling as text chat
+- ✅ Simpler code, easier to debug
+- ✅ Better error handling
+- ✅ Full hotel knowledge base included
+- ✅ Press-and-hold interaction model (clear UX)
+
+**Testing:**
+1. Visit https://www.oldpalaceresort.online/hotel/paradise-resort
+2. Enter PIN **596098** (Guest: AHMED, Room 21)
+3. Click "At Your Service" → "Call AI Assistant"
+4. **Hold the button** while speaking: "I need housekeeping"
+5. Release button → AI processes and responds
+6. AI knows hotel name, guest name, room number automatically
+
 ## 🚀 Live Application
 
 **Production:** https://www.oldpalaceresort.online ✅ **FULLY OPERATIONAL WITH AI VOICE CALLS!**
