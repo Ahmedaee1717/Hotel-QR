@@ -2036,3 +2036,98 @@ The AI will immediately understand you need hotel room maintenance and guide you
 4. **Clear Rules**: 10 absolute rules prevent irrelevant questions
 5. **Natural Flow**: 'auto' tool_choice allows conversation before function call
 
+
+---
+
+## ✅ FINAL OpenAI Realtime API Fix (2026-03-13)
+
+### Problem
+Previous attempts broke the AI by incorrectly removing or adding session parameters, causing errors:
+- `Model "undefined" is not supported`
+- `Invalid value: 'session'`
+- `Unknown parameter: 'session.modalities'`
+
+### Root Cause
+OpenAI Realtime API has **two types of parameters**:
+1. **Connection-level parameters** (set in WebSocket URL): `model`, `modalities`
+2. **Updatable session parameters** (sent via `session.update` event): `instructions`, `voice`, `temperature`, etc.
+
+Mixing these causes validation errors.
+
+### Solution (Commit 1520700)
+**Backend** (`/api/voice-assistant/session`):
+- Returns `model` and `modalities` at **top level** (for WebSocket URL construction)
+- `session_config` contains **only updatable parameters**:
+  - ✅ `instructions` (full hotel context + 50 KB chunks)
+  - ✅ `voice`, `temperature`, `max_response_output_tokens`
+  - ✅ `input_audio_format`, `output_audio_format`
+  - ✅ `input_audio_transcription`, `turn_detection`
+  - ✅ `tool_choice`, `tools`
+  - ❌ NO `model` or `modalities` in `session_config`
+
+**Frontend** (`connectToOpenAIRealtime`):
+- WebSocket URL uses `sessionData.model` (not `session_config.model`)
+- `session.update` event sends only `sessionData.session_config` (updatable params)
+
+### Technical Details
+**Response Structure:**
+```json
+{
+  "success": true,
+  "model": "gpt-4o-realtime-preview-2024-12-17",
+  "modalities": ["text", "audio"],
+  "session_config": {
+    "instructions": "...",
+    "voice": "alloy",
+    "temperature": 0.6,
+    "..."
+  },
+  "api_key": "sk-...",
+  "guest_info": {...},
+  "service_type_id": 1
+}
+```
+
+**WebSocket Connection:**
+```javascript
+const ws = new WebSocket(
+  'wss://api.openai.com/v1/realtime?model=' + sessionData.model,
+  ['realtime', 'openai-insecure-api-key.' + sessionData.api_key]
+);
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: 'session.update',
+    session: sessionData.session_config // Only updatable params
+  }));
+};
+```
+
+### Testing
+1. Visit https://www.oldpalaceresort.online/hotel/paradise-resort
+2. Enter PIN **596098** (Ahmed, Room 21)
+3. Click "At Your Service" → "Call AI Assistant"
+4. Console should show:
+   - ✅ `Connected to OpenAI Realtime API` (no errors)
+   - ✅ AI responds knowing hotel, guest name, room number
+   - ✅ No "unknown parameter" or "invalid value" errors
+5. Say "I need housekeeping" → AI should respond naturally
+
+### URLs
+- **Production**: https://www.oldpalaceresort.online
+- **Preview**: https://af1a77c5.project-c8738f5c.pages.dev
+
+### What AI Now Knows
+✅ Hotel: "Old Palace Resort"
+✅ Guest: "AHMED"
+✅ Room: "21"
+✅ Full hotel knowledge base (50 chunks)
+✅ All available services
+✅ Natural conversation flow with function calling
+
+### What AI Never Asks
+❌ "Which hotel are you at?"
+❌ "What's your location/ZIP code?"
+❌ "Is this for a car/appliance?"
+
+---
