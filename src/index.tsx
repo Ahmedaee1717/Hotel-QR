@@ -22012,30 +22012,32 @@ ${hotelContext}
       tools: [
         {
           type: 'function',
-          name: 'create_service_request',
-          description: 'Creates a service request when the guest confirms their booking',
-          parameters: {
-            type: 'object',
-            properties: {
-              service_type_id: {
-                type: 'number',
-                description: 'The ID of the service type (required for general requests). Match the guest request to one of the available services.'
+          function: {
+            name: 'create_service_request',
+            description: 'Creates a service request when the guest confirms their booking',
+            parameters: {
+              type: 'object',
+              properties: {
+                service_type_id: {
+                  type: 'number',
+                  description: 'The ID of the service type (required for general requests). Match the guest request to one of the available services.'
+                },
+                request_details: {
+                  type: 'string',
+                  description: 'Detailed description of what the guest needs'
+                },
+                priority: {
+                  type: 'string',
+                  enum: ['normal', 'high', 'urgent'],
+                  description: 'Priority level of the request'
+                },
+                guest_phone: {
+                  type: 'string',
+                  description: 'Guest phone number if provided (optional)'
+                }
               },
-              request_details: {
-                type: 'string',
-                description: 'Detailed description of what the guest needs'
-              },
-              priority: {
-                type: 'string',
-                enum: ['normal', 'high', 'urgent'],
-                description: 'Priority level of the request'
-              },
-              guest_phone: {
-                type: 'string',
-                description: 'Guest phone number if provided (optional)'
-              }
-            },
-            required: ['request_details', 'priority']
+              required: ['request_details', 'priority']
+            }
           }
         }
       ],
