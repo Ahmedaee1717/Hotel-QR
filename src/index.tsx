@@ -29287,15 +29287,16 @@ app.get('/hotel/:property_slug', async (c) => {
                     // Stop ringing sound
                     stopRingingSound();
                     
-                    // Send session update with instructions
-                    // NOTE: session object should NOT have a 'type' field - only the event wrapper has type: 'session.update'
+                    // Send session update with ONLY instructions first (minimal test)
                     const sessionUpdate = {
                         type: 'session.update',
-                        session: sessionData.session_config  // NO type field inside session
+                        session: {
+                            instructions: sessionData.session_config.instructions
+                        }
                     };
                     
-                    console.log('📤 Sending session update (first 800 chars):', JSON.stringify(sessionUpdate).substring(0, 800));
-                    console.log('📝 Instructions included:', sessionData.session_config.instructions ? 'YES' : 'NO');
+                    console.log('📤 MINIMAL session update - instructions only');
+                    console.log('📝 Instructions length:', sessionData.session_config.instructions?.length || 0);
                     ws.send(JSON.stringify(sessionUpdate));
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
