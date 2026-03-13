@@ -588,12 +588,12 @@ async function translateWithAI(texts: string[], targetLang: string, apiKey: stri
           content: `You are a professional tourism translator specializing in hotel, resort, and travel content for Egypt Red Sea destinations (Hurghada, Marsa Alam). 
 
 CRITICAL REQUIREMENTS:
-- Translate with 100% accuracy to ${languageNames[targetLang]}
+- Translate with 100% accuracy to ${window.languageNames[targetLang]}
 - Maintain tourism marketing tone and appeal
 - Preserve formatting, punctuation, and special characters
 - Keep proper nouns (hotel names, locations) unchanged
 - Use appropriate formality level for hospitality industry
-- Ensure cultural appropriateness for ${languageNames[targetLang]} speakers
+- Ensure cultural appropriateness for ${window.languageNames[targetLang]} speakers
 - Output translations separated by ---SPLIT--- markers
 - Output ONLY the translations, NO explanations or notes`
         }, {
@@ -23490,7 +23490,7 @@ app.get('/hotel/:property_slug', async (c) => {
         let allActivities = [];
         let customSections = [];
         let currentFilter = 'all';
-        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        let window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
         // Get linked pass reference from guestPassSession
         let linkedPassReference = null;
@@ -24293,8 +24293,8 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // Check cache first - CRITICAL: Include property_id for multi-tenancy isolation
             const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
-            if (translationCache.has(cacheKey)) {
-                return translationCache.get(cacheKey);
+            if (window.translationCache.has(cacheKey)) {
+                return window.translationCache.get(cacheKey);
             }
             
             try {
@@ -24310,7 +24310,7 @@ app.get('/hotel/:property_slug', async (c) => {
                     'ms': 'Malay'
                 };
                 
-                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                const targetLangName = window.languageNames[targetLanguage] || targetLanguage;
                 
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -24333,7 +24333,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 if (response.ok) {
                     const data = await response.json();
                     const translated = data.message || text;
-                    translationCache.set(cacheKey, translated);
+                    window.translationCache.set(cacheKey, translated);
                     return translated;
                 }
             } catch (error) {
@@ -24348,7 +24348,7 @@ app.get('/hotel/:property_slug', async (c) => {
             if (!item) return '';
             
             // If English, use _en field
-            if (currentLanguage === 'en') {
+            if (window.currentLanguage === 'en') {
                 return item[fieldName + '_en'] || item[fieldName] || '';
             }
             
@@ -24362,7 +24362,7 @@ app.get('/hotel/:property_slug', async (c) => {
             const englishText = item[fieldName + '_en'] || item[fieldName] || '';
             
             // Use AI translation if available
-            if (englishText && currentLanguage !== 'en') {
+            if (englishText && window.window.currentLanguage !== 'en') {
                 const aiTranslated = await translateText(englishText, currentLanguage);
                 return aiTranslated;
             }
@@ -24395,10 +24395,10 @@ app.get('/hotel/:property_slug', async (c) => {
                 return t.garden;
             }
             if (locationLower.includes('behind the souq') || locationLower.includes('souq')) {
-                return currentLanguage === 'ru' ? 'За базаром' : 
-                       currentLanguage === 'ar' ? 'خلف السوق' :
-                       currentLanguage === 'de' ? 'Hinter dem Souk' :
-                       currentLanguage === 'fr' ? 'Derrière le souk' : location;
+                return window.currentLanguage === 'ru' ? 'За базаром' : 
+                       window.currentLanguage === 'ar' ? 'خلف السوق' :
+                       window.currentLanguage === 'de' ? 'Hinter dem Souk' :
+                       window.currentLanguage === 'fr' ? 'Derrière le souk' : location;
             }
             
             // Return original if no match found
@@ -25665,7 +25665,7 @@ app.get('/hotel/:property_slug', async (c) => {
         };
 
         function applySectionTranslations(propertyData) {
-          const lang = currentLanguage;
+          const lang = window.currentLanguage;
           
           // Update section headings
           const sections = ['restaurants', 'events', 'spa', 'service', 'activities'];
@@ -25734,7 +25734,7 @@ app.get('/hotel/:property_slug', async (c) => {
             return;
           }
           
-          const lang = currentLanguage;
+          const lang = window.currentLanguage;
           const t = translations[lang] || translations.en;
           
           // Always show "All" pill
@@ -25866,7 +25866,7 @@ app.get('/hotel/:property_slug', async (c) => {
                         option.textContent = \`\${lang.flag} \${lang.native}\`;
                         languageSelector.appendChild(option);
                     });
-                    languageSelector.value = currentLanguage;
+                    languageSelector.value = window.currentLanguage;
                 }
                 
                 // Get property details
@@ -26994,12 +26994,12 @@ app.get('/hotel/:property_slug', async (c) => {
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
             // Always go to detail page first to show info
-            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
+            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
         }
 
         function viewActivity(activityId) {
             trackPageView('activity', String(activityId));
-            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + currentLanguage;
+            window.location.href = '/activity?id=' + activityId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
         }
 
         // Initialize on DOM ready
@@ -27007,14 +27007,14 @@ app.get('/hotel/:property_slug', async (c) => {
             // CRITICAL: Re-read language from localStorage on page load
             const savedLang = localStorage.getItem('preferredLanguage');
             if (savedLang) {
-                currentLanguage = savedLang;
+                window.currentLanguage = savedLang;
                 console.log('📖 Loaded language from localStorage:', savedLang);
             }
             
             // Set language selector value after DOM is loaded
             const languageSelector = document.getElementById('languageSelector');
             if (languageSelector) {
-                languageSelector.value = currentLanguage;
+                languageSelector.value = window.currentLanguage;
                 console.log('🎯 Language selector initialized to:', currentLanguage);
             }
             
@@ -27032,7 +27032,7 @@ app.get('/hotel/:property_slug', async (c) => {
             init().then(() => {
                 // Double-check selector value after init
                 if (languageSelector) {
-                    languageSelector.value = currentLanguage;
+                    languageSelector.value = window.currentLanguage;
                 }
                 
                 // Initialize seasonal effects
@@ -30279,7 +30279,7 @@ app.get('/offering-detail', async (c) => {
         // Get language from URL or localStorage
         const urlParams = new URLSearchParams(window.location.search);
         const langFromUrl = urlParams.get('lang');
-        let currentLanguage = langFromUrl || localStorage.getItem('preferredLanguage') || 'en';
+        let window.currentLanguage = langFromUrl || localStorage.getItem('preferredLanguage') || 'en';
         
         // Save to localStorage for persistence
         if (langFromUrl) {
@@ -30618,7 +30618,7 @@ app.get('/offering-detail', async (c) => {
         }
 
         function updateTranslations() {
-            const lang = currentLanguage;
+            const lang = window.currentLanguage;
             const dict = translations[lang] || translations['en'];
             
             document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -30674,12 +30674,12 @@ app.get('/offering-detail', async (c) => {
 
         async function renderOffering() {
             // Show translating overlay if not English
-            if (currentLanguage !== 'en') {
+            if (window.window.currentLanguage !== 'en') {
                 document.getElementById('translating').classList.remove('hidden');
             }
             
             // Get language-specific field names
-            const langSuffix = currentLanguage === 'en' ? '_en' : ('_' + currentLanguage);
+            const langSuffix = window.currentLanguage === 'en' ? '_en' : ('_' + currentLanguage);
             const titleField = 'title' + langSuffix;
             const shortDescField = 'short_description' + langSuffix;
             const fullDescField = 'full_description' + langSuffix;
@@ -30691,7 +30691,7 @@ app.get('/offering-detail', async (c) => {
             
             try {
                 // If no translation exists in database and language is not English, use AI translation
-                if (currentLanguage !== 'en') {
+                if (window.window.currentLanguage !== 'en') {
                     console.log('Translating to', currentLanguage);
                     
                     if (!offeringData[titleField]) {
@@ -30863,7 +30863,7 @@ app.get('/offering-detail', async (c) => {
 
         // Language selector
         document.getElementById('languageSelector').addEventListener('change', async (e) => {
-            currentLanguage = e.target.value;
+            window.currentLanguage = e.target.value;
             await renderOffering();
             updateTranslations();
         });
@@ -40351,7 +40351,7 @@ app.get('/activity', (c) => {
       
       // Get language from URL or localStorage
       const urlParams = new URLSearchParams(window.location.search);
-      let currentLanguage = urlParams.get('lang') || localStorage.getItem('language') || 'en';
+      let window.currentLanguage = urlParams.get('lang') || localStorage.getItem('language') || 'en';
       localStorage.setItem('language', currentLanguage);
       
       // Translation dictionary - ALL LANGUAGES
@@ -40482,11 +40482,11 @@ app.get('/activity', (c) => {
       function updateLanguageSelector() {
         const selector = document.getElementById('languageSelector');
         if (selector) {
-          selector.value = currentLanguage;
+          selector.value = window.currentLanguage;
           selector.addEventListener('change', function() {
-            currentLanguage = this.value;
+            window.currentLanguage = this.value;
             localStorage.setItem('language', currentLanguage);
-            window.location.href = '/activity?id=' + activityId + '&lang=' + currentLanguage;
+            window.location.href = '/activity?id=' + activityId + '&lang=' + window.currentLanguage;
           });
         }
       }
@@ -40515,7 +40515,7 @@ app.get('/activity', (c) => {
           let description = activity.full_description;
           
           // If language is not EN/AR, use AI translation
-          if (currentLanguage !== 'en' && currentLanguage !== 'ar') {
+          if (window.window.currentLanguage !== 'en' && window.window.currentLanguage !== 'ar') {
             // Show loading state
             document.getElementById('activityTitle').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
             document.getElementById('description').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
@@ -67859,7 +67859,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
     
     <script>
     const offeringId = '${offering_id}';
-    let currentLanguage = 'en';
+    let window.currentLanguage = 'en';
     let menuData = null;
     let designSettings = null;
     
@@ -68179,7 +68179,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
       overlay.classList.remove('hidden');
       
       // Change language and reload
-      currentLanguage = lang;
+      window.currentLanguage = lang;
       loadMenuData();
     };
     
@@ -70140,7 +70140,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let floorElements = []; // Floor plan elements
         let selectedStaffId = null; // Staff member creating the booking
         let staffMembers = []; // All active staff members
-        let currentLanguage = 'en'; // Current display language
+        let window.currentLanguage = 'en'; // Current display language
         let availableLanguages = []; // All available languages
         let menuTranslations = {}; // Store translations: { item_id: { lang: translation } }
         
@@ -70200,7 +70200,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         async function changeLanguage(languageCode) {
-            currentLanguage = languageCode;
+            window.currentLanguage = languageCode;
             console.log('🌐 Changing language to:', languageCode);
             
             // If we have menu items loaded, translate them
@@ -70287,7 +70287,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         async function translateMenuItems() {
-            if (currentLanguage === 'en') {
+            if (window.currentLanguage === 'en') {
                 // Reset to English - clear translations
                 menuTranslations = {};
                 return;
@@ -70297,7 +70297,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             // Get items that need translation
             const itemsToTranslate = menuItems.filter(item => {
-                const cacheKey = item.item_id + '_' + currentLanguage;
+                const cacheKey = item.item_id + '_' + window.currentLanguage;
                 return !menuTranslations[cacheKey];
             });
             
@@ -70310,7 +70310,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             
             // Translate ALL items in PARALLEL for speed
             const translationPromises = itemsToTranslate.map(async (item) => {
-                const cacheKey = item.item_id + '_' + currentLanguage;
+                const cacheKey = item.item_id + '_' + window.currentLanguage;
                 
                 try {
                     const response = await fetch('/api/translate', {
@@ -70338,11 +70338,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         }
         
         function getItemName(item) {
-            if (currentLanguage === 'en') {
+            if (window.currentLanguage === 'en') {
                 return item.item_name;
             }
             
-            const cacheKey = item.item_id + '_' + currentLanguage;
+            const cacheKey = item.item_id + '_' + window.currentLanguage;
             return menuTranslations[cacheKey] || item.item_name;
         }
         
@@ -75541,13 +75541,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
             'ms': 'Malay'
         };
-        const languageNames = window.languageNames;
         
-        window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        let currentLanguage = window.currentLanguage;
+        window.window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         
         window.translationCache = new Map();
-        const translationCache = window.translationCache;
         
         
         // Populate language selector
@@ -75559,10 +75556,10 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             ALL_LANGUAGES.forEach(lang => {
                 const option = document.createElement('option');
                 option.value = lang;
-                option.textContent = languageNames[lang] || lang;
+                option.textContent = window.languageNames[lang] || lang;
                 selector.appendChild(option);
             });
-            selector.value = currentLanguage;
+            selector.value = window.currentLanguage;
         }
         
         // Change language
@@ -75613,11 +75610,11 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // Parallel translation function - translates ALL items at once
         async function translateAllMenuItems(targetLanguage) {
             if (targetLanguage === 'en') {
-                translationCache.clear();
+                window.translationCache.clear();
                 return;
             }
             
-            console.log('🚀 Starting PARALLEL translation to:', languageNames[targetLanguage]);
+            console.log('🚀 Starting PARALLEL translation to:', window.languageNames[targetLanguage]);
             const startTime = Date.now();
             
             // Collect ALL unique texts from both menus
@@ -75651,8 +75648,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             // Translate ALL items in parallel (Promise.all)
             const translationPromises = [...textsArray, ...categoriesArray].map(async (text) => {
                 const cacheKey = targetLanguage + ':' + text;
-                if (translationCache.has(cacheKey)) {
-                    return { original: text, translated: translationCache.get(cacheKey) };
+                if (window.translationCache.has(cacheKey)) {
+                    return { original: text, translated: window.translationCache.get(cacheKey) };
                 }
                 
                 try {
@@ -75661,14 +75658,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             text: text,
-                            target_language: languageNames[targetLanguage]
+                            target_language: window.languageNames[targetLanguage]
                         })
                     });
                     
                     if (response.ok) {
                         const data = await response.json();
                         const translated = data.translation || text;
-                        translationCache.set(cacheKey, translated);
+                        window.translationCache.set(cacheKey, translated);
                         return { original: text, translated };
                     }
                 } catch (error) {
@@ -75691,7 +75688,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             
             console.log('🌐 Language changed to:', newLanguage);
             localStorage.setItem('preferredLanguage', newLanguage);
-            currentLanguage = newLanguage;
+            window.currentLanguage = newLanguage;
             
             // Show loading animation
             showTranslationLoading();
@@ -75718,8 +75715,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                     const originalText = el.getAttribute('data-original') || el.textContent;
                     el.setAttribute('data-original', originalText);
                     const cacheKey = currentLanguage + ':' + originalText.trim();
-                    if (translationCache.has(cacheKey)) {
-                        el.textContent = translationCache.get(cacheKey);
+                    if (window.translationCache.has(cacheKey)) {
+                        el.textContent = window.translationCache.get(cacheKey);
                     }
                 });
                 
@@ -75731,9 +75728,9 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         
         // Helper function to get translated text
         function getTranslatedText(text) {
-            if (!text || currentLanguage === 'en') return text;
+            if (!text || window.currentLanguage === 'en') return text;
             const cacheKey = currentLanguage + ':' + text.trim();
-            return translationCache.get(cacheKey) || text;
+            return window.translationCache.get(cacheKey) || text;
         }
         
         
@@ -75747,7 +75744,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             populateLanguageSelector();
             
             // Translate page if not English
-            if (currentLanguage !== 'en') {
+            if (window.window.currentLanguage !== 'en') {
                 await translatePage();
             }
             
@@ -76495,20 +76492,17 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
 
     <script>
         // Reference GLOBAL variables from first script block
-        const languageNames = window.languageNames;
-        let currentLanguage = window.currentLanguage;
-        const translationCache = window.translationCache;
         
         // Helper function to get translated text (must be defined first)
         function getTranslatedText(text) {
-            if (!text || typeof currentLanguage === 'undefined' || currentLanguage === 'en') return text;
+            if (!text || typeof window.currentLanguage === 'undefined' || window.currentLanguage === 'en') return text;
             if (typeof translationCache === 'undefined') return text;
             const cacheKey = currentLanguage + ':' + text.trim();
-            const translated = translationCache.get(cacheKey);
+            const translated = window.translationCache.get(cacheKey);
             
             // Debug logging (remove after testing)
             if (!translated && text.length < 50) {
-                console.log('⚠️ No translation for:', text, '| cacheKey:', cacheKey, '| cache size:', translationCache.size);
+                console.log('⚠️ No translation for:', text, '| cacheKey:', cacheKey, '| cache size:', window.translationCache.size);
             }
             
             return translated || text;
@@ -76518,11 +76512,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         // Parallel translation function - translates ALL menu items in ONE batch request
         async function translateAllMenuItems(targetLanguage) {
             if (targetLanguage === 'en') {
-                if (typeof translationCache !== 'undefined') translationCache.clear();
+                if (typeof translationCache !== 'undefined') window.translationCache.clear();
                 return;
             }
             
-            console.log('🚀 Starting BATCH translation to:', languageNames[targetLanguage]);
+            console.log('🚀 Starting BATCH translation to:', window.languageNames[targetLanguage]);
             const startTime = Date.now();
             
             // Collect ALL unique texts from both menus
@@ -76563,7 +76557,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             
             allItemsToTranslate.forEach((text, idx) => {
                 const cacheKey = targetLanguage + ':' + text.trim();
-                if (!translationCache.has(cacheKey)) {
+                if (!window.translationCache.has(cacheKey)) {
                     uncachedTexts.push(text.trim());
                     textIndexMap.set(text.trim(), idx);
                 }
@@ -76583,7 +76577,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         texts: uncachedTexts,
-                        target_language: languageNames[targetLanguage]
+                        target_language: window.languageNames[targetLanguage]
                     })
                 });
                 
@@ -76595,7 +76589,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     uncachedTexts.forEach((text, idx) => {
                         const cacheKey = targetLanguage + ':' + text.trim();
                         const translation = translations[idx] || text;
-                        translationCache.set(cacheKey, translation);
+                        window.translationCache.set(cacheKey, translation);
                         
                         // Debug logging for first 3 translations
                         if (idx < 3) {
@@ -77017,7 +77011,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             \`;
             
             // Translate if needed
-            if (currentLanguage !== 'en') {
+            if (window.window.currentLanguage !== 'en') {
                 const titleEl = statusDiv.querySelector('[data-i18n="voucher-title"]');
                 const messageEl = statusDiv.querySelector('[data-i18n="voucher-message"]');
                 const disclaimerEl = statusDiv.querySelector('[data-i18n="voucher-disclaimer"]');
@@ -77030,7 +77024,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             // Update button text
             const confirmButton = document.getElementById('confirmButton');
             if (confirmButton) {
-                const buttonText = currentLanguage === 'en' ? 'Use Voucher & Confirm' : await translateText('Use Voucher & Confirm', currentLanguage);
+                const buttonText = window.currentLanguage === 'en' ? 'Use Voucher & Confirm' : await translateText('Use Voucher & Confirm', currentLanguage);
                 confirmButton.innerHTML = \`<i class="fas fa-ticket-alt mr-2"></i>\${buttonText}\`;
             }
         }
@@ -77677,9 +77671,6 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
         
         // Reference global variables
-        const languageNames = window.languageNames;
-        let currentLanguage = window.currentLanguage;
-        const translationCache = window.translationCache;
         
         // Populate language selector
         function populateLanguageSelector() {
@@ -77690,10 +77681,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             ALL_LANGUAGES.forEach(lang => {
                 const option = document.createElement('option');
                 option.value = lang;
-                option.textContent = languageNames[lang] || lang;
+                option.textContent = window.languageNames[lang] || lang;
                 selector.appendChild(option);
             });
-            selector.value = currentLanguage;
+            selector.value = window.currentLanguage;
         }
         
         // Change language
@@ -77714,12 +77705,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             if (!trimmedText) return text; // Skip whitespace-only
             
             const cacheKey = targetLanguage + ':' + trimmedText;
-            if (translationCache.has(cacheKey)) {
-                return translationCache.get(cacheKey);
+            if (window.translationCache.has(cacheKey)) {
+                return window.translationCache.get(cacheKey);
             }
             
             try {
-                const targetLangName = languageNames[targetLanguage] || targetLanguage;
+                const targetLangName = window.languageNames[targetLanguage] || targetLanguage;
                 
                 console.log('🔄 Translating:', trimmedText.substring(0, 40), '→', targetLangName);
                 
@@ -77735,7 +77726,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 if (response.ok) {
                     const data = await response.json();
                     const translated = data.translation || trimmedText;
-                    translationCache.set(cacheKey, translated);
+                    window.translationCache.set(cacheKey, translated);
                     console.log('✅ Got translation:', translated.substring(0, 40));
                     return translated;
                 } else {
@@ -77751,7 +77742,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
         
         // Translate page
         async function translatePage() {
-            if (currentLanguage === 'en') return;
+            if (window.currentLanguage === 'en') return;
             
             console.log('🌐 Translating page to:', currentLanguage);
             
@@ -77784,7 +77775,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             populateLanguageSelector();
             
             // Translate ALL menu items first if not English (PARALLEL)
-            if (currentLanguage !== 'en') {
+            if (window.window.currentLanguage !== 'en') {
                 console.log('🚀 Initial page load - translating menu items to:', currentLanguage);
                 await translateAllMenuItems(currentLanguage);
                 // Then translate page elements
@@ -79305,7 +79296,7 @@ app.get('/room-service/:property_id', async (c) => {
           }
         };
         
-        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        let window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
         let menuItems = ${JSON.stringify(menuItems.results || [])};
         
         // Populate language selector
@@ -79322,7 +79313,7 @@ app.get('/room-service/:property_id', async (c) => {
                 option.textContent = lang.flag + ' ' + lang.native;
                 selector.appendChild(option);
             });
-            selector.value = currentLanguage;
+            selector.value = window.currentLanguage;
         }
         
         // Change language handler
@@ -79332,7 +79323,7 @@ app.get('/room-service/:property_id', async (c) => {
             
             console.log('🌐 Changing language to:', newLang);
             localStorage.setItem('preferredLanguage', newLang);
-            currentLanguage = newLang;
+            window.currentLanguage = newLang;
             
             // Translate static UI elements
             translateStaticUI(newLang);
@@ -79520,7 +79511,7 @@ app.get('/room-service/:property_id', async (c) => {
             populateLanguageSelector();
             translateStaticUI(currentLanguage);
             
-            if (currentLanguage !== 'en') {
+            if (window.window.currentLanguage !== 'en') {
                 translateMenuItems(currentLanguage);
             }
         });
