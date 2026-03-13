@@ -22002,7 +22002,6 @@ ${hotelContext}
     return c.json({
       success: true,
       session_config: {
-        type: 'realtime',  // REQUIRED: OpenAI Realtime API requires type: 'realtime'
         model: 'gpt-4o-realtime-preview-2024-12-17',
         modalities: ['text', 'audio'],
         instructions: instructions,
