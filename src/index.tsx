@@ -75552,6 +75552,12 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             const selector = document.getElementById('languageSelector');
             if (!selector) return;
             
+            // Safety check: ensure window.languageNames exists
+            if (!window.languageNames) {
+                console.error('❌ window.languageNames is undefined!');
+                return;
+            }
+            
             selector.innerHTML = '<option value="en">English</option>';
             ALL_LANGUAGES.forEach(lang => {
                 const option = document.createElement('option');
@@ -75559,7 +75565,7 @@ app.get('/admin/restaurant/:offering_id', (c) => {
                 option.textContent = window.languageNames[lang] || lang;
                 selector.appendChild(option);
             });
-            selector.value = window.currentLanguage;
+            selector.value = window.currentLanguage || 'en';
         }
         
         // Change language
@@ -77677,6 +77683,12 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const selector = document.getElementById('languageSelector');
             if (!selector) return;
             
+            // Safety check: ensure window.languageNames exists
+            if (!window.languageNames) {
+                console.error('❌ window.languageNames is undefined!');
+                return;
+            }
+            
             selector.innerHTML = '<option value="en">English</option>';
             ALL_LANGUAGES.forEach(lang => {
                 const option = document.createElement('option');
@@ -77684,7 +77696,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 option.textContent = window.languageNames[lang] || lang;
                 selector.appendChild(option);
             });
-            selector.value = window.currentLanguage;
+            selector.value = window.currentLanguage || 'en';
         }
         
         // Change language
