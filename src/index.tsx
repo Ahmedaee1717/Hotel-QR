@@ -29500,18 +29500,31 @@ app.get('/hotel/:property_slug', async (c) => {
             
             transcriptDiv.classList.remove('hidden');
             
+            // Also maintain plain text version in voiceCallData.transcript
             if (isDelta) {
                 // Append to last message if it's from the same speaker
                 const lastEntry = transcriptText.innerHTML.split('<br><br>').slice(-1)[0];
                 if (lastEntry.includes('<strong>' + speaker + ':</strong>')) {
                     transcriptText.innerHTML = transcriptText.innerHTML.slice(0, -8) + text;
+                    // Update plain text
+                    voiceCallData.transcript += text;
                 } else {
                     const entry = '<strong>' + speaker + ':</strong> ' + text;
                     transcriptText.innerHTML += entry;
+                    // Update plain text
+                    if (voiceCallData.transcript) {
+                        voiceCallData.transcript += '\n\n';
+                    }
+                    voiceCallData.transcript += speaker + ': ' + text;
                 }
             } else {
                 const entry = '<strong>' + speaker + ':</strong> ' + text + '<br><br>';
                 transcriptText.innerHTML += entry;
+                // Update plain text
+                if (voiceCallData.transcript) {
+                    voiceCallData.transcript += '\n\n';
+                }
+                voiceCallData.transcript += speaker + ': ' + text;
             }
             
             // Scroll to bottom
@@ -29548,7 +29561,8 @@ app.get('/hotel/:property_slug', async (c) => {
             // Save transcript to backend before closing
             const session = getGuestSession();
             const propertyId = getPropertyId();
-            const transcript = document.getElementById('voiceTranscript')?.innerText || voiceCallData.transcript || '';
+            // Use the plain text transcript from voiceCallData
+            const transcript = voiceCallData.transcript || '';
             
             if (transcript && transcript.trim().length > 0) {
                 console.log('💾 Saving voice call transcript before closing...');
