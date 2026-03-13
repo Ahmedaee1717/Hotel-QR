@@ -29287,17 +29287,22 @@ app.get('/hotel/:property_slug', async (c) => {
                     // Stop ringing sound
                     stopRingingSound();
                     
-                    // Send session update with ONLY instructions first (minimal test)
-                    const sessionUpdate = {
+                    // Send session configuration immediately after connection
+                    // According to OpenAI Realtime API: send session config parameters directly
+                    // Reference: https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+                    
+                    const sessionUpdatePayload = {
                         type: 'session.update',
                         session: {
-                            instructions: sessionData.session_config.instructions
+                            ...sessionData.session_config
                         }
                     };
                     
-                    console.log('📤 MINIMAL session update - instructions only');
+                    console.log('📤 Session update payload:', JSON.stringify(sessionUpdatePayload, null, 2).substring(0, 1500));
                     console.log('📝 Instructions length:', sessionData.session_config.instructions?.length || 0);
-                    ws.send(JSON.stringify(sessionUpdate));
+                    console.log('🔧 Session config keys:', Object.keys(sessionData.session_config));
+                    
+                    ws.send(JSON.stringify(sessionUpdatePayload));
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
                     document.getElementById('muteBtn').classList.remove('hidden');
