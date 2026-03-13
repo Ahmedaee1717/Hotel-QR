@@ -29283,26 +29283,13 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 ws.onopen = () => {
                     console.log('✅ Connected to OpenAI Realtime API');
+                    console.log('⏳ Waiting for session.created event to send configuration...');
                     
                     // Stop ringing sound
                     stopRingingSound();
                     
-                    // Send session configuration immediately after connection
-                    // According to OpenAI Realtime API: send session config parameters directly
-                    // Reference: https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
-                    
-                    const sessionUpdatePayload = {
-                        type: 'session.update',
-                        session: {
-                            ...sessionData.session_config
-                        }
-                    };
-                    
-                    console.log('📤 Session update payload:', JSON.stringify(sessionUpdatePayload, null, 2).substring(0, 1500));
-                    console.log('📝 Instructions length:', sessionData.session_config.instructions?.length || 0);
-                    console.log('🔧 Session config keys:', Object.keys(sessionData.session_config));
-                    
-                    ws.send(JSON.stringify(sessionUpdatePayload));
+                    // NOTE: Do NOT send session.update here - wait for session.created event
+                    // The handleOpenAIMessage function will send it after receiving session.created
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
                     document.getElementById('muteBtn').classList.remove('hidden');
@@ -29373,6 +29360,26 @@ app.get('/hotel/:property_slug', async (c) => {
         
         function handleOpenAIMessage(message) {
             console.log('📨 OpenAI message:', message.type);
+            
+            // Handle session.created - capture session ID and update with our config
+            if (message.type === 'session.created') {
+                console.log('✅ Session created, updating with our configuration...');
+                console.log('📝 Session ID:', message.session?.id);
+                
+                if (voiceCallData.ws && voiceCallData.ws.readyState === WebSocket.OPEN && sessionData.session_config) {
+                    // Send session.update with the session ID
+                    const sessionUpdatePayload = {
+                        type: 'session.update',
+                        session: {
+                            ...sessionData.session_config
+                        }
+                    };
+                    
+                    console.log('📤 Sending session.update after session.created');
+                    console.log('🔧 Config keys:', Object.keys(sessionData.session_config));
+                    voiceCallData.ws.send(JSON.stringify(sessionUpdatePayload));
+                }
+            }
             
             // Log EVERYTHING for debugging
             if (message.type.includes('function')) {
