@@ -82373,6 +82373,7 @@ app.get('/api/waiter/orders', async (c) => {
           total_cost: totalCost,
           source: 'kitchen',
           reservation_date: order.reservation_date,
+          reservation_time: order.reservation_time,
           created_at: order.created_at
         })
       } catch (err) {
