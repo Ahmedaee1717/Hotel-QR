@@ -75529,7 +75529,8 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         // ============= TRANSLATION SYSTEM =============
         const ALL_LANGUAGES = ['ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk', 'zh', 'es', 'ja', 'pt', 'ko', 'hi', 'tr', 'el', 'sv', 'no', 'da', 'ro', 'hu', 'fi', 'hr', 'sk', 'bg', 'sr', 'sl', 'th', 'id', 'vi', 'tl', 'ms'];
         
-        const languageNames = {
+        // GLOBAL variables (accessible across script blocks)
+        window.languageNames = {
             'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
             'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
             'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
@@ -75540,9 +75541,14 @@ app.get('/admin/restaurant/:offering_id', (c) => {
             'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
             'ms': 'Malay'
         };
+        const languageNames = window.languageNames;
         
-        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        const translationCache = new Map();
+        window.currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
+        let currentLanguage = window.currentLanguage;
+        
+        window.translationCache = new Map();
+        const translationCache = window.translationCache;
+        
         
         // Populate language selector
         function populateLanguageSelector() {
@@ -76488,21 +76494,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </div>
 
     <script>
-        // Language configuration and cache (shared across functions)
-        const languageNames = {
-            'ar': 'Arabic', 'de': 'German', 'ru': 'Russian', 'pl': 'Polish',
-            'it': 'Italian', 'fr': 'French', 'cs': 'Czech', 'uk': 'Ukrainian',
-            'zh': 'Simplified Chinese', 'es': 'Spanish', 'ja': 'Japanese',
-            'pt': 'Portuguese', 'ko': 'Korean', 'hi': 'Hindi', 'tr': 'Turkish',
-            'el': 'Greek', 'sv': 'Swedish', 'no': 'Norwegian', 'da': 'Danish',
-            'ro': 'Romanian', 'hu': 'Hungarian', 'fi': 'Finnish', 'hr': 'Croatian',
-            'sk': 'Slovak', 'bg': 'Bulgarian', 'sr': 'Serbian', 'sl': 'Slovenian',
-            'th': 'Thai', 'id': 'Indonesian', 'vi': 'Vietnamese', 'tl': 'Filipino',
-            'ms': 'Malay'
-        };
-        
-        let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
-        const translationCache = new Map();
+        // Reference GLOBAL variables from first script block
+        const languageNames = window.languageNames;
+        let currentLanguage = window.currentLanguage;
+        const translationCache = window.translationCache;
         
         // Helper function to get translated text (must be defined first)
         function getTranslatedText(text) {
