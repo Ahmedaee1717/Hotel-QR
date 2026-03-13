@@ -29438,11 +29438,12 @@ app.get('/hotel/:property_slug', async (c) => {
                 document.getElementById('muteBtn').classList.remove('hidden');
                 document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
                 
-                // Add press-and-hold functionality to call button
-                const callBtn = document.getElementById('callBtn');
+                // Add press-and-hold functionality to the voice circle (PTT - Push To Talk)
+                const voiceCircle = document.getElementById('voiceCircle');
                 let holdTimeout;
                 
-                callBtn.addEventListener('mousedown', () => {
+                // Mouse events
+                voiceCircle.addEventListener('mousedown', () => {
                     if (!voiceCallActive || voiceCallData.isRecording) return;
                     
                     // Start recording after short delay (prevents accidental clicks)
@@ -29452,31 +29453,69 @@ app.get('/hotel/:property_slug', async (c) => {
                         voiceCallData.mediaRecorder.start();
                         updateVoiceStatus('🎤 Recording...', 'Release button when done');
                         document.getElementById('voiceIcon').className = 'fas fa-microphone text-red-500 text-4xl animate-pulse';
+                        voiceCircle.style.transform = 'scale(1.1)';
                         console.log('🔴 Recording started');
                     }, 200);
                 });
                 
-                callBtn.addEventListener('mouseup', () => {
+                voiceCircle.addEventListener('mouseup', () => {
                     clearTimeout(holdTimeout);
                     if (voiceCallData.isRecording) {
                         voiceCallData.isRecording = false;
                         voiceCallData.mediaRecorder.stop();
                         updateVoiceStatus('🤔 Processing...', 'Please wait');
                         document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
+                        voiceCircle.style.transform = 'scale(1)';
                         console.log('⏹️ Recording stopped');
                     }
                 });
                 
-                callBtn.addEventListener('mouseleave', () => {
+                voiceCircle.addEventListener('mouseleave', () => {
                     clearTimeout(holdTimeout);
                     if (voiceCallData.isRecording) {
                         voiceCallData.isRecording = false;
                         voiceCallData.mediaRecorder.stop();
                         updateVoiceStatus('🤔 Processing...', 'Please wait');
                         document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
+                        voiceCircle.style.transform = 'scale(1)';
                         console.log('⏹️ Recording stopped (mouse left button)');
                     }
                 });
+                
+                // Touch events for mobile
+                voiceCircle.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (!voiceCallActive || voiceCallData.isRecording) return;
+                    
+                    holdTimeout = setTimeout(() => {
+                        voiceCallData.isRecording = true;
+                        voiceCallData.audioChunks = [];
+                        voiceCallData.mediaRecorder.start();
+                        updateVoiceStatus('🎤 Recording...', 'Release when done');
+                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-red-500 text-4xl animate-pulse';
+                        voiceCircle.style.transform = 'scale(1.1)';
+                        console.log('🔴 Recording started (touch)');
+                    }, 200);
+                });
+                
+                voiceCircle.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    clearTimeout(holdTimeout);
+                    if (voiceCallData.isRecording) {
+                        voiceCallData.isRecording = false;
+                        voiceCallData.mediaRecorder.stop();
+                        updateVoiceStatus('🤔 Processing...', 'Please wait');
+                        document.getElementById('voiceIcon').className = 'fas fa-microphone text-white text-4xl';
+                        voiceCircle.style.transform = 'scale(1)';
+                        console.log('⏹️ Recording stopped (touch)');
+                    }
+                });
+                
+                // Make it clear it's interactive
+                voiceCircle.style.cursor = 'pointer';
+                voiceCircle.style.transition = 'transform 0.2s ease';
+                
+                console.log('✅ Press-and-hold voice input ready!');
                 
             } catch (error) {
                 console.error('Voice assistant setup error:', error);
