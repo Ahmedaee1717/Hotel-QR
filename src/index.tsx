@@ -75468,48 +75468,33 @@ app.get('/admin/restaurant/:offering_id', (c) => {
         function showTranslationLoading() {
             const overlay = document.createElement('div');
             overlay.id = 'translationLoadingOverlay';
-            overlay.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
-            overlay.style.background = 'rgba(0,0,0,0.4)';
-            overlay.style.backdropFilter = 'blur(8px)';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);backdrop-filter:blur(8px)';
             
-            const container = document.createElement('div');
-            container.className = 'bg-white rounded-3xl shadow-2xl p-12 text-center max-w-md mx-4 transform transition-all duration-300';
-            container.style.transform = 'scale(0.95)';
+            const box = document.createElement('div');
+            box.style.cssText = 'background:white;border-radius:24px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);padding:48px;text-align:center;max-width:400px;margin:0 16px';
             
-            container.innerHTML = '\
-                <div class="relative w-32 h-32 mx-auto mb-6">
-                    <div class="absolute inset-0 rounded-full" style="background: linear-gradient(135deg, var(--primary-color), #7a1f1f); opacity: 0.2; animation: pulse 2s ease-in-out infinite;"></div>
-                    <div class="absolute inset-2 rounded-full flex items-center justify-center" style="background: linear-gradient(135deg, var(--primary-color), var(--accent-color));">
-                        <i class="fas fa-globe text-white text-5xl" style="animation: rotate 3s linear infinite;"></i>
-                    </div>
-                    <div class="absolute inset-0" style="animation: rotate 4s linear infinite;">
-                        <div class="absolute top-0 left-1/2 w-3 h-3 rounded-full -ml-1.5" style="background: var(--accent-color);"></div>
-                    </div>
-                    <div class="absolute inset-0" style="animation: rotate-reverse 3s linear infinite;">
-                        <div class="absolute bottom-0 left-1/2 w-3 h-3 rounded-full -ml-1.5" style="background: var(--accent-color);"></div>
-                    </div>
-                </div>
-                <h3 class="text-2xl font-bold mb-2" style="color: var(--primary-color);">Translating Menu</h3>
-                <p class="text-gray-600 mb-4">Please wait while we translate the menu for you...</p>
-                <div class="flex justify-center gap-2">
-                    <div class="w-3 h-3 rounded-full" style="background: var(--primary-color); animation: bounce1 1.4s ease-in-out infinite;"></div>
-                    <div class="w-3 h-3 rounded-full" style="background: #7a1f1f; animation: bounce2 1.4s ease-in-out infinite;"></div>
-                    <div class="w-3 h-3 rounded-full" style="background: var(--accent-color); animation: bounce3 1.4s ease-in-out infinite;"></div>
-                </div>
-                <style>
-                    @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                    @keyframes rotate-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-                    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.2; } 50% { transform: scale(1.05); opacity: 0.3; } }
-                    @keyframes bounce1 { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
-                    @keyframes bounce2 { 0%, 80%, 100% { transform: translateY(0); } 45% { transform: translateY(-10px); } }
-                    @keyframes bounce3 { 0%, 80%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-                </style>
-            `;
+            const spinner = document.createElement('div');
+            spinner.style.cssText = 'width:64px;height:64px;border:4px solid var(--accent-color);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 24px';
             
-            overlay.appendChild(container);
+            const title = document.createElement('h3');
+            title.textContent = 'Translating Menu...';
+            title.style.cssText = 'font-size:24px;font-weight:bold;color:var(--primary-color);margin-bottom:8px';
+            
+            const msg = document.createElement('p');
+            msg.textContent = 'Please wait while we translate the menu for you';
+            msg.style.cssText = 'color:#6b7280;font-size:14px';
+            
+            const style = document.createElement('style');
+            style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+            
+            box.appendChild(spinner);
+            box.appendChild(title);
+            box.appendChild(msg);
+            overlay.appendChild(box);
+            overlay.appendChild(style);
             document.body.appendChild(overlay);
-            setTimeout(() => { container.style.transform = 'scale(1)'; }, 10);
         }
+
         
         function hideTranslationLoading() {
             const overlay = document.getElementById('translationLoadingOverlay');
