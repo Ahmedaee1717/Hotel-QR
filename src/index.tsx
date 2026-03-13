@@ -29281,15 +29281,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 
                 ws.onopen = () => {
                     console.log('✅ Connected to OpenAI Realtime API');
+                    console.log('📝 Session config instructions (first 500 chars):', sessionData.session_config.instructions.substring(0, 500));
+                    console.log('🔍 Full session config:', sessionData.session_config);
                     
                     // Stop ringing sound
                     stopRingingSound();
                     
                     // Send session update with instructions
-                    ws.send(JSON.stringify({
+                    const sessionUpdate = {
                         type: 'session.update',
                         session: sessionData.session_config
-                    }));
+                    };
+                    console.log('📤 Sending session update to OpenAI:', sessionUpdate);
+                    ws.send(JSON.stringify(sessionUpdate));
                     
                     updateVoiceStatus('🎤 Connected! Start Speaking', 'Tell me what you need for ' + voiceCallData.serviceName);
                     document.getElementById('muteBtn').classList.remove('hidden');
