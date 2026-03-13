@@ -77131,7 +77131,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-gray-600 text-sm">EGP ' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 // Use translated text
                 const translatedName = getTranslatedText(item.item_name);
@@ -77199,7 +77199,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 }
                 
                 const itemNameEscaped = String(item.item_name).replace(/"/g, '&quot;').replace(/'/g, "&#39;");
-                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-amber-600 font-bold text-lg">€' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
+                const priceDisplay = item.cost_to_hotel > 0 ? '<span class="text-amber-600 font-bold text-lg">EGP ' + item.cost_to_hotel.toFixed(2) + '</span>' : '';
                 
                 // Use translated text
                 const translatedName = getTranslatedText(item.item_name);
