@@ -77577,8 +77577,11 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             // Populate language selector
             populateLanguageSelector();
             
-            // Translate page if not English
+            // Translate ALL menu items first if not English (PARALLEL)
             if (currentLanguage !== 'en') {
+                console.log('🚀 Initial page load - translating menu items to:', currentLanguage);
+                await translateAllMenuItems(currentLanguage);
+                // Then translate page elements
                 await translatePage();
             }
             
@@ -77591,7 +77594,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const firstSetCategory = generateSetMenuTabs();
             const firstRestaurantCategory = generateRestaurantMenuTabs();
             
-            // Show first categories after all functions are defined
+            // Show first categories after all functions are defined (now with translations loaded)
             if (firstSetCategory) {
                 showSetMenuCategory(firstSetCategory);
             }
