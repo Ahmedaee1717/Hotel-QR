@@ -69622,9 +69622,14 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 <h1 class="text-2xl font-bold">À La Carte Booking</h1>
                 <p class="text-white/80 text-sm">${propertyName}</p>
             </div>
-            <button onclick="confirmReset()" class="text-white/90 hover:text-white px-4 py-2 rounded-lg hover:bg-white/10 transition">
-                <i class="fas fa-redo mr-2"></i>New Booking
-            </button>
+            <div class="flex items-center gap-3">
+                <select id="languageSelector" onchange="changeLanguage(this.value)" class="px-4 py-2 rounded-lg shadow-lg border-2 font-semibold bg-white accent-border" style="color: var(--primary-color);">
+                    <option value="en">🇬🇧 English</option>
+                </select>
+                <button onclick="confirmReset()" class="text-white/90 hover:text-white px-4 py-2 rounded-lg hover:bg-white/10 transition">
+                    <i class="fas fa-redo mr-2"></i>New Booking
+                </button>
+            </div>
         </div>
     </div>
 
@@ -70037,11 +70042,15 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
         let floorElements = []; // Floor plan elements
         let selectedStaffId = null; // Staff member creating the booking
         let staffMembers = []; // All active staff members
+        let currentLanguage = 'en'; // Current display language
+        let availableLanguages = []; // All available languages
+        let menuTranslations = {}; // Store translations: { item_id: { lang: translation } }
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             setTodayDate();
             setCurrentTime();
+            loadLanguages();
             loadStaffMembers();
             loadRestaurants();
         });
@@ -70065,6 +70074,89 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const minute = document.getElementById('bookingMinute').value;
             if (!hour || !minute) return '';
             return hour + ':' + minute;
+        }
+        
+        // Language Translation Functions
+        async function loadLanguages() {
+            try {
+                const response = await fetch('/api/languages');
+                const data = await response.json();
+                if (data.success && data.languages) {
+                    availableLanguages = data.languages;
+                    renderLanguageSelector();
+                }
+            } catch (error) {
+                console.error('Failed to load languages:', error);
+            }
+        }
+        
+        function renderLanguageSelector() {
+            const selector = document.getElementById('languageSelector');
+            if (!selector || availableLanguages.length === 0) return;
+            
+            selector.innerHTML = availableLanguages.map(lang => {
+                const selected = lang.language_code === currentLanguage ? 'selected' : '';
+                return '<option value="' + lang.language_code + '" ' + selected + '>' + 
+                       lang.flag + ' ' + lang.language_name_native + '</option>';
+            }).join('');
+        }
+        
+        async function changeLanguage(languageCode) {
+            currentLanguage = languageCode;
+            console.log('🌐 Changing language to:', languageCode);
+            
+            // If we have menu items loaded, translate them
+            if (menuItems.length > 0 && selectedRestaurant) {
+                await translateMenuItems();
+                renderMenuItems();
+            }
+        }
+        
+        async function translateMenuItems() {
+            if (currentLanguage === 'en') {
+                // Reset to English - clear translations
+                menuTranslations = {};
+                return;
+            }
+            
+            console.log('🔄 Translating menu items to', currentLanguage);
+            
+            // Translate each menu item
+            for (const item of menuItems) {
+                const cacheKey = item.item_id + '_' + currentLanguage;
+                
+                // Skip if already translated
+                if (menuTranslations[cacheKey]) continue;
+                
+                try {
+                    const response = await fetch('/api/admin/translate-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: item.item_name,
+                            target_language: currentLanguage
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success && data.translation) {
+                        menuTranslations[cacheKey] = data.translation;
+                    }
+                } catch (error) {
+                    console.error('Translation error for item', item.item_id, error);
+                }
+            }
+            
+            console.log('✅ Translation complete');
+        }
+        
+        function getItemName(item) {
+            if (currentLanguage === 'en') {
+                return item.item_name;
+            }
+            
+            const cacheKey = item.item_id + '_' + currentLanguage;
+            return menuTranslations[cacheKey] || item.item_name;
         }
         
         // Handle allergy declaration radio buttons
@@ -70470,8 +70562,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 // Pre-escape the item_id for onclick handlers - replace double quotes with HTML entities
                 const itemIdEscaped = JSON.stringify(item.item_id).replace(/"/g, '&quot;');
                 
+                // Get translated item name
+                const itemName = getItemName(item);
+                
                 // Escape item name for HTML safety
-                const itemNameEscaped = (item.item_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const itemNameEscaped = (itemName || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
                 let limitButton = '';
                 if (isSelected) {
