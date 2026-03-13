@@ -24404,7 +24404,7 @@ app.get('/hotel/:property_slug', async (c) => {
           
           // Hero background with image and overlay
           const heroImageCSS = settings.hero_image_url ? 
-            'background-image: linear-gradient(rgba(0,0,0,' + heroOverlay + '), rgba(0,0,0,' + heroOverlay + ')), url(\\'' + settings.hero_image_url + '\\'); background-size: cover; background-position: center; ' + (heroFilter ? 'filter: ' + heroFilter + ';' : '')
+            'background-image: linear-gradient(rgba(0,0,0,' + heroOverlay + '), rgba(0,0,0,' + heroOverlay + ')), url(' + settings.hero_image_url + '); background-size: cover; background-position: center; ' + (heroFilter ? 'filter: ' + heroFilter + ';' : '')
             : '';
           
           // Generate dynamic CSS based on layout style
