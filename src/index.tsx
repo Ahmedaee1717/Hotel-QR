@@ -76523,8 +76523,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 Object.keys(setMenuByCategory).forEach(category => {
                     allCategories.add(category);
                     setMenuByCategory[category].forEach(item => {
-                        if (item.item_name) allTexts.add(item.item_name);
-                        if (item.description) allTexts.add(item.description);
+                        if (item.item_name) allTexts.add(item.item_name.trim());
+                        if (item.description) allTexts.add(item.description.trim());
                     });
                 });
             }
@@ -76534,8 +76534,8 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                 Object.keys(restaurantMenuByCategory).forEach(category => {
                     allCategories.add(category);
                     restaurantMenuByCategory[category].forEach(item => {
-                        if (item.item_name) allTexts.add(item.item_name);
-                        if (item.description) allTexts.add(item.description);
+                        if (item.item_name) allTexts.add(item.item_name.trim());
+                        if (item.description) allTexts.add(item.description.trim());
                     });
                 });
             }
@@ -76551,10 +76551,10 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             const textIndexMap = new Map();
             
             allItemsToTranslate.forEach((text, idx) => {
-                const cacheKey = targetLanguage + ':' + text;
+                const cacheKey = targetLanguage + ':' + text.trim();
                 if (!translationCache.has(cacheKey)) {
-                    uncachedTexts.push(text);
-                    textIndexMap.set(text, idx);
+                    uncachedTexts.push(text.trim());
+                    textIndexMap.set(text.trim(), idx);
                 }
             });
             
@@ -76582,7 +76582,7 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
                     
                     // Cache all translations
                     uncachedTexts.forEach((text, idx) => {
-                        const cacheKey = targetLanguage + ':' + text;
+                        const cacheKey = targetLanguage + ':' + text.trim();
                         const translation = translations[idx] || text;
                         translationCache.set(cacheKey, translation);
                     });
