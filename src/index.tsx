@@ -76390,6 +76390,14 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
     </div>
 
     <script>
+        // Helper function to get translated text (must be defined first)
+        function getTranslatedText(text) {
+            if (!text || typeof currentLanguage === 'undefined' || currentLanguage === 'en') return text;
+            if (typeof translationCache === 'undefined') return text;
+            const cacheKey = currentLanguage + ':' + text.trim();
+            return translationCache.get(cacheKey) || text;
+        }
+        
         // DEBUG: restaurant_id = ${restaurant_id}, offering_id = ${offering_id}
         // DEBUG: setMenu.results.length = ${setMenu.results?.length || 0}
         // DEBUG: restaurantMenu.menus.length = ${restaurantMenu.menus?.length || 0}
