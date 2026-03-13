@@ -76493,7 +76493,14 @@ app.get('/alacarte/book/:restaurant_id', async (c) => {
             if (!text || typeof currentLanguage === 'undefined' || currentLanguage === 'en') return text;
             if (typeof translationCache === 'undefined') return text;
             const cacheKey = currentLanguage + ':' + text.trim();
-            return translationCache.get(cacheKey) || text;
+            const translated = translationCache.get(cacheKey);
+            
+            // Debug logging (remove after testing)
+            if (!translated && text.length < 50) {
+                console.log('⚠️ No translation for:', text, '| cacheKey:', cacheKey, '| cache size:', translationCache.size);
+            }
+            
+            return translated || text;
         }
         
         // Parallel translation function - translates ALL menu items at once
