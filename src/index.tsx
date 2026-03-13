@@ -79000,6 +79000,7 @@ app.get('/room-service/:property_id', async (c) => {
             selector.innerHTML = '';
             Object.keys(SUPPORTED_LANGUAGES).forEach(code => {
                 const lang = SUPPORTED_LANGUAGES[code];
+                if (!lang || !lang.flag || !lang.native) return; // Skip invalid entries
                 const option = document.createElement('option');
                 option.value = code;
                 option.textContent = lang.flag + ' ' + lang.native;
