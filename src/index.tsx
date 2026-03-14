@@ -70079,7 +70079,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 <button onclick="goToStep(3)" class="flex-1 bg-gray-300 text-gray-700 py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
                     <i class="fas fa-arrow-left mr-2"></i>Back
                 </button>
-                <button onclick="goToStep(5)" class="flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target">
+                <button id="reviewOrderBtn" onclick="goToStep(5)" disabled class="flex-1 py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition" style="background: #ccc; color: #666; cursor: not-allowed;">
                     Review Order<i class="fas fa-arrow-right ml-2"></i>
                 </button>
             </div>
@@ -70941,8 +70941,11 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                         loadTablesForSelection(selectedRestaurant.offering_id);
                     }
                 } else if (currentStep === 4) {
-                    // Step 4: Table selection - optional but recommended
-                    // Allow proceeding without table selection (table_id will be null)
+                    // Step 4: Table selection - REQUIRED
+                    if (!selectedTableId) {
+                        alert('⚠️ Please select a table before proceeding');
+                        return;
+                    }
                     renderOrderSummary();
                 }
             }
@@ -70963,6 +70966,22 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             for (let i = 1; i < step; i++) {
                 document.getElementById('step' + i).classList.add('completed');
                 document.getElementById('step' + i).classList.remove('inactive');
+            }
+            
+            // Reset Review Order button state when entering Step 4
+            if (step === 4) {
+                const reviewBtn = document.getElementById('reviewOrderBtn');
+                if (reviewBtn) {
+                    if (!selectedTableId) {
+                        reviewBtn.disabled = true;
+                        reviewBtn.className = 'flex-1 py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition';
+                        reviewBtn.style.cssText = 'background: #ccc; color: #666; cursor: not-allowed;';
+                    } else {
+                        reviewBtn.disabled = false;
+                        reviewBtn.className = 'flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition';
+                        reviewBtn.style.cssText = '';
+                    }
+                }
             }
             
             currentStep = step;
@@ -71298,6 +71317,12 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             document.getElementById('selectedTableInfo').classList.remove('hidden');
             document.getElementById('selectedTableDetails').textContent = 
                 'Table ' + table.table_number + ' - ' + (table.table_name || '') + ' (Seats ' + table.capacity + ')';
+            
+            // Enable "Review Order" button
+            const reviewBtn = document.getElementById('reviewOrderBtn');
+            reviewBtn.disabled = false;
+            reviewBtn.className = 'flex-1 btn-accent text-white py-4 rounded-xl font-bold text-lg shadow-lg touch-target transition';
+            reviewBtn.style.cssText = '';
             
             console.log('✅ Selected table:', table.table_id, table.table_number);
         }
