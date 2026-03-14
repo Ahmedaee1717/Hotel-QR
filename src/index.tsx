@@ -82243,53 +82243,54 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     
     // Query combining both alacarte_vouchers and waiter_orders
     const query = `
-      SELECT 
-        v.voucher_id as order_id,
-        v.voucher_code,
-        v.voucher_code as guest_name,
-        v.table_number as room_number,
-        v.party_size,
-        v.reservation_date,
-        v.reservation_time,
-        v.status,
-        v.preorder_items as items,
-        v.total_cost,
-        v.special_requests,
-        v.created_at,
-        v.checked_in_at,
-        r.title_en as restaurant_name,
-        v.checked_in_by as created_by_staff,
-        'voucher' as order_type
-      FROM alacarte_vouchers v
-      LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
-      WHERE v.property_id = ?
-      ${dateCondition}
-      
-      UNION ALL
-      
-      SELECT 
-        w.order_id,
-        'WALK-' || w.order_id as voucher_code,
-        w.guest_name,
-        w.room_number,
-        w.party_size,
-        DATE(w.created_at) as reservation_date,
-        TIME(w.created_at) as reservation_time,
-        w.status,
-        w.items,
-        w.total_cost,
-        NULL as special_requests,
-        w.created_at,
-        NULL as checked_in_at,
-        r.title_en as restaurant_name,
-        u.first_name || ' ' || u.last_name as created_by_staff,
-        'waiter' as order_type
-      FROM waiter_orders w
-      LEFT JOIN hotel_offerings r ON w.restaurant_id = r.offering_id
-      LEFT JOIN users u ON w.waiter_id = u.user_id
-      WHERE 1=1
-      ${dateConditionWaiter}
-      
+      SELECT * FROM (
+        SELECT 
+          v.voucher_id as order_id,
+          v.voucher_code,
+          v.voucher_code as guest_name,
+          v.table_number as room_number,
+          v.party_size,
+          v.reservation_date,
+          v.reservation_time,
+          v.status,
+          v.preorder_items as items,
+          v.total_cost,
+          v.special_requests,
+          v.created_at,
+          v.checked_in_at,
+          r.title_en as restaurant_name,
+          v.checked_in_by as created_by_staff,
+          'voucher' as order_type
+        FROM alacarte_vouchers v
+        LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
+        WHERE v.property_id = ?
+        ${dateCondition}
+        
+        UNION ALL
+        
+        SELECT 
+          w.order_id,
+          'WALK-' || w.order_id as voucher_code,
+          w.guest_name,
+          w.room_number,
+          w.party_size,
+          DATE(w.created_at) as reservation_date,
+          TIME(w.created_at) as reservation_time,
+          w.status,
+          w.items,
+          w.total_cost,
+          NULL as special_requests,
+          w.created_at,
+          NULL as checked_in_at,
+          r.title_en as restaurant_name,
+          u.first_name || ' ' || u.last_name as created_by_staff,
+          'waiter' as order_type
+        FROM waiter_orders w
+        LEFT JOIN hotel_offerings r ON w.restaurant_id = r.offering_id
+        LEFT JOIN users u ON w.waiter_id = u.user_id
+        WHERE 1=1
+        ${dateConditionWaiter}
+      )
       ORDER BY created_at DESC
       LIMIT 500
     `
