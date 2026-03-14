@@ -81977,9 +81977,14 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
         const numericIds = extraChargeIds.map(e => e.numeric)
         const placeholders = numericIds.map(() => '?').join(',')
         const extraItems = await DB.prepare(`
-          SELECT item_id, item_name, category, price
-          FROM menu_items
-          WHERE item_id IN (${placeholders})
+          SELECT 
+            mi.item_id, 
+            mi.item_name, 
+            mc.category_name as category, 
+            mi.price
+          FROM menu_items mi
+          LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id
+          WHERE mi.item_id IN (${placeholders})
         `).bind(...numericIds).all()
         
         for (const item of extraItems.results || []) {
