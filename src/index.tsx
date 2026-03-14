@@ -82385,7 +82385,14 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
             const extraItems = await Promise.all(
               extraChargeIds.map(async ({ original, numeric }) => {
                 const result = await DB.prepare(
-                  'SELECT item_id, item_name, category, price FROM menu_items WHERE item_id = ?'
+                  `SELECT 
+                    mi.item_id, 
+                    mi.item_name, 
+                    mc.category_name as category, 
+                    mi.price 
+                  FROM menu_items mi
+                  LEFT JOIN menu_categories mc ON mi.category_id = mc.category_id
+                  WHERE mi.item_id = ?`
                 ).bind(numeric).first()
                 return result ? { 
                   item_id: original, 
