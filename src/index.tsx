@@ -70546,10 +70546,21 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
             const selector = document.getElementById('languageSelector');
             if (!selector || availableLanguages.length === 0) return;
             
+            // Map language codes to flag emojis
+            const flagMap = {
+                'en': '🇬🇧', 'ar': '🇸🇦', 'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪',
+                'it': '🇮🇹', 'pt': '🇵🇹', 'ru': '🇷🇺', 'zh': '🇨🇳', 'ja': '🇯🇵',
+                'ko': '🇰🇷', 'hi': '🇮🇳', 'tr': '🇹🇷', 'nl': '🇳🇱', 'pl': '🇵🇱',
+                'sv': '🇸🇪', 'no': '🇳🇴', 'da': '🇩🇰', 'fi': '🇫🇮', 'el': '🇬🇷',
+                'he': '🇮🇱', 'th': '🇹🇭', 'vi': '🇻🇳', 'id': '🇮🇩', 'ms': '🇲🇾',
+                'tl': '🇵🇭', 'cs': '🇨🇿', 'hu': '🇭🇺', 'ro': '🇷🇴', 'uk': '🇺🇦'
+            };
+            
             selector.innerHTML = availableLanguages.map(lang => {
                 const selected = lang.language_code === currentLanguage ? 'selected' : '';
+                const flag = flagMap[lang.language_code] || '🌐';
                 return '<option value="' + lang.language_code + '" ' + selected + '>' + 
-                       lang.flag + ' ' + lang.language_name_native + '</option>';
+                       flag + ' ' + lang.language_name_native + '</option>';
             }).join('');
         }
         
