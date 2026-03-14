@@ -55888,7 +55888,13 @@ app.get('/admin/dashboard', (c) => {
           });
           
           if (response.ok) {
-            alert('✅ Menu item added successfully!' + (formData.category !== document.getElementById('menuCategory').value ? '\n\nNew category "' + document.getElementById('customCategory').value + '" created!' : ''));
+            const categoryValue = document.getElementById('menuCategory').value;
+            const customCategoryName = document.getElementById('customCategory').value;
+            const isNewCategory = formData.category !== categoryValue;
+            const message = isNewCategory 
+              ? `✅ Menu item added successfully!\n\nNew category "${customCategoryName}" created!`
+              : '✅ Menu item added successfully!';
+            alert(message);
             document.getElementById('addMenuItemForm').reset();
             document.getElementById('customCategoryField').classList.add('hidden');
             await refreshALaCarteStats();
