@@ -71698,9 +71698,6 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     is_extra_charge: s.item.extraCharge || s.item.is_premium || false
                 }));
                 
-                console.log('[Frontend] Selected items:', itemsArray);
-                console.log('[Frontend] Items with rm_ prefix:', itemsArray.filter(i => String(i.item_id).startsWith('rm_')));
-                
                 const booking = {
                     guest_name: document.getElementById('guestName').value,
                     room_number: document.getElementById('roomNumber').value,
@@ -78854,9 +78851,6 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       quantity: i.quantity || 1
     }))
     
-    console.log('[Front Desk Booking] preorder_items:', JSON.stringify(preorder_items))
-    console.log('[Front Desk Booking] Items with rm_ prefix:', preorder_items.filter(i => String(i.item_id).startsWith('rm_')))
-    
     // Look up table number if table_id provided
     let table_number = null
     if (table_id) {
@@ -81913,9 +81907,6 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
     // Parse preorder items
     const itemsData = voucher.preorder_item_ids ? JSON.parse(voucher.preorder_item_ids) : []
     
-    console.log('[Kitchen Order Detail] voucher_id:', voucher_id)
-    console.log('[Kitchen Order Detail] itemsData:', itemsData)
-    
     // Separate into set menu items and extra-charge items
     const setMenuIds = []
     const extraChargeIds = []
@@ -81938,9 +81929,6 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
         }
       }
     }
-    
-    console.log('[Kitchen Order Detail] setMenuIds:', setMenuIds)
-    console.log('[Kitchen Order Detail] extraChargeIds:', extraChargeIds)
     
     const dishes = []
     
