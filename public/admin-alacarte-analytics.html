@@ -267,8 +267,13 @@
                             <span id="ordersFilteredCount" class="font-bold text-lg" style="color: #D4AF37;">0</span> orders found
                             <span id="ordersDateRange" class="ml-2"></span>
                         </div>
-                        <div class="text-sm dark-text-muted">
-                            <i class="fas fa-info-circle mr-1"></i>Click on any order to view full details
+                        <div class="flex items-center gap-4">
+                            <button onclick="exportOrdersToCSV()" class="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow-lg transition-colors">
+                                <i class="fas fa-file-excel mr-2"></i>Export to CSV
+                            </button>
+                            <div class="text-sm dark-text-muted">
+                                <i class="fas fa-info-circle mr-1"></i>Click on any order to view full details
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -659,6 +664,10 @@
             }
         }
         
+        // Store current filtered orders for export
+        let currentFilteredOrders = [];
+        let currentFilterPeriod = '';
+        
         async function loadOrderHistory(period) {
             const tbody = document.getElementById('ordersTableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center dark-text-muted"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Loading order history...</td></tr>';
@@ -751,15 +760,142 @@
                         `;
                     }).join('');
                     
+                    // Store orders for export
+                    currentFilteredOrders = data.orders;
+                    currentFilterPeriod = period;
+                    
                     // Update filtered count
                     document.getElementById('ordersFilteredCount').textContent = data.orders.length;
                 } else {
                     tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center dark-text-muted"><i class="fas fa-inbox text-3xl mb-2"></i><br>No orders found for this period</td></tr>';
                     document.getElementById('ordersFilteredCount').textContent = '0';
+                    currentFilteredOrders = [];
                 }
             } catch (error) {
                 console.error('Load order history error:', error);
                 tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-400"><i class="fas fa-exclamation-triangle text-2xl mb-2"></i><br>Failed to load order history</td></tr>';
+            }
+        }
+        
+        // Export filtered orders to CSV
+        function exportOrdersToCSV() {
+            if (!currentFilteredOrders || currentFilteredOrders.length === 0) {
+                alert('No orders to export. Please apply a filter first.');
+                return;
+            }
+            
+            try {
+                // CSV Headers
+                const headers = [
+                    'Date',
+                    'Time',
+                    'Voucher Code',
+                    'Guest Name',
+                    'Room Number',
+                    'Party Size',
+                    'Restaurant',
+                    'Status',
+                    'Items',
+                    'Item Count',
+                    'Total Cost (EGP)',
+                    'Created By',
+                    'Order Type',
+                    'Reservation Date',
+                    'Reservation Time',
+                    'Special Requests'
+                ];
+                
+                // Build CSV rows
+                const rows = currentFilteredOrders.map(order => {
+                    // Parse date/time
+                    const orderDate = new Date(order.created_at);
+                    const dateStr = orderDate.toLocaleDateString('en-US');
+                    const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    
+                    // Parse items
+                    let items = [];
+                    let itemsList = 'No items';
+                    if (order.items) {
+                        try {
+                            const parsed = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                            if (Array.isArray(parsed)) {
+                                items = parsed;
+                            } else if (typeof parsed === 'object') {
+                                items = Object.entries(parsed).map(([category, name]) => ({
+                                    item_name: name,
+                                    category: category,
+                                    quantity: 1
+                                }));
+                            }
+                            if (items.length > 0) {
+                                itemsList = items.map(item => `${item.quantity || 1}x ${item.item_name || item}`).join('; ');
+                            }
+                        } catch (e) {
+                            console.error('Error parsing items for export:', e);
+                        }
+                    }
+                    
+                    // Extract guest info
+                    let guestName = order.guest_name || 'Walk-in';
+                    let roomNumber = order.room_number || 'N/A';
+                    if (order.special_requests) {
+                        const guestMatch = order.special_requests.match(/Guest:\s*([^,\n]+)/);
+                        const roomMatch = order.special_requests.match(/Room:\s*(\d+)/);
+                        if (guestMatch) guestName = guestMatch[1].trim();
+                        if (roomMatch) roomNumber = roomMatch[1];
+                    }
+                    
+                    // Clean special requests for CSV (remove newlines, escape quotes)
+                    const cleanSpecialRequests = (order.special_requests || '')
+                        .replace(/\n/g, ' ')
+                        .replace(/"/g, '""');
+                    
+                    return [
+                        dateStr,
+                        timeStr,
+                        order.voucher_code || '',
+                        guestName,
+                        roomNumber,
+                        order.party_size || 1,
+                        order.restaurant_name || 'N/A',
+                        order.status || '',
+                        `"${itemsList}"`, // Quote items list since it contains commas
+                        items.length,
+                        (order.total_cost || 0).toFixed(2),
+                        order.created_by_staff || 'System',
+                        order.order_type || 'voucher',
+                        order.reservation_date || '',
+                        order.reservation_time || '',
+                        `"${cleanSpecialRequests}"`
+                    ];
+                });
+                
+                // Combine headers and rows
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.join(','))
+                ].join('\n');
+                
+                // Create blob and download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                
+                // Generate filename with date range
+                const dateRange = document.getElementById('ordersDateRange').textContent.replace(/[()]/g, '').replace(/ /g, '_');
+                const filename = `alacarte_orders_${dateRange}_${new Date().toISOString().split('T')[0]}.csv`;
+                
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // Show success message
+                alert(`✅ Successfully exported ${currentFilteredOrders.length} orders to ${filename}`);
+            } catch (error) {
+                console.error('CSV export error:', error);
+                alert('❌ Failed to export CSV. Please try again.');
             }
         }
         
