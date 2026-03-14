@@ -81930,51 +81930,59 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
     
     const dishes = []
     
-    // Fetch set menu items
+    // Fetch set menu items (only if we have IDs)
     if (setMenuIds.length > 0) {
-      const placeholders = setMenuIds.map(() => '?').join(',')
-      const setMenuItems = await DB.prepare(`
-        SELECT item_id, item_name, category, cost_to_hotel, is_premium
-        FROM alacarte_menu_items
-        WHERE item_id IN (${placeholders})
-      `).bind(...setMenuIds).all()
-      
-      for (const item of setMenuItems.results) {
-        dishes.push({
-          item_id: item.item_id,
-          originalId: item.item_id,
-          item_name: item.item_name,
-          category: item.category,
-          cost: item.cost_to_hotel || 0,
-          quantity: quantityMap[item.item_id] || 1,
-          extraCharge: false,
-          is_premium: item.is_premium
-        })
+      try {
+        const placeholders = setMenuIds.map(() => '?').join(',')
+        const setMenuItems = await DB.prepare(`
+          SELECT item_id, item_name, category, cost_to_hotel, is_premium
+          FROM alacarte_menu_items
+          WHERE item_id IN (${placeholders})
+        `).bind(...setMenuIds).all()
+        
+        for (const item of setMenuItems.results || []) {
+          dishes.push({
+            item_id: item.item_id,
+            originalId: item.item_id,
+            item_name: item.item_name,
+            category: item.category,
+            cost: item.cost_to_hotel || 0,
+            quantity: quantityMap[item.item_id] || 1,
+            extraCharge: false,
+            is_premium: item.is_premium
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching set menu items:', error)
       }
     }
     
-    // Fetch extra-charge items
+    // Fetch extra-charge items (only if we have IDs)
     if (extraChargeIds.length > 0) {
-      const numericIds = extraChargeIds.map(e => e.numeric)
-      const placeholders = numericIds.map(() => '?').join(',')
-      const extraItems = await DB.prepare(`
-        SELECT item_id, item_name, category, price
-        FROM menu_items
-        WHERE item_id IN (${placeholders})
-      `).bind(...numericIds).all()
-      
-      for (const item of extraItems.results) {
-        const original = extraChargeIds.find(e => e.numeric === String(item.item_id))?.original
-        dishes.push({
-          item_id: original || `rm_${item.item_id}`,
-          originalId: original || `rm_${item.item_id}`,
-          item_name: item.item_name,
-          category: item.category,
-          cost: item.price || 0,
-          quantity: quantityMap[original] || quantityMap[`rm_${item.item_id}`] || 1,
-          extraCharge: true,
-          is_premium: false
-        })
+      try {
+        const numericIds = extraChargeIds.map(e => e.numeric)
+        const placeholders = numericIds.map(() => '?').join(',')
+        const extraItems = await DB.prepare(`
+          SELECT item_id, item_name, category, price
+          FROM menu_items
+          WHERE item_id IN (${placeholders})
+        `).bind(...numericIds).all()
+        
+        for (const item of extraItems.results || []) {
+          const original = extraChargeIds.find(e => e.numeric === String(item.item_id))?.original
+          dishes.push({
+            item_id: original || `rm_${item.item_id}`,
+            originalId: original || `rm_${item.item_id}`,
+            item_name: item.item_name,
+            category: item.category,
+            cost: item.price || 0,
+            quantity: quantityMap[original] || quantityMap[`rm_${item.item_id}`] || 1,
+            extraCharge: true,
+            is_premium: false
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching extra charge items:', error)
       }
     }
     
@@ -82015,7 +82023,11 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
     })
   } catch (error) {
     console.error('Error fetching kitchen order:', error)
-    return c.json({ success: false, error: 'Failed to fetch order' }, 500)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to fetch order',
+      details: error.message || String(error)
+    }, 500)
   }
 })
 
