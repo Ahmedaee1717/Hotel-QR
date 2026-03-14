@@ -71691,6 +71691,16 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                 const hasAllergiesRadio = document.getElementById('hasAllergiesRadio').checked;
                 const allergyDetails = document.getElementById('allergyDetails').value.trim();
                 
+                const itemsArray = Object.values(selectedItems).map(s => ({
+                    item_id: s.item.item_id,
+                    quantity: s.quantity,
+                    custom_limit: s.customLimit,
+                    is_extra_charge: s.item.extraCharge || s.item.is_premium || false
+                }));
+                
+                console.log('[Frontend] Selected items:', itemsArray);
+                console.log('[Frontend] Items with rm_ prefix:', itemsArray.filter(i => String(i.item_id).startsWith('rm_')));
+                
                 const booking = {
                     guest_name: document.getElementById('guestName').value,
                     room_number: document.getElementById('roomNumber').value,
@@ -71700,12 +71710,7 @@ app.get('/front-desk/alacarte-booking/:property_id', async (c) => {
                     restaurant_id: selectedRestaurant.offering_id,
                     table_id: selectedTableId, // Include selected table
                     staff_id: selectedStaffId, // Track staff member creating booking
-                    items: Object.values(selectedItems).map(s => ({
-                        item_id: s.item.item_id,
-                        quantity: s.quantity,
-                        custom_limit: s.customLimit,
-                        is_extra_charge: s.item.extraCharge || s.item.is_premium || false
-                    })),
+                    items: itemsArray,
                     allergy_info: hasAllergiesRadio ? allergyDetails : null,
                     no_allergies_confirmed: !hasAllergiesRadio
                 };
