@@ -363,6 +363,30 @@
                 </div>
             </div>
         </div>
+
+        <!-- Order Details Modal -->
+        <div id="orderDetailsModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div class="dark-card rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-slate-600">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold dark-text">
+                            <i class="fas fa-receipt mr-3" style="color: #D4AF37;"></i>
+                            Order Details
+                        </h3>
+                        <button onclick="hideOrderDetails()" class="text-slate-400 hover:text-white text-2xl">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="orderDetailsContent" class="p-6">
+                    <div class="text-center py-8 dark-text-muted">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                        <div>Loading order details...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -544,10 +568,219 @@
             }
         }
         
-        function viewOrderDetails(voucherId) {
-            // Open order details in new tab or modal
-            window.open(`/admin-alacarte-viewer.html?voucher=${voucherId}`, '_blank');
+        async function viewOrderDetails(voucherId) {
+            // Show modal
+            document.getElementById('orderDetailsModal').classList.remove('hidden');
+            const content = document.getElementById('orderDetailsContent');
+            
+            // Show loading state
+            content.innerHTML = `
+                <div class="text-center py-8 dark-text-muted">
+                    <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                    <div>Loading order details...</div>
+                </div>
+            `;
+            
+            try {
+                // Fetch order details from API
+                const response = await fetch(`/api/analytics/alacarte/orders?period=all`, {
+                    headers: { 'X-Property-ID': '1' }
+                });
+                
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error || 'Failed to load orders');
+                
+                // Find the specific order
+                const order = data.orders.find(o => o.voucher_id === voucherId);
+                if (!order) throw new Error('Order not found');
+                
+                // Parse items
+                let items = [];
+                if (order.items) {
+                    try {
+                        const parsed = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                        if (Array.isArray(parsed)) {
+                            items = parsed;
+                        } else if (typeof parsed === 'object') {
+                            items = Object.entries(parsed).map(([category, name]) => ({
+                                item_name: name,
+                                category: category,
+                                quantity: 1
+                            }));
+                        }
+                    } catch (e) {
+                        console.error('Error parsing items:', e);
+                    }
+                }
+                
+                // Extract guest info
+                let guestName = order.guest_name || 'Walk-in';
+                let roomNumber = order.room_number || 'N/A';
+                if (order.special_requests) {
+                    const guestMatch = order.special_requests.match(/Guest:\s*([^,\n]+)/);
+                    const roomMatch = order.special_requests.match(/Room:\s*(\d+)/);
+                    if (guestMatch) guestName = guestMatch[1].trim();
+                    if (roomMatch) roomNumber = roomMatch[1];
+                }
+                
+                const orderDate = new Date(order.created_at);
+                const dateStr = orderDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                const statusColors = {
+                    'pending': 'bg-yellow-600',
+                    'confirmed': 'bg-blue-600',
+                    'preparing': 'bg-purple-600',
+                    'ready': 'bg-green-600',
+                    'served': 'bg-green-700',
+                    'cancelled': 'bg-red-600',
+                    'checked_in': 'bg-teal-600'
+                };
+                
+                // Render order details
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- Order Header -->
+                        <div class="bg-slate-800 rounded-lg p-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Voucher Code</div>
+                                    <div class="text-xl font-mono font-bold" style="color: #D4AF37;">${order.voucher_code}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Status</div>
+                                    <span class="px-3 py-1 rounded-full text-sm font-semibold text-white ${statusColors[order.status] || 'bg-gray-600'}">${order.status.toUpperCase()}</span>
+                                </div>
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Guest</div>
+                                    <div class="text-lg font-semibold dark-text">${guestName}</div>
+                                    <div class="text-sm dark-text-muted">Room ${roomNumber}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Party Size</div>
+                                    <div class="text-lg font-semibold dark-text">${order.party_size || 1} ${order.party_size > 1 ? 'guests' : 'guest'}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Reservation Details -->
+                        <div class="bg-slate-800 rounded-lg p-6">
+                            <h4 class="font-bold dark-text mb-4">
+                                <i class="fas fa-calendar-alt mr-2" style="color: #D4AF37;"></i>
+                                Reservation Details
+                            </h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Date</div>
+                                    <div class="dark-text font-semibold">${order.reservation_date || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Time</div>
+                                    <div class="dark-text font-semibold">${order.reservation_time || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm dark-text-muted mb-1">Restaurant</div>
+                                    <div class="dark-text font-semibold">${order.restaurant_name || 'N/A'}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Order Items -->
+                        <div class="bg-slate-800 rounded-lg p-6">
+                            <h4 class="font-bold dark-text mb-4">
+                                <i class="fas fa-utensils mr-2" style="color: #D4AF37;"></i>
+                                Order Items
+                            </h4>
+                            ${items.length > 0 ? `
+                                <div class="space-y-2">
+                                    ${items.map(item => `
+                                        <div class="flex justify-between items-center py-2 border-b border-slate-700 last:border-0">
+                                            <div>
+                                                <div class="dark-text font-semibold">${item.item_name || item}</div>
+                                                ${item.category ? `<div class="text-sm dark-text-muted capitalize">${item.category}</div>` : ''}
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="dark-text font-semibold">×${item.quantity || 1}</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : `
+                                <div class="text-center py-4 dark-text-muted">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    No items specified for this order
+                                </div>
+                            `}
+                        </div>
+                        
+                        <!-- Cost Details -->
+                        <div class="bg-slate-800 rounded-lg p-6">
+                            <h4 class="font-bold dark-text mb-4">
+                                <i class="fas fa-money-bill-wave mr-2" style="color: #D4AF37;"></i>
+                                Cost Details
+                            </h4>
+                            <div class="flex justify-between items-center text-xl">
+                                <span class="dark-text font-semibold">Total Cost:</span>
+                                <span class="font-bold" style="color: #D4AF37;">EGP ${(order.total_cost || 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Special Requests -->
+                        ${order.special_requests ? `
+                            <div class="bg-slate-800 rounded-lg p-6">
+                                <h4 class="font-bold dark-text mb-4">
+                                    <i class="fas fa-comment-dots mr-2" style="color: #D4AF37;"></i>
+                                    Special Requests
+                                </h4>
+                                <div class="dark-text whitespace-pre-wrap">${order.special_requests}</div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Timeline -->
+                        <div class="bg-slate-800 rounded-lg p-6">
+                            <h4 class="font-bold dark-text mb-4">
+                                <i class="fas fa-clock mr-2" style="color: #D4AF37;"></i>
+                                Order Timeline
+                            </h4>
+                            <div class="space-y-3">
+                                <div class="flex items-start">
+                                    <div class="w-2 h-2 rounded-full bg-blue-500 mt-2 mr-3"></div>
+                                    <div>
+                                        <div class="dark-text font-semibold">Created</div>
+                                        <div class="text-sm dark-text-muted">${dateStr} at ${timeStr}</div>
+                                        ${order.created_by_staff && order.created_by_staff !== 'System' ? `<div class="text-xs dark-text-muted">By: ${order.created_by_staff}</div>` : ''}
+                                    </div>
+                                </div>
+                                ${order.checked_in_at ? `
+                                    <div class="flex items-start">
+                                        <div class="w-2 h-2 rounded-full bg-green-500 mt-2 mr-3"></div>
+                                        <div>
+                                            <div class="dark-text font-semibold">Checked In</div>
+                                            <div class="text-sm dark-text-muted">${new Date(order.checked_in_at).toLocaleString()}</div>
+                                            ${order.checked_in_by ? `<div class="text-xs dark-text-muted">By: ${order.checked_in_by}</div>` : ''}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading order details:', error);
+                content.innerHTML = `
+                    <div class="text-center py-8 text-red-400">
+                        <i class="fas fa-exclamation-triangle text-3xl mb-2"></i>
+                        <div>Failed to load order details</div>
+                        <div class="text-sm mt-2">${error.message}</div>
+                    </div>
+                `;
+            }
         }
+        
+        function hideOrderDetails() {
+            document.getElementById('orderDetailsModal').classList.add('hidden');
+        }
+
 
         // UPDATED: Chart with dark mode and BRAND COLORS
         function updateTopItemsChart(items) {
