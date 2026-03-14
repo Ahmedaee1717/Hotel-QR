@@ -82253,7 +82253,7 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
           v.reservation_date,
           v.reservation_time,
           v.status,
-          v.preorder_items as items,
+          v.preorder_item_ids as items,
           v.total_cost,
           v.special_requests,
           v.created_at,
@@ -82297,11 +82297,98 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     
     const orders = await DB.prepare(query).bind(property_id).all()
     
-    // Format orders
-    const formattedOrders = (orders.results || []).map(order => ({
-      ...order,
-      voucher_id: order.order_id, // Ensure consistent field name
-      created_by_staff: order.created_by_staff || 'System'
+    // Format orders and fetch item details
+    const formattedOrders = await Promise.all((orders.results || []).map(async (order) => {
+      let parsedItems = []
+      
+      // Parse items based on order type
+      if (order.order_type === 'voucher' && order.items) {
+        try {
+          const itemsData = JSON.parse(order.items)
+          
+          // Extract item IDs
+          const itemIds = itemsData.map(item => {
+            if (typeof item === 'object' && item.item_id) {
+              return item.item_id
+            }
+            return item
+          })
+          
+          // Create quantity map
+          const quantityMap = {}
+          itemsData.forEach(item => {
+            if (typeof item === 'object' && item.item_id) {
+              quantityMap[item.item_id] = item.quantity || 1
+            } else {
+              quantityMap[item] = 1
+            }
+          })
+          
+          // Separate set menu and extra charge items
+          const setMenuIds = []
+          const extraChargeIds = []
+          
+          itemIds.forEach(id => {
+            if (typeof id === 'string' && id.startsWith('rm_')) {
+              const numericId = parseInt(id.substring(3))
+              if (!isNaN(numericId)) {
+                extraChargeIds.push({ original: id, numeric: numericId })
+              }
+            } else {
+              setMenuIds.push(id)
+            }
+          })
+          
+          // Fetch set menu items
+          if (setMenuIds.length > 0) {
+            const setMenuItems = await Promise.all(
+              setMenuIds.map(async (id) => {
+                const result = await DB.prepare(
+                  'SELECT item_id, item_name, category FROM alacarte_menu_items WHERE item_id = ?'
+                ).bind(id).first()
+                return result ? { ...result, quantity: quantityMap[id] || 1, extraCharge: false } : null
+              })
+            )
+            parsedItems.push(...setMenuItems.filter(Boolean))
+          }
+          
+          // Fetch extra charge items
+          if (extraChargeIds.length > 0) {
+            const extraItems = await Promise.all(
+              extraChargeIds.map(async ({ original, numeric }) => {
+                const result = await DB.prepare(
+                  'SELECT item_id, item_name, category, price FROM menu_items WHERE item_id = ?'
+                ).bind(numeric).first()
+                return result ? { 
+                  item_id: original, 
+                  item_name: result.item_name, 
+                  category: result.category,
+                  quantity: quantityMap[original] || 1,
+                  extraCharge: true,
+                  price: result.price
+                } : null
+              })
+            )
+            parsedItems.push(...extraItems.filter(Boolean))
+          }
+        } catch (e) {
+          console.error('Failed to parse voucher items:', e)
+        }
+      } else if (order.order_type === 'waiter' && order.items) {
+        // Waiter orders already have items as JSON
+        try {
+          parsedItems = JSON.parse(order.items)
+        } catch (e) {
+          console.error('Failed to parse waiter items:', e)
+        }
+      }
+      
+      return {
+        ...order,
+        voucher_id: order.order_id,
+        created_by_staff: order.created_by_staff || 'System',
+        items: JSON.stringify(parsedItems) // Convert back to JSON string for frontend
+      }
     }))
     
     return c.json({
