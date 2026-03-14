@@ -82941,18 +82941,17 @@ app.get('/api/waiter/orders', async (c) => {
   const { restaurant, waiter, property, date, start_date, end_date } = c.req.query()
   
   try {
-    // Calculate date range - show PAST 30 days to FUTURE 7 days
+    // Calculate date range - show ALL historical orders
     const today = new Date()
-    const minDate = new Date(today)
-    minDate.setDate(minDate.getDate() - 30) // Past 30 days
+    const minDate = new Date('2000-01-01') // Very old date to get all historical orders
     const minDateStr = minDate.toISOString().split('T')[0]
     
     const maxDate = new Date(today)
-    maxDate.setDate(maxDate.getDate() + 7) // Future 7 days
+    maxDate.setDate(maxDate.getDate() + 30) // Future 30 days
     const maxDateStr = maxDate.toISOString().split('T')[0]
     
     // Determine start and end dates
-    let startDateFilter = start_date || date || minDateStr // Default to 30 days ago
+    let startDateFilter = start_date || date || minDateStr // Default to all historical
     let endDateFilter = end_date || date || maxDateStr
     
     // Get waiter orders (if waiter=0, get all) - INCLUDE ALL STATUSES
@@ -82986,7 +82985,7 @@ app.get('/api/waiter/orders', async (c) => {
     
     const waiterOrders = await DB.prepare(waiterOrdersQuery).bind(...waiterOrdersParams).all()
     
-    // Get kitchen orders (alacarte_vouchers) for this restaurant - only recent ones
+    // Get kitchen orders (alacarte_vouchers) for this restaurant - ALL STATUSES
     const kitchenOrders = await DB.prepare(`
       SELECT 
         av.voucher_id,
@@ -83005,10 +83004,9 @@ app.get('/api/waiter/orders', async (c) => {
       FROM alacarte_vouchers av
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
-        AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
         AND av.reservation_date BETWEEN ? AND ?
       ORDER BY av.reservation_date DESC, av.created_at DESC
-      LIMIT 50
+      LIMIT 200
     `).bind(restaurant, property_id, startDateFilter, endDateFilter).all()
     
     // Parse waiter orders
