@@ -46911,7 +46911,7 @@ app.get('/admin/dashboard', (c) => {
                             <div id="customCategoryField" class="hidden mt-2">
                                 <input type="text" id="customCategory" placeholder="Enter new category name (e.g., Breakfast, Sushi, Vegan)" class="w-full px-4 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200">
                                 <p class="text-xs text-yellow-700 mt-1 font-semibold">
-                                    <i class="fas fa-lightbulb mr-1"></i>Tip: Use descriptive names like "Breakfast Specials", "Fresh Sushi", "Vegan Options"
+                                    <i class="fas fa-lightbulb mr-1"></i>Tip: Use descriptive names like 'Breakfast Specials', 'Fresh Sushi', 'Vegan Options'
                                 </p>
                             </div>
                             <p class="text-xs text-gray-500 mt-1">Choose existing or create new category</p>
