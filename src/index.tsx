@@ -55891,9 +55891,10 @@ app.get('/admin/dashboard', (c) => {
             const categoryValue = document.getElementById('menuCategory').value;
             const customCategoryName = document.getElementById('customCategory').value;
             const isNewCategory = formData.category !== categoryValue;
-            const message = isNewCategory 
-              ? `✅ Menu item added successfully!\n\nNew category "${customCategoryName}" created!`
-              : '✅ Menu item added successfully!';
+            let message = 'Menu item added successfully!';
+            if (isNewCategory) {
+              message += '\\n\\nNew category "' + customCategoryName + '" created!';
+            }
             alert(message);
             document.getElementById('addMenuItemForm').reset();
             document.getElementById('customCategoryField').classList.add('hidden');
