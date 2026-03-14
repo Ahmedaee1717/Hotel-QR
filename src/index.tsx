@@ -82232,27 +82232,27 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     }
     
     // Build query with date condition
+    // Note: alacarte_vouchers doesn't have guest_name/room_number, these come from walk-in orders (waiter_orders table)
+    // For now, return voucher_code as guest identifier and table_number instead of room_number
     const query = `
       SELECT 
         v.voucher_id,
         v.voucher_code,
-        v.guest_name,
-        v.room_number,
+        v.voucher_code as guest_name,
+        v.table_number as room_number,
         v.party_size,
         v.reservation_date,
         v.reservation_time,
         v.status,
-        v.preorder_item_ids as items,
+        v.preorder_items as items,
         v.total_cost,
         v.special_requests,
         v.created_at,
         v.checked_in_at,
         r.title_en as restaurant_name,
-        u.first_name as staff_first_name,
-        u.last_name as staff_last_name
+        v.checked_in_by as created_by_staff
       FROM alacarte_vouchers v
       LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
-      LEFT JOIN users u ON v.created_by_staff_id = u.user_id
       WHERE v.property_id = ?
       ${dateCondition}
       ORDER BY v.created_at DESC
@@ -82261,12 +82261,10 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     
     const orders = await DB.prepare(query).bind(property_id).all()
     
-    // Format orders with staff name concatenation
+    // Format orders
     const formattedOrders = (orders.results || []).map(order => ({
       ...order,
-      created_by_staff: order.staff_first_name && order.staff_last_name 
-        ? `${order.staff_first_name} ${order.staff_last_name}` 
-        : null
+      created_by_staff: order.created_by_staff || 'System'
     }))
     
     return c.json({
