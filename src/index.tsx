@@ -24291,6 +24291,11 @@ app.get('/hotel/:property_slug', async (c) => {
             // Get property ID from propertyData
             const propId = propertyData?.property_id || '1';
             
+            // Initialize translationCache if not exists
+            if (!window.translationCache) {
+                window.translationCache = new Map();
+            }
+            
             // Check cache first - CRITICAL: Include property_id for multi-tenancy isolation
             const cacheKey = \`\${targetLanguage}:\${trimmedText}\`;
             if (window.translationCache.has(cacheKey)) {
