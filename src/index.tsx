@@ -55940,7 +55940,7 @@ app.get('/admin/dashboard', (c) => {
           
           try {
             // Normalize new category name
-            const newCategory = newName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            const newCategory = newName.toLowerCase().replace(/\\s+/g, '_').replace(/[^a-z0-9_]/g, '');
             
             const response = await fetchWithAuth('/api/admin/alacarte/bulk-update-category', {
               method: 'POST',
@@ -56132,7 +56132,7 @@ app.get('/admin/dashboard', (c) => {
             return;
           }
           // Normalize custom category: lowercase, replace spaces with underscores
-          category = customCategory.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          category = customCategory.toLowerCase().replace(/\\s+/g, '_').replace(/[^a-z0-9_]/g, '');
           console.log('✅ Creating new category:', customCategory, '→', category);
         }
         
