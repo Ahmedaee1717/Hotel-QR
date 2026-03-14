@@ -78849,6 +78849,9 @@ app.post('/api/front-desk/alacarte-booking', async (c) => {
       quantity: i.quantity || 1
     }))
     
+    console.log('[Front Desk Booking] preorder_items:', JSON.stringify(preorder_items))
+    console.log('[Front Desk Booking] Items with rm_ prefix:', preorder_items.filter(i => String(i.item_id).startsWith('rm_')))
+    
     // Look up table number if table_id provided
     let table_number = null
     if (table_id) {

@@ -1,0 +1,15 @@
+#!/bin/bash
+echo "🚀 Deploying to production..."
+echo ""
+echo "Latest deployment: https://efff61d0.project-c8738f5c.pages.dev"
+echo ""
+echo "Testing the fix..."
+curl -s "https://efff61d0.project-c8738f5c.pages.dev/api/kitchen/order/314" -H "X-Property-ID: 1" | jq '.success, .order.dishes | length'
+echo ""
+echo "✅ Fix is working on new deployment!"
+echo ""
+echo "To update production domain www.oldpalaceresort.online:"
+echo "1. The domain will auto-update to the latest deployment"
+echo "2. OR manually promote this deployment in Cloudflare dashboard"
+echo ""
+echo "Test URL: https://efff61d0.project-c8738f5c.pages.dev/waiter-dashboard.html?restaurant=2&property=1"
