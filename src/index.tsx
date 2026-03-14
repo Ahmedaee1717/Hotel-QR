@@ -55728,6 +55728,250 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
+      // ============= INLINE EDITING FUNCTIONS =============
+      
+      window.editItemName = function(element) {
+        const itemId = element.dataset.itemId;
+        const currentName = element.dataset.originalName;
+        
+        // Create input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'w-full px-2 py-1 border-2 border-blue-400 rounded focus:border-blue-600 focus:outline-none font-semibold';
+        
+        // Replace content with input
+        element.innerHTML = '';
+        element.appendChild(input);
+        element.style.cursor = 'default';
+        input.focus();
+        input.select();
+        
+        // Save on Enter or blur
+        const save = async () => {
+          const newName = input.value.trim();
+          if (!newName || newName === currentName) {
+            // Restore original
+            element.innerHTML = currentName + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+            return;
+          }
+          
+          // Show loading
+          element.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+          
+          try {
+            const response = await fetchWithAuth('/api/admin/alacarte/menu-items/' + itemId, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': propertyId
+              },
+              body: JSON.stringify({ item_name: newName })
+            });
+            
+            if (response.ok) {
+              element.dataset.originalName = newName;
+              element.innerHTML = newName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+              element.style.cursor = 'pointer';
+              
+              // Show brief success indicator
+              element.style.background = '#d1fae5';
+              setTimeout(() => { element.style.background = ''; }, 1000);
+            } else {
+              alert('Failed to update item name');
+              element.innerHTML = currentName + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+              element.style.cursor = 'pointer';
+            }
+          } catch (error) {
+            console.error('Update item name error:', error);
+            alert('Failed to update item name');
+            element.innerHTML = currentName + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+          }
+        };
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+          } else if (e.key === 'Escape') {
+            element.innerHTML = currentName + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+          }
+        });
+        
+        input.addEventListener('blur', save);
+      }
+      
+      window.editItemPrice = function(element) {
+        const itemId = element.dataset.itemId;
+        const currentPrice = parseFloat(element.dataset.originalPrice);
+        
+        // Create input field
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = currentPrice.toFixed(2);
+        input.step = '0.01';
+        input.min = '0';
+        input.className = 'w-24 px-2 py-1 border-2 border-blue-400 rounded focus:border-blue-600 focus:outline-none font-bold text-right';
+        
+        // Replace content with input
+        element.innerHTML = 'EGP ';
+        element.appendChild(input);
+        element.style.cursor = 'default';
+        input.focus();
+        input.select();
+        
+        // Save on Enter or blur
+        const save = async () => {
+          const newPrice = parseFloat(input.value);
+          if (isNaN(newPrice) || newPrice < 0 || newPrice === currentPrice) {
+            // Restore original
+            element.innerHTML = 'EGP ' + currentPrice.toFixed(2) + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+            return;
+          }
+          
+          // Show loading
+          element.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+          
+          try {
+            const response = await fetchWithAuth('/api/admin/alacarte/menu-items/' + itemId, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': propertyId
+              },
+              body: JSON.stringify({ cost_to_hotel: newPrice })
+            });
+            
+            if (response.ok) {
+              element.dataset.originalPrice = newPrice;
+              element.innerHTML = 'EGP ' + newPrice.toFixed(2) + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+              element.style.cursor = 'pointer';
+              
+              // Show brief success indicator
+              element.style.background = '#d1fae5';
+              setTimeout(() => { element.style.background = ''; }, 1000);
+              
+              await refreshALaCarteStats();
+            } else {
+              alert('Failed to update price');
+              element.innerHTML = 'EGP ' + currentPrice.toFixed(2) + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+              element.style.cursor = 'pointer';
+            }
+          } catch (error) {
+            console.error('Update price error:', error);
+            alert('Failed to update price');
+            element.innerHTML = 'EGP ' + currentPrice.toFixed(2) + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+          }
+        };
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+          } else if (e.key === 'Escape') {
+            element.innerHTML = 'EGP ' + currentPrice.toFixed(2) + '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>';
+            element.style.cursor = 'pointer';
+          }
+        });
+        
+        input.addEventListener('blur', save);
+      }
+      
+      window.editCategoryName = function(element) {
+        const oldCategory = element.dataset.category;
+        const restaurant = element.dataset.restaurant;
+        const currentText = element.textContent.trim();
+        const itemCount = currentText.match(/\((\d+)\)/)?.[1] || '0';
+        const currentName = currentText.replace(/\s*\(\d+\).*/, '').trim();
+        
+        // Create input field
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'px-2 py-1 border-2 border-blue-400 rounded focus:border-blue-600 focus:outline-none font-bold';
+        
+        // Replace content with input
+        element.innerHTML = '';
+        element.appendChild(input);
+        element.style.cursor = 'default';
+        input.focus();
+        input.select();
+        
+        // Save on Enter or blur
+        const save = async () => {
+          const newName = input.value.trim();
+          if (!newName || newName === currentName) {
+            // Restore original
+            element.innerHTML = currentName + ' (' + itemCount + ')';
+            element.style.cursor = 'pointer';
+            return;
+          }
+          
+          const confirm = window.confirm('Rename category "' + currentName + '" to "' + newName + '"?\\n\\nThis will update all ' + itemCount + ' items in this category.');
+          if (!confirm) {
+            element.innerHTML = currentName + ' (' + itemCount + ')';
+            element.style.cursor = 'pointer';
+            return;
+          }
+          
+          // Show loading
+          element.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating ' + itemCount + ' items...';
+          
+          try {
+            // Normalize new category name
+            const newCategory = newName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+            
+            const response = await fetchWithAuth('/api/admin/alacarte/bulk-update-category', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Property-ID': propertyId
+              },
+              body: JSON.stringify({
+                restaurant_name: restaurant,
+                old_category: oldCategory,
+                new_category: newCategory
+              })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              alert('✅ Category renamed successfully!\\n\\n' + data.updated + ' items updated.');
+              await loadMenuItems();
+            } else {
+              const error = await response.json();
+              alert('Failed to rename category: ' + (error.error || 'Unknown error'));
+              element.innerHTML = currentName + ' (' + itemCount + ')';
+              element.style.cursor = 'pointer';
+            }
+          } catch (error) {
+            console.error('Rename category error:', error);
+            alert('Failed to rename category');
+            element.innerHTML = currentName + ' (' + itemCount + ')';
+            element.style.cursor = 'pointer';
+          }
+        };
+        
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+          } else if (e.key === 'Escape') {
+            element.innerHTML = currentName + ' (' + itemCount + ')';
+            element.style.cursor = 'pointer';
+          }
+        });
+        
+        input.addEventListener('blur', save);
+      }
+      
+      // ============= END INLINE EDITING FUNCTIONS =============
+      
       window.deleteMenuItem = async function(itemId, itemName, restaurantName) {
         if (!confirm(\`Delete "\${itemName}" from \${restaurantName}?\\n\\nThis action cannot be undone.\`)) return;
         
@@ -55954,9 +56198,19 @@ app.get('/admin/dashboard', (c) => {
           // Display all categories dynamically (not just hardcoded 4)
           Object.keys(categories).sort().forEach(category => {
             if (categories[category].length > 0) {
-              const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+              const categoryName = category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
+              const categoryId = 'cat-' + restaurant.replace(/[^a-z0-9]/gi, '-') + '-' + category.replace(/[^a-z0-9]/gi, '-');
               html += '<div>' +
-                '<h5 class="font-bold text-gray-700 mb-2 capitalize border-b pb-1">' + categoryName + ' (' + categories[category].length + ')</h5>' +
+                '<h5 class="font-bold text-gray-700 mb-2 capitalize border-b pb-1 flex items-center justify-between group">' +
+                '<span class="editable-category cursor-pointer hover:bg-yellow-50 hover:underline px-2 py-1 rounded transition" ' +
+                'data-category="' + category + '" ' +
+                'data-restaurant="' + restaurant + '" ' +
+                'onclick="editCategoryName(this)" ' +
+                'title="Click to rename category">' +
+                categoryName + ' (' + categories[category].length + ')' +
+                '</span>' +
+                '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs" style="pointer-events: none;"></i>' +
+                '</h5>' +
                 '<div class="grid grid-cols-1 md:grid-cols-2 gap-2">';
               
               categories[category].forEach(item => {
@@ -55966,16 +56220,30 @@ app.get('/admin/dashboard', (c) => {
                 const itemDesc = ((item.description || '').substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;'));
                 const restaurantName = (item.restaurant_name || '').replace(/'/g, '&#39;');
                 
-                html += '<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg ' + borderClass + '">' +
+                html += '<div class="flex items-center gap-2 p-3 bg-gray-50 rounded-lg ' + borderClass + ' group hover:shadow-md transition">' +
                   '<input type="checkbox" class="menu-item-checkbox w-5 h-5" data-restaurant="' + restaurantId + '" data-item-id="' + item.item_id + '" onchange="updateBulkDeleteButton()">' +
                   '<div class="flex-1 flex items-center justify-between">' +
                   '<div class="flex-1">' +
-                  '<div class="font-semibold text-gray-800">' + itemName + '</div>' +
+                  '<div class="font-semibold text-gray-800 editable-item-name cursor-pointer hover:bg-yellow-50 hover:underline px-2 py-1 rounded -ml-2 transition relative" ' +
+                  'data-item-id="' + item.item_id + '" ' +
+                  'data-original-name="' + itemName + '" ' +
+                  'onclick="editItemName(this)" ' +
+                  'title="Click to edit name">' +
+                  itemName +
+                  '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>' +
+                  '</div>' +
                   '<div class="text-xs text-gray-600">' + itemDesc + '...</div>' +
                   '</div>' +
                   '<div class="ml-3 flex items-center gap-3">' +
                   '<div class="text-right">' +
-                  '<div class="text-lg font-bold text-purple-600">€' + item.cost_to_hotel.toFixed(2) + '</div>' +
+                  '<div class="text-lg font-bold text-purple-600 editable-price cursor-pointer hover:bg-yellow-50 hover:underline px-2 py-1 rounded transition relative" ' +
+                  'data-item-id="' + item.item_id + '" ' +
+                  'data-original-price="' + item.cost_to_hotel + '" ' +
+                  'onclick="editItemPrice(this)" ' +
+                  'title="Click to edit price">' +
+                  'EGP ' + item.cost_to_hotel.toFixed(2) +
+                  '<i class="fas fa-edit text-gray-400 opacity-0 group-hover:opacity-100 transition text-xs ml-1" style="pointer-events: none;"></i>' +
+                  '</div>' +
                   premiumBadge +
                   '</div>' +
                   '<button onclick="window.deleteMenuItem(' + item.item_id + ', ' + "'" + itemName + "'" + ', ' + "'" + restaurantName + "'" + ')" ' +
@@ -80248,6 +80516,95 @@ app.put('/api/admin/alacarte/menu-items/:item_id', async (c) => {
     return c.json({
       success: false,
       error: 'Failed to update menu item'
+    }, 500)
+  }
+})
+
+// Admin API: Update menu item (PATCH for partial updates)
+app.patch('/api/admin/alacarte/menu-items/:item_id', async (c) => {
+  const { item_id } = c.req.param()
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const body = await c.req.json()
+    const updates = []
+    const values = []
+    
+    // Build dynamic UPDATE query based on provided fields
+    if (body.item_name !== undefined) {
+      updates.push('item_name = ?')
+      values.push(body.item_name)
+    }
+    if (body.cost_to_hotel !== undefined) {
+      updates.push('cost_to_hotel = ?')
+      values.push(body.cost_to_hotel)
+    }
+    if (body.description !== undefined) {
+      updates.push('description = ?')
+      values.push(body.description)
+    }
+    if (body.category !== undefined) {
+      updates.push('category = ?')
+      values.push(body.category)
+    }
+    if (body.is_premium !== undefined) {
+      updates.push('is_premium = ?')
+      values.push(body.is_premium)
+    }
+    
+    if (updates.length === 0) {
+      return c.json({ success: false, error: 'No fields to update' }, 400)
+    }
+    
+    // Add item_id and property_id to values
+    values.push(item_id, property_id)
+    
+    const query = `UPDATE alacarte_menu_items SET ${updates.join(', ')} WHERE item_id = ? AND property_id = ?`
+    
+    await DB.prepare(query).bind(...values).run()
+    
+    return c.json({ success: true, message: 'Item updated successfully' })
+  } catch (error) {
+    console.error('Update menu item error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to update menu item'
+    }, 500)
+  }
+})
+
+// Admin API: Bulk rename category
+app.post('/api/admin/alacarte/bulk-update-category', async (c) => {
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { DB } = c.env
+  
+  try {
+    const { restaurant_name, old_category, new_category } = await c.req.json()
+    
+    if (!restaurant_name || !old_category || !new_category) {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    
+    // Update all items in this category for this restaurant
+    const result = await DB.prepare(`
+      UPDATE alacarte_menu_items
+      SET category = ?
+      WHERE property_id = ?
+      AND restaurant_id = (SELECT offering_id FROM alacarte_offerings WHERE property_id = ? AND title = ? LIMIT 1)
+      AND category = ?
+    `).bind(new_category, property_id, property_id, restaurant_name, old_category).run()
+    
+    return c.json({ 
+      success: true, 
+      updated: result.meta.changes || 0,
+      message: `Updated ${result.meta.changes} items` 
+    })
+  } catch (error) {
+    console.error('Bulk update category error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to rename category'
     }, 500)
   }
 })
