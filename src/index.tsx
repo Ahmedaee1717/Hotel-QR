@@ -55565,12 +55565,16 @@ app.get('/admin/dashboard', (c) => {
             // Populate category dropdown
             const select = document.getElementById('menuCategory');
             if (select) {
-              select.innerHTML = allCategories
+              let options = '<option value="">-- Choose Category --</option>';
+              options += allCategories
                 .map(cat => {
-                  const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+                  const label = cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ');
                   return '<option value="' + cat + '">' + label + '</option>';
                 })
                 .join('');
+              // Add custom category option at the end
+              options += '<option value="__custom__" style="background: #fef3c7; font-weight: bold;">➕ Create New Category...</option>';
+              select.innerHTML = options;
             }
             
             console.log('✅ Loaded ' + allCategories.length + ' menu categories:', allCategories);
