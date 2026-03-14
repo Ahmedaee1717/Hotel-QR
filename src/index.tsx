@@ -82222,26 +82222,29 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
   try {
     // Calculate date range based on period
     let dateCondition = ''
+    let dateConditionWaiter = ''
     if (period === 'today') {
       dateCondition = "AND DATE(v.created_at) = DATE('now')"
+      dateConditionWaiter = "AND DATE(w.created_at) = DATE('now')"
     } else if (period === 'week') {
       dateCondition = "AND v.created_at >= datetime('now', '-7 days')"
+      dateConditionWaiter = "AND w.created_at >= datetime('now', '-7 days')"
     } else if (period === 'month') {
       dateCondition = "AND v.created_at >= datetime('now', '-30 days')"
+      dateConditionWaiter = "AND w.created_at >= datetime('now', '-30 days')"
     } else if (period.startsWith('custom:')) {
       // Handle custom date range: custom:2026-03-14:2026-03-14
       const parts = period.split(':')
       if (parts.length === 3) {
         dateCondition = `AND DATE(v.created_at) >= '${parts[1]}' AND DATE(v.created_at) <= '${parts[2]}'`
+        dateConditionWaiter = `AND DATE(w.created_at) >= '${parts[1]}' AND DATE(w.created_at) <= '${parts[2]}'`
       }
     }
     
-    // Build query with date condition
-    // Note: alacarte_vouchers doesn't have guest_name/room_number, these come from walk-in orders (waiter_orders table)
-    // For now, return voucher_code as guest identifier and table_number instead of room_number
+    // Query combining both alacarte_vouchers and waiter_orders
     const query = `
       SELECT 
-        v.voucher_id,
+        v.voucher_id as order_id,
         v.voucher_code,
         v.voucher_code as guest_name,
         v.table_number as room_number,
@@ -82255,12 +82258,39 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
         v.created_at,
         v.checked_in_at,
         r.title_en as restaurant_name,
-        v.checked_in_by as created_by_staff
+        v.checked_in_by as created_by_staff,
+        'voucher' as order_type
       FROM alacarte_vouchers v
       LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
       WHERE v.property_id = ?
       ${dateCondition}
-      ORDER BY v.created_at DESC
+      
+      UNION ALL
+      
+      SELECT 
+        w.order_id,
+        'WALK-' || w.order_id as voucher_code,
+        w.guest_name,
+        w.room_number,
+        w.party_size,
+        DATE(w.created_at) as reservation_date,
+        TIME(w.created_at) as reservation_time,
+        w.status,
+        w.items,
+        w.total_cost,
+        NULL as special_requests,
+        w.created_at,
+        NULL as checked_in_at,
+        r.title_en as restaurant_name,
+        u.first_name || ' ' || u.last_name as created_by_staff,
+        'waiter' as order_type
+      FROM waiter_orders w
+      LEFT JOIN hotel_offerings r ON w.restaurant_id = r.offering_id
+      LEFT JOIN users u ON w.waiter_id = u.user_id
+      WHERE 1=1
+      ${dateConditionWaiter}
+      
+      ORDER BY created_at DESC
       LIMIT 500
     `
     
@@ -82269,6 +82299,7 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     // Format orders
     const formattedOrders = (orders.results || []).map(order => ({
       ...order,
+      voucher_id: order.order_id, // Ensure consistent field name
       created_by_staff: order.created_by_staff || 'System'
     }))
     
