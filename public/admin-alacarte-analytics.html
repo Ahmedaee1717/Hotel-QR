@@ -85,6 +85,20 @@
             </button>
         </div>
 
+        <!-- TAB NAVIGATION -->
+        <div class="dark-card rounded-lg shadow-xl mb-8">
+            <div class="flex border-b border-slate-700">
+                <button onclick="switchTab('overview')" id="overviewTab" class="flex-1 px-6 py-4 font-semibold transition-all border-b-2" style="border-color: #D4AF37; color: #D4AF37; background-color: #1e293b;">
+                    <i class="fas fa-chart-pie mr-2"></i>Overview & Charts
+                </button>
+                <button onclick="switchTab('orders')" id="ordersTab" class="flex-1 px-6 py-4 font-semibold dark-text-muted transition-all border-b-2 border-transparent hover:bg-slate-700">
+                    <i class="fas fa-table mr-2"></i>Detailed Order History
+                </button>
+            </div>
+        </div>
+
+        <!-- OVERVIEW TAB CONTENT -->
+        <div id="overviewContent">
         <!-- Key Metrics - DARK MODE -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="dark-card rounded-lg shadow-xl p-6">
@@ -182,34 +196,108 @@
                 </div>
             </div>
         </div>
+        </div>
+        <!-- END OVERVIEW TAB CONTENT -->
 
-        <!-- Detailed Reports Table - DARK MODE -->
-        <div class="dark-card rounded-lg shadow-xl p-6">
-            <h3 class="text-xl font-bold dark-text mb-4">
-                <i class="fas fa-table text-slate-400 mr-2"></i>
-                Detailed Order History
-            </h3>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-slate-800 border-b-2 border-slate-600">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Date</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Voucher Code</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Guest</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Items</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Total Cost</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ordersTableBody" class="divide-y divide-slate-700">
-                        <tr>
-                            <td colspan="6" class="px-4 py-8 text-center dark-text-muted">
-                                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>
-                                Loading orders...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- TAB NAVIGATION -->
+        <div class="dark-card rounded-lg shadow-xl mb-8">
+            <div class="flex border-b border-slate-700">
+                <button onclick="switchTab('overview')" id="overviewTab" class="flex-1 px-6 py-4 font-semibold transition-all border-b-2" style="border-color: #D4AF37; color: #D4AF37; background-color: #1e293b;">
+                    <i class="fas fa-chart-pie mr-2"></i>Overview & Charts
+                </button>
+                <button onclick="switchTab('orders')" id="ordersTab" class="flex-1 px-6 py-4 font-semibold dark-text-muted transition-all border-b-2 border-transparent hover:bg-slate-700">
+                    <i class="fas fa-table mr-2"></i>Detailed Order History
+                </button>
+            </div>
+        </div>
+
+        <!-- OVERVIEW TAB CONTENT -->
+        <div id="overviewContent">
+            <!-- This will contain charts that are already above -->
+        </div>
+
+        <!-- ORDERS TAB CONTENT -->
+        <div id="ordersContent" class="hidden">
+            <!-- Simple Date Filters for Orders -->
+            <div class="dark-card rounded-lg shadow-xl p-6 mb-6">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="text-lg font-bold dark-text flex-shrink-0">
+                        <i class="fas fa-filter mr-2"></i>Filter Orders
+                    </div>
+                    
+                    <!-- Quick Filter Buttons -->
+                    <div class="flex gap-2">
+                        <button onclick="filterOrders('today')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-calendar-day mr-1"></i>Today
+                        </button>
+                        <button onclick="filterOrders('week')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-calendar-week mr-1"></i>This Week
+                        </button>
+                        <button onclick="filterOrders('month')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors">
+                            <i class="fas fa-calendar-alt mr-1"></i>This Month
+                        </button>
+                        <button onclick="filterOrders('all')" class="px-4 py-2 text-white rounded-lg font-semibold transition-colors" style="background-color: #D4AF37; color: #000;" onmouseover="this.style.backgroundColor='#C49F2E'" onmouseout="this.style.backgroundColor='#D4AF37'">
+                            <i class="fas fa-infinity mr-1"></i>All Time
+                        </button>
+                    </div>
+                    
+                    <div class="border-l-2 border-slate-600 h-10"></div>
+                    
+                    <!-- Custom Date Range -->
+                    <div class="flex items-center gap-2">
+                        <label class="font-medium dark-text text-sm">From:</label>
+                        <input type="date" id="orderStartDate" class="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="font-medium dark-text text-sm">To:</label>
+                        <input type="date" id="orderEndDate" class="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-emerald-500" />
+                    </div>
+                    <button onclick="filterOrdersCustom()" class="px-5 py-2 text-white rounded-lg font-semibold shadow-lg" style="background-color: #972626;" onmouseover="this.style.backgroundColor='#6B1529'" onmouseout="this.style.backgroundColor='#972626'">
+                        <i class="fas fa-search mr-2"></i>Apply
+                    </button>
+                    <button onclick="clearOrderFilters()" class="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold">
+                        <i class="fas fa-times mr-2"></i>Clear
+                    </button>
+                </div>
+                
+                <!-- Results Summary -->
+                <div class="mt-4 pt-4 border-t border-slate-700">
+                    <div class="flex items-center justify-between">
+                        <div class="dark-text-muted">
+                            <span id="ordersFilteredCount" class="font-bold text-lg" style="color: #D4AF37;">0</span> orders found
+                            <span id="ordersDateRange" class="ml-2"></span>
+                        </div>
+                        <div class="text-sm dark-text-muted">
+                            <i class="fas fa-info-circle mr-1"></i>Click on any order to view full details
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Reports Table -->
+            <div class="dark-card rounded-lg shadow-xl p-6">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-800 border-b-2 border-slate-600">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Date</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Voucher Code</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Guest</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Items</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Total Cost</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold dark-text">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ordersTableBody" class="divide-y divide-slate-700">
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center dark-text-muted">
+                                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>
+                                    Loading orders...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -468,6 +556,109 @@
             }
         }
         
+        // Tab switching function
+        function switchTab(tab) {
+            const overviewTab = document.getElementById('overviewTab');
+            const ordersTab = document.getElementById('ordersTab');
+            const overviewContent = document.getElementById('overviewContent');
+            const ordersContent = document.getElementById('ordersContent');
+            
+            if (tab === 'overview') {
+                // Style active tab
+                overviewTab.style.borderColor = '#D4AF37';
+                overviewTab.style.color = '#D4AF37';
+                overviewTab.style.backgroundColor = '#1e293b';
+                
+                // Style inactive tab
+                ordersTab.style.borderColor = 'transparent';
+                ordersTab.classList.add('dark-text-muted');
+                ordersTab.classList.remove('dark-text');
+                ordersTab.style.backgroundColor = 'transparent';
+                
+                // Show/hide content
+                overviewContent.classList.remove('hidden');
+                ordersContent.classList.add('hidden');
+            } else {
+                // Style active tab
+                ordersTab.style.borderColor = '#D4AF37';
+                ordersTab.style.color = '#D4AF37';
+                ordersTab.style.backgroundColor = '#1e293b';
+                ordersTab.classList.remove('dark-text-muted');
+                ordersTab.classList.add('dark-text');
+                
+                // Style inactive tab
+                overviewTab.style.borderColor = 'transparent';
+                overviewTab.classList.add('dark-text-muted');
+                overviewTab.classList.remove('dark-text');
+                overviewTab.style.backgroundColor = 'transparent';
+                
+                // Show/hide content
+                overviewContent.classList.add('hidden');
+                ordersContent.classList.remove('hidden');
+                
+                // Load orders if not already loaded
+                if (!window.ordersLoaded) {
+                    filterOrders('all');
+                    window.ordersLoaded = true;
+                }
+            }
+        }
+        
+        // Filter orders by quick periods
+        function filterOrders(period) {
+            loadOrderHistory(period);
+            updateOrdersDateRange(period);
+        }
+        
+        // Filter orders with custom date range
+        function filterOrdersCustom() {
+            const startDate = document.getElementById('orderStartDate').value;
+            const endDate = document.getElementById('orderEndDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            if (startDate > endDate) {
+                alert('Start date must be before end date');
+                return;
+            }
+            
+            const customPeriod = `custom:${startDate}:${endDate}`;
+            loadOrderHistory(customPeriod);
+            updateOrdersDateRange(customPeriod, startDate, endDate);
+        }
+        
+        // Clear order filters
+        function clearOrderFilters() {
+            document.getElementById('orderStartDate').value = '';
+            document.getElementById('orderEndDate').value = '';
+            filterOrders('all');
+        }
+        
+        // Update date range display
+        function updateOrdersDateRange(period, startDate = null, endDate = null) {
+            const rangeEl = document.getElementById('ordersDateRange');
+            const today = new Date().toISOString().split('T')[0];
+            
+            if (period === 'today') {
+                rangeEl.textContent = `(${today})`;
+            } else if (period === 'week') {
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                rangeEl.textContent = `(${weekAgo.toISOString().split('T')[0]} to ${today})`;
+            } else if (period === 'month') {
+                const monthAgo = new Date();
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                rangeEl.textContent = `(${monthAgo.toISOString().split('T')[0]} to ${today})`;
+            } else if (period === 'all') {
+                rangeEl.textContent = '(All time)';
+            } else if (startDate && endDate) {
+                rangeEl.textContent = `(${startDate} to ${endDate})`;
+            }
+        }
+        
         async function loadOrderHistory(period) {
             const tbody = document.getElementById('ordersTableBody');
             tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center dark-text-muted"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br>Loading order history...</td></tr>';
@@ -559,8 +750,12 @@
                             </tr>
                         `;
                     }).join('');
+                    
+                    // Update filtered count
+                    document.getElementById('ordersFilteredCount').textContent = data.orders.length;
                 } else {
                     tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center dark-text-muted"><i class="fas fa-inbox text-3xl mb-2"></i><br>No orders found for this period</td></tr>';
+                    document.getElementById('ordersFilteredCount').textContent = '0';
                 }
             } catch (error) {
                 console.error('Load order history error:', error);
@@ -963,11 +1158,18 @@
             document.getElementById('startDate').value = today;
             document.getElementById('endDate').value = today;
             
-            // Auto-load all orders report (not just today)
+            // Set order filter dates to reasonable defaults
+            document.getElementById('orderStartDate').value = today;
+            document.getElementById('orderEndDate').value = today;
+            
+            // Auto-load overview report (not orders yet - those load when tab is clicked)
             loadReport('all');
             
             // Auto-load staff analytics
             loadStaffAnalytics();
+            
+            // Initialize orders loaded flag
+            window.ordersLoaded = false;
         });
 
         // ==========================================
