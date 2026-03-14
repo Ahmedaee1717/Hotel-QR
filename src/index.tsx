@@ -80613,16 +80613,16 @@ app.post('/api/admin/alacarte/bulk-update-category', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
     }
     
-    // First, get the restaurant_id
+    // First, get the restaurant_id from hotel_offerings
     const restaurantResult = await DB.prepare(`
-      SELECT offering_id FROM alacarte_offerings 
-      WHERE property_id = ? AND title = ?
+      SELECT offering_id FROM hotel_offerings 
+      WHERE property_id = ? AND title_en = ?
       LIMIT 1
     `).bind(property_id, restaurant_name).first()
     
     if (!restaurantResult) {
       console.error('❌ Restaurant not found:', restaurant_name)
-      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+      return c.json({ success: false, error: 'Restaurant not found: ' + restaurant_name }, 404)
     }
     
     const restaurant_id = restaurantResult.offering_id
