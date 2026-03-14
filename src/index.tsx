@@ -46892,7 +46892,8 @@ app.get('/admin/dashboard', (c) => {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-2">Category</label>
-                            <select id="menuCategory" required class="w-full px-4 py-2 border rounded-lg">
+                            <select id="menuCategory" required class="w-full px-4 py-2 border rounded-lg" onchange="handleCategoryChange()">
+                                <option value="">-- Choose Category --</option>
                                 <option value="salad">Salad</option>
                                 <option value="soup">Soup</option>
                                 <option value="appetizer">Appetizer</option>
@@ -46903,9 +46904,17 @@ app.get('/admin/dashboard', (c) => {
                                 <option value="dessert">Dessert</option>
                                 <option value="drink">Drink</option>
                                 <option value="side">Side Dish</option>
+                                <option value="pizza">Pizza</option>
                                 <option value="other">Other</option>
+                                <option value="__custom__" style="background: #fef3c7; font-weight: bold;">➕ Create New Category...</option>
                             </select>
-                            <p class="text-xs text-gray-500 mt-1">AI can create custom categories automatically</p>
+                            <div id="customCategoryField" class="hidden mt-2">
+                                <input type="text" id="customCategory" placeholder="Enter new category name (e.g., Breakfast, Sushi, Vegan)" class="w-full px-4 py-2 border-2 border-yellow-400 rounded-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200">
+                                <p class="text-xs text-yellow-700 mt-1 font-semibold">
+                                    <i class="fas fa-lightbulb mr-1"></i>Tip: Use descriptive names like "Breakfast Specials", "Fresh Sushi", "Vegan Options"
+                                </p>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Choose existing or create new category</p>
                         </div>
                     </div>
                     
@@ -55681,6 +55690,8 @@ app.get('/admin/dashboard', (c) => {
       window.resetMenuForm = function() {
         document.getElementById('addMenuItemForm').reset();
         document.getElementById('premiumCostField').classList.add('hidden');
+        document.getElementById('customCategoryField').classList.add('hidden');
+        document.getElementById('customCategory').value = '';
       }
       
       window.togglePremiumCost = function() {
@@ -55691,6 +55702,25 @@ app.get('/admin/dashboard', (c) => {
         } else {
           costField.classList.add('hidden');
           document.getElementById('menuCost').value = '';
+        }
+      }
+      
+      window.handleCategoryChange = function() {
+        const categorySelect = document.getElementById('menuCategory');
+        const customCategoryField = document.getElementById('customCategoryField');
+        const customCategoryInput = document.getElementById('customCategory');
+        
+        if (categorySelect.value === '__custom__') {
+          // Show custom category input
+          customCategoryField.classList.remove('hidden');
+          customCategoryInput.required = true;
+          customCategoryInput.focus();
+          console.log('📝 Custom category field shown');
+        } else {
+          // Hide custom category input
+          customCategoryField.classList.add('hidden');
+          customCategoryInput.required = false;
+          customCategoryInput.value = '';
         }
       }
       
@@ -55819,10 +55849,24 @@ app.get('/admin/dashboard', (c) => {
         
         const isPremium = document.getElementById('menuIsPremium').checked;
         
+        // Get category - use custom if selected
+        let category = document.getElementById('menuCategory').value;
+        if (category === '__custom__') {
+          const customCategory = document.getElementById('customCategory').value.trim();
+          if (!customCategory) {
+            alert('⚠️ Please enter a custom category name');
+            document.getElementById('customCategory').focus();
+            return;
+          }
+          // Normalize custom category: lowercase, replace spaces with underscores
+          category = customCategory.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+          console.log('✅ Creating new category:', customCategory, '→', category);
+        }
+        
         const formData = {
           property_id: propertyId,
           restaurant_id: document.getElementById('menuRestaurantId').value,
-          category: document.getElementById('menuCategory').value,
+          category: category,
           item_name: document.getElementById('menuItemName').value,
           item_name_ar: null,
           description: document.getElementById('menuDescription').value || null,
@@ -55844,8 +55888,9 @@ app.get('/admin/dashboard', (c) => {
           });
           
           if (response.ok) {
-            alert('Menu item added successfully!');
+            alert('✅ Menu item added successfully!' + (formData.category !== document.getElementById('menuCategory').value ? '\n\nNew category "' + document.getElementById('customCategory').value + '" created!' : ''));
             document.getElementById('addMenuItemForm').reset();
+            document.getElementById('customCategoryField').classList.add('hidden');
             await refreshALaCarteStats();
             await loadMenuItems();
           } else {
