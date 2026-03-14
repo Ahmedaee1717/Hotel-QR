@@ -55902,25 +55902,41 @@ app.get('/admin/dashboard', (c) => {
         input.focus();
         input.select();
         
+        let isSaving = false; // Prevent double-save
+        
         // Save on Enter or blur
         const save = async () => {
+          if (isSaving) return; // Already saving
+          
           const newName = input.value.trim();
           if (!newName || newName === currentName) {
             // Restore original
-            element.innerHTML = currentName + ' (' + itemCount + ')';
-            element.style.cursor = 'pointer';
+            if (element.parentNode) {
+              element.innerHTML = currentName + ' (' + itemCount + ')';
+              element.style.cursor = 'pointer';
+            }
             return;
           }
           
-          const confirm = window.confirm('Rename category "' + currentName + '" to "' + newName + '"?\\n\\nThis will update all ' + itemCount + ' items in this category.');
-          if (!confirm) {
-            element.innerHTML = currentName + ' (' + itemCount + ')';
-            element.style.cursor = 'pointer';
+          isSaving = true;
+          
+          // Remove blur listener to prevent double-trigger
+          input.removeEventListener('blur', save);
+          
+          const confirmResult = window.confirm('Rename category "' + currentName + '" to "' + newName + '"?\\n\\nThis will update all ' + itemCount + ' items in this category.');
+          if (!confirmResult) {
+            if (element.parentNode) {
+              element.innerHTML = currentName + ' (' + itemCount + ')';
+              element.style.cursor = 'pointer';
+            }
+            isSaving = false;
             return;
           }
           
           // Show loading
-          element.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating ' + itemCount + ' items...';
+          if (element.parentNode) {
+            element.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating ' + itemCount + ' items...';
+          }
           
           try {
             // Normalize new category name
@@ -55946,15 +55962,21 @@ app.get('/admin/dashboard', (c) => {
             } else {
               const error = await response.json();
               alert('Failed to rename category: ' + (error.error || 'Unknown error'));
-              element.innerHTML = currentName + ' (' + itemCount + ')';
-              element.style.cursor = 'pointer';
+              if (element.parentNode) {
+                element.innerHTML = currentName + ' (' + itemCount + ')';
+                element.style.cursor = 'pointer';
+              }
             }
           } catch (error) {
             console.error('Rename category error:', error);
-            alert('Failed to rename category');
-            element.innerHTML = currentName + ' (' + itemCount + ')';
-            element.style.cursor = 'pointer';
+            alert('Failed to rename category: ' + error.message);
+            if (element.parentNode) {
+              element.innerHTML = currentName + ' (' + itemCount + ')';
+              element.style.cursor = 'pointer';
+            }
           }
+          
+          isSaving = false;
         };
         
         input.addEventListener('keydown', (e) => {
@@ -55962,8 +55984,11 @@ app.get('/admin/dashboard', (c) => {
             e.preventDefault();
             save();
           } else if (e.key === 'Escape') {
-            element.innerHTML = currentName + ' (' + itemCount + ')';
-            element.style.cursor = 'pointer';
+            input.removeEventListener('blur', save);
+            if (element.parentNode) {
+              element.innerHTML = currentName + ' (' + itemCount + ')';
+              element.style.cursor = 'pointer';
+            }
           }
         });
         
@@ -80582,18 +80607,35 @@ app.post('/api/admin/alacarte/bulk-update-category', async (c) => {
   try {
     const { restaurant_name, old_category, new_category } = await c.req.json()
     
+    console.log('🔄 Bulk category rename:', { restaurant_name, old_category, new_category, property_id })
+    
     if (!restaurant_name || !old_category || !new_category) {
       return c.json({ success: false, error: 'Missing required fields' }, 400)
     }
+    
+    // First, get the restaurant_id
+    const restaurantResult = await DB.prepare(`
+      SELECT offering_id FROM alacarte_offerings 
+      WHERE property_id = ? AND title = ?
+      LIMIT 1
+    `).bind(property_id, restaurant_name).first()
+    
+    if (!restaurantResult) {
+      console.error('❌ Restaurant not found:', restaurant_name)
+      return c.json({ success: false, error: 'Restaurant not found' }, 404)
+    }
+    
+    const restaurant_id = restaurantResult.offering_id
+    console.log('✅ Found restaurant_id:', restaurant_id)
     
     // Update all items in this category for this restaurant
     const result = await DB.prepare(`
       UPDATE alacarte_menu_items
       SET category = ?
-      WHERE property_id = ?
-      AND restaurant_id = (SELECT offering_id FROM alacarte_offerings WHERE property_id = ? AND title = ? LIMIT 1)
-      AND category = ?
-    `).bind(new_category, property_id, property_id, restaurant_name, old_category).run()
+      WHERE property_id = ? AND restaurant_id = ? AND category = ?
+    `).bind(new_category, property_id, restaurant_id, old_category).run()
+    
+    console.log('✅ Updated', result.meta.changes, 'items')
     
     return c.json({ 
       success: true, 
@@ -80601,10 +80643,10 @@ app.post('/api/admin/alacarte/bulk-update-category', async (c) => {
       message: `Updated ${result.meta.changes} items` 
     })
   } catch (error) {
-    console.error('Bulk update category error:', error)
+    console.error('❌ Bulk update category error:', error)
     return c.json({
       success: false,
-      error: 'Failed to rename category'
+      error: error.message || 'Failed to rename category'
     }, 500)
   }
 })
