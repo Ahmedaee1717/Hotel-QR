@@ -82096,6 +82096,11 @@ app.get('/api/analytics/alacarte', async (c) => {
       dateFilter = "date('now', '-7 days')"
     } else if (period === 'month') {
       dateFilter = "date('now', '-30 days')"
+    } else if (period === 'all') {
+      dateFilter = "date('2000-01-01')" // All historical data
+    } else {
+      // Default to today
+      dateFilter = "date('now')"
     }
     
     // Build date condition for custom range
