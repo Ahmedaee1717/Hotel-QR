@@ -475,8 +475,39 @@
                         const dateStr = orderDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                         const timeStr = orderDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                         
-                        const items = order.items ? JSON.parse(order.items) : [];
-                        const itemsList = items.map(item => `${item.quantity}x ${item.item_name}`).join(', ');
+                        // Parse items - handle both null and JSON string
+                        let items = [];
+                        let itemsList = 'No items specified';
+                        if (order.items) {
+                            try {
+                                const parsed = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+                                if (Array.isArray(parsed)) {
+                                    items = parsed;
+                                } else if (typeof parsed === 'object') {
+                                    // Convert object format {"salad": "Caesar", "main": "Ribeye"} to array
+                                    items = Object.entries(parsed).map(([category, name]) => ({
+                                        item_name: name,
+                                        category: category,
+                                        quantity: 1
+                                    }));
+                                }
+                                if (items.length > 0) {
+                                    itemsList = items.map(item => `${item.quantity || 1}x ${item.item_name || item}`).join(', ');
+                                }
+                            } catch (e) {
+                                console.error('Error parsing items:', e, order.items);
+                            }
+                        }
+                        
+                        // Extract guest info from special_requests if available
+                        let guestName = order.guest_name || 'Walk-in';
+                        let roomNumber = order.room_number || 'N/A';
+                        if (order.special_requests) {
+                            const guestMatch = order.special_requests.match(/Guest:\s*([^,\n]+)/);
+                            const roomMatch = order.special_requests.match(/Room:\s*(\d+)/);
+                            if (guestMatch) guestName = guestMatch[1].trim();
+                            if (roomMatch) roomNumber = roomMatch[1];
+                        }
                         
                         return `
                             <tr class="hover:bg-slate-800 transition-colors cursor-pointer" onclick="viewOrderDetails(${order.voucher_id})">
@@ -488,11 +519,11 @@
                                     <span class="font-mono font-semibold dark-text">${order.voucher_code || 'N/A'}</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm dark-text">
-                                    <div class="font-semibold">${order.guest_name || 'Walk-in'}</div>
-                                    <div class="text-xs dark-text-muted">Room ${order.room_number || 'N/A'} • Party: ${order.party_size || 1}</div>
+                                    <div class="font-semibold">${guestName}</div>
+                                    <div class="text-xs dark-text-muted">Room ${roomNumber} • Party: ${order.party_size || 1}</div>
                                 </td>
                                 <td class="px-4 py-3 text-sm dark-text max-w-xs">
-                                    <div class="truncate">${itemsList || 'No items'}</div>
+                                    <div class="truncate">${itemsList}</div>
                                     <div class="text-xs dark-text-muted">${items.length} item(s)</div>
                                 </td>
                                 <td class="px-4 py-3 text-sm">
