@@ -82208,6 +82208,67 @@ app.get('/api/analytics/alacarte', async (c) => {
   }
 })
 
+// Detailed Order History API
+app.get('/api/analytics/alacarte/orders', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.header('X-Property-ID') || '1'
+  const { period = 'month' } = c.req.query()
+  
+  try {
+    // Calculate date range based on period
+    let dateCondition = ''
+    if (period === 'today') {
+      dateCondition = `AND DATE(v.created_at) = DATE('now')`
+    } else if (period === 'week') {
+      dateCondition = `AND v.created_at >= datetime('now', '-7 days')`
+    } else if (period === 'month') {
+      dateCondition = `AND v.created_at >= datetime('now', '-30 days')`
+    } else if (period === 'all') {
+      dateCondition = '' // No date filter for 'all'
+    }
+    
+    // Fetch all orders with details
+    const orders = await DB.prepare(`
+      SELECT 
+        v.voucher_id,
+        v.voucher_code,
+        v.guest_name,
+        v.room_number,
+        v.party_size,
+        v.reservation_date,
+        v.reservation_time,
+        v.status,
+        v.preorder_item_ids as items,
+        v.total_cost,
+        v.special_requests,
+        v.created_at,
+        v.checked_in_at,
+        r.title_en as restaurant_name,
+        u.first_name || ' ' || u.last_name as created_by_staff
+      FROM alacarte_vouchers v
+      LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
+      LEFT JOIN users u ON v.created_by_staff_id = u.user_id
+      WHERE v.property_id = ?
+      ${dateCondition}
+      ORDER BY v.created_at DESC
+      LIMIT 500
+    `).bind(property_id).all()
+    
+    return c.json({
+      success: true,
+      orders: orders.results || [],
+      total: orders.results?.length || 0
+    })
+  } catch (error) {
+    console.error('Order history error:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to load order history',
+      details: error.message
+    }, 500)
+  }
+})
+
 // Staff Performance Analytics API
 app.get('/api/analytics/staff-performance', async (c) => {
   const { DB } = c.env
