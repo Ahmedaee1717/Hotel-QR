@@ -81913,6 +81913,9 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
     // Parse preorder items
     const itemsData = voucher.preorder_item_ids ? JSON.parse(voucher.preorder_item_ids) : []
     
+    console.log('[Kitchen Order Detail] voucher_id:', voucher_id)
+    console.log('[Kitchen Order Detail] itemsData:', itemsData)
+    
     // Separate into set menu items and extra-charge items
     const setMenuIds = []
     const extraChargeIds = []
@@ -81935,6 +81938,9 @@ app.get('/api/kitchen/order/:voucher_id', async (c) => {
         }
       }
     }
+    
+    console.log('[Kitchen Order Detail] setMenuIds:', setMenuIds)
+    console.log('[Kitchen Order Detail] extraChargeIds:', extraChargeIds)
     
     const dishes = []
     
