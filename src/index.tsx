@@ -82704,13 +82704,9 @@ app.get('/api/waiter/tables', async (c) => {
         av.reservation_time,
         av.preorder_item_ids,
         av.created_at,
-        av.created_by_staff_id,
         av.checked_in_at,
-        av.checked_in_by,
-        u.first_name as staff_first_name,
-        u.last_name as staff_last_name
+        av.checked_in_by
       FROM alacarte_vouchers av
-      LEFT JOIN users u ON av.created_by_staff_id = u.user_id
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
         AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
@@ -82739,10 +82735,8 @@ app.get('/api/waiter/tables', async (c) => {
         // Parse items for display
         const preorderItems = kb.preorder_item_ids ? JSON.parse(kb.preorder_item_ids) : []
         
-        // Get booked by info
-        const bookedBy = kb.staff_first_name 
-          ? `${kb.staff_first_name} ${kb.staff_last_name || ''}`.trim()
-          : 'Front Desk'
+        // Get booked by info from checked_in_by
+        const bookedBy = kb.checked_in_by || 'Front Desk'
         
         kitchenBookingMap.set(kb.table_number, { 
           ...kb, 
