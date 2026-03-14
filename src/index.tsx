@@ -82218,17 +82218,21 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     // Calculate date range based on period
     let dateCondition = ''
     if (period === 'today') {
-      dateCondition = `AND DATE(v.created_at) = DATE('now')`
+      dateCondition = "AND DATE(v.created_at) = DATE('now')"
     } else if (period === 'week') {
-      dateCondition = `AND v.created_at >= datetime('now', '-7 days')`
+      dateCondition = "AND v.created_at >= datetime('now', '-7 days')"
     } else if (period === 'month') {
-      dateCondition = `AND v.created_at >= datetime('now', '-30 days')`
-    } else if (period === 'all') {
-      dateCondition = '' // No date filter for 'all'
+      dateCondition = "AND v.created_at >= datetime('now', '-30 days')"
+    } else if (period.startsWith('custom:')) {
+      // Handle custom date range: custom:2026-03-14:2026-03-14
+      const parts = period.split(':')
+      if (parts.length === 3) {
+        dateCondition = `AND DATE(v.created_at) >= '${parts[1]}' AND DATE(v.created_at) <= '${parts[2]}'`
+      }
     }
     
-    // Fetch all orders with details
-    const orders = await DB.prepare(`
+    // Build query with date condition
+    const query = `
       SELECT 
         v.voucher_id,
         v.voucher_code,
@@ -82244,7 +82248,8 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
         v.created_at,
         v.checked_in_at,
         r.title_en as restaurant_name,
-        u.first_name || ' ' || u.last_name as created_by_staff
+        u.first_name as staff_first_name,
+        u.last_name as staff_last_name
       FROM alacarte_vouchers v
       LEFT JOIN hotel_offerings r ON v.restaurant_id = r.offering_id
       LEFT JOIN users u ON v.created_by_staff_id = u.user_id
@@ -82252,12 +82257,22 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
       ${dateCondition}
       ORDER BY v.created_at DESC
       LIMIT 500
-    `).bind(property_id).all()
+    `
+    
+    const orders = await DB.prepare(query).bind(property_id).all()
+    
+    // Format orders with staff name concatenation
+    const formattedOrders = (orders.results || []).map(order => ({
+      ...order,
+      created_by_staff: order.staff_first_name && order.staff_last_name 
+        ? `${order.staff_first_name} ${order.staff_last_name}` 
+        : null
+    }))
     
     return c.json({
       success: true,
-      orders: orders.results || [],
-      total: orders.results?.length || 0
+      orders: formattedOrders,
+      total: formattedOrders.length
     })
   } catch (error) {
     console.error('Order history error:', error)
