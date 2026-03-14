@@ -82677,8 +82677,7 @@ app.get('/api/waiter/tables', async (c) => {
         rt.position_y,
         rt.width,
         rt.height,
-        rt.shape,
-        rt.rotation
+        rt.shape
       FROM restaurant_tables rt
       WHERE rt.offering_id = ?
         AND rt.is_active = 1
@@ -82765,7 +82764,7 @@ app.get('/api/waiter/tables', async (c) => {
         width: t.width || 80,
         height: t.height || 80,
         shape: t.shape || 'rectangle',
-        rotation: t.rotation || 0
+        rotation: 0
       }
       
       // Check waiter order first (seated but not yet dining)
