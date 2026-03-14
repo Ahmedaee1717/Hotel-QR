@@ -82232,6 +82232,10 @@ app.get('/api/analytics/alacarte/orders', async (c) => {
     } else if (period === 'month') {
       dateCondition = "AND v.created_at >= datetime('now', '-30 days')"
       dateConditionWaiter = "AND w.created_at >= datetime('now', '-30 days')"
+    } else if (period === 'all') {
+      // No date filter - show all orders
+      dateCondition = ""
+      dateConditionWaiter = ""
     } else if (period.startsWith('custom:')) {
       // Handle custom date range: custom:2026-03-14:2026-03-14
       const parts = period.split(':')
