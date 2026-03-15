@@ -30174,32 +30174,40 @@ app.get('/hotel/:property_slug', async (c) => {
             const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
             const isAndroid = /Android/.test(navigator.userAgent);
             
-            // Create install button
+            // Create install button (side flag design)
             const installBtn = document.createElement('button');
             installBtn.id = 'pwa-install-btn';
             installBtn.innerHTML = \`
-                <i class="fas fa-download mr-2"></i>
-                <span>Install App</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-mobile-alt" style="font-size: 18px;"></i>
+                    <span style="writing-mode: horizontal-tb; white-space: nowrap;">Install</span>
+                </div>
             \`;
             installBtn.style.cssText = \`
                 position: fixed;
-                bottom: 20px;
-                right: 20px;
+                top: 50%;
+                right: 0;
+                transform: translateY(-50%) translateX(0);
                 z-index: 9999;
                 background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%);
                 color: white;
                 border: none;
-                border-radius: 50px;
-                padding: 12px 24px;
-                font-size: 14px;
+                border-top-left-radius: 8px;
+                border-bottom-left-radius: 8px;
+                padding: 16px 12px;
+                font-size: 13px;
                 font-weight: 600;
-                box-shadow: 0 4px 12px rgba(1, 110, 143, 0.4);
+                box-shadow: -2px 2px 12px rgba(1, 110, 143, 0.3);
                 cursor: pointer;
                 display: flex;
+                flex-direction: column;
                 align-items: center;
-                gap: 8px;
-                animation: slideInUp 0.5s ease, pulse 2s ease-in-out infinite;
-                transition: transform 0.2s;
+                gap: 4px;
+                animation: slideInFromRight 0.5s ease, gentlePulse 3s ease-in-out infinite;
+                transition: all 0.3s ease;
+                min-height: 100px;
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
             \`;
             
             // Create install modal
@@ -30253,19 +30261,20 @@ app.get('/hotel/:property_slug', async (c) => {
             // Add animations
             const style = document.createElement('style');
             style.textContent = \`
-                @keyframes slideInUp {
-                    from { transform: translateY(100px); opacity: 0; }
-                    to { transform: translateY(0); opacity: 1; }
+                @keyframes slideInFromRight {
+                    from { transform: translateY(-50%) translateX(100px); opacity: 0; }
+                    to { transform: translateY(-50%) translateX(0); opacity: 1; }
                 }
-                @keyframes pulse {
-                    0%, 100% { transform: scale(1); }
-                    50% { transform: scale(1.05); }
+                @keyframes gentlePulse {
+                    0%, 100% { box-shadow: -2px 2px 12px rgba(1, 110, 143, 0.3); }
+                    50% { box-shadow: -2px 2px 16px rgba(0, 212, 170, 0.4); }
                 }
                 #pwa-install-btn:hover {
-                    transform: scale(1.1);
+                    transform: translateY(-50%) translateX(-4px);
+                    box-shadow: -4px 4px 20px rgba(1, 110, 143, 0.5);
                 }
                 #pwa-install-btn:active {
-                    transform: scale(0.95);
+                    transform: translateY(-50%) translateX(2px);
                 }
             \`;
             document.head.appendChild(style);
