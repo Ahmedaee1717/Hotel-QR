@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite",
     "dev:sandbox": "wrangler pages dev dist --d1=webapp-production --local --ip 0.0.0.0 --port 3000",
-    "build": "vite build && cp public/*.html dist/ 2>/dev/null || true && node -e \"const fs=require('fs'); const routes={version:1,include:['/*'],exclude:['/*.png','/*.jpg','/*.jpeg','/*.gif','/*.svg','/*.ico','/*.css','/*.js','/*.woff','/*.woff2','/*.ttf','/*.eot']};fs.writeFileSync('dist/_routes.json',JSON.stringify(routes,null,2));\"",
+    "build": "vite build && cp public/*.html dist/ 2>/dev/null || true && node -e \"const fs=require('fs'); const routes={version:1,include:['/*'],exclude:['/*.png','/*.jpg','/*.jpeg','/*.gif','/*.svg','/*.ico','/*.css','/*.js','/*.json','/*.woff','/*.woff2','/*.ttf','/*.eot']};fs.writeFileSync('dist/_routes.json',JSON.stringify(routes,null,2));\"",
     "preview": "wrangler pages dev dist",
     "deploy": "npm run build && echo '_worker.js' > dist/.assetsignore && wrangler deploy",
     "deploy:prod": "npm run build && wrangler deploy",
