@@ -1,11 +1,11 @@
 {
-  "name": "Paradise Resort",
-  "short_name": "Paradise",
-  "description": "Paradise Resort - Your luxury getaway destination",
+  "name": "Old Palace Resort",
+  "short_name": "Old Palace",
+  "description": "Old Palace Resort - Your luxury getaway destination",
   "start_url": "/hotel/paradise-resort",
   "display": "standalone",
-  "background_color": "#016e8f",
-  "theme_color": "#016e8f",
+  "background_color": "#8B1538",
+  "theme_color": "#8B1538",
   "orientation": "portrait-primary",
   "icons": [
     {

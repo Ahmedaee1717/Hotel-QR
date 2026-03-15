@@ -23004,7 +23004,7 @@ app.get('/hotel/:property_slug', async (c) => {
         <meta name="mobile-web-app-capable" content="yes">
         
         <!-- PWA Meta Tags -->
-        <meta name="theme-color" content="#016e8f">
+        <meta name="theme-color" content="#8B1538">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <link rel="manifest" href="/manifest.json">
         <link rel="apple-touch-icon" href="/icon-192.png">
@@ -30189,7 +30189,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 right: 0;
                 transform: translateY(-50%) translateX(0);
                 z-index: 9999;
-                background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%);
+                background: linear-gradient(135deg, #8B1538 0%, #A01D48 100%);
                 color: white;
                 border: none;
                 border-top-left-radius: 8px;
@@ -30197,7 +30197,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 padding: 16px 12px;
                 font-size: 13px;
                 font-weight: 600;
-                box-shadow: -2px 2px 12px rgba(1, 110, 143, 0.3);
+                box-shadow: -2px 2px 12px rgba(139, 21, 56, 0.3);
                 cursor: pointer;
                 display: flex;
                 flex-direction: column;
@@ -30233,10 +30233,10 @@ app.get('/hotel/:property_slug', async (c) => {
                         <i class="fas fa-times"></i>
                     </button>
                     <div style="text-align: center;">
-                        <div style="width: 80px; height: 80px; margin: 0 auto 16px; background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                        <div style="width: 80px; height: 80px; margin: 0 auto 16px; background: linear-gradient(135deg, #8B1538 0%, #A01D48 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
                             <i class="fas fa-mobile-alt" style="font-size: 40px; color: white;"></i>
                         </div>
-                        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1f2937;">Install Paradise Resort</h3>
+                        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1f2937;">Install Old Palace Resort</h3>
                         <p style="color: #6b7280; margin-bottom: 24px;">Get the app experience with offline access</p>
                         
                         <div id="install-instructions" style="background: #f3f4f6; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 20px;">
@@ -30247,7 +30247,7 @@ app.get('/hotel/:property_slug', async (c) => {
                             <button id="dismiss-install" style="flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; font-weight: 600; cursor: pointer;">
                                 Maybe Later
                             </button>
-                            <button id="install-now" style="flex: 1; padding: 12px; border: none; border-radius: 8px; background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%); color: white; font-weight: 600; cursor: pointer;">
+                            <button id="install-now" style="flex: 1; padding: 12px; border: none; border-radius: 8px; background: linear-gradient(135deg, #8B1538 0%, #A01D48 100%); color: white; font-weight: 600; cursor: pointer;">
                                 Got It
                             </button>
                         </div>
@@ -30266,12 +30266,12 @@ app.get('/hotel/:property_slug', async (c) => {
                     to { transform: translateY(-50%) translateX(0); opacity: 1; }
                 }
                 @keyframes gentlePulse {
-                    0%, 100% { box-shadow: -2px 2px 12px rgba(1, 110, 143, 0.3); }
-                    50% { box-shadow: -2px 2px 16px rgba(0, 212, 170, 0.4); }
+                    0%, 100% { box-shadow: -2px 2px 12px rgba(139, 21, 56, 0.3); }
+                    50% { box-shadow: -2px 2px 16px rgba(160, 29, 72, 0.4); }
                 }
                 #pwa-install-btn:hover {
                     transform: translateY(-50%) translateX(-4px);
-                    box-shadow: -4px 4px 20px rgba(1, 110, 143, 0.5);
+                    box-shadow: -4px 4px 20px rgba(139, 21, 56, 0.5);
                 }
                 #pwa-install-btn:active {
                     transform: translateY(-50%) translateX(2px);
