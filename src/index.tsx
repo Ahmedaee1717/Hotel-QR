@@ -30156,6 +30156,195 @@ app.get('/hotel/:property_slug', async (c) => {
                     });
             });
         }
+        
+        // PWA Install Prompt
+        (function() {
+            // Check if already installed
+            if (window.matchMedia('(display-mode: standalone)').matches || 
+                window.navigator.standalone === true) {
+                return; // Already installed
+            }
+            
+            // Check if dismissed
+            if (localStorage.getItem('pwa-install-dismissed')) {
+                return;
+            }
+            
+            let deferredPrompt = null;
+            const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+            const isAndroid = /Android/.test(navigator.userAgent);
+            
+            // Create install button
+            const installBtn = document.createElement('button');
+            installBtn.id = 'pwa-install-btn';
+            installBtn.innerHTML = \`
+                <i class="fas fa-download mr-2"></i>
+                <span>Install App</span>
+            \`;
+            installBtn.style.cssText = \`
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9999;
+                background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 600;
+                box-shadow: 0 4px 12px rgba(1, 110, 143, 0.4);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                animation: slideInUp 0.5s ease, pulse 2s ease-in-out infinite;
+                transition: transform 0.2s;
+            \`;
+            
+            // Create install modal
+            const installModal = document.createElement('div');
+            installModal.id = 'pwa-install-modal';
+            installModal.style.cssText = \`
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 10000;
+                background: rgba(0, 0, 0, 0.7);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            \`;
+            
+            installModal.innerHTML = \`
+                <div style="background: white; border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; position: relative;">
+                    <button id="close-modal" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div style="text-align: center;">
+                        <div style="width: 80px; height: 80px; margin: 0 auto 16px; background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%); border-radius: 20px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-mobile-alt" style="font-size: 40px; color: white;"></i>
+                        </div>
+                        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #1f2937;">Install Paradise Resort</h3>
+                        <p style="color: #6b7280; margin-bottom: 24px;">Get the app experience with offline access</p>
+                        
+                        <div id="install-instructions" style="background: #f3f4f6; border-radius: 12px; padding: 16px; text-align: left; margin-bottom: 20px;">
+                            <!-- Instructions will be inserted here -->
+                        </div>
+                        
+                        <div style="display: flex; gap: 12px;">
+                            <button id="dismiss-install" style="flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; font-weight: 600; cursor: pointer;">
+                                Maybe Later
+                            </button>
+                            <button id="install-now" style="flex: 1; padding: 12px; border: none; border-radius: 8px; background: linear-gradient(135deg, #016e8f 0%, #00d4aa 100%); color: white; font-weight: 600; cursor: pointer;">
+                                Got It
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            \`;
+            
+            document.body.appendChild(installBtn);
+            document.body.appendChild(installModal);
+            
+            // Add animations
+            const style = document.createElement('style');
+            style.textContent = \`
+                @keyframes slideInUp {
+                    from { transform: translateY(100px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                #pwa-install-btn:hover {
+                    transform: scale(1.1);
+                }
+                #pwa-install-btn:active {
+                    transform: scale(0.95);
+                }
+            \`;
+            document.head.appendChild(style);
+            
+            // Set instructions based on device
+            const instructionsEl = document.getElementById('install-instructions');
+            if (isIOS) {
+                instructionsEl.innerHTML = \`
+                    <div style="font-size: 14px; color: #374151;">
+                        <p style="font-weight: 600; margin-bottom: 12px;">📱 To install on iPhone:</p>
+                        <ol style="padding-left: 20px; margin: 0; line-height: 1.8;">
+                            <li>Tap the <strong>Share</strong> button <i class="fas fa-share" style="color: #016e8f;"></i> below</li>
+                            <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                            <li>Tap <strong>"Add"</strong> in the top right</li>
+                        </ol>
+                    </div>
+                \`;
+            } else {
+                instructionsEl.innerHTML = \`
+                    <div style="font-size: 14px; color: #374151;">
+                        <p style="font-weight: 600; margin-bottom: 12px;">📱 Click the button below to install:</p>
+                        <p style="margin: 0; line-height: 1.6;">The app will be added to your home screen and can be used offline.</p>
+                    </div>
+                \`;
+            }
+            
+            // Show modal on button click
+            installBtn.addEventListener('click', () => {
+                installModal.style.display = 'flex';
+            });
+            
+            // Close modal
+            document.getElementById('close-modal').addEventListener('click', () => {
+                installModal.style.display = 'none';
+            });
+            
+            // Dismiss permanently
+            document.getElementById('dismiss-install').addEventListener('click', () => {
+                localStorage.setItem('pwa-install-dismissed', 'true');
+                installModal.style.display = 'none';
+                installBtn.style.display = 'none';
+            });
+            
+            // Install now (or close for iOS)
+            document.getElementById('install-now').addEventListener('click', () => {
+                if (deferredPrompt && !isIOS) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted the install prompt');
+                            installBtn.style.display = 'none';
+                        }
+                        deferredPrompt = null;
+                    });
+                }
+                installModal.style.display = 'none';
+            });
+            
+            // Capture beforeinstallprompt event (Android/Desktop)
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                // Update button text for Android
+                if (isAndroid) {
+                    document.querySelector('#install-now').textContent = 'Install Now';
+                }
+            });
+            
+            // Hide button if app gets installed
+            window.addEventListener('appinstalled', () => {
+                installBtn.style.display = 'none';
+                localStorage.setItem('pwa-install-dismissed', 'true');
+            });
+            
+            // Show button after 3 seconds
+            setTimeout(() => {
+                installBtn.style.display = 'flex';
+            }, 3000);
+        })();
         </script>
     </body>
     </html>
