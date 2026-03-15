@@ -60702,7 +60702,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 <h5 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-comments mr-2"></i>Responses</h5>
                 <div class="space-y-4">
                   \${submission.answers.map((answer, idx) => {
-                    let answerDisplay = answer.answer_text;
+                    let answerDisplay = answer.answer_text || '<span class="text-gray-400 italic">No answer provided</span>';
                     
                     // Handle rating display
                     if (answer.question_type === 'rating' && answer.answer_text) {
