@@ -79665,7 +79665,7 @@ app.get('/room-service/:property_id', async (c) => {
         category,
         item_name,
         description,
-        price,
+        cost_to_hotel as price,
         is_premium,
         allergens
       FROM alacarte_menu_items
