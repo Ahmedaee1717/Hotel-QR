@@ -23002,6 +23002,13 @@ app.get('/hotel/:property_slug', async (c) => {
         <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net wss://api.openai.com https://api.openai.com;">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="mobile-web-app-capable" content="yes">
+        
+        <!-- PWA Meta Tags -->
+        <meta name="theme-color" content="#016e8f">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <link rel="manifest" href="/manifest.json">
+        <link rel="apple-touch-icon" href="/icon-192.png">
+        
         <title>Welcome</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -30136,6 +30143,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 serviceButton.addEventListener('click', window.openServiceMenu);
             }
         });
+        
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('[PWA] Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('[PWA] Service Worker registration failed:', error);
+                    });
+            });
+        }
         </script>
     </body>
     </html>
@@ -68123,6 +68143,14 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#016e8f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    
     <title>${restaurant.title_en} - Digital Menu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -68539,6 +68567,15 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
     
     // Initial load
     loadMenuData();
+    
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => console.log('[PWA] SW registered'))
+                .catch(error => console.log('[PWA] SW registration failed:', error));
+        });
+    }
     </script>
 </body>
 </html>
@@ -68578,6 +68615,14 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#016e8f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    
     <title>Book Table - ${restaurant.title_en}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
@@ -69337,6 +69382,15 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
         } catch (error) {
           console.error('Auto-fill error:', error);
         }
+      }
+      
+      // PWA Service Worker Registration
+      if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js')
+                  .then(registration => console.log('[PWA] SW registered'))
+                  .catch(error => console.log('[PWA] SW registration failed:', error));
+          });
       }
     </script>
 </body>

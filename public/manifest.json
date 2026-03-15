@@ -1,0 +1,41 @@
+{
+  "name": "Paradise Resort",
+  "short_name": "Paradise",
+  "description": "Paradise Resort - Your luxury getaway destination",
+  "start_url": "/hotel/paradise-resort",
+  "display": "standalone",
+  "background_color": "#016e8f",
+  "theme_color": "#016e8f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["hospitality", "travel"],
+  "shortcuts": [
+    {
+      "name": "Restaurants",
+      "short_name": "Dine",
+      "description": "Browse resort restaurants",
+      "url": "/hotel/paradise-resort#restaurants",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Pass",
+      "short_name": "Pass",
+      "description": "View your digital pass",
+      "url": "/hotel/paradise-resort#pass",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
