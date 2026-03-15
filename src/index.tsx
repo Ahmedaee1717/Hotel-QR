@@ -4400,8 +4400,8 @@ app.get('/api/admin/frontdesk/feed', async (c) => {
           SELECT 
             cc.conversation_id as id,
             'chatbot' as type,
-            NULL as guest_name,
-            NULL as room_number,
+            cc.guest_name,
+            cc.room_number,
             cc.last_activity as created_at,
             NULL as sentiment_label,
             NULL as sentiment_score,
@@ -11976,12 +11976,33 @@ app.post('/api/chatbot/chat', async (c) => {
     let isAIPaused = false
     
     if (!convId) {
+      // Create new conversation with guest info if available
       const convResult = await DB.prepare(`
-        INSERT INTO chatbot_conversations (property_id, session_id)
-        VALUES (?, ?)
-      `).bind(property_id, session_id).run()
+        INSERT INTO chatbot_conversations (property_id, session_id, guest_name, room_number)
+        VALUES (?, ?, ?, ?)
+      `).bind(
+        property_id, 
+        session_id,
+        guest_context?.guest_name || null,
+        guest_context?.room_number || null
+      ).run()
       convId = convResult.meta.last_row_id
     } else {
+      // Update existing conversation with guest info if provided and not already set
+      if (guest_context?.guest_name || guest_context?.room_number) {
+        await DB.prepare(`
+          UPDATE chatbot_conversations
+          SET guest_name = COALESCE(guest_name, ?),
+              room_number = COALESCE(room_number, ?)
+          WHERE conversation_id = ? AND session_id = ? AND property_id = ?
+        `).bind(
+          guest_context?.guest_name || null,
+          guest_context?.room_number || null,
+          convId,
+          session_id,
+          property_id
+        ).run()
+      }
       // Check if admin has taken over (only for existing conversations)
       try {
         const conv = await DB.prepare(`
