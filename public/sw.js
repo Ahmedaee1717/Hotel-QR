@@ -1,14 +1,12 @@
 // Paradise Resort PWA Service Worker
 // Simple caching strategy: Network First, Cache Fallback
 
-const CACHE_NAME = 'paradise-resort-v1';
+const CACHE_NAME = 'paradise-resort-v2';
 const GUEST_PAGES = [
   '/hotel/paradise-resort',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png',
-  'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css'
+  '/icon-512.png'
 ];
 
 // Install event - cache essential guest pages
@@ -16,7 +14,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[SW] Caching guest pages');
-      return cache.addAll(GUEST_PAGES);
+      // Cache pages one by one to avoid CORS issues
+      return Promise.all(
+        GUEST_PAGES.map(url => 
+          cache.add(url).catch(err => console.log('[SW] Failed to cache:', url, err))
+        )
+      );
     })
   );
   self.skipWaiting();
@@ -39,33 +42,29 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - Network First strategy
+// Fetch event - Network First strategy (ONLY for guest hotel pages)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip API calls, admin pages, staff tools - always fetch fresh
-  if (
-    url.pathname.startsWith('/api/') ||
-    url.pathname.startsWith('/admin') ||
-    url.pathname.startsWith('/waiter') ||
-    url.pathname.startsWith('/kitchen') ||
-    url.pathname.startsWith('/front-desk') ||
-    url.pathname.includes('wrangler') ||
-    request.method !== 'GET'
-  ) {
-    return; // Let browser handle normally
+  // ONLY intercept guest hotel pages - let everything else pass through
+  const isGuestPage = url.pathname.startsWith('/hotel/') && request.method === 'GET';
+  
+  if (!isGuestPage) {
+    return; // Let browser handle normally (includes ALL API calls, admin pages, etc.)
   }
 
-  // For guest pages: Network First, Cache Fallback
+  // For guest hotel pages ONLY: Network First, Cache Fallback
   event.respondWith(
     fetch(request)
       .then((response) => {
         // Clone response and cache it
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
+        if (response.ok) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
+          });
+        }
         return response;
       })
       .catch(() => {
