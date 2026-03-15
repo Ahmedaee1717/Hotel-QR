@@ -79665,6 +79665,7 @@ app.get('/room-service/:property_id', async (c) => {
         category,
         item_name,
         description,
+        price,
         is_premium,
         allergens
       FROM alacarte_menu_items
@@ -79705,16 +79706,23 @@ app.get('/room-service/:property_id', async (c) => {
         grouped[category].forEach((item: any) => {
           menuHTML += '<div class="border-b border-gray-100 pb-4 last:border-0">';
           menuHTML += '<div class="flex justify-between items-start mb-2">';
+          menuHTML += '<div class="flex-1">';
           menuHTML += '<h3 class="text-lg font-semibold text-gray-800">' + item.item_name + '</h3>';
-          if (item.is_premium) {
-            menuHTML += '<span class="px-2 py-1 rounded-full text-xs font-semibold" style="background-color: ' + accentColor + '20; color: ' + accentColor + ';"><i class="fas fa-star mr-1"></i>Premium</span>';
+          if (item.description) {
+            menuHTML += '<p class="text-gray-600 text-sm mt-1">' + item.description + '</p>';
           }
           menuHTML += '</div>';
-          if (item.description) {
-            menuHTML += '<p class="text-gray-600 text-sm mb-2">' + item.description + '</p>';
+          menuHTML += '<div class="ml-4 flex items-start gap-2 flex-shrink-0">';
+          if (item.price) {
+            menuHTML += '<span class="text-xl font-bold whitespace-nowrap" style="color: ' + primaryColor + ';">' + item.price.toFixed(2) + ' EGP</span>';
           }
+          if (item.is_premium) {
+            menuHTML += '<span class="px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap" style="background-color: ' + accentColor + '20; color: ' + accentColor + ';"><i class="fas fa-star mr-1"></i>Premium</span>';
+          }
+          menuHTML += '</div>';
+          menuHTML += '</div>';
           if (item.allergens) {
-            menuHTML += '<p class="text-xs text-orange-600"><i class="fas fa-exclamation-triangle mr-1"></i>Allergens: ' + item.allergens + '</p>';
+            menuHTML += '<p class="text-xs text-orange-600 mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>Allergens: ' + item.allergens + '</p>';
           }
           menuHTML += '</div>';
         });
