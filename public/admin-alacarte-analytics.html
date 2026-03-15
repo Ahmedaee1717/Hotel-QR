@@ -115,7 +115,7 @@
             <div class="dark-card rounded-lg shadow-xl p-6">
                 <div class="flex items-center justify-between mb-2">
                     <span class="dark-text-muted text-sm font-medium">Total Revenue</span>
-                    <i class="fas fa-euro-sign text-xl" style="color: #D4AF37;"></i>
+                    <i class="fas fa-pound-sign text-xl" style="color: #D4AF37;"></i>
                 </div>
                 <div id="totalRevenue" class="text-4xl font-bold dark-text">-</div>
                 <div class="text-sm dark-text-muted mt-2">
@@ -1166,7 +1166,7 @@
                 data: {
                     labels: trend.map(t => t.date),
                     datasets: [{
-                        label: 'Revenue (€)',
+                        label: 'Revenue (EGP)',
                         data: trend.map(t => t.revenue),
                         borderColor: '#D4AF37',  // Gold
                         backgroundColor: 'rgba(212, 175, 55, 0.1)',  // Gold with low opacity
@@ -1269,7 +1269,7 @@
                     insights.push(`
                         <div class="dark-card rounded-lg p-4 border-l-4 border-amber-500 mb-4">
                             <h4 class="font-bold dark-text mb-2"><i class="fas fa-euro-sign text-amber-400 mr-2"></i>Average Order Value</h4>
-                            <p class="dark-text-muted">Average order is €${analytics.metrics.avg_order_value.toFixed(2)}. Consider upselling premium items to increase this value.</p>
+                            <p class="dark-text-muted">Average order is EGP ${analytics.metrics.avg_order_value.toFixed(2)}. Consider upselling premium items to increase this value.</p>
                         </div>
                     `);
                 }
@@ -1277,7 +1277,7 @@
                 insights.push(`
                     <div class="dark-card rounded-lg p-4 border-l-4 border-purple-500">
                         <h4 class="font-bold dark-text mb-2"><i class="fas fa-chart-line text-purple-400 mr-2"></i>Performance Summary</h4>
-                        <p class="dark-text-muted">Total of ${analytics.metrics.total_orders} orders generating €${analytics.metrics.total_revenue.toFixed(2)} in revenue. Keep up the great work!</p>
+                        <p class="dark-text-muted">Total of ${analytics.metrics.total_orders} orders generating EGP ${analytics.metrics.total_revenue.toFixed(2)} in revenue. Keep up the great work!</p>
                     </div>
                 `);
                 
@@ -1356,7 +1356,7 @@
             const avgRate = data.staff_performance.reduce((sum, s) => sum + (s.upsell_rate || 0), 0) / (data.staff_performance.length || 1);
             const activeStaff = data.staff_performance.filter(s => s.total_bookings > 0).length;
             
-            document.getElementById('totalUpsellRevenue').textContent = '€' + totalRevenue.toFixed(2);
+            document.getElementById('totalUpsellRevenue').textContent = 'EGP ' + totalRevenue.toFixed(2);
             document.getElementById('avgUpsellRate').textContent = avgRate.toFixed(1) + '%';
             document.getElementById('activeStaffCount').textContent = activeStaff;
         }
@@ -1390,8 +1390,8 @@
                                 ${staff.upsell_rate}%
                             </span>
                         </td>
-                        <td class="px-4 py-3 dark-text text-right font-bold" style="color: #D4AF37;">€${(staff.total_upsell_revenue || 0).toFixed(2)}</td>
-                        <td class="px-4 py-3 dark-text-muted text-right">€${(staff.avg_upsell_per_booking || 0).toFixed(2)}</td>
+                        <td class="px-4 py-3 dark-text text-right font-bold" style="color: #D4AF37;">EGP ${(staff.total_upsell_revenue || 0).toFixed(2)}</td>
+                        <td class="px-4 py-3 dark-text-muted text-right">EGP ${(staff.avg_upsell_per_booking || 0).toFixed(2)}</td>
                     </tr>
                 `;
             }).join('');
@@ -1428,7 +1428,7 @@
                 data: {
                     labels: items.slice(0, 10).map(item => item.item_name),
                     datasets: [{
-                        label: 'Revenue (€)',
+                        label: 'Revenue (EGP)',
                         data: items.slice(0, 10).map(item => item.total_revenue),
                         backgroundColor: 'rgba(212, 175, 55, 0.5)',
                         borderColor: '#D4AF37',
@@ -1445,7 +1445,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: { color: '#94a3b8', callback: value => '€' + value },
+                            ticks: { color: '#94a3b8', callback: value => 'EGP ' + value },
                             grid: { color: '#334155' }
                         },
                         x: {
@@ -1468,7 +1468,7 @@
                 data: {
                     labels: trendData.map(t => t.reservation_date),
                     datasets: [{
-                        label: 'Upsell Revenue (€)',
+                        label: 'Upsell Revenue (EGP)',
                         data: trendData.map(t => t.daily_revenue),
                         borderColor: '#10B981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -1484,7 +1484,7 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            ticks: { color: '#94a3b8', callback: value => '€' + value },
+                            ticks: { color: '#94a3b8', callback: value => 'EGP ' + value },
                             grid: { color: '#334155' }
                         },
                         x: {
@@ -1532,7 +1532,7 @@
                             </div>
                             <div class="flex justify-between dark-text-muted">
                                 <span>Revenue:</span>
-                                <span class="font-bold" style="color: #D4AF37;">€${(staff.total_revenue || 0).toFixed(2)}</span>
+                                <span class="font-bold" style="color: #D4AF37;">EGP ${(staff.total_revenue || 0).toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
