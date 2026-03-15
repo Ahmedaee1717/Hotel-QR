@@ -60702,27 +60702,51 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 <h5 class="text-lg font-bold text-gray-900 mb-4"><i class="fas fa-comments mr-2"></i>Responses</h5>
                 <div class="space-y-4">
                   \${submission.answers.map((answer, idx) => {
-                    let answerDisplay = answer.answer_text || '<span class="text-gray-400 italic">No answer provided</span>';
+                    let answerDisplay = '';
                     
-                    // Handle rating display
-                    if (answer.question_type === 'rating' && answer.answer_text) {
-                      const rating = parseInt(answer.answer_text);
+                    // Handle rating display (stored in answer_numeric)
+                    if (answer.question_type === 'rating' && answer.answer_numeric !== null && answer.answer_numeric !== undefined) {
+                      const rating = parseInt(answer.answer_numeric);
                       answerDisplay = '<div class="flex items-center gap-1">' + 
                         Array(5).fill(0).map((_, i) => 
                           \`<i class="fas fa-star text-xl \${i < rating ? 'text-yellow-500' : 'text-gray-300'}"></i>\`
                         ).join('') + 
                         \`<span class="ml-2 text-gray-600">(\${rating}/5)</span></div>\`;
                     }
-                    
+                    // Handle scale display (stored in answer_numeric)
+                    else if (answer.question_type === 'scale' && answer.answer_numeric !== null && answer.answer_numeric !== undefined) {
+                      const scale = parseInt(answer.answer_numeric);
+                      const maxScale = answer.question_text.includes('1 to 10') ? 10 : 5;
+                      const percentage = (scale / maxScale) * 100;
+                      const color = percentage >= 70 ? 'green' : percentage >= 40 ? 'yellow' : 'red';
+                      answerDisplay = \`
+                        <div class="space-y-2">
+                          <div class="flex items-center gap-3">
+                            <div class="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
+                              <div class="bg-\${color}-500 h-full rounded-full" style="width: \${percentage}%"></div>
+                            </div>
+                            <span class="text-lg font-bold text-gray-900">\${scale}/\${maxScale}</span>
+                          </div>
+                        </div>
+                      \`;
+                    }
                     // Handle yes/no display
-                    if (answer.question_type === 'yes_no') {
-                      const isYes = answer.answer_text?.toLowerCase() === 'yes';
+                    else if (answer.question_type === 'yes_no' && answer.answer_text) {
+                      const isYes = answer.answer_text.toLowerCase() === 'yes';
                       answerDisplay = \`
                         <span class="inline-flex items-center px-4 py-2 rounded-full \${isYes ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                           <i class="fas fa-\${isYes ? 'check' : 'times'} mr-2"></i>
                           \${answer.answer_text}
                         </span>
                       \`;
+                    }
+                    // Handle text answers
+                    else if (answer.answer_text) {
+                      answerDisplay = answer.answer_text;
+                    }
+                    // No answer provided
+                    else {
+                      answerDisplay = '<span class="text-gray-400 italic">No answer provided</span>';
                     }
 
                     return \`
