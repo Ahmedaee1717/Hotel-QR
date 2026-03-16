@@ -83124,7 +83124,7 @@ app.get('/api/waiter/tables', async (c) => {
     
     // Get waiter orders (only pending/confirmed/seated - not yet cleared)
     const waiterOrders = await DB.prepare(`
-      SELECT table_id, order_id, guest_name, party_size, status, waiter_id
+      SELECT table_id, order_id, guest_name, room_number, party_size, status, waiter_id
       FROM waiter_orders
       WHERE restaurant_id = ? 
         AND status IN ('pending', 'confirmed', 'seated', 'preparing', 'ready')
@@ -83143,8 +83143,11 @@ app.get('/api/waiter/tables', async (c) => {
         av.preorder_item_ids,
         av.created_at,
         av.checked_in_at,
-        av.checked_in_by
+        av.checked_in_by,
+        dp.primary_guest_name as guest_name,
+        dp.room_number
       FROM alacarte_vouchers av
+      LEFT JOIN digital_passes dp ON av.pass_id = dp.pass_id
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
         AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
@@ -83161,9 +83164,9 @@ app.get('/api/waiter/tables', async (c) => {
     const kitchenBookingMap = new Map()
     for (const kb of kitchenBookings.results) {
       if (kb.table_number) {
-        // Extract guest name from special_requests
-        let guestName = 'Guest'
-        if (kb.special_requests) {
+        // Use guest_name from digital_passes JOIN, fallback to special_requests parsing
+        let guestName = kb.guest_name || 'Guest'
+        if (!kb.guest_name && kb.special_requests) {
           const match = kb.special_requests.match(/Guest:\s*([^,\n]+)/)
           if (match) {
             guestName = match[1].trim()
@@ -83179,6 +83182,7 @@ app.get('/api/waiter/tables', async (c) => {
         kitchenBookingMap.set(kb.table_number, { 
           ...kb, 
           guest_name: guestName,
+          room_number: kb.room_number || null,
           items_count: preorderItems.length,
           booked_by: bookedBy
         })
@@ -83207,6 +83211,7 @@ app.get('/api/waiter/tables', async (c) => {
           current_order: {
             order_id: waiterOrder.order_id,
             guest_name: waiterOrder.guest_name,
+            room_number: waiterOrder.room_number || null,
             party_size: waiterOrder.party_size,
             status: waiterOrder.status,
             source: 'waiter'
@@ -83222,6 +83227,7 @@ app.get('/api/waiter/tables', async (c) => {
           current_order: {
             order_id: `kitchen-${kitchenBooking.voucher_id}`,
             guest_name: kitchenBooking.guest_name,
+            room_number: kitchenBooking.room_number || null,
             party_size: kitchenBooking.party_size,
             status: kitchenBooking.status,
             source: 'kitchen',
