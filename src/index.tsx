@@ -83277,6 +83277,7 @@ app.get('/api/waiter/orders', async (c) => {
         wo.table_id,
         rt.table_number,
         wo.guest_name,
+        wo.room_number,
         wo.party_size,
         wo.status,
         wo.items,
@@ -83316,8 +83317,11 @@ app.get('/api/waiter/orders', async (c) => {
         av.created_at,
         av.checked_in_at,
         av.checked_in_by,
+        dp.primary_guest_name as guest_name,
+        dp.room_number,
         'kitchen' as source
       FROM alacarte_vouchers av
+      LEFT JOIN digital_passes dp ON av.pass_id = dp.pass_id
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
         AND av.reservation_date BETWEEN ? AND ?
