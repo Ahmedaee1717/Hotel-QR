@@ -83166,10 +83166,20 @@ app.get('/api/waiter/tables', async (c) => {
       if (kb.table_number) {
         // Use guest_name from digital_passes JOIN, fallback to special_requests parsing
         let guestName = kb.guest_name || 'Guest'
+        let roomNumber = kb.room_number || null
+        
         if (!kb.guest_name && kb.special_requests) {
-          const match = kb.special_requests.match(/Guest:\s*([^,\n]+)/)
-          if (match) {
-            guestName = match[1].trim()
+          const guestMatch = kb.special_requests.match(/Guest:\s*([^,\n]+)/)
+          if (guestMatch) {
+            guestName = guestMatch[1].trim()
+          }
+        }
+        
+        // Extract room number from special_requests if not from digital_passes
+        if (!roomNumber && kb.special_requests) {
+          const roomMatch = kb.special_requests.match(/Room:\s*([^,\s\(\)]+)/)
+          if (roomMatch) {
+            roomNumber = roomMatch[1].trim()
           }
         }
         
@@ -83182,7 +83192,7 @@ app.get('/api/waiter/tables', async (c) => {
         kitchenBookingMap.set(kb.table_number, { 
           ...kb, 
           guest_name: guestName,
-          room_number: kb.room_number || null,
+          room_number: roomNumber,
           items_count: preorderItems.length,
           booked_by: bookedBy
         })
