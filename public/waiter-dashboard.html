@@ -504,6 +504,10 @@
                                 <span class="font-bold dark-text" id="currentPartySize">-</span>
                             </div>
                             <div class="flex items-center justify-between mb-2">
+                                <span class="dark-text-muted">Room Number:</span>
+                                <span class="font-bold dark-text" id="currentRoomNumber">-</span>
+                            </div>
+                            <div class="flex items-center justify-between mb-2">
                                 <span class="dark-text-muted">Reservation:</span>
                                 <span class="font-bold dark-text" id="currentOrderTime">-</span>
                             </div>
@@ -1246,6 +1250,7 @@
                 
                 document.getElementById('currentGuestName').textContent = order.guest_name || 'Guest';
                 document.getElementById('currentPartySize').textContent = order.party_size || '?';
+                document.getElementById('currentRoomNumber').textContent = order.room_number || 'N/A';
                 
                 // Show RESERVATION TIME (when guest is scheduled to arrive) or order creation time
                 if (order.reservation_date && order.reservation_time) {
@@ -1808,6 +1813,7 @@
                     document.getElementById('currentOrderSection').classList.remove('hidden');
                     document.getElementById('currentGuestName').textContent = guestName;
                     document.getElementById('currentPartySize').textContent = partySize;
+                    document.getElementById('currentRoomNumber').textContent = roomNumber || 'N/A';
                     document.getElementById('currentOrderStatus').className = 'px-3 py-1 rounded-full text-sm font-bold text-white bg-yellow-500';
                     document.getElementById('currentOrderStatus').textContent = 'PENDING';
                     
