@@ -83391,6 +83391,7 @@ app.get('/api/waiter/orders', async (c) => {
           order_id: `kitchen-${order.voucher_id}`,
           table_number: order.table_number || 'N/A',
           guest_name: guestName,
+          room_number: order.room_number || null,
           party_size: parseInt(order.party_size) || 1,
           status: order.status || 'confirmed',
           items: items,
