@@ -36003,6 +36003,23 @@ app.get('/admin/beach-map-designer', (c) => {
         });
         
         function renderSpots() {
+            // Calculate canvas dimensions based on spot positions
+            let maxX = 0;
+            let maxY = 0;
+            spots.forEach(spot => {
+                maxX = Math.max(maxX, spot.x + 40);
+                maxY = Math.max(maxY, spot.y + 40);
+            });
+            
+            // Get container width and ensure canvas is at least full width
+            const container = canvas.parentElement;
+            const containerWidth = container ? container.offsetWidth : 0;
+            const canvasWidth = Math.max(maxX, containerWidth);
+            const canvasHeight = Math.max(maxY, 500);
+            
+            canvas.style.width = canvasWidth + 'px';
+            canvas.style.height = canvasHeight + 'px';
+            
             // Remove existing spot elements
             document.querySelectorAll('.spot-icon').forEach(el => el.remove());
             
@@ -38137,7 +38154,7 @@ app.get('/beach-booking/:property_id', async (c) => {
                         Select Your Spot
                     </h2>
                     <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-auto" style="height: 500px; max-height: 70vh;">
-                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content; background-size: 100% auto; background-position: top left; background-repeat: no-repeat;">
+                        <div id="beachCanvas" class="relative" style="width: 100%; min-height: 500px; height: auto; background-size: cover; background-position: center; background-repeat: no-repeat;">
                             <!-- Spots will be rendered here -->
                         </div>
                     </div>
@@ -38541,6 +38558,23 @@ app.get('/beach-booking/:property_id', async (c) => {
         
         function renderSpots() {
             renderZones();
+            
+            // Calculate canvas dimensions based on spot positions
+            let maxX = 0;
+            let maxY = 0;
+            spots.forEach(spot => {
+                maxX = Math.max(maxX, spot.position_x + 40); // +40 for spot icon size
+                maxY = Math.max(maxY, spot.position_y + 40);
+            });
+            
+            // Get container width and ensure canvas is at least full width
+            const container = canvas.parentElement;
+            const containerWidth = container ? container.offsetWidth : 0;
+            const canvasWidth = Math.max(maxX, containerWidth);
+            const canvasHeight = Math.max(maxY, 500); // min 500px
+            
+            canvas.style.width = canvasWidth + 'px';
+            canvas.style.height = canvasHeight + 'px';
             
             // Remove existing spot elements
             document.querySelectorAll('.spot-icon').forEach(el => el.remove());
