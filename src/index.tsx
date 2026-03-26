@@ -14854,9 +14854,12 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
     }
     
     // Check if booking exists AND belongs to staff's property (multi-tenancy validation)
+    // Support both booking_reference (BCH-xxx) and booking_code (B12345)
     const existing = await DB.prepare(`
-      SELECT booking_status, property_id FROM beach_bookings WHERE booking_reference = ?
-    `).bind(booking_reference).first()
+      SELECT booking_reference, booking_status, property_id 
+      FROM beach_bookings 
+      WHERE booking_reference = ? OR booking_code = ?
+    `).bind(booking_reference, booking_reference).first()
     
     if (!existing) {
       return c.json({ success: false, error: 'Booking not found' }, 404)
@@ -14871,6 +14874,9 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
       return c.json({ success: false, error: 'Already checked in' }, 400)
     }
     
+    // Use the actual booking_reference from the database (in case user entered booking_code)
+    const actualBookingReference = existing.booking_reference;
+    
     // Update booking to checked_in
     await DB.prepare(`
       UPDATE beach_bookings
@@ -14878,7 +14884,7 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
           checked_in_at = CURRENT_TIMESTAMP,
           checked_in_by = ?
       WHERE booking_reference = ? AND property_id = ?
-    `).bind(staff_name, booking_reference, property_id).run()
+    `).bind(staff_name, actualBookingReference, property_id).run()
     
     // Get updated booking
     const booking = await DB.prepare(`
@@ -14886,7 +14892,7 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
       FROM beach_bookings bb
       JOIN beach_spots bs ON bb.spot_id = bs.spot_id
       WHERE bb.booking_reference = ?
-    `).bind(booking_reference).first()
+    `).bind(actualBookingReference).first()
     
     return c.json({ success: true, booking })
   } catch (error) {
