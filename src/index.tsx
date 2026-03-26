@@ -34955,16 +34955,23 @@ app.get('/admin/beach-management', (c) => {
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            console.log('QR Code scanned:', decodedText);
+            console.log('🎯 QR Code scanned:', decodedText);
             stopQRScanner();
             
             try {
                 const data = JSON.parse(decodedText);
+                console.log('📦 Parsed QR data:', data);
                 if (data.booking_reference || data.booking_code) {
-                    verifyAndCheckIn(data.booking_reference || data.booking_code);
+                    const code = data.booking_reference || data.booking_code;
+                    console.log('✅ Using code:', code);
+                    verifyAndCheckIn(code);
+                } else {
+                    console.error('❌ No booking_reference or booking_code in QR data');
+                    showCheckInError('Invalid QR code format');
                 }
             } catch (e) {
-                // Try as booking code
+                console.log('📝 Not JSON, treating as plain booking code:', decodedText);
+                // Try as plain booking code
                 verifyAndCheckIn(decodedText);
             }
         }
@@ -34997,6 +35004,8 @@ app.get('/admin/beach-management', (c) => {
                     localStorage.setItem('staff_name', staffName.trim());
                 }
                 
+                console.log('🔄 Sending check-in request:', { code, staffName });
+                
                 const response = await fetchWithAuth('/api/staff/beach/check-in', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -35006,7 +35015,9 @@ app.get('/admin/beach-management', (c) => {
                     })
                 });
                 
+                console.log('📡 Response status:', response.status);
                 const data = await response.json();
+                console.log('📦 Response data:', data);
                 
                 if (data.success) {
                     showCheckInSuccess(data.booking);
@@ -35016,8 +35027,8 @@ app.get('/admin/beach-management', (c) => {
                     showCheckInError(data.error || 'Booking not found');
                 }
             } catch (error) {
-                console.error('Check-in error:', error);
-                showCheckInError('Failed to verify booking');
+                console.error('❌ Check-in error:', error);
+                showCheckInError('Failed to verify booking: ' + error.message);
             }
         }
 
