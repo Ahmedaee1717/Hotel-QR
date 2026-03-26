@@ -14854,12 +14854,14 @@ app.post('/api/staff/beach/check-in', requirePermission('beach_checkin'), async 
     }
     
     // Check if booking exists AND belongs to staff's property (multi-tenancy validation)
-    // Support both booking_reference (BCH-xxx) and booking_code (B12345)
+    // Support: booking_reference (BCH-xxx), booking_code (B12345), or beach_booking_id (numeric)
     const existing = await DB.prepare(`
       SELECT booking_reference, booking_status, property_id 
       FROM beach_bookings 
-      WHERE booking_reference = ? OR booking_code = ?
-    `).bind(booking_reference, booking_reference).first()
+      WHERE booking_reference = ? 
+         OR booking_code = ? 
+         OR CAST(beach_booking_id AS TEXT) = ?
+    `).bind(booking_reference, booking_reference, booking_reference).first()
     
     if (!existing) {
       return c.json({ success: false, error: 'Booking not found' }, 404)
