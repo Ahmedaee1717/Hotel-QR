@@ -38136,8 +38136,8 @@ app.get('/beach-booking/:property_id', async (c) => {
                         <i class="fas fa-map-marked-alt mr-3 text-blue-600"></i>
                         Select Your Spot
                     </h2>
-                    <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-auto" style="height: 500px; max-height: 70vh;">
-                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content; background-size: cover; background-position: center; background-repeat: no-repeat;">
+                    <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-hidden" style="height: 500px; max-height: 70vh;">
+                        <div id="beachCanvas" class="relative w-full h-full" style="min-height: 500px; background-size: cover; background-position: center; background-repeat: no-repeat;">
                             <!-- Spots will be rendered here -->
                         </div>
                     </div>
