@@ -35894,6 +35894,9 @@ app.get('/admin/beach-map-designer', (c) => {
                 
                 if (data.success && data.settings && data.settings.beach_map_image_url) {
                     canvas.style.backgroundImage = 'url(' + data.settings.beach_map_image_url + ')';
+                    canvas.style.backgroundSize = 'cover';
+                    canvas.style.backgroundPosition = 'center';
+                    canvas.style.backgroundRepeat = 'no-repeat';
                     console.log('🏖️ Loaded beach photo from database');
                 }
             } catch (error) {
@@ -38134,7 +38137,7 @@ app.get('/beach-booking/:property_id', async (c) => {
                         Select Your Spot
                     </h2>
                     <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-auto" style="height: 500px; max-height: 70vh;">
-                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content;">
+                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content; background-size: cover; background-position: center; background-repeat: no-repeat;">
                             <!-- Spots will be rendered here -->
                         </div>
                     </div>
@@ -38344,6 +38347,9 @@ app.get('/beach-booking/:property_id', async (c) => {
                     const beachCanvas = document.getElementById('beachCanvas');
                     if (beachCanvas && settings.beach_map_image_url) {
                         beachCanvas.style.backgroundImage = 'url(' + settings.beach_map_image_url + ')';
+                        beachCanvas.style.backgroundSize = 'cover';
+                        beachCanvas.style.backgroundPosition = 'center';
+                        beachCanvas.style.backgroundRepeat = 'no-repeat';
                         console.log('🏖️ Applied beach map image:', settings.beach_map_image_url);
                     }
                     
