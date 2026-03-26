@@ -35894,7 +35894,7 @@ app.get('/admin/beach-map-designer', (c) => {
                 
                 if (data.success && data.settings && data.settings.beach_map_image_url) {
                     canvas.style.backgroundImage = 'url(' + data.settings.beach_map_image_url + ')';
-                    canvas.style.backgroundSize = '100% 100%';
+                    canvas.style.backgroundSize = '100% auto';
                     canvas.style.backgroundPosition = 'top left';
                     canvas.style.backgroundRepeat = 'no-repeat';
                     console.log('🏖️ Loaded beach photo from database');
@@ -38137,7 +38137,7 @@ app.get('/beach-booking/:property_id', async (c) => {
                         Select Your Spot
                     </h2>
                     <div class="relative w-full bg-gradient-to-b from-blue-100 to-yellow-100 rounded-xl overflow-auto" style="height: 500px; max-height: 70vh;">
-                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content; background-size: 100% 100%; background-position: top left; background-repeat: no-repeat;">
+                        <div id="beachCanvas" class="relative" style="min-width: 100%; min-height: 500px; width: max-content; height: max-content; background-size: 100% auto; background-position: top left; background-repeat: no-repeat;">
                             <!-- Spots will be rendered here -->
                         </div>
                     </div>
@@ -38347,7 +38347,7 @@ app.get('/beach-booking/:property_id', async (c) => {
                     const beachCanvas = document.getElementById('beachCanvas');
                     if (beachCanvas && settings.beach_map_image_url) {
                         beachCanvas.style.backgroundImage = 'url(' + settings.beach_map_image_url + ')';
-                        beachCanvas.style.backgroundSize = '100% 100%';
+                        beachCanvas.style.backgroundSize = '100% auto';
                         beachCanvas.style.backgroundPosition = 'top left';
                         beachCanvas.style.backgroundRepeat = 'no-repeat';
                         console.log('🏖️ Applied beach map image:', settings.beach_map_image_url);
