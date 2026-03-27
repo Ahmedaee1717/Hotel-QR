@@ -7,10 +7,147 @@ let brandColors = {
     primary: '#972626',
     secondary: '#681529'
 };
+let currentLanguage = 'en';
+let translations = {};
+let originalTexts = {}; // Store original texts for translation
+
+// Translation strings for UI elements
+const UI_TRANSLATIONS = {
+    en: {
+        progress: 'Progress', question: 'Question', of: 'of', previous: 'Previous', next: 'Next', submit: 'Submit Feedback',
+        guestInfo: 'GUEST INFORMATION', roomNumber: 'Room Number', yourName: 'Your Name', emailAddress: 'Email Address', phoneNumber: 'Phone Number',
+        roomPlaceholder: 'e.g., 303', namePlaceholder: 'Full name', emailPlaceholder: 'your@email.com', phonePlaceholder: '+1234567890',
+        provideInfo: 'Please provide your {field} to help us serve you better.', typePlaceholder: 'Type your answer here...',
+        sharePlaceholder: 'Share your thoughts...', notAtAll: 'Not at all', extremely: 'Extremely',
+        notAtAllLikely: 'Not at all likely', extremelyLikely: 'Extremely likely', yes: 'Yes', no: 'No',
+        thankYou: 'Thank You!', appreciateText: 'We truly appreciate you taking the time to share your feedback with us.',
+        helpImprove: 'Your responses help us improve our services and create better experiences for all our guests.',
+        formNotAvailable: 'Form Not Available', loading: 'Loading your feedback form...'
+    },
+    ar: {
+        progress: 'التقدم', question: 'سؤال', of: 'من', previous: 'السابق', next: 'التالي', submit: 'إرسال الملاحظات',
+        guestInfo: 'معلومات الضيف', roomNumber: 'رقم الغرفة', yourName: 'اسمك', emailAddress: 'عنوان البريد الإلكتروني', phoneNumber: 'رقم الهاتف',
+        roomPlaceholder: 'مثال: 303', namePlaceholder: 'الاسم الكامل', emailPlaceholder: 'your@email.com', phonePlaceholder: '+1234567890',
+        provideInfo: 'يرجى تقديم {field} لمساعدتنا في خدمتك بشكل أفضل.', typePlaceholder: 'اكتب إجابتك هنا...',
+        sharePlaceholder: 'شاركنا أفكارك...', notAtAll: 'إطلاقاً', extremely: 'للغاية',
+        notAtAllLikely: 'غير محتمل على الإطلاق', extremelyLikely: 'محتمل للغاية', yes: 'نعم', no: 'لا',
+        thankYou: 'شكراً لك!', appreciateText: 'نحن نقدر حقاً وقتك في مشاركة ملاحظاتك معنا.',
+        helpImprove: 'تساعدنا إجاباتك على تحسين خدماتنا وخلق تجارب أفضل لجميع ضيوفنا.',
+        formNotAvailable: 'النموذج غير متاح', loading: 'جارٍ تحميل نموذج الملاحظات...'
+    },
+    // Add more languages as needed - they will use Google Translate API for dynamic translation
+};
 
 // Extract form ID from URL
 const pathParts = window.location.pathname.split('/');
 const formId = pathParts[pathParts.length - 1];
+
+// Translation function using Google Translate API
+async function translateText(text, targetLang) {
+    if (!text || targetLang === 'en') return text;
+    
+    try {
+        const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
+        const data = await response.json();
+        return data[0][0][0] || text;
+    } catch (error) {
+        console.error('Translation error:', error);
+        return text;
+    }
+}
+
+// Translate multiple texts in batch
+async function translateBatch(texts, targetLang) {
+    if (targetLang === 'en') return texts;
+    
+    const results = await Promise.all(
+        texts.map(text => translateText(text, targetLang))
+    );
+    return results;
+}
+
+// Get UI translation
+function getUIText(key) {
+    return UI_TRANSLATIONS[currentLanguage]?.[key] || UI_TRANSLATIONS.en[key] || key;
+}
+
+// Change language
+async function changeLanguage(lang) {
+    currentLanguage = lang;
+    localStorage.setItem('feedbackFormLanguage', lang);
+    
+    // Show loading indicator
+    const languageSelector = document.getElementById('languageSelector');
+    languageSelector.disabled = true;
+    
+    // Update static UI labels
+    document.getElementById('progressLabel').textContent = getUIText('progress');
+    document.getElementById('questionLabel').textContent = getUIText('question');
+    document.getElementById('ofLabel').textContent = getUIText('of');
+    document.getElementById('thankYouText').textContent = getUIText('thankYou');
+    document.querySelectorAll('#thankYouScreen p')[0].textContent = getUIText('appreciateText');
+    document.querySelectorAll('#thankYouScreen .bg-gray-100 p')[0].textContent = getUIText('helpImprove');
+    document.querySelectorAll('#errorScreen h2')[0].textContent = getUIText('formNotAvailable');
+    document.querySelectorAll('#loading p')[0].textContent = getUIText('loading');
+    
+    // Translate and re-render
+    await translateFormContent();
+    renderCurrentStep();
+    
+    languageSelector.disabled = false;
+}
+
+// Translate form content
+async function translateFormContent() {
+    if (currentLanguage === 'en' || !formData) return;
+    
+    // Translate form name and description
+    if (originalTexts.formName) {
+        const translatedName = await translateText(originalTexts.formName, currentLanguage);
+        document.getElementById('formName').textContent = translatedName;
+    }
+    
+    if (originalTexts.formDescription) {
+        const translatedDesc = await translateText(originalTexts.formDescription, currentLanguage);
+        document.getElementById('formDescription').textContent = translatedDesc;
+    }
+    
+    // Translate all questions
+    if (formData.questions && formData.questions.length > 0) {
+        for (let i = 0; i < formData.questions.length; i++) {
+            const question = formData.questions[i];
+            
+            // Store original if not already stored
+            if (!originalTexts.questions) originalTexts.questions = {};
+            if (!originalTexts.questions[question.question_id]) {
+                originalTexts.questions[question.question_id] = {
+                    text: question.question_text,
+                    options: question.options || []
+                };
+            }
+            
+            // Translate question text
+            if (currentLanguage !== 'en') {
+                question.question_text = await translateText(
+                    originalTexts.questions[question.question_id].text,
+                    currentLanguage
+                );
+                
+                // Translate options for multiple choice questions
+                if (question.options && question.options.length > 0) {
+                    question.options = await translateBatch(
+                        originalTexts.questions[question.question_id].options,
+                        currentLanguage
+                    );
+                }
+            } else {
+                // Restore original English text
+                question.question_text = originalTexts.questions[question.question_id].text;
+                question.options = originalTexts.questions[question.question_id].options;
+            }
+        }
+    }
+}
 
 // Load form data and branding
 async function loadForm() {
@@ -26,8 +163,23 @@ async function loadForm() {
         console.log('✅ Questions count:', formData.questions ? formData.questions.length : 0);
         console.log('✅ Questions:', formData.questions);
         
+        // Store original texts
+        originalTexts.formName = formData.form_name;
+        originalTexts.formDescription = formData.form_description || '';
+        originalTexts.propertyName = formData.property_name;
+        
+        // Load saved language preference
+        const savedLanguage = localStorage.getItem('feedbackFormLanguage') || 'en';
+        currentLanguage = savedLanguage;
+        document.getElementById('languageSelector').value = savedLanguage;
+        
         // Load property branding colors
         await loadPropertyBranding(formData.property_id);
+        
+        // Translate if not English
+        if (currentLanguage !== 'en') {
+            await translateFormContent();
+        }
         
         // Set form metadata
         document.getElementById('formName').textContent = formData.form_name;
@@ -128,6 +280,11 @@ function renderCurrentStep() {
     const nextBtn = document.getElementById('nextBtn');
     const submitBtn = document.getElementById('submitBtn');
 
+    // Update button text with translations
+    prevBtn.innerHTML = `<i class="fas fa-arrow-left"></i> ${getUIText('previous')}`;
+    nextBtn.innerHTML = `${getUIText('next')} <i class="fas fa-arrow-right"></i>`;
+    submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> ${getUIText('submit')}`;
+
     // Update progress
     currentQuestionNum.textContent = currentStep + 1;
     const progressPercent = ((currentStep + 1) / totalSteps) * 100;
@@ -182,12 +339,16 @@ function renderCurrentStep() {
 // Render guest info field
 function renderGuestInfoField(fieldName, label, type, placeholder, required) {
     const value = responses[fieldName] || '';
+    const translatedLabel = getUIText(fieldName.replace('guest_', '').replace('_', ''));
+    const translatedPlaceholder = getUIText(fieldName.replace('guest_', '').replace('_', '') + 'Placeholder');
+    const provideText = getUIText('provideInfo').replace('{field}', translatedLabel.toLowerCase());
+    
     return `
         <div class="flex-1 flex flex-col justify-center">
             <div class="mb-8">
-                <div class="text-sm font-semibold text-gray-500 mb-2">GUEST INFORMATION</div>
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">${label}${required ? '<span class="text-red-500">*</span>' : ''}</h2>
-                <p class="text-gray-600">Please provide your ${label.toLowerCase()} to help us serve you better.</p>
+                <div class="text-sm font-semibold text-gray-500 mb-2">${getUIText('guestInfo')}</div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">${translatedLabel}${required ? '<span class="text-red-500">*</span>' : ''}</h2>
+                <p class="text-gray-600">${provideText}</p>
             </div>
             <input 
                 type="${type}" 
@@ -195,11 +356,12 @@ function renderGuestInfoField(fieldName, label, type, placeholder, required) {
                 value="${value}"
                 class="w-full px-6 py-4 text-xl border-2 rounded-xl focus:ring-4 focus:ring-opacity-50 transition-all"
                 style="border-color: ${brandColors.primary}; focus:ring-color: ${brandColors.primary};"
-                placeholder="${placeholder}"
+                placeholder="${translatedPlaceholder}"
                 ${required ? 'required' : ''}
                 autofocus>
         </div>
     `;
+}
 }
 
 // Render question based on type
@@ -216,7 +378,7 @@ function renderQuestion(question, index) {
                     value="${savedAnswer}"
                     class="w-full px-6 py-4 text-xl border-2 rounded-xl focus:ring-4 focus:ring-opacity-50"
                     style="border-color: ${brandColors.primary};"
-                    placeholder="Type your answer here..."
+                    placeholder="${getUIText('typePlaceholder')}"
                     ${question.is_required ? 'required' : ''}
                     autofocus>
             `;
@@ -229,7 +391,7 @@ function renderQuestion(question, index) {
                     rows="5"
                     class="w-full px-6 py-4 text-lg border-2 rounded-xl focus:ring-4 focus:ring-opacity-50 resize-none"
                     style="border-color: ${brandColors.primary};"
-                    placeholder="Share your thoughts..."
+                    placeholder="${getUIText('sharePlaceholder')}"
                     ${question.is_required ? 'required' : ''}
                     autofocus>${savedAnswer}</textarea>
             `;
@@ -259,8 +421,8 @@ function renderQuestion(question, index) {
                     `).join('')}
                 </div>
                 <div class="flex justify-between text-sm text-gray-500 mt-3">
-                    <span>Not at all</span>
-                    <span>Extremely</span>
+                    <span>${getUIText('notAtAll')}</span>
+                    <span>${getUIText('extremely')}</span>
                 </div>
                 <input type="hidden" id="scaleValue" value="${savedAnswer}">
             `;
@@ -289,13 +451,13 @@ function renderQuestion(question, index) {
                          data-value="Yes"
                          onclick="selectChoice(this, 'Yes')">
                         <i class="fas fa-check-circle text-3xl mb-2"></i>
-                        <div class="text-xl font-bold">Yes</div>
+                        <div class="text-xl font-bold">${getUIText('yes')}</div>
                     </div>
                     <div class="choice-option ${savedAnswer === 'No' ? 'active' : ''}"
                          data-value="No"
                          onclick="selectChoice(this, 'No')">
                         <i class="fas fa-times-circle text-3xl mb-2"></i>
-                        <div class="text-xl font-bold">No</div>
+                        <div class="text-xl font-bold">${getUIText('no')}</div>
                     </div>
                 </div>
                 <input type="hidden" id="choiceValue" value="${savedAnswer}">
@@ -313,8 +475,8 @@ function renderQuestion(question, index) {
                     `).join('')}
                 </div>
                 <div class="flex justify-between text-sm text-gray-500 mt-3">
-                    <span>Not at all likely</span>
-                    <span>Extremely likely</span>
+                    <span>${getUIText('notAtAllLikely')}</span>
+                    <span>${getUIText('extremelyLikely')}</span>
                 </div>
                 <input type="hidden" id="scaleValue" value="${savedAnswer}">
             `;
@@ -324,7 +486,7 @@ function renderQuestion(question, index) {
     return `
         <div class="flex-1 flex flex-col justify-center">
             <div class="mb-8">
-                <div class="text-sm font-semibold text-gray-500 mb-2">QUESTION ${index + 1}</div>
+                <div class="text-sm font-semibold text-gray-500 mb-2">${getUIText('question').toUpperCase()} ${index + 1}</div>
                 <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
                     ${question.question_text}
                     ${question.is_required ? '<span class="text-red-500">*</span>' : ''}
