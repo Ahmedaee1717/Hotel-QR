@@ -362,7 +362,6 @@ function renderGuestInfoField(fieldName, label, type, placeholder, required) {
         </div>
     `;
 }
-}
 
 // Render question based on type
 function renderQuestion(question, index) {
