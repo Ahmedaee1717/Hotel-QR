@@ -1958,8 +1958,20 @@ npm run deploy:prod
 ## 📞 Support & Contact
 
 **Project Status**: ✅ Fully Functional MVP
-**Last Updated**: December 6, 2025
-**Version**: 1.0.0
+**Last Updated**: March 28, 2026
+**Version**: 1.1.2
+
+## 🔧 Recent Fixes (March 2026)
+
+### Feedback Forms - Duplication & Save Issues (FIXED ✅)
+- **Problem**: Questions appeared multiple times (3x → 5x → more) and Save button didn't work
+- **Root Cause**: Database foreign key constraint prevented deletion of questions that had answers, but code continued to re-add questions anyway
+- **Solution**: 
+  - Updated DELETE endpoint to cascade delete answers first, then questions
+  - Cleaned 119 duplicate questions from production database
+  - Form 9006 "Guest Feedback": 130 questions → 11 questions (cleaned!)
+- **Status**: ✅ All forms now save correctly with no duplicates
+- **Details**: See `FEEDBACK_FIX_SUMMARY.md` for full technical details
 
 **Test Account Issues?**
 - Credentials are in this README
