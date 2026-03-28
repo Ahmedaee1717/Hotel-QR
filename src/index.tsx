@@ -61297,6 +61297,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       let editingFormId = null;
+      let originalQuestionIds = []; // Track original question IDs for deletion
 
       async function editForm(formId) {
         try {
@@ -61332,6 +61333,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             options: q.options,
             display_order: q.display_order
           }));
+          
+          // Store original question IDs for deletion tracking
+          originalQuestionIds = form.questions.map(q => q.question_id);
+          console.log('📌 Stored original question IDs:', originalQuestionIds);
           
           // Update modal title
           document.querySelector('#formBuilderModal .text-2xl').innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Feedback Form';
@@ -61388,15 +61393,15 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             throw new Error('Failed to update form');
           }
           
-          // Delete all existing questions
-          const existingQuestions = formQuestions.filter(q => q.question_id);
-          console.log('🗑️ Deleting', existingQuestions.length, 'existing questions:', existingQuestions.map(q => q.question_id));
-          for (const q of existingQuestions) {
-            console.log('🗑️ Deleting question ID:', q.question_id);
-            const deleteRes = await fetchWithAuth('/api/admin/feedback/questions/' + q.question_id, {
+          // Delete ALL original questions (including ones removed from UI)
+          console.log('🗑️ Deleting', originalQuestionIds.length, 'original questions:', originalQuestionIds);
+          for (const questionId of originalQuestionIds) {
+            console.log('🗑️ Deleting question ID:', questionId);
+            const deleteRes = await fetchWithAuth('/api/admin/feedback/questions/' + questionId, {
               method: 'DELETE'
             });
-            console.log('🗑️ Delete response:', deleteRes.status, await deleteRes.json());
+            const deleteResult = await deleteRes.json();
+            console.log('🗑️ Delete response:', deleteRes.status, deleteResult);
           }
           
           // Add all questions (both new and existing)
@@ -61422,6 +61427,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           closeFormBuilder();
           loadFeedbackTab();
           editingFormId = null;
+          originalQuestionIds = []; // Clear tracking
         } catch (error) {
           console.error('Save edited form error:', error);
           alert('Failed to update form. Please try again.');
