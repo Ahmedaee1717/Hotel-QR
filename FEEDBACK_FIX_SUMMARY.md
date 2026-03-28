@@ -16,9 +16,14 @@
 - **Root Cause**: JavaScript errors due to failed deletions blocked the save process
 - **Result**: Changes weren't persisted
 
+### Problem 3: Cannot Delete Questions
+- **Symptom**: Clicking delete icon on questions did nothing
+- **Root Cause**: Frontend used plain `fetch()` instead of `fetchWithAuth()`, missing required authentication headers
+- **Result**: 401 Unauthorized error, deletion silently failed
+
 ## Solutions Implemented
 
-### Backend Fix (Commit db684ea)
+### Backend Fix #1 (Commit db684ea)
 Updated `/api/admin/feedback/questions/:question_id` DELETE endpoint:
 ```typescript
 // OLD (BROKEN):
@@ -27,6 +32,20 @@ DELETE FROM feedback_questions WHERE question_id = ?
 // NEW (FIXED):
 DELETE FROM feedback_answers WHERE question_id = ?  // Delete answers first
 DELETE FROM feedback_questions WHERE question_id = ? // Then delete question
+```
+
+### Frontend Fix #2 (Commit af22b14)
+Updated `saveEditedForm()` function to use `fetchWithAuth()`:
+```typescript
+// OLD (BROKEN):
+await fetch('/api/admin/feedback/questions/' + q.question_id, {
+  method: 'DELETE'
+});
+
+// NEW (FIXED):
+await fetchWithAuth('/api/admin/feedback/questions/' + q.question_id, {
+  method: 'DELETE'
+});
 ```
 
 ### Database Cleanup
@@ -40,6 +59,7 @@ Removed **119 duplicate questions** from production database:
 ✅ **DELETE endpoint fixed** - Questions can now be deleted properly
 ✅ **Database cleaned** - All duplicate questions removed
 ✅ **Save function works** - Forms can be edited and saved successfully
+✅ **Question deletion works** - Frontend now sends authentication headers
 ✅ **Translation enabled** - All 33 languages work on frontend
 
 ## How to Use (Admin Dashboard)
@@ -55,6 +75,7 @@ Removed **119 duplicate questions** from production database:
    - Click the trash icon next to any question
    - Question will be removed from the list
    - Click **Save** to persist changes
+   - Changes will save successfully now! ✅
 
 3. **Verify Changes**:
    - Reload the page
@@ -70,9 +91,12 @@ Removed **119 duplicate questions** from production database:
 
 ## Deployment Details
 
-- **Git Commit**: db684ea (backend fix)
+- **Git Commits**: 
+  - `db684ea` (backend cascade delete fix)
+  - `93cd3f0` (documentation)
+  - `af22b14` (frontend fetchWithAuth fix)
 - **Production URL**: https://www.oldpalaceresort.online
-- **Preview URL**: https://42fb47e7.project-c8738f5c.pages.dev
+- **Preview URL**: https://85f88448.project-c8738f5c.pages.dev
 - **Database**: Cleaned (119 duplicates removed)
 
 ## What's Next
