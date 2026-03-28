@@ -60425,7 +60425,10 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       function removeQuestion(index) {
+        console.log('🗑️ removeQuestion called with index:', index);
+        console.log('📋 formQuestions before removal:', formQuestions.length, formQuestions);
         formQuestions.splice(index, 1);
+        console.log('📋 formQuestions after removal:', formQuestions.length, formQuestions);
         renderQuestions();
       }
 
@@ -61387,15 +61390,20 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           
           // Delete all existing questions
           const existingQuestions = formQuestions.filter(q => q.question_id);
+          console.log('🗑️ Deleting', existingQuestions.length, 'existing questions:', existingQuestions.map(q => q.question_id));
           for (const q of existingQuestions) {
-            await fetchWithAuth('/api/admin/feedback/questions/' + q.question_id, {
+            console.log('🗑️ Deleting question ID:', q.question_id);
+            const deleteRes = await fetchWithAuth('/api/admin/feedback/questions/' + q.question_id, {
               method: 'DELETE'
             });
+            console.log('🗑️ Delete response:', deleteRes.status, await deleteRes.json());
           }
           
           // Add all questions (both new and existing)
+          console.log('➕ Adding', formQuestions.length, 'questions back');
           for (const question of formQuestions) {
-            await fetch('/api/admin/feedback/questions', {
+            console.log('➕ Adding question:', question.question_text);
+            const addRes = await fetchWithAuth('/api/admin/feedback/questions', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -61407,6 +61415,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 display_order: question.display_order
               })
             });
+            console.log('➕ Add response:', addRes.status);
           }
           
           alert('✅ Form updated successfully!');
