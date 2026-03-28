@@ -61388,7 +61388,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
           // Delete all existing questions
           const existingQuestions = formQuestions.filter(q => q.question_id);
           for (const q of existingQuestions) {
-            await fetch('/api/admin/feedback/questions/' + q.question_id, {
+            await fetchWithAuth('/api/admin/feedback/questions/' + q.question_id, {
               method: 'DELETE'
             });
           }
