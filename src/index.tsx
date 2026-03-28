@@ -21049,6 +21049,12 @@ app.delete('/api/admin/feedback/questions/:question_id', async (c) => {
   const { question_id } = c.req.param()
   
   try {
+    // First delete any answers referencing this question
+    await DB.prepare(`
+      DELETE FROM feedback_answers WHERE question_id = ?
+    `).bind(question_id).run()
+    
+    // Then delete the question
     await DB.prepare(`
       DELETE FROM feedback_questions WHERE question_id = ?
     `).bind(question_id).run()
@@ -21056,7 +21062,7 @@ app.delete('/api/admin/feedback/questions/:question_id', async (c) => {
     return c.json({ success: true })
   } catch (error) {
     console.error('Delete question error:', error)
-    return c.json({ error: 'Failed to delete question' }, 500)
+    return c.json({ error: 'Failed to delete question: ' + error.message }, 500)
   }
 })
 
