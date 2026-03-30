@@ -259,6 +259,30 @@
 
             <!-- Floor Plan Container -->
             <div class="dark-card rounded-lg p-4 mb-4">
+                <!-- Date Filter for Tables -->
+                <div class="mb-4 flex items-center gap-3 flex-wrap">
+                    <label class="dark-text font-semibold">
+                        <i class="fas fa-calendar-day mr-2"></i>Filter Date:
+                    </label>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="setTableDate('today')" id="tableDateToday" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                            Today
+                        </button>
+                        <button onclick="setTableDate('tomorrow')" id="tableDateTomorrow" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">
+                            Tomorrow
+                        </button>
+                        <input 
+                            type="date" 
+                            id="tableCustomDate" 
+                            onchange="setTableDate('custom')"
+                            class="px-4 py-2 bg-slate-700 text-white rounded-lg border-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                    <span id="tableFilterDateDisplay" class="text-sm text-slate-400">
+                        Showing: Today
+                    </span>
+                </div>
+                
                 <h3 class="font-bold dark-text mb-3 flex items-center justify-between">
                     <span><i class="fas fa-layer-group mr-2"></i>Restaurant Floor Plan</span>
                     <button onclick="loadDashboard()" class="text-sm px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded-lg">
@@ -597,6 +621,9 @@
         let selectedMenuItems = {}; // { item_id: quantity }
         let restaurantTextures = null;
         
+        // Date filter state for tables view
+        let selectedTableDate = 'today'; // 'today', 'tomorrow', or 'YYYY-MM-DD'
+        
         const urlParams = new URLSearchParams(window.location.search);
         // Case-insensitive parameter retrieval
         const restaurantId = urlParams.get('restaurant') || urlParams.get('Restaurant') || '2';
@@ -846,8 +873,20 @@
 
         async function loadTables() {
             try {
-                // Add cache-busting timestamp
-                const response = await fetch(`/api/waiter/tables?restaurant=${restaurantId}&property=${propertyId}&_t=${Date.now()}`, {
+                // Calculate the date to filter by
+                let filterDate = '';
+                if (selectedTableDate === 'today') {
+                    filterDate = new Date().toISOString().split('T')[0];
+                } else if (selectedTableDate === 'tomorrow') {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    filterDate = tomorrow.toISOString().split('T')[0];
+                } else {
+                    filterDate = selectedTableDate; // Custom date YYYY-MM-DD
+                }
+                
+                // Add cache-busting timestamp and date filter
+                const response = await fetch(`/api/waiter/tables?restaurant=${restaurantId}&property=${propertyId}&date=${filterDate}&_t=${Date.now()}`, {
                     headers: { 
                         'X-Property-ID': propertyId,
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -862,6 +901,47 @@
             } catch (error) {
                 console.error('Failed to load tables:', error);
             }
+        }
+        
+        // Date filter functions for Tables View
+        function setTableDate(type) {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+            
+            // Update button styles
+            document.getElementById('tableDateToday').className = 'px-4 py-2 rounded-lg font-semibold hover:bg-slate-600 transition-colors ' + 
+                (type === 'today' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-white');
+            document.getElementById('tableDateTomorrow').className = 'px-4 py-2 rounded-lg hover:bg-slate-600 transition-colors ' + 
+                (type === 'tomorrow' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-white');
+            
+            if (type === 'today') {
+                selectedTableDate = 'today';
+                document.getElementById('tableCustomDate').value = '';
+                document.getElementById('tableFilterDateDisplay').textContent = 'Showing: Today (' + formatDate(today) + ')';
+            } else if (type === 'tomorrow') {
+                selectedTableDate = 'tomorrow';
+                document.getElementById('tableCustomDate').value = '';
+                document.getElementById('tableFilterDateDisplay').textContent = 'Showing: Tomorrow (' + formatDate(tomorrowStr) + ')';
+            } else if (type === 'custom') {
+                const customDate = document.getElementById('tableCustomDate').value;
+                if (customDate) {
+                    selectedTableDate = customDate;
+                    document.getElementById('tableFilterDateDisplay').textContent = 'Showing: ' + formatDate(customDate);
+                    // Reset button styles for custom date
+                    document.getElementById('tableDateToday').className = 'px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors';
+                    document.getElementById('tableDateTomorrow').className = 'px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors';
+                }
+            }
+            
+            // Reload tables with new date filter
+            loadTables().then(() => renderFloorPlan());
+        }
+        
+        function formatDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
         function renderFloorPlan() {

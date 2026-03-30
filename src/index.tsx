@@ -83176,14 +83176,16 @@ app.get('/api/restaurant/:restaurant_id/menu/extra-charge', async (c) => {
 app.get('/api/waiter/tables', async (c) => {
   const { DB } = c.env
   const property_id = c.req.header('X-Property-ID') || '1'
-  const { restaurant, property } = c.req.query()
+  const { restaurant, property, date } = c.req.query()
   
   try {
-    // Calculate date range for active orders
-    const today = new Date().toISOString().split('T')[0]
-    const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + 7)
-    const maxDateStr = maxDate.toISOString().split('T')[0]
+    // Use provided date or default to today
+    const filterDate = date || new Date().toISOString().split('T')[0]
+    
+    // Calculate max date (same day for single-day view)
+    const maxDate = filterDate
+    
+    console.log(`📅 Waiter tables date filter: ${filterDate}`)
     
     // Get all tables for restaurant with position data
     const tables = await DB.prepare(`
@@ -83210,7 +83212,7 @@ app.get('/api/waiter/tables', async (c) => {
         AND status IN ('pending', 'confirmed', 'seated', 'preparing', 'ready')
     `).bind(restaurant).all()
     
-    // Get kitchen bookings (already dining) - with booking details
+    // Get kitchen bookings for the selected date ONLY
     const kitchenBookings = await DB.prepare(`
       SELECT 
         av.table_number,
@@ -83231,9 +83233,9 @@ app.get('/api/waiter/tables', async (c) => {
       WHERE av.restaurant_id = ?
         AND av.property_id = ?
         AND av.status IN ('confirmed', 'preparing', 'ready', 'checked_in')
-        AND av.reservation_date BETWEEN ? AND ?
+        AND av.reservation_date = ?
       ORDER BY av.reservation_date, av.reservation_time
-    `).bind(restaurant, property_id, today, maxDateStr).all()
+    `).bind(restaurant, property_id, filterDate).all()
     
     // Create maps for quick lookup
     const waiterOrderMap = new Map()
