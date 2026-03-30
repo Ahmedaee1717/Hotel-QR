@@ -38292,14 +38292,22 @@ app.get('/beach-booking/:property_id', async (c) => {
                         </div>
                     </div>
 
-                    <!-- Book Button -->
-                    <button id="bookButton" onclick="completeBooking()" disabled class="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold text-lg hover:from-green-700 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
-                        <i class="fas fa-check-circle mr-2"></i>Complete Booking
-                    </button>
+                    <!-- Book Button / Override Message -->
+                    <div id="bookButtonContainer">
+                        <button id="bookButton" onclick="completeBooking()" disabled class="w-full py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl font-bold text-lg hover:from-green-700 hover:to-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+                            <i class="fas fa-check-circle mr-2"></i>Complete Booking
+                        </button>
+                        
+                        <p class="text-xs text-gray-500 text-center mt-3">
+                            <i class="fas fa-info-circle mr-1"></i>Free for hotel guests
+                        </p>
+                    </div>
                     
-                    <p class="text-xs text-gray-500 text-center mt-3">
-                        <i class="fas fa-info-circle mr-1"></i>Free for hotel guests
-                    </p>
+                    <!-- Override Message (hidden by default) -->
+                    <div id="bookingOverrideMessage" class="hidden p-6 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl text-center">
+                        <i class="fas fa-info-circle text-4xl text-amber-600 mb-3"></i>
+                        <p id="overrideMessageText" class="text-lg font-semibold text-gray-800"></p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -38373,6 +38381,17 @@ app.get('/beach-booking/:property_id', async (c) => {
                 
                 if (data.success && data.settings) {
                     settings = data.settings;
+                    
+                    // Check if booking button is overridden
+                    if (settings.booking_button_override_enabled === 1) {
+                        document.getElementById('bookButtonContainer').classList.add('hidden');
+                        document.getElementById('bookingOverrideMessage').classList.remove('hidden');
+                        document.getElementById('overrideMessageText').textContent = settings.booking_button_override_message || 'Beach bookings are currently unavailable.';
+                        console.log('🚫 Booking button overridden with message');
+                    } else {
+                        document.getElementById('bookButtonContainer').classList.remove('hidden');
+                        document.getElementById('bookingOverrideMessage').classList.add('hidden');
+                    }
                     
                     // Apply colors
                     const bgFrom = settings.bg_color_from || '#3b82f6';
@@ -49625,11 +49644,48 @@ app.get('/admin/dashboard', (c) => {
                         <input type="url" id="beachMapImageUrl" placeholder="https://example.com/beach-map.jpg" class="w-full px-4 py-2 border rounded-lg">
                         <p class="text-sm text-gray-600 mt-1">📍 Upload your beach layout image to a hosting service (Imgur, Cloudinary, etc.) and paste the URL here. This image will be shown to guests when they select beach spots.</p>
                     </div>
+                    <div class="col-span-2 border-t pt-4 mt-4">
+                        <div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">
+                            <h4 class="text-lg font-bold mb-3 flex items-center text-amber-800">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>Booking Button Override
+                            </h4>
+                            <p class="text-sm text-gray-700 mb-4">When enabled, the "Complete Booking" button will be replaced with your custom message on the guest booking page.</p>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="flex items-center space-x-3 cursor-pointer">
+                                        <input type="checkbox" id="bookingButtonOverrideEnabled" class="w-5 h-5 rounded" onchange="toggleOverrideMessage()">
+                                        <span class="font-medium text-gray-800">Enable Booking Button Override</span>
+                                    </label>
+                                    <p class="text-xs text-gray-600 ml-8 mt-1">Hide the booking button and show a custom message instead</p>
+                                </div>
+                                <div id="overrideMessageContainer" class="hidden">
+                                    <label class="block font-medium mb-2 text-gray-800">
+                                        <i class="fas fa-comment-dots mr-2"></i>Override Message
+                                    </label>
+                                    <textarea id="bookingButtonOverrideMessage" rows="3" placeholder="Beach bookings are currently unavailable. Please check back later." class="w-full px-4 py-2 border-2 border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500"></textarea>
+                                    <p class="text-xs text-gray-600 mt-1">This message will be displayed to guests instead of the booking button</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <button onclick="saveBeachSettings()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                     <i class="fas fa-save mr-2"></i>Save Settings
                 </button>
             </div>
+            
+            <script>
+                // Toggle override message textarea visibility
+                function toggleOverrideMessage() {
+                    const checkbox = document.getElementById('bookingButtonOverrideEnabled');
+                    const container = document.getElementById('overrideMessageContainer');
+                    if (checkbox.checked) {
+                        container.classList.remove('hidden');
+                    } else {
+                        container.classList.add('hidden');
+                    }
+                }
+            </script>
 
             <!-- Time Slots Management -->
             <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-lg p-6 mb-6 border-2 border-green-200">
@@ -58069,12 +58125,16 @@ app.get('/admin/dashboard', (c) => {
           const cabanasDesc = document.getElementById('cabanasDesc')?.value || 'Private & Cozy';
           const loungersLabel = document.getElementById('loungersLabel')?.value || 'Loungers';
           const loungersDesc = document.getElementById('loungersDesc')?.value || 'Relax in Style';
-          const daybedsLabel = document.getElementById('daybedsLabel')?.value || 'Daybeds';
+          const daybedsLabel = document.getElementById('daybedslabel')?.value || 'Daybeds';
           const daybedsDesc = document.getElementById('daybedsDesc')?.value || 'Ultimate Comfort';
           const buttonText = document.getElementById('buttonText')?.value || 'Book Your Spot Now';
           
           const beachMapImageUrl = document.getElementById('beachMapImageUrl')?.value || null;
           console.log('🏖️ Beach Map Image URL being sent:', beachMapImageUrl);
+          
+          // Get booking button override settings
+          const bookingButtonOverrideEnabled = document.getElementById('bookingButtonOverrideEnabled')?.checked ? 1 : 0;
+          const bookingButtonOverrideMessage = document.getElementById('bookingButtonOverrideMessage')?.value || 'Beach bookings are currently unavailable.';
           
           const payload = {
             beach_booking_enabled: document.getElementById('beachBookingEnabled').checked ? 1 : 0,
@@ -58084,6 +58144,8 @@ app.get('/admin/dashboard', (c) => {
             advance_booking_days: parseInt(document.getElementById('advanceBookingDays').value),
             max_booking_duration_hours: parseInt(document.getElementById('maxDurationHours').value),
             beach_map_image_url: beachMapImageUrl,
+            booking_button_override_enabled: bookingButtonOverrideEnabled,
+            booking_button_override_message: bookingButtonOverrideMessage,
             // Preserve colors
             bg_color_from: bgColorFrom,
             bg_color_to: bgColorTo,
@@ -58129,6 +58191,45 @@ app.get('/admin/dashboard', (c) => {
           alert('❌ Error saving settings');
         }
       };
+      
+      // Load beach settings into form
+      window.loadBeachSettingsForm = async function() {
+        try {
+          const response = await fetchWithAuth('/api/admin/beach/settings/' + propertyId);
+          const data = await response.json();
+          
+          if (data.success && data.settings) {
+            const s = data.settings;
+            
+            // Populate form fields
+            if (document.getElementById('beachBookingEnabled')) document.getElementById('beachBookingEnabled').checked = s.beach_booking_enabled === 1;
+            if (document.getElementById('freeForGuests')) document.getElementById('freeForGuests').checked = s.free_for_hotel_guests === 1;
+            if (document.getElementById('openingTime')) document.getElementById('openingTime').value = s.opening_time || '08:00';
+            if (document.getElementById('closingTime')) document.getElementById('closingTime').value = s.closing_time || '18:00';
+            if (document.getElementById('advanceBookingDays')) document.getElementById('advanceBookingDays').value = s.advance_booking_days || 7;
+            if (document.getElementById('maxDurationHours')) document.getElementById('maxDurationHours').value = s.max_booking_duration_hours || 12;
+            if (document.getElementById('beachMapImageUrl')) document.getElementById('beachMapImageUrl').value = s.beach_map_image_url || '';
+            
+            // Populate override settings
+            if (document.getElementById('bookingButtonOverrideEnabled')) {
+              document.getElementById('bookingButtonOverrideEnabled').checked = s.booking_button_override_enabled === 1;
+              toggleOverrideMessage(); // Show/hide the message textarea
+            }
+            if (document.getElementById('bookingButtonOverrideMessage')) {
+              document.getElementById('bookingButtonOverrideMessage').value = s.booking_button_override_message || 'Beach bookings are currently unavailable.';
+            }
+            
+            console.log('✅ Beach settings loaded into form');
+          }
+        } catch (error) {
+          console.error('Load beach settings error:', error);
+        }
+      };
+      
+      // Load settings when page loads
+      if (document.getElementById('beachBookingEnabled')) {
+        loadBeachSettingsForm();
+      }
       
       async function loadBeachSpots() {
         try {
