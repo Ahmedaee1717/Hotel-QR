@@ -57884,6 +57884,21 @@ app.get('/admin/dashboard', (c) => {
             const defaultInfo = 'Please arrive 10 minutes before your time slot\\nBring your QR code (printed or on phone)\\nBeach towels provided by hotel\\nLate arrivals may result in reduced time';
             safeSet('importantInformation', s.important_information || defaultInfo);
             
+            // Load booking button override settings
+            safeCheck('bookingButtonOverrideEnabled', s.booking_button_override_enabled === 1);
+            safeSet('bookingButtonOverrideMessage', s.booking_button_override_message || 'Beach bookings are currently unavailable. Please contact staff at the beach.');
+            
+            // Show/hide override message textarea based on checkbox state
+            const overrideCheckbox = document.getElementById('bookingButtonOverrideEnabled');
+            const overrideContainer = document.getElementById('overrideMessageContainer');
+            if (overrideCheckbox && overrideContainer) {
+              if (overrideCheckbox.checked) {
+                overrideContainer.classList.remove('hidden');
+              } else {
+                overrideContainer.classList.add('hidden');
+              }
+            }
+            
             // Load beach spots
             await loadBeachSpots();
             
