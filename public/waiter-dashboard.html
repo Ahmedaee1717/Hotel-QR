@@ -1133,6 +1133,9 @@
         function renderOrders() {
             const container = document.getElementById('ordersList');
             
+            console.log('🎨 Rendering orders:', orders.length, 'orders');
+            console.log('Room numbers:', orders.map(o => o.room_number));
+            
             if (orders.length === 0) {
                 container.innerHTML = '<div class="text-center py-8 dark-text-muted">No active orders</div>';
                 return;
@@ -2360,6 +2363,14 @@
                 if (data.success) {
                     allOrdersCache = data.orders || [];
                     orders = allOrdersCache; // Keep orders array in sync
+                    
+                    // DEBUG: Log orders with room numbers
+                    console.log('📦 Loaded orders:', orders.map(o => ({
+                        guest: o.guest_name,
+                        table: o.table_number,
+                        room: o.room_number,
+                        source: o.source
+                    })))
                     
                     // Detect new orders
                     if (lastOrderCount > 0 && allOrdersCache.length > lastOrderCount) {
