@@ -1167,7 +1167,10 @@
                                         <i class="fas ${sourceIcons[order.source]} mr-1"></i>${order.source.toUpperCase()}
                                     </span>
                                 </div>
-                                <div class="text-sm dark-text-muted">${order.guest_name} • ${order.party_size} guests</div>
+                                <div class="text-sm dark-text-muted">
+                                    ${order.guest_name} • ${order.party_size} guests
+                                    ${order.room_number ? ` • <span class="text-blue-400 font-semibold">Room ${order.room_number}</span>` : ''}
+                                </div>
                                 ${order.reservation_date && order.reservation_time ? (() => {
                                     const reservationDateTime = new Date(`${order.reservation_date} ${order.reservation_time}`);
                                     const now = new Date();
