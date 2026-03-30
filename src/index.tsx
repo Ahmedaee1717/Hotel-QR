@@ -83474,12 +83474,17 @@ app.get('/api/waiter/orders', async (c) => {
           }
         }
         
-        // Extract guest name from special_requests
+        // Extract guest name and room number from special_requests
         let guestName = 'Guest'
+        let roomNumber = null
         if (order.special_requests) {
-          const match = order.special_requests.match(/Guest:\s*([^,\n]+)/)
-          if (match) {
-            guestName = match[1].trim()
+          const guestMatch = order.special_requests.match(/Guest:\s*([^,\n]+)/)
+          if (guestMatch) {
+            guestName = guestMatch[1].trim()
+          }
+          const roomMatch = order.special_requests.match(/Room:\s*(\d+)/)
+          if (roomMatch) {
+            roomNumber = roomMatch[1]
           }
         }
         
@@ -83489,7 +83494,7 @@ app.get('/api/waiter/orders', async (c) => {
           order_id: `kitchen-${order.voucher_id}`,
           table_number: order.table_number || 'N/A',
           guest_name: guestName,
-          room_number: order.room_number || null,
+          room_number: order.room_number || roomNumber,
           party_size: parseInt(order.party_size) || 1,
           status: order.status || 'confirmed',
           items: items,
