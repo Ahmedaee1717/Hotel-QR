@@ -38140,9 +38140,40 @@ app.get('/beach-booking/:property_id', async (c) => {
             opacity: 1;
         }
         .spot-icon.booked {
-            opacity: 0.3;
-            filter: grayscale(100%);
+            opacity: 0.5;
+            filter: grayscale(100%) brightness(0.7);
             cursor: not-allowed;
+            position: relative;
+        }
+        .spot-icon.booked::after {
+            content: '❌';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            text-shadow: 0 0 4px white;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .spot-icon.booked:hover::before {
+            content: 'BOOKED';
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ef4444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         .spot-icon.selected {
             transform: scale(1.3);
@@ -38213,10 +38244,14 @@ app.get('/beach-booking/:property_id', async (c) => {
                                 <span class="text-gray-600">Daybed</span>
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-4 text-sm pt-2 border-t">
-                            <div class="flex items-center gap-2">
-                                <span class="text-2xl opacity-30 grayscale">🔵</span>
-                                <span class="text-gray-600">Booked</span>
+                        <div class="flex flex-wrap gap-4 text-sm pt-3 border-t border-gray-200">
+                            <div class="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border-2 border-green-300">
+                                <span class="text-2xl">✅</span>
+                                <span class="text-green-700 font-semibold">Available</span>
+                            </div>
+                            <div class="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border-2 border-red-300">
+                                <span class="text-2xl">❌</span>
+                                <span class="text-red-700 font-semibold">Booked</span>
                             </div>
                         </div>
                     </div>
