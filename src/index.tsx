@@ -14784,7 +14784,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       },
       body: JSON.stringify({
         from: 'Old Palace Resort <onboarding@resend.dev>',
-        to: ['ahmed.enin@gmail.com'],
+        to: ['ahmed.enin@virgingates.com'],
         subject: `📊 Weekly Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`,
         html: htmlContent
       })
