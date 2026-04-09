@@ -49277,6 +49277,64 @@ app.get('/admin/dashboard', (c) => {
                     </div>
                 </form>
             </div>
+
+            <!-- Weekly Analytics Report Email Settings -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">
+                    <i class="fas fa-envelope mr-2 text-blue-600"></i>
+                    Weekly Analytics Report
+                </h2>
+                <p class="text-gray-600 mb-6">
+                    Configure the email address that receives automated weekly analytics reports every Monday at 9 AM UTC.
+                </p>
+                
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-at mr-1"></i>
+                                Report Email Address
+                            </label>
+                            <div class="flex flex-col md:flex-row gap-3">
+                                <input 
+                                    type="email" 
+                                    id="weeklyReportEmail" 
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    placeholder="email@example.com"
+                                >
+                                <button 
+                                    onclick="saveWeeklyReportEmail()" 
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                                >
+                                    <i class="fas fa-save mr-2"></i>
+                                    Save
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Current schedule: Every Monday at 9:00 AM UTC
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-700">Test Email Delivery</p>
+                                <p class="text-xs text-gray-500">Send a test weekly report to verify email configuration</p>
+                            </div>
+                            <button 
+                                onclick="sendTestWeeklyReport()" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Send Test Email
+                            </button>
+                        </div>
+
+                        <!-- Success/Error Messages -->
+                        <div id="weeklyReportMessage" class="hidden"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -66811,6 +66869,115 @@ app.get('/mood-check', async (c) => {
         function thankYou() {
             showThankYou();
         }
+        
+        // Weekly Report Email Functions
+        async function loadWeeklyReportEmail() {
+            try {
+                const response = await fetch('/api/admin/settings/weekly-report-email');
+                const data = await response.json();
+                
+                if (data.success && data.email) {
+                    document.getElementById('weeklyReportEmail').value = data.email;
+                }
+            } catch (error) {
+                console.error('Error loading weekly report email:', error);
+            }
+        }
+
+        async function saveWeeklyReportEmail() {
+            const email = document.getElementById('weeklyReportEmail').value.trim();
+            
+            if (!email) {
+                showWeeklyReportMessage('Please enter an email address', 'error');
+                return;
+            }
+            
+            // Basic email validation
+            const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showWeeklyReportMessage('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/settings/weekly-report-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showWeeklyReportMessage('✅ Email address saved successfully!', 'success');
+                } else {
+                    showWeeklyReportMessage('❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error saving weekly report email:', error);
+                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function sendTestWeeklyReport() {
+            const email = document.getElementById('weeklyReportEmail').value.trim();
+            
+            if (!email) {
+                showWeeklyReportMessage('Please save an email address first', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class=\"fas fa-spinner fa-spin mr-2\"></i>Sending...';
+            
+            try {
+                const response = await fetch('/api/admin/send-weekly-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showWeeklyReportMessage('✅ Test email sent successfully! Check your inbox.', 'success');
+                } else {
+                    showWeeklyReportMessage('❌ Failed to send email: ' + (data.error || data.details?.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error sending test email:', error);
+                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        function showWeeklyReportMessage(message, type) {
+            const messageEl = document.getElementById('weeklyReportMessage');
+            messageEl.className = `mt-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'}`;
+            messageEl.textContent = message;
+            messageEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Load weekly report email when settings tab is shown
+        document.addEventListener('DOMContentLoaded', () => {
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                settingsTab.addEventListener('click', () => {
+                    setTimeout(loadWeeklyReportEmail, 100);
+                });
+            }
+        });
         
         // Initialize
         setGreeting();
