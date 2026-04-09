@@ -49548,56 +49548,156 @@ app.get('/admin/dashboard', (c) => {
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4">
                     <i class="fas fa-envelope mr-2 text-blue-600"></i>
-                    Weekly Analytics Report
+                    Weekly Analytics Reports
                 </h2>
                 <p class="text-gray-600 mb-6">
-                    Configure the email address that receives automated weekly analytics reports every Monday at 9 AM UTC.
+                    Configure email addresses for automated weekly analytics reports. Each report type can be sent to a different email address. Reports are sent every Monday at 9:00 AM UTC.
                 </p>
                 
-                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200">
+                <!-- Beach Analytics -->
+                <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border-2 border-blue-200 mb-6">
+                    <h3 class="text-lg font-bold text-blue-800 mb-4">
+                        <i class="fas fa-umbrella-beach mr-2"></i>
+                        🏖️ Beach Analytics
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">Bookings, occupancy, check-ins, popular spots</p>
+                    
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">
                                 <i class="fas fa-at mr-1"></i>
-                                Report Email Address
+                                Email Address
                             </label>
                             <div class="flex flex-col md:flex-row gap-3">
                                 <input 
                                     type="email" 
-                                    id="weeklyReportEmail" 
+                                    id="beachEmail" 
                                     class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                    placeholder="email@example.com"
+                                    placeholder="beach-manager@example.com"
                                 >
                                 <button 
-                                    id="saveWeeklyEmailBtn"
+                                    id="saveBeachEmailBtn"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
                                 >
                                     <i class="fas fa-save mr-2"></i>
                                     Save
                                 </button>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                Current schedule: Every Monday at 9:00 AM UTC
-                            </p>
                         </div>
 
                         <div class="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-lg p-4 border border-gray-200">
                             <div class="flex-1">
-                                <p class="text-sm font-semibold text-gray-700">Test Email Delivery</p>
-                                <p class="text-xs text-gray-500">Send a test weekly report to verify email configuration</p>
+                                <p class="text-sm font-semibold text-gray-700">Test Beach Report</p>
+                                <p class="text-xs text-gray-500">Send a test beach analytics email</p>
                             </div>
                             <button 
-                                id="sendTestWeeklyEmailBtn"
+                                id="sendTestBeachEmailBtn"
                                 class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
                             >
                                 <i class="fas fa-paper-plane mr-2"></i>
-                                Send Test Email
+                                Send Test
                             </button>
                         </div>
 
-                        <!-- Success/Error Messages -->
-                        <div id="weeklyReportMessage" class="hidden"></div>
+                        <div id="beachEmailMessage" class="hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Feedback Analytics -->
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-200 mb-6">
+                    <h3 class="text-lg font-bold text-green-800 mb-4">
+                        <i class="fas fa-comments mr-2"></i>
+                        💬 Feedback Analytics
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">Guest ratings, reviews, sentiment analysis</p>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-at mr-1"></i>
+                                Email Address
+                            </label>
+                            <div class="flex flex-col md:flex-row gap-3">
+                                <input 
+                                    type="email" 
+                                    id="feedbackEmail" 
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                    placeholder="feedback-manager@example.com"
+                                >
+                                <button 
+                                    id="saveFeedbackEmailBtn"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                                >
+                                    <i class="fas fa-save mr-2"></i>
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-700">Test Feedback Report</p>
+                                <p class="text-xs text-gray-500">Send a test feedback analytics email</p>
+                            </div>
+                            <button 
+                                id="sendTestFeedbackEmailBtn"
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Send Test
+                            </button>
+                        </div>
+
+                        <div id="feedbackEmailMessage" class="hidden"></div>
+                    </div>
+                </div>
+
+                <!-- General Analytics -->
+                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border-2 border-purple-200">
+                    <h3 class="text-lg font-bold text-purple-800 mb-4">
+                        <i class="fas fa-chart-line mr-2"></i>
+                        📊 General Analytics & Usage Stats
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">Dashboard overview, bookings, revenue, engagement</p>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-at mr-1"></i>
+                                Email Address
+                            </label>
+                            <div class="flex flex-col md:flex-row gap-3">
+                                <input 
+                                    type="email" 
+                                    id="generalEmail" 
+                                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    placeholder="admin@example.com"
+                                >
+                                <button 
+                                    id="saveGeneralEmailBtn"
+                                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                                >
+                                    <i class="fas fa-save mr-2"></i>
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-start md:items-center gap-3 bg-white rounded-lg p-4 border border-gray-200">
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-700">Test General Report</p>
+                                <p class="text-xs text-gray-500">Send a test general analytics email</p>
+                            </div>
+                            <button 
+                                id="sendTestGeneralEmailBtn"
+                                class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
+                            >
+                                <i class="fas fa-paper-plane mr-2"></i>
+                                Send Test
+                            </button>
+                        </div>
+
+                        <div id="generalEmailMessage" class="hidden"></div>
                     </div>
                 </div>
             </div>
@@ -66645,78 +66745,84 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.addEventListener('load', () => {
         loadFaceAPIModels();
       });
-        // Weekly Report Email Functions
-        async function loadWeeklyReportEmail() {
+        // Analytics Email Functions
+        async function loadAnalyticsEmails() {
             try {
-                const response = await fetch('/api/admin/settings/weekly-report-email');
+                const response = await fetch('/api/admin/analytics-emails');
                 const data = await response.json();
                 
-                if (data.success && data.email) {
-                    document.getElementById('weeklyReportEmail').value = data.email;
+                if (data.success && data.configs) {
+                    data.configs.forEach(config => {
+                        const inputId = `${config.report_type}Email`;
+                        const input = document.getElementById(inputId);
+                        if (input) {
+                            input.value = config.email_address;
+                        }
+                    });
                 }
             } catch (error) {
-                console.error('Error loading weekly report email:', error);
+                console.error('Error loading analytics emails:', error);
             }
         }
 
-        async function saveWeeklyReportEmail() {
-            console.log('💾 saveWeeklyReportEmail called');
-            const email = document.getElementById('weeklyReportEmail').value.trim();
+        async function saveAnalyticsEmail(reportType) {
+            console.log(`💾 Saving ${reportType} email...`);
+            const email = document.getElementById(`${reportType}Email`).value.trim();
             console.log('📧 Email value:', email);
             
             if (!email) {
                 console.warn('⚠️ No email entered');
-                showWeeklyReportMessage('Please enter an email address', 'error');
+                showAnalyticsMessage(reportType, 'Please enter an email address', 'error');
                 return;
             }
             
             // Basic email validation
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
-                showWeeklyReportMessage('Please enter a valid email address', 'error');
+                showAnalyticsMessage(reportType, 'Please enter a valid email address', 'error');
                 return;
             }
             
             try {
-                const response = await fetch('/api/admin/settings/weekly-report-email', {
+                const response = await fetch(`/api/admin/analytics-emails/${reportType}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email_address: email, enabled: true })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    showWeeklyReportMessage('✅ Email address saved successfully!', 'success');
+                    showAnalyticsMessage(reportType, '✅ Email address saved successfully!', 'success');
                 } else {
-                    showWeeklyReportMessage('❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
+                    showAnalyticsMessage(reportType, '❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                console.error('Error saving weekly report email:', error);
-                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+                console.error(`Error saving ${reportType} email:`, error);
+                showAnalyticsMessage(reportType, '❌ Error: ' + error.message, 'error');
             }
         }
 
-        async function sendTestWeeklyReport() {
-            console.log('📨 sendTestWeeklyReport called');
-            const email = document.getElementById('weeklyReportEmail').value.trim();
+        async function sendTestAnalyticsEmail(reportType) {
+            console.log(`📨 Sending test ${reportType} email...`);
+            const email = document.getElementById(`${reportType}Email`).value.trim();
             console.log('📧 Email value:', email);
             
             if (!email) {
                 console.warn('⚠️ No email entered');
-                showWeeklyReportMessage('Please save an email address first', 'error');
+                showAnalyticsMessage(reportType, 'Please save an email address first', 'error');
                 return;
             }
             
             const button = event.target;
             const originalText = button.innerHTML;
             button.disabled = true;
-            button.innerHTML = '<i class=\"fas fa-spinner fa-spin mr-2\"></i>Sending...';
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
             
             try {
-                const response = await fetch('/api/admin/send-weekly-report', {
+                const response = await fetch(`/api/admin/send-weekly-report?type=${reportType}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -66726,21 +66832,23 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 const data = await response.json();
                 
                 if (data.success) {
-                    showWeeklyReportMessage('✅ Test email sent successfully! Check your inbox.', 'success');
+                    showAnalyticsMessage(reportType, '✅ Test email sent successfully! Check your inbox.', 'success');
                 } else {
-                    showWeeklyReportMessage('❌ Failed to send email: ' + (data.error || data.details?.message || 'Unknown error'), 'error');
+                    showAnalyticsMessage(reportType, '❌ Failed to send email: ' + (data.error || data.details || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                console.error('Error sending test email:', error);
-                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+                console.error(`Error sending test ${reportType} email:`, error);
+                showAnalyticsMessage(reportType, '❌ Error: ' + error.message, 'error');
             } finally {
                 button.disabled = false;
                 button.innerHTML = originalText;
             }
         }
 
-        function showWeeklyReportMessage(message, type) {
-            const messageEl = document.getElementById('weeklyReportMessage');
+        function showAnalyticsMessage(reportType, message, type) {
+            const messageEl = document.getElementById(`${reportType}EmailMessage`);
+            if (!messageEl) return;
+            
             messageEl.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300');
             messageEl.textContent = message;
             messageEl.classList.remove('hidden');
@@ -66750,40 +66858,46 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             }, 5000);
         }
 
-        // Attach event listeners for weekly report buttons
-        function attachWeeklyReportListeners() {
-            console.log('🔧 Attaching weekly report button listeners...');
+        // Attach event listeners for all analytics email buttons
+        function attachAnalyticsEmailListeners() {
+            console.log('🔧 Attaching analytics email button listeners...');
             
-            const saveBtn = document.getElementById('saveWeeklyEmailBtn');
-            if (saveBtn) {
-                console.log('✅ Save button found, attaching listener');
-                saveBtn.addEventListener('click', saveWeeklyReportEmail);
-            } else {
-                console.warn('❌ Save button not found');
-            }
+            const reportTypes = ['beach', 'feedback', 'general'];
             
-            const testBtn = document.getElementById('sendTestWeeklyEmailBtn');
-            if (testBtn) {
-                console.log('✅ Test button found, attaching listener');
-                testBtn.addEventListener('click', sendTestWeeklyReport);
-            } else {
-                console.warn('❌ Test button not found');
-            }
+            reportTypes.forEach(type => {
+                // Save button
+                const saveBtn = document.getElementById(`save${type.charAt(0).toUpperCase() + type.slice(1)}EmailBtn`);
+                if (saveBtn) {
+                    console.log(`✅ ${type} save button found`);
+                    saveBtn.addEventListener('click', () => saveAnalyticsEmail(type));
+                } else {
+                    console.warn(`❌ ${type} save button not found`);
+                }
+                
+                // Test button
+                const testBtn = document.getElementById(`sendTest${type.charAt(0).toUpperCase() + type.slice(1)}EmailBtn`);
+                if (testBtn) {
+                    console.log(`✅ ${type} test button found`);
+                    testBtn.addEventListener('click', () => sendTestAnalyticsEmail(type));
+                } else {
+                    console.warn(`❌ ${type} test button not found`);
+                }
+            });
         }
         
         // Attach event listeners when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('📋 DOM Content Loaded - setting up weekly report');
+            console.log('📋 DOM Content Loaded - setting up analytics emails');
             
-            // Load weekly report email and attach listeners when settings tab is shown
+            // Load analytics emails and attach listeners when settings tab is shown
             const settingsTab = document.querySelector('[data-tab="settings"]');
             if (settingsTab) {
                 console.log('✅ Settings tab found');
                 settingsTab.addEventListener('click', () => {
                     console.log('🖱️ Settings tab clicked');
                     setTimeout(() => {
-                        loadWeeklyReportEmail();
-                        attachWeeklyReportListeners();
+                        loadAnalyticsEmails();
+                        attachAnalyticsEmailListeners();
                     }, 100);
                 });
             } else {
