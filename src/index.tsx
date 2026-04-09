@@ -49303,7 +49303,7 @@ app.get('/admin/dashboard', (c) => {
                                     placeholder="email@example.com"
                                 >
                                 <button 
-                                    onclick="saveWeeklyReportEmail()" 
+                                    id="saveWeeklyEmailBtn"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
                                 >
                                     <i class="fas fa-save mr-2"></i>
@@ -49322,7 +49322,7 @@ app.get('/admin/dashboard', (c) => {
                                 <p class="text-xs text-gray-500">Send a test weekly report to verify email configuration</p>
                             </div>
                             <button 
-                                onclick="sendTestWeeklyReport()" 
+                                id="sendTestWeeklyEmailBtn"
                                 class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition whitespace-nowrap"
                             >
                                 <i class="fas fa-paper-plane mr-2"></i>
@@ -66969,18 +66969,25 @@ app.get('/mood-check', async (c) => {
             }, 5000);
         }
 
-        // Expose functions to global scope for onclick handlers
-        window.saveWeeklyReportEmail = saveWeeklyReportEmail;
-        window.sendTestWeeklyReport = sendTestWeeklyReport;
-        window.loadWeeklyReportEmail = loadWeeklyReportEmail;
-        
-        // Load weekly report email when settings tab is shown
+        // Attach event listeners when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
+            // Load weekly report email when settings tab is shown
             const settingsTab = document.querySelector('[data-tab="settings"]');
             if (settingsTab) {
                 settingsTab.addEventListener('click', () => {
                     setTimeout(loadWeeklyReportEmail, 100);
                 });
+            }
+            
+            // Attach button click handlers
+            const saveBtn = document.getElementById('saveWeeklyEmailBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', saveWeeklyReportEmail);
+            }
+            
+            const testBtn = document.getElementById('sendTestWeeklyEmailBtn');
+            if (testBtn) {
+                testBtn.addEventListener('click', sendTestWeeklyReport);
             }
         });
         
