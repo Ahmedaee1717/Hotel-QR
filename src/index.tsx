@@ -14631,6 +14631,9 @@ app.post('/api/admin/send-weekly-report', async (c) => {
   const { DB } = c.env
   const RESEND_API_KEY = c.env.RESEND_API_KEY
   
+  console.log('📧 Starting weekly report generation...')
+  console.log('RESEND_API_KEY exists:', !!RESEND_API_KEY)
+  
   try {
     // Calculate date ranges
     const today = new Date()
@@ -14914,7 +14917,11 @@ app.post('/api/admin/send-weekly-report', async (c) => {
     })
   } catch (error) {
     console.error('Send weekly report error:', error)
-    return c.json({ error: 'Failed to send weekly report' }, 500)
+    return c.json({ 
+      error: 'Failed to send weekly report', 
+      details: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    }, 500)
   }
 })
 
