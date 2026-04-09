@@ -14626,6 +14626,298 @@ app.post('/api/admin/beach/bookings/:booking_reference/checkout', async (c) => {
   }
 })
 
+// API: Send Weekly Analytics Report
+app.post('/api/admin/send-weekly-report', async (c) => {
+  const { DB } = c.env
+  const RESEND_API_KEY = c.env.RESEND_API_KEY
+  
+  try {
+    // Calculate date ranges
+    const today = new Date()
+    const lastWeekStart = new Date(today)
+    lastWeekStart.setDate(today.getDate() - 7)
+    const lastWeekEnd = new Date(today)
+    
+    const previousWeekStart = new Date(today)
+    previousWeekStart.setDate(today.getDate() - 14)
+    const previousWeekEnd = new Date(today)
+    previousWeekEnd.setDate(today.getDate() - 7)
+    
+    const formatDate = (date: Date) => date.toISOString().split('T')[0]
+    
+    // Get restaurant analytics
+    const restaurantOrders = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_orders,
+        SUM(total_cost) as total_revenue,
+        AVG(total_cost) as avg_order_value,
+        COUNT(DISTINCT table_id) as unique_tables
+      FROM waiter_orders
+      WHERE property_id = 1 
+        AND order_date >= ? 
+        AND order_date < ?
+        AND order_status != 'cancelled'
+    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
+    
+    const prevRestaurantOrders = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_orders,
+        SUM(total_cost) as total_revenue
+      FROM waiter_orders
+      WHERE property_id = 1 
+        AND order_date >= ? 
+        AND order_date < ?
+        AND order_status != 'cancelled'
+    `).bind(formatDate(previousWeekStart), formatDate(previousWeekEnd)).first()
+    
+    // Get top menu items
+    const topItems = await DB.prepare(`
+      SELECT 
+        item_name,
+        SUM(quantity) as total_quantity,
+        SUM(quantity * item_cost) as total_revenue
+      FROM (
+        SELECT 
+          wo.order_id,
+          json_each.value->>'name' as item_name,
+          CAST(json_each.value->>'quantity' AS INTEGER) as quantity,
+          CAST(json_each.value->>'cost' AS REAL) as item_cost
+        FROM waiter_orders wo,
+        json_each(wo.order_items)
+        WHERE wo.property_id = 1
+          AND wo.order_date >= ?
+          AND wo.order_date < ?
+          AND wo.order_status != 'cancelled'
+      )
+      GROUP BY item_name
+      ORDER BY total_quantity DESC
+      LIMIT 5
+    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
+    
+    // Get beach booking analytics
+    const beachBookings = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_bookings,
+        SUM(num_guests) as total_guests,
+        COUNT(DISTINCT spot_id) as unique_spots,
+        SUM(CASE WHEN booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count,
+        SUM(CASE WHEN booking_status = 'no_show' THEN 1 ELSE 0 END) as no_show_count
+      FROM beach_bookings
+      WHERE property_id = 1 
+        AND booking_date >= ? 
+        AND booking_date < ?
+    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
+    
+    const prevBeachBookings = await DB.prepare(`
+      SELECT 
+        COUNT(*) as total_bookings
+      FROM beach_bookings
+      WHERE property_id = 1 
+        AND booking_date >= ? 
+        AND booking_date < ?
+    `).bind(formatDate(previousWeekStart), formatDate(previousWeekEnd)).first()
+    
+    // Get popular beach spots
+    const popularSpots = await DB.prepare(`
+      SELECT 
+        bs.spot_number,
+        bs.spot_type,
+        COUNT(*) as booking_count
+      FROM beach_bookings bb
+      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+      WHERE bb.property_id = 1
+        AND bb.booking_date >= ?
+        AND bb.booking_date < ?
+      GROUP BY bs.spot_number, bs.spot_type
+      ORDER BY booking_count DESC
+      LIMIT 5
+    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
+    
+    // Calculate week-over-week changes
+    const restaurantChange = prevRestaurantOrders?.total_revenue 
+      ? (((restaurantOrders?.total_revenue || 0) - (prevRestaurantOrders.total_revenue || 0)) / prevRestaurantOrders.total_revenue * 100).toFixed(1)
+      : '0'
+    
+    const beachChange = prevBeachBookings?.total_bookings
+      ? (((beachBookings?.total_bookings || 0) - (prevBeachBookings.total_bookings || 0)) / prevBeachBookings.total_bookings * 100).toFixed(1)
+      : '0'
+    
+    // Build HTML email
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px; }
+        .section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .section h2 { color: #667eea; margin-top: 0; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .stat-card { background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; }
+        .stat-value { font-size: 28px; font-weight: bold; color: #667eea; }
+        .stat-label { color: #666; font-size: 14px; }
+        .change-positive { color: #10b981; font-weight: bold; }
+        .change-negative { color: #ef4444; font-weight: bold; }
+        .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .table th { background: #667eea; color: white; padding: 12px; text-align: left; }
+        .table td { padding: 10px; border-bottom: 1px solid #ddd; }
+        .table tr:hover { background: #f0f0f0; }
+        .footer { text-align: center; color: #666; margin-top: 30px; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>🏨 Old Palace Resort</h1>
+        <p style="font-size: 18px;">Weekly Analytics Report</p>
+        <p>${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}</p>
+      </div>
+      
+      <div class="section">
+        <h2>🍽️ Restaurant Analytics</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">${restaurantOrders?.total_orders || 0}</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">$${(restaurantOrders?.total_revenue || 0).toFixed(2)}</div>
+            <div class="stat-label">Total Revenue</div>
+            <div class="${Number(restaurantChange) >= 0 ? 'change-positive' : 'change-negative'}">
+              ${Number(restaurantChange) >= 0 ? '↑' : '↓'} ${Math.abs(Number(restaurantChange))}% vs last week
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">$${(restaurantOrders?.avg_order_value || 0).toFixed(2)}</div>
+            <div class="stat-label">Avg Order Value</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${restaurantOrders?.unique_tables || 0}</div>
+            <div class="stat-label">Tables Served</div>
+          </div>
+        </div>
+        
+        <h3>📊 Top 5 Menu Items</h3>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Orders</th>
+              <th>Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${topItems?.results?.map(item => `
+              <tr>
+                <td>${item.item_name}</td>
+                <td>${item.total_quantity}</td>
+                <td>$${Number(item.total_revenue).toFixed(2)}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="3">No data</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="section">
+        <h2>🏖️ Beach Booking Analytics</h2>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">${beachBookings?.total_bookings || 0}</div>
+            <div class="stat-label">Total Bookings</div>
+            <div class="${Number(beachChange) >= 0 ? 'change-positive' : 'change-negative'}">
+              ${Number(beachChange) >= 0 ? '↑' : '↓'} ${Math.abs(Number(beachChange))}% vs last week
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${beachBookings?.total_guests || 0}</div>
+            <div class="stat-label">Total Guests</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${beachBookings?.checked_in_count || 0}</div>
+            <div class="stat-label">Check-ins</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${beachBookings?.no_show_count || 0}</div>
+            <div class="stat-label">No-Shows</div>
+          </div>
+        </div>
+        
+        <h3>🌟 Top 5 Popular Spots</h3>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Spot Number</th>
+              <th>Type</th>
+              <th>Bookings</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${popularSpots?.results?.map(spot => `
+              <tr>
+                <td>Spot ${spot.spot_number}</td>
+                <td>${spot.spot_type}</td>
+                <td>${spot.booking_count}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="3">No data</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="footer">
+        <p>This is an automated weekly report from Old Palace Resort</p>
+        <p>Generated on ${new Date().toLocaleString()}</p>
+      </div>
+    </body>
+    </html>
+    `
+    
+    // Send email via Resend
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Old Palace Resort <reports@oldpalaceresort.online>',
+        to: ['admin@paradiseresort.com'],
+        subject: `📊 Weekly Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`,
+        html: htmlContent
+      })
+    })
+    
+    const emailResult = await emailResponse.json()
+    
+    if (!emailResponse.ok) {
+      console.error('Resend API error:', emailResult)
+      return c.json({ error: 'Failed to send email', details: emailResult }, 500)
+    }
+    
+    console.log('✅ Weekly report email sent successfully:', emailResult)
+    
+    return c.json({ 
+      success: true, 
+      message: 'Weekly report sent successfully',
+      email_id: emailResult.id,
+      stats: {
+        restaurant: {
+          orders: restaurantOrders?.total_orders || 0,
+          revenue: restaurantOrders?.total_revenue || 0,
+          change: restaurantChange
+        },
+        beach: {
+          bookings: beachBookings?.total_bookings || 0,
+          guests: beachBookings?.total_guests || 0,
+          change: beachChange
+        }
+      }
+    })
+  } catch (error) {
+    console.error('Send weekly report error:', error)
+    return c.json({ error: 'Failed to send weekly report' }, 500)
+  }
+})
+
 // API: Staff - Verify Booking (QR or Code)
 app.post('/api/staff/beach/verify', async (c) => {
   const { DB } = c.env
@@ -84215,29 +84507,28 @@ app.post('/api/waiter/checkout-table', async (c) => {
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
-    console.log('Running scheduled biometric data deletion job...')
+    console.log('Running scheduled jobs...', event.cron)
     
     try {
-      // Call the auto-delete endpoint internally
-      const request = new Request('https://internal/api/admin/all-inclusive/biometric/auto-delete', {
-        method: 'POST',
-        headers: {
-          'X-Cron-Token': env.CRON_SECRET || 'change-this-in-production',
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      // Create a context with the environment
-      const c = {
-        env,
-        req: {
+      // Weekly analytics report (Monday 9 AM)
+      if (event.cron === '0 9 * * MON') {
+        console.log('📧 Sending weekly analytics report...')
+        
+        const { DB, RESEND_API_KEY } = env
+        const c = { env, req: { method: 'POST' }, json: (data: any) => ({ data }) }
+        
+        // Call the send-weekly-report endpoint logic directly
+        const reportEndpoint = await fetch('https://www.oldpalaceresort.online/api/admin/send-weekly-report', {
           method: 'POST',
-          header: (name: string) => {
-            if (name === 'X-Cron-Token') return env.CRON_SECRET || 'change-this-in-production'
-            return null
-          }
-        }
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        const result = await reportEndpoint.json()
+        console.log('✅ Weekly report result:', result)
       }
+      
+      // Biometric data deletion job
+      console.log('🗑️ Running biometric data deletion job...')
       
       // Execute the deletion logic directly
       const { DB } = env
