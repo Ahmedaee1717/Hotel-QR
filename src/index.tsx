@@ -14655,22 +14655,26 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         SUM(total_cost) as total_revenue,
         AVG(total_cost) as avg_order_value,
         COUNT(DISTINCT table_id) as unique_tables
-      FROM waiter_orders
-      WHERE property_id = 1 
-        AND order_date >= ? 
-        AND order_date < ?
-        AND order_status != 'cancelled'
+      FROM waiter_orders wo
+      JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+      JOIN restaurants r ON rt.restaurant_id = r.restaurant_id
+      WHERE r.property_id = 1 
+        AND wo.order_date >= ? 
+        AND wo.order_date < ?
+        AND wo.order_status != 'cancelled'
     `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
     
     const prevRestaurantOrders = await DB.prepare(`
       SELECT 
         COUNT(*) as total_orders,
         SUM(total_cost) as total_revenue
-      FROM waiter_orders
-      WHERE property_id = 1 
-        AND order_date >= ? 
-        AND order_date < ?
-        AND order_status != 'cancelled'
+      FROM waiter_orders wo
+      JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+      JOIN restaurants r ON rt.restaurant_id = r.restaurant_id
+      WHERE r.property_id = 1 
+        AND wo.order_date >= ? 
+        AND wo.order_date < ?
+        AND wo.order_status != 'cancelled'
     `).bind(formatDate(previousWeekStart), formatDate(previousWeekEnd)).first()
     
     // Get top menu items
@@ -14685,9 +14689,11 @@ app.post('/api/admin/send-weekly-report', async (c) => {
           json_each.value->>'name' as item_name,
           CAST(json_each.value->>'quantity' AS INTEGER) as quantity,
           CAST(json_each.value->>'cost' AS REAL) as item_cost
-        FROM waiter_orders wo,
+        FROM waiter_orders wo
+        JOIN restaurant_tables rt ON wo.table_id = rt.table_id
+        JOIN restaurants r ON rt.restaurant_id = r.restaurant_id,
         json_each(wo.order_items)
-        WHERE wo.property_id = 1
+        WHERE r.property_id = 1
           AND wo.order_date >= ?
           AND wo.order_date < ?
           AND wo.order_status != 'cancelled'
