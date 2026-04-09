@@ -14626,6 +14626,56 @@ app.post('/api/admin/beach/bookings/:booking_reference/checkout', async (c) => {
   }
 })
 
+// API: Get Weekly Report Email Setting
+app.get('/api/admin/settings/weekly-report-email', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const setting = await DB.prepare(`
+      SELECT setting_value FROM system_settings WHERE setting_key = 'weekly_report_email'
+    `).first()
+    
+    return c.json({ 
+      success: true, 
+      email: setting?.setting_value || 'survapps@gmail.com'
+    })
+  } catch (error) {
+    console.error('Get weekly report email error:', error)
+    return c.json({ error: 'Failed to get email setting' }, 500)
+  }
+})
+
+// API: Update Weekly Report Email Setting
+app.post('/api/admin/settings/weekly-report-email', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const { email } = await c.req.json()
+    
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400)
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return c.json({ error: 'Invalid email format' }, 400)
+    }
+    
+    await DB.prepare(`
+      INSERT OR REPLACE INTO system_settings (setting_key, setting_value, description, updated_at)
+      VALUES ('weekly_report_email', ?, 'Email address for weekly analytics reports', CURRENT_TIMESTAMP)
+    `).bind(email).run()
+    
+    console.log('✅ Updated weekly report email to:', email)
+    
+    return c.json({ success: true, email })
+  } catch (error) {
+    console.error('Update weekly report email error:', error)
+    return c.json({ error: 'Failed to update email setting' }, 500)
+  }
+})
+
 // API: Send Weekly Analytics Report
 app.post('/api/admin/send-weekly-report', async (c) => {
   const { DB } = c.env
@@ -14775,6 +14825,14 @@ app.post('/api/admin/send-weekly-report', async (c) => {
     </html>
     `
     
+    // Get email address from database
+    const emailSetting = await DB.prepare(`
+      SELECT setting_value FROM system_settings WHERE setting_key = 'weekly_report_email'
+    `).first()
+    
+    const recipientEmail = emailSetting?.setting_value || 'survapps@gmail.com'
+    console.log('📧 Sending weekly report to:', recipientEmail)
+    
     // Send email via Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -14784,7 +14842,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       },
       body: JSON.stringify({
         from: 'Old Palace Resort <reports@oldpalaceresort.online>',
-        to: ['survapps@gmail.com'],
+        to: [recipientEmail],
         subject: `📊 Weekly Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`,
         html: htmlContent
       })
