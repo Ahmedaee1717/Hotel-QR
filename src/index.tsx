@@ -66889,11 +66889,21 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         document.addEventListener('DOMContentLoaded', () => {
             console.log('📋 DOM Content Loaded - setting up analytics emails');
             
-            // Load analytics emails and attach listeners when settings tab is shown
-            const settingsTab = document.querySelector('[data-tab="settings"]');
-            if (settingsTab) {
-                console.log('✅ Settings tab found');
-                settingsTab.addEventListener('click', () => {
+            // Check if settings tab is already visible (e.g., after page refresh on settings tab)
+            const settingsTab = document.getElementById('settingsTab');
+            if (settingsTab && !settingsTab.classList.contains('hidden')) {
+                console.log('✅ Settings tab already visible - attaching listeners now');
+                setTimeout(() => {
+                    loadAnalyticsEmails();
+                    attachAnalyticsEmailListeners();
+                }, 200);
+            }
+            
+            // Also attach listeners when settings tab is clicked
+            const settingsTabButton = document.querySelector('[data-tab="settings"]');
+            if (settingsTabButton) {
+                console.log('✅ Settings tab button found');
+                settingsTabButton.addEventListener('click', () => {
                     console.log('🖱️ Settings tab clicked');
                     setTimeout(() => {
                         loadAnalyticsEmails();
@@ -66901,7 +66911,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                     }, 100);
                 });
             } else {
-                console.warn('❌ Settings tab not found');
+                console.warn('❌ Settings tab button not found');
             }
         });
         
