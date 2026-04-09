@@ -66380,6 +66380,155 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.addEventListener('load', () => {
         loadFaceAPIModels();
       });
+        // Weekly Report Email Functions
+        async function loadWeeklyReportEmail() {
+            try {
+                const response = await fetch('/api/admin/settings/weekly-report-email');
+                const data = await response.json();
+                
+                if (data.success && data.email) {
+                    document.getElementById('weeklyReportEmail').value = data.email;
+                }
+            } catch (error) {
+                console.error('Error loading weekly report email:', error);
+            }
+        }
+
+        async function saveWeeklyReportEmail() {
+            console.log('💾 saveWeeklyReportEmail called');
+            const email = document.getElementById('weeklyReportEmail').value.trim();
+            console.log('📧 Email value:', email);
+            
+            if (!email) {
+                console.warn('⚠️ No email entered');
+                showWeeklyReportMessage('Please enter an email address', 'error');
+                return;
+            }
+            
+            // Basic email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showWeeklyReportMessage('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/settings/weekly-report-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showWeeklyReportMessage('✅ Email address saved successfully!', 'success');
+                } else {
+                    showWeeklyReportMessage('❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error saving weekly report email:', error);
+                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+            }
+        }
+
+        async function sendTestWeeklyReport() {
+            console.log('📨 sendTestWeeklyReport called');
+            const email = document.getElementById('weeklyReportEmail').value.trim();
+            console.log('📧 Email value:', email);
+            
+            if (!email) {
+                console.warn('⚠️ No email entered');
+                showWeeklyReportMessage('Please save an email address first', 'error');
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class=\"fas fa-spinner fa-spin mr-2\"></i>Sending...';
+            
+            try {
+                const response = await fetch('/api/admin/send-weekly-report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showWeeklyReportMessage('✅ Test email sent successfully! Check your inbox.', 'success');
+                } else {
+                    showWeeklyReportMessage('❌ Failed to send email: ' + (data.error || data.details?.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Error sending test email:', error);
+                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        function showWeeklyReportMessage(message, type) {
+            const messageEl = document.getElementById('weeklyReportMessage');
+            messageEl.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300');
+            messageEl.textContent = message;
+            messageEl.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Attach event listeners for weekly report buttons
+        function attachWeeklyReportListeners() {
+            console.log('🔧 Attaching weekly report button listeners...');
+            
+            const saveBtn = document.getElementById('saveWeeklyEmailBtn');
+            if (saveBtn) {
+                console.log('✅ Save button found, attaching listener');
+                saveBtn.addEventListener('click', saveWeeklyReportEmail);
+            } else {
+                console.warn('❌ Save button not found');
+            }
+            
+            const testBtn = document.getElementById('sendTestWeeklyEmailBtn');
+            if (testBtn) {
+                console.log('✅ Test button found, attaching listener');
+                testBtn.addEventListener('click', sendTestWeeklyReport);
+            } else {
+                console.warn('❌ Test button not found');
+            }
+        }
+        
+        // Attach event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📋 DOM Content Loaded - setting up weekly report');
+            
+            // Load weekly report email and attach listeners when settings tab is shown
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                console.log('✅ Settings tab found');
+                settingsTab.addEventListener('click', () => {
+                    console.log('🖱️ Settings tab clicked');
+                    setTimeout(() => {
+                        loadWeeklyReportEmail();
+                        attachWeeklyReportListeners();
+                    }, 100);
+                });
+            } else {
+                console.warn('❌ Settings tab not found');
+            }
+        });
+        
+        // Initialize
+        setGreeting();
+        calculateStayDay();
     </script>
 </body>
 </html>
@@ -66871,153 +67020,6 @@ app.get('/mood-check', async (c) => {
             showThankYou();
         }
         
-        // Weekly Report Email Functions
-        async function loadWeeklyReportEmail() {
-            try {
-                const response = await fetch('/api/admin/settings/weekly-report-email');
-                const data = await response.json();
-                
-                if (data.success && data.email) {
-                    document.getElementById('weeklyReportEmail').value = data.email;
-                }
-            } catch (error) {
-                console.error('Error loading weekly report email:', error);
-            }
-        }
-
-        async function saveWeeklyReportEmail() {
-            console.log('💾 saveWeeklyReportEmail called');
-            const email = document.getElementById('weeklyReportEmail').value.trim();
-            console.log('📧 Email value:', email);
-            
-            if (!email) {
-                console.warn('⚠️ No email entered');
-                showWeeklyReportMessage('Please enter an email address', 'error');
-                return;
-            }
-            
-            // Basic email validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                showWeeklyReportMessage('Please enter a valid email address', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/admin/settings/weekly-report-email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showWeeklyReportMessage('✅ Email address saved successfully!', 'success');
-                } else {
-                    showWeeklyReportMessage('❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                console.error('Error saving weekly report email:', error);
-                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
-            }
-        }
-
-        async function sendTestWeeklyReport() {
-            console.log('📨 sendTestWeeklyReport called');
-            const email = document.getElementById('weeklyReportEmail').value.trim();
-            console.log('📧 Email value:', email);
-            
-            if (!email) {
-                console.warn('⚠️ No email entered');
-                showWeeklyReportMessage('Please save an email address first', 'error');
-                return;
-            }
-            
-            const button = event.target;
-            const originalText = button.innerHTML;
-            button.disabled = true;
-            button.innerHTML = '<i class=\"fas fa-spinner fa-spin mr-2\"></i>Sending...';
-            
-            try {
-                const response = await fetch('/api/admin/send-weekly-report', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showWeeklyReportMessage('✅ Test email sent successfully! Check your inbox.', 'success');
-                } else {
-                    showWeeklyReportMessage('❌ Failed to send email: ' + (data.error || data.details?.message || 'Unknown error'), 'error');
-                }
-            } catch (error) {
-                console.error('Error sending test email:', error);
-                showWeeklyReportMessage('❌ Error: ' + error.message, 'error');
-            } finally {
-                button.disabled = false;
-                button.innerHTML = originalText;
-            }
-        }
-
-        function showWeeklyReportMessage(message, type) {
-            const messageEl = document.getElementById('weeklyReportMessage');
-            messageEl.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300');
-            messageEl.textContent = message;
-            messageEl.classList.remove('hidden');
-            
-            setTimeout(() => {
-                messageEl.classList.add('hidden');
-            }, 5000);
-        }
-
-        // Attach event listeners for weekly report buttons
-        function attachWeeklyReportListeners() {
-            console.log('🔧 Attaching weekly report button listeners...');
-            
-            const saveBtn = document.getElementById('saveWeeklyEmailBtn');
-            if (saveBtn) {
-                console.log('✅ Save button found, attaching listener');
-                saveBtn.addEventListener('click', saveWeeklyReportEmail);
-            } else {
-                console.warn('❌ Save button not found');
-            }
-            
-            const testBtn = document.getElementById('sendTestWeeklyEmailBtn');
-            if (testBtn) {
-                console.log('✅ Test button found, attaching listener');
-                testBtn.addEventListener('click', sendTestWeeklyReport);
-            } else {
-                console.warn('❌ Test button not found');
-            }
-        }
-        
-        // Attach event listeners when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('📋 DOM Content Loaded - setting up weekly report');
-            
-            // Load weekly report email and attach listeners when settings tab is shown
-            const settingsTab = document.querySelector('[data-tab="settings"]');
-            if (settingsTab) {
-                console.log('✅ Settings tab found');
-                settingsTab.addEventListener('click', () => {
-                    console.log('🖱️ Settings tab clicked');
-                    setTimeout(() => {
-                        loadWeeklyReportEmail();
-                        attachWeeklyReportListeners();
-                    }, 100);
-                });
-            } else {
-                console.warn('❌ Settings tab not found');
-            }
-        });
-        
-        // Initialize
         setGreeting();
         calculateStayDay();
     </script>
