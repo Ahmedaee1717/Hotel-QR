@@ -14783,7 +14783,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'Old Palace Resort <reports@oldpalaceresort.online>',
+        from: 'Old Palace Resort <onboarding@resend.dev>',
         to: ['admin@paradiseresort.com'],
         subject: `📊 Weekly Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`,
         html: htmlContent
