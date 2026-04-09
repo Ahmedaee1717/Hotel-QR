@@ -14657,8 +14657,8 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         COUNT(DISTINCT table_id) as unique_tables
       FROM waiter_orders wo
       JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-      JOIN restaurants r ON rt.restaurant_id = r.restaurant_id
-      WHERE r.property_id = 1 
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE ho.property_id = 1 
         AND wo.order_date >= ? 
         AND wo.order_date < ?
         AND wo.order_status != 'cancelled'
@@ -14670,8 +14670,8 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         SUM(total_cost) as total_revenue
       FROM waiter_orders wo
       JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-      JOIN restaurants r ON rt.restaurant_id = r.restaurant_id
-      WHERE r.property_id = 1 
+      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
+      WHERE ho.property_id = 1 
         AND wo.order_date >= ? 
         AND wo.order_date < ?
         AND wo.order_status != 'cancelled'
@@ -14691,9 +14691,9 @@ app.post('/api/admin/send-weekly-report', async (c) => {
           CAST(json_each.value->>'cost' AS REAL) as item_cost
         FROM waiter_orders wo
         JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-        JOIN restaurants r ON rt.restaurant_id = r.restaurant_id,
+        JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id,
         json_each(wo.order_items)
-        WHERE r.property_id = 1
+        WHERE ho.property_id = 1
           AND wo.order_date >= ?
           AND wo.order_date < ?
           AND wo.order_status != 'cancelled'
