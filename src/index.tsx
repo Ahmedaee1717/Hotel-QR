@@ -66969,6 +66969,11 @@ app.get('/mood-check', async (c) => {
             }, 5000);
         }
 
+        // Expose functions to global scope for onclick handlers
+        window.saveWeeklyReportEmail = saveWeeklyReportEmail;
+        window.sendTestWeeklyReport = sendTestWeeklyReport;
+        window.loadWeeklyReportEmail = loadWeeklyReportEmail;
+        
         // Load weekly report email when settings tab is shown
         document.addEventListener('DOMContentLoaded', () => {
             const settingsTab = document.querySelector('[data-tab="settings"]');
