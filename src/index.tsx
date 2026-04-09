@@ -66893,7 +66893,7 @@ app.get('/mood-check', async (c) => {
             }
             
             // Basic email validation
-            const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(email)) {
                 showWeeklyReportMessage('Please enter a valid email address', 'error');
                 return;
@@ -66960,7 +66960,7 @@ app.get('/mood-check', async (c) => {
 
         function showWeeklyReportMessage(message, type) {
             const messageEl = document.getElementById('weeklyReportMessage');
-            messageEl.className = `mt-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'}`;
+            messageEl.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300');
             messageEl.textContent = message;
             messageEl.classList.remove('hidden');
             
