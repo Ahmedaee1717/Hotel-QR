@@ -44047,6 +44047,7 @@ app.get('/gm/features', (c) => {
 // Super Admin Dashboard page
 // Admin Dashboard page
 app.get('/admin/dashboard', (c) => {
+  // Version: 2026-04-09-v2
   return c.html(`
 <!DOCTYPE html>
 <html lang="en">
