@@ -66753,7 +66753,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 
                 if (data.success && data.configs) {
                     data.configs.forEach(config => {
-                        const inputId = `${config.report_type}Email`;
+                        const inputId = config.report_type + 'Email';
                         const input = document.getElementById(inputId);
                         if (input) {
                             input.value = config.email_address;
@@ -66766,8 +66766,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
 
         async function saveAnalyticsEmail(reportType) {
-            console.log(`💾 Saving ${reportType} email...`);
-            const email = document.getElementById(`${reportType}Email`).value.trim();
+            console.log('💾 Saving ' + reportType + ' email...');
+            const email = document.getElementById(reportType + 'Email').value.trim();
             console.log('📧 Email value:', email);
             
             if (!email) {
@@ -66784,7 +66784,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             }
             
             try {
-                const response = await fetch(`/api/admin/analytics-emails/${reportType}`, {
+                const response = await fetch('/api/admin/analytics-emails/' + reportType, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -66800,14 +66800,14 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                     showAnalyticsMessage(reportType, '❌ Failed to save email: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                console.error(`Error saving ${reportType} email:`, error);
+                console.error('Error saving ' + reportType + ' email:', error);
                 showAnalyticsMessage(reportType, '❌ Error: ' + error.message, 'error');
             }
         }
 
         async function sendTestAnalyticsEmail(reportType) {
-            console.log(`📨 Sending test ${reportType} email...`);
-            const email = document.getElementById(`${reportType}Email`).value.trim();
+            console.log('📨 Sending test ' + reportType + ' email...');
+            const email = document.getElementById(reportType + 'Email').value.trim();
             console.log('📧 Email value:', email);
             
             if (!email) {
@@ -66822,7 +66822,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
             
             try {
-                const response = await fetch(`/api/admin/send-weekly-report?type=${reportType}`, {
+                const response = await fetch('/api/admin/send-weekly-report?type=' + reportType, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -66837,7 +66837,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                     showAnalyticsMessage(reportType, '❌ Failed to send email: ' + (data.error || data.details || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                console.error(`Error sending test ${reportType} email:`, error);
+                console.error('Error sending test ' + reportType + ' email:', error);
                 showAnalyticsMessage(reportType, '❌ Error: ' + error.message, 'error');
             } finally {
                 button.disabled = false;
@@ -66846,7 +66846,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
 
         function showAnalyticsMessage(reportType, message, type) {
-            const messageEl = document.getElementById(`${reportType}EmailMessage`);
+            const messageEl = document.getElementById(reportType + 'EmailMessage');
             if (!messageEl) return;
             
             messageEl.className = 'mt-4 p-4 rounded-lg ' + (type === 'success' ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300');
@@ -66866,21 +66866,21 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
             
             reportTypes.forEach(type => {
                 // Save button
-                const saveBtn = document.getElementById(`save${type.charAt(0).toUpperCase() + type.slice(1)}EmailBtn`);
+                const saveBtn = document.getElementById('save' + type.charAt(0).toUpperCase() + type.slice(1) + 'EmailBtn');
                 if (saveBtn) {
-                    console.log(`✅ ${type} save button found`);
+                    console.log('✅ ' + type + ' save button found');
                     saveBtn.addEventListener('click', () => saveAnalyticsEmail(type));
                 } else {
-                    console.warn(`❌ ${type} save button not found`);
+                    console.warn('❌ ' + type + ' save button not found');
                 }
                 
                 // Test button
-                const testBtn = document.getElementById(`sendTest${type.charAt(0).toUpperCase() + type.slice(1)}EmailBtn`);
+                const testBtn = document.getElementById('sendTest' + type.charAt(0).toUpperCase() + type.slice(1) + 'EmailBtn');
                 if (testBtn) {
-                    console.log(`✅ ${type} test button found`);
+                    console.log('✅ ' + type + ' test button found');
                     testBtn.addEventListener('click', () => sendTestAnalyticsEmail(type));
                 } else {
-                    console.warn(`❌ ${type} test button not found`);
+                    console.warn('❌ ' + type + ' test button not found');
                 }
             });
         }
