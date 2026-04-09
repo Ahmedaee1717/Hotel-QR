@@ -14678,160 +14678,285 @@ app.post('/api/admin/settings/weekly-report-email', async (c) => {
 
 // API: Send Weekly Analytics Report
 app.post('/api/admin/send-weekly-report', async (c) => {
-  const { DB } = c.env
-  const RESEND_API_KEY = c.env.RESEND_API_KEY
+  const { DB, RESEND_API_KEY } = c.env
+  const reportType = c.req.query('type') || 'beach' // Default to beach for backward compatibility
   
-  console.log('📧 Starting weekly report generation...')
-  console.log('RESEND_API_KEY exists:', !!RESEND_API_KEY)
+  console.log(`📧 Starting ${reportType} analytics report generation...`)
   
   if (!RESEND_API_KEY) {
     return c.json({ error: 'RESEND_API_KEY not configured' }, 500)
   }
   
   try {
+    // Get email configuration for this report type
+    const emailConfig = await DB.prepare(`
+      SELECT email_address, enabled 
+      FROM analytics_email_config 
+      WHERE report_type = ?
+    `).bind(reportType).first()
+    
+    if (!emailConfig || !emailConfig.enabled) {
+      return c.json({ error: `${reportType} analytics email not configured or disabled` }, 400)
+    }
+    
+    const recipientEmail = emailConfig.email_address
+    
     // Calculate date ranges
     const today = new Date()
     const lastWeekStart = new Date(today)
     lastWeekStart.setDate(today.getDate() - 7)
     const lastWeekEnd = new Date(today)
-    
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
     
-    // Get beach booking analytics (this works)
-    const beachBookings = await DB.prepare(`
-      SELECT 
-        COUNT(*) as total_bookings,
-        SUM(num_guests) as total_guests,
-        COUNT(DISTINCT spot_id) as unique_spots,
-        SUM(CASE WHEN booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count,
-        SUM(CASE WHEN booking_status = 'no_show' THEN 1 ELSE 0 END) as no_show_count
-      FROM beach_bookings
-      WHERE property_id = 1 
-        AND booking_date >= ? 
-        AND booking_date < ?
-    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
+    let subject = ''
+    let htmlContent = ''
+    let stats = {}
     
-    const prevBeachBookings = await DB.prepare(`
-      SELECT 
-        COUNT(*) as total_bookings
-      FROM beach_bookings
-      WHERE property_id = 1 
-        AND booking_date >= date('now', '-14 days')
-        AND booking_date < date('now', '-7 days')
-    `).first()
-    
-    // Get popular beach spots
-    const popularSpots = await DB.prepare(`
-      SELECT 
-        bs.spot_number,
-        bs.spot_type,
-        COUNT(*) as booking_count
-      FROM beach_bookings bb
-      JOIN beach_spots bs ON bb.spot_id = bs.spot_id
-      WHERE bb.property_id = 1
-        AND bb.booking_date >= ?
-        AND bb.booking_date < ?
-      GROUP BY bs.spot_number, bs.spot_type
-      ORDER BY booking_count DESC
-      LIMIT 5
-    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
-    
-    // Calculate week-over-week change
-    const beachChange = prevBeachBookings?.total_bookings
-      ? (((beachBookings?.total_bookings || 0) - (prevBeachBookings.total_bookings || 0)) / prevBeachBookings.total_bookings * 100).toFixed(1)
-      : '0'
-    
-    // Build HTML email
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px; }
-        .section { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        .section h2 { color: #667eea; margin-top: 0; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
-        .stat-card { background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; }
-        .stat-value { font-size: 28px; font-weight: bold; color: #667eea; }
-        .stat-label { color: #666; font-size: 14px; }
-        .change-positive { color: #10b981; font-weight: bold; }
-        .change-negative { color: #ef4444; font-weight: bold; }
-        .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .table th { background: #667eea; color: white; padding: 12px; text-align: left; }
-        .table td { padding: 10px; border-bottom: 1px solid #ddd; }
-        .table tr:hover { background: #f0f0f0; }
-        .footer { text-align: center; color: #666; margin-top: 30px; font-size: 12px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>🏨 Old Palace Resort</h1>
-        <p style="font-size: 18px;">Weekly Analytics Report</p>
-        <p>${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}</p>
-      </div>
+    // Generate report based on type
+    if (reportType === 'beach') {
+      // Beach Analytics
+      const beachBookings = await DB.prepare(`
+        SELECT 
+          COUNT(*) as total_bookings,
+          SUM(num_guests) as total_guests,
+          COUNT(DISTINCT spot_id) as unique_spots,
+          SUM(CASE WHEN booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count,
+          SUM(CASE WHEN booking_status = 'no_show' THEN 1 ELSE 0 END) as no_show_count
+        FROM beach_bookings
+        WHERE property_id = 1 
+          AND booking_date >= ? 
+          AND booking_date < ?
+      `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
       
-      <div class="section">
-        <h2>🏖️ Beach Booking Analytics</h2>
-        <div class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-value">${beachBookings?.total_bookings || 0}</div>
-            <div class="stat-label">Total Bookings</div>
-            <div class="${Number(beachChange) >= 0 ? 'change-positive' : 'change-negative'}">
-              ${Number(beachChange) >= 0 ? '↑' : '↓'} ${Math.abs(Number(beachChange))}% vs last week
+      const prevBeachBookings = await DB.prepare(`
+        SELECT COUNT(*) as total_bookings
+        FROM beach_bookings
+        WHERE property_id = 1 
+          AND booking_date >= date('now', '-14 days')
+          AND booking_date < date('now', '-7 days')
+      `).first()
+      
+      const popularSpots = await DB.prepare(`
+        SELECT bs.spot_number, bs.spot_type, COUNT(*) as booking_count
+        FROM beach_bookings bb
+        JOIN beach_spots bs ON bb.spot_id = bs.spot_id
+        WHERE bb.property_id = 1 
+          AND bb.booking_date >= ? 
+          AND bb.booking_date < ?
+        GROUP BY bb.spot_id
+        ORDER BY booking_count DESC
+        LIMIT 5
+      `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
+      
+      const beachChange = prevBeachBookings?.total_bookings ? 
+        ((beachBookings?.total_bookings - prevBeachBookings.total_bookings) / prevBeachBookings.total_bookings * 100).toFixed(1) : 0
+      const changeArrow = parseFloat(beachChange) >= 0 ? '📈' : '📉'
+      
+      subject = `🏖️ Beach Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`
+      stats = {
+        bookings: beachBookings?.total_bookings || 0,
+        guests: beachBookings?.total_guests || 0,
+        change: beachChange
+      }
+      
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">🏖️ Old Palace Resort</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">Beach Analytics Report</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">${formatDate(lastWeekStart)} - ${formatDate(lastWeekEnd)}</p>
+          </div>
+          
+          <div style="padding: 30px 20px;">
+            <h2 style="color: #3B82F6; border-bottom: 2px solid #3B82F6; padding-bottom: 10px;">📊 Beach Booking Summary</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0;">
+              <div style="background: #EFF6FF; padding: 20px; border-radius: 8px; border-left: 4px solid #3B82F6;">
+                <div style="color: #1E40AF; font-size: 32px; font-weight: bold;">${beachBookings?.total_bookings || 0}</div>
+                <div style="color: #60A5FA; font-size: 14px; margin-top: 5px;">Total Bookings ${changeArrow} ${Math.abs(beachChange)}%</div>
+              </div>
+              
+              <div style="background: #F0FDF4; padding: 20px; border-radius: 8px; border-left: 4px solid #10B981;">
+                <div style="color: #065F46; font-size: 32px; font-weight: bold;">${beachBookings?.total_guests || 0}</div>
+                <div style="color: #34D399; font-size: 14px; margin-top: 5px;">Total Guests</div>
+              </div>
+              
+              <div style="background: #FEF3C7; padding: 20px; border-radius: 8px; border-left: 4px solid #F59E0B;">
+                <div style="color: #92400E; font-size: 32px; font-weight: bold;">${beachBookings?.checked_in_count || 0}</div>
+                <div style="color: #FBBF24; font-size: 14px; margin-top: 5px;">✅ Check-ins</div>
+              </div>
+              
+              <div style="background: #FEE2E2; padding: 20px; border-radius: 8px; border-left: 4px solid #EF4444;">
+                <div style="color: #991B1B; font-size: 32px; font-weight: bold;">${beachBookings?.no_show_count || 0}</div>
+                <div style="color: #F87171; font-size: 14px; margin-top: 5px;">❌ No-shows</div>
+              </div>
             </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${beachBookings?.total_guests || 0}</div>
-            <div class="stat-label">Total Guests</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${beachBookings?.checked_in_count || 0}</div>
-            <div class="stat-label">Check-ins</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${beachBookings?.no_show_count || 0}</div>
-            <div class="stat-label">No-Shows</div>
+            
+            <h3 style="color: #3B82F6; margin-top: 30px;">🏆 Top 5 Popular Beach Spots</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+              <thead>
+                <tr style="background: #F3F4F6;">
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid #E5E7EB;">Spot</th>
+                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid #E5E7EB;">Type</th>
+                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid #E5E7EB;">Bookings</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${popularSpots?.results?.map((spot: any, idx: number) => `
+                  <tr style="border-bottom: 1px solid #E5E7EB;">
+                    <td style="padding: 12px;">#${spot.spot_number}</td>
+                    <td style="padding: 12px; text-transform: capitalize;">${spot.spot_type}</td>
+                    <td style="padding: 12px; text-align: right; font-weight: bold; color: #3B82F6;">${spot.booking_count}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="3" style="padding: 12px; text-align: center; color: #9CA3AF;">No data available</td></tr>'}
+              </tbody>
+            </table>
+            
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 12px;">
+              Report generated: ${new Date().toLocaleString()}<br>
+              Sent to: ${recipientEmail}
+            </p>
           </div>
         </div>
-        
-        <h3>🌟 Top 5 Popular Spots</h3>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Spot Number</th>
-              <th>Type</th>
-              <th>Bookings</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${popularSpots?.results?.map(spot => `
-              <tr>
-                <td>Spot ${spot.spot_number}</td>
-                <td>${spot.spot_type}</td>
-                <td>${spot.booking_count}</td>
-              </tr>
-            `).join('') || '<tr><td colspan="3">No data</td></tr>'}
-          </tbody>
-        </table>
-      </div>
+      `
+    } else if (reportType === 'feedback') {
+      // Feedback Analytics
+      const feedbackStats = await DB.prepare(`
+        SELECT 
+          COUNT(*) as total_responses,
+          AVG(CAST(rating as REAL)) as avg_rating,
+          SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as positive_count,
+          SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as neutral_count,
+          SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as negative_count
+        FROM feedback_responses
+        WHERE property_id = 1
+          AND created_at >= datetime('now', '-7 days')
+      `).first()
       
-      <div class="footer">
-        <p>This is an automated weekly report from Old Palace Resort</p>
-        <p>Generated on ${new Date().toLocaleString()}</p>
-      </div>
-    </body>
-    </html>
-    `
-    
-    // Get email address from database
-    const emailSetting = await DB.prepare(`
-      SELECT setting_value FROM system_settings WHERE setting_key = 'weekly_report_email'
-    `).first()
-    
-    const recipientEmail = emailSetting?.setting_value || 'survapps@gmail.com'
-    console.log('📧 Sending weekly report to:', recipientEmail)
+      const prevFeedbackStats = await DB.prepare(`
+        SELECT COUNT(*) as total_responses
+        FROM feedback_responses
+        WHERE property_id = 1
+          AND created_at >= datetime('now', '-14 days')
+          AND created_at < datetime('now', '-7 days')
+      `).first()
+      
+      const feedbackChange = prevFeedbackStats?.total_responses ?
+        ((feedbackStats?.total_responses - prevFeedbackStats.total_responses) / prevFeedbackStats.total_responses * 100).toFixed(1) : 0
+      const changeArrow = parseFloat(feedbackChange) >= 0 ? '📈' : '📉'
+      
+      const positivePercent = feedbackStats?.total_responses ? 
+        ((feedbackStats.positive_count / feedbackStats.total_responses) * 100).toFixed(1) : 0
+      const neutralPercent = feedbackStats?.total_responses ?
+        ((feedbackStats.neutral_count / feedbackStats.total_responses) * 100).toFixed(1) : 0
+      const negativePercent = feedbackStats?.total_responses ?
+        ((feedbackStats.negative_count / feedbackStats.total_responses) * 100).toFixed(1) : 0
+      
+      subject = `💬 Feedback Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`
+      stats = {
+        responses: feedbackStats?.total_responses || 0,
+        rating: feedbackStats?.avg_rating?.toFixed(1) || 0,
+        change: feedbackChange
+      }
+      
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">💬 Old Palace Resort</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">Feedback Analytics Report</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">${formatDate(lastWeekStart)} - ${formatDate(lastWeekEnd)}</p>
+          </div>
+          
+          <div style="padding: 30px 20px;">
+            <h2 style="color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 10px;">📊 Guest Feedback Summary</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0;">
+              <div style="background: #F0FDF4; padding: 20px; border-radius: 8px; border-left: 4px solid #10B981;">
+                <div style="color: #065F46; font-size: 32px; font-weight: bold;">${feedbackStats?.total_responses || 0}</div>
+                <div style="color: #34D399; font-size: 14px; margin-top: 5px;">Total Responses ${changeArrow} ${Math.abs(feedbackChange)}%</div>
+              </div>
+              
+              <div style="background: #FEF3C7; padding: 20px; border-radius: 8px; border-left: 4px solid #F59E0B;">
+                <div style="color: #92400E; font-size: 32px; font-weight: bold;">${feedbackStats?.avg_rating?.toFixed(1) || 0} ⭐</div>
+                <div style="color: #FBBF24; font-size: 14px; margin-top: 5px;">Average Rating</div>
+              </div>
+            </div>
+            
+            <h3 style="color: #10B981; margin-top: 30px;">😊 Sentiment Breakdown</h3>
+            <div style="margin: 20px 0;">
+              <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                  <span style="color: #059669; font-weight: 600;">😊 Positive (4-5 stars)</span>
+                  <span style="color: #059669; font-weight: bold;">${positivePercent}%</span>
+                </div>
+                <div style="background: #D1FAE5; height: 24px; border-radius: 4px; overflow: hidden;">
+                  <div style="background: #10B981; height: 100%; width: ${positivePercent}%;"></div>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                  <span style="color: #D97706; font-weight: 600;">😐 Neutral (3 stars)</span>
+                  <span style="color: #D97706; font-weight: bold;">${neutralPercent}%</span>
+                </div>
+                <div style="background: #FEF3C7; height: 24px; border-radius: 4px; overflow: hidden;">
+                  <div style="background: #F59E0B; height: 100%; width: ${neutralPercent}%;"></div>
+                </div>
+              </div>
+              
+              <div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                  <span style="color: #DC2626; font-weight: 600;">😞 Negative (1-2 stars)</span>
+                  <span style="color: #DC2626; font-weight: bold;">${negativePercent}%</span>
+                </div>
+                <div style="background: #FEE2E2; height: 24px; border-radius: 4px; overflow: hidden;">
+                  <div style="background: #EF4444; height: 100%; width: ${negativePercent}%;"></div>
+                </div>
+              </div>
+            </div>
+            
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 12px;">
+              Report generated: ${new Date().toLocaleString()}<br>
+              Sent to: ${recipientEmail}
+            </p>
+          </div>
+        </div>
+      `
+    } else if (reportType === 'general') {
+      // General Dashboard Analytics
+      // Note: This is placeholder data - you'll need to connect to actual dashboard metrics
+      subject = `📊 General Analytics & Usage Stats - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`
+      stats = {
+        placeholder: true,
+        message: 'General analytics data structure needs to be defined'
+      }
+      
+      htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 40px 20px; text-align: center; color: white;">
+            <h1 style="margin: 0; font-size: 28px;">📊 Old Palace Resort</h1>
+            <p style="margin: 10px 0 0 0; font-size: 18px;">General Analytics & Usage Stats</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">${formatDate(lastWeekStart)} - ${formatDate(lastWeekEnd)}</p>
+          </div>
+          
+          <div style="padding: 30px 20px;">
+            <h2 style="color: #8B5CF6; border-bottom: 2px solid #8B5CF6; padding-bottom: 10px;">📈 Dashboard Overview</h2>
+            
+            <div style="background: #F5F3FF; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+              <p style="color: #6D28D9; font-size: 18px; margin: 0;">
+                🚧 General analytics report is being configured.<br><br>
+                This will include booking trends, revenue metrics, user engagement, and overall usage statistics.
+              </p>
+            </div>
+            
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 12px;">
+              Report generated: ${new Date().toLocaleString()}<br>
+              Sent to: ${recipientEmail}
+            </p>
+          </div>
+        </div>
+      `
+    }
     
     // Send email via Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -14843,7 +14968,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       body: JSON.stringify({
         from: 'Old Palace Resort <reports@oldpalaceresort.online>',
         to: [recipientEmail],
-        subject: `📊 Weekly Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`,
+        subject: subject,
         html: htmlContent
       })
     })
@@ -14855,27 +14980,167 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       return c.json({ error: 'Failed to send email', details: emailResult }, 500)
     }
     
-    console.log('✅ Weekly report email sent successfully:', emailResult)
+    console.log(`✅ ${reportType} analytics email sent successfully:`, emailResult)
     
     return c.json({ 
       success: true, 
-      message: 'Weekly report sent successfully',
+      message: `${reportType} analytics report sent successfully`,
       email_id: emailResult.id,
-      stats: {
-        beach: {
-          bookings: beachBookings?.total_bookings || 0,
-          guests: beachBookings?.total_guests || 0,
-          change: beachChange
-        }
-      }
+      sent_to: recipientEmail,
+      stats: stats
     })
   } catch (error) {
-    console.error('Send weekly report error:', error)
+    console.error(`Send ${reportType} report error:`, error)
     return c.json({ 
-      error: 'Failed to send weekly report', 
-      details: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
+      error: `Failed to send ${reportType} report`, 
+      details: error instanceof Error ? error.message : String(error)
     }, 500)
+  }
+})
+
+// API: Get all analytics email configurations
+app.get('/api/admin/analytics-emails', async (c) => {
+  const { DB } = c.env
+  
+  try {
+    const result = await DB.prepare(`
+      SELECT id, report_type, email_address, enabled, created_at, updated_at
+      FROM analytics_email_config
+      ORDER BY report_type
+    `).all()
+    
+    return c.json({ success: true, configs: result.results })
+  } catch (error) {
+    console.error('Error fetching analytics email configs:', error)
+    return c.json({ error: 'Failed to fetch email configurations' }, 500)
+  }
+})
+
+// API: Update analytics email configuration
+app.post('/api/admin/analytics-emails/:reportType', async (c) => {
+  const { DB } = c.env
+  const reportType = c.req.param('reportType')
+  const { email_address, enabled } = await c.req.json()
+  
+  try {
+    await DB.prepare(`
+      INSERT INTO analytics_email_config (report_type, email_address, enabled, updated_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(report_type) DO UPDATE SET
+        email_address = excluded.email_address,
+        enabled = excluded.enabled,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(reportType, email_address, enabled ? 1 : 0).run()
+    
+    return c.json({ success: true, report_type: reportType, email_address, enabled })
+  } catch (error) {
+    console.error('Error updating analytics email config:', error)
+    return c.json({ error: 'Failed to update email configuration' }, 500)
+  }
+})
+
+// API: Send test analytics email
+app.post('/api/admin/analytics-emails/:reportType/test', async (c) => {
+  const { DB, RESEND_API_KEY } = c.env
+  const reportType = c.req.param('reportType')
+  
+  try {
+    // Get email configuration
+    const config = await DB.prepare(`
+      SELECT email_address FROM analytics_email_config 
+      WHERE report_type = ? AND enabled = 1
+    `).bind(reportType).first()
+    
+    if (!config) {
+      return c.json({ error: 'Email configuration not found or disabled' }, 400)
+    }
+    
+    // Generate test email based on report type
+    let subject = ''
+    let html = ''
+    
+    if (reportType === 'beach') {
+      subject = '🏖️ Test: Beach Analytics Report'
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3B82F6;">🏖️ Beach Analytics Report (Test)</h2>
+          <p>This is a test email for Beach Analytics.</p>
+          <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3>Sample Beach Metrics:</h3>
+            <p>📊 Total Bookings: 174</p>
+            <p>👥 Total Guests: 437</p>
+            <p>✅ Check-ins: 156</p>
+            <p>📈 Occupancy Rate: 75%</p>
+          </div>
+          <p style="color: #6B7280; font-size: 12px;">Sent to: ${config.email_address}</p>
+        </div>
+      `
+    } else if (reportType === 'feedback') {
+      subject = '💬 Test: Feedback Analytics Report'
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #10B981;">💬 Feedback Analytics Report (Test)</h2>
+          <p>This is a test email for Feedback Analytics.</p>
+          <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3>Sample Feedback Metrics:</h3>
+            <p>⭐ Average Rating: 4.5/5</p>
+            <p>📝 Total Responses: 89</p>
+            <p>😊 Positive: 75%</p>
+            <p>😐 Neutral: 20%</p>
+            <p>😞 Negative: 5%</p>
+          </div>
+          <p style="color: #6B7280; font-size: 12px;">Sent to: ${config.email_address}</p>
+        </div>
+      `
+    } else if (reportType === 'general') {
+      subject = '📊 Test: General Analytics Report'
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #8B5CF6;">📊 General Analytics & Usage Stats (Test)</h2>
+          <p>This is a test email for General Analytics.</p>
+          <div style="background: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3>Sample Dashboard Metrics:</h3>
+            <p>🎫 Total Bookings: 245</p>
+            <p>💰 Revenue: $12,450</p>
+            <p>👤 Active Users: 1,234</p>
+            <p>📈 Engagement Rate: 68%</p>
+          </div>
+          <p style="color: #6B7280; font-size: 12px;">Sent to: ${config.email_address}</p>
+        </div>
+      `
+    }
+    
+    // Send test email via Resend
+    const emailResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Old Palace Resort <reports@oldpalaceresort.online>',
+        to: [config.email_address],
+        subject: subject,
+        html: html
+      })
+    })
+    
+    const emailResult = await emailResponse.json()
+    
+    if (!emailResponse.ok) {
+      console.error('Resend API error:', emailResult)
+      return c.json({ error: 'Failed to send test email', details: emailResult }, 500)
+    }
+    
+    return c.json({ 
+      success: true, 
+      message: 'Test email sent successfully',
+      email_id: emailResult.id,
+      sent_to: config.email_address
+    })
+  } catch (error) {
+    console.error('Error sending test email:', error)
+    return c.json({ error: 'Failed to send test email' }, 500)
   }
 })
 
@@ -84680,19 +84945,43 @@ export default {
     try {
       // Weekly analytics report (Monday 9 AM)
       if (event.cron === '0 9 * * MON') {
-        console.log('📧 Sending weekly analytics report...')
+        console.log('📧 Sending weekly analytics reports...')
         
-        const { DB, RESEND_API_KEY } = env
-        const c = { env, req: { method: 'POST' }, json: (data: any) => ({ data }) }
+        // Send Beach Analytics
+        try {
+          const beachResponse = await fetch('https://www.oldpalaceresort.online/api/admin/send-weekly-report?type=beach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          const beachResult = await beachResponse.json()
+          console.log('✅ Beach report result:', beachResult)
+        } catch (error) {
+          console.error('❌ Beach report error:', error)
+        }
         
-        // Call the send-weekly-report endpoint logic directly
-        const reportEndpoint = await fetch('https://www.oldpalaceresort.online/api/admin/send-weekly-report', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
+        // Send Feedback Analytics
+        try {
+          const feedbackResponse = await fetch('https://www.oldpalaceresort.online/api/admin/send-weekly-report?type=feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          const feedbackResult = await feedbackResponse.json()
+          console.log('✅ Feedback report result:', feedbackResult)
+        } catch (error) {
+          console.error('❌ Feedback report error:', error)
+        }
         
-        const result = await reportEndpoint.json()
-        console.log('✅ Weekly report result:', result)
+        // Send General Analytics
+        try {
+          const generalResponse = await fetch('https://www.oldpalaceresort.online/api/admin/send-weekly-report?type=general', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          const generalResult = await generalResponse.json()
+          console.log('✅ General report result:', generalResult)
+        } catch (error) {
+          console.error('❌ General report error:', error)
+        }
       }
       
       // Biometric data deletion job
