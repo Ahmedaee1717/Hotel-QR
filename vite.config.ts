@@ -11,7 +11,6 @@ export default defineConfig({
         '/feedback.html',
         '/activity.html',
         '/activity-detail.html',
-        '/admin-dashboard.html',
         '/admin-login.html',
         '/staff-face-scanner.html',
         '/staff-pass-scanner.html',
