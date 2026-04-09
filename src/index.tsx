@@ -66885,9 +66885,12 @@ app.get('/mood-check', async (c) => {
         }
 
         async function saveWeeklyReportEmail() {
+            console.log('💾 saveWeeklyReportEmail called');
             const email = document.getElementById('weeklyReportEmail').value.trim();
+            console.log('📧 Email value:', email);
             
             if (!email) {
+                console.warn('⚠️ No email entered');
                 showWeeklyReportMessage('Please enter an email address', 'error');
                 return;
             }
@@ -66922,9 +66925,12 @@ app.get('/mood-check', async (c) => {
         }
 
         async function sendTestWeeklyReport() {
+            console.log('📨 sendTestWeeklyReport called');
             const email = document.getElementById('weeklyReportEmail').value.trim();
+            console.log('📧 Email value:', email);
             
             if (!email) {
+                console.warn('⚠️ No email entered');
                 showWeeklyReportMessage('Please save an email address first', 'error');
                 return;
             }
@@ -66969,25 +66975,44 @@ app.get('/mood-check', async (c) => {
             }, 5000);
         }
 
-        // Attach event listeners when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load weekly report email when settings tab is shown
-            const settingsTab = document.querySelector('[data-tab="settings"]');
-            if (settingsTab) {
-                settingsTab.addEventListener('click', () => {
-                    setTimeout(loadWeeklyReportEmail, 100);
-                });
-            }
+        // Attach event listeners for weekly report buttons
+        function attachWeeklyReportListeners() {
+            console.log('🔧 Attaching weekly report button listeners...');
             
-            // Attach button click handlers
             const saveBtn = document.getElementById('saveWeeklyEmailBtn');
             if (saveBtn) {
+                console.log('✅ Save button found, attaching listener');
                 saveBtn.addEventListener('click', saveWeeklyReportEmail);
+            } else {
+                console.warn('❌ Save button not found');
             }
             
             const testBtn = document.getElementById('sendTestWeeklyEmailBtn');
             if (testBtn) {
+                console.log('✅ Test button found, attaching listener');
                 testBtn.addEventListener('click', sendTestWeeklyReport);
+            } else {
+                console.warn('❌ Test button not found');
+            }
+        }
+        
+        // Attach event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📋 DOM Content Loaded - setting up weekly report');
+            
+            // Load weekly report email and attach listeners when settings tab is shown
+            const settingsTab = document.querySelector('[data-tab="settings"]');
+            if (settingsTab) {
+                console.log('✅ Settings tab found');
+                settingsTab.addEventListener('click', () => {
+                    console.log('🖱️ Settings tab clicked');
+                    setTimeout(() => {
+                        loadWeeklyReportEmail();
+                        attachWeeklyReportListeners();
+                    }, 100);
+                });
+            } else {
+                console.warn('❌ Settings tab not found');
             }
         });
         
