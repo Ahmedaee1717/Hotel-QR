@@ -14820,26 +14820,62 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         </div>
       `
     } else if (reportType === 'feedback') {
-      // Feedback Analytics
+      // Feedback Analytics from guest_feedback table
       const feedbackStats = await DB.prepare(`
         SELECT 
           COUNT(*) as total_responses,
-          AVG(CAST(rating as REAL)) as avg_rating,
-          SUM(CASE WHEN rating >= 4 THEN 1 ELSE 0 END) as positive_count,
-          SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as neutral_count,
-          SUM(CASE WHEN rating <= 2 THEN 1 ELSE 0 END) as negative_count
-        FROM feedback_responses
+          AVG(CAST(mood_score as REAL)) as avg_rating,
+          SUM(CASE WHEN mood_score >= 4 THEN 1 ELSE 0 END) as positive_count,
+          SUM(CASE WHEN mood_score = 3 THEN 1 ELSE 0 END) as neutral_count,
+          SUM(CASE WHEN mood_score <= 2 THEN 1 ELSE 0 END) as negative_count,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+          SUM(CASE WHEN status = 'acknowledged' THEN 1 ELSE 0 END) as acknowledged_count,
+          SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count
+        FROM guest_feedback
         WHERE property_id = 1
           AND created_at >= datetime('now', '-7 days')
       `).first()
       
       const prevFeedbackStats = await DB.prepare(`
         SELECT COUNT(*) as total_responses
-        FROM feedback_responses
+        FROM guest_feedback
         WHERE property_id = 1
           AND created_at >= datetime('now', '-14 days')
           AND created_at < datetime('now', '-7 days')
       `).first()
+      
+      // Get top feedback categories
+      const topCategories = await DB.prepare(`
+        SELECT 
+          categories,
+          COUNT(*) as count
+        FROM guest_feedback
+        WHERE property_id = 1
+          AND created_at >= datetime('now', '-7 days')
+          AND categories IS NOT NULL
+        GROUP BY categories
+        ORDER BY count DESC
+        LIMIT 5
+      `).all()
+      
+      // Get recent feedback with comments
+      const recentFeedback = await DB.prepare(`
+        SELECT 
+          guest_name,
+          room_number,
+          mood_score,
+          feedback_type,
+          custom_comment,
+          status,
+          created_at
+        FROM guest_feedback
+        WHERE property_id = 1
+          AND created_at >= datetime('now', '-7 days')
+          AND custom_comment IS NOT NULL
+          AND custom_comment != ''
+        ORDER BY created_at DESC
+        LIMIT 10
+      `).all()
       
       const feedbackChange = prevFeedbackStats?.total_responses ?
         ((feedbackStats?.total_responses - prevFeedbackStats.total_responses) / prevFeedbackStats.total_responses * 100).toFixed(1) : 0
@@ -14851,6 +14887,19 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         ((feedbackStats.neutral_count / feedbackStats.total_responses) * 100).toFixed(1) : 0
       const negativePercent = feedbackStats?.total_responses ?
         ((feedbackStats.negative_count / feedbackStats.total_responses) * 100).toFixed(1) : 0
+      
+      // Parse categories
+      const categoryBreakdown = topCategories?.results?.map((item: any) => {
+        try {
+          const cats = JSON.parse(item.categories || '[]')
+          return {
+            categories: Array.isArray(cats) ? cats.join(', ') : cats,
+            count: item.count
+          }
+        } catch {
+          return { categories: 'Various', count: item.count }
+        }
+      }) || []
       
       subject = `💬 Feedback Analytics Report - ${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}`
       stats = {
@@ -14877,7 +14926,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
               </div>
               
               <div style="background: #FEF3C7; padding: 20px; border-radius: 8px; border-left: 4px solid #F59E0B;">
-                <div style="color: #92400E; font-size: 32px; font-weight: bold;">${feedbackStats?.avg_rating?.toFixed(1) || 0} ⭐</div>
+                <div style="color: #92400E; font-size: 32px; font-weight: bold;">${feedbackStats?.avg_rating?.toFixed(1) || 0} / 5 ⭐</div>
                 <div style="color: #FBBF24; font-size: 14px; margin-top: 5px;">Average Rating</div>
               </div>
             </div>
@@ -14887,7 +14936,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
               <div style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                   <span style="color: #059669; font-weight: 600;">😊 Positive (4-5 stars)</span>
-                  <span style="color: #059669; font-weight: bold;">${positivePercent}%</span>
+                  <span style="color: #059669; font-weight: bold;">${positivePercent}% (${feedbackStats?.positive_count || 0})</span>
                 </div>
                 <div style="background: #D1FAE5; height: 24px; border-radius: 4px; overflow: hidden;">
                   <div style="background: #10B981; height: 100%; width: ${positivePercent}%;"></div>
@@ -14897,7 +14946,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
               <div style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                   <span style="color: #D97706; font-weight: 600;">😐 Neutral (3 stars)</span>
-                  <span style="color: #D97706; font-weight: bold;">${neutralPercent}%</span>
+                  <span style="color: #D97706; font-weight: bold;">${neutralPercent}% (${feedbackStats?.neutral_count || 0})</span>
                 </div>
                 <div style="background: #FEF3C7; height: 24px; border-radius: 4px; overflow: hidden;">
                   <div style="background: #F59E0B; height: 100%; width: ${neutralPercent}%;"></div>
@@ -14907,13 +14956,67 @@ app.post('/api/admin/send-weekly-report', async (c) => {
               <div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                   <span style="color: #DC2626; font-weight: 600;">😞 Negative (1-2 stars)</span>
-                  <span style="color: #DC2626; font-weight: bold;">${negativePercent}%</span>
+                  <span style="color: #DC2626; font-weight: bold;">${negativePercent}% (${feedbackStats?.negative_count || 0})</span>
                 </div>
                 <div style="background: #FEE2E2; height: 24px; border-radius: 4px; overflow: hidden;">
                   <div style="background: #EF4444; height: 100%; width: ${negativePercent}%;"></div>
                 </div>
               </div>
             </div>
+            
+            <h3 style="color: #10B981; margin-top: 30px;">📋 Status Overview</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0;">
+              <div style="background: #FEF3C7; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="color: #92400E; font-size: 24px; font-weight: bold;">${feedbackStats?.pending_count || 0}</div>
+                <div style="color: #D97706; font-size: 12px; margin-top: 5px;">⏳ Pending</div>
+              </div>
+              <div style="background: #DBEAFE; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="color: #1E40AF; font-size: 24px; font-weight: bold;">${feedbackStats?.acknowledged_count || 0}</div>
+                <div style="color: #3B82F6; font-size: 12px; margin-top: 5px;">👁️ Acknowledged</div>
+              </div>
+              <div style="background: #D1FAE5; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="color: #065F46; font-size: 24px; font-weight: bold;">${feedbackStats?.resolved_count || 0}</div>
+                <div style="color: #10B981; font-size: 12px; margin-top: 5px;">✅ Resolved</div>
+              </div>
+            </div>
+            
+            ${categoryBreakdown.length > 0 ? `
+              <h3 style="color: #10B981; margin-top: 30px;">🏷️ Top Feedback Categories</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <thead>
+                  <tr style="background: #F3F4F6;">
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #E5E7EB;">Category</th>
+                    <th style="padding: 12px; text-align: right; border-bottom: 2px solid #E5E7EB;">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${categoryBreakdown.map((cat: any) => `
+                    <tr style="border-bottom: 1px solid #E5E7EB;">
+                      <td style="padding: 12px;">${cat.categories}</td>
+                      <td style="padding: 12px; text-align: right; font-weight: bold; color: #10B981;">${cat.count}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : ''}
+            
+            ${recentFeedback?.results && recentFeedback.results.length > 0 ? `
+              <h3 style="color: #10B981; margin-top: 30px;">💭 Recent Comments</h3>
+              <div style="margin: 15px 0;">
+                ${recentFeedback.results.slice(0, 5).map((fb: any) => `
+                  <div style="background: #F9FAFB; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${fb.mood_score >= 4 ? '#10B981' : fb.mood_score === 3 ? '#F59E0B' : '#EF4444'};">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span style="font-weight: 600; color: #374151;">${fb.guest_name}${fb.room_number ? ' - Room ' + fb.room_number : ''}</span>
+                      <span style="color: #6B7280; font-size: 14px;">${'⭐'.repeat(fb.mood_score)}</span>
+                    </div>
+                    <p style="margin: 0; color: #4B5563; font-size: 14px; font-style: italic;">"${fb.custom_comment}"</p>
+                    <div style="margin-top: 8px; font-size: 12px; color: #9CA3AF;">
+                      ${fb.feedback_type} • ${fb.status} • ${new Date(fb.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<p style="color: #9CA3AF; text-align: center; margin: 20px 0;">No comments in the past week</p>'}
             
             <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 12px;">
               Report generated: ${new Date().toLocaleString()}<br>
@@ -66914,10 +67017,6 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
                 console.warn('❌ Settings tab button not found');
             }
         });
-        
-        // Initialize
-        setGreeting();
-        calculateStayDay();
     </script>
 </body>
 </html>
