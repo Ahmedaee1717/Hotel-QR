@@ -14652,9 +14652,9 @@ app.post('/api/admin/send-weekly-report', async (c) => {
     const restaurantOrders = await DB.prepare(`
       SELECT 
         COUNT(*) as total_orders,
-        SUM(total_cost) as total_revenue,
-        AVG(total_cost) as avg_order_value,
-        COUNT(DISTINCT table_id) as unique_tables
+        SUM(wo.total_cost) as total_revenue,
+        AVG(wo.total_cost) as avg_order_value,
+        COUNT(DISTINCT wo.table_id) as unique_tables
       FROM waiter_orders wo
       JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
@@ -14667,7 +14667,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
     const prevRestaurantOrders = await DB.prepare(`
       SELECT 
         COUNT(*) as total_orders,
-        SUM(total_cost) as total_revenue
+        SUM(wo.total_cost) as total_revenue
       FROM waiter_orders wo
       JOIN restaurant_tables rt ON wo.table_id = rt.table_id
       JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
