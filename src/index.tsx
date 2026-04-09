@@ -14634,6 +14634,10 @@ app.post('/api/admin/send-weekly-report', async (c) => {
   console.log('📧 Starting weekly report generation...')
   console.log('RESEND_API_KEY exists:', !!RESEND_API_KEY)
   
+  if (!RESEND_API_KEY) {
+    return c.json({ error: 'RESEND_API_KEY not configured' }, 500)
+  }
+  
   try {
     // Calculate date ranges
     const today = new Date()
@@ -14641,69 +14645,9 @@ app.post('/api/admin/send-weekly-report', async (c) => {
     lastWeekStart.setDate(today.getDate() - 7)
     const lastWeekEnd = new Date(today)
     
-    const previousWeekStart = new Date(today)
-    previousWeekStart.setDate(today.getDate() - 14)
-    const previousWeekEnd = new Date(today)
-    previousWeekEnd.setDate(today.getDate() - 7)
-    
     const formatDate = (date: Date) => date.toISOString().split('T')[0]
     
-    // Get restaurant analytics
-    const restaurantOrders = await DB.prepare(`
-      SELECT 
-        COUNT(*) as total_orders,
-        SUM(wo.total_cost) as total_revenue,
-        AVG(wo.total_cost) as avg_order_value,
-        COUNT(DISTINCT wo.table_id) as unique_tables
-      FROM waiter_orders wo
-      JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
-      WHERE ho.property_id = 1 
-        AND wo.order_date >= ? 
-        AND wo.order_date < ?
-        AND wo.order_status != 'cancelled'
-    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).first()
-    
-    const prevRestaurantOrders = await DB.prepare(`
-      SELECT 
-        COUNT(*) as total_orders,
-        SUM(wo.total_cost) as total_revenue
-      FROM waiter_orders wo
-      JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-      JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id
-      WHERE ho.property_id = 1 
-        AND wo.order_date >= ? 
-        AND wo.order_date < ?
-        AND wo.order_status != 'cancelled'
-    `).bind(formatDate(previousWeekStart), formatDate(previousWeekEnd)).first()
-    
-    // Get top menu items
-    const topItems = await DB.prepare(`
-      SELECT 
-        item_name,
-        SUM(quantity) as total_quantity,
-        SUM(quantity * item_cost) as total_revenue
-      FROM (
-        SELECT 
-          wo.order_id,
-          json_each.value->>'name' as item_name,
-          CAST(json_each.value->>'quantity' AS INTEGER) as quantity,
-          CAST(json_each.value->>'cost' AS REAL) as item_cost
-        FROM waiter_orders wo
-        JOIN restaurant_tables rt ON wo.table_id = rt.table_id
-        JOIN hotel_offerings ho ON rt.offering_id = ho.offering_id,
-        json_each(wo.order_items)
-        WHERE ho.property_id = 1
-          AND wo.order_date >= ?
-          AND wo.order_date < ?
-          AND wo.order_status != 'cancelled'
-      )
-      GROUP BY item_name
-      ORDER BY total_quantity DESC
-      LIMIT 5
-    `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
-    
-    // Get beach booking analytics
+    // Get beach booking analytics (this works)
     const beachBookings = await DB.prepare(`
       SELECT 
         COUNT(*) as total_bookings,
@@ -14722,9 +14666,9 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         COUNT(*) as total_bookings
       FROM beach_bookings
       WHERE property_id = 1 
-        AND booking_date >= ? 
-        AND booking_date < ?
-    `).bind(formatDate(previousWeekStart), formatDate(previousWeekEnd)).first()
+        AND booking_date >= date('now', '-14 days')
+        AND booking_date < date('now', '-7 days')
+    `).first()
     
     // Get popular beach spots
     const popularSpots = await DB.prepare(`
@@ -14742,11 +14686,7 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       LIMIT 5
     `).bind(formatDate(lastWeekStart), formatDate(lastWeekEnd)).all()
     
-    // Calculate week-over-week changes
-    const restaurantChange = prevRestaurantOrders?.total_revenue 
-      ? (((restaurantOrders?.total_revenue || 0) - (prevRestaurantOrders.total_revenue || 0)) / prevRestaurantOrders.total_revenue * 100).toFixed(1)
-      : '0'
-    
+    // Calculate week-over-week change
     const beachChange = prevBeachBookings?.total_bookings
       ? (((beachBookings?.total_bookings || 0) - (prevBeachBookings.total_bookings || 0)) / prevBeachBookings.total_bookings * 100).toFixed(1)
       : '0'
@@ -14780,51 +14720,6 @@ app.post('/api/admin/send-weekly-report', async (c) => {
         <h1>🏨 Old Palace Resort</h1>
         <p style="font-size: 18px;">Weekly Analytics Report</p>
         <p>${formatDate(lastWeekStart)} to ${formatDate(lastWeekEnd)}</p>
-      </div>
-      
-      <div class="section">
-        <h2>🍽️ Restaurant Analytics</h2>
-        <div class="stat-grid">
-          <div class="stat-card">
-            <div class="stat-value">${restaurantOrders?.total_orders || 0}</div>
-            <div class="stat-label">Total Orders</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">$${(restaurantOrders?.total_revenue || 0).toFixed(2)}</div>
-            <div class="stat-label">Total Revenue</div>
-            <div class="${Number(restaurantChange) >= 0 ? 'change-positive' : 'change-negative'}">
-              ${Number(restaurantChange) >= 0 ? '↑' : '↓'} ${Math.abs(Number(restaurantChange))}% vs last week
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">$${(restaurantOrders?.avg_order_value || 0).toFixed(2)}</div>
-            <div class="stat-label">Avg Order Value</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">${restaurantOrders?.unique_tables || 0}</div>
-            <div class="stat-label">Tables Served</div>
-          </div>
-        </div>
-        
-        <h3>📊 Top 5 Menu Items</h3>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Orders</th>
-              <th>Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${topItems?.results?.map(item => `
-              <tr>
-                <td>${item.item_name}</td>
-                <td>${item.total_quantity}</td>
-                <td>$${Number(item.total_revenue).toFixed(2)}</td>
-              </tr>
-            `).join('') || '<tr><td colspan="3">No data</td></tr>'}
-          </tbody>
-        </table>
       </div>
       
       <div class="section">
@@ -14909,11 +14804,6 @@ app.post('/api/admin/send-weekly-report', async (c) => {
       message: 'Weekly report sent successfully',
       email_id: emailResult.id,
       stats: {
-        restaurant: {
-          orders: restaurantOrders?.total_orders || 0,
-          revenue: restaurantOrders?.total_revenue || 0,
-          change: restaurantChange
-        },
         beach: {
           bookings: beachBookings?.total_bookings || 0,
           guests: beachBookings?.total_guests || 0,
