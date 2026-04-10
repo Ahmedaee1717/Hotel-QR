@@ -36184,6 +36184,9 @@ app.get('/admin/beach-management', (c) => {
                                     <div><i class="fas fa-umbrella-beach mr-1 text-gray-500"></i>Spot: <strong>\${booking.spot_number}</strong> (\${booking.spot_type})</div>
                                     <div><i class="fas fa-calendar mr-1 text-gray-500"></i>Date: <strong>\${bookingDate}</strong></div>
                                     <div><i class="fas fa-clock mr-1 text-gray-500"></i>Slot: <strong>\${booking.slot_type.replace('_', ' ')}</strong></div>
+                                    \${booking.guest_phone ? \`<div><i class="fas fa-phone mr-1 text-gray-500"></i>Phone: <strong>\${booking.guest_phone}</strong></div>\` : ''}
+                                    \${booking.guest_email ? \`<div><i class="fas fa-envelope mr-1 text-gray-500"></i>Email: <strong>\${booking.guest_email}</strong></div>\` : ''}
+                                    <div><i class="fas fa-users mr-1 text-gray-500"></i>Guests: <strong>\${booking.num_guests}</strong></div>
                                 </div>
                             </div>
                             
