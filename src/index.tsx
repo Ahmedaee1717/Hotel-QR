@@ -14315,6 +14315,46 @@ app.get('/api/admin/beach/bookings', async (c) => {
   }
 })
 
+// API: Get Guest Profiles (Aggregated from all bookings)
+app.get('/api/admin/guest-profiles', async (c) => {
+  const { DB } = c.env
+  const property_id = c.req.query('property_id') || '1'
+  
+  try {
+    // Aggregate guest data from beach bookings
+    const guests = await DB.prepare(`
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY MAX(bb.created_at) DESC) as guest_id,
+        bb.guest_name,
+        bb.guest_room_number,
+        bb.guest_phone,
+        bb.guest_email,
+        COUNT(*) as total_bookings,
+        MAX(bb.booking_date) as last_booking_date,
+        MIN(bb.booking_date) as first_booking_date,
+        SUM(CASE WHEN bb.booking_status = 'checked_in' THEN 1 ELSE 0 END) as checked_in_count,
+        SUM(CASE WHEN bb.booking_status = 'no_show' THEN 1 ELSE 0 END) as no_show_count
+      FROM beach_bookings bb
+      WHERE bb.property_id = ?
+        AND bb.booking_status NOT IN ('cancelled')
+      GROUP BY 
+        LOWER(TRIM(bb.guest_name)),
+        LOWER(TRIM(COALESCE(bb.guest_room_number, ''))),
+        LOWER(TRIM(COALESCE(bb.guest_phone, ''))),
+        LOWER(TRIM(COALESCE(bb.guest_email, '')))
+      ORDER BY last_booking_date DESC
+    `).bind(property_id).all()
+    
+    return c.json({ 
+      success: true, 
+      guests: guests.results || [] 
+    })
+  } catch (error) {
+    console.error('Get guest profiles error:', error)
+    return c.json({ error: 'Failed to get guest profiles' }, 500)
+  }
+})
+
 // API: Get Beach Availability (Guest)
 app.get('/api/beach/availability/:property_id/:date', async (c) => {
   const { DB } = c.env
@@ -32795,6 +32835,10 @@ app.get('/superadmin/dashboard', (c) => {
                     <i class="nav-icon fas fa-calendar-check"></i>
                     <span>All Bookings</span>
                 </div>
+                <div class="nav-item" data-tab="guest-profiles">
+                    <i class="nav-icon fas fa-address-card"></i>
+                    <span>Guest Profiles</span>
+                </div>
             </div>
             
             <div class="nav-section">
@@ -33063,6 +33107,92 @@ app.get('/superadmin/dashboard', (c) => {
                     </div>
                 </div>
             </div>
+
+        <!-- Guest Profiles Tab -->
+        <div id="guest-profilesTab" class="tab-content hidden">
+            <div class="content-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-address-card"></i>
+                        Guest Profiles
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="guestSearchInput" placeholder="Search by name, room, phone, email..." class="px-4 py-2 border-2 border-gray-200 rounded-lg w-80">
+                        <button onclick="searchGuests()" class="btn-primary">
+                            <i class="fas fa-search"></i>
+                            Search
+                        </button>
+                        <button onclick="loadAllGuests()" class="btn-secondary">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                        <button onclick="exportGuestData()" class="btn-secondary">
+                            <i class="fas fa-download"></i>
+                            Export CSV
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Stats Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border-2 border-blue-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-blue-600 font-semibold">Total Guests</div>
+                                <div class="text-3xl font-bold text-blue-900" id="totalGuestsCount">0</div>
+                            </div>
+                            <div class="bg-blue-500 rounded-full p-3">
+                                <i class="fas fa-users text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-green-600 font-semibold">Beach Bookings</div>
+                                <div class="text-3xl font-bold text-green-900" id="totalBeachBookings">0</div>
+                            </div>
+                            <div class="bg-green-500 rounded-full p-3">
+                                <i class="fas fa-umbrella-beach text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border-2 border-purple-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-purple-600 font-semibold">With Contact Info</div>
+                                <div class="text-3xl font-bold text-purple-900" id="guestsWithContact">0</div>
+                            </div>
+                            <div class="bg-purple-500 rounded-full p-3">
+                                <i class="fas fa-phone text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border-2 border-orange-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-orange-600 font-semibold">Return Guests</div>
+                                <div class="text-3xl font-bold text-orange-900" id="returnGuestsCount">0</div>
+                            </div>
+                            <div class="bg-orange-500 rounded-full p-3">
+                                <i class="fas fa-redo text-white text-2xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Guest List -->
+                <div id="guestProfilesList" class="space-y-4">
+                    <div class="text-center py-12">
+                        <div class="loading-spinner mx-auto mb-4"></div>
+                        <p class="text-gray-600">Loading guest profiles...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Users Management Tab -->
         <div id="usersTab" class="tab-content">
@@ -33823,6 +33953,7 @@ app.get('/superadmin/dashboard', (c) => {
                 'vendors': 'Vendors',
                 'users': 'Users',
                 'bookings': 'All Bookings',
+                'guest-profiles': 'Guest Profiles',
                 'support': 'Support Tickets',
                 'chat': 'Live Chat',
                 'notifications': 'Notifications',
@@ -33839,6 +33970,7 @@ app.get('/superadmin/dashboard', (c) => {
                 'vendors': 'Vendor network management',
                 'users': 'User accounts and permissions',
                 'bookings': 'Platform-wide booking history',
+                'guest-profiles': 'Unified guest contact information and booking history',
                 'support': 'Customer support requests',
                 'chat': 'Real-time messaging',
                 'notifications': 'System notifications',
@@ -33873,6 +34005,7 @@ app.get('/superadmin/dashboard', (c) => {
                 if (tab === 'vendors') loadVendors();
                 if (tab === 'bookings') loadBookings();
                 if (tab === 'users') loadUsers();
+                if (tab === 'guest-profiles') loadAllGuests();
             }
         }
         
@@ -66851,6 +66984,200 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       window.addEventListener('load', () => {
         loadFaceAPIModels();
       });
+        
+        // Guest Profiles Functions
+        let guestProfilesData = [];
+        
+        async function loadAllGuests() {
+            try {
+                console.log('Loading all guest profiles...');
+                const response = await fetch('/api/admin/guest-profiles?property_id=1');
+                const data = await response.json();
+                
+                if (data.success) {
+                    guestProfilesData = data.guests || [];
+                    displayGuestProfiles(guestProfilesData);
+                    updateGuestStats(guestProfilesData);
+                } else {
+                    showGuestProfilesError('Failed to load guest profiles');
+                }
+            } catch (error) {
+                console.error('Load guest profiles error:', error);
+                showGuestProfilesError('Error loading guest profiles');
+            }
+        }
+        
+        async function searchGuests() {
+            const searchTerm = document.getElementById('guestSearchInput').value.trim().toLowerCase();
+            
+            if (!searchTerm) {
+                displayGuestProfiles(guestProfilesData);
+                return;
+            }
+            
+            const filtered = guestProfilesData.filter(guest => 
+                guest.guest_name.toLowerCase().includes(searchTerm) ||
+                (guest.guest_phone && guest.guest_phone.toLowerCase().includes(searchTerm)) ||
+                (guest.guest_email && guest.guest_email.toLowerCase().includes(searchTerm)) ||
+                (guest.guest_room_number && guest.guest_room_number.toLowerCase().includes(searchTerm))
+            );
+            
+            displayGuestProfiles(filtered);
+        }
+        
+        function updateGuestStats(guests) {
+            document.getElementById('totalGuestsCount').textContent = guests.length;
+            
+            const totalBookings = guests.reduce((sum, g) => sum + g.total_bookings, 0);
+            document.getElementById('totalBeachBookings').textContent = totalBookings;
+            
+            const withContact = guests.filter(g => g.guest_phone || g.guest_email).length;
+            document.getElementById('guestsWithContact').textContent = withContact;
+            
+            const returnGuests = guests.filter(g => g.total_bookings > 1).length;
+            document.getElementById('returnGuestsCount').textContent = returnGuests;
+        }
+        
+        function displayGuestProfiles(guests) {
+            const container = document.getElementById('guestProfilesList');
+            
+            if (!guests || guests.length === 0) {
+                container.innerHTML = \`
+                    <div class="text-center py-12">
+                        <i class="fas fa-user-slash text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-600 text-lg">No guest profiles found</p>
+                        <p class="text-gray-500 text-sm mt-2">Try adjusting your search criteria</p>
+                    </div>
+                \`;
+                return;
+            }
+            
+            const html = guests.map(guest => \`
+                <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow border-2 border-gray-100">
+                    <div class="p-6">
+                        <div class="flex items-start justify-between">
+                            <!-- Guest Info -->
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                                        \${guest.guest_name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">\${guest.guest_name}</h3>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                                                <i class="fas fa-calendar-check mr-1"></i>\${guest.total_bookings} Booking\${guest.total_bookings > 1 ? 's' : ''}
+                                            </span>
+                                            \${guest.total_bookings > 1 ? '<span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-semibold"><i class="fas fa-star mr-1"></i>Return Guest</span>' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Contact Grid -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div class="flex items-center gap-2 text-gray-700">
+                                        <i class="fas fa-door-open text-blue-500 w-5"></i>
+                                        <span class="text-sm"><strong>Room:</strong> \${guest.guest_room_number || 'N/A'}</span>
+                                    </div>
+                                    \${guest.guest_phone ? \`
+                                        <div class="flex items-center gap-2 text-gray-700">
+                                            <i class="fas fa-phone text-green-500 w-5"></i>
+                                            <a href="tel:\${guest.guest_phone}" class="text-sm hover:text-blue-600"><strong>Phone:</strong> \${guest.guest_phone}</a>
+                                        </div>
+                                    \` : '<div class="flex items-center gap-2 text-gray-400"><i class="fas fa-phone w-5"></i><span class="text-sm">No phone</span></div>'}
+                                    \${guest.guest_email ? \`
+                                        <div class="flex items-center gap-2 text-gray-700">
+                                            <i class="fas fa-envelope text-purple-500 w-5"></i>
+                                            <a href="mailto:\${guest.guest_email}" class="text-sm hover:text-blue-600"><strong>Email:</strong> \${guest.guest_email}</a>
+                                        </div>
+                                    \` : '<div class="flex items-center gap-2 text-gray-400"><i class="fas fa-envelope w-5"></i><span class="text-sm">No email</span></div>'}
+                                    <div class="flex items-center gap-2 text-gray-700">
+                                        <i class="fas fa-clock text-gray-500 w-5"></i>
+                                        <span class="text-sm"><strong>Last Visit:</strong> \${new Date(guest.last_booking_date).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Actions -->
+                            <div class="flex flex-col gap-2">
+                                <button onclick="viewGuestDetails('\${guest.guest_id}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition">
+                                    <i class="fas fa-eye mr-2"></i>View Details
+                                </button>
+                                <button onclick="contactGuest('\${guest.guest_phone || guest.guest_email}')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition" \${!guest.guest_phone && !guest.guest_email ? 'disabled' : ''}>
+                                    <i class="fas fa-paper-plane mr-2"></i>Contact
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            \`).join('');
+            
+            container.innerHTML = html;
+        }
+        
+        function viewGuestDetails(guestId) {
+            const guest = guestProfilesData.find(g => g.guest_id == guestId);
+            if (!guest) return;
+            
+            alert(\`Guest Details:\\n\\nName: \${guest.guest_name}\\nRoom: \${guest.guest_room_number || 'N/A'}\\nPhone: \${guest.guest_phone || 'N/A'}\\nEmail: \${guest.guest_email || 'N/A'}\\nTotal Bookings: \${guest.total_bookings}\\nLast Visit: \${new Date(guest.last_booking_date).toLocaleDateString()}\`);
+        }
+        
+        function contactGuest(contact) {
+            if (!contact) {
+                alert('No contact information available for this guest.');
+                return;
+            }
+            
+            if (contact.includes('@')) {
+                window.location.href = \`mailto:\${contact}\`;
+            } else {
+                window.location.href = \`tel:\${contact}\`;
+            }
+        }
+        
+        function exportGuestData() {
+            if (guestProfilesData.length === 0) {
+                alert('No guest data to export');
+                return;
+            }
+            
+            const headers = ['Name', 'Room', 'Phone', 'Email', 'Total Bookings', 'Last Visit'];
+            const rows = guestProfilesData.map(g => [
+                g.guest_name,
+                g.guest_room_number || 'N/A',
+                g.guest_phone || 'N/A',
+                g.guest_email || 'N/A',
+                g.total_bookings,
+                new Date(g.last_booking_date).toLocaleDateString()
+            ]);
+            
+            let csv = headers.join(',') + '\\n';
+            rows.forEach(row => {
+                csv += row.map(cell => \`"\${cell}"\`).join(',') + '\\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = \`guest-profiles-\${new Date().toISOString().split('T')[0]}.csv\`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        function showGuestProfilesError(message) {
+            const container = document.getElementById('guestProfilesList');
+            container.innerHTML = \`
+                <div class="text-center py-12">
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-4"></i>
+                    <p class="text-red-600 text-lg">\${message}</p>
+                    <button onclick="loadAllGuests()" class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
+                        <i class="fas fa-sync-alt mr-2"></i>Retry
+                    </button>
+                </div>
+            \`;
+        }
+        
         // Analytics Email Functions
         async function loadAnalyticsEmails() {
             try {
