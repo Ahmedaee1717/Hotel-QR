@@ -21856,7 +21856,7 @@ app.get('/api/property/:property_id', async (c) => {
   
   try {
     const property = await DB.prepare(`
-      SELECT property_id, name, slug, primary_color, secondary_color, logo_url
+      SELECT property_id, name, slug, primary_color, secondary_color, brand_logo_url as logo_url
       FROM properties
       WHERE property_id = ? AND status = 'active'
     `).bind(property_id).first()
@@ -23551,22 +23551,34 @@ app.get('/hotel/:property_slug', async (c) => {
         --pass-bar-secondary: #00d4aa;
     }
     .pass-link-bar {
-        background: linear-gradient(135deg, var(--pass-bar-primary) 0%, var(--pass-bar-secondary) 100%);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        background: rgba(18, 10, 14, 0.85);
+        -webkit-backdrop-filter: blur(18px) saturate(1.2);
+        backdrop-filter: blur(18px) saturate(1.2);
+        border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+        box-shadow: 0 14px 34px -22px rgba(0, 0, 0, 0.85);
         position: sticky;
         top: 0;
         z-index: 1000;
         transition: all 0.3s ease;
+        color: #f6f0e3;
     }
+    .pass-link-bar .w-8.h-8 {
+        background: rgba(212, 175, 55, 0.12) !important;
+        border: 1px solid rgba(212, 175, 55, 0.55);
+    }
+    .pass-link-bar .w-8.h-8 i { color: var(--lux-gold, #D4AF37) !important; }
     .pass-link-input {
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(212, 175, 55, 0.32);
+        background: rgba(250, 246, 236, 0.07);
+        color: #f6f0e3;
         transition: all 0.3s ease;
     }
+    .pass-link-input::placeholder { color: rgba(246, 240, 227, 0.45); }
     .pass-link-input:focus {
-        border-color: white;
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+        border-color: var(--lux-gold, #D4AF37);
+        box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
         outline: none;
+        background: rgba(250, 246, 236, 0.1);
     }
     .pass-linked-badge {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -23577,40 +23589,15 @@ app.get('/hotel/:property_slug', async (c) => {
         to { opacity: 1; transform: translateX(0); }
     }
     .pass-link-button {
-        background: white;
-        color: var(--pass-bar-primary);
-        transition: all 0.3s ease;
-    }
-    .pass-link-button:hover {
-        background: #f0f9ff;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    .pass-link-button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-<style>
-    .pass-link-bar {
-        background: linear-gradient(135deg, #016e8f 0%, #01567a 100%);
-        border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-    }
-    .pass-link-input {
-        border: 2px solid #e5e7eb;
-        background: white;
-    }
-    .pass-link-input:focus {
-        outline: none;
-        border-color: #016e8f;
-        box-shadow: 0 0 0 3px rgba(1, 110, 143, 0.1);
-    }
-    .pass-link-button {
-        background: linear-gradient(135deg, #D4AF37 0%, #B8941F 100%);
-        color: white;
+        background: linear-gradient(135deg, #e9cd76 0%, #D4AF37 45%, #b08c2c 100%);
+        color: #231307;
+        letter-spacing: 0.04em;
         transition: all 0.2s;
     }
     .pass-link-button:hover {
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+        box-shadow: 0 10px 24px -10px rgba(212, 175, 55, 0.55);
+        filter: brightness(1.05);
     }
     .pass-link-button:disabled {
         opacity: 0.6;
@@ -23618,7 +23605,7 @@ app.get('/hotel/:property_slug', async (c) => {
     }
     .link-mode-toggle {
         display: inline-flex;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         border-radius: 0.5rem;
         padding: 0.25rem;
     }
@@ -23627,74 +23614,152 @@ app.get('/hotel/:property_slug', async (c) => {
         border-radius: 0.375rem;
         cursor: pointer;
         transition: all 0.2s;
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(246, 240, 227, 0.7);
         font-size: 0.875rem;
         font-weight: 500;
     }
     .link-mode-option.active {
-        background: white;
-        color: #016e8f;
+        background: var(--lux-gold, #D4AF37);
+        color: #231307;
     }
+    .lux-pass-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.72rem 0;
+        background: none;
+        border: none;
+        color: #f6f0e3;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        text-align: left;
+    }
+    .lux-pass-toggle strong { color: var(--lux-gold-2, #f0d98c); font-weight: 600; }
+    .lux-pass-left { display: flex; align-items: center; gap: 0.6rem; }
+    .lux-pass-key {
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(212, 175, 55, 0.5);
+        background: rgba(212, 175, 55, 0.1);
+        color: var(--lux-gold, #D4AF37);
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+    .lux-pass-chev { color: var(--lux-gold, #D4AF37); font-size: 0.7rem; transition: transform 0.35s ease; }
+    .pass-link-bar.lux-open .lux-pass-chev { transform: rotate(180deg); }
+    .lux-pass-form { max-height: 0; overflow: hidden; transition: max-height 0.45s ease, padding-bottom 0.3s ease; padding-bottom: 0; }
+    .pass-link-bar.lux-open .lux-pass-form { max-height: 340px; padding-bottom: 0.9rem; }
+    .lux-pass-hint { font-size: 0.68rem; color: rgba(246, 240, 227, 0.55); margin-top: 0.55rem; line-height: 1.5; }
+    .lux-welcome-label { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(246, 240, 227, 0.5); }
+    .lux-welcome-name { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.15rem; font-weight: 700; color: #f6f0e3; line-height: 1.15; }
+    .lux-room-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--lux-gold-2, #f0d98c);
+        border: 1px solid rgba(212, 175, 55, 0.45);
+        background: rgba(212, 175, 55, 0.08);
+        padding: 0.32rem 0.6rem;
+        border-radius: 999px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .lux-bookings-btn {
+        display: inline-flex;
+        align-items: center;
+        background: linear-gradient(135deg, #e9cd76 0%, #D4AF37 45%, #b08c2c 100%);
+        color: #231307;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.55rem 0.9rem;
+        border-radius: 999px;
+        box-shadow: 0 10px 22px -10px rgba(212, 175, 55, 0.55);
+        white-space: nowrap;
+    }
+    .lux-signout-btn { color: rgba(246, 240, 227, 0.6); padding: 0.5rem; border-radius: 0.6rem; background: none; border: none; }
+    .lux-signout-btn:hover { color: #f6f0e3; background: rgba(255, 255, 255, 0.08); }
     </style>
-<div id="passLinkBarUnlinked" class="pass-link-bar py-3">
+<div id="passLinkBarUnlinked" class="pass-link-bar">
     <div class="max-w-7xl mx-auto px-4">
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2 text-white min-w-fit">
-                <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                    <i class="fas fa-user text-sm" style="color: #016e8f;"></i>
-                </div>
-                <span class="font-semibold hidden sm:inline">Link Your Pass</span>
+        <button type="button" onclick="luxTogglePassForm()" class="lux-pass-toggle" id="luxPassToggle">
+            <span class="lux-pass-left">
+                <span class="lux-pass-key"><i class="fas fa-key"></i></span>
+                <span>Staying with us? <strong>Link your stay</strong></span>
+            </span>
+            <i class="fas fa-chevron-down lux-pass-chev" id="luxPassChev"></i>
+        </button>
+        <div id="luxPassForm" class="lux-pass-form">
+            <div class="flex items-center gap-2">
+                <input type="text" id="guestNameInput" placeholder="Your full name (e.g., John Smith)" class="pass-link-input flex-1 px-4 py-2.5 rounded-full text-sm">
+                <button onclick="requestPassLink()" id="requestLinkButton" class="pass-link-button px-5 py-2.5 rounded-full font-semibold whitespace-nowrap text-sm">
+                    <i class="fas fa-link mr-2"></i>Link
+                </button>
             </div>
-            <div class="flex-1">
-                <!-- Name Input -->
-                <div class="flex items-center gap-2">
-                    <input type="text" id="guestNameInput" placeholder="Enter your full name (e.g., John Smith)" class="pass-link-input flex-1 px-4 py-2 rounded-lg text-sm">
-                    <button onclick="requestPassLink()" id="requestLinkButton" class="pass-link-button px-6 py-2 rounded-lg font-semibold whitespace-nowrap">
-                        <i class="fas fa-link mr-2"></i><span class="hidden sm:inline">Link Pass</span><span class="sm:hidden">Link</span>
-                    </button>
-                </div>
+            <p class="lux-pass-hint">Our front desk will link your OnePass in minutes — unlocking bookings, benefits and your personal concierge.</p>
+            <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
+                <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Link Your Digital Pass</p>
+                <p class="mb-2">Enter your full name and our front desk team will link your OnePass digital pass within a few minutes.</p>
+                <p class="text-xs opacity-80">Once linked, you'll have instant access to all resort services and bookings</p>
             </div>
-            <button onclick="togglePassInfo()" class="text-white hover:text-gray-100 transition-colors"><i class="fas fa-info-circle text-xl"></i></button>
-        </div>
-        <div id="passInfoPanel" class="hidden mt-3 bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 text-white text-sm">
-            <p class="font-semibold mb-2"><i class="fas fa-lightbulb mr-2"></i>Link Your Digital Pass</p>
-            <p class="mb-2">Enter your full name and our front desk team will link your OnePass digital pass within a few minutes.</p>
-            <p class="text-xs opacity-80">Once linked, you'll have instant access to all resort services and bookings</p>
-        </div>
-        <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
-            <i class="fas fa-exclamation-circle mr-2"></i><span id="passLinkErrorMessage"></span>
-        </div>
-        <div id="passLinkSuccess" class="hidden mt-2 bg-green-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
-            <i class="fas fa-check-circle mr-2"></i><span id="passLinkSuccessMessage"></span>
+            <div id="passLinkError" class="hidden mt-2 bg-red-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
+                <i class="fas fa-exclamation-circle mr-2"></i><span id="passLinkErrorMessage"></span>
+            </div>
+            <div id="passLinkSuccess" class="hidden mt-2 bg-green-500 bg-opacity-90 rounded-lg p-3 text-white text-sm">
+                <i class="fas fa-check-circle mr-2"></i><span id="passLinkSuccessMessage"></span>
+            </div>
         </div>
     </div>
 </div>
-<div id="passLinkBarLinked" class="hidden pass-link-bar py-3">
+<div id="passLinkBarLinked" class="hidden pass-link-bar">
     <div class="max-w-7xl mx-auto px-4">
-        <div class="flex items-center justify-between gap-6 py-3.5">
+        <div class="flex items-center justify-between gap-3 py-2.5">
             <!-- Left: Welcome Message -->
-            <div class="flex items-center gap-3">
-                <div class="leading-relaxed">
-                    <p class="text-white text-sm font-medium opacity-90">Welcome back,</p>
-                    <p class="text-white font-bold text-lg" id="linkedGuestName">Guest</p>
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="leading-tight min-w-0">
+                    <p class="lux-welcome-label">Welcome back</p>
+                    <p class="lux-welcome-name truncate" id="linkedGuestName">Guest</p>
                 </div>
-                <span class="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm ml-3">
-                    <i class="fas fa-door-open mr-1.5 text-xs"></i>Room <strong id="linkedRoomNumber" class="text-xs">—</strong>
+                <span class="lux-room-chip">
+                    <i class="fas fa-door-open"></i>Room <strong id="linkedRoomNumber">—</strong>
                 </span>
             </div>
-            
+
             <!-- Right: Action Buttons -->
-            <div class="flex items-center gap-4">
-                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="text-white px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all shadow-md" style="background-color: var(--accent-color, #D4AF37);">
-                    <i class="fas fa-clipboard-list mr-2"></i>My Bookings
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <a href="#" id="myBookingsButton" onclick="goToMyBookings(); return false;" class="lux-bookings-btn">
+                    <i class="fas fa-clipboard-list mr-1.5"></i>My Bookings
                 </a>
-                <button onclick="unlinkGuestPass()" class="text-white hover:bg-white/20 transition-colors p-2.5 rounded-xl" title="Sign out">
+                <button onclick="unlinkGuestPass()" class="lux-signout-btn" title="Sign out">
                     <i class="fas fa-sign-out-alt text-xl"></i>
                 </button>
             </div>
         </div>
     </div>
 </div>
+<script>
+window.luxTogglePassForm = function() {
+    var bar = document.getElementById('passLinkBarUnlinked');
+    if (!bar) return;
+    bar.classList.toggle('lux-open');
+    if (bar.classList.contains('lux-open')) {
+        setTimeout(function() {
+            var inp = document.getElementById('guestNameInput');
+            if (inp) inp.focus();
+        }, 380);
+    }
+};
+</script>
 <script src="/static/pass-link.js"></script>
 `;
   
@@ -23704,7 +23769,7 @@ app.get('/hotel/:property_slug', async (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net wss://api.openai.com https://api.openai.com;">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net wss://api.openai.com https://api.openai.com;">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="mobile-web-app-capable" content="yes">
         
@@ -23715,6 +23780,9 @@ app.get('/hotel/:property_slug', async (c) => {
         <link rel="apple-touch-icon" href="/icon-192.png">
         
         <title>Welcome</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -23766,60 +23834,694 @@ app.get('/hotel/:property_slug', async (c) => {
             transform: scale(1.05);
           }
         </style>
+        <!-- ══════════════════ LUXURY DESIGN SYSTEM · "MAISON" ══════════════════ -->
+        <style id="lux-design-system">
+          :root {
+            --lux-ink: #120a0e;
+            --lux-ink-2: #1c1016;
+            --lux-ink-3: #2a161e;
+            --lux-ivory: #faf6ec;
+            --lux-cream: #f1e8d6;
+            --lux-gold: #D4AF37;
+            --lux-gold-2: #f0d98c;
+            --lux-gold-deep: #a8842a;
+            --lux-gold-soft: rgba(212, 175, 55, 0.30);
+            --lux-gold-faint: rgba(212, 175, 55, 0.14);
+            --lux-text: #f6f0e3;
+            --lux-text-dim: rgba(246, 240, 227, 0.62);
+            --lux-card-ink: #241318;
+            --lux-serif: 'Cormorant Garamond', Georgia, serif;
+            --lux-sans: 'Montserrat', 'Inter', system-ui, sans-serif;
+            --lux-ease: cubic-bezier(0.22, 1, 0.36, 1);
+            --lux-gold-grad: linear-gradient(135deg, #e9cd76 0%, #D4AF37 45%, #b08c2c 100%);
+          }
+
+          html { scroll-behavior: smooth; }
+
+          body {
+            font-family: var(--lux-sans) !important;
+            background: var(--lux-ink) !important;
+            color: var(--lux-text);
+            min-height: 100vh;
+          }
+
+          /* Ambient atmosphere: soft gold glows + fine grid, fixed behind everything */
+          body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+              radial-gradient(900px 600px at 85% -10%, rgba(212, 175, 55, 0.10), transparent 60%),
+              radial-gradient(700px 500px at -10% 30%, rgba(151, 38, 38, 0.12), transparent 60%),
+              radial-gradient(800px 700px at 50% 110%, rgba(107, 21, 41, 0.14), transparent 60%);
+          }
+          body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-image:
+              linear-gradient(rgba(212, 175, 55, 0.028) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(212, 175, 55, 0.028) 1px, transparent 1px);
+            background-size: 56px 56px;
+            -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 78%);
+                    mask-image: radial-gradient(ellipse at 50% 0%, black 30%, transparent 78%);
+          }
+          #content, #loading { position: relative; z-index: 1; }
+
+          ::selection { background: rgba(212, 175, 55, 0.35); color: #fff; }
+
+          /* Refined scrollbar */
+          ::-webkit-scrollbar { width: 10px; height: 8px; }
+          ::-webkit-scrollbar-track { background: var(--lux-ink); }
+          ::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.28); border-radius: 999px; border: 2px solid var(--lux-ink); }
+          ::-webkit-scrollbar-thumb:hover { background: rgba(212, 175, 55, 0.5); }
+
+          /* ── Preloader ── */
+          #loading {
+            background: var(--lux-ink) !important;
+          }
+          .lux-loader-emblem {
+            position: relative;
+            width: 108px;
+            height: 108px;
+            margin: 0 auto 1.6rem;
+          }
+          .lux-loader-emblem .lux-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(212, 175, 55, 0.25);
+          }
+          .lux-loader-emblem .lux-ring.spin {
+            border-color: transparent;
+            border-top-color: var(--lux-gold);
+            animation: luxSpin 1.6s linear infinite;
+          }
+          .lux-loader-emblem .lux-ring.spin2 {
+            inset: 10px;
+            border-color: transparent;
+            border-bottom-color: rgba(212, 175, 55, 0.55);
+            animation: luxSpin 2.6s linear infinite reverse;
+          }
+          .lux-loader-emblem .lux-loader-icon {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--lux-serif);
+            font-size: 2.1rem;
+            color: var(--lux-gold);
+            text-shadow: 0 0 24px rgba(212, 175, 55, 0.5);
+          }
+          @keyframes luxSpin { to { transform: rotate(360deg); } }
+          .lux-loader-word {
+            font-family: var(--lux-serif);
+            font-size: 1.35rem;
+            letter-spacing: 0.04em;
+            color: var(--lux-text);
+          }
+          .lux-loader-sub {
+            font-size: 0.68rem;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: var(--lux-text-dim);
+            margin-top: 0.5rem;
+          }
+
+          /* ── Hero ── */
+          .lux-hero-wrap { position: relative; }
+          .gradient-hero {
+            height: clamp(430px, 62vh, 640px) !important;
+            position: relative;
+          }
+          .gradient-hero::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+              linear-gradient(180deg, rgba(18, 10, 14, 0.55) 0%, rgba(18, 10, 14, 0.05) 30%, rgba(18, 10, 14, 0.05) 55%, rgba(18, 10, 14, 0.92) 88%, var(--lux-ink) 100%),
+              radial-gradient(120% 60% at 50% 100%, rgba(18, 10, 14, 0.35), transparent 60%);
+          }
+          .lux-hero-frame {
+            position: absolute;
+            inset: 14px;
+            border: 1px solid rgba(212, 175, 55, 0.22);
+            border-radius: 14px;
+            pointer-events: none;
+            z-index: 2;
+            -webkit-mask-image: linear-gradient(180deg, black 68%, transparent 96%);
+                    mask-image: linear-gradient(180deg, black 68%, transparent 96%);
+          }
+          .lux-hero-frame::before, .lux-hero-frame::after {
+            content: '✦';
+            position: absolute;
+            top: -9px;
+            font-size: 12px;
+            color: var(--lux-gold);
+            background: transparent;
+          }
+          .lux-hero-frame::before { left: calc(50% - 30px); }
+          .lux-hero-frame::after { right: calc(50% - 30px); }
+
+          .lux-hero-actions { position: absolute; top: 26px; right: 26px; z-index: 10; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+          .lux-chip-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.62rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(18, 10, 14, 0.55) !important;
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            color: var(--lux-text) !important;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            transition: all 0.35s var(--lux-ease);
+            box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+          }
+          .lux-chip-btn:hover { border-color: var(--lux-gold); background: rgba(42, 22, 30, 0.75) !important; transform: translateY(-1px); }
+          .lux-chip-btn i { color: var(--lux-gold); }
+          .lux-chip-btn.lux-chip-gold {
+            background: var(--lux-gold-grad) !important;
+            color: #231307 !important;
+            border-color: transparent;
+            box-shadow: 0 14px 30px -12px rgba(212, 175, 55, 0.55);
+          }
+          .lux-chip-btn.lux-chip-gold i { color: #231307; }
+          .lux-chip-btn.lux-chip-gold:hover { filter: brightness(1.06); }
+
+          #languageSelector {
+            appearance: none;
+            -webkit-appearance: none;
+            padding: 0.62rem 2.1rem 0.62rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(18, 10, 14, 0.55) !important;
+            border: 1px solid rgba(212, 175, 55, 0.35) !important;
+            color: var(--lux-text) !important;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            background-image: linear-gradient(45deg, transparent 50%, var(--lux-gold) 50%), linear-gradient(135deg, var(--lux-gold) 50%, transparent 50%) !important;
+            background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55% !important;
+            background-size: 5px 5px, 5px 5px !important;
+            background-repeat: no-repeat !important;
+            cursor: pointer;
+          }
+          #languageSelector option { background: var(--lux-ink-2); color: var(--lux-text); text-transform: none; }
+
+          .lux-clock {
+            position: absolute;
+            top: 26px;
+            left: 26px;
+            z-index: 10;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.62rem 1.1rem;
+            border-radius: 999px;
+            background: rgba(18, 10, 14, 0.55);
+            border: 1px solid rgba(212, 175, 55, 0.28);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--lux-text-dim);
+            box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+          }
+          .lux-clock .lux-clock-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--lux-gold);
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.9);
+            animation: luxBreathePulse 2.4s ease-in-out infinite;
+          }
+          @keyframes luxBreathePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+          .lux-hero-identity {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 5;
+            padding: 0 1.5rem 2.4rem;
+            text-align: center;
+          }
+          #propertyLogo { display: inline-block; position: relative; margin-bottom: 1.1rem; }
+          #propertyLogo::before {
+            content: '';
+            position: absolute;
+            inset: -9px;
+            border-radius: 50%;
+            border: 1px solid rgba(212, 175, 55, 0.45);
+            animation: luxRotate 26s linear infinite;
+            border-top-color: var(--lux-gold-2);
+          }
+          @keyframes luxRotate { to { transform: rotate(360deg); } }
+          #propertyLogo img, #propertyLogo > div {
+            border: 2px solid var(--lux-gold) !important;
+            box-shadow: 0 0 0 5px rgba(18, 10, 14, 0.55), 0 0 44px rgba(212, 175, 55, 0.4), 0 18px 44px -12px rgba(0, 0, 0, 0.7) !important;
+            background: var(--lux-ink-2) !important;
+          }
+          #propertyName {
+            font-family: var(--lux-serif) !important;
+            font-size: clamp(1.85rem, 8vw, 3.6rem) !important;
+            font-weight: 600 !important;
+            line-height: 1.08 !important;
+            color: var(--lux-text) !important;
+            letter-spacing: 0.01em;
+            text-shadow: 0 2px 30px rgba(0, 0, 0, 0.65);
+            margin-bottom: 0.65rem !important;
+            padding: 0 0.25rem;
+            overflow-wrap: break-word;
+          }
+          .lux-tagline-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.9rem;
+          }
+          .lux-tagline-row::before, .lux-tagline-row::after {
+            content: '';
+            height: 1px;
+            width: clamp(30px, 8vw, 90px);
+            background: linear-gradient(90deg, transparent, var(--lux-gold));
+          }
+          .lux-tagline-row::after { background: linear-gradient(90deg, var(--lux-gold), transparent); }
+          #propertyTagline {
+            font-size: 0.72rem !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.42em !important;
+            text-transform: uppercase;
+            color: var(--lux-gold-2) !important;
+            margin-bottom: 0 !important;
+          }
+
+          /* ── Sticky category nav (sits below the pass bar) ── */
+          .sticky-nav {
+            top: var(--lux-passbar-h, 3rem) !important;
+            background: rgba(18, 10, 14, 0.78) !important;
+            -webkit-backdrop-filter: blur(20px) saturate(1.25);
+            backdrop-filter: blur(20px) saturate(1.25);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.16);
+            box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.8) !important;
+            scrollbar-width: none;
+          }
+          .sticky-nav::-webkit-scrollbar { display: none; }
+
+          .category-pill {
+            font-family: var(--lux-sans) !important;
+            font-size: 0.7rem !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.15em !important;
+            text-transform: uppercase;
+            padding: 0.68rem 1.3rem !important;
+            border-radius: 999px !important;
+            border: 1px solid rgba(212, 175, 55, 0.3) !important;
+            background: rgba(250, 246, 236, 0.04) !important;
+            color: var(--lux-text-dim) !important;
+            transition: all 0.35s var(--lux-ease) !important;
+            box-shadow: none !important;
+          }
+          .category-pill:hover { border-color: rgba(212, 175, 55, 0.7) !important; color: var(--lux-text) !important; transform: translateY(-1px); }
+          .category-pill.bg-blue-500 {
+            background: var(--lux-gold-grad) !important;
+            color: #231307 !important;
+            border-color: transparent !important;
+            box-shadow: 0 12px 26px -12px rgba(212, 175, 55, 0.65) !important;
+          }
+
+          /* ── Section headers ── */
+          #content section h2 {
+            font-family: var(--lux-serif) !important;
+            font-size: clamp(1.85rem, 4vw, 2.5rem) !important;
+            font-weight: 600 !important;
+            color: var(--lux-text) !important;
+            letter-spacing: 0.01em;
+            position: relative;
+            padding-bottom: 0.9rem;
+            margin-bottom: 1.6rem !important;
+          }
+          #content section h2::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 74px;
+            height: 1px;
+            background: linear-gradient(90deg, var(--lux-gold), transparent);
+          }
+          #content section h2 i {
+            width: 2.7rem;
+            height: 2.7rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            background: rgba(212, 175, 55, 0.08);
+            font-size: 0.95rem !important;
+            color: var(--lux-gold) !important;
+            flex-shrink: 0;
+          }
+          #beach-booking-section h2 { padding-bottom: 0 !important; margin-bottom: 0.75rem !important; }
+          #beach-booking-section h2::after { display: none; }
+          #content section > p { color: var(--lux-text-dim) !important; }
+
+          /* ── Offering cards: dark glass, one theme with the shell ── */
+          #content .offering-card {
+            background: linear-gradient(160deg, rgba(52, 29, 39, 0.72) 0%, rgba(26, 14, 19, 0.92) 100%) !important;
+            border-radius: 1.35rem !important;
+            border: 1px solid rgba(212, 175, 55, 0.26) !important;
+            box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.75) !important;
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+            overflow: hidden;
+            transition: transform 0.5s var(--lux-ease), box-shadow 0.5s var(--lux-ease), border-color 0.5s var(--lux-ease) !important;
+          }
+          #content .offering-card:hover {
+            transform: translateY(-7px) !important;
+            border-color: rgba(212, 175, 55, 0.75) !important;
+            box-shadow: 0 20px 50px -20px rgba(212, 175, 55, 0.25), 0 40px 80px -40px rgba(0, 0, 0, 0.85) !important;
+          }
+          #content .offering-card img { transition: transform 1.4s var(--lux-ease); }
+          #content .offering-card:hover img { transform: scale(1.055); }
+          #content .offering-card h3 {
+            font-family: var(--lux-serif) !important;
+            font-size: 1.5rem !important;
+            font-weight: 600 !important;
+            color: var(--lux-text) !important;
+            line-height: 1.15 !important;
+          }
+
+          /* ── Tier membership card refinements (background color stays tier-driven) ── */
+          #tierCard { border: 1px solid rgba(212, 175, 55, 0.5) !important; border-radius: 1.6rem !important; }
+          #tierName { font-family: var(--lux-serif) !important; font-size: 2.4rem !important; font-weight: 700 !important; letter-spacing: 0.01em; }
+          #tierDetailsPanel .bg-white { background: var(--lux-ivory) !important; }
+          #tierDetailsPanel h4 { font-family: var(--lux-sans); }
+
+          /* ── Beach section shell ── */
+          .lux-beach-shell {
+            background: linear-gradient(145deg, rgba(42, 22, 30, 0.9) 0%, rgba(18, 10, 14, 0.94) 100%) !important;
+            border: 1px solid rgba(212, 175, 55, 0.3) !important;
+            -webkit-backdrop-filter: blur(16px);
+            backdrop-filter: blur(16px);
+            color: var(--lux-text) !important;
+          }
+
+          /* ── Floating buttons ── */
+          #mapFloatingBtn {
+            background: rgba(18, 10, 14, 0.72) !important;
+            border: 1px solid rgba(212, 175, 55, 0.5) !important;
+            color: var(--lux-gold-2) !important;
+            -webkit-backdrop-filter: blur(16px);
+            backdrop-filter: blur(16px);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-size: 0.72rem !important;
+            box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9) !important;
+          }
+          #mapFloatingBtn:hover { border-color: var(--lux-gold) !important; background: rgba(42, 22, 30, 0.85) !important; }
+
+          #chatbotButton {
+            background: var(--lux-gold-grad) !important;
+            color: #231307 !important;
+            box-shadow: 0 16px 40px -14px rgba(212, 175, 55, 0.75), 0 0 0 1px rgba(212, 175, 55, 0.5) !important;
+          }
+          #chatbotButton::after {
+            content: '';
+            position: absolute;
+            inset: -7px;
+            border-radius: 50%;
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            animation: luxOrb 2.8s var(--lux-ease) infinite;
+            pointer-events: none;
+          }
+          @keyframes luxOrb {
+            0% { transform: scale(0.9); opacity: 0.9; }
+            70%, 100% { transform: scale(1.35); opacity: 0; }
+          }
+
+          /* ── Concierge chat window ── */
+          #chatWindow {
+            background: rgba(20, 11, 15, 0.94) !important;
+            border: 1px solid rgba(212, 175, 55, 0.4) !important;
+            -webkit-backdrop-filter: blur(22px);
+            backdrop-filter: blur(22px);
+            overflow: hidden;
+          }
+          #chatWindow #chatMessages { background: transparent !important; }
+          #chatMessages .bg-white {
+            background: var(--lux-ivory) !important;
+            border-color: rgba(212, 175, 55, 0.35) !important;
+          }
+          #chatbotName { font-family: var(--lux-serif); font-size: 1.15rem; letter-spacing: 0.02em; }
+          .lux-chat-header {
+            background: linear-gradient(135deg, #2a161e 0%, #120a0e 100%) !important;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.35);
+          }
+          .lux-chat-header .bg-white\\/20 { background: rgba(212, 175, 55, 0.15) !important; border: 1px solid rgba(212, 175, 55, 0.45); }
+          .lux-chat-header i { color: var(--lux-gold-2); }
+          #chatInput:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25) !important;
+            border-color: var(--lux-gold) !important;
+          }
+          #chatWindow > div:last-child {
+            background: rgba(18, 10, 14, 0.85) !important;
+            border-top: 1px solid rgba(212, 175, 55, 0.2) !important;
+          }
+          #chatInput {
+            background: rgba(250, 246, 236, 0.07) !important;
+            border: 1px solid rgba(212, 175, 55, 0.35) !important;
+            color: var(--lux-text) !important;
+          }
+          #chatInput::placeholder { color: rgba(246, 240, 227, 0.4); }
+          #chatWindow .text-gray-500 { color: rgba(246, 240, 227, 0.5) !important; }
+
+          /* ── Modals: ivory paper + serif ── */
+          #infoMenuModal .bg-white, #infoPageModal .bg-white, #moodCheckModal .bg-white,
+          #serviceModal .bg-white, #voiceCallModal .bg-white, #mapModal .bg-white {
+            background: var(--lux-ivory) !important;
+          }
+          #infoMenuModal h2, #infoPageModal h2, #moodCheckModal h2, #serviceModal h2,
+          #mapModal h2, #voiceCallModal h2 {
+            font-family: var(--lux-serif) !important;
+          }
+          #mapModal h2 { color: var(--lux-card-ink); }
+
+          /* ── Reveal on scroll ── */
+          .lux-reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.9s ease, transform 0.9s var(--lux-ease); }
+          .lux-reveal.lux-in { opacity: 1; transform: none; }
+
+          /* ── Buttons polish ── */
+          #content button { transition: all 0.3s var(--lux-ease); }
+
+          @media (max-width: 640px) {
+            .lux-hero-actions { top: 16px; right: 12px; gap: 0.4rem; }
+            .lux-clock { top: 16px; left: 12px; padding: 0.5rem 0.85rem; }
+            .lux-hero-frame { inset: 8px; }
+            .gradient-hero { height: clamp(400px, 58vh, 520px) !important; }
+            #mapFloatingBtn {
+              padding: 0 !important;
+              width: 3.4rem;
+              height: 3.4rem;
+              border-radius: 50% !important;
+              display: flex !important;
+              align-items: center;
+              justify-content: center;
+              bottom: 1.25rem !important;
+              right: 1.25rem !important;
+            }
+            #mapFloatingBtn span { display: none; }
+            #mapFloatingBtn i { margin: 0 !important; font-size: 1.15rem; }
+            #chatbotButton { bottom: 1.25rem !important; left: 1.25rem !important; }
+          }
+
+          .lux-beach-cta {
+            background: var(--lux-gold-grad) !important;
+            color: #231307 !important;
+            letter-spacing: 0.02em;
+            box-shadow: 0 16px 36px -14px rgba(212, 175, 55, 0.6) !important;
+          }
+          .lux-beach-cta:hover { filter: brightness(1.07); }
+
+          /* ── Compact glanceable row cards ── */
+          #content .offering-card.lux-row {
+            display: flex;
+            align-items: stretch;
+            min-height: 106px;
+            cursor: pointer;
+          }
+          #content .offering-card.lux-row:hover { transform: translateY(-3px) !important; }
+          .lux-row-media { width: 106px; flex-shrink: 0; position: relative; overflow: hidden; }
+          .lux-row-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+          .lux-row-media::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(90deg, transparent 55%, rgba(30, 16, 22, 0.55) 100%);
+          }
+          .lux-row-badge { position: absolute; left: 5px; bottom: 5px; transform: scale(0.78); transform-origin: left bottom; }
+          .lux-row-badge:empty { display: none; }
+          .lux-row-main {
+            flex: 1;
+            min-width: 0;
+            padding: 0.8rem 0.3rem 0.8rem 0.95rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.3rem;
+          }
+          #content .offering-card.lux-row h3 { font-size: 1.28rem !important; margin: 0 !important; }
+          .lux-row-sub {
+            font-size: 0.76rem;
+            color: rgba(246, 240, 227, 0.62);
+            line-height: 1.45;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            margin: 0;
+          }
+          .lux-row-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.35rem 0.75rem;
+            font-size: 0.66rem;
+            color: rgba(246, 240, 227, 0.55);
+            letter-spacing: 0.02em;
+            font-weight: 500;
+          }
+          .lux-row-meta i { margin-right: 0.32rem; color: var(--lux-gold-2, #f0d98c); }
+          .lux-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid rgba(212, 175, 55, 0.45);
+            background: rgba(212, 175, 55, 0.12);
+            color: #ecd88f;
+            border-radius: 999px;
+            padding: 0.14rem 0.52rem;
+            font-weight: 600;
+          }
+          .lux-row-go {
+            display: flex;
+            align-items: center;
+            padding: 0 0.8rem 0 0.3rem;
+            color: var(--lux-gold-2, #f0d98c);
+            font-size: 0.8rem;
+            flex-shrink: 0;
+          }
+          .lux-row-actions { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+          .lux-row-actions button {
+            flex: 1;
+            border-radius: 999px;
+            padding: 0.55rem 0.6rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+          }
+          .lux-act-gold { background: var(--lux-gold-grad); color: #231307; box-shadow: 0 8px 18px -8px rgba(212, 175, 55, 0.55); }
+          .lux-act-ghost { background: rgba(250, 246, 236, 0.08); color: var(--lux-text); border: 1px solid rgba(212, 175, 55, 0.35); }
+          .lux-row-iconbox {
+            width: 76px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.7rem;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.15);
+          }
+          .lux-row-accent { border-color: rgba(255, 255, 255, 0.25) !important; }
+          .lux-row-accent h3 { color: #fff !important; }
+          .lux-row-accent .lux-row-sub { color: rgba(255, 255, 255, 0.85); }
+          .lux-row-accent .lux-row-meta, .lux-row-accent .lux-row-meta i { color: rgba(255, 255, 255, 0.85); }
+          .lux-row-accent .lux-row-go { color: rgba(255, 255, 255, 0.9); }
+
+          #content > .max-w-6xl { padding-top: 2.8rem; padding-bottom: 7.5rem; }
+
+          @media (prefers-reduced-motion: reduce) {
+            .lux-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+            #propertyLogo::before, #chatbotButton::after, .lux-clock .lux-clock-dot { animation: none !important; }
+            html { scroll-behavior: auto; }
+          }
+        </style>
     </head>
     <body class="bg-gray-50">
         <!-- Pass Link Bar (Inline Component) -->
         ${passLinkBarHTML}
         
-        <!-- Loading Spinner -->
-        <div id="loading" class="fixed inset-0 bg-white z-[1001] flex items-center justify-center">
+        <!-- Loading Screen -->
+        <div id="loading" class="fixed inset-0 z-[1001] flex items-center justify-center">
             <div class="text-center">
-                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mx-auto"></div>
-                <p class="mt-4 text-gray-600">Loading your experience...</p>
+                <div class="lux-loader-emblem">
+                    <div class="lux-ring"></div>
+                    <div class="lux-ring spin"></div>
+                    <div class="lux-ring spin2"></div>
+                    <div class="lux-loader-icon">✦</div>
+                </div>
+                <p class="lux-loader-word">Preparing your experience</p>
+                <p class="lux-loader-sub">One moment</p>
             </div>
         </div>
 
         <div id="content" class="hidden">
-            <!-- Hero Header - Facebook Profile Style -->
-            <div class="relative bg-white">
-                <!-- Cover Photo -->
-                <div class="gradient-hero h-64 md:h-96 relative">
-                    <!-- Info Button, Feedback Button, At Your Service Button & Language Selector - Top Right on Cover -->
-                    <div class="absolute top-4 right-4 z-10 flex gap-2">
+            <!-- Cinematic Hero -->
+            <div class="lux-hero-wrap">
+                <div class="gradient-hero relative">
+                    <div class="lux-hero-frame"></div>
+                    <!-- Local time chip -->
+                    <div class="lux-clock" title="Local time">
+                        <span class="lux-clock-dot"></span>
+                        <span id="luxClockTime">--:--</span>
+                    </div>
+                    <!-- Action cluster -->
+                    <div class="lux-hero-actions">
                         <!-- At Your Service Button -->
-                        <button id="serviceButton" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2" style="background-color: var(--accent-color, #D4AF37);" title="At Your Service">
+                        <button id="serviceButton" class="lux-chip-btn lux-chip-gold" title="At Your Service">
                             <i class="fas fa-concierge-bell"></i>
                             <span class="hidden sm:inline">At Your Service</span>
                         </button>
                         <!-- Feedback Button (only shows if active form exists) -->
-                        <button id="feedbackButton" onclick="openFeedbackForm()" class="hidden px-4 py-2 bg-black text-white rounded-lg shadow-lg font-semibold transition-all hover:bg-gray-800 flex items-center gap-2" title="Share Your Feedback">
+                        <button id="feedbackButton" onclick="openFeedbackForm()" class="hidden lux-chip-btn" title="Share Your Feedback">
                             <i class="fas fa-comment-dots"></i>
                             <span class="hidden sm:inline">Feedback</span>
                         </button>
-                        <button id="infoButton" onclick="openInfoMenu()" class="px-4 py-2 text-white rounded-lg shadow-lg font-semibold transition flex items-center gap-2" title="Hotel Information">
+                        <button id="infoButton" onclick="openInfoMenu()" class="lux-chip-btn" title="Hotel Information">
                             <i class="fas fa-info-circle"></i>
                             <span class="hidden sm:inline">Info</span>
                         </button>
-                        <select id="languageSelector" class="px-3 py-2 bg-white/90 backdrop-blur-sm text-gray-800 rounded-lg shadow-lg text-sm cursor-pointer hover:bg-white transition" onchange="changeLanguage()">
+                        <select id="languageSelector" onchange="changeLanguage()">
                             <!-- Language options will be populated dynamically -->
                         </select>
                     </div>
-                    <!-- Profile Picture - Overlaps at bottom left of cover -->
-                    <div class="absolute bottom-0 left-4 md:left-8 translate-y-1/2">
+                    <!-- Identity: medallion, name, tagline -->
+                    <div class="lux-hero-identity">
                         <div id="propertyLogo" class="relative">
                             <!-- Logo placeholder - will be replaced if logo exists -->
-                            <div class="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white shadow-lg border-4 border-white flex items-center justify-center">
-                                <i class="fas fa-hotel text-2xl md:text-3xl text-gray-400"></i>
+                            <div class="w-24 h-24 md:w-32 md:h-32 rounded-full flex items-center justify-center">
+                                <i class="fas fa-hotel text-2xl md:text-3xl" style="color: var(--lux-gold);"></i>
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Profile Info Section -->
-                <div class="pt-14 md:pt-20 pb-6 px-4 md:px-8">
-                    <div class="max-w-6xl mx-auto">
-                        <h1 class="text-2xl md:text-3xl font-bold mb-2 text-gray-900" id="propertyName">Paradise Resort</h1>
-                        <p class="text-sm md:text-base text-gray-600 mb-4" id="propertyTagline">Discover all we have to offer</p>
+                        <h1 id="propertyName">Paradise Resort</h1>
+                        <div class="lux-tagline-row">
+                            <p id="propertyTagline">Where timeless elegance meets tomorrow</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -24014,7 +24716,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
                 
                 <!-- Hotel Restaurants Section -->
-                <section id="restaurants-section" class="mb-12">
+                <section id="restaurants-section" class="mb-12 lux-reveal">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-utensils text-blue-500 mr-3"></i>
                         <span id="section-heading-restaurants">Dining & Drinks</span>
@@ -24025,7 +24727,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
 
                 <!-- Upcoming Events Section -->
-                <section id="events-section" class="mb-12">
+                <section id="events-section" class="mb-12 lux-reveal">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-calendar-star text-purple-500 mr-3"></i>
                         <span id="section-heading-events">Upcoming Events</span>
@@ -24036,7 +24738,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
 
                 <!-- Spa & Wellness Section -->
-                <section id="spa-section" class="mb-12">
+                <section id="spa-section" class="mb-12 lux-reveal">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-spa text-green-500 mr-3"></i>
                         <span id="section-heading-spa">Spa & Wellness</span>
@@ -24047,7 +24749,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
 
                 <!-- Hotel Services Section -->
-                <section id="service-section" class="mb-12">
+                <section id="service-section" class="mb-12 lux-reveal">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-concierge-bell text-indigo-500 mr-3"></i>
                         <span id="section-heading-service">Facilities & Amenities</span>
@@ -24058,7 +24760,7 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
 
                 <!-- Vendor Activities Section -->
-                <section id="activities-section" class="mb-12">
+                <section id="activities-section" class="mb-12 lux-reveal">
                     <h2 class="text-2xl font-bold mb-4 flex items-center">
                         <i class="fas fa-hiking text-orange-500 mr-3"></i>
                         <span id="section-heading-activities">Activities & Experiences</span>
@@ -24070,8 +24772,8 @@ app.get('/hotel/:property_slug', async (c) => {
                 </section>
 
                 <!-- Beach Booking Section -->
-                <section id="beach-booking-section" class="mb-12 hidden">
-                    <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl p-8 shadow-xl">
+                <section id="beach-booking-section" class="mb-12 hidden lux-reveal">
+                    <div class="bg-gradient-to-r lux-beach-shell rounded-3xl p-8 shadow-xl">
                         <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                             <div class="flex-1 w-full">
                                 <!-- Title and traffic light container - desktop: inline, mobile: stacked -->
@@ -24128,7 +24830,7 @@ app.get('/hotel/:property_slug', async (c) => {
                                 </div>
                             </div>
                             <div>
-                                <button onclick="goToBeachBooking()" class="bg-white text-blue-600 px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-50 transition shadow-lg transform hover:scale-105">
+                                <button onclick="goToBeachBooking()" class="lux-beach-cta px-8 py-4 rounded-xl font-bold text-lg transition shadow-lg transform hover:scale-105">
                                     <i class="fas fa-calendar-check mr-2"></i>
                                     Book Your Spot Now
                                 </button>
@@ -24193,6 +24895,57 @@ app.get('/hotel/:property_slug', async (c) => {
             </div>
         </div>
 
+        <!-- Luxury runtime: local-time chip + reveal-on-scroll -->
+        <script>
+        (function() {
+          function luxTick() {
+            var el = document.getElementById('luxClockTime');
+            if (!el) return;
+            var d = new Date();
+            var h = d.getHours(), m = d.getMinutes();
+            el.textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+          }
+          luxTick();
+          setInterval(luxTick, 15000);
+
+          var luxObserver = null;
+          if ('IntersectionObserver' in window) {
+            luxObserver = new IntersectionObserver(function(entries) {
+              entries.forEach(function(en) {
+                if (en.isIntersecting) {
+                  en.target.classList.add('lux-in');
+                  luxObserver.unobserve(en.target);
+                }
+              });
+            }, { threshold: 0.08 });
+          }
+          function luxWatch() {
+            document.querySelectorAll('.lux-reveal:not(.lux-in)').forEach(function(el) {
+              if (luxObserver) { luxObserver.observe(el); } else { el.classList.add('lux-in'); }
+            });
+          }
+          function luxNavOffset() {
+            var linked = document.getElementById('passLinkBarLinked');
+            var unlinked = document.getElementById('passLinkBarUnlinked');
+            var h = 0;
+            if (linked && !linked.classList.contains('hidden')) h = linked.offsetHeight;
+            else if (unlinked && !unlinked.classList.contains('hidden')) h = unlinked.offsetHeight;
+            document.documentElement.style.setProperty('--lux-passbar-h', h + 'px');
+          }
+          luxWatch();
+          luxNavOffset();
+          var luxWatchCount = 0;
+          var luxWatchTimer = setInterval(function() {
+            luxWatch();
+            luxNavOffset();
+            if (++luxWatchCount > 20) clearInterval(luxWatchTimer);
+          }, 800);
+          window.addEventListener('resize', luxNavOffset);
+          setTimeout(function() {
+            document.querySelectorAll('.lux-reveal:not(.lux-in)').forEach(function(el) { el.classList.add('lux-in'); });
+          }, 12000);
+        })();
+        </script>
         <script>
         const propertySlug = '${property_slug}';
         window.propertySlug = propertySlug; // Make available globally for inline handlers
@@ -25558,7 +26311,36 @@ app.get('/hotel/:property_slug', async (c) => {
             \`;
           }
           
-          document.getElementById('dynamic-styles').textContent = dynamicCSS;
+          // MAISON luxury skin: one unified design replaces the legacy layout styles.
+          // Admin colors flow into the luxury token system; hero image + overlay are preserved.
+          const luxCSS = \`
+            :root {
+              --lux-gold: \${accentColor};
+              --lux-gold-2: color-mix(in srgb, \${accentColor} 62%, #fff8e1);
+              --lux-gold-deep: color-mix(in srgb, \${accentColor} 68%, #1a1206);
+              --lux-gold-soft: color-mix(in srgb, \${accentColor} 32%, transparent);
+              --lux-gold-faint: color-mix(in srgb, \${accentColor} 14%, transparent);
+              --lux-gold-grad: linear-gradient(135deg, color-mix(in srgb, \${accentColor} 72%, #fff3c4) 0%, \${accentColor} 45%, color-mix(in srgb, \${accentColor} 62%, #000) 100%);
+              --lux-primary: \${primaryColor};
+              --lux-secondary: \${secondaryColor};
+            }
+            .gradient-hero {
+              background: \${heroBackground};
+              position: relative;
+              \${heroImageCSS}
+            }
+            .text-blue-500, .text-blue-600 { color: \${primaryColor} !important; }
+            .bg-blue-600 { background: \${primaryColor} !important; }
+            .bg-blue-600:hover { background: \${secondaryColor} !important; }
+            .text-green-600 { color: \${secondaryColor} !important; }
+            .text-orange-600 { color: \${accentColor} !important; }
+            .bg-green-100 { background-color: \${secondaryColor}22 !important; color: \${secondaryColor} !important; }
+            .bg-blue-100 { background-color: \${primaryColor}22 !important; color: \${primaryColor} !important; }
+            .bg-secondary { background: \${secondaryColor} !important; }
+            .bg-secondary:hover { opacity: 0.9; }
+            .text-secondary { color: \${secondaryColor} !important; }
+          \`;
+          document.getElementById('dynamic-styles').textContent = luxCSS;
         }
 
         // Translation helpers
@@ -26944,39 +27726,28 @@ app.get('/hotel/:property_slug', async (c) => {
                     : \`javascript:viewOffering('\${r.offering_id}')\`;
                 
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300">
-                    <div class="relative cursor-pointer" onclick="viewOffering('\${r.offering_id}')">
-                        <img src="\${r.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${title}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute top-3 left-3 right-3 flex items-start justify-between gap-2">
-                            \${generateOccupancyBadge(r.occupancy_status)}
-                            <div class="flex-shrink-0 flex flex-col gap-2 items-end">
-                                \${isEligible ? '<span class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg animate-pulse"><i class="fas fa-ticket-alt mr-1"></i>' + voucherData.vouchers.remaining + ' VOUCHERS</span>' : ''}
-                                \${(r.offering_type === 'restaurant' ? r.enable_booking === 1 : r.requires_booking === 1) ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
-                            </div>
-                        </div>
+                <div class="offering-card lux-row" onclick="viewOffering('\${r.offering_id}')">
+                    <div class="lux-row-media">
+                        <img src="\${r.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
+                        <div class="lux-row-badge">\${generateOccupancyBadge(r.occupancy_status)}</div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800 cursor-pointer" onclick="viewOffering('\${r.offering_id}')">\${title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        <div class="flex items-center text-sm text-gray-500 mb-4">
-                            <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
-                            <span>\${translateLocation(r.location)}</span>
+                    <div class="lux-row-main">
+                        <h3>\${title}</h3>
+                        <p class="lux-row-sub">\${description}</p>
+                        <div class="lux-row-meta">
+                            \${r.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(r.location) + '</span>' : ''}
+                            \${(r.offering_type === 'restaurant' ? r.enable_booking === 1 : r.requires_booking === 1) ? '<span class="lux-meta-chip"><i class="fas fa-calendar-check"></i>' + reservationsText + '</span>' : ''}
                         </div>
-                        <div class="pt-3 border-t border-gray-100 space-y-2">
-                            \${isEligible ? \`
-                            <button onclick="window.location.href='\${bookingUrl}'" 
-                                    class="w-full text-white py-3 rounded-lg hover:opacity-90 font-bold text-sm transition-all shadow-md" style="background-color: var(--accent-color, #D4AF37);">
-                                <i class="fas fa-ticket-alt mr-2"></i>Use Voucher (\${voucherData.vouchers.remaining} Left)
+                        \${isEligible ? \`
+                        <div class="lux-row-actions" onclick="event.stopPropagation()">
+                            <button onclick="window.location.href='\${bookingUrl}'" class="lux-act-gold">
+                                <i class="fas fa-ticket-alt mr-1"></i>Use Voucher (\${voucherData.vouchers.remaining})
                             </button>
-                            \` : ''}
-                            <button onclick="viewOffering('\${r.offering_id}')" 
-                                    class="w-full \${isEligible ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-secondary text-white hover:opacity-90'} py-2.5 rounded-lg font-semibold text-sm transition-all">
-                                <i class="fas fa-info-circle mr-2"></i>\${viewDetailsText}
-                            </button>
+                            <button onclick="viewOffering('\${r.offering_id}')" class="lux-act-ghost">\${viewDetailsText}</button>
                         </div>
+                        \` : ''}
                     </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27002,27 +27773,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const title = await getTranslatedField(e, 'title');
                 const description = await getTranslatedField(e, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${e.offering_id}')">
-                    <div class="relative">
-                        <img src="\${e.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${title}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                        <div class="absolute bottom-3 left-3 right-3">
-                            \${e.event_date ? '<span class="bg-white/95 backdrop-blur-sm text-purple-600 px-3 py-1.5 rounded-full text-xs font-medium inline-block shadow-lg"><i class="fas fa-calendar mr-1"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
+                <div class="offering-card lux-row" onclick="viewOffering('\${e.offering_id}')">
+                    <div class="lux-row-media">
+                        <img src="\${e.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
+                    </div>
+                    <div class="lux-row-main">
+                        <h3>\${title}</h3>
+                        <p class="lux-row-sub">\${description}</p>
+                        <div class="lux-row-meta">
+                            \${e.event_date ? '<span class="lux-meta-chip"><i class="fas fa-calendar"></i>' + new Date(e.event_date).toLocaleDateString() + '</span>' : ''}
+                            \${e.event_start_time ? '<span><i class="fas fa-clock"></i>' + e.event_start_time + '</span>' : ''}
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        <div class="flex items-center gap-3 text-sm text-gray-500 mb-4">
-                            \${e.event_start_time ? '<span><i class="fas fa-clock mr-2 text-gray-400"></i>' + e.event_start_time + '</span>' : ''}
-                        </div>
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${t('learn-more')}</span>
-                            <i class="fas fa-arrow-right text-purple-600"></i>
-                        </div>
-                    </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27051,25 +27814,18 @@ app.get('/hotel/:property_slug', async (c) => {
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${s.offering_id}')">
-                    <div class="relative">
-                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${title}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-emerald-900/40 via-transparent to-transparent"></div>
+                <div class="offering-card lux-row" onclick="viewOffering('\${s.offering_id}')">
+                    <div class="lux-row-media">
+                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        <div class="flex items-center text-sm text-gray-500 mb-4">
-                            <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${s.duration_minutes} \${minutesText}</span>
-                        </div>
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${discoverText}</span>
-                            <i class="fas fa-arrow-right text-secondary"></i>
+                    <div class="lux-row-main">
+                        <h3>\${title}</h3>
+                        <p class="lux-row-sub">\${description}</p>
+                        <div class="lux-row-meta">
+                            \${s.duration_minutes ? '<span><i class="fas fa-clock"></i>' + s.duration_minutes + ' ' + minutesText + '</span>' : ''}
                         </div>
                     </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27097,22 +27853,18 @@ app.get('/hotel/:property_slug', async (c) => {
                 const title = await getTranslatedField(s, 'title');
                 const description = await getTranslatedField(s, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${s.offering_id}')">
-                    <div class="relative">
-                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${title}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-transparent"></div>
+                <div class="offering-card lux-row" onclick="viewOffering('\${s.offering_id}')">
+                    <div class="lux-row-media">
+                        <img src="\${s.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        \${s.location ? '<div class="flex items-center text-sm text-gray-500 mb-4"><i class="fas fa-map-marker-alt mr-2 text-gray-400"></i><span>' + translateLocation(s.location) + '</span></div>' : ''}
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${viewDetailsText}</span>
-                            <i class="fas fa-arrow-right text-secondary"></i>
+                    <div class="lux-row-main">
+                        <h3>\${title}</h3>
+                        <p class="lux-row-sub">\${description}</p>
+                        <div class="lux-row-meta">
+                            \${s.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(s.location) + '</span>' : ''}
                         </div>
                     </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27149,29 +27901,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const safeCategoryName = escapeHtml(a.category_name);
                 
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewActivity(\${a.activity_id})">
-                    <div class="relative">
-                        <img src="\${a.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${safeTitle}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-orange-900/40 via-transparent to-transparent"></div>
-                        <div class="absolute top-3 right-3">
-                            <span class="bg-white/95 backdrop-blur-sm text-orange-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">\${safeCategoryName}</span>
+                <div class="offering-card lux-row" onclick="viewActivity(\${a.activity_id})">
+                    <div class="lux-row-media">
+                        <img src="\${a.images[0] || '/static/placeholder.jpg'}" alt="\${safeTitle}">
+                    </div>
+                    <div class="lux-row-main">
+                        <h3>\${safeTitle}</h3>
+                        <p class="lux-row-sub">\${safeDescription}</p>
+                        <div class="lux-row-meta">
+                            <span class="lux-meta-chip">\${safeCategoryName}</span>
+                            \${a.duration_minutes ? '<span><i class="fas fa-clock"></i>' + a.duration_minutes + ' ' + minutesText + '</span>' : ''}
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-1 text-gray-800">\${safeTitle}</h3>
-                        <p class="text-xs text-gray-500 mb-3">\${curatedByText} \${safeBusinessName}</p>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${safeDescription}</p>
-                        <div class="flex items-center text-sm text-gray-500 mb-4">
-                            <i class="fas fa-clock mr-2 text-gray-400"></i>
-                            <span>\${a.duration_minutes} \${minutesText}</span>
-                        </div>
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-xs text-gray-400 uppercase tracking-wider font-medium">\${bookNowText}</span>
-                            <i class="fas fa-arrow-right text-secondary"></i>
-                        </div>
-                    </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27209,31 +27951,19 @@ app.get('/hotel/:property_slug', async (c) => {
                 const title = await getTranslatedField(o, 'title');
                 const description = await getTranslatedField(o, 'short_description');
                 return \`
-                <div class="offering-card bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300" onclick="viewOffering('\${o.offering_id}')">
-                    <div class="relative">
-                        <img src="\${o.images[0] || '/static/placeholder.jpg'}" 
-                             alt="\${title}" 
-                             class="w-full h-48 object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-                        <div class="absolute top-3 right-3">
-                            \${(o.offering_type === 'restaurant' ? o.enable_booking === 1 : o.requires_booking === 1) ? '<span class="bg-white/95 backdrop-blur-sm text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"><i class="fas fa-calendar-check mr-1"></i>' + reservationsText + '</span>' : ''}
+                <div class="offering-card lux-row" onclick="viewOffering('\${o.offering_id}')">
+                    <div class="lux-row-media">
+                        <img src="\${o.images[0] || '/static/placeholder.jpg'}" alt="\${title}">
+                    </div>
+                    <div class="lux-row-main">
+                        <h3>\${title}</h3>
+                        <p class="lux-row-sub">\${description}</p>
+                        <div class="lux-row-meta">
+                            \${o.location ? '<span><i class="fas fa-map-marker-alt"></i>' + translateLocation(o.location) + '</span>' : ''}
+                            \${(o.offering_type === 'restaurant' ? o.enable_booking === 1 : o.requires_booking === 1) ? '<span class="lux-meta-chip"><i class="fas fa-calendar-check"></i>' + reservationsText + '</span>' : ''}
                         </div>
                     </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-xl mb-2 text-gray-800">\${title}</h3>
-                        <p class="text-sm text-gray-600 mb-4 line-clamp-2">\${description}</p>
-                        \${o.location ? \`
-                            <div class="flex items-center text-sm text-gray-500 mb-4">
-                                <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
-                                <span>\${translateLocation(o.location)}</span>
-                            </div>
-                        \` : ''}
-                        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
-                            <span class="text-sm text-blue-600 font-medium hover:text-blue-700 transition">
-                                <i class="fas fa-arrow-right mr-1"></i>\${t('explore-more')}
-                            </span>
-                        </div>
-                    </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 \`;
             }));
@@ -27280,29 +28010,21 @@ app.get('/hotel/:property_slug', async (c) => {
             
             // Create room service card
             grid.innerHTML = \`
-                <div class="offering-card bg-gradient-to-br rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1" 
+                <div class="offering-card lux-row lux-row-accent"
                      onclick="window.location.href='/room-service/\${propertyData.property_id}'"
                      style="\${gradientStyle}">
-                    <div class="p-8 text-white">
-                        <div class="flex items-start justify-between mb-4">
-                            <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                <i class="\${cardIcon} text-4xl"></i>
-                            </div>
-                            <span class="bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold">
-                                <i class="fas fa-clock mr-1"></i>\${roomService.full_description_en || '24/7'}
-                            </span>
-                        </div>
-                        <h3 class="font-bold text-2xl mb-2">\${cardTitle}</h3>
-                        <p class="text-white/90 font-medium mb-3">\${cardSubtitle}</p>
-                        <p class="text-sm text-white/80 mb-6 leading-relaxed">\${cardDescription}</p>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium flex items-center gap-2">
-                                <i class="fas fa-book-open"></i>
-                                View Menu
-                            </span>
-                            <i class="fas fa-arrow-right text-xl"></i>
+                    <div class="lux-row-iconbox">
+                        <i class="\${cardIcon}"></i>
+                    </div>
+                    <div class="lux-row-main">
+                        <h3>\${cardTitle}</h3>
+                        <p class="lux-row-sub">\${cardSubtitle}</p>
+                        <div class="lux-row-meta">
+                            <span><i class="fas fa-clock"></i>\${roomService.full_description_en || '24/7'}</span>
+                            <span><i class="fas fa-book-open"></i>View Menu</span>
                         </div>
                     </div>
+                    <div class="lux-row-go"><i class="fas fa-chevron-right"></i></div>
                 </div>
             \`;
         }
@@ -27953,12 +28675,12 @@ app.get('/hotel/:property_slug', async (c) => {
           const infoPageCloseFooterBtn = document.getElementById('infoPageCloseFooterBtn');
           
           if (infoPageHeader) {
-            infoPageHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, #ffffff 100%)';
+            infoPageHeader.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, #1c1016 100%)';
           }
           if (infoPageCloseFooterBtn) {
             infoPageCloseFooterBtn.style.background = primaryColor;
           }
-          
+
           document.getElementById('infoPageModal').classList.remove('hidden');
         }
 
@@ -28771,21 +29493,21 @@ app.get('/hotel/:property_slug', async (c) => {
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
-          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition-transform duration-300 z-[1001]" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <i class="fas fa-comments"></i>
+          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-2xl hover:scale-110 transition-transform duration-300 z-[1001]" title="AI Concierge">
+            <i class="fas fa-wand-magic-sparkles"></i>
           </button>
           
           <!-- Chat Window -->
           <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-[1001] border border-gray-200">
             <!-- Header -->
-            <div class="p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="lux-chat-header p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3">
-                  <i class="fas fa-robot text-xl"></i>
+                  <i class="fas fa-wand-magic-sparkles text-xl"></i>
                 </div>
                 <div>
                   <h3 id="chatbotName" class="font-bold">Hotel Assistant</h3>
-                  <p class="text-xs opacity-90">Always here to help</p>
+                  <p class="text-xs opacity-90">At your service, always</p>
                 </div>
               </div>
               <button id="closeChatBtn" class="bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-all border border-white/40 flex items-center gap-2">
@@ -30883,36 +31605,33 @@ app.get('/hotel/:property_slug', async (c) => {
             const installBtn = document.createElement('button');
             installBtn.id = 'pwa-install-btn';
             installBtn.innerHTML = \`
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-mobile-alt" style="font-size: 18px;"></i>
-                    <span style="writing-mode: horizontal-tb; white-space: nowrap;">Install</span>
+                <div style="display: flex; align-items: center; gap: 7px;">
+                    <i class="fas fa-arrow-down" style="font-size: 11px; color: #f0d98c;"></i>
+                    <span style="white-space: nowrap;">Install App</span>
                 </div>
             \`;
             installBtn.style.cssText = \`
                 position: fixed;
-                top: 50%;
-                right: 0;
-                transform: translateY(-50%) translateX(0);
-                z-index: 9999;
-                background: linear-gradient(135deg, #8B1538 0%, #A01D48 100%);
-                color: white;
-                border: none;
-                border-top-left-radius: 8px;
-                border-bottom-left-radius: 8px;
-                padding: 16px 12px;
-                font-size: 13px;
+                bottom: 6.2rem;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 900;
+                background: rgba(18, 10, 14, 0.82);
+                color: #f0d98c;
+                border: 1px solid rgba(212, 175, 55, 0.5);
+                border-radius: 999px;
+                padding: 9px 16px;
+                font-size: 11px;
                 font-weight: 600;
-                box-shadow: -2px 2px 12px rgba(139, 21, 56, 0.3);
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                -webkit-backdrop-filter: blur(14px);
+                backdrop-filter: blur(14px);
+                box-shadow: 0 12px 28px -12px rgba(0, 0, 0, 0.85);
                 cursor: pointer;
                 display: flex;
-                flex-direction: column;
                 align-items: center;
-                gap: 4px;
-                animation: slideInFromRight 0.5s ease, gentlePulse 3s ease-in-out infinite;
                 transition: all 0.3s ease;
-                min-height: 100px;
-                writing-mode: vertical-rl;
-                text-orientation: mixed;
             \`;
             
             // Create install modal
@@ -30933,7 +31652,7 @@ app.get('/hotel/:property_slug', async (c) => {
             \`;
             
             installModal.innerHTML = \`
-                <div style="background: white; border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; position: relative;">
+                <div style="background: #faf6ec; border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; position: relative;">
                     <button id="close-modal" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">
                         <i class="fas fa-times"></i>
                     </button>
