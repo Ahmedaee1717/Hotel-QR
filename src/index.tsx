@@ -24453,6 +24453,117 @@ window.luxTogglePassForm = function() {
           .lux-row-accent .lux-row-meta, .lux-row-accent .lux-row-meta i { color: rgba(255, 255, 255, 0.85); }
           .lux-row-accent .lux-row-go { color: rgba(255, 255, 255, 0.9); }
 
+          /* ── Pass-link bar removed (hotel request) & pill nav replaced by launcher ── */
+          #passLinkBarUnlinked, #passLinkBarLinked { display: none !important; }
+          .sticky-nav { display: none !important; }
+
+          /* ── Home launcher: big thumb-friendly category tiles ── */
+          .lux-home-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.9rem;
+            margin-bottom: 2rem;
+          }
+          @media (min-width: 900px) { .lux-home-grid { grid-template-columns: repeat(3, 1fr); } }
+          .lux-tile {
+            position: relative;
+            border-radius: 1.3rem;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            background: linear-gradient(160deg, rgba(52, 29, 39, 0.72) 0%, rgba(26, 14, 19, 0.92) 100%);
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+            padding: 1.35rem 0.9rem 1.15rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            min-height: 128px;
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.35s var(--lux-ease), border-color 0.35s var(--lux-ease), box-shadow 0.35s var(--lux-ease);
+            box-shadow: 0 24px 48px -28px rgba(0, 0, 0, 0.8);
+          }
+          .lux-tile:hover { border-color: rgba(212, 175, 55, 0.75); transform: translateY(-4px); }
+          .lux-tile:active { transform: scale(0.97); }
+          .lux-tile-icon {
+            width: 3.3rem;
+            height: 3.3rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--lux-gold-2);
+            font-size: 1.2rem;
+            flex-shrink: 0;
+          }
+          .lux-tile-text { display: flex; flex-direction: column; gap: 0.3rem; align-items: center; min-width: 0; }
+          .lux-tile-label {
+            font-family: var(--lux-serif);
+            font-size: 1.18rem;
+            font-weight: 600;
+            color: var(--lux-text);
+            line-height: 1.15;
+          }
+          .lux-tile-sub {
+            font-size: 0.58rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(246, 240, 227, 0.5);
+            font-weight: 500;
+          }
+          .lux-tile.lux-tile-wide {
+            grid-column: 1 / -1;
+            flex-direction: row;
+            justify-content: flex-start;
+            text-align: left;
+            padding: 1.15rem 1.25rem;
+            min-height: 96px;
+            gap: 1rem;
+          }
+          .lux-tile.lux-tile-wide .lux-tile-text { align-items: flex-start; }
+          .lux-tile.lux-tile-wide::after {
+            content: '\\f054';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: auto;
+            color: var(--lux-gold-2);
+            font-size: 0.85rem;
+          }
+
+          /* Home mode: only the launcher (and membership card) visible */
+          #content.lux-home-mode section:not(#tierBenefitsCard) { display: none !important; }
+          #content:not(.lux-home-mode) #tierBenefitsCard { display: none !important; }
+          #content:not(.lux-home-mode) #luxHome { display: none; }
+
+          /* Big thumb-zone back button */
+          .lux-back-btn {
+            position: fixed;
+            bottom: 1.35rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: var(--lux-gold-grad);
+            color: #231307;
+            border: none;
+            border-radius: 999px;
+            padding: 1rem 2rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            box-shadow: 0 16px 40px -12px rgba(212, 175, 55, 0.65), 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+            cursor: pointer;
+            transition: all 0.3s var(--lux-ease);
+          }
+          .lux-back-btn:hover { filter: brightness(1.06); transform: translateX(-50%) translateY(-2px); }
+          .lux-back-btn.hidden { display: none; }
+
           #content > .max-w-6xl { padding-top: 2.8rem; padding-bottom: 7.5rem; }
 
           @media (prefers-reduced-motion: reduce) {
@@ -24480,7 +24591,7 @@ window.luxTogglePassForm = function() {
             </div>
         </div>
 
-        <div id="content" class="hidden">
+        <div id="content" class="hidden lux-home-mode">
             <!-- Cinematic Hero -->
             <div class="lux-hero-wrap">
                 <div class="gradient-hero relative">
@@ -24552,7 +24663,10 @@ window.luxTogglePassForm = function() {
 
             <!-- Main Content -->
             <div class="max-w-6xl mx-auto px-4 py-6 pb-20">
-                
+
+                <!-- MAISON Home Launcher: thumb-friendly category tiles -->
+                <div id="luxHome" class="lux-home-grid"></div>
+
                 <!-- Tier Benefits Card (Shown when guest is linked) -->
                 <section id="tierBenefitsCard" class="mb-8 hidden">
                     <div class="rounded-3xl shadow-2xl overflow-hidden border-2 border-white/20" id="tierCard" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -24868,8 +24982,13 @@ window.luxTogglePassForm = function() {
             </div>
         </div>
 
+        <!-- Back to Menu (category view) -->
+        <button id="luxBackBtn" class="lux-back-btn hidden" onclick="luxGoHome()">
+            <i class="fas fa-arrow-left"></i><span>Menu</span>
+        </button>
+
         <!-- Floating Map Button (appears when map available) -->
-        <button id="mapFloatingBtn" 
+        <button id="mapFloatingBtn"
                 onclick="openMapModal()" 
                 class="fixed bottom-6 right-6 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-[1001] hidden">
             <i class="fas fa-map-marked-alt mr-2"></i>
@@ -24938,11 +25057,18 @@ window.luxTogglePassForm = function() {
           var luxWatchTimer = setInterval(function() {
             luxWatch();
             luxNavOffset();
+            if (window.luxBuildHomeSafe) window.luxBuildHomeSafe();
             if (++luxWatchCount > 20) clearInterval(luxWatchTimer);
           }, 800);
           window.addEventListener('resize', luxNavOffset);
           setTimeout(function() {
             document.querySelectorAll('.lux-reveal:not(.lux-in)').forEach(function(el) { el.classList.add('lux-in'); });
+            // Safety: never leave the guest on an empty home screen
+            var home = document.getElementById('luxHome');
+            var content = document.getElementById('content');
+            if (home && content && home.children.length === 0) {
+              content.classList.remove('lux-home-mode');
+            }
           }, 12000);
         })();
         </script>
@@ -27315,6 +27441,9 @@ window.luxTogglePassForm = function() {
           setTimeout(() => {
             container.innerHTML = pillsHTML;
           }, 100);
+
+          // Keep the MAISON home launcher in sync (pills nav itself is hidden)
+          try { luxBuildHome(); } catch (e) { console.error('lux home build', e); }
         }
 
         async function init() {
@@ -28429,6 +28558,106 @@ window.luxTogglePassForm = function() {
             
             updateSectionVisibility();
         }
+
+        // ── MAISON home launcher: big thumb-friendly category tiles ──
+        function luxTile(icon, label, sub, action, wide) {
+            return '<button class="lux-tile' + (wide ? ' lux-tile-wide' : '') + '" onclick="' + action + '">' +
+                '<span class="lux-tile-icon"><i class="' + icon + '"></i></span>' +
+                '<span class="lux-tile-text"><span class="lux-tile-label">' + label + '</span>' +
+                (sub ? '<span class="lux-tile-sub">' + sub + '</span>' : '') +
+                '</span>' +
+            '</button>';
+        }
+
+        function luxBuildHome() {
+            const grid = document.getElementById('luxHome');
+            if (!grid || !propertyData) return;
+            const lang = window.currentLanguage || 'en';
+            let html = '';
+
+            if (propertyData.show_restaurants === 1) {
+                const name = propertyData['section_restaurants_' + lang] || 'Dining';
+                html += luxTile('fas fa-utensils', name, 'Restaurants & Bars', "luxOpenCategory('restaurant')", true);
+            }
+            if (propertyData.show_events === 1) {
+                html += luxTile('fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')");
+            }
+            if (propertyData.show_spa === 1) {
+                html += luxTile('fas fa-spa', propertyData['section_spa_' + lang] || 'Spa & Wellness', '', "luxOpenCategory('spa')");
+            }
+            if (propertyData.show_service === 1) {
+                html += luxTile('fas fa-concierge-bell', propertyData['section_service_' + lang] || 'Services', '', "luxOpenCategory('service')");
+            }
+            if (propertyData.show_activities === 1) {
+                html += luxTile('fas fa-hiking', propertyData['section_activities_' + lang] || 'Experiences', '', "luxOpenCategory('activities')");
+            }
+            (customSections || []).forEach(cs => {
+                if (cs.is_visible === 1) {
+                    const name = (cs.translated_name || cs.section_name_en || '').replace(/</g, '&lt;');
+                    html += luxTile(cs.icon_class || 'fas fa-star', name, '', "luxOpenCategory('" + cs.section_key + "')");
+                }
+            });
+            const beachEl = document.getElementById('beach-booking-section');
+            if (beachEl && (beachEl.dataset.luxEnabled === '1' || !beachEl.classList.contains('hidden'))) {
+                beachEl.dataset.luxEnabled = '1';
+                html += luxTile('fas fa-umbrella-beach', 'Beach', 'Reserve your spot', "luxOpenCategory('beach')");
+            }
+            (infoPages || []).forEach(p => {
+                const t = (p['title_' + lang] || p.title_en || '').replace(/</g, '&lt;');
+                html += luxTile(p.icon_class || 'fas fa-info-circle', t, '', "openInfoPage('" + p.page_key + "')");
+            });
+            const fb = document.getElementById('feedbackButton');
+            if (fb && !fb.classList.contains('hidden')) {
+                html += luxTile('fas fa-comment-dots', 'Feedback', 'Share your thoughts', 'openFeedbackForm()');
+            }
+            if (propertyData.show_hotel_map === 1 && propertyData.hotel_map_url) {
+                html += luxTile('fas fa-map-marked-alt', 'Hotel Map', '', 'openMapModal()');
+            }
+            grid.innerHTML = html;
+        }
+
+        window.luxBuildHomeSafe = function() {
+            const content = document.getElementById('content');
+            if (content && content.classList.contains('lux-home-mode')) {
+                try { luxBuildHome(); } catch (e) { console.error('lux home build', e); }
+            }
+        };
+
+        window.luxOpenCategory = function(key) {
+            const content = document.getElementById('content');
+            if (content) content.classList.remove('lux-home-mode');
+            const back = document.getElementById('luxBackBtn');
+            if (back) back.classList.remove('hidden');
+            const beachEl = document.getElementById('beach-booking-section');
+            if (key === 'beach') {
+                currentFilter = 'lux-none';
+                updateSectionVisibility();
+                if (beachEl) beachEl.classList.remove('hidden');
+                trackPageView('beach', null);
+            } else {
+                if (beachEl) beachEl.classList.add('hidden');
+                filterOfferings(key);
+            }
+            // Land the guest right on the category content, not back at the hero
+            setTimeout(function() {
+                const container = document.querySelector('#content > .max-w-6xl');
+                if (container) {
+                    const target = Math.max(0, container.getBoundingClientRect().top + window.pageYOffset - 24);
+                    window.scrollTo({ top: target, behavior: 'smooth' });
+                } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }, 60);
+        };
+
+        window.luxGoHome = function() {
+            const content = document.getElementById('content');
+            if (content) content.classList.add('lux-home-mode');
+            const back = document.getElementById('luxBackBtn');
+            if (back) back.classList.add('hidden');
+            try { luxBuildHome(); } catch (e) {}
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
 
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
