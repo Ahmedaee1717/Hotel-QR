@@ -1,7 +1,7 @@
 // Paradise Resort PWA Service Worker
 // Simple caching strategy: Network First, Cache Fallback
 
-const CACHE_NAME = 'paradise-resort-v2';
+const CACHE_NAME = 'paradise-resort-v3-maison';
 const GUEST_PAGES = [
   '/hotel/paradise-resort',
   '/manifest.json',

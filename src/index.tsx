@@ -11546,7 +11546,7 @@ async function detectComplaintWithAI(message: string, apiKey: string, baseURL: s
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: baseURL.includes('deepseek') ? 'deepseek-chat' : 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -12424,8 +12424,10 @@ app.post('/api/chatbot/chat', async (c) => {
     
     // 🌐 MULTILINGUAL QUERY TRANSLATION: Translate non-English queries to English for chunk search
     let searchQuery = message
-    const apiKey = c.env.OPENAI_API_KEY
-    const baseURL = c.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'
+    // Chat brain: DeepSeek when configured (OpenAI-compatible API), else OpenAI
+    const apiKey = c.env.DEEPSEEK_API_KEY || c.env.OPENAI_API_KEY
+    const baseURL = c.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com/v1' : (c.env.OPENAI_BASE_URL || 'https://api.openai.com/v1')
+    const chatModel = c.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o-mini'
     
     // Detect if query is likely non-English (contains Arabic, Chinese, Cyrillic, etc.)
     const isNonEnglish = /[\u0600-\u06FF\u4E00-\u9FFF\u0400-\u04FF]/.test(message)
@@ -12440,11 +12442,11 @@ app.post('/api/chatbot/chat', async (c) => {
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: chatModel,
             messages: [
-              { 
-                role: 'system', 
-                content: 'You are a translator. Translate the following text to English. Return ONLY the English translation, nothing else.' 
+              {
+                role: 'system',
+                content: 'You are a translator. Translate the following text to English. Return ONLY the English translation, nothing else.'
               },
               { role: 'user', content: message }
             ],
@@ -12654,7 +12656,7 @@ Remember: You are a hotel concierge. The guest is IN THE HOTEL. You already know
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini', // OpenAI's fastest, cheapest model
+            model: chatModel,
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: message }
@@ -24564,6 +24566,129 @@ window.luxTogglePassForm = function() {
           .lux-back-btn:hover { filter: brightness(1.06); transform: translateX(-50%) translateY(-2px); }
           .lux-back-btn.hidden { display: none; }
 
+          /* ── Seamless in-app sheet ── */
+          .lux-sheet { position: fixed; inset: 0; z-index: 1200; }
+          .lux-sheet.hidden { display: none; }
+          .lux-sheet-backdrop {
+            position: absolute; inset: 0;
+            background: rgba(8, 4, 6, 0.7);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+          }
+          .lux-sheet-panel {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            max-height: 93vh;
+            background: linear-gradient(180deg, #241318 0%, #140a0e 100%);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            border-bottom: none;
+            border-radius: 1.6rem 1.6rem 0 0;
+            box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.7);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            animation: luxSheetUp 0.45s var(--lux-ease);
+          }
+          @media (min-width: 900px) { .lux-sheet-panel { max-width: 640px; margin: 0 auto; } }
+          .lux-sheet-panel::before {
+            content: '';
+            position: absolute; top: 0.55rem; left: 50%; transform: translateX(-50%);
+            width: 44px; height: 4px; border-radius: 999px;
+            background: rgba(212, 175, 55, 0.5);
+            z-index: 5;
+          }
+          @keyframes luxSheetUp { from { transform: translateY(60px); opacity: 0; } to { transform: none; opacity: 1; } }
+          .lux-sheet-close {
+            position: absolute; top: 0.9rem; right: 0.9rem; z-index: 6;
+            width: 2.6rem; height: 2.6rem; border-radius: 50%;
+            background: rgba(18, 10, 14, 0.65);
+            border: 1px solid rgba(212, 175, 55, 0.45);
+            color: var(--lux-gold-2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+          }
+          .lux-sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+          .lux-sheet-hero { position: relative; height: 220px; flex-shrink: 0; }
+          .lux-sheet-hero img { width: 100%; height: 100%; object-fit: cover; }
+          .lux-sheet-hero::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(20, 10, 14, 0.3) 0%, transparent 40%, rgba(20, 10, 14, 0.96) 100%);
+          }
+          .lux-sheet-hero-title { position: absolute; left: 1.25rem; right: 1.25rem; bottom: 0.9rem; z-index: 2; }
+          .lux-sheet-hero-title h2 { font-family: var(--lux-serif); font-size: 1.9rem; font-weight: 600; color: var(--lux-text); line-height: 1.1; }
+          .lux-sheet-hero-title p { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lux-gold-2); margin-top: 0.3rem; }
+          .lux-sheet-content { padding: 1.1rem 1.25rem 2.4rem; }
+          .lux-sheet-content h3 {
+            font-family: var(--lux-serif); font-size: 1.3rem; color: var(--lux-text);
+            margin: 1.3rem 0 0.6rem; padding-bottom: 0.4rem; position: relative;
+          }
+          .lux-sheet-content h3::after {
+            content: ''; position: absolute; left: 0; bottom: 0;
+            width: 54px; height: 1px;
+            background: linear-gradient(90deg, var(--lux-gold), transparent);
+          }
+          .lux-sheet-desc { font-size: 0.85rem; line-height: 1.65; color: rgba(246, 240, 227, 0.72); white-space: pre-line; }
+          .lux-sheet-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.3rem; }
+          .lux-menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
+          .lux-menu-card { border-radius: 0.9rem; overflow: hidden; border: 1px solid rgba(212, 175, 55, 0.35); background: rgba(250, 246, 236, 0.04); cursor: pointer; }
+          .lux-menu-card img { width: 100%; height: 110px; object-fit: cover; }
+          .lux-menu-card p { font-size: 0.72rem; font-weight: 600; color: var(--lux-text); text-align: center; padding: 0.5rem 0.4rem; }
+          .lux-form label { display: block; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(246, 240, 227, 0.55); margin: 0.85rem 0 0.3rem; }
+          .lux-form input, .lux-form textarea {
+            width: 100%;
+            background: rgba(250, 246, 236, 0.06);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 0.8rem;
+            padding: 0.85rem 0.95rem;
+            color: var(--lux-text);
+            font-size: 0.95rem;
+          }
+          .lux-form input:focus, .lux-form textarea:focus { outline: none; border-color: var(--lux-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18); }
+          .lux-form input[type="datetime-local"] { color-scheme: dark; }
+          .lux-total-row {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 1rem; padding: 1rem;
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 0.9rem;
+            background: rgba(212, 175, 55, 0.07);
+          }
+          .lux-total-row .lbl { font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(246, 240, 227, 0.6); }
+          .lux-total-row .val { font-family: var(--lux-serif); font-size: 1.5rem; color: var(--lux-gold-2); font-weight: 700; }
+          .lux-cta {
+            width: 100%; margin-top: 1.1rem;
+            background: var(--lux-gold-grad);
+            color: #231307; border: none; border-radius: 999px;
+            padding: 1.05rem;
+            font-weight: 700; font-size: 0.88rem; letter-spacing: 0.1em; text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 14px 34px -12px rgba(212, 175, 55, 0.6);
+          }
+          .lux-cta:disabled { opacity: 0.6; }
+          .lux-menu-item { display: flex; justify-content: space-between; gap: 0.9rem; padding: 0.85rem 0; border-bottom: 1px solid rgba(212, 175, 55, 0.14); }
+          .lux-menu-item:last-child { border-bottom: none; }
+          .lux-menu-item .nm { font-size: 0.94rem; font-weight: 600; color: var(--lux-text); }
+          .lux-menu-item .ds { font-size: 0.74rem; color: rgba(246, 240, 227, 0.55); margin-top: 0.15rem; line-height: 1.45; }
+          .lux-menu-item .pr { font-family: var(--lux-serif); color: var(--lux-gold-2); font-weight: 700; white-space: nowrap; }
+          .lux-lightbox { position: fixed; inset: 0; z-index: 1300; background: rgba(8, 4, 6, 0.93); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+          .lux-lightbox.hidden { display: none; }
+          .lux-lightbox img { max-width: 100%; max-height: 92vh; border-radius: 0.6rem; }
+          .lux-sheet-ok { text-align: center; padding: 2.6rem 1.2rem; }
+          .lux-sheet-ok .ic {
+            width: 4.2rem; height: 4.2rem; margin: 0 auto 1rem;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(212, 175, 55, 0.55);
+            background: rgba(212, 175, 55, 0.12);
+            color: var(--lux-gold-2); font-size: 1.6rem;
+          }
+          body.lux-noscroll { overflow: hidden; }
+
+          /* Subtle faded image inside launcher tiles */
+          .lux-tile { overflow: hidden; }
+          .lux-tile-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.15; transition: opacity 0.35s; border-radius: inherit; }
+          .lux-tile:hover .lux-tile-bg { opacity: 0.26; }
+          .lux-tile > * { position: relative; }
+
           #content > .max-w-6xl { padding-top: 2.8rem; padding-bottom: 7.5rem; }
 
           @media (prefers-reduced-motion: reduce) {
@@ -24980,6 +25105,18 @@ window.luxTogglePassForm = function() {
                 </section>
                 
             </div>
+        </div>
+
+        <!-- MAISON seamless sheet: in-app details, menus, booking -->
+        <div id="luxSheet" class="lux-sheet hidden">
+            <div class="lux-sheet-backdrop" onclick="luxCloseSheet()"></div>
+            <div class="lux-sheet-panel">
+                <button class="lux-sheet-close" onclick="luxCloseSheet()" title="Close"><i class="fas fa-times"></i></button>
+                <div id="luxSheetBody" class="lux-sheet-body"></div>
+            </div>
+        </div>
+        <div id="luxLightbox" class="lux-lightbox hidden" onclick="luxCloseLightbox()">
+            <img id="luxLightboxImg" src="" alt="Menu">
         </div>
 
         <!-- Back to Menu (category view) -->
@@ -28140,7 +28277,7 @@ window.luxTogglePassForm = function() {
             // Create room service card
             grid.innerHTML = \`
                 <div class="offering-card lux-row lux-row-accent"
-                     onclick="window.location.href='/room-service/\${propertyData.property_id}'"
+                     onclick="luxOpenRoomService()"
                      style="\${gradientStyle}">
                     <div class="lux-row-iconbox">
                         <i class="\${cardIcon}"></i>
@@ -28560,13 +28697,23 @@ window.luxTogglePassForm = function() {
         }
 
         // ── MAISON home launcher: big thumb-friendly category tiles ──
-        function luxTile(icon, label, sub, action, wide) {
+        function luxTile(icon, label, sub, action, wide, bgImg) {
             return '<button class="lux-tile' + (wide ? ' lux-tile-wide' : '') + '" onclick="' + action + '">' +
+                (bgImg ? '<span class="lux-tile-bg" style="background-image: url(&quot;' + bgImg + '&quot;)"></span>' : '') +
                 '<span class="lux-tile-icon"><i class="' + icon + '"></i></span>' +
                 '<span class="lux-tile-text"><span class="lux-tile-label">' + label + '</span>' +
                 (sub ? '<span class="lux-tile-sub">' + sub + '</span>' : '') +
                 '</span>' +
             '</button>';
+        }
+
+        // First admin-managed photo of the category = subtle faded tile background
+        function luxCatImg(type, sectionKey) {
+            const o = (allOfferings || []).find(x =>
+                (type ? x.offering_type === type : x.custom_section_key === sectionKey) &&
+                x.images && x.images[0]
+            );
+            return o ? o.images[0] : '';
         }
 
         function luxBuildHome() {
@@ -28577,24 +28724,29 @@ window.luxTogglePassForm = function() {
 
             if (propertyData.show_restaurants === 1) {
                 const name = propertyData['section_restaurants_' + lang] || 'Dining';
-                html += luxTile('fas fa-utensils', name, 'Restaurants & Bars', "luxOpenCategory('restaurant')", true);
+                html += luxTile('fas fa-utensils', name, 'Restaurants & Bars', "luxOpenCategory('restaurant')", true, luxCatImg('restaurant'));
             }
             if (propertyData.show_events === 1) {
-                html += luxTile('fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')");
+                html += luxTile('fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')", false, luxCatImg('event'));
             }
             if (propertyData.show_spa === 1) {
-                html += luxTile('fas fa-spa', propertyData['section_spa_' + lang] || 'Spa & Wellness', '', "luxOpenCategory('spa')");
+                html += luxTile('fas fa-spa', propertyData['section_spa_' + lang] || 'Spa & Wellness', '', "luxOpenCategory('spa')", false, luxCatImg('spa'));
             }
             if (propertyData.show_service === 1) {
-                html += luxTile('fas fa-concierge-bell', propertyData['section_service_' + lang] || 'Services', '', "luxOpenCategory('service')");
+                html += luxTile('fas fa-concierge-bell', propertyData['section_service_' + lang] || 'Services', '', "luxOpenCategory('service')", false, luxCatImg('service'));
             }
             if (propertyData.show_activities === 1) {
-                html += luxTile('fas fa-hiking', propertyData['section_activities_' + lang] || 'Experiences', '', "luxOpenCategory('activities')");
+                const actImg = (typeof allActivities !== 'undefined' && allActivities[0] && allActivities[0].images && allActivities[0].images[0]) || '';
+                html += luxTile('fas fa-hiking', propertyData['section_activities_' + lang] || 'Experiences', '', "luxOpenCategory('activities')", false, actImg);
             }
             (customSections || []).forEach(cs => {
                 if (cs.is_visible === 1) {
                     const name = (cs.translated_name || cs.section_name_en || '').replace(/</g, '&lt;');
-                    html += luxTile(cs.icon_class || 'fas fa-star', name, '', "luxOpenCategory('" + cs.section_key + "')");
+                    if (cs.section_key === 'room-service') {
+                        html += luxTile(cs.icon_class || 'fas fa-utensils', name, 'Served to your room', 'luxOpenRoomService()', false, luxCatImg('room_service'));
+                    } else {
+                        html += luxTile(cs.icon_class || 'fas fa-star', name, '', "luxOpenCategory('" + cs.section_key + "')", false, luxCatImg(null, cs.section_key));
+                    }
                 }
             });
             const beachEl = document.getElementById('beach-booking-section');
@@ -28659,10 +28811,210 @@ window.luxTogglePassForm = function() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
+        // ── Seamless sheets: offering details, menus, booking, room service — all in-app ──
+        function luxSheetOpen(html) {
+            const sheet = document.getElementById('luxSheet');
+            const body = document.getElementById('luxSheetBody');
+            if (!sheet || !body) return;
+            body.innerHTML = html;
+            body.scrollTop = 0;
+            sheet.classList.remove('hidden');
+            document.body.classList.add('lux-noscroll');
+        }
+        window.luxCloseSheet = function() {
+            const sheet = document.getElementById('luxSheet');
+            if (sheet) sheet.classList.add('hidden');
+            document.body.classList.remove('lux-noscroll');
+        };
+        window.luxCloseLightbox = function() {
+            document.getElementById('luxLightbox').classList.add('hidden');
+        };
+        window.luxShowImage = function(src) {
+            document.getElementById('luxLightboxImg').src = src;
+            document.getElementById('luxLightbox').classList.remove('hidden');
+        };
+        window.luxOrderViaConcierge = function() {
+            luxCloseSheet();
+            const b = document.getElementById('chatbotButton');
+            if (b) b.click();
+        };
+
+        window.luxOpenOffering = async function(offeringId) {
+            const o = allOfferings.find(x => String(x.offering_id) === String(offeringId));
+            if (!o) {
+                // Fallback: unknown offering, use the legacy page
+                window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
+                return;
+            }
+            const title = await getTranslatedField(o, 'title');
+            let about = '';
+            try { about = await getTranslatedField(o, 'full_description'); } catch (e) {}
+            if (!about) { try { about = await getTranslatedField(o, 'short_description'); } catch (e) {} }
+            const img = (o.images && o.images[0]) || '/static/placeholder.jpg';
+            const canBook = (o.offering_type === 'restaurant' ? o.enable_booking === 1 : o.requires_booking === 1);
+            const price = parseFloat(o.price) || 0;
+            const currency = o.currency || 'USD';
+
+            let chips = '';
+            if (o.location) chips += '<span class="lux-meta-chip"><i class="fas fa-map-marker-alt"></i>' + translateLocation(o.location) + '</span>';
+            if (o.event_date) chips += '<span class="lux-meta-chip"><i class="fas fa-calendar"></i>' + new Date(o.event_date).toLocaleDateString() + '</span>';
+            if (o.event_start_time) chips += '<span class="lux-meta-chip"><i class="fas fa-clock"></i>' + o.event_start_time + '</span>';
+            if (o.duration_minutes) chips += '<span class="lux-meta-chip"><i class="fas fa-hourglass-half"></i>' + o.duration_minutes + ' min</span>';
+            if (price > 0) chips += '<span class="lux-meta-chip"><i class="fas fa-tag"></i>' + currency + ' ' + price + '</span>';
+
+            const html = '' +
+            '<div class="lux-sheet-hero">' +
+                '<img src="' + img + '" alt="" onerror="this.style.display=&quot;none&quot;">' +
+                '<div class="lux-sheet-hero-title"><h2>' + title + '</h2>' +
+                (o.location ? '<p>' + translateLocation(o.location) + '</p>' : '') + '</div>' +
+            '</div>' +
+            '<div class="lux-sheet-content">' +
+                (chips ? '<div class="lux-sheet-chips">' + chips + '</div>' : '') +
+                (about ? '<h3>About</h3><p class="lux-sheet-desc">' + about + '</p>' : '') +
+                '<div id="luxSheetMenus"></div>' +
+                (canBook ? luxBookingFormHtml(o) : '') +
+            '</div>';
+            luxSheetOpen(html);
+
+            if (o.offering_type === 'restaurant') {
+                try {
+                    const r = await fetch('/api/offerings/' + o.offering_id + '/menus');
+                    const d = await r.json();
+                    if (d.success && d.menus && d.menus.length) {
+                        let mh = '<h3>Our Menus</h3><div class="lux-menu-grid">';
+                        d.menus.forEach(m => {
+                            mh += '<div class="lux-menu-card" onclick="luxShowImage(&quot;' + m.original_image_url + '&quot;)">' +
+                                  '<img src="' + m.original_image_url + '" alt="" loading="lazy"><p>' + (m.menu_name || 'Menu') + '</p></div>';
+                        });
+                        mh += '</div>';
+                        const slot = document.getElementById('luxSheetMenus');
+                        if (slot) slot.innerHTML = mh;
+                    }
+                } catch (e) { console.error('menus load', e); }
+            }
+            if (canBook) luxWireBookingForm(o, price, currency);
+        };
+
+        function luxBookingFormHtml(o) {
+            const isRestaurant = o.offering_type === 'restaurant';
+            const price = parseFloat(o.price) || 0;
+            return '' +
+            '<h3>Book Your Experience</h3>' +
+            '<form id="luxBookForm" class="lux-form">' +
+                '<label>Your Name</label><input type="text" id="luxBkName" required autocomplete="name">' +
+                '<label>Phone Number</label><input type="tel" id="luxBkPhone" required autocomplete="tel">' +
+                '<label>Email</label><input type="email" id="luxBkEmail" required autocomplete="email">' +
+                (isRestaurant ? '<label>Preferred Date &amp; Time</label><input type="datetime-local" id="luxBkWhen">' : '') +
+                '<label>Number of Guests</label><input type="number" id="luxBkGuests" min="1" value="2" required>' +
+                '<label>Special Requests (optional)</label><textarea id="luxBkNotes" rows="3"></textarea>' +
+                (price > 0 ? '<div class="lux-total-row"><span class="lbl">Total</span><span class="val" id="luxBkTotal"></span></div>' : '') +
+                '<button type="submit" class="lux-cta" id="luxBkSubmit"><i class="fas fa-calendar-check mr-2"></i>Request Booking</button>' +
+            '</form>';
+        }
+
+        function luxWireBookingForm(o, price, currency) {
+            const form = document.getElementById('luxBookForm');
+            if (!form) return;
+            const totalEl = document.getElementById('luxBkTotal');
+            const guestsEl = document.getElementById('luxBkGuests');
+            function updTotal() {
+                if (!totalEl) return;
+                const n = parseInt(guestsEl && guestsEl.value) || 1;
+                totalEl.textContent = currency + ' ' + (n * price).toFixed(2);
+            }
+            if (guestsEl) guestsEl.addEventListener('input', updTotal);
+            updTotal();
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const btn = document.getElementById('luxBkSubmit');
+                if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+                const whenEl = document.getElementById('luxBkWhen');
+                const n = parseInt(document.getElementById('luxBkGuests').value) || 1;
+                try {
+                    const resp = await fetch('/api/offering-booking', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            offering_id: o.offering_id,
+                            property_id: propertyData.property_id,
+                            guest_name: document.getElementById('luxBkName').value,
+                            guest_email: document.getElementById('luxBkEmail').value,
+                            guest_phone: document.getElementById('luxBkPhone').value,
+                            num_guests: n,
+                            booking_date: (whenEl && whenEl.value) || new Date().toISOString(),
+                            special_requests: document.getElementById('luxBkNotes').value,
+                            total_amount: n * price
+                        })
+                    });
+                    const result = await resp.json();
+                    if (result.success) {
+                        document.getElementById('luxSheetBody').innerHTML =
+                            '<div class="lux-sheet-ok"><div class="ic"><i class="fas fa-check"></i></div>' +
+                            '<h2 style="font-family: var(--lux-serif); font-size: 1.7rem; color: var(--lux-text); margin-bottom: 0.5rem;">Request received</h2>' +
+                            '<p class="lux-sheet-desc">Our team will contact you shortly to confirm your booking.</p>' +
+                            '<button class="lux-cta" style="max-width: 280px; margin: 1.6rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button></div>';
+                    } else {
+                        alert('Booking failed: ' + (result.error || 'Unknown error'));
+                        if (btn) { btn.disabled = false; btn.textContent = 'Request Booking'; }
+                    }
+                } catch (err) {
+                    console.error('Booking error:', err);
+                    alert('Failed to submit booking. Please try again.');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Request Booking'; }
+                }
+            });
+        }
+
+        window.luxOpenRoomService = function() {
+            trackPageView('room-service', null);
+            luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><p class="lux-sheet-desc">Loading menu...</p></div>');
+            fetch('/api/room-service-menu/' + propertyData.property_id)
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.success) throw new Error(d.error || 'unavailable');
+                    const o = d.offering;
+                    let img = '/static/placeholder.jpg';
+                    try { const arr = JSON.parse(o.images || '[]'); if (arr[0]) img = arr[0]; } catch (e) {}
+                    const groups = {};
+                    (d.items || []).forEach(it => { (groups[it.category] = groups[it.category] || []).push(it); });
+
+                    let html = '' +
+                    '<div class="lux-sheet-hero"><img src="' + img + '" alt="" onerror="this.style.display=&quot;none&quot;">' +
+                        '<div class="lux-sheet-hero-title"><h2>' + (o.title_en || 'In-Room Dining') + '</h2><p>Served to your room</p></div></div>' +
+                    '<div class="lux-sheet-content">' +
+                    (o.short_description_en ? '<p class="lux-sheet-desc">' + o.short_description_en + '</p>' : '');
+
+                    const cats = Object.keys(groups);
+                    if (cats.length === 0) {
+                        html += '<h3>Menu Coming Soon</h3><p class="lux-sheet-desc">Our room service menu is being updated. Please call the front desk for assistance.</p>';
+                    }
+                    cats.forEach(cat => {
+                        html += '<h3 style="text-transform: capitalize;">' + cat + '</h3>';
+                        groups[cat].forEach(it => {
+                            html += '<div class="lux-menu-item"><div>' +
+                                '<div class="nm">' + it.item_name + (it.is_premium ? ' <i class="fas fa-star" style="color: var(--lux-gold-2); font-size: 0.7rem;"></i>' : '') + '</div>' +
+                                (it.description ? '<div class="ds">' + it.description + '</div>' : '') +
+                                (it.allergens ? '<div class="ds" style="opacity: 0.75;"><i class="fas fa-exclamation-triangle" style="margin-right: 0.3rem;"></i>Allergens: ' + it.allergens + '</div>' : '') +
+                                '</div>' +
+                                (it.price ? '<div class="pr">' + Number(it.price).toFixed(2) + ' EGP</div>' : '') +
+                            '</div>';
+                        });
+                    });
+                    html += '<button class="lux-cta" onclick="luxOrderViaConcierge()"><i class="fas fa-wand-magic-sparkles mr-2"></i>Order via Concierge</button>' +
+                            '<p class="lux-sheet-desc" style="text-align: center; margin-top: 0.8rem; font-size: 0.72rem;">Or dial Room Service from your room phone</p>' +
+                    '</div>';
+                    luxSheetOpen(html);
+                })
+                .catch(e => {
+                    console.error('room service sheet', e);
+                    luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><h3>In-Room Dining</h3><p class="lux-sheet-desc">The menu is unavailable right now. Please dial Room Service from your room phone.</p></div>');
+                });
+        };
+
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
-            // Always go to detail page first to show info
-            window.location.href = '/offering-detail?id=' + offeringId + '&property=' + propertyData.property_id + '&lang=' + window.currentLanguage;
+            // Seamless in-app sheet (no page navigation)
+            luxOpenOffering(offeringId);
         }
 
         function viewActivity(activityId) {
@@ -82096,10 +82448,54 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
 })
 
 // Guest: Room Service Menu Page
+// JSON API for the in-app room-service sheet (mirrors the /room-service page queries)
+app.get('/api/room-service-menu/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  try {
+    const roomService = await DB.prepare(`
+      SELECT offering_id, title_en, short_description_en, full_description_en, location, images
+      FROM hotel_offerings
+      WHERE property_id = ? AND offering_type = 'room_service'
+      LIMIT 1
+    `).bind(property_id).first()
+
+    if (!roomService) {
+      return c.json({ success: false, error: 'Room service not available' }, 404)
+    }
+
+    const menuItems = await DB.prepare(`
+      SELECT item_id, category, item_name, description, cost_to_hotel as price, is_premium, allergens
+      FROM alacarte_menu_items
+      WHERE restaurant_id = ? AND property_id = ? AND is_available = 1
+      ORDER BY
+        CASE category
+          WHEN 'salad' THEN 1
+          WHEN 'starter' THEN 2
+          WHEN 'appetizer' THEN 3
+          WHEN 'soup' THEN 4
+          WHEN 'pasta' THEN 5
+          WHEN 'main' THEN 6
+          WHEN 'seafood' THEN 7
+          WHEN 'side' THEN 8
+          WHEN 'dessert' THEN 9
+          WHEN 'drink' THEN 10
+          ELSE 11
+        END,
+        item_name
+    `).bind(roomService.offering_id, property_id).all()
+
+    return c.json({ success: true, offering: roomService, items: menuItems.results })
+  } catch (error) {
+    console.error('Room service menu API error:', error)
+    return c.json({ success: false, error: 'Failed to load menu' }, 500)
+  }
+})
+
 app.get('/room-service/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
-  
+
   try {
     // Get property settings for colors
     const settings = await DB.prepare(`
