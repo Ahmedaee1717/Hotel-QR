@@ -24743,49 +24743,131 @@ window.luxTogglePassForm = function() {
           .lux-beach-map-wrap::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.45); border-radius: 999px; border: none; }
           .lux-beach-map-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
           .lux-beach-canvas { position: relative; }
+          .lux-beach-canvas.lux-3d { perspective: 1100px; perspective-origin: 50% 18%; overflow: hidden; }
           .lux-beach-svg { position: absolute; inset: 0; z-index: 0; }
+
+          /* Golden-hour sky over the Red Sea */
+          .lux-beach-sky {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 0;
+            background: linear-gradient(180deg, #7fa8cf 0%, #bdd2e3 42%, #f4d5a2 74%, #ffca87 100%);
+          }
+          .lux-sun {
+            position: absolute; left: 44%; bottom: 26px;
+            width: 46px; height: 46px; border-radius: 50%;
+            background: radial-gradient(circle, #fff7e0 0%, #ffd982 45%, rgba(255, 200, 110, 0) 72%);
+            box-shadow: 0 0 70px 30px rgba(255, 205, 120, 0.6);
+          }
+          .lux-horizon { position: absolute; left: 0; right: 0; bottom: 22px; width: 100%; height: 26px; opacity: 0.85; }
+
+          /* The tilted sand plane (Sims-style ground) */
+          .lux-beach-plane {
+            position: absolute; bottom: 0; left: 0;
+            transform: rotateX(54deg);
+            transform-origin: 50% 100%;
+            transform-style: preserve-3d;
+          }
           .lux-zone { position: absolute; z-index: 1; border: 2px solid; border-radius: 12px; pointer-events: none; }
           .lux-zone span { position: absolute; top: 6px; left: 6px; color: #fff; font-size: 0.62rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 0.4rem; letter-spacing: 0.06em; }
-          .lux-spot {
-            position: absolute; z-index: 2;
-            transform: translate(-50%, -50%);
-            display: flex; flex-direction: column; align-items: center;
-            cursor: pointer;
-            transition: transform 0.25s var(--lux-ease), filter 0.25s;
+
+          /* Upright umbrella sprites standing on the sand */
+          .lux-spot3d { position: absolute; width: 0; height: 0; cursor: pointer; transform-style: preserve-3d; }
+          .lux-spot3d .s-shadow {
+            position: absolute; left: -17px; top: -6px;
+            width: 34px; height: 12px; border-radius: 50%;
+            background: radial-gradient(ellipse, rgba(70, 45, 20, 0.4), transparent 70%);
           }
-          .lux-spot .disc {
-            width: 26px; height: 26px; border-radius: 50%;
-            background: repeating-conic-gradient(#cdaa6d 0deg 11deg, #b28d4f 11deg 22deg);
-            border: 2px solid #8a6a38;
-            box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4);
-            position: relative;
+          .lux-spot3d .s-up {
+            position: absolute; left: -23px; bottom: -3px;
+            width: 46px; height: 54px;
+            transform: rotateX(-54deg);
+            transform-origin: 50% 100%;
+            transition: filter 0.25s;
           }
-          .lux-spot .disc::after {
+          .lux-spot3d .s-screen {
+            position: absolute; bottom: 1px; left: 8px;
+            width: 30px; height: 15px;
+            background: repeating-linear-gradient(90deg, #f0e8d4 0 5px, #e0d4b6 5px 10px);
+            border: 1px solid #c6b795;
+            border-radius: 5px 5px 2px 2px;
+            box-shadow: inset 0 -3px 4px rgba(120, 100, 60, 0.25);
+          }
+          .lux-spot3d .s-lounger {
+            position: absolute; bottom: 0;
+            width: 15px; height: 6px;
+            background: linear-gradient(180deg, #4f7fd9 0 55%, #eef2f8 55%);
+            border-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+          }
+          .lux-spot3d .s-lounger.l1 { left: 6px; }
+          .lux-spot3d .s-lounger.l2 { left: 25px; }
+          .lux-spot3d .s-pole { position: absolute; bottom: 5px; left: 22px; width: 2px; height: 30px; background: linear-gradient(180deg, #7a5a30, #5d431f); }
+          .lux-spot3d .s-canopy {
+            position: absolute; top: 1px; left: 3px;
+            width: 40px; height: 16px;
+            background:
+              repeating-linear-gradient(90deg, rgba(120, 90, 45, 0.22) 0 2px, transparent 2px 5px),
+              linear-gradient(100deg, #d9b87f 15%, #c09a5e 55%, #9d7a44 95%);
+            border-radius: 50% 50% 46% 46% / 100% 100% 26% 26%;
+            box-shadow: 0 2px 3px rgba(90, 60, 25, 0.35);
+          }
+          .lux-spot3d .s-canopy::before {
             content: '';
-            position: absolute; top: 50%; left: 50%;
-            width: 5px; height: 5px; border-radius: 50%;
-            transform: translate(-50%, -50%);
-            background: #6b4f26;
+            position: absolute; top: -5px; left: 50%;
+            transform: translateX(-50%);
+            width: 5px; height: 7px;
+            background: #8a6a38;
+            border-radius: 2px 2px 0 0;
           }
-          .lux-spot.t-cabana .disc { border-radius: 7px; background: repeating-linear-gradient(45deg, #efe6d2 0 5px, #d9c9a5 5px 10px); border-color: #9b8455; }
-          .lux-spot.t-lounger .disc { border-radius: 7px; width: 28px; height: 18px; background: linear-gradient(180deg, #f0ead9, #cfd8e3); border-color: #7b8aa0; }
-          .lux-spot.t-daybed .disc { border-radius: 9px; background: repeating-linear-gradient(90deg, #e6d7f5 0 5px, #cdb4e8 5px 10px); border-color: #8b6bb0; }
-          .lux-spot .num {
-            margin-top: -7px;
-            background: rgba(250, 246, 236, 0.95);
+          /* Floating number plates: screen-space layer above the 3D scene */
+          .lux-plate-layer { position: absolute; inset: 0; z-index: 500; pointer-events: none; }
+          .lux-plate {
+            position: absolute;
+            pointer-events: auto;
+            min-width: 24px; height: 21px; padding: 0 6px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(250, 246, 236, 0.94);
             color: #241318;
-            font-size: 0.58rem; font-weight: 800;
-            padding: 0.1rem 0.4rem;
+            font-size: 0.62rem; font-weight: 800;
             border-radius: 999px;
-            border: 1px solid rgba(138, 106, 56, 0.6);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(138, 106, 56, 0.65);
+            box-shadow: 0 3px 7px rgba(0, 0, 0, 0.35);
+            cursor: pointer;
             white-space: nowrap;
           }
-          .lux-spot:hover { transform: translate(-50%, -50%) scale(1.18); z-index: 4; }
-          .lux-spot.selected { transform: translate(-50%, -50%) scale(1.28); z-index: 5; }
-          .lux-spot.selected .disc { outline: 3px solid var(--lux-gold); outline-offset: 2px; }
-          .lux-spot.selected .num { background: var(--lux-gold-grad); border-color: transparent; }
-          .lux-spot.booked { filter: grayscale(1) brightness(0.55); cursor: not-allowed; }
+          .lux-plate.selected { background: var(--lux-gold-grad); border-color: transparent; box-shadow: 0 0 14px rgba(212, 175, 55, 0.9); }
+          .lux-plate.booked { filter: grayscale(1) brightness(0.62); cursor: not-allowed; opacity: 0.75; }
+          .lux-spot3d.t-cabana .s-screen { width: 38px; height: 22px; left: 4px; border-radius: 7px 7px 3px 3px; }
+          .lux-spot3d.t-cabana .s-canopy { top: 6px; height: 12px; border-radius: 6px 6px 40% 40% / 10px 10px 30% 30%; background: linear-gradient(100deg, #f2ead6, #d9cba6); }
+          .lux-spot3d.t-cabana .s-pole { display: none; }
+          .lux-spot3d.t-lounger .s-canopy, .lux-spot3d.t-lounger .s-pole, .lux-spot3d.t-lounger .s-screen { display: none; }
+          .lux-spot3d.t-lounger .s-lounger { width: 24px; height: 8px; left: 10px; }
+          .lux-spot3d:hover .s-up { filter: brightness(1.12); }
+          .lux-spot3d.selected .s-plate { background: var(--lux-gold-grad); border-color: transparent; }
+          .lux-spot3d.selected .s-shadow {
+            background: radial-gradient(ellipse, rgba(212, 175, 55, 0.75), transparent 72%);
+            animation: luxBreathePulse 2s ease-in-out infinite;
+          }
+          .lux-spot3d.selected .s-up { filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.8)); }
+          .lux-spot3d.booked { cursor: not-allowed; }
+          .lux-spot3d.booked .s-up { filter: grayscale(1) brightness(0.55); }
+          .lux-spot3d.booked .s-shadow { opacity: 0.4; }
+
+          /* Flat badges for admin-uploaded photorealistic renders */
+          .lux-flatspot {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            min-width: 26px; height: 26px; padding: 0 6px;
+            border-radius: 999px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(250, 246, 236, 0.95);
+            color: #241318;
+            font-size: 0.62rem; font-weight: 800;
+            border: 1px solid rgba(138, 106, 56, 0.6);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+          }
+          .lux-flatspot.selected { background: var(--lux-gold-grad); border-color: transparent; transform: translate(-50%, -50%) scale(1.25); }
+          .lux-flatspot.booked { filter: grayscale(1) brightness(0.6); cursor: not-allowed; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -29308,42 +29390,54 @@ window.luxTogglePassForm = function() {
                 '<span class="lux-stat"><span class="dot all"></span><strong>' + total + '</strong> Spots</span>';
         }
 
-        function luxBeachScene(w, h, seaTop) {
-            // Hand-drawn aerial scene: promenade, warm sand, shoreline, turquoise Red Sea
-            var foam1 = '', foam2 = '', speckle = '';
+        function luxBeachScene(w, h, seaH) {
+            // Ground plane surface, looking out to sea: deep water far (top), foam at the
+            // shore, wet sand line, then warm speckled sand toward the viewer
+            var foam1 = '', foam2 = '', speckle = '', buoys = '', boats = '';
             for (var x = 0; x <= w; x += 40) {
-                var dy = Math.sin(x / 53) * 7;
-                foam1 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaTop + 14 + dy);
-                foam2 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaTop + 40 + Math.sin(x / 71 + 2) * 9);
+                foam1 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaH - 10 + Math.sin(x / 53) * 6);
+                foam2 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaH - 34 + Math.sin(x / 71 + 2) * 8);
             }
-            for (var i = 0; i < 110; i++) {
-                var sx = Math.random() * w, sy = 70 + Math.random() * (seaTop - 90);
-                speckle += '<circle cx="' + sx.toFixed(0) + '" cy="' + sy.toFixed(0) + '" r="' + (0.8 + Math.random() * 1.4).toFixed(1) + '" fill="rgba(140,110,70,0.18)"/>';
+            for (var i = 0; i < 130; i++) {
+                var sx = Math.random() * w, sy = seaH + 30 + Math.random() * (h - seaH - 50);
+                speckle += '<circle cx="' + sx.toFixed(0) + '" cy="' + sy.toFixed(0) + '" r="' + (0.8 + Math.random() * 1.5).toFixed(1) + '" fill="rgba(140,110,70,0.18)"/>';
             }
-            var palms = '';
-            for (var p = 30; p < w; p += 95) {
-                palms += '<circle cx="' + p + '" cy="30" r="13" fill="rgba(66,110,58,0.55)"/>' +
-                         '<circle cx="' + (p + 9) + '" cy="24" r="9" fill="rgba(84,130,70,0.5)"/>';
+            for (var b = 40; b < w; b += 120) {
+                buoys += '<circle cx="' + b + '" cy="' + (seaH - 52 + Math.sin(b / 90) * 5) + '" r="2.4" fill="#fff" opacity="0.75"/>';
             }
+            boats += '<ellipse cx="' + (w * 0.22) + '" cy="' + (seaH * 0.3) + '" rx="9" ry="2.6" fill="#f6f2e8" opacity="0.85"/>' +
+                     '<ellipse cx="' + (w * 0.68) + '" cy="' + (seaH * 0.22) + '" rx="7" ry="2.2" fill="#f6f2e8" opacity="0.75"/>';
             return '<svg class="lux-beach-svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
                 '<defs>' +
-                '<linearGradient id="lbSand" x1="0" y1="0" x2="0" y2="1">' +
-                    '<stop offset="0" stop-color="#e8cf9f"/><stop offset="0.7" stop-color="#e2c48d"/><stop offset="1" stop-color="#d9b87c"/>' +
-                '</linearGradient>' +
                 '<linearGradient id="lbSea" x1="0" y1="0" x2="0" y2="1">' +
-                    '<stop offset="0" stop-color="#8fe3da"/><stop offset="0.35" stop-color="#3fc3cf"/><stop offset="1" stop-color="#0f8fae"/>' +
+                    '<stop offset="0" stop-color="#0c6f96"/><stop offset="0.45" stop-color="#1fa3bd"/><stop offset="0.85" stop-color="#66d9d2"/><stop offset="1" stop-color="#9beee2"/>' +
+                '</linearGradient>' +
+                '<linearGradient id="lbSand" x1="0" y1="0" x2="0" y2="1">' +
+                    '<stop offset="0" stop-color="#ead2a1"/><stop offset="0.5" stop-color="#e5c78f"/><stop offset="1" stop-color="#dcba7e"/>' +
                 '</linearGradient>' +
                 '</defs>' +
-                '<rect width="' + w + '" height="60" fill="#cfc3ae"/>' +
-                '<rect y="56" width="' + w + '" height="6" fill="rgba(120,105,80,0.35)"/>' +
-                palms +
-                '<rect y="60" width="' + w + '" height="' + (seaTop - 60) + '" fill="url(#lbSand)"/>' +
+                '<rect width="' + w + '" height="' + seaH + '" fill="url(#lbSea)"/>' +
+                buoys + boats +
+                '<path d="' + foam2 + '" stroke="rgba(255,255,255,0.45)" stroke-width="2.5" fill="none"/>' +
+                '<path d="' + foam1 + '" stroke="rgba(255,255,255,0.9)" stroke-width="3.5" fill="none" stroke-linecap="round"/>' +
+                '<rect y="' + seaH + '" width="' + w + '" height="16" fill="#ecd9ad"/>' +
+                '<rect y="' + (seaH + 14) + '" width="' + w + '" height="' + (h - seaH - 14) + '" fill="url(#lbSand)"/>' +
                 speckle +
-                '<rect y="' + (seaTop - 16) + '" width="' + w + '" height="18" fill="#e9dcb8" opacity="0.8"/>' +
-                '<rect y="' + seaTop + '" width="' + w + '" height="' + (h - seaTop) + '" fill="url(#lbSea)"/>' +
-                '<path d="' + foam1 + '" stroke="rgba(255,255,255,0.85)" stroke-width="3" fill="none" stroke-linecap="round"/>' +
-                '<path d="' + foam2 + '" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none"/>' +
             '</svg>';
+        }
+
+        function luxBeachSpriteHtml(s, idx, free, sel) {
+            var cls = 'lux-spot3d t-' + (s.spot_type || 'umbrella') + (free ? '' : ' booked') + (sel ? ' selected' : '');
+            return '<div class="' + cls + '" data-idx="' + idx + '">' +
+                '<span class="s-shadow"></span>' +
+                '<span class="s-up">' +
+                    '<span class="s-screen"></span>' +
+                    '<span class="s-lounger l1"></span>' +
+                    '<span class="s-lounger l2"></span>' +
+                    '<span class="s-pole"></span>' +
+                    '<span class="s-canopy"></span>' +
+                '</span>' +
+            '</div>';
         }
 
         function luxBeachRenderMap() {
@@ -29358,46 +29452,104 @@ window.luxTogglePassForm = function() {
                 minY = Math.min(minY, s.position_y);
             });
             if (!isFinite(minY)) minY = 0;
-            // Trim dead space above the first umbrella row (only when we draw our own scene;
-            // an uploaded map image must keep the admin's original coordinates)
-            var shiftY = hasImage ? 0 : Math.max(0, minY - 100);
-            var w = Math.round((maxX + 60) * S);
-            var seaTop = Math.round((maxY - shiftY + 55) * S);
-            var h = seaTop + 120;
-            canvas.style.width = w + 'px';
-            canvas.style.height = h + 'px';
 
-            var html = '';
             if (hasImage) {
+                // Photorealistic mode: admin-uploaded render/photo with flat badges on the
+                // admin's original coordinates (like the reference screenshot)
+                var w2 = Math.round((maxX + 60) * S);
+                var h2 = Math.round((maxY + 80) * S);
+                canvas.innerHTML = '';
+                canvas.style.width = w2 + 'px';
+                canvas.style.height = h2 + 'px';
                 canvas.style.backgroundImage = 'url(' + luxBeach.settings.beach_map_image_url + ')';
                 canvas.style.backgroundSize = '100% auto';
                 canvas.style.backgroundRepeat = 'no-repeat';
+                var flat = '';
+                luxBeach.spots.forEach(function(s, idx) {
+                    var free = luxBeachSpotFree(s.spot_id);
+                    var sel = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
+                    flat += '<div class="lux-flatspot' + (free ? '' : ' booked') + (sel ? ' selected' : '') + '" data-idx="' + idx + '" style="left:' + Math.round(s.position_x * S) + 'px; top:' + Math.round(s.position_y * S) + 'px;">' + s.spot_number + (s.is_premium ? '★' : '') + '</div>';
+                });
+                canvas.innerHTML = flat;
             } else {
-                html += luxBeachScene(w, h, seaTop);
+                // 3D world mode: perspective sand plane looking out to the Red Sea,
+                // upright umbrella sprites standing on it (Sims-style)
+                var pad = 50;
+                var seaH = 170;
+                var DEPTH = 1.55; // exaggerate depth so rows breathe like a game map
+                var PERSP = 1100;
+                var A = 54 * Math.PI / 180;
+                var w = Math.round((maxX + pad) * S);
+                var planeH = Math.round(seaH + (maxY - minY + 130) * S * DEPTH);
+                // flip: rows closest to the water sit far (top of plane)
+                var yFlip = function(y) { return Math.round(seaH + ((maxY - y) + 40) * S * DEPTH); };
+                var zTop = planeH * Math.sin(A);
+                var topScale = PERSP / (PERSP + zTop);
+                var projH = Math.round(planeH * Math.cos(A) * (1 + topScale) / 2);
+                var skyH = 96;
+                var canvasH = projH + skyH;
+                // screen-space projection of a plane point (mirrors rotateX + perspective)
+                var project = function(xp, yp) {
+                    var d = planeH - yp;
+                    var y3 = canvasH - d * Math.cos(A);
+                    var z3 = d * Math.sin(A);
+                    var k = PERSP / (PERSP + z3);
+                    var ox = w / 2, oy = 0.18 * canvasH;
+                    return { x: ox + (xp - ox) * k, y: oy + (y3 - oy) * k, k: k };
+                };
+
+                var html = '<div class="lux-beach-sky">' +
+                    '<span class="lux-sun"></span>' +
+                    '<svg class="lux-horizon" viewBox="0 0 400 26" preserveAspectRatio="none">' +
+                        '<path d="M0 26 L0 22 H30 L34 16 Q38 10 42 16 L46 22 H120 L124 18 Q133 4 142 18 L146 22 H210 L213 19 Q219 12 225 19 L228 22 H310 L314 15 Q320 8 326 15 L330 22 H400 V26 Z" fill="rgba(255,252,244,0.75)"/>' +
+                    '</svg>' +
+                '</div>';
+                html += '<div class="lux-beach-plane" style="width:' + w + 'px; height:' + planeH + 'px;">';
+                html += luxBeachScene(w, planeH, seaH);
+
+                luxBeach.zones.forEach(function(z) {
+                    try {
+                        var c = JSON.parse(z.coordinates);
+                        var zy = yFlip(c.y + c.height);
+                        html += '<div class="lux-zone" style="left:' + Math.round(c.x * S) + 'px; top:' + zy + 'px; width:' + Math.round(c.width * S) + 'px; height:' + Math.round(c.height * S * DEPTH) + 'px; border-color:' + z.color + '; background:' + z.color + '1c;">' +
+                            '<span style="background:' + z.color + ';">' + z.zone_name + '</span></div>';
+                    } catch (e) {}
+                });
+
+                // paint back-to-front so nearer umbrellas overlap the far ones
+                var order = luxBeach.spots.map(function(s, idx) { return { s: s, idx: idx, py: yFlip(s.position_y) }; });
+                order.sort(function(a, b) { return a.py - b.py; });
+                order.forEach(function(o) {
+                    var free = luxBeachSpotFree(o.s.spot_id);
+                    var sel = luxBeach.spot && luxBeach.spot.spot_id === o.s.spot_id;
+                    html += luxBeachSpriteHtml(o.s, o.idx, free, sel)
+                        .replace('class="lux-spot3d', 'style="left:' + Math.round(o.s.position_x * S) + 'px; top:' + o.py + 'px; z-index:' + o.py + ';" class="lux-spot3d');
+                });
+                html += '</div>';
+
+                // Floating number plates in screen space — never hidden behind umbrellas
+                html += '<div class="lux-plate-layer">';
+                order.forEach(function(o) {
+                    var free = luxBeachSpotFree(o.s.spot_id);
+                    var sel = luxBeach.spot && luxBeach.spot.spot_id === o.s.spot_id;
+                    var pt = project(o.s.position_x * S, o.py + 14);
+                    html += '<button class="lux-plate' + (free ? '' : ' booked') + (sel ? ' selected' : '') + '" data-idx="' + o.idx + '"' +
+                        ' style="left:' + pt.x.toFixed(1) + 'px; top:' + pt.y.toFixed(1) + 'px; z-index:' + (1000 + o.py) + '; transform: translate(-50%, -50%) scale(' + Math.max(0.72, pt.k).toFixed(2) + ');">' +
+                        o.s.spot_number + (o.s.is_premium ? '★' : '') + '</button>';
+                });
+                html += '</div>';
+
+                canvas.style.backgroundImage = 'none';
+                canvas.style.width = w + 'px';
+                canvas.style.height = canvasH + 'px';
+                canvas.classList.add('lux-3d');
+                canvas.innerHTML = html;
+                var sky = canvas.querySelector('.lux-beach-sky');
+                if (sky) sky.style.height = (skyH + 26) + 'px';
             }
 
-            // Zone overlays (admin-drawn)
-            luxBeach.zones.forEach(function(z) {
-                try {
-                    var c = JSON.parse(z.coordinates);
-                    html += '<div class="lux-zone" style="left:' + (c.x * S) + 'px; top:' + ((c.y - shiftY) * S) + 'px; width:' + (c.width * S) + 'px; height:' + (c.height * S) + 'px; border-color:' + z.color + '; background:' + z.color + '22;">' +
-                        '<span style="background:' + z.color + ';">' + z.zone_name + '</span></div>';
-                } catch (e) {}
-            });
-
-            luxBeach.spots.forEach(function(s, idx) {
-                var free = luxBeachSpotFree(s.spot_id);
-                var sel = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
-                var cls = 'lux-spot t-' + (s.spot_type || 'umbrella') + (free ? '' : ' booked') + (sel ? ' selected' : '');
-                html += '<div class="' + cls + '" data-idx="' + idx + '" style="left:' + Math.round(s.position_x * S) + 'px; top:' + Math.round((s.position_y - shiftY) * S) + 'px;">' +
-                    '<span class="disc"></span>' +
-                    '<span class="num">' + s.spot_number + (s.is_premium ? '★' : '') + '</span>' +
-                '</div>';
-            });
-            canvas.innerHTML = html;
-
             canvas.onclick = function(e) {
-                var el = e.target.closest('.lux-spot');
+                var el = e.target.closest('.lux-spot3d, .lux-flatspot, .lux-plate');
                 if (!el || el.classList.contains('booked')) return;
                 luxBeach.spot = luxBeach.spots[parseInt(el.dataset.idx, 10)];
                 luxBeachRenderMap();
@@ -29411,7 +29563,7 @@ window.luxTogglePassForm = function() {
             var wrap = document.getElementById('luxBeachMapWrap');
             if (wrap && !wrap.dataset.centered) {
                 wrap.dataset.centered = '1';
-                wrap.scrollLeft = Math.max(0, (w - wrap.offsetWidth) / 2);
+                wrap.scrollLeft = Math.max(0, (canvas.offsetWidth - wrap.offsetWidth) / 2);
             }
         }
 
