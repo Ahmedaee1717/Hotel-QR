@@ -25019,6 +25019,52 @@ window.luxTogglePassForm = function() {
           .lux-legend-chip i { color: var(--lux-gold-2); font-size: 0.8rem; }
           .lux-legend-chip:active { transform: scale(0.96); }
           .lux-map-editbar { padding: 0 1.25rem 1.6rem; }
+          .lux-edit-row { display: flex; gap: 0.5rem; }
+          .lux-edit-row .lux-cta { margin-top: 0.6rem; }
+          .lux-cta-ghost {
+            background: rgba(250, 246, 236, 0.08) !important;
+            color: var(--lux-text) !important;
+            border: 1px solid rgba(212, 175, 55, 0.4) !important;
+            box-shadow: none !important;
+          }
+          .lux-placing { cursor: crosshair; }
+          .lux-placing .leaflet-grab, .lux-placing .leaflet-interactive { cursor: crosshair !important; }
+          .lux-pin-draft { background: rgba(250, 246, 236, 0.92) !important; animation: luxBreathePulse 1.6s ease-in-out infinite; }
+          .lux-poi-form {
+            position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 1200;
+            background: rgba(24, 13, 18, 0.97);
+            border: 1px solid rgba(212, 175, 55, 0.55);
+            border-radius: 0.9rem;
+            padding: 0.9rem;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+          }
+          .lux-poi-form .t { font-family: var(--lux-serif); font-size: 1.15rem; color: var(--lux-text); margin-bottom: 0.55rem; }
+          .lux-poi-form input, .lux-poi-form textarea, .lux-poi-form select {
+            width: 100%;
+            background: rgba(250, 246, 236, 0.07);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            border-radius: 0.6rem;
+            padding: 0.6rem 0.7rem;
+            color: var(--lux-text);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+          }
+          .lux-poi-form select option { background: #241318; }
+          .lux-poi-form .row { display: flex; gap: 0.5rem; margin-top: 0.1rem; }
+          .lux-poi-form .row button {
+            flex: 1; border-radius: 999px; padding: 0.65rem;
+            font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+          }
+          .lux-poi-form .row .c { background: rgba(250, 246, 236, 0.08); color: var(--lux-text); border: 1px solid rgba(212, 175, 55, 0.35); }
+          .lux-poi-form .row .s { background: var(--lux-gold-grad); color: #231307; border: none; }
+          .lux-pop .rowbtns { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+          .lux-pop .ed {
+            flex: 1;
+            background: rgba(212, 175, 55, 0.15); color: var(--lux-gold-2);
+            border: 1px solid rgba(212, 175, 55, 0.45); border-radius: 0.6rem;
+            padding: 0.45rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+          }
+          .lux-pop .rowbtns .rm { flex: 1; margin-top: 0; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -29913,8 +29959,11 @@ window.luxTogglePassForm = function() {
                 '<div class="lux-map-legend" id="luxMapLegend"></div>' +
                 (luxMap.editMode ?
                     '<div class="lux-map-editbar">' +
-                        '<button class="lux-cta" onclick="luxMapAddHere()"><i class="fas fa-location-crosshairs mr-2"></i>Add spot at my location</button>' +
-                        '<p class="lux-sheet-desc" style="font-size: 0.7rem; text-align: center; margin-top: 0.5rem;">Editor mode — long-press anywhere on the map to add a spot there. Open a pin to remove it.</p>' +
+                        '<div class="lux-edit-row">' +
+                            '<button class="lux-cta" onclick="luxMapStartPlace()"><i class="fas fa-map-pin mr-2"></i>Tap map to add</button>' +
+                            '<button class="lux-cta lux-cta-ghost" onclick="luxMapAddHere()"><i class="fas fa-location-crosshairs mr-2"></i>At my location</button>' +
+                        '</div>' +
+                        '<p class="lux-sheet-desc" style="font-size: 0.7rem; text-align: center; margin-top: 0.5rem;">Editor mode — drag any pin to move it. Open a pin to edit or remove it.</p>' +
                     '</div>' : '')
             );
             try {
@@ -29993,9 +30042,15 @@ window.luxTogglePassForm = function() {
             luxMap.pois.forEach(function(p) { luxMapAddMarker(p); });
             luxMapRenderLegend();
 
-            // Long-press to add (editor mode)
+            // Editor mode: long-press or place-mode tap opens the spot form
             if (luxMap.editMode) {
-                map.on('contextmenu', function(ev) { luxMapAddAt(ev.latlng.lat, ev.latlng.lng); });
+                map.on('contextmenu', function(ev) { luxMapShowForm(ev.latlng.lat, ev.latlng.lng, null); });
+                map.on('click', function(ev) {
+                    if (!luxMap.placeMode) return;
+                    luxMap.placeMode = false;
+                    host.classList.remove('lux-placing');
+                    luxMapShowForm(ev.latlng.lat, ev.latlng.lng, null);
+                });
             }
 
             // Live guest location
@@ -30043,13 +30098,17 @@ window.luxTogglePassForm = function() {
                     (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m') + ' from you</div>';
             }
             if (luxMap.editMode) {
-                html += '<button class="rm" onclick="luxMapRemove(' + p.poi_id + ')"><i class="fas fa-trash"></i> Remove</button>';
+                html += '<div class="rowbtns">' +
+                    '<button class="ed" onclick="luxMapEdit(' + p.poi_id + ')"><i class="fas fa-pen"></i> Edit</button>' +
+                    '<button class="rm" onclick="luxMapRemove(' + p.poi_id + ')"><i class="fas fa-trash"></i> Remove</button>' +
+                '</div>';
             }
             return html + '</div>';
         }
 
         function luxMapAddMarker(p) {
             var mk = L.marker([p.lat, p.lng], {
+                draggable: !!luxMap.editMode,
                 icon: L.divIcon({
                     className: 'lux-pin-wrap',
                     html: '<span class="lux-pin"><i class="' + (p.icon_class || 'fas fa-location-dot') + '"></i></span><span class="lux-pin-tip"></span>',
@@ -30057,6 +30116,19 @@ window.luxTogglePassForm = function() {
                 })
             }).addTo(luxMap.map);
             mk.bindPopup(function() { return luxMapPopupHtml(p); }, { closeButton: true, maxWidth: 240 });
+            if (luxMap.editMode) {
+                mk.on('dragend', async function() {
+                    var ll = mk.getLatLng();
+                    p.lat = ll.lat; p.lng = ll.lng;
+                    try {
+                        await fetch('/api/map-pois/' + p.poi_id, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lat: ll.lat, lng: ll.lng })
+                        });
+                    } catch (e) { alert('Failed to save the new position'); }
+                });
+            }
             p._marker = mk;
         }
 
@@ -30086,36 +30158,94 @@ window.luxTogglePassForm = function() {
             hotel: 'fas fa-bell-concierge', shop: 'fas fa-bag-shopping', medical: 'fas fa-briefcase-medical'
         };
 
+        window.luxMapStartPlace = function() {
+            luxMap.placeMode = true;
+            var host = document.getElementById('luxLiveMap');
+            if (host) host.classList.add('lux-placing');
+        };
+
         window.luxMapAddHere = function() {
-            if (luxMap.userPos) { luxMapAddAt(luxMap.userPos.lat, luxMap.userPos.lng); return; }
+            if (luxMap.userPos) { luxMapShowForm(luxMap.userPos.lat, luxMap.userPos.lng, null); return; }
             if (!navigator.geolocation) { alert('GPS unavailable'); return; }
             navigator.geolocation.getCurrentPosition(function(pos) {
-                luxMapAddAt(pos.coords.latitude, pos.coords.longitude);
+                luxMapShowForm(pos.coords.latitude, pos.coords.longitude, null);
             }, function() { alert('Could not get your location'); }, { enableHighAccuracy: true, timeout: 10000 });
         };
 
-        window.luxMapAddAt = async function(lat, lng) {
-            var name = prompt('Spot name (e.g., Dive Center):');
-            if (!name) return;
-            var description = prompt('Short description (shown when guests tap the pin):') || '';
-            var category = (prompt('Category (dining / bar / pool / beach / dive / spa / hotel / shop):') || '').trim();
-            var icon = LUX_CAT_ICONS[category.toLowerCase()] || 'fas fa-location-dot';
+        var luxDraftMarker = null;
+
+        window.luxMapShowForm = function(lat, lng, poi) {
+            var host = document.getElementById('luxLiveMap');
+            if (!host || !luxMap.map) return;
+            luxMapKillForm();
+            if (!poi) {
+                luxDraftMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({ className: 'lux-pin-wrap', html: '<span class="lux-pin lux-pin-draft"><i class="fas fa-plus"></i></span><span class="lux-pin-tip"></span>', iconSize: [36, 46], iconAnchor: [18, 44] })
+                }).addTo(luxMap.map);
+            }
+            var cats = ['dining', 'bar', 'pool', 'beach', 'dive', 'spa', 'hotel', 'shop', 'medical', 'other'];
+            var opts = '';
+            cats.forEach(function(ct) {
+                opts += '<option value="' + ct + '"' + (poi && poi.category === ct ? ' selected' : '') + '>' + ct.charAt(0).toUpperCase() + ct.slice(1) + '</option>';
+            });
+            var f = document.createElement('div');
+            f.className = 'lux-poi-form';
+            f.id = 'luxPoiForm';
+            f.innerHTML = '<div class="t">' + (poi ? 'Edit spot' : 'New spot') + '</div>' +
+                '<input id="luxPfName" type="text" placeholder="Name (e.g., Dive Center)" value="' + (poi ? String(poi.name).replace(/"/g, '&quot;') : '') + '">' +
+                '<textarea id="luxPfDesc" rows="2" placeholder="Short description shown to guests">' + (poi ? (poi.description || '') : '') + '</textarea>' +
+                '<select id="luxPfCat">' + opts + '</select>' +
+                '<div class="row"><button class="c" id="luxPfCancel">Cancel</button><button class="s" id="luxPfSave">Save spot</button></div>';
+            host.appendChild(f);
+            document.getElementById('luxPfCancel').onclick = luxMapKillForm;
+            document.getElementById('luxPfSave').onclick = function() { luxMapSaveForm(lat, lng, poi); };
+        };
+
+        function luxMapKillForm() {
+            var f = document.getElementById('luxPoiForm');
+            if (f) f.remove();
+            if (luxDraftMarker && luxMap.map) { luxMap.map.removeLayer(luxDraftMarker); luxDraftMarker = null; }
+        }
+
+        async function luxMapSaveForm(lat, lng, poi) {
+            var name = (document.getElementById('luxPfName').value || '').trim();
+            if (!name) { alert('Please enter a name'); return; }
+            var description = document.getElementById('luxPfDesc').value || '';
+            var category = document.getElementById('luxPfCat').value || '';
+            var icon = LUX_CAT_ICONS[category] || 'fas fa-location-dot';
             try {
-                var r = await fetch('/api/map-pois', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ property_id: propertyData.property_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng })
-                });
-                var d = await r.json();
-                if (d.success) {
-                    var p = { poi_id: d.poi_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng };
+                if (poi) {
+                    var r1 = await fetch('/api/map-pois/' + poi.poi_id, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name, description: description, category: category, icon_class: icon })
+                    });
+                    var d1 = await r1.json();
+                    if (!d1.success) throw new Error(d1.error || 'update failed');
+                    poi.name = name; poi.description = description; poi.category = category; poi.icon_class = icon;
+                    if (poi._marker) { luxMap.map.removeLayer(poi._marker); }
+                    luxMapAddMarker(poi);
+                } else {
+                    var r2 = await fetch('/api/map-pois', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ property_id: propertyData.property_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng })
+                    });
+                    var d2 = await r2.json();
+                    if (!d2.success) throw new Error(d2.error || 'create failed');
+                    var p = { poi_id: d2.poi_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng };
                     luxMap.pois.push(p);
                     luxMapAddMarker(p);
-                    luxMapRenderLegend();
-                } else {
-                    alert('Failed to save: ' + (d.error || 'unknown'));
                 }
+                luxMapRenderLegend();
+                luxMapKillForm();
             } catch (e) { alert('Failed to save spot'); }
+        }
+
+        window.luxMapEdit = function(poiId) {
+            var p = luxMap.pois.find(function(x) { return x.poi_id === poiId; });
+            if (p) {
+                if (p._marker) p._marker.closePopup();
+                luxMapShowForm(p.lat, p.lng, p);
+            }
         };
 
         window.luxMapRemove = async function(poiId) {
@@ -47014,6 +47144,257 @@ app.get('/gm/features', (c) => {
 
 // Super Admin Dashboard page
 // Admin Dashboard page
+// ADMIN: Resort Map editor — manage the live map's annotated spots
+app.get('/admin/map-editor', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resort Map Editor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: #14090c; color: #f6f0e3; min-height: 100vh; }
+        header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(212,175,55,.25); }
+        header h1 { font-size: 1.15rem; font-weight: 700; }
+        header h1 i { color: #D4AF37; margin-right: 8px; }
+        header a { color: #f0d98c; text-decoration: none; font-size: .85rem; }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+        .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .btn { border: none; border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: .85rem; cursor: pointer; }
+        .btn-gold { background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; }
+        .btn-gold.armed { outline: 3px solid rgba(212,175,55,.5); }
+        .hint { font-size: .75rem; color: rgba(246,240,227,.6); }
+        #map { height: 62vh; min-height: 420px; border-radius: 14px; border: 1px solid rgba(212,175,55,.4); }
+        #map.placing { cursor: crosshair; }
+        #map.placing .leaflet-grab { cursor: crosshair !important; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: .85rem; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(212,175,55,.15); }
+        th { font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: rgba(246,240,227,.55); }
+        td .cat { font-size: .68rem; color: #f0d98c; text-transform: capitalize; }
+        .act { display: flex; gap: 6px; }
+        .act button { border: 1px solid rgba(212,175,55,.4); background: rgba(250,246,236,.06); color: #f6f0e3; border-radius: 8px; padding: 6px 10px; font-size: .72rem; cursor: pointer; }
+        .act button.del { border-color: rgba(244,63,94,.5); color: #fda4af; }
+        .pin { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; border: 2px solid rgba(255,255,255,.9); box-shadow: 0 5px 14px rgba(0,0,0,.5); font-size: .85rem; }
+        .pin-tip { display: block; margin: -2px auto 0; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 9px solid #b08c2c; }
+        .pin-wrap { background: none; border: none; }
+        .leaflet-popup-content-wrapper { background: rgba(24,13,18,.97) !important; color: #f6f0e3; border: 1px solid rgba(212,175,55,.5); border-radius: 12px !important; }
+        .leaflet-popup-tip { background: rgba(24,13,18,.97) !important; }
+        .pop-nm { font-weight: 700; font-size: 1rem; margin-bottom: 2px; }
+        .pop-ds { font-size: .78rem; color: rgba(246,240,227,.7); }
+        .pop-row { display: flex; gap: 6px; margin-top: 8px; }
+        .pop-row button { flex: 1; border-radius: 8px; padding: 6px; font-size: .72rem; font-weight: 700; cursor: pointer; }
+        .pop-ed { background: rgba(212,175,55,.18); color: #f0d98c; border: 1px solid rgba(212,175,55,.45); }
+        .pop-rm { background: rgba(244,63,94,.15); color: #fda4af; border: 1px solid rgba(244,63,94,.4); }
+        /* form modal */
+        #formWrap { position: fixed; inset: 0; background: rgba(8,4,6,.7); display: none; align-items: center; justify-content: center; z-index: 5000; padding: 16px; }
+        #formWrap.open { display: flex; }
+        .form { background: #241318; border: 1px solid rgba(212,175,55,.5); border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; }
+        .form .t { font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; }
+        .form label { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: rgba(246,240,227,.55); margin: 10px 0 4px; }
+        .form input, .form textarea, .form select { width: 100%; background: rgba(250,246,236,.07); border: 1px solid rgba(212,175,55,.35); border-radius: 8px; padding: 10px; color: #f6f0e3; font-size: .9rem; }
+        .form select option { background: #241318; }
+        .form .row { display: flex; gap: 8px; margin-top: 16px; }
+        .form .row button { flex: 1; border-radius: 999px; padding: 11px; font-weight: 700; cursor: pointer; }
+        .form .cancel { background: rgba(250,246,236,.08); color: #f6f0e3; border: 1px solid rgba(212,175,55,.35); }
+        .form .save { background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; border: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><i class="fas fa-map-location-dot"></i>Resort Map Editor</h1>
+        <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Back to dashboard</a>
+    </header>
+    <div class="wrap">
+        <div class="toolbar">
+            <button class="btn btn-gold" id="addBtn"><i class="fas fa-map-pin"></i> Add spot (then click the map)</button>
+            <span class="hint">Drag any pin to move it — position saves automatically. Click a pin to edit or remove it.</span>
+        </div>
+        <div id="map"></div>
+        <table>
+            <thead><tr><th>Name</th><th>Category</th><th>Description</th><th style="width:180px">Actions</th></tr></thead>
+            <tbody id="poiRows"></tbody>
+        </table>
+    </div>
+
+    <div id="formWrap">
+        <div class="form">
+            <div class="t" id="formTitle">New spot</div>
+            <label>Name</label><input id="fName" type="text" placeholder="e.g., Dive Center">
+            <label>Description (shown to guests)</label><textarea id="fDesc" rows="3"></textarea>
+            <label>Category</label>
+            <select id="fCat">
+                <option value="dining">Dining</option><option value="bar">Bar</option>
+                <option value="pool">Pool</option><option value="beach">Beach</option>
+                <option value="dive">Dive</option><option value="spa">Spa</option>
+                <option value="hotel">Hotel</option><option value="shop">Shop</option>
+                <option value="medical">Medical</option><option value="other">Other</option>
+            </select>
+            <div class="row">
+                <button class="cancel" id="fCancel">Cancel</button>
+                <button class="save" id="fSave">Save spot</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.min.js"></script>
+    <script>
+        if (!localStorage.getItem('admin_token')) window.location.href = '/admin/login';
+        var PROPERTY_ID = localStorage.getItem('property_id') || '1';
+        var RING = [[27.048829, 33.888100], [27.046152, 33.889835], [27.045267, 33.888114], [27.047944, 33.886379]];
+        var CAT_ICONS = { dining: 'fas fa-utensils', bar: 'fas fa-martini-glass', pool: 'fas fa-person-swimming', beach: 'fas fa-umbrella-beach', dive: 'fas fa-fish', spa: 'fas fa-spa', hotel: 'fas fa-bell-concierge', shop: 'fas fa-bag-shopping', medical: 'fas fa-briefcase-medical', other: 'fas fa-location-dot' };
+        var pois = [], placing = false, editingPoi = null, draftLatLng = null, draftMarker = null;
+
+        var canRotate = !!(L.Map.prototype.setBearing);
+        var map = L.map('map', { zoomSnap: 0.25, rotate: canRotate, bearing: canRotate ? 30 : 0, rotateControl: false, touchRotate: false, shiftKeyRotate: false }).setView([27.047736, 33.887975], 17);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Imagery © Esri · Maxar', maxNativeZoom: 18, maxZoom: 19 }).addTo(map);
+        L.polygon([[[85, -180], [85, 180], [-85, 180], [-85, -180]], RING], { stroke: false, fillColor: '#0d0709', fillOpacity: 0.65, interactive: false }).addTo(map);
+        L.polygon(RING, { color: '#D4AF37', weight: 2, fill: false, interactive: false }).addTo(map);
+        var rb = L.latLngBounds(RING), rc = rb.getCenter();
+        var sz = map.getSize();
+        var need = Math.max(197 / Math.max(sz.x - 30, 100), 344 / Math.max(sz.y - 30, 100));
+        var z = Math.log(156543.03392 * Math.cos(rc.lat * Math.PI / 180) / need) / Math.LN2;
+        map.setView(rc, Math.max(16, Math.min(18.5, Math.floor(z * 4) / 4)));
+        map.setMaxBounds(rb.pad(0.6));
+        map.setMinZoom(15.5);
+
+        function pinIcon(ic) {
+            return L.divIcon({ className: 'pin-wrap', html: '<span class="pin"><i class="' + ic + '"></i></span><span class="pin-tip"></span>', iconSize: [34, 43], iconAnchor: [17, 41], popupAnchor: [0, -41] });
+        }
+
+        function popupHtml(p) {
+            return '<div><div class="pop-nm">' + p.name + '</div>' +
+                (p.description ? '<div class="pop-ds">' + p.description + '</div>' : '') +
+                '<div class="pop-row">' +
+                '<button class="pop-ed" onclick="editPoi(' + p.poi_id + ')"><i class="fas fa-pen"></i> Edit</button>' +
+                '<button class="pop-rm" onclick="delPoi(' + p.poi_id + ')"><i class="fas fa-trash"></i> Remove</button>' +
+                '</div></div>';
+        }
+
+        function addMarker(p) {
+            var mk = L.marker([p.lat, p.lng], { draggable: true, icon: pinIcon(p.icon_class || 'fas fa-location-dot') }).addTo(map);
+            mk.bindPopup(function() { return popupHtml(p); }, { maxWidth: 240 });
+            mk.on('dragend', function() {
+                var ll = mk.getLatLng();
+                p.lat = ll.lat; p.lng = ll.lng;
+                fetch('/api/map-pois/' + p.poi_id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: ll.lat, lng: ll.lng }) })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) { if (!d.success) alert('Failed to save position'); renderTable(); });
+            });
+            p._marker = mk;
+        }
+
+        function renderTable() {
+            var tb = document.getElementById('poiRows');
+            var html = '';
+            pois.forEach(function(p) {
+                html += '<tr><td><i class="' + (p.icon_class || 'fas fa-location-dot') + '" style="color:#f0d98c;margin-right:8px;"></i>' + p.name + '</td>' +
+                    '<td><span class="cat">' + (p.category || '—') + '</span></td>' +
+                    '<td style="color:rgba(246,240,227,.65);">' + (p.description || '') + '</td>' +
+                    '<td><div class="act">' +
+                    '<button onclick="showPoi(' + p.poi_id + ')"><i class="fas fa-eye"></i></button>' +
+                    '<button onclick="editPoi(' + p.poi_id + ')"><i class="fas fa-pen"></i></button>' +
+                    '<button class="del" onclick="delPoi(' + p.poi_id + ')"><i class="fas fa-trash"></i></button>' +
+                    '</div></td></tr>';
+            });
+            tb.innerHTML = html || '<tr><td colspan="4" style="color:rgba(246,240,227,.5);">No spots yet — click "Add spot" and then click the map.</td></tr>';
+        }
+
+        function findPoi(id) { return pois.find(function(p) { return p.poi_id === id; }); }
+        window.showPoi = function(id) { var p = findPoi(id); if (p) { map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 18)); setTimeout(function() { p._marker.openPopup(); }, 500); } };
+        window.editPoi = function(id) {
+            var p = findPoi(id);
+            if (!p) return;
+            editingPoi = p; draftLatLng = null;
+            document.getElementById('formTitle').textContent = 'Edit spot';
+            document.getElementById('fName').value = p.name;
+            document.getElementById('fDesc').value = p.description || '';
+            document.getElementById('fCat').value = p.category || 'other';
+            document.getElementById('formWrap').classList.add('open');
+        };
+        window.delPoi = function(id) {
+            if (!confirm('Remove this spot from the guest map?')) return;
+            fetch('/api/map-pois/' + id, { method: 'DELETE' }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.success) {
+                    var i = pois.findIndex(function(p) { return p.poi_id === id; });
+                    if (i >= 0) { if (pois[i]._marker) map.removeLayer(pois[i]._marker); pois.splice(i, 1); renderTable(); }
+                } else alert('Failed to remove');
+            });
+        };
+
+        document.getElementById('addBtn').onclick = function() {
+            placing = !placing;
+            this.classList.toggle('armed', placing);
+            document.getElementById('map').classList.toggle('placing', placing);
+        };
+        map.on('click', function(ev) {
+            if (!placing) return;
+            placing = false;
+            document.getElementById('addBtn').classList.remove('armed');
+            document.getElementById('map').classList.remove('placing');
+            editingPoi = null;
+            draftLatLng = ev.latlng;
+            if (draftMarker) map.removeLayer(draftMarker);
+            draftMarker = L.marker(ev.latlng, { icon: pinIcon('fas fa-plus') }).addTo(map);
+            document.getElementById('formTitle').textContent = 'New spot';
+            document.getElementById('fName').value = '';
+            document.getElementById('fDesc').value = '';
+            document.getElementById('fCat').value = 'other';
+            document.getElementById('formWrap').classList.add('open');
+        });
+
+        function closeForm() {
+            document.getElementById('formWrap').classList.remove('open');
+            if (draftMarker) { map.removeLayer(draftMarker); draftMarker = null; }
+            editingPoi = null; draftLatLng = null;
+        }
+        document.getElementById('fCancel').onclick = closeForm;
+        document.getElementById('fSave').onclick = function() {
+            var name = document.getElementById('fName').value.trim();
+            if (!name) { alert('Please enter a name'); return; }
+            var body = {
+                name: name,
+                description: document.getElementById('fDesc').value,
+                category: document.getElementById('fCat').value,
+                icon_class: CAT_ICONS[document.getElementById('fCat').value] || 'fas fa-location-dot'
+            };
+            if (editingPoi) {
+                fetch('/api/map-pois/' + editingPoi.poi_id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                    .then(function(r) { return r.json(); }).then(function(d) {
+                        if (!d.success) { alert('Failed to save'); return; }
+                        editingPoi.name = body.name; editingPoi.description = body.description;
+                        editingPoi.category = body.category; editingPoi.icon_class = body.icon_class;
+                        map.removeLayer(editingPoi._marker);
+                        addMarker(editingPoi);
+                        renderTable(); closeForm();
+                    });
+            } else if (draftLatLng) {
+                body.property_id = parseInt(PROPERTY_ID, 10);
+                body.lat = draftLatLng.lat; body.lng = draftLatLng.lng;
+                fetch('/api/map-pois', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                    .then(function(r) { return r.json(); }).then(function(d) {
+                        if (!d.success) { alert('Failed to save'); return; }
+                        var p = { poi_id: d.poi_id, name: body.name, description: body.description, category: body.category, icon_class: body.icon_class, lat: body.lat, lng: body.lng };
+                        pois.push(p); addMarker(p); renderTable(); closeForm();
+                    });
+            }
+        };
+
+        fetch('/api/map-pois/' + PROPERTY_ID).then(function(r) { return r.json(); }).then(function(d) {
+            pois = (d && d.pois) || [];
+            pois.forEach(addMarker);
+            renderTable();
+        });
+    </script>
+</body>
+</html>
+  `)
+})
+
 app.get('/admin/dashboard', (c) => {
   // Version: 2026-04-09-v2
   return c.html(`
@@ -83656,6 +84037,36 @@ app.delete('/api/map-pois/:poi_id', async (c) => {
     return c.json({ success: true })
   } catch (error) {
     return c.json({ success: false, error: 'Failed to remove spot' }, 500)
+  }
+})
+
+app.put('/api/map-pois/:poi_id', async (c) => {
+  const { DB } = c.env
+  const { poi_id } = c.req.param()
+  try {
+    const b = await c.req.json()
+    await DB.prepare(`
+      UPDATE map_pois SET
+        name = COALESCE(?, name),
+        description = COALESCE(?, description),
+        icon_class = COALESCE(?, icon_class),
+        category = COALESCE(?, category),
+        lat = COALESCE(?, lat),
+        lng = COALESCE(?, lng)
+      WHERE poi_id = ?
+    `).bind(
+      b.name !== undefined ? b.name : null,
+      b.description !== undefined ? b.description : null,
+      b.icon_class !== undefined ? b.icon_class : null,
+      b.category !== undefined ? b.category : null,
+      b.lat !== undefined ? b.lat : null,
+      b.lng !== undefined ? b.lng : null,
+      poi_id
+    ).run()
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('Map POI update error:', error)
+    return c.json({ success: false, error: 'Failed to update spot' }, 500)
   }
 })
 
