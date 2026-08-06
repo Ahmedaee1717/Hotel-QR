@@ -29860,24 +29860,35 @@ window.luxTogglePassForm = function() {
             userPos: null, editMode: /[?&]mapedit=1/.test(window.location.search)
         };
         var LUX_RESORT = { lat: 27.047736, lng: 33.887975 };
-        // Resort boundary (drawn by the hotel) — everything outside is masked away
+        // Resort boundary — true rectangle fitted to the hotel's drawn border,
+        // extended ~75m seaward so the private beach is inside the grounds
+        // (long axis bearing ~150°; the map is rotated +30° so this shows upright)
         var LUX_RESORT_RING = [
-            [27.04900, 33.88796],
-            [27.04690, 33.88932],
-            [27.04568, 33.88787],
-            [27.04778, 33.88652]
+            [27.048829, 33.888100],
+            [27.046152, 33.889835],
+            [27.045267, 33.888114],
+            [27.047944, 33.886379]
         ];
+        var LUX_MAP_BEARING = 30;
+        var LUX_RING_W = 197;  // meters, short side (horizontal on screen)
+        var LUX_RING_H = 344;  // meters, long side (vertical on screen)
 
         function luxLoadLeaflet() {
             return new Promise(function(resolve, reject) {
-                if (window.L) { resolve(); return; }
+                if (window.L && window.L.Map.prototype.setBearing) { resolve(); return; }
                 var css = document.createElement('link');
                 css.rel = 'stylesheet';
                 css.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css';
                 document.head.appendChild(css);
                 var s = document.createElement('script');
                 s.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js';
-                s.onload = function() { resolve(); };
+                s.onload = function() {
+                    var r = document.createElement('script');
+                    r.src = 'https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.min.js';
+                    r.onload = function() { resolve(); };
+                    r.onerror = function() { resolve(); }; // rotation is an enhancement, not a requirement
+                    document.head.appendChild(r);
+                };
                 s.onerror = function() { reject(new Error('leaflet failed')); };
                 document.head.appendChild(s);
             });
@@ -29922,8 +29933,17 @@ window.luxTogglePassForm = function() {
             host.innerHTML = '';
             if (luxMap.map) { try { luxMap.map.remove(); } catch (e) {} luxMap.map = null; }
 
-            var map = L.map(host, { zoomControl: false, attributionControl: true })
-                .setView([LUX_RESORT.lat, LUX_RESORT.lng], 17);
+            var canRotate = !!(L.Map.prototype.setBearing);
+            var map = L.map(host, {
+                zoomControl: false,
+                attributionControl: true,
+                zoomSnap: 0.25,
+                rotate: canRotate,
+                bearing: canRotate ? LUX_MAP_BEARING : 0,
+                rotateControl: false,
+                touchRotate: false,
+                shiftKeyRotate: false
+            }).setView([LUX_RESORT.lat, LUX_RESORT.lng], 17);
             luxMap.map = map;
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 attribution: 'Imagery © Esri · Maxar',
@@ -29939,8 +29959,18 @@ window.luxTogglePassForm = function() {
             }).addTo(map);
             L.polygon(LUX_RESORT_RING, { color: 'rgba(212, 175, 55, 0.45)', weight: 7, fill: false, interactive: false }).addTo(map);
             L.polygon(LUX_RESORT_RING, { color: '#D4AF37', weight: 2, fill: false, interactive: false }).addTo(map);
+            // Manual fit: fitBounds ignores rotation, so compute the zoom from the
+            // rectangle's real size (short side horizontal, long side vertical on screen)
             var ringBounds = L.latLngBounds(LUX_RESORT_RING);
-            map.fitBounds(ringBounds.pad(0.06));
+            var rc = ringBounds.getCenter();
+            var sz = map.getSize();
+            var need = Math.max(
+                LUX_RING_W / Math.max(sz.x - 28, 100),
+                LUX_RING_H / Math.max(sz.y - 28, 100)
+            );
+            var fitZoom = Math.log(156543.03392 * Math.cos(rc.lat * Math.PI / 180) / need) / Math.LN2;
+            fitZoom = Math.max(16, Math.min(18.5, Math.floor(fitZoom * 4) / 4));
+            map.setView(rc, fitZoom);
             map.setMaxBounds(ringBounds.pad(0.4));
             map.setMinZoom(16);
 
