@@ -24918,6 +24918,107 @@ window.luxTogglePassForm = function() {
             cursor: not-allowed;
           }
           .lux-seat.booked .n { filter: grayscale(1) brightness(0.7); opacity: 0.75; }
+
+          /* ── Live resort map ── */
+          .lux-map-head { padding: 2.6rem 1.25rem 0.8rem; }
+          .lux-map-head h2 { font-family: var(--lux-serif); font-size: 1.9rem; font-weight: 600; color: var(--lux-text); }
+          .lux-map-head p { font-size: 0.66rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lux-gold-2); margin-top: 0.2rem; }
+          .lux-gps {
+            display: inline-block; margin-left: 0.6rem; padding: 0.14rem 0.5rem;
+            border-radius: 999px; border: 1px solid rgba(212, 175, 55, 0.4);
+            font-size: 0.56rem; letter-spacing: 0.16em; color: var(--lux-text-dim);
+          }
+          .lux-gps.on { background: rgba(52, 211, 153, 0.15); border-color: rgba(52, 211, 153, 0.6); color: #6ee7b7; }
+          .lux-live-map {
+            height: 56vh;
+            min-height: 360px;
+            margin: 0 0.9rem;
+            border-radius: 1.1rem;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            overflow: hidden;
+            position: relative;
+            background: #12202a;
+            box-shadow: 0 24px 50px -28px rgba(0, 0, 0, 0.85);
+            z-index: 1;
+          }
+          .lux-map-loading {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+            color: var(--lux-text-dim); font-size: 0.8rem; letter-spacing: 0.06em;
+          }
+          .lux-map-loading i { color: var(--lux-gold-2); }
+          .lux-locate-btn {
+            position: absolute; right: 10px; top: 10px; z-index: 1000;
+            width: 2.7rem; height: 2.7rem; border-radius: 50%;
+            background: var(--lux-gold-grad); color: #231307;
+            border: none; font-size: 1rem; cursor: pointer;
+            box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.7);
+          }
+          .lux-pin-wrap, .lux-me-wrap { background: none; border: none; }
+          .lux-pin {
+            display: flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; border-radius: 50%;
+            background: var(--lux-gold-grad);
+            color: #231307; font-size: 0.95rem;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+          }
+          .lux-pin-tip {
+            display: block; margin: -2px auto 0; width: 0; height: 0;
+            border-left: 7px solid transparent; border-right: 7px solid transparent;
+            border-top: 10px solid #b08c2c;
+            filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.4));
+          }
+          .lux-me { position: relative; display: block; width: 26px; height: 26px; }
+          .lux-me .dot {
+            position: absolute; inset: 5px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, #ffe9a8, #D4AF37 70%);
+            border: 2.5px solid #fff;
+            box-shadow: 0 0 14px rgba(212, 175, 55, 0.95);
+          }
+          .lux-me .ring {
+            position: absolute; inset: -6px; border-radius: 50%;
+            border: 2px solid rgba(212, 175, 55, 0.8);
+            animation: luxOrb 2.2s var(--lux-ease) infinite;
+          }
+          .leaflet-popup-content-wrapper {
+            background: rgba(24, 13, 18, 0.96) !important;
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            border-radius: 0.9rem !important;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6) !important;
+          }
+          .leaflet-popup-tip { background: rgba(24, 13, 18, 0.96) !important; }
+          .leaflet-popup-content { margin: 12px 14px !important; }
+          .leaflet-popup-close-button { color: var(--lux-gold-2) !important; }
+          .lux-pop .cat { font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--lux-gold-2); margin-bottom: 0.2rem; }
+          .lux-pop .nm { font-family: var(--lux-serif); font-size: 1.15rem; font-weight: 600; color: var(--lux-text); line-height: 1.15; }
+          .lux-pop .ds { font-size: 0.74rem; color: rgba(246, 240, 227, 0.72); line-height: 1.5; margin-top: 0.35rem; }
+          .lux-pop .dist { margin-top: 0.5rem; font-size: 0.68rem; color: var(--lux-gold-2); font-weight: 600; }
+          .lux-pop .dist i { margin-right: 0.3rem; }
+          .lux-pop .rm {
+            margin-top: 0.6rem; width: 100%;
+            background: rgba(244, 63, 94, 0.15); color: #fda4af;
+            border: 1px solid rgba(244, 63, 94, 0.4); border-radius: 0.6rem;
+            padding: 0.45rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;
+          }
+          .lux-map-legend {
+            display: flex; gap: 0.5rem; overflow-x: auto;
+            padding: 0.9rem 1.25rem 1.4rem;
+            scrollbar-width: none;
+          }
+          .lux-map-legend::-webkit-scrollbar { display: none; }
+          .lux-legend-chip {
+            flex: 0 0 auto;
+            display: inline-flex; align-items: center; gap: 0.45rem;
+            padding: 0.55rem 0.95rem; border-radius: 999px;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            color: var(--lux-text); font-size: 0.72rem; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+          }
+          .lux-legend-chip i { color: var(--lux-gold-2); font-size: 0.8rem; }
+          .lux-legend-chip:active { transform: scale(0.96); }
+          .lux-map-editbar { padding: 0 1.25rem 1.6rem; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -25405,9 +25506,9 @@ window.luxTogglePassForm = function() {
             <i class="fas fa-arrow-left"></i><span>Menu</span>
         </button>
 
-        <!-- Floating Map Button (appears when map available) -->
+        <!-- Floating Map Button (live resort map) -->
         <button id="mapFloatingBtn"
-                onclick="openMapModal()" 
+                onclick="luxOpenLiveMap()"
                 class="fixed bottom-6 right-6 text-white px-6 py-3 rounded-full shadow-2xl transition-all transform hover:scale-105 z-[1001] hidden">
             <i class="fas fa-map-marked-alt mr-2"></i>
             <span class="font-semibold">Hotel Map</span>
@@ -29048,8 +29149,8 @@ window.luxTogglePassForm = function() {
             if (fb && !fb.classList.contains('hidden')) {
                 html += luxTile('fas fa-comment-dots', 'Feedback', 'Share your thoughts', 'openFeedbackForm()');
             }
-            if (propertyData.show_hotel_map === 1 && propertyData.hotel_map_url) {
-                html += luxTile('fas fa-map-marked-alt', 'Hotel Map', '', 'openMapModal()');
+            if (propertyData.show_hotel_map === 1) {
+                html += luxTile('fas fa-map-location-dot', 'Resort Map', 'Live · Find your way', 'luxOpenLiveMap()');
             }
             grid.innerHTML = html;
         }
@@ -29111,6 +29212,7 @@ window.luxTogglePassForm = function() {
             const sheet = document.getElementById('luxSheet');
             if (sheet) sheet.classList.add('hidden');
             document.body.classList.remove('lux-noscroll');
+            if (typeof luxMapCleanup === 'function') { try { luxMapCleanup(); } catch (e) {} }
         };
         window.luxCloseLightbox = function() {
             document.getElementById('luxLightbox').classList.add('hidden');
@@ -29750,6 +29852,261 @@ window.luxTogglePassForm = function() {
                     btn.innerHTML = '<i class="fas fa-umbrella-beach mr-2"></i>Confirm Booking';
                 }
             });
+        }
+
+        // ── Live resort map: real satellite view, live guest location, annotated spots ──
+        var luxMap = {
+            map: null, pois: [], userMarker: null, accCircle: null, watchId: null,
+            userPos: null, editMode: /[?&]mapedit=1/.test(window.location.search)
+        };
+        var LUX_RESORT = { lat: 27.047736, lng: 33.887975 };
+        // Resort boundary (drawn by the hotel) — everything outside is masked away
+        var LUX_RESORT_RING = [
+            [27.04900, 33.88796],
+            [27.04690, 33.88932],
+            [27.04568, 33.88787],
+            [27.04778, 33.88652]
+        ];
+
+        function luxLoadLeaflet() {
+            return new Promise(function(resolve, reject) {
+                if (window.L) { resolve(); return; }
+                var css = document.createElement('link');
+                css.rel = 'stylesheet';
+                css.href = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css';
+                document.head.appendChild(css);
+                var s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js';
+                s.onload = function() { resolve(); };
+                s.onerror = function() { reject(new Error('leaflet failed')); };
+                document.head.appendChild(s);
+            });
+        }
+
+        function luxMapDistance(a, b) {
+            var R = 6371000, toR = Math.PI / 180;
+            var dLat = (b.lat - a.lat) * toR, dLng = (b.lng - a.lng) * toR;
+            var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+        }
+
+        window.luxOpenLiveMap = async function() {
+            trackPageView('live-map', null);
+            luxSheetOpen(
+                '<div class="lux-map-head">' +
+                    '<h2>Resort Map</h2>' +
+                    '<p>Old Palace · Sahl Hasheesh <span id="luxMapGps" class="lux-gps">locating…</span></p>' +
+                '</div>' +
+                '<div id="luxLiveMap" class="lux-live-map"><div class="lux-map-loading"><i class="fas fa-satellite"></i> Loading satellite view…</div></div>' +
+                '<div class="lux-map-legend" id="luxMapLegend"></div>' +
+                (luxMap.editMode ?
+                    '<div class="lux-map-editbar">' +
+                        '<button class="lux-cta" onclick="luxMapAddHere()"><i class="fas fa-location-crosshairs mr-2"></i>Add spot at my location</button>' +
+                        '<p class="lux-sheet-desc" style="font-size: 0.7rem; text-align: center; margin-top: 0.5rem;">Editor mode — long-press anywhere on the map to add a spot there. Open a pin to remove it.</p>' +
+                    '</div>' : '')
+            );
+            try {
+                await luxLoadLeaflet();
+                await luxMapInit();
+            } catch (e) {
+                console.error('live map', e);
+                var el = document.getElementById('luxLiveMap');
+                if (el) el.innerHTML = '<div class="lux-map-loading">The map is unavailable right now. Please try again.</div>';
+            }
+        };
+
+        async function luxMapInit() {
+            var host = document.getElementById('luxLiveMap');
+            if (!host || !window.L) return;
+            host.innerHTML = '';
+            if (luxMap.map) { try { luxMap.map.remove(); } catch (e) {} luxMap.map = null; }
+
+            var map = L.map(host, { zoomControl: false, attributionControl: true })
+                .setView([LUX_RESORT.lat, LUX_RESORT.lng], 17);
+            luxMap.map = map;
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Imagery © Esri · Maxar',
+                maxNativeZoom: 18,
+                maxZoom: 19
+            }).addTo(map);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // Spotlight the resort: mask the world outside the drawn boundary
+            var WORLD_RING = [[85, -180], [85, 180], [-85, 180], [-85, -180]];
+            L.polygon([WORLD_RING, LUX_RESORT_RING], {
+                stroke: false, fillColor: '#0d0709', fillOpacity: 0.9, interactive: false
+            }).addTo(map);
+            L.polygon(LUX_RESORT_RING, { color: 'rgba(212, 175, 55, 0.45)', weight: 7, fill: false, interactive: false }).addTo(map);
+            L.polygon(LUX_RESORT_RING, { color: '#D4AF37', weight: 2, fill: false, interactive: false }).addTo(map);
+            var ringBounds = L.latLngBounds(LUX_RESORT_RING);
+            map.fitBounds(ringBounds.pad(0.06));
+            map.setMaxBounds(ringBounds.pad(0.4));
+            map.setMinZoom(16);
+
+            // Locate-me control
+            var locBtn = L.DomUtil.create('button', 'lux-locate-btn');
+            locBtn.innerHTML = '<i class="fas fa-location-crosshairs"></i>';
+            locBtn.title = 'Show my location';
+            locBtn.onclick = function(e) {
+                e.stopPropagation();
+                if (luxMap.userPos) map.flyTo([luxMap.userPos.lat, luxMap.userPos.lng], Math.max(map.getZoom(), 18));
+            };
+            host.appendChild(locBtn);
+
+            // Load POIs
+            try {
+                var r = await fetch('/api/map-pois/' + propertyData.property_id);
+                var d = await r.json();
+                luxMap.pois = (d && d.pois) || [];
+            } catch (e) { luxMap.pois = []; }
+            luxMap.pois.forEach(function(p) { luxMapAddMarker(p); });
+            luxMapRenderLegend();
+
+            // Long-press to add (editor mode)
+            if (luxMap.editMode) {
+                map.on('contextmenu', function(ev) { luxMapAddAt(ev.latlng.lat, ev.latlng.lng); });
+            }
+
+            // Live guest location
+            var gps = document.getElementById('luxMapGps');
+            if (navigator.geolocation) {
+                if (luxMap.watchId) navigator.geolocation.clearWatch(luxMap.watchId);
+                luxMap.watchId = navigator.geolocation.watchPosition(function(pos) {
+                    luxMap.userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    var acc = pos.coords.accuracy || 0;
+                    if (gps) { gps.textContent = 'LIVE'; gps.classList.add('on'); }
+                    if (!luxMap.userMarker) {
+                        luxMap.userMarker = L.marker([luxMap.userPos.lat, luxMap.userPos.lng], {
+                            icon: L.divIcon({ className: 'lux-me-wrap', html: '<span class="lux-me"><span class="ring"></span><span class="dot"></span></span>', iconSize: [26, 26], iconAnchor: [13, 13] }),
+                            zIndexOffset: 1000
+                        }).addTo(map).bindPopup('<div class="lux-pop"><div class="nm">You are here</div></div>');
+                        luxMap.accCircle = L.circle([luxMap.userPos.lat, luxMap.userPos.lng], {
+                            radius: Math.min(acc, 150), color: '#D4AF37', weight: 1, opacity: 0.5,
+                            fillColor: '#D4AF37', fillOpacity: 0.08, interactive: false
+                        }).addTo(map);
+                    } else {
+                        luxMap.userMarker.setLatLng([luxMap.userPos.lat, luxMap.userPos.lng]);
+                        if (luxMap.accCircle) {
+                            luxMap.accCircle.setLatLng([luxMap.userPos.lat, luxMap.userPos.lng]);
+                            luxMap.accCircle.setRadius(Math.min(acc, 150));
+                        }
+                    }
+                }, function(err) {
+                    if (gps) { gps.textContent = 'GPS off'; gps.classList.remove('on'); }
+                }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+            } else if (gps) {
+                gps.textContent = 'GPS unavailable';
+            }
+
+            setTimeout(function() { map.invalidateSize(); }, 250);
+        }
+
+        function luxMapPopupHtml(p) {
+            var html = '<div class="lux-pop">' +
+                (p.category ? '<div class="cat">' + p.category + '</div>' : '') +
+                '<div class="nm">' + p.name + '</div>' +
+                (p.description ? '<div class="ds">' + p.description + '</div>' : '');
+            if (luxMap.userPos) {
+                var m = luxMapDistance(luxMap.userPos, p);
+                html += '<div class="dist"><i class="fas fa-person-walking"></i> ' +
+                    (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m') + ' from you</div>';
+            }
+            if (luxMap.editMode) {
+                html += '<button class="rm" onclick="luxMapRemove(' + p.poi_id + ')"><i class="fas fa-trash"></i> Remove</button>';
+            }
+            return html + '</div>';
+        }
+
+        function luxMapAddMarker(p) {
+            var mk = L.marker([p.lat, p.lng], {
+                icon: L.divIcon({
+                    className: 'lux-pin-wrap',
+                    html: '<span class="lux-pin"><i class="' + (p.icon_class || 'fas fa-location-dot') + '"></i></span><span class="lux-pin-tip"></span>',
+                    iconSize: [36, 46], iconAnchor: [18, 44], popupAnchor: [0, -44]
+                })
+            }).addTo(luxMap.map);
+            mk.bindPopup(function() { return luxMapPopupHtml(p); }, { closeButton: true, maxWidth: 240 });
+            p._marker = mk;
+        }
+
+        function luxMapRenderLegend() {
+            var host = document.getElementById('luxMapLegend');
+            if (!host) return;
+            var html = '';
+            luxMap.pois.forEach(function(p, i) {
+                html += '<button class="lux-legend-chip" data-i="' + i + '"><i class="' + (p.icon_class || 'fas fa-location-dot') + '"></i>' + p.name + '</button>';
+            });
+            host.innerHTML = html;
+            host.querySelectorAll('.lux-legend-chip').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var p = luxMap.pois[parseInt(btn.dataset.i, 10)];
+                    if (p && p._marker && luxMap.map) {
+                        luxMap.map.flyTo([p.lat, p.lng], Math.max(luxMap.map.getZoom(), 18));
+                        setTimeout(function() { p._marker.openPopup(); }, 600);
+                    }
+                });
+            });
+        }
+
+        var LUX_CAT_ICONS = {
+            dining: 'fas fa-utensils', restaurant: 'fas fa-utensils', bar: 'fas fa-martini-glass',
+            pool: 'fas fa-person-swimming', leisure: 'fas fa-person-swimming', beach: 'fas fa-umbrella-beach',
+            dive: 'fas fa-fish', activities: 'fas fa-fish', spa: 'fas fa-spa', wellness: 'fas fa-spa',
+            hotel: 'fas fa-bell-concierge', shop: 'fas fa-bag-shopping', medical: 'fas fa-briefcase-medical'
+        };
+
+        window.luxMapAddHere = function() {
+            if (luxMap.userPos) { luxMapAddAt(luxMap.userPos.lat, luxMap.userPos.lng); return; }
+            if (!navigator.geolocation) { alert('GPS unavailable'); return; }
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                luxMapAddAt(pos.coords.latitude, pos.coords.longitude);
+            }, function() { alert('Could not get your location'); }, { enableHighAccuracy: true, timeout: 10000 });
+        };
+
+        window.luxMapAddAt = async function(lat, lng) {
+            var name = prompt('Spot name (e.g., Dive Center):');
+            if (!name) return;
+            var description = prompt('Short description (shown when guests tap the pin):') || '';
+            var category = (prompt('Category (dining / bar / pool / beach / dive / spa / hotel / shop):') || '').trim();
+            var icon = LUX_CAT_ICONS[category.toLowerCase()] || 'fas fa-location-dot';
+            try {
+                var r = await fetch('/api/map-pois', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ property_id: propertyData.property_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng })
+                });
+                var d = await r.json();
+                if (d.success) {
+                    var p = { poi_id: d.poi_id, name: name, description: description, category: category, icon_class: icon, lat: lat, lng: lng };
+                    luxMap.pois.push(p);
+                    luxMapAddMarker(p);
+                    luxMapRenderLegend();
+                } else {
+                    alert('Failed to save: ' + (d.error || 'unknown'));
+                }
+            } catch (e) { alert('Failed to save spot'); }
+        };
+
+        window.luxMapRemove = async function(poiId) {
+            if (!confirm('Remove this spot from the map?')) return;
+            try {
+                await fetch('/api/map-pois/' + poiId, { method: 'DELETE' });
+                var idx = luxMap.pois.findIndex(function(p) { return p.poi_id === poiId; });
+                if (idx >= 0) {
+                    var p = luxMap.pois[idx];
+                    if (p._marker && luxMap.map) luxMap.map.removeLayer(p._marker);
+                    luxMap.pois.splice(idx, 1);
+                    luxMapRenderLegend();
+                }
+            } catch (e) { alert('Failed to remove'); }
+        };
+
+        function luxMapCleanup() {
+            if (luxMap.watchId && navigator.geolocation) { navigator.geolocation.clearWatch(luxMap.watchId); luxMap.watchId = null; }
+            if (luxMap.map) { try { luxMap.map.remove(); } catch (e) {} luxMap.map = null; }
+            luxMap.userMarker = null;
+            luxMap.accCircle = null;
         }
 
         function viewOffering(offeringId) {
@@ -83225,6 +83582,53 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
 })
 
 // Guest: Room Service Menu Page
+// ── Live resort map POIs ──
+app.get('/api/map-pois/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  try {
+    const pois = await DB.prepare(`
+      SELECT poi_id, name, description, icon_class, category, lat, lng
+      FROM map_pois
+      WHERE property_id = ? AND is_active = 1
+      ORDER BY name
+    `).bind(property_id).all()
+    return c.json({ success: true, pois: pois.results || [] })
+  } catch (error) {
+    console.error('Map POIs error:', error)
+    return c.json({ success: false, error: 'Failed to load map spots' }, 500)
+  }
+})
+
+app.post('/api/map-pois', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    if (!b.property_id || !b.name || typeof b.lat !== 'number' || typeof b.lng !== 'number') {
+      return c.json({ success: false, error: 'Missing required fields' }, 400)
+    }
+    const r = await DB.prepare(`
+      INSERT INTO map_pois (property_id, name, description, icon_class, category, lat, lng)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(b.property_id, b.name, b.description || '', b.icon_class || 'fas fa-location-dot', b.category || '', b.lat, b.lng).run()
+    return c.json({ success: true, poi_id: r.meta.last_row_id })
+  } catch (error) {
+    console.error('Map POI create error:', error)
+    return c.json({ success: false, error: 'Failed to save spot' }, 500)
+  }
+})
+
+app.delete('/api/map-pois/:poi_id', async (c) => {
+  const { DB } = c.env
+  const { poi_id } = c.req.param()
+  try {
+    await DB.prepare(`UPDATE map_pois SET is_active = 0 WHERE poi_id = ?`).bind(poi_id).run()
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: 'Failed to remove spot' }, 500)
+  }
+})
+
 // JSON API for the in-app room-service sheet (mirrors the /room-service page queries)
 app.get('/api/room-service-menu/:property_id', async (c) => {
   const { DB } = c.env
