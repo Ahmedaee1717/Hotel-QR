@@ -25065,6 +25065,83 @@ window.luxTogglePassForm = function() {
             padding: 0.45rem; font-size: 0.7rem; font-weight: 700; cursor: pointer;
           }
           .lux-pop .rowbtns .rm { flex: 1; margin-top: 0; }
+
+          /* ── Info sheets: dial cards, channel guide, prose ── */
+          .lux-info-head { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.1rem; }
+          .lux-info-head .ic {
+            width: 3.1rem; height: 3.1rem; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--lux-gold-2); font-size: 1.1rem; flex-shrink: 0;
+          }
+          .lux-info-head h2 { font-family: var(--lux-serif); font-size: 1.75rem; font-weight: 600; color: var(--lux-text); line-height: 1.12; }
+          .lux-dial-hint { font-size: 0.78rem; color: var(--lux-text-dim); margin-bottom: 0.9rem; letter-spacing: 0.03em; }
+          .lux-dial-hint i { color: var(--lux-gold-2); margin-right: 0.4rem; }
+          .lux-dial {
+            display: flex; align-items: center; justify-content: space-between;
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            background: linear-gradient(160deg, rgba(52, 29, 39, 0.72) 0%, rgba(26, 14, 19, 0.92) 100%);
+            border-radius: 1.1rem;
+            padding: 1rem 1.2rem;
+            margin-bottom: 0.7rem;
+          }
+          .lux-dial .who { font-family: var(--lux-serif); font-size: 1.35rem; font-weight: 600; color: var(--lux-text); }
+          .lux-dial .num {
+            min-width: 3.4rem; height: 3.4rem; padding: 0 0.9rem;
+            border-radius: 999px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--lux-gold-grad); color: #231307;
+            font-size: 1.55rem; font-weight: 800;
+            box-shadow: 0 10px 24px -10px rgba(212, 175, 55, 0.6);
+          }
+          .lux-ch-search { position: relative; margin-bottom: 0.7rem; }
+          .lux-ch-search i { position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); color: var(--lux-gold-2); font-size: 0.85rem; }
+          .lux-ch-search input {
+            width: 100%;
+            background: rgba(250, 246, 236, 0.07);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            border-radius: 999px;
+            padding: 0.85rem 1rem 0.85rem 2.5rem;
+            color: var(--lux-text); font-size: 0.95rem;
+          }
+          .lux-ch-search input:focus { outline: none; border-color: var(--lux-gold); box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18); }
+          .lux-ch-cats { display: flex; gap: 0.45rem; overflow-x: auto; padding-bottom: 0.5rem; scrollbar-width: none; }
+          .lux-ch-cats::-webkit-scrollbar { display: none; }
+          .lux-ch-cat {
+            flex: 0 0 auto;
+            padding: 0.45rem 0.9rem; border-radius: 999px;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--lux-text-dim); font-size: 0.68rem; font-weight: 600;
+            letter-spacing: 0.06em; cursor: pointer; white-space: nowrap;
+          }
+          .lux-ch-cat.on { background: var(--lux-gold-grad); color: #231307; border-color: transparent; }
+          .lux-ch-count { font-size: 0.66rem; color: var(--lux-text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin: 0.3rem 0 0.4rem; }
+          .lux-ch { display: flex; gap: 0.9rem; align-items: center; padding: 0.62rem 0; border-bottom: 1px solid rgba(212, 175, 55, 0.13); }
+          .lux-ch:last-child { border-bottom: none; }
+          .lux-ch .no {
+            min-width: 2.7rem; height: 2.7rem; padding: 0 0.4rem;
+            border-radius: 0.8rem;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(212, 175, 55, 0.12);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: var(--lux-gold-2); font-weight: 800; font-size: 0.95rem;
+            flex-shrink: 0;
+          }
+          .lux-ch .nm { font-size: 0.95rem; font-weight: 600; color: var(--lux-text); line-height: 1.25; }
+          .lux-ch .meta { font-size: 0.68rem; color: rgba(246, 240, 227, 0.55); margin-top: 0.1rem; }
+          .lux-info-prose { color: rgba(246, 240, 227, 0.8); font-size: 0.9rem; line-height: 1.65; }
+          .lux-info-prose h1, .lux-info-prose h2, .lux-info-prose h3 { font-family: var(--lux-serif); color: var(--lux-text); margin: 1.2rem 0 0.5rem; }
+          .lux-info-prose p { margin-bottom: 0.8rem; }
+          .lux-info-prose ul, .lux-info-prose ol { padding-left: 1.2rem; margin-bottom: 0.8rem; }
+          .lux-info-prose li { margin-bottom: 0.35rem; }
+          .lux-info-prose a { color: var(--lux-gold-2); }
+          .lux-info-prose table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+          .lux-info-prose th { background: rgba(212, 175, 55, 0.12) !important; color: var(--lux-gold-2) !important; padding: 0.55rem !important; text-align: left; border: none !important; }
+          .lux-info-prose td { padding: 0.55rem !important; border: none !important; border-bottom: 1px solid rgba(212, 175, 55, 0.13) !important; color: rgba(246, 240, 227, 0.8) !important; background: transparent !important; }
+          .lux-info-prose tr, .lux-info-prose thead tr, .lux-info-prose tbody tr { background: transparent !important; }
+          .lux-info-prose div { background: transparent !important; border: none !important; box-shadow: none !important; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -30269,6 +30346,131 @@ window.luxTogglePassForm = function() {
             luxMap.accCircle = null;
         }
 
+        // ── Info pages as luxury sheets (phone extensions, TV guide, any admin page) ──
+        function luxEsc(s) {
+            return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        }
+
+        function luxInfoParseExtensions(doc) {
+            var lis = doc.querySelectorAll('li');
+            if (!lis.length) return null;
+            var rows = [], matched = 0;
+            lis.forEach(function(li) {
+                var m = (li.textContent || '').trim().match(/^(.*?)\\s*[-–—:]\\s*([0-9]{1,6})\\s*$/);
+                if (m) { matched++; rows.push({ label: m[1].trim(), num: m[2] }); }
+            });
+            return (matched && matched >= lis.length * 0.6) ? rows : null;
+        }
+
+        function luxInfoExtensionsHtml(rows) {
+            var html = '<p class="lux-dial-hint"><i class="fas fa-phone"></i> Pick up your room phone and dial:</p>';
+            rows.forEach(function(r) {
+                html += '<div class="lux-dial"><span class="who">' + luxEsc(r.label) + '</span><span class="num">' + luxEsc(r.num) + '</span></div>';
+            });
+            return html;
+        }
+
+        function luxInfoParseChannels(doc) {
+            var table = doc.querySelector('table');
+            if (!table) return null;
+            var trs = table.querySelectorAll('tbody tr');
+            if (trs.length < 10) return null;
+            var rows = [];
+            trs.forEach(function(tr) {
+                var td = tr.querySelectorAll('td');
+                if (td.length < 2) return;
+                rows.push({
+                    no: (td[0].textContent || '').trim(),
+                    name: (td[1].textContent || '').trim(),
+                    cat: td.length > 2 ? (td[2].textContent || '').trim() : '',
+                    lang: td.length > 3 ? (td[3].textContent || '').trim() : ''
+                });
+            });
+            return rows.length >= 10 ? rows : null;
+        }
+
+        function luxInfoChannelsHtml(rows) {
+            var cats = [];
+            rows.forEach(function(r) { if (r.cat && cats.indexOf(r.cat) < 0) cats.push(r.cat); });
+            var html = '<div class="lux-ch-search"><i class="fas fa-magnifying-glass"></i>' +
+                '<input id="luxChSearch" type="search" placeholder="Search channel name..."></div>';
+            if (cats.length > 1 && cats.length <= 16) {
+                html += '<div class="lux-ch-cats">';
+                cats.forEach(function(ct) {
+                    html += '<button class="lux-ch-cat" data-cat="' + luxEsc(ct) + '">' + luxEsc(ct) + '</button>';
+                });
+                html += '</div>';
+            }
+            html += '<p class="lux-ch-count" id="luxChCount"></p><div class="lux-ch-list">';
+            rows.forEach(function(r) {
+                var s = (r.no + ' ' + r.name + ' ' + r.cat + ' ' + r.lang).toLowerCase();
+                html += '<div class="lux-ch" data-s="' + luxEsc(s) + '" data-cat="' + luxEsc(r.cat) + '">' +
+                    '<span class="no">' + luxEsc(r.no) + '</span>' +
+                    '<div class="mid"><div class="nm">' + luxEsc(r.name) + '</div>' +
+                    '<div class="meta">' + luxEsc(r.cat) + (r.lang ? ' · ' + luxEsc(r.lang) : '') + '</div></div>' +
+                '</div>';
+            });
+            return html + '</div>';
+        }
+
+        function luxInfoWireChannelFilter() {
+            var input = document.getElementById('luxChSearch');
+            var chips = document.querySelectorAll('.lux-ch-cat');
+            var rows = document.querySelectorAll('.lux-ch');
+            var activeCat = '';
+            function apply() {
+                var q = ((input && input.value) || '').toLowerCase().trim();
+                var shown = 0;
+                rows.forEach(function(rw) {
+                    var ok = (!q || rw.dataset.s.indexOf(q) >= 0) && (!activeCat || rw.dataset.cat === activeCat);
+                    rw.style.display = ok ? '' : 'none';
+                    if (ok) shown++;
+                });
+                var cnt = document.getElementById('luxChCount');
+                if (cnt) cnt.textContent = shown + ' channels';
+            }
+            if (input) input.addEventListener('input', apply);
+            chips.forEach(function(ch) {
+                ch.addEventListener('click', function() {
+                    activeCat = (activeCat === ch.dataset.cat) ? '' : ch.dataset.cat;
+                    chips.forEach(function(c2) { c2.classList.toggle('on', c2.dataset.cat === activeCat); });
+                    apply();
+                });
+            });
+            apply();
+        }
+
+        window.luxOpenInfoSheet = function(page) {
+            var lang = window.currentLanguage || 'en';
+            var title = page['title_' + lang] || page.title_en || 'Information';
+            var content = page['content_' + lang] || page.content_en || '';
+            var icon = page.icon_class || 'fas fa-circle-info';
+            var doc = new DOMParser().parseFromString(content, 'text/html');
+
+            var body, isChannels = false;
+            var extRows = luxInfoParseExtensions(doc);
+            var chRows = extRows ? null : luxInfoParseChannels(doc);
+            if (extRows) {
+                body = luxInfoExtensionsHtml(extRows);
+            } else if (chRows) {
+                body = luxInfoChannelsHtml(chRows);
+                isChannels = true;
+            } else {
+                body = '<div class="lux-info-prose">' + content + '</div>';
+            }
+
+            luxSheetOpen(
+                '<div class="lux-sheet-content" style="padding-top: 2.7rem;">' +
+                    '<div class="lux-info-head">' +
+                        '<span class="ic"><i class="' + luxEsc(icon) + '"></i></span>' +
+                        '<h2>' + luxEsc(title) + '</h2>' +
+                    '</div>' +
+                    body +
+                '</div>'
+            );
+            if (isChannels) luxInfoWireChannelFilter();
+        };
+
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
             // Seamless in-app sheet (no page navigation)
@@ -30472,10 +30674,15 @@ window.luxTogglePassForm = function() {
           try {
             const response = await fetch('/api/info-page/' + propertyData.property_id + '/' + pageKey);
             const data = await response.json();
-            
+
             if (data.success) {
-              displayInfoPage(data.page);
               closeInfoMenu();
+              // Seamless MAISON sheet instead of the legacy modal
+              if (typeof window.luxOpenInfoSheet === 'function') {
+                window.luxOpenInfoSheet(data.page);
+              } else {
+                displayInfoPage(data.page);
+              }
             }
           } catch (error) {
             console.error('Open info page error:', error);
