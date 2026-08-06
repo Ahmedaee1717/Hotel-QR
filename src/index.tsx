@@ -11987,6 +11987,8 @@ app.post('/api/chatbot/chat', async (c) => {
         guest_context?.room_number || null
       ).run()
       convId = convResult.meta.last_row_id
+      // Instant staff alert: a brand-new guest conversation started
+      try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
     } else {
       // Update existing conversation with guest info if provided and not already set
       if (guest_context?.guest_name || guest_context?.room_number) {
@@ -12025,7 +12027,10 @@ app.post('/api/chatbot/chat', async (c) => {
         INSERT INTO chatbot_messages (conversation_id, role, content, created_at)
         VALUES (?, 'user', ?, CURRENT_TIMESTAMP)
       `).bind(convId, message).run()
-      
+
+      // Instant staff alert: the guest replied while a human is handling the chat
+      try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
+
       return c.json({
         success: true,
         response: 'A staff member is currently assisting you. They will respond shortly.',
@@ -22022,6 +22027,9 @@ app.post('/api/feedback/submit', async (c) => {
       ).run()
     }
     
+    // Instant staff alert: new guest feedback arrived
+    try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
+
     return c.json({ success: true, submission_id })
   } catch (error) {
     console.error('Submit feedback error:', error)
@@ -47351,6 +47359,292 @@ app.get('/gm/features', (c) => {
 
 // Super Admin Dashboard page
 // Admin Dashboard page
+// STAFF OPS APP — front desk console (installable PWA / wrapped as APK)
+app.get('/staff/app', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Old Palace Ops</title>
+    <link rel="manifest" href="/staff-manifest.json">
+    <meta name="theme-color" content="#120a0e">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--ink:#120a0e;--ink2:#1c1016;--card:#241318;--gold:#D4AF37;--gold2:#f0d98c;--txt:#f6f0e3;--dim:rgba(246,240,227,.6)}
+        body{font-family:Montserrat,system-ui,sans-serif;background:var(--ink);color:var(--txt);min-height:100dvh;padding-bottom:84px;-webkit-font-smoothing:antialiased}
+        header{position:sticky;top:0;z-index:50;background:rgba(18,10,14,.94);backdrop-filter:blur(14px);border-bottom:1px solid rgba(212,175,55,.2);padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+        header h1{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:700}
+        header h1 span{color:var(--gold2)}
+        .bell{border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.1);color:var(--gold2);border-radius:999px;padding:8px 14px;font-size:.72rem;font-weight:700;letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+        .bell.on{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.5);color:#6ee7b7}
+        .wrap{padding:14px}
+        .tabs{display:flex;gap:8px;margin-bottom:14px}
+        .tab{flex:1;padding:11px;border-radius:999px;border:1px solid rgba(212,175,55,.3);background:rgba(250,246,236,.05);color:var(--dim);font-weight:700;font-size:.78rem;cursor:pointer;position:relative}
+        .tab.on{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border-color:transparent}
+        .tab .dot{position:absolute;top:6px;right:10px;width:8px;height:8px;border-radius:50%;background:#f43f5e;display:none}
+        .tab .dot.show{display:block}
+        .card{background:linear-gradient(160deg,rgba(52,29,39,.72),rgba(26,14,19,.92));border:1px solid rgba(212,175,55,.28);border-radius:16px;padding:14px;margin-bottom:10px;cursor:pointer}
+        .card:active{transform:scale(.99)}
+        .card .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+        .card .who{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:700}
+        .card .when{font-size:.66rem;color:var(--dim);white-space:nowrap}
+        .card .msg{font-size:.83rem;color:rgba(246,240,227,.75);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+        .chip{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.22rem .55rem;border-radius:999px;border:1px solid rgba(212,175,55,.4);color:var(--gold2)}
+        .chip.live{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.5);color:#6ee7b7}
+        .chip.urgent{background:rgba(244,63,94,.16);border-color:rgba(244,63,94,.5);color:#fda4af}
+        .chip.ai{background:rgba(212,175,55,.12)}
+        .empty{text-align:center;color:var(--dim);padding:40px 20px;font-size:.85rem}
+        /* chat view */
+        #chat{position:fixed;inset:0;background:var(--ink);z-index:100;display:none;flex-direction:column}
+        #chat.open{display:flex}
+        #chatHead{padding:calc(12px + env(safe-area-inset-top)) 14px 12px;border-bottom:1px solid rgba(212,175,55,.25);display:flex;align-items:center;gap:12px}
+        #chatHead .back{background:none;border:none;color:var(--gold2);font-size:1.2rem;cursor:pointer}
+        #chatHead .t{flex:1;min-width:0}
+        #chatHead .t .n{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:700;line-height:1.1}
+        #chatHead .t .s{font-size:.66rem;color:var(--dim)}
+        #msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+        .b{max-width:82%;padding:10px 13px;border-radius:16px;font-size:.88rem;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+        .b.user{align-self:flex-start;background:rgba(250,246,236,.08);border:1px solid rgba(212,175,55,.2);border-top-left-radius:5px}
+        .b.assistant{align-self:flex-end;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.3);border-top-right-radius:5px}
+        .b.admin{align-self:flex-end;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border-top-right-radius:5px;font-weight:500}
+        .b .rl{font-size:.55rem;letter-spacing:.14em;text-transform:uppercase;opacity:.65;display:block;margin-bottom:3px}
+        #takeoverBar{padding:10px 14px;border-top:1px solid rgba(212,175,55,.2);display:flex;gap:8px;align-items:center}
+        #takeoverBar button{flex:1;border-radius:999px;padding:11px;font-size:.75rem;font-weight:700;cursor:pointer;border:none}
+        .btn-take{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
+        .btn-release{background:rgba(250,246,236,.08);color:var(--txt);border:1px solid rgba(212,175,55,.35)!important}
+        #composer{padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(212,175,55,.2);display:flex;gap:8px}
+        #composer input{flex:1;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.35);border-radius:999px;padding:12px 16px;color:var(--txt);font-size:.95rem}
+        #composer input:focus{outline:none;border-color:var(--gold)}
+        #composer button{width:48px;height:48px;border-radius:50%;border:none;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;font-size:1rem;cursor:pointer}
+        .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:rgba(24,13,18,.97);border:1px solid rgba(212,175,55,.5);color:var(--txt);padding:10px 18px;border-radius:999px;font-size:.8rem;z-index:500;display:none}
+        .toast.show{display:block}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Old Palace <span>Ops</span></h1>
+        <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
+    </header>
+
+    <div class="wrap">
+        <div class="tabs">
+            <button class="tab on" data-tab="chats"><i class="fas fa-comments"></i> Chats <span class="dot" id="dotChats"></span></button>
+            <button class="tab" data-tab="feedback"><i class="fas fa-star"></i> Feedback <span class="dot" id="dotFb"></span></button>
+        </div>
+        <div id="listChats"><div class="empty">Loading…</div></div>
+        <div id="listFb" style="display:none"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div id="chat">
+        <div id="chatHead">
+            <button class="back" onclick="closeChat()"><i class="fas fa-arrow-left"></i></button>
+            <div class="t"><div class="n" id="chatName">Guest</div><div class="s" id="chatSub"></div></div>
+        </div>
+        <div id="msgs"></div>
+        <div id="takeoverBar"></div>
+        <div id="composer">
+            <input id="msgInput" type="text" placeholder="Type a reply to the guest…">
+            <button onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+    var PROPERTY_ID = '1';
+    var VAPID_PUBLIC = '${VAPID_PUBLIC_KEY}';
+    var cur = null, chats = [], feedback = [], lastSeenChat = localStorage.getItem('seenChat') || '', lastSeenFb = localStorage.getItem('seenFb') || '';
+
+    function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2600)}
+    function ago(s){
+        if(!s) return '';
+        var t = Date.parse(s.replace(' ','T')+'Z'); if(isNaN(t)) return '';
+        var d = (Date.now()-t)/1000;
+        if(d<60) return 'just now';
+        if(d<3600) return Math.floor(d/60)+'m ago';
+        if(d<86400) return Math.floor(d/3600)+'h ago';
+        return Math.floor(d/86400)+'d ago';
+    }
+    function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+    // ── Push notifications ──
+    function urlB64ToUint8(b64){
+        var pad='='.repeat((4-b64.length%4)%4);
+        var raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+        var out=new Uint8Array(raw.length);
+        for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+        return out;
+    }
+    async function enablePush(){
+        try{
+            if(!('serviceWorker' in navigator)||!('PushManager' in window)){ toast('This device cannot receive push'); return; }
+            var reg = await navigator.serviceWorker.register('/staff-sw.js', { scope: '/staff/' });
+            await navigator.serviceWorker.ready;
+            var perm = await Notification.requestPermission();
+            if(perm!=='granted'){ toast('Notifications blocked in settings'); return; }
+            var sub = await reg.pushManager.getSubscription();
+            if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: urlB64ToUint8(VAPID_PUBLIC) });
+            var j = sub.toJSON();
+            await fetch('/api/staff/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,endpoint:j.endpoint,keys:j.keys,label:navigator.userAgent.slice(0,60)})});
+            markBell(true);
+            toast('Alerts enabled on this phone');
+        }catch(e){ console.error(e); toast('Could not enable alerts'); }
+    }
+    function markBell(on){
+        var b=document.getElementById('bellBtn');
+        b.classList.toggle('on',on);
+        document.getElementById('bellTxt').textContent = on ? 'Alerts on' : 'Enable alerts';
+    }
+
+    // ── Lists ──
+    async function loadAll(){
+        try{
+            var r1 = await fetch('/api/staff/inbox/'+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
+            chats = (r1&&r1.conversations)||[];
+            renderChats();
+        }catch(e){}
+        try{
+            var r2 = await fetch('/api/staff/feedback/'+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
+            feedback = (r2&&r2.feedback)||[];
+            renderFb();
+        }catch(e){}
+    }
+    function renderChats(){
+        var el=document.getElementById('listChats');
+        if(!chats.length){ el.innerHTML='<div class="empty">No guest conversations yet.</div>'; return; }
+        var html='';
+        chats.forEach(function(c,i){
+            var who = c.guest_name || 'Guest';
+            var room = c.room_number ? ' · Room '+c.room_number : '';
+            html += '<div class="card" onclick="openChat('+i+')">'+
+                '<div class="top"><div class="who">'+esc(who)+'</div><div class="when">'+ago(c.last_at)+'</div></div>'+
+                '<div class="msg">'+esc(c.last_message||'—')+'</div>'+
+                '<div class="chips">'+
+                    (c.is_ai_paused?'<span class="chip live">You are handling</span>':'<span class="chip ai">AI handling</span>')+
+                    (room?'<span class="chip">'+esc(room.replace(' · ',''))+'</span>':'')+
+                    '<span class="chip">'+(c.message_count||0)+' msgs</span>'+
+                '</div></div>';
+        });
+        el.innerHTML=html;
+        var newest = chats[0] && chats[0].last_at;
+        document.getElementById('dotChats').classList.toggle('show', !!(newest && newest !== lastSeenChat));
+    }
+    function renderFb(){
+        var el=document.getElementById('listFb');
+        if(!feedback.length){ el.innerHTML='<div class="empty">No feedback submitted yet.</div>'; return; }
+        var html='';
+        feedback.forEach(function(f){
+            var who=f.guest_name||'Guest';
+            html += '<div class="card">'+
+                '<div class="top"><div class="who">'+esc(who)+'</div><div class="when">'+ago(f.submitted_at)+'</div></div>'+
+                '<div class="chips">'+
+                    (f.is_urgent?'<span class="chip urgent">Urgent</span>':'')+
+                    (f.sentiment_label?'<span class="chip">'+esc(f.sentiment_label)+'</span>':'')+
+                    (f.room_number?'<span class="chip">Room '+esc(f.room_number)+'</span>':'')+
+                    (f.submission_source?'<span class="chip">'+esc(f.submission_source)+'</span>':'')+
+                '</div></div>';
+        });
+        el.innerHTML=html;
+        var newest = feedback[0] && feedback[0].submitted_at;
+        document.getElementById('dotFb').classList.toggle('show', !!(newest && newest !== lastSeenFb));
+    }
+
+    document.querySelectorAll('.tab').forEach(function(t){
+        t.onclick=function(){
+            document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
+            t.classList.add('on');
+            var isChats = t.dataset.tab==='chats';
+            document.getElementById('listChats').style.display = isChats?'':'none';
+            document.getElementById('listFb').style.display = isChats?'none':'';
+            if(isChats && chats[0]){ lastSeenChat=chats[0].last_at||''; localStorage.setItem('seenChat',lastSeenChat); document.getElementById('dotChats').classList.remove('show'); }
+            if(!isChats && feedback[0]){ lastSeenFb=feedback[0].submitted_at||''; localStorage.setItem('seenFb',lastSeenFb); document.getElementById('dotFb').classList.remove('show'); }
+        };
+    });
+
+    // ── Chat view ──
+    window.openChat=async function(i){
+        cur = chats[i];
+        document.getElementById('chatName').textContent = cur.guest_name || 'Guest';
+        document.getElementById('chatSub').textContent = (cur.room_number?'Room '+cur.room_number+' · ':'')+(cur.is_ai_paused?'You are handling this chat':'AI is handling this chat');
+        document.getElementById('chat').classList.add('open');
+        renderTakeover();
+        await loadMsgs();
+    };
+    window.closeChat=function(){ document.getElementById('chat').classList.remove('open'); cur=null; loadAll(); };
+    function renderTakeover(){
+        var bar=document.getElementById('takeoverBar');
+        bar.innerHTML = cur.is_ai_paused
+            ? '<button class="btn-release" onclick="endTakeover()"><i class="fas fa-robot"></i> Hand back to AI</button>'
+            : '<button class="btn-take" onclick="takeOver()"><i class="fas fa-headset"></i> Take over this chat</button>';
+    }
+    async function loadMsgs(){
+        if(!cur) return;
+        try{
+            var d = await fetch('/api/admin/chatbot/messages/'+cur.session_id+'?property_id='+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
+            var msgs = d.messages||[];
+            var box=document.getElementById('msgs');
+            box.innerHTML = msgs.map(function(m){
+                var role = m.role==='admin'?'admin':(m.role==='user'?'user':'assistant');
+                var label = role==='admin'?'You':(role==='user'?'Guest':'AI');
+                return '<div class="b '+role+'"><span class="rl">'+label+'</span>'+esc(m.content)+'</div>';
+            }).join('');
+            box.scrollTop = box.scrollHeight;
+        }catch(e){}
+    }
+    window.takeOver=async function(){
+        if(!cur) return;
+        await sendMsg('Hello, this is the front desk. How may I help you?');
+        cur.is_ai_paused=1;
+        document.getElementById('chatSub').textContent=(cur.room_number?'Room '+cur.room_number+' · ':'')+'You are handling this chat';
+        renderTakeover();
+    };
+    window.endTakeover=async function(){
+        if(!cur) return;
+        try{
+            await fetch('/api/admin/chatbot/end-takeover',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id})});
+            cur.is_ai_paused=0;
+            document.getElementById('chatSub').textContent=(cur.room_number?'Room '+cur.room_number+' · ':'')+'AI is handling this chat';
+            renderTakeover();
+            toast('AI resumed');
+        }catch(e){ toast('Failed'); }
+    };
+    window.sendMsg=async function(preset){
+        var input=document.getElementById('msgInput');
+        var text = typeof preset==='string' ? preset : input.value.trim();
+        if(!text||!cur) return;
+        if(typeof preset!=='string') input.value='';
+        try{
+            await fetch('/api/admin/chatbot/send-message',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id,message:text,admin_id:'frontdesk'})});
+            cur.is_ai_paused=1;
+            renderTakeover();
+            await loadMsgs();
+        }catch(e){ toast('Failed to send'); }
+    };
+    document.getElementById('msgInput').addEventListener('keydown',function(e){ if(e.key==='Enter') sendMsg(); });
+
+    document.getElementById('bellBtn').onclick=enablePush;
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('/staff-sw.js',{scope:'/staff/'}).then(function(reg){
+            return reg.pushManager.getSubscription();
+        }).then(function(s){ markBell(!!s); }).catch(function(){});
+        navigator.serviceWorker.addEventListener('message',function(ev){ if(ev.data&&ev.data.type==='refresh'){ loadAll(); if(cur) loadMsgs(); } });
+    }
+
+    loadAll();
+    setInterval(function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } }, 15000);
+    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } });
+    </script>
+</body>
+</html>
+  `)
+})
+
 // ADMIN: Resort Map editor — manage the live map's annotated spots
 app.get('/admin/map-editor', (c) => {
   return c.html(`
@@ -84200,6 +84494,124 @@ app.post('/api/admin/alacarte/menu-items/bulk-delete', async (c) => {
 })
 
 // Guest: Room Service Menu Page
+// ── Staff push notifications: self-hosted Web Push (VAPID, zero cost) ──
+const VAPID_PUBLIC_KEY = 'BL6jUXboCLUufRZKW_6aOw7pt1H9B9G8horUuJRv87KooHXFOvdnY8bJNjUNlHWm_o2jaco2udlPZJrmDdXYrHs'
+
+function b64urlBytes(buf: ArrayBuffer): string {
+  let s = ''
+  const u = new Uint8Array(buf)
+  for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i])
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+function b64urlStr(s: string): string {
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+async function vapidAuthHeader(env: any, endpoint: string): Promise<string | null> {
+  try {
+    const jwk = JSON.parse(env.VAPID_PRIVATE_JWK || '')
+    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+    const aud = new URL(endpoint).origin
+    const header = b64urlStr(JSON.stringify({ typ: 'JWT', alg: 'ES256' }))
+    const payload = b64urlStr(JSON.stringify({ aud: aud, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:info@oldpalaceresort.online' }))
+    const data = new TextEncoder().encode(header + '.' + payload)
+    const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, data)
+    return 'vapid t=' + header + '.' + payload + '.' + b64urlBytes(sig) + ', k=' + VAPID_PUBLIC_KEY
+  } catch (e) {
+    console.error('vapid jwt error', e)
+    return null
+  }
+}
+
+// Payload-less pushes: the service worker wakes and shows the notification,
+// so no RFC8291 payload encryption is needed. Dead subscriptions are pruned.
+async function notifyStaff(env: any, DB: any) {
+  try {
+    const subs = await DB.prepare('SELECT sub_id, endpoint FROM staff_push_subs').all()
+    const list = subs.results || []
+    await Promise.all(list.map(async (s: any) => {
+      try {
+        const auth = await vapidAuthHeader(env, s.endpoint)
+        if (!auth) return
+        const r = await fetch(s.endpoint, {
+          method: 'POST',
+          headers: { 'TTL': '120', 'Urgency': 'high', 'Authorization': auth }
+        })
+        if (r.status === 404 || r.status === 410) {
+          await DB.prepare('DELETE FROM staff_push_subs WHERE sub_id = ?').bind(s.sub_id).run()
+        }
+      } catch (e) {}
+    }))
+  } catch (e) {
+    console.error('notifyStaff error', e)
+  }
+}
+
+app.post('/api/staff/push/subscribe', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    if (!b.endpoint) return c.json({ success: false, error: 'endpoint required' }, 400)
+    await DB.prepare(`
+      INSERT INTO staff_push_subs (property_id, endpoint, p256dh, auth, label)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, label = excluded.label
+    `).bind(b.property_id || 1, b.endpoint, (b.keys && b.keys.p256dh) || '', (b.keys && b.keys.auth) || '', b.label || '').run()
+    return c.json({ success: true })
+  } catch (e) {
+    console.error('push subscribe error', e)
+    return c.json({ success: false, error: 'failed' }, 500)
+  }
+})
+
+app.post('/api/staff/push/test', async (c) => {
+  const { DB } = c.env
+  await notifyStaff(c.env, DB)
+  const n = await DB.prepare('SELECT COUNT(*) as n FROM staff_push_subs').first()
+  return c.json({ success: true, subscribers: (n && n.n) || 0 })
+})
+
+app.get('/api/staff/inbox/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  try {
+    const convos = await DB.prepare(`
+      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at,
+        (SELECT content FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_message,
+        (SELECT role FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_role,
+        (SELECT created_at FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_at,
+        (SELECT COUNT(*) FROM chatbot_messages WHERE conversation_id = c.conversation_id) as message_count
+      FROM chatbot_conversations c
+      WHERE c.property_id = ?
+      ORDER BY last_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+    return c.json({ success: true, conversations: convos.results || [] })
+  } catch (error) {
+    console.error('Staff inbox error:', error)
+    return c.json({ success: false, error: 'Failed to load inbox' }, 500)
+  }
+})
+
+app.get('/api/staff/feedback/:property_id', async (c) => {
+  const { DB } = c.env
+  const { property_id } = c.req.param()
+  try {
+    const subs = await DB.prepare(`
+      SELECT submission_id, guest_name, room_number, sentiment_score, sentiment_label,
+             is_urgent, is_read, submitted_at, submission_source
+      FROM feedback_submissions
+      WHERE property_id = ?
+      ORDER BY submitted_at DESC
+      LIMIT 50
+    `).bind(property_id).all()
+    return c.json({ success: true, feedback: subs.results || [] })
+  } catch (error) {
+    console.error('Staff feedback error:', error)
+    return c.json({ success: false, error: 'Failed to load feedback' }, 500)
+  }
+})
+
 // ── Live resort map POIs ──
 app.get('/api/map-pois/:property_id', async (c) => {
   const { DB } = c.env
