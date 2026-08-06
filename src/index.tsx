@@ -24693,6 +24693,145 @@ window.luxTogglePassForm = function() {
           }
           body.lux-noscroll { overflow: hidden; }
 
+          /* ── Beach booking sheet ── */
+          .lux-beach-title { font-family: var(--lux-serif); font-size: 1.9rem; font-weight: 600; color: var(--lux-text); }
+          .lux-beach-sub { font-size: 0.66rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--lux-gold-2); margin: 0.2rem 0 1rem; }
+          .lux-day-strip { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.4rem; scrollbar-width: none; margin-bottom: 0.6rem; }
+          .lux-day-strip::-webkit-scrollbar { display: none; }
+          .lux-day-chip {
+            flex: 0 0 auto; min-width: 3.6rem;
+            display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+            padding: 0.55rem 0.7rem; border-radius: 1rem;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--lux-text-dim); cursor: pointer;
+          }
+          .lux-day-chip .dw { font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; }
+          .lux-day-chip .dn { font-family: var(--lux-serif); font-size: 1.25rem; font-weight: 700; color: var(--lux-text); }
+          .lux-day-chip.on { background: var(--lux-gold-grad); border-color: transparent; color: #3a2a10; }
+          .lux-day-chip.on .dn { color: #231307; }
+          .lux-slot-row { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+          .lux-slot-chip {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.12rem;
+            padding: 0.6rem 0.4rem; border-radius: 0.9rem;
+            background: rgba(250, 246, 236, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: var(--lux-text-dim); cursor: pointer;
+          }
+          .lux-slot-chip .sn { font-weight: 700; font-size: 0.78rem; color: var(--lux-text); }
+          .lux-slot-chip .st { font-size: 0.6rem; letter-spacing: 0.05em; }
+          .lux-slot-chip.on { background: var(--lux-gold-grad); border-color: transparent; }
+          .lux-slot-chip.on .sn, .lux-slot-chip.on .st { color: #231307; }
+          .lux-beach-stats { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.6rem; font-size: 0.72rem; color: var(--lux-text-dim); }
+          .lux-stat { display: inline-flex; align-items: center; gap: 0.4rem; }
+          .lux-stat strong { color: var(--lux-text); font-size: 0.9rem; }
+          .lux-stat .dot { width: 8px; height: 8px; border-radius: 50%; }
+          .lux-stat .dot.free { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.7); }
+          .lux-stat .dot.taken { background: #f43f5e; }
+          .lux-stat .dot.all { background: var(--lux-gold); }
+          .lux-beach-map-wrap {
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 1.1rem;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            max-height: 430px;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.35);
+            overscroll-behavior: contain;
+          }
+          .lux-beach-map-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+          .lux-beach-map-wrap::-webkit-scrollbar-corner { background: transparent; }
+          .lux-beach-map-wrap::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.45); border-radius: 999px; border: none; }
+          .lux-beach-map-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.25); }
+          .lux-beach-canvas { position: relative; }
+          .lux-beach-svg { position: absolute; inset: 0; z-index: 0; }
+          .lux-zone { position: absolute; z-index: 1; border: 2px solid; border-radius: 12px; pointer-events: none; }
+          .lux-zone span { position: absolute; top: 6px; left: 6px; color: #fff; font-size: 0.62rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 0.4rem; letter-spacing: 0.06em; }
+          .lux-spot {
+            position: absolute; z-index: 2;
+            transform: translate(-50%, -50%);
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer;
+            transition: transform 0.25s var(--lux-ease), filter 0.25s;
+          }
+          .lux-spot .disc {
+            width: 26px; height: 26px; border-radius: 50%;
+            background: repeating-conic-gradient(#cdaa6d 0deg 11deg, #b28d4f 11deg 22deg);
+            border: 2px solid #8a6a38;
+            box-shadow: 0 5px 9px rgba(0, 0, 0, 0.4);
+            position: relative;
+          }
+          .lux-spot .disc::after {
+            content: '';
+            position: absolute; top: 50%; left: 50%;
+            width: 5px; height: 5px; border-radius: 50%;
+            transform: translate(-50%, -50%);
+            background: #6b4f26;
+          }
+          .lux-spot.t-cabana .disc { border-radius: 7px; background: repeating-linear-gradient(45deg, #efe6d2 0 5px, #d9c9a5 5px 10px); border-color: #9b8455; }
+          .lux-spot.t-lounger .disc { border-radius: 7px; width: 28px; height: 18px; background: linear-gradient(180deg, #f0ead9, #cfd8e3); border-color: #7b8aa0; }
+          .lux-spot.t-daybed .disc { border-radius: 9px; background: repeating-linear-gradient(90deg, #e6d7f5 0 5px, #cdb4e8 5px 10px); border-color: #8b6bb0; }
+          .lux-spot .num {
+            margin-top: -7px;
+            background: rgba(250, 246, 236, 0.95);
+            color: #241318;
+            font-size: 0.58rem; font-weight: 800;
+            padding: 0.1rem 0.4rem;
+            border-radius: 999px;
+            border: 1px solid rgba(138, 106, 56, 0.6);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+            white-space: nowrap;
+          }
+          .lux-spot:hover { transform: translate(-50%, -50%) scale(1.18); z-index: 4; }
+          .lux-spot.selected { transform: translate(-50%, -50%) scale(1.28); z-index: 5; }
+          .lux-spot.selected .disc { outline: 3px solid var(--lux-gold); outline-offset: 2px; }
+          .lux-spot.selected .num { background: var(--lux-gold-grad); border-color: transparent; }
+          .lux-spot.booked { filter: grayscale(1) brightness(0.55); cursor: not-allowed; }
+          .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
+          .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
+          .lux-beach-selcard {
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            background: rgba(212, 175, 55, 0.07);
+            border-radius: 1rem;
+            padding: 0.95rem 1.05rem;
+            margin-bottom: 0.4rem;
+          }
+          .lux-beach-selcard .hd { display: flex; align-items: center; gap: 0.7rem; }
+          .lux-beach-selcard .badge {
+            min-width: 2.5rem; height: 2.5rem; padding: 0 0.5rem;
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: var(--lux-gold-grad); color: #231307;
+            font-weight: 800; font-size: 0.95rem;
+          }
+          .lux-beach-selcard .tt { font-family: var(--lux-serif); font-size: 1.2rem; font-weight: 600; color: var(--lux-text); }
+          .lux-beach-selcard .zz { font-size: 0.66rem; color: var(--lux-text-dim); letter-spacing: 0.06em; }
+          .lux-beach-selcard .zz i { color: var(--lux-gold-2); margin-right: 0.3rem; }
+          .lux-beach-selcard .mm { display: flex; gap: 1rem; margin-top: 0.6rem; font-size: 0.7rem; color: var(--lux-text-dim); flex-wrap: wrap; }
+          .lux-beach-selcard .mm i { color: var(--lux-gold-2); margin-right: 0.3rem; }
+          .lux-beach-selcard .dd { font-size: 0.72rem; color: rgba(246, 240, 227, 0.6); margin-top: 0.5rem; font-style: italic; }
+          .lux-beach-override {
+            border: 1px solid rgba(212, 175, 55, 0.45);
+            background: rgba(212, 175, 55, 0.09);
+            color: var(--lux-text);
+            border-radius: 1rem;
+            padding: 1.1rem 1.2rem;
+            font-size: 0.85rem;
+            line-height: 1.55;
+            margin-top: 0.6rem;
+            text-align: center;
+          }
+          .lux-beach-override i { color: var(--lux-gold-2); margin-right: 0.45rem; }
+          .lux-qr-card {
+            background: var(--lux-ivory);
+            border-radius: 1.1rem;
+            padding: 1.1rem;
+            display: inline-block;
+            margin: 1.1rem auto 0.6rem;
+            box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+          }
+          .lux-qr-card img { display: block; width: 200px; height: 200px; margin: 0 auto; }
+          .lux-qr-card .ref { font-family: var(--lux-serif); font-weight: 700; color: #241318; margin-top: 0.6rem; text-align: center; letter-spacing: 0.06em; }
+
           /* Subtle faded image inside launcher tiles */
           .lux-tile { overflow: hidden; }
           .lux-tile-bg { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0.15; transition: opacity 0.35s; border-radius: inherit; }
@@ -28639,7 +28778,12 @@ window.luxTogglePassForm = function() {
         }
         
         function goToBeachBooking() {
-            window.location.href = '/beach-booking/' + propertyData.property_id;
+            // Seamless in-app beach booking sheet (legacy page remains as fallback)
+            if (typeof window.luxOpenBeach === 'function') {
+                window.luxOpenBeach();
+            } else {
+                window.location.href = '/beach-booking/' + propertyData.property_id;
+            }
         }
 
         function updateSectionVisibility() {
@@ -28762,7 +28906,7 @@ window.luxTogglePassForm = function() {
             const beachEl = document.getElementById('beach-booking-section');
             if (beachEl && (beachEl.dataset.luxEnabled === '1' || !beachEl.classList.contains('hidden'))) {
                 beachEl.dataset.luxEnabled = '1';
-                html += luxTile('fas fa-umbrella-beach', 'Beach', 'Reserve your spot', "luxOpenCategory('beach')");
+                html += luxTile('fas fa-umbrella-beach', 'Beach', 'Reserve your spot', 'luxOpenBeach()');
             }
             (infoPages || []).forEach(p => {
                 const t = (p['title_' + lang] || p.title_en || '').replace(/</g, '&lt;');
@@ -29020,6 +29164,357 @@ window.luxTogglePassForm = function() {
                     luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><h3>In-Room Dining</h3><p class="lux-sheet-desc">The menu is unavailable right now. Please dial Room Service from your room phone.</p></div>');
                 });
         };
+
+        // ── Beach booking: seamless in-app aerial experience ──
+        const luxBeach = { settings: {}, spots: [], zones: [], bookings: [], date: null, slot: null, spot: null };
+        const LUX_BEACH_SCALE = 1.35;
+
+        function luxBeachDateStr(d) {
+            var m = d.getMonth() + 1, dd = d.getDate();
+            return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+        }
+
+        window.luxOpenBeach = async function() {
+            trackPageView('beach-booking', null);
+            luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><p class="lux-sheet-desc">Preparing the beach...</p></div>');
+            try {
+                const pid = propertyData.property_id;
+                const results = await Promise.all([
+                    fetch('/api/admin/beach/settings/' + pid).then(r => r.json()).catch(() => null),
+                    fetch('/api/admin/beach/spots/' + pid).then(r => r.json()).catch(() => null),
+                    fetch('/api/admin/beach/zone-overlays/' + pid).then(r => r.json()).catch(() => null)
+                ]);
+                luxBeach.settings = (results[0] && results[0].settings) || {};
+                luxBeach.spots = (results[1] && results[1].spots) || [];
+                luxBeach.zones = (results[2] && results[2].overlays) || [];
+                luxBeach.date = luxBeachDateStr(new Date());
+                luxBeach.slot = null;
+                luxBeach.spot = null;
+                await luxBeachLoadBookings();
+                luxBeachRenderSheet();
+            } catch (e) {
+                console.error('beach sheet', e);
+                luxSheetOpen('<div class="lux-sheet-content" style="padding-top: 3.4rem;"><h3>Beach Booking</h3><p class="lux-sheet-desc">The beach map is unavailable right now. Please contact the front desk.</p></div>');
+            }
+        };
+
+        async function luxBeachLoadBookings() {
+            try {
+                const r = await fetch('/api/beach/availability/' + propertyData.property_id + '/' + luxBeach.date);
+                const d = await r.json();
+                luxBeach.bookings = (d && d.bookings) || [];
+            } catch (e) { luxBeach.bookings = []; }
+        }
+
+        function luxBeachSpotFree(spotId) {
+            var slot = luxBeach.slot;
+            if (!slot) return true;
+            return !luxBeach.bookings.some(function(b) {
+                if (b.spot_id !== spotId || b.booking_status === 'cancelled') return false;
+                return b.slot_type === slot || b.slot_type === 'full_day' || slot === 'full_day';
+            });
+        }
+
+        function luxBeachSlots() {
+            try {
+                var arr = luxBeach.settings.time_slots ? JSON.parse(luxBeach.settings.time_slots) : null;
+                if (arr && arr.length) return arr;
+            } catch (e) {}
+            return [
+                { id: 'half_day_am', name: 'Morning', start: '08:00', end: '13:00' },
+                { id: 'half_day_pm', name: 'Afternoon', start: '13:00', end: '18:00' },
+                { id: 'full_day', name: 'Full Day', start: '08:00', end: '18:00' }
+            ];
+        }
+
+        function luxBeachRenderSheet() {
+            var html = '' +
+            '<div class="lux-sheet-content" style="padding-top: 2.7rem;">' +
+                '<h2 class="lux-beach-title">Beach Booking</h2>' +
+                '<p class="lux-beach-sub">Sahl Hasheesh · Red Sea</p>' +
+                '<div class="lux-day-strip" id="luxDayStrip"></div>' +
+                '<div class="lux-slot-row" id="luxSlotRow"></div>' +
+                '<div class="lux-beach-stats" id="luxBeachStats"></div>' +
+                '<div class="lux-beach-map-wrap" id="luxBeachMapWrap">' +
+                    '<div class="lux-beach-canvas" id="luxBeachCanvas"></div>' +
+                '</div>' +
+                '<p class="lux-beach-hint"><i class="fas fa-hand-pointer"></i> Drag to explore — tap an umbrella to choose your spot</p>' +
+                '<div id="luxBeachSel"></div>' +
+                '<div id="luxBeachForm"></div>' +
+            '</div>';
+            luxSheetOpen(html);
+            luxBeachRenderDays();
+            luxBeachRenderSlots();
+            luxBeachRenderMap();
+            luxBeachRenderSelection();
+            luxBeachRenderForm();
+        }
+
+        function luxBeachRenderDays() {
+            var host = document.getElementById('luxDayStrip');
+            if (!host) return;
+            var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            var html = '';
+            for (var i = 0; i < 7; i++) {
+                var d = new Date();
+                d.setDate(d.getDate() + i);
+                var ds = luxBeachDateStr(d);
+                html += '<button class="lux-day-chip' + (ds === luxBeach.date ? ' on' : '') + '" data-date="' + ds + '">' +
+                    '<span class="dw">' + (i === 0 ? 'Today' : names[d.getDay()]) + '</span>' +
+                    '<span class="dn">' + d.getDate() + '</span>' +
+                '</button>';
+            }
+            host.innerHTML = html;
+            host.querySelectorAll('.lux-day-chip').forEach(function(btn) {
+                btn.addEventListener('click', async function() {
+                    luxBeach.date = btn.dataset.date;
+                    await luxBeachLoadBookings();
+                    luxBeachRenderDays();
+                    luxBeachRenderMap();
+                    luxBeachRenderStats();
+                });
+            });
+            luxBeachRenderStats();
+        }
+
+        function luxBeachRenderSlots() {
+            var host = document.getElementById('luxSlotRow');
+            if (!host) return;
+            var html = '';
+            luxBeachSlots().forEach(function(s) {
+                html += '<button class="lux-slot-chip' + (luxBeach.slot === s.id ? ' on' : '') + '" data-slot="' + s.id + '">' +
+                    '<span class="sn">' + s.name + '</span><span class="st">' + s.start + ' – ' + s.end + '</span></button>';
+            });
+            host.innerHTML = html;
+            host.querySelectorAll('.lux-slot-chip').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    luxBeach.slot = btn.dataset.slot;
+                    luxBeachRenderSlots();
+                    luxBeachRenderMap();
+                    luxBeachRenderStats();
+                    luxBeachRenderForm();
+                });
+            });
+        }
+
+        function luxBeachRenderStats() {
+            var host = document.getElementById('luxBeachStats');
+            if (!host) return;
+            var total = luxBeach.spots.length;
+            var free = luxBeach.spots.filter(function(s) { return luxBeachSpotFree(s.spot_id); }).length;
+            host.innerHTML = '' +
+                '<span class="lux-stat"><span class="dot free"></span><strong>' + free + '</strong> Available</span>' +
+                (luxBeach.slot ? '<span class="lux-stat"><span class="dot taken"></span><strong>' + (total - free) + '</strong> Booked</span>' : '') +
+                '<span class="lux-stat"><span class="dot all"></span><strong>' + total + '</strong> Spots</span>';
+        }
+
+        function luxBeachScene(w, h, seaTop) {
+            // Hand-drawn aerial scene: promenade, warm sand, shoreline, turquoise Red Sea
+            var foam1 = '', foam2 = '', speckle = '';
+            for (var x = 0; x <= w; x += 40) {
+                var dy = Math.sin(x / 53) * 7;
+                foam1 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaTop + 14 + dy);
+                foam2 += (x === 0 ? 'M' : 'L') + x + ' ' + (seaTop + 40 + Math.sin(x / 71 + 2) * 9);
+            }
+            for (var i = 0; i < 110; i++) {
+                var sx = Math.random() * w, sy = 70 + Math.random() * (seaTop - 90);
+                speckle += '<circle cx="' + sx.toFixed(0) + '" cy="' + sy.toFixed(0) + '" r="' + (0.8 + Math.random() * 1.4).toFixed(1) + '" fill="rgba(140,110,70,0.18)"/>';
+            }
+            var palms = '';
+            for (var p = 30; p < w; p += 95) {
+                palms += '<circle cx="' + p + '" cy="30" r="13" fill="rgba(66,110,58,0.55)"/>' +
+                         '<circle cx="' + (p + 9) + '" cy="24" r="9" fill="rgba(84,130,70,0.5)"/>';
+            }
+            return '<svg class="lux-beach-svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
+                '<defs>' +
+                '<linearGradient id="lbSand" x1="0" y1="0" x2="0" y2="1">' +
+                    '<stop offset="0" stop-color="#e8cf9f"/><stop offset="0.7" stop-color="#e2c48d"/><stop offset="1" stop-color="#d9b87c"/>' +
+                '</linearGradient>' +
+                '<linearGradient id="lbSea" x1="0" y1="0" x2="0" y2="1">' +
+                    '<stop offset="0" stop-color="#8fe3da"/><stop offset="0.35" stop-color="#3fc3cf"/><stop offset="1" stop-color="#0f8fae"/>' +
+                '</linearGradient>' +
+                '</defs>' +
+                '<rect width="' + w + '" height="60" fill="#cfc3ae"/>' +
+                '<rect y="56" width="' + w + '" height="6" fill="rgba(120,105,80,0.35)"/>' +
+                palms +
+                '<rect y="60" width="' + w + '" height="' + (seaTop - 60) + '" fill="url(#lbSand)"/>' +
+                speckle +
+                '<rect y="' + (seaTop - 16) + '" width="' + w + '" height="18" fill="#e9dcb8" opacity="0.8"/>' +
+                '<rect y="' + seaTop + '" width="' + w + '" height="' + (h - seaTop) + '" fill="url(#lbSea)"/>' +
+                '<path d="' + foam1 + '" stroke="rgba(255,255,255,0.85)" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+                '<path d="' + foam2 + '" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none"/>' +
+            '</svg>';
+        }
+
+        function luxBeachRenderMap() {
+            var canvas = document.getElementById('luxBeachCanvas');
+            if (!canvas) return;
+            var S = LUX_BEACH_SCALE;
+            var hasImage = !!luxBeach.settings.beach_map_image_url;
+            var maxX = 0, maxY = 0, minY = Infinity;
+            luxBeach.spots.forEach(function(s) {
+                maxX = Math.max(maxX, s.position_x);
+                maxY = Math.max(maxY, s.position_y);
+                minY = Math.min(minY, s.position_y);
+            });
+            if (!isFinite(minY)) minY = 0;
+            // Trim dead space above the first umbrella row (only when we draw our own scene;
+            // an uploaded map image must keep the admin's original coordinates)
+            var shiftY = hasImage ? 0 : Math.max(0, minY - 100);
+            var w = Math.round((maxX + 60) * S);
+            var seaTop = Math.round((maxY - shiftY + 55) * S);
+            var h = seaTop + 120;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+
+            var html = '';
+            if (hasImage) {
+                canvas.style.backgroundImage = 'url(' + luxBeach.settings.beach_map_image_url + ')';
+                canvas.style.backgroundSize = '100% auto';
+                canvas.style.backgroundRepeat = 'no-repeat';
+            } else {
+                html += luxBeachScene(w, h, seaTop);
+            }
+
+            // Zone overlays (admin-drawn)
+            luxBeach.zones.forEach(function(z) {
+                try {
+                    var c = JSON.parse(z.coordinates);
+                    html += '<div class="lux-zone" style="left:' + (c.x * S) + 'px; top:' + ((c.y - shiftY) * S) + 'px; width:' + (c.width * S) + 'px; height:' + (c.height * S) + 'px; border-color:' + z.color + '; background:' + z.color + '22;">' +
+                        '<span style="background:' + z.color + ';">' + z.zone_name + '</span></div>';
+                } catch (e) {}
+            });
+
+            luxBeach.spots.forEach(function(s, idx) {
+                var free = luxBeachSpotFree(s.spot_id);
+                var sel = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
+                var cls = 'lux-spot t-' + (s.spot_type || 'umbrella') + (free ? '' : ' booked') + (sel ? ' selected' : '');
+                html += '<div class="' + cls + '" data-idx="' + idx + '" style="left:' + Math.round(s.position_x * S) + 'px; top:' + Math.round((s.position_y - shiftY) * S) + 'px;">' +
+                    '<span class="disc"></span>' +
+                    '<span class="num">' + s.spot_number + (s.is_premium ? '★' : '') + '</span>' +
+                '</div>';
+            });
+            canvas.innerHTML = html;
+
+            canvas.onclick = function(e) {
+                var el = e.target.closest('.lux-spot');
+                if (!el || el.classList.contains('booked')) return;
+                luxBeach.spot = luxBeach.spots[parseInt(el.dataset.idx, 10)];
+                luxBeachRenderMap();
+                luxBeachRenderSelection();
+                luxBeachRenderForm();
+                var sel = document.getElementById('luxBeachSel');
+                if (sel) sel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            };
+
+            // Center the view on the spots the first time
+            var wrap = document.getElementById('luxBeachMapWrap');
+            if (wrap && !wrap.dataset.centered) {
+                wrap.dataset.centered = '1';
+                wrap.scrollLeft = Math.max(0, (w - wrap.offsetWidth) / 2);
+            }
+        }
+
+        function luxBeachRenderSelection() {
+            var host = document.getElementById('luxBeachSel');
+            if (!host) return;
+            var s = luxBeach.spot;
+            if (!s) { host.innerHTML = ''; return; }
+            var typeNames = { umbrella: 'Straw Umbrella', cabana: 'Cabana', lounger: 'Lounger', daybed: 'Daybed' };
+            var price = parseFloat(s.price_full_day) || 0;
+            host.innerHTML = '' +
+            '<div class="lux-beach-selcard">' +
+                '<div class="hd"><span class="badge">' + s.spot_number + '</span>' +
+                '<div><div class="tt">' + (typeNames[s.spot_type] || 'Beach Spot') + (s.is_premium ? ' <i class="fas fa-star" style="color: var(--lux-gold-2); font-size: 0.7rem;"></i>' : '') + '</div>' +
+                (s.zone_name ? '<div class="zz"><i class="fas fa-map-marker-alt"></i>' + s.zone_name + '</div>' : '') + '</div></div>' +
+                '<div class="mm">' +
+                    '<span><i class="fas fa-users"></i>Up to ' + (s.max_capacity || 2) + ' guests</span>' +
+                    '<span><i class="fas fa-tag"></i>' + (price > 0 ? (s.currency || 'USD') + ' ' + price : 'Free for hotel guests') + '</span>' +
+                '</div>' +
+                (s.spot_description ? '<p class="dd">' + s.spot_description + '</p>' : '') +
+            '</div>';
+        }
+
+        function luxBeachRenderForm() {
+            var host = document.getElementById('luxBeachForm');
+            if (!host) return;
+            var st = luxBeach.settings || {};
+            if (st.booking_button_override_enabled === 1) {
+                host.innerHTML = '<div class="lux-beach-override"><i class="fas fa-circle-info"></i>' +
+                    (st.booking_button_override_message || 'Beach bookings are currently unavailable. Please contact our beach team.') + '</div>';
+                return;
+            }
+            var ready = luxBeach.spot && luxBeach.slot;
+            host.innerHTML = '' +
+            '<form id="luxBeachBookForm" class="lux-form">' +
+                '<label>Your Name</label><input type="text" id="luxBchName" required autocomplete="name">' +
+                '<label>Room Number</label><input type="text" id="luxBchRoom" required>' +
+                '<label>Number of Guests</label><input type="number" id="luxBchGuests" min="1" value="2" required>' +
+                '<label>Special Requests (optional)</label><textarea id="luxBchNotes" rows="2" placeholder="Extra towels, shade setup..."></textarea>' +
+                '<button type="submit" class="lux-cta" id="luxBchSubmit"' + (ready ? '' : ' disabled') + '>' +
+                    '<i class="fas fa-umbrella-beach mr-2"></i>' + (ready ? 'Confirm Booking' : 'Choose a spot and time above') +
+                '</button>' +
+            '</form>';
+            // Pre-fill from OnePass session when available
+            try {
+                var sess = JSON.parse(localStorage.getItem('guestPassSession') || 'null');
+                if (sess && sess.guest) {
+                    if (sess.guest.full_name) document.getElementById('luxBchName').value = sess.guest.full_name;
+                    if (sess.guest.room_number) document.getElementById('luxBchRoom').value = sess.guest.room_number;
+                }
+            } catch (e) {}
+            var form = document.getElementById('luxBeachBookForm');
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (!luxBeach.spot || !luxBeach.slot) return;
+                var btn = document.getElementById('luxBchSubmit');
+                btn.disabled = true;
+                btn.textContent = 'Reserving...';
+                try {
+                    var resp = await fetch('/api/beach/bookings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            property_id: propertyData.property_id,
+                            spot_id: luxBeach.spot.spot_id,
+                            booking_date: luxBeach.date,
+                            slot_type: luxBeach.slot,
+                            guest_name: document.getElementById('luxBchName').value,
+                            guest_room_number: document.getElementById('luxBchRoom').value,
+                            num_guests: parseInt(document.getElementById('luxBchGuests').value) || 1,
+                            special_requests: document.getElementById('luxBchNotes').value
+                        })
+                    });
+                    var data = await resp.json();
+                    if (data.success && data.booking) {
+                        var ref = data.booking.booking_reference;
+                        var slotName = '';
+                        luxBeachSlots().forEach(function(s) { if (s.id === luxBeach.slot) slotName = s.name; });
+                        document.getElementById('luxSheetBody').innerHTML = '' +
+                        '<div class="lux-sheet-ok">' +
+                            '<div class="ic"><i class="fas fa-umbrella-beach"></i></div>' +
+                            '<h2 style="font-family: var(--lux-serif); font-size: 1.8rem; color: var(--lux-text); margin-bottom: 0.4rem;">Your spot is reserved</h2>' +
+                            '<p class="lux-sheet-desc">Spot ' + luxBeach.spot.spot_number + ' · ' + slotName + ' · ' + luxBeach.date + '</p>' +
+                            '<div class="lux-qr-card">' +
+                                '<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&bgcolor=faf6ec&color=241318&data=' + encodeURIComponent(ref) + '" alt="Booking QR">' +
+                                '<p class="ref">' + ref + '</p>' +
+                            '</div>' +
+                            '<p class="lux-sheet-desc" style="font-size: 0.76rem;">Show this code at the beach entrance</p>' +
+                            '<button class="lux-cta" style="max-width: 280px; margin: 1.4rem auto 0; display: block;" onclick="luxCloseSheet()">Done</button>' +
+                        '</div>';
+                    } else {
+                        alert('Booking failed: ' + (data.error || 'Please try again'));
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-umbrella-beach mr-2"></i>Confirm Booking';
+                    }
+                } catch (err) {
+                    console.error('beach booking', err);
+                    alert('Booking failed. Please try again.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-umbrella-beach mr-2"></i>Confirm Booking';
+                }
+            });
+        }
 
         function viewOffering(offeringId) {
             trackPageView('offering', String(offeringId));
