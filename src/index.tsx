@@ -24265,7 +24265,7 @@ window.luxTogglePassForm = function() {
             content: '';
             position: absolute;
             inset: -7px;
-            border-radius: 50%;
+            border-radius: 999px;
             border: 1px solid rgba(212, 175, 55, 0.5);
             animation: luxOrb 2.8s var(--lux-ease) infinite;
             pointer-events: none;
@@ -24277,11 +24277,21 @@ window.luxTogglePassForm = function() {
 
           /* ── Concierge chat window ── */
           #chatWindow {
-            background: rgba(20, 11, 15, 0.94) !important;
+            background: rgba(20, 11, 15, 0.96) !important;
             border: 1px solid rgba(212, 175, 55, 0.4) !important;
             -webkit-backdrop-filter: blur(22px);
             backdrop-filter: blur(22px);
             overflow: hidden;
+          }
+          @media (max-width: 767px) {
+            #chatWindow {
+              height: 100dvh;
+              max-height: 100dvh;
+              border-radius: 0 !important;
+              border: none !important;
+            }
+            .lux-chat-header { padding-top: calc(1rem + env(safe-area-inset-top)) !important; }
+            #chatWindow > div:last-child { padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important; }
           }
           #chatWindow #chatMessages { background: transparent !important; }
           #chatMessages .bg-white {
@@ -30074,17 +30084,18 @@ window.luxTogglePassForm = function() {
         <!-- AI Chatbot Widget -->
         <div id="chatbotWidget" style="display: none;">
           <!-- Chat Button -->
-          <button id="chatbotButton" class="fixed bottom-6 left-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center text-2xl hover:scale-110 transition-transform duration-300 z-[1001]" title="AI Concierge">
-            <i class="fas fa-wand-magic-sparkles"></i>
+          <button id="chatbotButton" class="fixed bottom-6 left-6 h-16 px-6 rounded-full shadow-2xl flex items-center justify-center gap-2.5 hover:scale-105 transition-transform duration-300 z-[1001]" title="Chat">
+            <i class="fas fa-comments text-2xl"></i>
+            <span id="chatFabLabel" class="font-bold text-lg tracking-wide">Chat</span>
           </button>
           
           <!-- Chat Window -->
-          <div id="chatWindow" class="hidden fixed bottom-4 left-4 right-4 md:bottom-24 md:left-6 md:right-auto md:w-96 h-[calc(100vh-2rem)] md:h-[500px] max-h-[calc(100vh-2rem)] bg-white rounded-2xl shadow-2xl flex flex-col z-[1001] border border-gray-200">
+          <div id="chatWindow" class="hidden fixed inset-0 md:inset-auto md:bottom-24 md:left-6 md:w-96 md:h-[500px] bg-white md:rounded-2xl shadow-2xl flex flex-col z-[1001] border border-gray-200">
             <!-- Header -->
-            <div class="lux-chat-header p-4 rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="lux-chat-header p-4 md:rounded-t-2xl text-white flex items-center justify-between" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
               <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-3">
-                  <i class="fas fa-wand-magic-sparkles text-xl"></i>
+                  <i class="fas fa-comments text-xl"></i>
                 </div>
                 <div>
                   <h3 id="chatbotName" class="font-bold">Hotel Assistant</h3>
@@ -30130,6 +30141,27 @@ window.luxTogglePassForm = function() {
           const chatInput = document.getElementById('chatInput');
           const sendChatBtn = document.getElementById('sendChatBtn');
           const callServiceBtn = document.getElementById('callServiceBtn');
+          // May not exist on this page — declared so references never throw (this
+          // ReferenceError used to abort initChatbot before the greeting was added)
+          const voiceInputBtn = document.getElementById('voiceInputBtn');
+
+          // Localized label on the chat button (kept dead-simple for guests)
+          (function() {
+            const labels = { en: 'Chat', pl: 'Czat', ru: 'Чат', uk: 'Чат', de: 'Chat', it: 'Chat', fr: 'Chat', es: 'Chat', cs: 'Chat', ar: 'دردشة' };
+            const lang = localStorage.getItem('preferredLanguage') || 'en';
+            const el = document.getElementById('chatFabLabel');
+            if (el && labels[lang]) el.textContent = labels[lang];
+          })();
+
+          // Keep the chat sized to the visible area on phones (URL bar + keyboard)
+          if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', function() {
+              if (window.innerWidth < 768 && chatWindow && !chatWindow.classList.contains('hidden')) {
+                chatWindow.style.height = window.visualViewport.height + 'px';
+                if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+              }
+            });
+          }
           
           let chatConversationId = null;
           let chatSessionId = 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -30480,7 +30512,10 @@ window.luxTogglePassForm = function() {
                   
                   // Add welcome message
                   const greeting = data.settings.chatbot_greeting_en || 'Hi! How can I help you today?';
-                  addMessage(greeting, 'assistant');
+                  window.chatbotGreetingText = greeting;
+                  if (chatMessages.children.length === 0) {
+                    addMessage(greeting, 'assistant');
+                  }
                 }
               } catch (error) {
                 console.error('Chatbot init error:', error);
@@ -30504,15 +30539,26 @@ window.luxTogglePassForm = function() {
             chatButton.addEventListener('click', () => {
               chatWindow.classList.toggle('hidden');
               if (!chatWindow.classList.contains('hidden')) {
-                chatInput.focus();
+                // Never show an empty chat — greet if nothing is there yet
+                if (chatMessages.children.length === 0) {
+                  addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant');
+                }
+                if (window.innerWidth < 768) {
+                  // Fit the visible screen; don't pop the keyboard until the guest taps the field
+                  if (window.visualViewport) chatWindow.style.height = window.visualViewport.height + 'px';
+                } else {
+                  chatInput.focus();
+                }
                 startMessagePolling(); // Start polling when chat opens
               } else {
+                chatWindow.style.height = '';
                 stopMessagePolling(); // Stop polling when chat closes
               }
             });
-            
+
             closeChatBtn.addEventListener('click', () => {
               chatWindow.classList.add('hidden');
+              chatWindow.style.height = '';
               stopMessagePolling(); // Stop polling when chat closes
             });
             
