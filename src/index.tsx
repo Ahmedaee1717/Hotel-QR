@@ -24852,22 +24852,31 @@ window.luxTogglePassForm = function() {
           .lux-spot3d.booked .s-up { filter: grayscale(1) brightness(0.55); }
           .lux-spot3d.booked .s-shadow { opacity: 0.4; }
 
-          /* Flat badges for admin-uploaded photorealistic renders */
+          /* Photorealistic render mode */
+          .lux-hero-box { position: relative; width: max-content; }
+          .lux-hero-img { display: block; width: auto; user-select: none; -webkit-user-drag: none; }
           .lux-flatspot {
             position: absolute;
             transform: translate(-50%, -50%);
-            min-width: 26px; height: 26px; padding: 0 6px;
+            min-width: 27px; height: 27px; padding: 0 7px;
             border-radius: 999px;
             display: inline-flex; align-items: center; justify-content: center;
-            background: rgba(250, 246, 236, 0.95);
+            background: rgba(250, 246, 236, 0.96);
             color: #241318;
-            font-size: 0.62rem; font-weight: 800;
-            border: 1px solid rgba(138, 106, 56, 0.6);
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+            font-size: 0.66rem; font-weight: 800;
+            border: 1px solid rgba(138, 106, 56, 0.65);
+            box-shadow: 0 3px 9px rgba(0, 0, 0, 0.45);
             cursor: pointer;
+            transition: transform 0.2s var(--lux-ease);
           }
-          .lux-flatspot.selected { background: var(--lux-gold-grad); border-color: transparent; transform: translate(-50%, -50%) scale(1.25); }
-          .lux-flatspot.booked { filter: grayscale(1) brightness(0.6); cursor: not-allowed; }
+          .lux-flatspot:hover { transform: translate(-50%, -50%) scale(1.2); }
+          .lux-flatspot.selected {
+            background: var(--lux-gold-grad);
+            border-color: transparent;
+            transform: translate(-50%, -50%) scale(1.35);
+            box-shadow: 0 0 16px rgba(212, 175, 55, 0.95), 0 3px 9px rgba(0, 0, 0, 0.45);
+          }
+          .lux-flatspot.booked { filter: grayscale(1) brightness(0.6); cursor: not-allowed; opacity: 0.8; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -29272,6 +29281,7 @@ window.luxTogglePassForm = function() {
                 luxBeach.date = luxBeachDateStr(new Date());
                 luxBeach.slot = null;
                 luxBeach.spot = null;
+                luxBeach.bookable = null;
                 await luxBeachLoadBookings();
                 luxBeachRenderSheet();
             } catch (e) {
@@ -29320,7 +29330,7 @@ window.luxTogglePassForm = function() {
                 '<div class="lux-beach-map-wrap" id="luxBeachMapWrap">' +
                     '<div class="lux-beach-canvas" id="luxBeachCanvas"></div>' +
                 '</div>' +
-                '<p class="lux-beach-hint"><i class="fas fa-hand-pointer"></i> Drag to explore — tap an umbrella to choose your spot</p>' +
+                '<p class="lux-beach-hint"><i class="fas fa-hand-pointer"></i> Drag to explore — tap a numbered spot on the front row to reserve</p>' +
                 '<div id="luxBeachSel"></div>' +
                 '<div id="luxBeachForm"></div>' +
             '</div>';
@@ -29328,6 +29338,7 @@ window.luxTogglePassForm = function() {
             luxBeachRenderDays();
             luxBeachRenderSlots();
             luxBeachRenderMap();
+            luxBeachRenderStats(); // after the map so the bookable (front-row) pool is set
             luxBeachRenderSelection();
             luxBeachRenderForm();
         }
@@ -29382,8 +29393,9 @@ window.luxTogglePassForm = function() {
         function luxBeachRenderStats() {
             var host = document.getElementById('luxBeachStats');
             if (!host) return;
-            var total = luxBeach.spots.length;
-            var free = luxBeach.spots.filter(function(s) { return luxBeachSpotFree(s.spot_id); }).length;
+            var pool = luxBeach.bookable || luxBeach.spots;
+            var total = pool.length;
+            var free = pool.filter(function(s) { return luxBeachSpotFree(s.spot_id); }).length;
             host.innerHTML = '' +
                 '<span class="lux-stat"><span class="dot free"></span><strong>' + free + '</strong> Available</span>' +
                 (luxBeach.slot ? '<span class="lux-stat"><span class="dot taken"></span><strong>' + (total - free) + '</strong> Booked</span>' : '') +
@@ -29454,23 +29466,43 @@ window.luxTogglePassForm = function() {
             if (!isFinite(minY)) minY = 0;
 
             if (hasImage) {
-                // Photorealistic mode: admin-uploaded render/photo with flat badges on the
-                // admin's original coordinates (like the reference screenshot)
-                var w2 = Math.round((maxX + 60) * S);
-                var h2 = Math.round((maxY + 80) * S);
-                canvas.innerHTML = '';
-                canvas.style.width = w2 + 'px';
-                canvas.style.height = h2 + 'px';
-                canvas.style.backgroundImage = 'url(' + luxBeach.settings.beach_map_image_url + ')';
-                canvas.style.backgroundSize = '100% auto';
-                canvas.style.backgroundRepeat = 'no-repeat';
-                var flat = '';
-                luxBeach.spots.forEach(function(s, idx) {
-                    var free = luxBeachSpotFree(s.spot_id);
-                    var sel = luxBeach.spot && luxBeach.spot.spot_id === s.spot_id;
-                    flat += '<div class="lux-flatspot' + (free ? '' : ' booked') + (sel ? ' selected' : '') + '" data-idx="' + idx + '" style="left:' + Math.round(s.position_x * S) + 'px; top:' + Math.round(s.position_y * S) + 'px;">' + s.spot_number + (s.is_premium ? '★' : '') + '</div>';
+                // Photorealistic resort render — the FRONT row (closest to the sea) is bookable.
+                // Badge lane measured on the render: y 66.3%, x 2.25% .. 98.1%
+                var LANE = { y: 0.663, x0: 0.0225, x1: 0.981 };
+                var DISP_H = 500;
+                canvas.classList.remove('lux-3d');
+                canvas.style.backgroundImage = 'none';
+                canvas.style.width = 'auto';
+                canvas.style.height = 'auto';
+
+                var minY2 = Infinity;
+                luxBeach.spots.forEach(function(s) { minY2 = Math.min(minY2, s.position_y); });
+                var front = [];
+                luxBeach.spots.forEach(function(s, idx) { if (s.position_y <= minY2 + 25) front.push({ s: s, idx: idx }); });
+                front.sort(function(a, b) { return a.s.position_x - b.s.position_x; });
+                luxBeach.bookable = front.map(function(f) { return f.s; });
+
+                var hero = '<div class="lux-hero-box" style="height:' + DISP_H + 'px;">' +
+                    '<img class="lux-hero-img" src="' + luxBeach.settings.beach_map_image_url + '" alt="Beach" style="height:' + DISP_H + 'px;">';
+                front.forEach(function(f, i) {
+                    var freeS = luxBeachSpotFree(f.s.spot_id);
+                    var selS = luxBeach.spot && luxBeach.spot.spot_id === f.s.spot_id;
+                    var fx = front.length === 1 ? 0.5 : LANE.x0 + (LANE.x1 - LANE.x0) * (i / (front.length - 1));
+                    hero += '<button class="lux-flatspot' + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '" style="left:' + (fx * 100).toFixed(2) + '%; top:' + (LANE.y * 100).toFixed(2) + '%;">' + f.s.spot_number + (f.s.is_premium ? '★' : '') + '</button>';
                 });
-                canvas.innerHTML = flat;
+                hero += '</div>';
+                canvas.innerHTML = hero;
+
+                var imEl = canvas.querySelector('.lux-hero-img');
+                if (imEl) {
+                    imEl.onload = function() {
+                        var wrap2 = document.getElementById('luxBeachMapWrap');
+                        if (wrap2 && !wrap2.dataset.centered) {
+                            wrap2.dataset.centered = '1';
+                            wrap2.scrollLeft = Math.max(0, (imEl.offsetWidth - wrap2.offsetWidth) / 2);
+                        }
+                    };
+                }
             } else {
                 // 3D world mode: perspective sand plane looking out to the Red Sea,
                 // upright umbrella sprites standing on it (Sims-style)
