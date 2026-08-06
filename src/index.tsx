@@ -47359,6 +47359,17 @@ app.get('/gm/features', (c) => {
 
 // Super Admin Dashboard page
 // Admin Dashboard page
+// Digital Asset Links — lets the signed Android APK (TWA) run full-screen,
+// with no browser address bar. Fingerprint comes from the release keystore.
+app.get('/.well-known/assetlinks.json', (c) => {
+  const fp = (c.env as any).TWA_FINGERPRINT || ''
+  const pkg = (c.env as any).TWA_PACKAGE || 'online.oldpalaceresort.ops'
+  return c.json(fp ? [{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: [fp] }
+  }] : [])
+})
+
 // STAFF OPS APP — front desk console (installable PWA / wrapped as APK)
 app.get('/staff/app', (c) => {
   return c.html(`

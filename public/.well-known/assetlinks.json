@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "online.oldpalaceresort.ops",
+      "sha256_cert_fingerprints": [
+        "31:6F:D6:1F:1E:AA:0E:3E:46:F3:AA:D7:A6:79:21:5A:0D:0F:FA:4B:6E:A4:EC:A9:1B:15:FA:7E:E0:1C:B6:9D"
+      ]
+    }
+  }
+]
