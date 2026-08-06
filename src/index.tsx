@@ -24877,6 +24877,47 @@ window.luxTogglePassForm = function() {
             box-shadow: 0 0 16px rgba(212, 175, 55, 0.95), 0 3px 9px rgba(0, 0, 0, 0.45);
           }
           .lux-flatspot.booked { filter: grayscale(1) brightness(0.6); cursor: not-allowed; opacity: 0.8; }
+
+          /* Seat-map highlight cells: outline the umbrella + beds, number tucked below */
+          .lux-seat {
+            position: absolute;
+            border-radius: 10px;
+            border: 1.5px solid rgba(255, 255, 255, 0.55);
+            background: rgba(255, 255, 255, 0.07);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 0 0 3px;
+            cursor: pointer;
+            transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+          }
+          .lux-seat:hover { background: rgba(255, 255, 255, 0.17); border-color: rgba(255, 255, 255, 0.85); }
+          .lux-seat .n {
+            background: rgba(250, 246, 236, 0.95);
+            color: #241318;
+            font-size: 0.56rem;
+            font-weight: 800;
+            line-height: 1;
+            padding: 0.16rem 0.36rem;
+            border-radius: 999px;
+            border: 1px solid rgba(138, 106, 56, 0.55);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+            white-space: nowrap;
+            transform: translateY(50%);
+          }
+          .lux-seat.selected {
+            border-color: var(--lux-gold);
+            border-width: 2px;
+            background: rgba(212, 175, 55, 0.24);
+            box-shadow: 0 0 18px rgba(212, 175, 55, 0.8), inset 0 0 14px rgba(212, 175, 55, 0.25);
+          }
+          .lux-seat.selected .n { background: var(--lux-gold-grad); border-color: transparent; }
+          .lux-seat.booked {
+            background: rgba(16, 9, 12, 0.45);
+            border-color: rgba(255, 255, 255, 0.12);
+            cursor: not-allowed;
+          }
+          .lux-seat.booked .n { filter: grayscale(1) brightness(0.7); opacity: 0.75; }
           .lux-beach-hint { font-size: 0.66rem; color: var(--lux-text-dim); text-align: center; margin: 0.6rem 0 0.9rem; letter-spacing: 0.04em; }
           .lux-beach-hint i { color: var(--lux-gold-2); margin-right: 0.35rem; }
           .lux-beach-selcard {
@@ -29467,8 +29508,12 @@ window.luxTogglePassForm = function() {
 
             if (hasImage) {
                 // Photorealistic resort render — the FRONT row (closest to the sea) is bookable.
-                // Badge lane measured on the render: y 66.3%, x 2.25% .. 98.1%
-                var LANE = { y: 0.663, x0: 0.0225, x1: 0.981 };
+                // Measured umbrella centers on the render (fractions of image width), one cell per
+                // painted umbrella so highlights sit exactly on the umbrella + its beds
+                var UMB = [0.0180, 0.0592, 0.1003, 0.1420, 0.1832, 0.2255, 0.2666, 0.3083,
+                           0.3495, 0.3917, 0.4329, 0.4746, 0.5158, 0.5580, 0.5992, 0.6409,
+                           0.6821, 0.7244, 0.7655, 0.8072, 0.8484, 0.8907, 0.9318, 0.9735];
+                var UMB_LANE = { top: 0.588, h: 0.118, w: 0.040 };
                 var DISP_H = 500;
                 canvas.classList.remove('lux-3d');
                 canvas.style.backgroundImage = 'none';
@@ -29480,6 +29525,10 @@ window.luxTogglePassForm = function() {
                 var front = [];
                 luxBeach.spots.forEach(function(s, idx) { if (s.position_y <= minY2 + 25) front.push({ s: s, idx: idx }); });
                 front.sort(function(a, b) { return a.s.position_x - b.s.position_x; });
+                // one spot per painted umbrella — extra configured spots beyond the
+                // render's umbrella count are not shown on the map
+                var count = Math.min(front.length, UMB.length);
+                front = front.slice(0, count);
                 luxBeach.bookable = front.map(function(f) { return f.s; });
 
                 var hero = '<div class="lux-hero-box" style="height:' + DISP_H + 'px;">' +
@@ -29487,8 +29536,11 @@ window.luxTogglePassForm = function() {
                 front.forEach(function(f, i) {
                     var freeS = luxBeachSpotFree(f.s.spot_id);
                     var selS = luxBeach.spot && luxBeach.spot.spot_id === f.s.spot_id;
-                    var fx = front.length === 1 ? 0.5 : LANE.x0 + (LANE.x1 - LANE.x0) * (i / (front.length - 1));
-                    hero += '<button class="lux-flatspot' + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '" style="left:' + (fx * 100).toFixed(2) + '%; top:' + (LANE.y * 100).toFixed(2) + '%;">' + f.s.spot_number + (f.s.is_premium ? '★' : '') + '</button>';
+                    var left = UMB[i] - UMB_LANE.w / 2;
+                    hero += '<button class="lux-seat' + (freeS ? '' : ' booked') + (selS ? ' selected' : '') + '" data-idx="' + f.idx + '"' +
+                        ' style="left:' + (left * 100).toFixed(2) + '%; width:' + (UMB_LANE.w * 100).toFixed(2) + '%; top:' + (UMB_LANE.top * 100).toFixed(2) + '%; height:' + (UMB_LANE.h * 100).toFixed(2) + '%;">' +
+                        '<span class="n">' + f.s.spot_number + (f.s.is_premium ? '★' : '') + '</span>' +
+                    '</button>';
                 });
                 hero += '</div>';
                 canvas.innerHTML = hero;
@@ -29581,7 +29633,7 @@ window.luxTogglePassForm = function() {
             }
 
             canvas.onclick = function(e) {
-                var el = e.target.closest('.lux-spot3d, .lux-flatspot, .lux-plate');
+                var el = e.target.closest('.lux-spot3d, .lux-flatspot, .lux-plate, .lux-seat');
                 if (!el || el.classList.contains('booked')) return;
                 luxBeach.spot = luxBeach.spots[parseInt(el.dataset.idx, 10)];
                 luxBeachRenderMap();
