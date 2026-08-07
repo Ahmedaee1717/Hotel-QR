@@ -47429,6 +47429,8 @@ app.get('/staff/app', (c) => {
         .tr-note{font-size:.6rem;color:var(--dim);text-align:center;padding:4px 0 0}
         .wd{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:.68rem;letter-spacing:.04em;border-bottom:1px solid rgba(212,175,55,.15);color:var(--dim)}
         .wd .dot{width:8px;height:8px;border-radius:50%;background:#f43f5e;flex-shrink:0}
+        .wd button{margin-left:auto;flex-shrink:0;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.12);color:var(--gold2);border-radius:999px;padding:5px 12px;font-size:.65rem;font-weight:800;cursor:pointer}
+        .wd #wdTxt{min-width:0}
         .wd.ok .dot{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.9)}
         .wd.ok{color:#6ee7b7}
         #msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -47460,7 +47462,11 @@ app.get('/staff/app', (c) => {
         <h1>Old Palace <span>Ops</span></h1>
         <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
     </header>
-    <div id="watchdog" class="wd"><span class="dot"></span><span id="wdTxt">Checking alert watcher…</span></div>
+    <div id="watchdog" class="wd">
+        <span class="dot"></span>
+        <span id="wdTxt">Checking alert watcher…</span>
+        <button id="testRingBtn" onclick="testRing()">Test ring</button>
+    </div>
 
     <div class="wrap">
         <div class="tabs">
@@ -47579,20 +47585,35 @@ app.get('/staff/app', (c) => {
     }
 
     // ── Lists ──
+    // Which build is on this phone? The app appends ?app=<version> on launch.
+    var APP_VER = new URLSearchParams(location.search).get('app');
+    var IN_APP = APP_VER || document.referrer.indexOf('android-app://online.oldpalaceresort.ops') === 0;
+
+    window.testRing=async function(){
+        var b=document.getElementById('testRingBtn');
+        b.textContent='Ringing…';
+        try{
+            await fetch('/api/staff/test-ring',{method:'POST'});
+            toast('The front desk phone should ring within 10 seconds');
+        }catch(e){ toast('Could not start test'); }
+        setTimeout(function(){ b.textContent='Test ring'; }, 12000);
+    };
+
     async function loadWatchdog(){
         try{
             var d = await fetch('/api/staff/watchdog',{cache:'no-store'}).then(function(r){return r.json()});
             var dev = (d.devices||[]).filter(function(x){ return x.seconds_ago!=null && x.seconds_ago < 90; })[0];
             var el=document.getElementById('watchdog'), tx=document.getElementById('wdTxt');
+            var here = APP_VER ? ' · this phone: app v'+APP_VER : (IN_APP ? ' · this phone: app (old build — update it)' : '');
             if(dev){
                 el.classList.add('ok');
-                tx.textContent='Alert watcher running on '+dev.device+' · checked '+dev.seconds_ago+'s ago';
+                tx.textContent='Alert watcher running on '+dev.device+' · checked '+dev.seconds_ago+'s ago'+here;
             }else{
                 el.classList.remove('ok');
                 var last=(d.devices||[])[0];
-                tx.textContent = last
+                tx.textContent = (last
                     ? 'Alert watcher NOT running — last seen '+Math.round(last.seconds_ago/60)+' min ago ('+last.device+'). Open the app on that phone.'
-                    : 'Alert watcher not installed yet — install the Ops app on the front desk phone.';
+                    : 'Alert watcher not running yet — install/open the latest Ops app on the front desk phone.') + here;
             }
         }catch(e){}
     }
@@ -84923,10 +84944,40 @@ app.get('/api/staff/watchdog', async (c) => {
 })
 
 // Native Android ring service polls this: "is anything waiting, and what?"
+// "Test ring" from the console: makes the phone ring for 40s so staff can
+// prove alerting works without waiting for a real guest.
+app.post('/api/staff/test-ring', async (c) => {
+  const { DB } = c.env
+  try {
+    await DB.prepare(`
+      INSERT INTO staff_test_ring (id, until) VALUES (1, datetime('now', '+40 seconds'))
+      ON CONFLICT(id) DO UPDATE SET until = datetime('now', '+40 seconds')
+    `).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.post('/api/staff/test-ring-stop', async (c) => {
+  const { DB } = c.env
+  try {
+    await DB.prepare(`UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1`).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
 app.get('/api/staff/ring-state', async (c) => {
   const { DB } = c.env
   const pid = c.req.query('property_id') || '1'
   try {
+    const test = await DB.prepare(`SELECT 1 AS active FROM staff_test_ring WHERE id = 1 AND until > datetime('now')`).first()
+    if (test) {
+      return c.json({
+        ringing: true, kind: 'test',
+        title: '🔔 Test ring',
+        body: 'Alerting works. Tap Acknowledge to stop.',
+        session_id: ''
+      })
+    }
     const chat = await DB.prepare(`
       SELECT c.session_id, c.guest_name, c.room_number,
              (SELECT content FROM chatbot_messages m2
