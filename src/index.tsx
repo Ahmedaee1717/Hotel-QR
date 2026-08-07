@@ -47420,6 +47420,13 @@ app.get('/staff/app', (c) => {
         #chatHead .t{flex:1;min-width:0}
         #chatHead .t .n{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:700;line-height:1.1}
         #chatHead .t .s{font-size:.66rem;color:var(--dim)}
+        .langtog{display:flex;gap:4px;background:rgba(250,246,236,.06);border:1px solid rgba(212,175,55,.3);border-radius:999px;padding:3px}
+        .langtog button{border:none;background:none;color:var(--dim);font-size:.68rem;font-weight:800;padding:5px 10px;border-radius:999px;cursor:pointer}
+        .langtog button.on{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
+        .b .xl{display:block;font-size:.62rem;color:rgba(246,240,227,.5);margin-top:6px;padding-top:5px;border-top:1px dashed rgba(212,175,55,.25);font-style:italic;cursor:pointer}
+        .b.admin .xl{color:rgba(35,19,7,.65);border-top-color:rgba(35,19,7,.25)}
+        .langflag{display:inline-block;font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--gold2);background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.35);border-radius:999px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+        .tr-note{font-size:.6rem;color:var(--dim);text-align:center;padding:4px 0 0}
         #msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
         .b{max-width:82%;padding:10px 13px;border-radius:16px;font-size:.88rem;line-height:1.45;white-space:pre-wrap;word-break:break-word}
         .b.user{align-self:flex-start;background:rgba(250,246,236,.08);border:1px solid rgba(212,175,55,.2);border-top-left-radius:5px}
@@ -47463,6 +47470,10 @@ app.get('/staff/app', (c) => {
         <div id="chatHead">
             <button class="back" onclick="closeChat()"><i class="fas fa-arrow-left"></i></button>
             <div class="t"><div class="n" id="chatName">Guest</div><div class="s" id="chatSub"></div></div>
+            <div class="langtog">
+                <button id="langEn" class="on" onclick="setStaffLang('en')">EN</button>
+                <button id="langAr" onclick="setStaffLang('ar')">ع</button>
+            </div>
         </div>
         <div id="msgs"></div>
         <div id="takeoverBar"></div>
@@ -47588,6 +47599,7 @@ app.get('/staff/app', (c) => {
                 '<div class="chips">'+
                     (c.is_ai_paused?'<span class="chip live">You are handling</span>':'<span class="chip ai">AI handling</span>')+
                     (room?'<span class="chip">'+esc(room.replace(' · ',''))+'</span>':'')+
+                    (c.guest_lang && c.guest_lang!=='en' ? '<span class="chip">'+esc(LANGNAME[c.guest_lang]||c.guest_lang)+'</span>' : '')+
                     '<span class="chip">'+(c.message_count||0)+' msgs</span>'+
                 '</div></div>';
         });
@@ -47630,6 +47642,8 @@ app.get('/staff/app', (c) => {
     // ── Chat view ──
     window.openChat=async function(i){
         cur = chats[i];
+        guestLang = cur.guest_lang || null;
+        document.getElementById('msgInput').placeholder='Type a reply to the guest…';
         stopRing(true);
         try{ fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:cur.session_id})}); }catch(e){}
         document.getElementById('chatName').textContent = cur.guest_name || 'Guest';
@@ -47645,19 +47659,72 @@ app.get('/staff/app', (c) => {
             ? '<button class="btn-release" onclick="endTakeover()"><i class="fas fa-robot"></i> Hand back to AI</button>'
             : '<button class="btn-take" onclick="takeOver()"><i class="fas fa-headset"></i> Take over this chat</button>';
     }
+    // ── Translation: guests write in any language, staff read EN or AR ──
+    var STAFF_LANG = localStorage.getItem('staffLang') || 'en';
+    var trCache = {};           // messageId -> {lang, text}
+    var guestLang = null;       // detected language of the current guest
+    var LANGNAME = {en:'English',ar:'Arabic',ru:'Russian',de:'German',fr:'French',it:'Italian',es:'Spanish',pl:'Polish',cs:'Czech',uk:'Ukrainian',tr:'Turkish',nl:'Dutch',ro:'Romanian',hu:'Hungarian',sv:'Swedish',zh:'Chinese',ja:'Japanese',ko:'Korean',pt:'Portuguese',he:'Hebrew',fa:'Persian',hi:'Hindi',sk:'Slovak',bg:'Bulgarian',sr:'Serbian'};
+
+    window.setStaffLang=function(l){
+        STAFF_LANG=l; localStorage.setItem('staffLang',l);
+        document.getElementById('langEn').classList.toggle('on',l==='en');
+        document.getElementById('langAr').classList.toggle('on',l==='ar');
+        trCache={};
+        if(cur) loadMsgs();
+    };
+    window.toggleOriginal=function(el){
+        var o=el.getAttribute('data-orig');
+        var showing=el.getAttribute('data-showing')==='1';
+        el.textContent = showing ? ('Original (' + el.getAttribute('data-ln') + ') — tap to show') : o;
+        el.setAttribute('data-showing', showing?'0':'1');
+    };
+
+    async function translateMsgs(msgs){
+        var need = msgs.filter(function(m){ return m.content && !trCache[m.message_id]; })
+                       .map(function(m){ return {id:m.message_id, text:m.content}; });
+        if(!need.length) return;
+        try{
+            var d = await fetch('/api/staff/translate',{
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({items:need, target:STAFF_LANG, session_id: cur? cur.session_id : null})
+            }).then(function(r){return r.json()});
+            (d.results||[]).forEach(function(r){ trCache[r.id]={lang:r.lang, text:r.text}; });
+        }catch(e){}
+    }
+
     async function loadMsgs(){
         if(!cur) return;
         try{
             var d = await fetch('/api/admin/chatbot/messages/'+cur.session_id+'?property_id='+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
             var msgs = d.messages||[];
+            render(msgs);
+            await translateMsgs(msgs);
+            render(msgs);
+        }catch(e){}
+
+        function render(msgs){
             var box=document.getElementById('msgs');
+            var foreign=null;
             box.innerHTML = msgs.map(function(m){
                 var role = m.role==='admin'?'admin':(m.role==='user'?'user':'assistant');
                 var label = role==='admin'?'You':(role==='user'?'Guest':'AI');
-                return '<div class="b '+role+'"><span class="rl">'+label+'</span>'+esc(m.content)+'</div>';
+                var tr = trCache[m.message_id];
+                var isForeign = tr && tr.lang && tr.lang!=='unknown' && tr.lang!==STAFF_LANG;
+                if(role==='user' && isForeign) foreign=tr.lang;
+                var shown = isForeign ? tr.text : m.content;
+                var html = '<div class="b '+role+'"><span class="rl">'+label+
+                    (isForeign?'<span class="langflag">'+(LANGNAME[tr.lang]||tr.lang)+'</span>':'')+'</span>'+esc(shown);
+                if(isForeign){
+                    html += '<span class="xl" data-orig="'+esc(m.content).replace(/"/g,'&quot;')+'" data-ln="'+(LANGNAME[tr.lang]||tr.lang)+'" data-showing="0" onclick="toggleOriginal(this)">Original ('+(LANGNAME[tr.lang]||tr.lang)+') — tap to show</span>';
+                }
+                return html+'</div>';
             }).join('');
             box.scrollTop = box.scrollHeight;
-        }catch(e){}
+            if(foreign){
+                guestLang=foreign;
+                document.getElementById('msgInput').placeholder='Reply in '+(STAFF_LANG==='ar'?'Arabic':'English')+' — sent in '+(LANGNAME[foreign]||foreign);
+            }
+        }
     }
     window.takeOver=async function(){
         if(!cur) return;
@@ -47682,7 +47749,18 @@ app.get('/staff/app', (c) => {
         if(!text||!cur) return;
         if(typeof preset!=='string') input.value='';
         try{
-            await fetch('/api/admin/chatbot/send-message',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id,message:text,admin_id:'frontdesk'})});
+            // Guest reads their own language: translate the reply before sending
+            var outText = text;
+            if(guestLang && guestLang!==STAFF_LANG){
+                try{
+                    var t = await fetch('/api/staff/translate',{
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({items:[{id:'reply',text:text}], target:guestLang})
+                    }).then(function(r){return r.json()});
+                    if(t.results && t.results[0] && t.results[0].text) outText = t.results[0].text;
+                }catch(e){}
+            }
+            await fetch('/api/admin/chatbot/send-message',{method:'POST',headers:{'Content-Type':'application/json','X-Property-ID':PROPERTY_ID},body:JSON.stringify({session_id:cur.session_id,message:outText,admin_id:'frontdesk'})});
             cur.is_ai_paused=1;
             renderTakeover();
             await loadMsgs();
@@ -47703,6 +47781,7 @@ app.get('/staff/app', (c) => {
         });
     }
 
+    setStaffLang(STAFF_LANG);
     loadAll();
     setInterval(function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } }, 15000);
     document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } });
@@ -84678,6 +84757,108 @@ app.post('/api/staff/ring-check', async (c) => {
   }
 })
 
+// Staff translation: guests write in any language, the front desk reads
+// English or Arabic. DeepSeek does the work; D1 caches so the app's 15s
+// polling never re-pays for the same message.
+const LANG_NAMES: Record<string, string> = {
+  en: 'English', ar: 'Arabic', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian',
+  es: 'Spanish', pl: 'Polish', cs: 'Czech', uk: 'Ukrainian', tr: 'Turkish', nl: 'Dutch',
+  ro: 'Romanian', hu: 'Hungarian', sv: 'Swedish', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
+  pt: 'Portuguese', he: 'Hebrew', fa: 'Persian', hi: 'Hindi', sk: 'Slovak', bg: 'Bulgarian', sr: 'Serbian'
+}
+
+async function cacheKey(text: string, target: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(target + '::' + text))
+  return Array.from(new Uint8Array(buf)).slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+app.post('/api/staff/translate', async (c) => {
+  const { DB } = c.env
+  try {
+    const body = await c.req.json()
+    const target = (body.target || 'en').toLowerCase()
+    const items: any[] = (body.items || []).filter((i: any) => i && i.text && String(i.text).trim())
+    if (!items.length) return c.json({ success: true, results: [] })
+
+    const results: any[] = []
+    const todo: any[] = []
+    for (const it of items) {
+      const key = await cacheKey(String(it.text), target)
+      const hit = await DB.prepare('SELECT src_lang, translated FROM staff_translations WHERE cache_key = ?').bind(key).first()
+      if (hit) {
+        results.push({ id: it.id, lang: hit.src_lang, text: hit.translated })
+      } else {
+        todo.push({ ...it, _key: key })
+      }
+    }
+
+    if (todo.length) {
+      const apiKey = c.env.DEEPSEEK_API_KEY
+      const targetName = LANG_NAMES[target] || 'English'
+      if (!apiKey) {
+        todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
+      } else {
+        const payload = todo.map((t, i) => ({ i: i, text: String(t.text).slice(0, 1500) }))
+        const prompt = 'You are a hotel front-desk translator. For EACH item, detect the source language and translate the text into ' + targetName + '.\n' +
+          'Reply with ONLY a JSON array, no markdown: [{"i":0,"lang":"<ISO 639-1 code of the SOURCE language>","text":"<translation into ' + targetName + '>"}]\n' +
+          'If an item is already in ' + targetName + ', copy the text unchanged and still report its language code. Preserve meaning, tone and any room numbers or times exactly.\n\n' +
+          JSON.stringify(payload)
+        try {
+          const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+            body: JSON.stringify({
+              model: 'deepseek-chat',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.1,
+              max_tokens: 2000
+            })
+          })
+          const d: any = await r.json()
+          let raw = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '[]'
+          raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim()
+          const arr = JSON.parse(raw)
+          for (const out of arr) {
+            const src = todo[out.i]
+            if (!src) continue
+            results.push({ id: src.id, lang: out.lang || 'unknown', text: out.text || src.text })
+            try {
+              await DB.prepare(`
+                INSERT INTO staff_translations (cache_key, src_lang, target_lang, translated)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(cache_key) DO UPDATE SET translated = excluded.translated, src_lang = excluded.src_lang
+              `).bind(src._key, out.lang || 'unknown', target, out.text || src.text).run()
+            } catch (e) {}
+          }
+          // anything the model skipped falls back to the original
+          todo.forEach(t => {
+            if (!results.find(r2 => r2.id === t.id)) results.push({ id: t.id, lang: 'unknown', text: t.text })
+          })
+        } catch (e) {
+          console.error('staff translate error', e)
+          todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
+        }
+      }
+    }
+
+    // Remember the guest's language so staff replies can be sent back in it
+    if (body.session_id) {
+      const guestLang = results.map(r => r.lang).find(l => l && l !== 'unknown' && l !== target)
+      if (guestLang) {
+        try {
+          await DB.prepare('UPDATE chatbot_conversations SET guest_lang = ? WHERE session_id = ?')
+            .bind(guestLang, body.session_id).run()
+        } catch (e) {}
+      }
+    }
+
+    return c.json({ success: true, results })
+  } catch (error) {
+    console.error('translate endpoint error', error)
+    return c.json({ success: false, error: 'translation failed' }, 500)
+  }
+})
+
 app.post('/api/staff/push/subscribe', async (c) => {
   const { DB } = c.env
   try {
@@ -84707,7 +84888,7 @@ app.get('/api/staff/inbox/:property_id', async (c) => {
   const { property_id } = c.req.param()
   try {
     const convos = await DB.prepare(`
-      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at,
+      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at, c.guest_lang,
         (SELECT content FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_message,
         (SELECT role FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_role,
         (SELECT created_at FROM chatbot_messages WHERE conversation_id = c.conversation_id ORDER BY created_at DESC, rowid DESC LIMIT 1) as last_at,
