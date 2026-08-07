@@ -11988,7 +11988,7 @@ app.post('/api/chatbot/chat', async (c) => {
       ).run()
       convId = convResult.meta.last_row_id
       // Instant staff alert: a brand-new guest conversation started
-      try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
+      try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
     } else {
       // Update existing conversation with guest info if provided and not already set
       if (guest_context?.guest_name || guest_context?.room_number) {
@@ -12029,7 +12029,7 @@ app.post('/api/chatbot/chat', async (c) => {
       `).bind(convId, message).run()
 
       // Instant staff alert: the guest replied while a human is handling the chat
-      try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
+      try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
 
       return c.json({
         success: true,
@@ -22028,7 +22028,7 @@ app.post('/api/feedback/submit', async (c) => {
     }
     
     // Instant staff alert: new guest feedback arrived
-    try { c.executionCtx.waitUntil(notifyStaff(c.env, DB)) } catch (e) {}
+    try { c.executionCtx.waitUntil(ringStaff(c.env, DB)) } catch (e) {}
 
     return c.json({ success: true, submission_id })
   } catch (error) {
@@ -47436,6 +47436,12 @@ app.get('/staff/app', (c) => {
         #composer button{width:48px;height:48px;border-radius:50%;border:none;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;font-size:1rem;cursor:pointer}
         .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:90px;background:rgba(24,13,18,.97);border:1px solid rgba(212,175,55,.5);color:var(--txt);padding:10px 18px;border-radius:999px;font-size:.8rem;z-index:500;display:none}
         .toast.show{display:block}
+        /* incoming-call ring bar */
+        #ringBar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:none;align-items:center;gap:10px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(135deg,#b3122f,#7d0a20);box-shadow:0 -10px 30px rgba(0,0,0,.6);animation:ringPulse 1s ease-in-out infinite}
+        #ringBar.show{display:flex}
+        #ringBar .rb-txt{flex:1;font-weight:700;font-size:.9rem;color:#fff}
+        #ringBar button{background:#fff;color:#7d0a20;border:none;border-radius:999px;padding:12px 20px;font-weight:800;font-size:.8rem;cursor:pointer}
+        @keyframes ringPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
     </style>
 </head>
 <body>
@@ -47466,6 +47472,10 @@ app.get('/staff/app', (c) => {
         </div>
     </div>
     <div class="toast" id="toast"></div>
+    <div id="ringBar">
+        <div class="rb-txt"><i class="fas fa-bell"></i> Guest waiting — respond now</div>
+        <button onclick="stopRing()">Acknowledge</button>
+    </div>
 
     <script>
     var PROPERTY_ID = '1';
@@ -47473,6 +47483,45 @@ app.get('/staff/app', (c) => {
     var cur = null, chats = [], feedback = [], lastSeenChat = localStorage.getItem('seenChat') || '', lastSeenFb = localStorage.getItem('seenFb') || '';
 
     function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2600)}
+
+    // ── Ringtone: loops loud until a staff member acknowledges ──
+    var ringAudio=null, ringing=false, vibTimer=null;
+    function initRing(){
+        if(ringAudio) return ringAudio;
+        ringAudio=new Audio('/static/ops-ring.wav');
+        ringAudio.loop=true;
+        ringAudio.volume=1.0;
+        return ringAudio;
+    }
+    function startRing(){
+        if(ringing) return;
+        ringing=true;
+        document.getElementById('ringBar').classList.add('show');
+        try{ initRing().play().catch(function(){}); }catch(e){}
+        if(navigator.vibrate){
+            var buzz=function(){ navigator.vibrate([700,250,700,250,700]); };
+            buzz(); vibTimer=setInterval(buzz,3000);
+        }
+    }
+    window.stopRing=function(silentAck){
+        ringing=false;
+        document.getElementById('ringBar').classList.remove('show');
+        try{ if(ringAudio){ ringAudio.pause(); ringAudio.currentTime=0; } }catch(e){}
+        if(vibTimer){ clearInterval(vibTimer); vibTimer=null; }
+        if(navigator.vibrate) navigator.vibrate(0);
+        if(!silentAck) ackAll();
+    };
+    async function ackAll(){
+        try{ await fetch('/api/staff/ack-feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1})}); }catch(e){}
+        try{
+            if(chats[0]) await fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:chats[0].session_id})});
+        }catch(e){}
+    }
+    // Unlock audio on the first tap (mobile autoplay policy)
+    document.addEventListener('click',function unlock(){
+        try{ var a=initRing(); a.play().then(function(){ a.pause(); a.currentTime=0; }).catch(function(){}); }catch(e){}
+        document.removeEventListener('click',unlock);
+    },{once:true});
     function ago(s){
         if(!s) return '';
         var t = Date.parse(s.replace(' ','T')+'Z'); if(isNaN(t)) return '';
@@ -47574,13 +47623,15 @@ app.get('/staff/app', (c) => {
             document.getElementById('listChats').style.display = isChats?'':'none';
             document.getElementById('listFb').style.display = isChats?'none':'';
             if(isChats && chats[0]){ lastSeenChat=chats[0].last_at||''; localStorage.setItem('seenChat',lastSeenChat); document.getElementById('dotChats').classList.remove('show'); }
-            if(!isChats && feedback[0]){ lastSeenFb=feedback[0].submitted_at||''; localStorage.setItem('seenFb',lastSeenFb); document.getElementById('dotFb').classList.remove('show'); }
+            if(!isChats && feedback[0]){ lastSeenFb=feedback[0].submitted_at||''; localStorage.setItem('seenFb',lastSeenFb); document.getElementById('dotFb').classList.remove('show'); stopRing(); }
         };
     });
 
     // ── Chat view ──
     window.openChat=async function(i){
         cur = chats[i];
+        stopRing(true);
+        try{ fetch('/api/staff/ack-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_id:1,session_id:cur.session_id})}); }catch(e){}
         document.getElementById('chatName').textContent = cur.guest_name || 'Guest';
         document.getElementById('chatSub').textContent = (cur.room_number?'Room '+cur.room_number+' · ':'')+(cur.is_ai_paused?'You are handling this chat':'AI is handling this chat');
         document.getElementById('chat').classList.add('open');
@@ -47644,7 +47695,12 @@ app.get('/staff/app', (c) => {
         navigator.serviceWorker.register('/staff-sw.js',{scope:'/staff/'}).then(function(reg){
             return reg.pushManager.getSubscription();
         }).then(function(s){ markBell(!!s); }).catch(function(){});
-        navigator.serviceWorker.addEventListener('message',function(ev){ if(ev.data&&ev.data.type==='refresh'){ loadAll(); if(cur) loadMsgs(); } });
+        navigator.serviceWorker.addEventListener('message',function(ev){
+            if(!ev.data) return;
+            if(ev.data.type==='refresh'){ loadAll(); if(cur) loadMsgs(); }
+            if(ev.data.type==='ring'){ loadAll(); startRing(); }
+            if(ev.data.type==='stopring'){ stopRing(true); }
+        });
     }
 
     loadAll();
@@ -84557,6 +84613,70 @@ async function notifyStaff(env: any, DB: any) {
     console.error('notifyStaff error', e)
   }
 }
+
+// Ring like a phone: a burst of pushes a few seconds apart so the
+// notification sound + vibration repeat instead of pinging once
+async function ringStaff(env: any, DB: any, times: number = 3, gapMs: number = 6000) {
+  for (let i = 0; i < times; i++) {
+    if (i > 0) await new Promise(res => setTimeout(res, gapMs))
+    await notifyStaff(env, DB)
+  }
+}
+
+app.post('/api/staff/ack-chat', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    if (!b.session_id) return c.json({ success: false, error: 'session_id required' }, 400)
+    await DB.prepare(`
+      UPDATE chatbot_conversations SET staff_ack_at = CURRENT_TIMESTAMP
+      WHERE session_id = ? AND property_id = ?
+    `).bind(b.session_id, b.property_id || 1).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.post('/api/staff/ack-feedback', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json().catch(() => ({}))
+    await DB.prepare(`UPDATE feedback_submissions SET is_read = 1 WHERE property_id = ? AND is_read = 0`)
+      .bind((b && b.property_id) || 1).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// Called by the op-ring cron every minute: keep ringing while anything is
+// unacknowledged (recent guest activity with no staff ack), cutoff 20 min
+app.post('/api/staff/ring-check', async (c) => {
+  const { DB } = c.env
+  try {
+    const unackedChats = await DB.prepare(`
+      SELECT COUNT(*) as n FROM chatbot_conversations c
+      WHERE c.property_id = 1
+        AND EXISTS (
+          SELECT 1 FROM chatbot_messages m
+          WHERE m.conversation_id = c.conversation_id
+            AND m.role = 'user'
+            AND m.created_at > datetime('now', '-20 minutes')
+            AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
+        )
+    `).first()
+    const unreadFb = await DB.prepare(`
+      SELECT COUNT(*) as n FROM feedback_submissions
+      WHERE property_id = 1 AND is_read = 0
+        AND submitted_at > datetime('now', '-20 minutes')
+    `).first()
+    const pending = ((unackedChats && unackedChats.n) || 0) + ((unreadFb && unreadFb.n) || 0)
+    if (pending > 0) {
+      c.executionCtx.waitUntil(ringStaff(c.env, DB, 2, 5000))
+    }
+    return c.json({ success: true, pending })
+  } catch (e) {
+    console.error('ring-check', e)
+    return c.json({ success: false }, 500)
+  }
+})
 
 app.post('/api/staff/push/subscribe', async (c) => {
   const { DB } = c.env

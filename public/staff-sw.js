@@ -37,23 +37,57 @@ self.addEventListener('push', (event) => {
       }
     } catch (e) {}
 
+    // Ring like an incoming call: sticky notification, long insistent
+    // vibration pattern, custom klaxon, and an explicit Acknowledge action.
     await self.registration.showNotification(title, {
       body,
       tag,
       renotify: true,
       requireInteraction: true,
-      vibrate: [200, 80, 200],
+      silent: false,
+      vibrate: [700, 250, 700, 250, 700, 250, 700, 250, 700],
+      sound: '/static/ops-ring.wav',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
+      actions: [{ action: 'ack', title: 'Acknowledge' }],
       data: { url: '/staff/app' }
     });
+
+    // Wake any open app window so it starts the looping ringtone
+    const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    wins.forEach(w => { try { w.postMessage({ type: 'ring' }); } catch (e) {} });
   })());
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/staff/app';
+  const acked = event.action === 'ack';
+
   event.waitUntil((async () => {
+    // Acknowledging stops the repeat-ring cron for chats + feedback
+    if (acked) {
+      try {
+        await fetch('/api/staff/ack-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ property_id: 1 })
+        });
+        const inbox = await fetch('/api/staff/inbox/1', { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+        const top = inbox && inbox.conversations && inbox.conversations[0];
+        if (top) {
+          await fetch('/api/staff/ack-chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: 1, session_id: top.session_id })
+          });
+        }
+      } catch (e) {}
+      const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      wins.forEach(w => { try { w.postMessage({ type: 'stopring' }); } catch (e) {} });
+      return;
+    }
+
     const all = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of all) {
       if (c.url.includes('/staff/app')) {
