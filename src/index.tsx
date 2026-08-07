@@ -85290,20 +85290,31 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
 
   // WaSender: sends free-form text from the hotel's own WhatsApp number, so
   // alerts need no template approval and read like a normal message.
+  // The free plan allows 1 request/minute, so a 429 is retried briefly rather
+  // than being written off as a failed alert.
   if (env.WASENDER_TOKEN) {
-    try {
-      const r = await fetch('https://www.wasenderapi.com/api/send-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.WASENDER_TOKEN },
-        body: JSON.stringify({ to: '+' + String(contact.phone).replace(/[^0-9]/g, ''), text })
-      })
-      const body = await r.text()
-      let ok = r.ok
-      try { ok = ok && JSON.parse(body).success !== false } catch (e) { /* keep HTTP verdict */ }
-      return { channel: 'wasender', ok, detail: body.slice(0, 300) }
-    } catch (e: any) {
-      return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
+    const to = '+' + String(contact.phone).replace(/[^0-9]/g, '')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch('https://www.wasenderapi.com/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.WASENDER_TOKEN },
+          body: JSON.stringify({ to, text })
+        })
+        const body = await r.text()
+        if (r.status === 429 && attempt < 2) {
+          const wait = Number(r.headers.get('retry-after') || 0) * 1000 || 21000
+          await new Promise(res => setTimeout(res, Math.min(wait, 25000)))
+          continue
+        }
+        let ok = r.ok
+        try { ok = ok && JSON.parse(body).success !== false } catch (e) { /* keep HTTP verdict */ }
+        return { channel: 'wasender', ok, detail: (r.status === 429 ? 'rate limited: ' : '') + body.slice(0, 260) }
+      } catch (e: any) {
+        if (attempt === 2) return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
+      }
     }
+    return { channel: 'wasender', ok: false, detail: 'Rate limited — upgrade the WaSender plan or alert a WhatsApp group instead of several numbers' }
   }
 
   if (token && phoneId) {
@@ -85414,21 +85425,47 @@ async function runEscalations(env: any, DB: any) {
 
 // Is the WhatsApp channel genuinely able to send right now? A saved token is
 // not enough — WaSender also needs a linked WhatsApp session behind it.
-async function whatsappHealth(env: any) {
+async function whatsappHealth(env: any, DB?: any) {
   if (env.WASENDER_TOKEN) {
+    // The free plan allows only 1 request/minute, and an alert must never lose
+    // that slot to a status check — so the result is cached for 10 minutes.
+    if (DB) {
+      try {
+        const cached = await DB.prepare(`
+          SELECT state, note FROM wasender_health
+          WHERE id = 1 AND checked_at > datetime('now', '-10 minutes')
+        `).first()
+        if (cached) return { channel: 'WaSender', state: cached.state, note: cached.note || '' }
+      } catch (e) { /* table may not exist yet */ }
+    }
     try {
       const r = await fetch('https://www.wasenderapi.com/api/status', {
         headers: { 'Authorization': 'Bearer ' + env.WASENDER_TOKEN }
       })
       const body = await r.text()
-      if (r.ok) return { channel: 'WaSender', state: 'ready', note: '' }
-      if (/session not found/i.test(body)) {
-        return { channel: 'WaSender', state: 'no_session', note: 'No WhatsApp number is linked in WaSender yet — scan the QR in your WaSender dashboard, then paste that session\'s API key here.' }
+      let state = 'error'
+      let note = body.slice(0, 160)
+      if (r.ok) { state = 'ready'; note = '' }
+      else if (r.status === 429) {
+        // Out of quota this minute, not broken — keep the previous verdict
+        state = 'ready'
+        note = ''
+      } else if (/session not found/i.test(body)) {
+        state = 'no_session'
+        note = 'No WhatsApp number is linked in WaSender yet — scan the QR in your WaSender dashboard, then paste that session\'s API key here.'
+      } else if (/invalid api key/i.test(body)) {
+        state = 'bad_key'
+        note = 'WaSender rejected this key. Use the key from the WhatsApp session page (the key icon), not the account token.'
       }
-      if (/invalid api key/i.test(body)) {
-        return { channel: 'WaSender', state: 'bad_key', note: 'WaSender rejected this key. Use the key from the WhatsApp session page (the key icon), not the account token.' }
+      if (DB) {
+        try {
+          await DB.prepare(`
+            INSERT INTO wasender_health (id, state, note, checked_at) VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET state = excluded.state, note = excluded.note, checked_at = CURRENT_TIMESTAMP
+          `).bind(state, note).run()
+        } catch (e) { /* cache is best effort */ }
       }
-      return { channel: 'WaSender', state: 'error', note: body.slice(0, 160) }
+      return { channel: 'WaSender', state, note }
     } catch (e) {
       return { channel: 'WaSender', state: 'error', note: 'Could not reach WaSender' }
     }
@@ -85442,7 +85479,7 @@ async function whatsappHealth(env: any) {
 app.get('/api/staff/escalation/config', async (c) => {
   const { DB } = c.env
   try {
-    const health = await whatsappHealth(c.env)
+    const health = await whatsappHealth(c.env, DB)
     const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
     const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 ORDER BY contact_id').all()
     const log = await DB.prepare(`
@@ -85470,6 +85507,13 @@ app.get('/api/staff/escalation/config', async (c) => {
 app.post('/api/staff/wasender-webhook', async (c) => {
   const { DB } = c.env
   try {
+    // "Anyone with this key can fake events" — so reject anything unsigned
+    const secret = c.env.WASENDER_WEBHOOK_SECRET
+    if (secret) {
+      const sig = c.req.header('X-Webhook-Signature') || c.req.header('x-webhook-signature') || ''
+      if (sig !== secret) return c.json({ success: false, error: 'bad signature' }, 401)
+    }
+
     const payload = await c.req.json().catch(() => ({}))
     const flat = JSON.stringify(payload)
 
