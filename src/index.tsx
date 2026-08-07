@@ -84865,6 +84865,65 @@ app.post('/api/staff/translate', async (c) => {
   }
 })
 
+// Native Android ring service polls this: "is anything waiting, and what?"
+app.get('/api/staff/ring-state', async (c) => {
+  const { DB } = c.env
+  const pid = c.req.query('property_id') || '1'
+  try {
+    const chat = await DB.prepare(`
+      SELECT c.session_id, c.guest_name, c.room_number,
+             (SELECT content FROM chatbot_messages m2
+               WHERE m2.conversation_id = c.conversation_id AND m2.role = 'user'
+               ORDER BY m2.created_at DESC, m2.rowid DESC LIMIT 1) as last_text
+      FROM chatbot_conversations c
+      WHERE c.property_id = ?
+        AND EXISTS (
+          SELECT 1 FROM chatbot_messages m
+          WHERE m.conversation_id = c.conversation_id
+            AND m.role = 'user'
+            AND m.created_at > datetime('now', '-20 minutes')
+            AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
+        )
+      ORDER BY c.conversation_id DESC
+      LIMIT 1
+    `).bind(pid).first()
+
+    const fb = await DB.prepare(`
+      SELECT submission_id, guest_name, room_number, is_urgent, sentiment_label
+      FROM feedback_submissions
+      WHERE property_id = ? AND is_read = 0
+        AND submitted_at > datetime('now', '-20 minutes')
+      ORDER BY submitted_at DESC
+      LIMIT 1
+    `).bind(pid).first()
+
+    if (chat) {
+      const who = chat.guest_name || 'Guest'
+      const room = chat.room_number ? ' · Room ' + chat.room_number : ''
+      return c.json({
+        ringing: true, kind: 'chat',
+        title: '💬 ' + who + room + ' is waiting',
+        body: String(chat.last_text || 'New message from a guest').slice(0, 160),
+        session_id: chat.session_id
+      })
+    }
+    if (fb) {
+      const who = fb.guest_name || 'A guest'
+      const room = fb.room_number ? ' · Room ' + fb.room_number : ''
+      return c.json({
+        ringing: true, kind: 'feedback',
+        title: (fb.is_urgent ? '🚨 Urgent feedback' : '📝 New feedback'),
+        body: who + room + (fb.sentiment_label ? ' · ' + fb.sentiment_label : ''),
+        session_id: ''
+      })
+    }
+    return c.json({ ringing: false })
+  } catch (e) {
+    console.error('ring-state', e)
+    return c.json({ ringing: false })
+  }
+})
+
 app.post('/api/staff/push/subscribe', async (c) => {
   const { DB } = c.env
   try {
