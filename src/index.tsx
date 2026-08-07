@@ -47427,6 +47427,10 @@ app.get('/staff/app', (c) => {
         .b.admin .xl{color:rgba(35,19,7,.65);border-top-color:rgba(35,19,7,.25)}
         .langflag{display:inline-block;font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--gold2);background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.35);border-radius:999px;padding:1px 6px;margin-left:6px;vertical-align:middle}
         .tr-note{font-size:.6rem;color:var(--dim);text-align:center;padding:4px 0 0}
+        .wd{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:.68rem;letter-spacing:.04em;border-bottom:1px solid rgba(212,175,55,.15);color:var(--dim)}
+        .wd .dot{width:8px;height:8px;border-radius:50%;background:#f43f5e;flex-shrink:0}
+        .wd.ok .dot{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.9)}
+        .wd.ok{color:#6ee7b7}
         #msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
         .b{max-width:82%;padding:10px 13px;border-radius:16px;font-size:.88rem;line-height:1.45;white-space:pre-wrap;word-break:break-word}
         .b.user{align-self:flex-start;background:rgba(250,246,236,.08);border:1px solid rgba(212,175,55,.2);border-top-left-radius:5px}
@@ -47456,6 +47460,7 @@ app.get('/staff/app', (c) => {
         <h1>Old Palace <span>Ops</span></h1>
         <button class="bell" id="bellBtn"><i class="fas fa-bell"></i> <span id="bellTxt">Enable alerts</span></button>
     </header>
+    <div id="watchdog" class="wd"><span class="dot"></span><span id="wdTxt">Checking alert watcher…</span></div>
 
     <div class="wrap">
         <div class="tabs">
@@ -47574,6 +47579,24 @@ app.get('/staff/app', (c) => {
     }
 
     // ── Lists ──
+    async function loadWatchdog(){
+        try{
+            var d = await fetch('/api/staff/watchdog',{cache:'no-store'}).then(function(r){return r.json()});
+            var dev = (d.devices||[]).filter(function(x){ return x.seconds_ago!=null && x.seconds_ago < 90; })[0];
+            var el=document.getElementById('watchdog'), tx=document.getElementById('wdTxt');
+            if(dev){
+                el.classList.add('ok');
+                tx.textContent='Alert watcher running on '+dev.device+' · checked '+dev.seconds_ago+'s ago';
+            }else{
+                el.classList.remove('ok');
+                var last=(d.devices||[])[0];
+                tx.textContent = last
+                    ? 'Alert watcher NOT running — last seen '+Math.round(last.seconds_ago/60)+' min ago ('+last.device+'). Open the app on that phone.'
+                    : 'Alert watcher not installed yet — install the Ops app on the front desk phone.';
+            }
+        }catch(e){}
+    }
+
     async function loadAll(){
         try{
             var r1 = await fetch('/api/staff/inbox/'+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
@@ -47782,9 +47805,9 @@ app.get('/staff/app', (c) => {
     }
 
     setStaffLang(STAFF_LANG);
-    loadAll();
-    setInterval(function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } }, 15000);
-    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ loadAll(); if(cur) loadMsgs(); } });
+    loadAll(); loadWatchdog();
+    setInterval(function(){ if(document.visibilityState==='visible'){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); } }, 15000);
+    document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible'){ loadAll(); loadWatchdog(); if(cur) loadMsgs(); } });
     </script>
 </body>
 </html>
@@ -84862,6 +84885,40 @@ app.post('/api/staff/translate', async (c) => {
   } catch (error) {
     console.error('translate endpoint error', error)
     return c.json({ success: false, error: 'translation failed' }, 500)
+  }
+})
+
+// The phone's native watcher checks in here every poll, so the console can
+// show whether alerting is actually alive on the device.
+app.post('/api/staff/ring-heartbeat', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json().catch(() => ({}))
+    await DB.prepare(`
+      INSERT INTO staff_watchdog (device, property_id, app_version, ringing, last_seen)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(device) DO UPDATE SET
+        app_version = excluded.app_version,
+        ringing = excluded.ringing,
+        last_seen = CURRENT_TIMESTAMP
+    `).bind(b.device || 'unknown', b.property_id || 1, b.app || '', b.ringing ? 1 : 0).run()
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ success: false }, 500)
+  }
+})
+
+app.get('/api/staff/watchdog', async (c) => {
+  const { DB } = c.env
+  try {
+    const rows = await DB.prepare(`
+      SELECT device, app_version, ringing, last_seen,
+             CAST((julianday('now') - julianday(last_seen)) * 86400 AS INTEGER) as seconds_ago
+      FROM staff_watchdog ORDER BY last_seen DESC LIMIT 10
+    `).all()
+    return c.json({ success: true, devices: rows.results || [] })
+  } catch (e) {
+    return c.json({ success: false, devices: [] })
   }
 })
 
