@@ -47845,37 +47845,44 @@ app.get('/admin/escalation', (c) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WhatsApp Escalation</title>
 <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Montserrat,system-ui,sans-serif;background:#120a0e;color:#f6f0e3;min-height:100vh}
-header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(212,175,55,.25)}
-header h1{font-family:'Cormorant Garamond',serif;font-size:1.4rem}
-header h1 i{color:#25D366;margin-right:8px}
-header a{color:#f0d98c;text-decoration:none;font-size:.85rem}
-.wrap{max-width:820px;margin:0 auto;padding:18px}
-.card{background:linear-gradient(160deg,rgba(52,29,39,.72),rgba(26,14,19,.92));border:1px solid rgba(212,175,55,.28);border-radius:14px;padding:16px;margin-bottom:16px}
-.card h2{font-family:'Cormorant Garamond',serif;font-size:1.2rem;margin-bottom:12px}
-label{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;color:rgba(246,240,227,.55);margin:10px 0 4px}
-input{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.35);border-radius:8px;padding:10px;color:#f6f0e3;font-size:.9rem}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.row>div{flex:1;min-width:120px}
-.btn{border:none;border-radius:999px;padding:11px 20px;font-weight:700;font-size:.8rem;cursor:pointer;margin-top:14px}
-.btn-gold{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
-.btn-wa{background:#25D366;color:#04310f}
-.btn-ghost{background:rgba(250,246,236,.08);color:#f6f0e3;border:1px solid rgba(212,175,55,.35)}
-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.85rem}
-th,td{text-align:left;padding:9px 6px;border-bottom:1px solid rgba(212,175,55,.15)}
-th{font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:rgba(246,240,227,.5)}
-td button{border:1px solid rgba(244,63,94,.5);background:rgba(244,63,94,.12);color:#fda4af;border-radius:8px;padding:5px 9px;font-size:.7rem;cursor:pointer}
-.pill{display:inline-block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid rgba(212,175,55,.4);color:#f0d98c}
-.pill.ok{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.5);color:#6ee7b7}
-.pill.warn{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.5);color:#fcd34d}
-.muted{color:rgba(246,240,227,.6);font-size:.78rem;line-height:1.6}
-.log{font-size:.72rem;color:rgba(246,240,227,.6);max-height:220px;overflow:auto}
-.log div{padding:5px 0;border-bottom:1px solid rgba(212,175,55,.1)}
-.ok{color:#6ee7b7}.bad{color:#fda4af}
-code{background:rgba(250,246,236,.08);padding:2px 6px;border-radius:5px;font-size:.75rem}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f3f4f6;color:#1f2937}
+body.embed{background:transparent}
+body.embed header{display:none}
+header{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #e5e7eb}
+header h1{font-size:1.3rem;font-weight:800;color:#111827}
+header h1 i{color:#25D366;margin-right:9px}
+header a{color:#2563eb;text-decoration:none;font-size:.85rem;font-weight:600}
+.wrap{max-width:880px;margin:0 auto;padding:20px}
+body.embed .wrap{padding:0;max-width:none}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h2{font-size:1.05rem;font-weight:800;color:#111827;margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.card h2 i{color:#25D366}
+label{display:block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:12px 0 5px}
+input{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem}
+input:focus{outline:none;border-color:#25D366;box-shadow:0 0 0 3px rgba(37,211,102,.15)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>div{flex:1;min-width:150px}
+.btn{border:none;border-radius:9px;padding:11px 20px;font-weight:700;font-size:.85rem;cursor:pointer;margin-top:16px;margin-right:8px}
+.btn-gold{background:#2563eb;color:#fff}
+.btn-gold:hover{background:#1d4ed8}
+.btn-wa{background:#25D366;color:#fff}
+.btn-wa:hover{background:#1eb856}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.88rem}
+th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #f0f1f3}
+th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700}
+td button{border:1px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:7px;padding:6px 11px;font-size:.75rem;cursor:pointer;font-weight:600}
+.pill{display:inline-block;font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;font-weight:800;padding:4px 11px;border-radius:999px;background:#f3f4f6;color:#4b5563}
+.pill.ok{background:#dcfce7;color:#15803d}
+.pill.warn{background:#fef3c7;color:#a16207}
+.muted{color:#6b7280;font-size:.86rem;line-height:1.65}
+.log{font-size:.8rem;color:#4b5563;max-height:240px;overflow:auto}
+.log div{padding:8px 0;border-bottom:1px solid #f3f4f6}
+.ok{color:#16a34a;font-weight:700}.bad{color:#dc2626;font-weight:700}
+code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:#be123c}
+.switch{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:.9rem;font-weight:600;color:#374151}
+.switch input{width:auto}
 </style>
 </head>
 <body>
@@ -47931,7 +47938,9 @@ code{background:rgba(250,246,236,.08);padding:2px 6px;border-radius:5px;font-siz
 </div>
 
 <script>
-if(!localStorage.getItem('admin_token')) window.location.href='/admin/login';
+var EMBED = new URLSearchParams(location.search).has('embed');
+if(EMBED) document.body.classList.add('embed');
+if(!EMBED && !localStorage.getItem('admin_token')) window.location.href='/admin/login';
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
 async function load(){
   var d = await fetch('/api/staff/escalation/config',{cache:'no-store'}).then(function(r){return r.json()});
@@ -47997,51 +48006,55 @@ app.get('/admin/map-editor', (c) => {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; background: #14090c; color: #f6f0e3; min-height: 100vh; }
-        header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(212,175,55,.25); }
-        header h1 { font-size: 1.15rem; font-weight: 700; }
-        header h1 i { color: #D4AF37; margin-right: 8px; }
-        header a { color: #f0d98c; text-decoration: none; font-size: .85rem; }
-        .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
-        .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-        .btn { border: none; border-radius: 999px; padding: 10px 18px; font-weight: 700; font-size: .85rem; cursor: pointer; }
-        .btn-gold { background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; }
-        .btn-gold.armed { outline: 3px solid rgba(212,175,55,.5); }
-        .hint { font-size: .75rem; color: rgba(246,240,227,.6); }
-        #map { height: 62vh; min-height: 420px; border-radius: 14px; border: 1px solid rgba(212,175,55,.4); }
-        #map.placing { cursor: crosshair; }
-        #map.placing .leaflet-grab { cursor: crosshair !important; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: .85rem; }
-        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid rgba(212,175,55,.15); }
-        th { font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: rgba(246,240,227,.55); }
-        td .cat { font-size: .68rem; color: #f0d98c; text-transform: capitalize; }
-        .act { display: flex; gap: 6px; }
-        .act button { border: 1px solid rgba(212,175,55,.4); background: rgba(250,246,236,.06); color: #f6f0e3; border-radius: 8px; padding: 6px 10px; font-size: .72rem; cursor: pointer; }
-        .act button.del { border-color: rgba(244,63,94,.5); color: #fda4af; }
-        .pin { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; border: 2px solid rgba(255,255,255,.9); box-shadow: 0 5px 14px rgba(0,0,0,.5); font-size: .85rem; }
-        .pin-tip { display: block; margin: -2px auto 0; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 9px solid #b08c2c; }
-        .pin-wrap { background: none; border: none; }
-        .leaflet-popup-content-wrapper { background: rgba(24,13,18,.97) !important; color: #f6f0e3; border: 1px solid rgba(212,175,55,.5); border-radius: 12px !important; }
-        .leaflet-popup-tip { background: rgba(24,13,18,.97) !important; }
-        .pop-nm { font-weight: 700; font-size: 1rem; margin-bottom: 2px; }
-        .pop-ds { font-size: .78rem; color: rgba(246,240,227,.7); }
-        .pop-row { display: flex; gap: 6px; margin-top: 8px; }
-        .pop-row button { flex: 1; border-radius: 8px; padding: 6px; font-size: .72rem; font-weight: 700; cursor: pointer; }
-        .pop-ed { background: rgba(212,175,55,.18); color: #f0d98c; border: 1px solid rgba(212,175,55,.45); }
-        .pop-rm { background: rgba(244,63,94,.15); color: #fda4af; border: 1px solid rgba(244,63,94,.4); }
-        /* form modal */
-        #formWrap { position: fixed; inset: 0; background: rgba(8,4,6,.7); display: none; align-items: center; justify-content: center; z-index: 5000; padding: 16px; }
-        #formWrap.open { display: flex; }
-        .form { background: #241318; border: 1px solid rgba(212,175,55,.5); border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; }
-        .form .t { font-size: 1.05rem; font-weight: 700; margin-bottom: 12px; }
-        .form label { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: rgba(246,240,227,.55); margin: 10px 0 4px; }
-        .form input, .form textarea, .form select { width: 100%; background: rgba(250,246,236,.07); border: 1px solid rgba(212,175,55,.35); border-radius: 8px; padding: 10px; color: #f6f0e3; font-size: .9rem; }
-        .form select option { background: #241318; }
-        .form .row { display: flex; gap: 8px; margin-top: 16px; }
-        .form .row button { flex: 1; border-radius: 999px; padding: 11px; font-weight: 700; cursor: pointer; }
-        .form .cancel { background: rgba(250,246,236,.08); color: #f6f0e3; border: 1px solid rgba(212,175,55,.35); }
-        .form .save { background: linear-gradient(135deg, #e9cd76, #D4AF37 45%, #b08c2c); color: #231307; border: none; }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f3f4f6;color:#1f2937;min-height:100vh}
+        body.embed{background:transparent}
+        body.embed header{display:none}
+        body.embed .wrap{padding:0;max-width:none}
+        header{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #e5e7eb}
+        header h1{font-size:1.3rem;font-weight:800;color:#111827}
+        header h1 i{color:#D4AF37;margin-right:9px}
+        header a{color:#2563eb;text-decoration:none;font-size:.85rem;font-weight:600}
+        .wrap{max-width:1100px;margin:0 auto;padding:20px}
+        .panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:18px}
+        .toolbar{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+        .btn{border:none;border-radius:9px;padding:11px 20px;font-weight:700;font-size:.85rem;cursor:pointer}
+        .btn-gold{background:#2563eb;color:#fff}
+        .btn-gold:hover{background:#1d4ed8}
+        .btn-gold.armed{background:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,.2)}
+        .hint{font-size:.82rem;color:#6b7280}
+        #map{height:58vh;min-height:400px;border-radius:12px;border:1px solid #e5e7eb}
+        #map.placing{cursor:crosshair}
+        #map.placing .leaflet-grab{cursor:crosshair !important}
+        table{width:100%;border-collapse:collapse;margin-top:6px;font-size:.88rem}
+        th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #f0f1f3}
+        th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:700}
+        td .cat{font-size:.7rem;color:#a16207;background:#fef3c7;padding:3px 9px;border-radius:999px;text-transform:capitalize;font-weight:700}
+        .act{display:flex;gap:6px}
+        .act button{border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;padding:7px 11px;font-size:.76rem;cursor:pointer}
+        .act button:hover{background:#f9fafb}
+        .act button.del{border-color:#fecaca;background:#fef2f2;color:#dc2626}
+        .pin{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;border:2px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.35);font-size:.85rem}
+        .pin-tip{display:block;margin:-2px auto 0;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #b08c2c}
+        .pin-wrap{background:none;border:none}
+        .leaflet-popup-content-wrapper{background:#fff !important;color:#1f2937;border-radius:12px !important;box-shadow:0 10px 30px rgba(0,0,0,.18) !important}
+        .pop-nm{font-weight:800;font-size:1rem;margin-bottom:3px;color:#111827}
+        .pop-ds{font-size:.8rem;color:#6b7280;line-height:1.5}
+        .pop-row{display:flex;gap:6px;margin-top:10px}
+        .pop-row button{flex:1;border-radius:7px;padding:7px;font-size:.75rem;font-weight:700;cursor:pointer}
+        .pop-ed{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
+        .pop-rm{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+        #formWrap{position:fixed;inset:0;background:rgba(17,24,39,.55);display:none;align-items:center;justify-content:center;z-index:5000;padding:16px}
+        #formWrap.open{display:flex}
+        .form{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:430px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+        .form .t{font-size:1.1rem;font-weight:800;margin-bottom:10px;color:#111827}
+        .form label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;margin:12px 0 5px;font-weight:700}
+        .form input,.form textarea,.form select{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem}
+        .form input:focus,.form textarea:focus,.form select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+        .form .row{display:flex;gap:10px;margin-top:18px}
+        .form .row button{flex:1;border-radius:9px;padding:12px;font-weight:700;cursor:pointer;font-size:.85rem}
+        .form .cancel{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}
+        .form .save{background:#2563eb;color:#fff;border:none}
     </style>
 </head>
 <body>
@@ -48050,16 +48063,19 @@ app.get('/admin/map-editor', (c) => {
         <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Back to dashboard</a>
     </header>
     <div class="wrap">
-        <div class="toolbar">
-            <button class="btn btn-gold" id="addBtn"><i class="fas fa-map-pin"></i> Add spot (then click the map)</button>
-            <span class="hint">Drag any pin to move it — position saves automatically. Click a pin to edit or remove it.</span>
+        <div class="panel">
+            <div class="toolbar">
+                <button class="btn btn-gold" id="addBtn"><i class="fas fa-map-pin"></i> Add spot</button>
+                <span class="hint">Click <strong>Add spot</strong> then click the map to place it. Drag any pin to move it — it saves automatically.</span>
+            </div>
+            <div id="map"></div>
         </div>
-        <div id="map"></div>
-        <table>
-            <thead><tr><th>Name</th><th>Category</th><th>Description</th><th style="width:180px">Actions</th></tr></thead>
-            <tbody id="poiRows"></tbody>
-        </table>
-    </div>
+        <div class="panel">
+            <table>
+                <thead><tr><th>Name</th><th>Category</th><th>Description</th><th style="width:170px">Actions</th></tr></thead>
+                <tbody id="poiRows"></tbody>
+            </table>
+        </div>
 
     <div id="formWrap">
         <div class="form">
@@ -48084,7 +48100,9 @@ app.get('/admin/map-editor', (c) => {
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.min.js"></script>
     <script>
-        if (!localStorage.getItem('admin_token')) window.location.href = '/admin/login';
+        var EMBED = new URLSearchParams(location.search).has('embed');
+        if (EMBED) document.body.classList.add('embed');
+        if (!EMBED && !localStorage.getItem('admin_token')) window.location.href = '/admin/login';
         var PROPERTY_ID = localStorage.getItem('property_id') || '1';
         var RING = [[27.048829, 33.888100], [27.046152, 33.889835], [27.045267, 33.888114], [27.047944, 33.886379]];
         var CAT_ICONS = { dining: 'fas fa-utensils', bar: 'fas fa-martini-glass', pool: 'fas fa-person-swimming', beach: 'fas fa-umbrella-beach', dive: 'fas fa-fish', spa: 'fas fa-spa', hotel: 'fas fa-bell-concierge', shop: 'fas fa-bag-shopping', medical: 'fas fa-briefcase-medical', other: 'fas fa-location-dot' };
@@ -48133,16 +48151,16 @@ app.get('/admin/map-editor', (c) => {
             var tb = document.getElementById('poiRows');
             var html = '';
             pois.forEach(function(p) {
-                html += '<tr><td><i class="' + (p.icon_class || 'fas fa-location-dot') + '" style="color:#f0d98c;margin-right:8px;"></i>' + p.name + '</td>' +
+                html += '<tr><td><i class="' + (p.icon_class || 'fas fa-location-dot') + '" style="color:#b08c2c;margin-right:8px;"></i>' + p.name + '</td>' +
                     '<td><span class="cat">' + (p.category || '—') + '</span></td>' +
-                    '<td style="color:rgba(246,240,227,.65);">' + (p.description || '') + '</td>' +
+                    '<td style="color:#6b7280;">' + (p.description || '') + '</td>' +
                     '<td><div class="act">' +
                     '<button onclick="showPoi(' + p.poi_id + ')"><i class="fas fa-eye"></i></button>' +
                     '<button onclick="editPoi(' + p.poi_id + ')"><i class="fas fa-pen"></i></button>' +
                     '<button class="del" onclick="delPoi(' + p.poi_id + ')"><i class="fas fa-trash"></i></button>' +
                     '</div></td></tr>';
             });
-            tb.innerHTML = html || '<tr><td colspan="4" style="color:rgba(246,240,227,.5);">No spots yet — click "Add spot" and then click the map.</td></tr>';
+            tb.innerHTML = html || '<tr><td colspan="4" style="color:#9ca3af;">No spots yet — click "Add spot" and then click the map.</td></tr>';
         }
 
         function findPoi(id) { return pois.find(function(p) { return p.poi_id === id; }); }
@@ -48594,15 +48612,6 @@ app.get('/admin/dashboard', (c) => {
             </div>
             
             <nav class="py-4">
-                <!-- OnePass Premium Feature - FIRST & PROMINENT -->
-                <div class="px-3 mb-6 border-b-2 border-teal-200 pb-6">
-                    <button data-tab="onepass" class="onepass-btn sidebar-btn w-full text-left px-4 py-3 rounded-xl font-bold transition-all flex items-center gap-3 mb-2">
-                        <img src="/onepass-logo.png" alt="OnePass" style="height: 22px; width: auto; max-width: 24px; object-fit: contain;">
-                        <span class="flex-1">OnePass</span>
-                        <span style="background: #00d4aa; color: #0f1f33; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 800;">PRO</span>
-                    </button>
-                    <p class="text-xs text-gray-500 px-4 mt-2 italic">Digital Pass + Face Recognition</p>
-                </div>
                 <!-- Core Section -->
                 <div class="px-3 mb-6">
                     <h3 class="text-sm font-extrabold text-gray-700 uppercase tracking-wide px-3 mb-3 mt-4 border-l-4 border-blue-500 pl-2">Core</h3>
@@ -48643,6 +48652,9 @@ app.get('/admin/dashboard', (c) => {
                     </button>
                     <button data-tab="activities" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
                         <i class="fas fa-hiking w-5"></i><span>Activities</span>
+                    </button>
+                    <button data-tab="resortmap" class="sidebar-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-all flex items-center gap-3">
+                        <i class="fas fa-map-location-dot w-5"></i><span>Resort Map</span>
                     </button>
                 </div>
                 
@@ -53631,6 +53643,31 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- AI Chatbot Tab -->
         <div id="chatbotTab" class="tab-content hidden">
+            <!-- Sub-navigation: knowledge base vs. human escalation -->
+            <div class="flex gap-2 mb-6 border-b border-gray-200">
+                <button id="cbSubKb" onclick="chatbotSub('kb')"
+                        class="px-5 py-3 font-bold text-sm border-b-2 border-purple-600 text-purple-700">
+                    <i class="fas fa-robot mr-2"></i>Knowledge Base
+                </button>
+                <button id="cbSubEsc" onclick="chatbotSub('esc')"
+                        class="px-5 py-3 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-800">
+                    <i class="fab fa-whatsapp mr-2" style="color:#25D366;"></i>WhatsApp Escalation
+                </button>
+            </div>
+
+            <!-- Escalation sub-tab -->
+            <div id="cbEscPane" class="hidden">
+                <div class="mb-5">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">
+                        <i class="fab fa-whatsapp mr-2" style="color:#25D366;"></i>When nobody answers a guest
+                    </h2>
+                    <p class="text-gray-600">If a guest message isn't acknowledged in the Ops app in time, these numbers get a WhatsApp alert. Sent直 through Meta's Cloud API — about $0.007 per message.</p>
+                </div>
+                <iframe id="escalationFrame" data-src="/admin/escalation?embed=1"
+                        style="width:100%;height:calc(100vh - 250px);min-height:620px;border:0;border-radius:14px;background:transparent;"></iframe>
+            </div>
+
+            <div id="cbKbPane">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4">
                     <i class="fas fa-robot mr-2 text-purple-600"></i>
@@ -53890,6 +53927,7 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </form>
         </div>
+            </div><!-- /cbKbPane -->
     </div>
 
     <!-- Restaurants Management Tab -->
@@ -54650,297 +54688,17 @@ app.get('/admin/dashboard', (c) => {
     </div>
 
     <!-- OnePass - Digital Pass + Face Recognition Tab -->
-    <div id="onepassTab" class="tab-content hidden">
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 class="text-3xl font-bold mb-6 flex items-center gap-3" style="color: #016e8f;">
-                <i class="fas fa-id-badge"></i>
-                OnePass - Digital Pass + Face Recognition
+
+    <!-- Resort Map Tab: live map spot editor -->
+    <div id="resortmapTab" class="tab-content hidden">
+        <div class="mb-6">
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-map-location-dot mr-3" style="color:#D4AF37;"></i>Resort Map
             </h2>
-            
-            <div class="bg-gradient-to-r from-[#f6f2e9] to-[#aecfb4]/20 border-l-4 p-6 rounded-lg mb-6" style="border-color: #016e8f;">
-                <h3 class="font-bold text-lg mb-2 flex items-center gap-2" style="color: #016e8f;">
-                    <i class="fas fa-shield-alt"></i>
-                    Eliminate Wristband Fraud - Save $135K-225K Annually
-                </h3>
-                <p class="text-gray-700 mb-3">
-                    Replace physical wristbands with fraud-proof digital passes. Prevent old wristband reuse, sharing, counterfeiting, and tier fraud.
-                </p>
-                <div class="grid md:grid-cols-3 gap-4 text-sm">
-                    <div class="bg-white p-3 rounded-lg border border-gray-200">
-                        <strong style="color: #016e8f;">✓ Rotating QR Codes</strong>
-                        <p class="text-gray-600">Refresh every 60s - impossible to counterfeit</p>
-                    </div>
-                    <div class="bg-white p-3 rounded-lg border border-gray-200">
-                        <strong style="color: #016e8f;">✓ Instant Deactivation</strong>
-                        <p class="text-gray-600">Auto-expire at checkout - no old pass reuse</p>
-                    </div>
-                    <div class="bg-white p-3 rounded-lg border border-gray-200">
-                        <strong style="color: #016e8f;">✓ Tier Verification</strong>
-                        <p class="text-gray-600">Staff verify access rights in 1 second</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Quick Stats Dashboard -->
-            <div class="grid md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
-                    <div class="text-3xl font-bold" id="stats-active-passes">0</div>
-                    <div class="opacity-90 text-sm">Active Passes</div>
-                </div>
-                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
-                    <div class="text-3xl font-bold" id="stats-verifications-today">0</div>
-                    <div class="opacity-90 text-sm">Verifications Today</div>
-                </div>
-                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
-                    <div class="text-3xl font-bold" id="stats-total-tiers">0</div>
-                    <div class="opacity-90 text-sm">Tier Levels</div>
-                </div>
-                <div class="bg-gradient-to-br text-white p-5 rounded-xl shadow-lg" style="background: linear-gradient(to bottom right, #016e8f, #014a5e);">
-                    <div class="text-3xl font-bold" id="stats-fraud-alerts">0</div>
-                    <div class="opacity-90 text-sm">Fraud Alerts</div>
-                </div>
-            </div>
-
-            <!-- Management Tabs -->
-            <div class="border-b border-gray-200 mb-6">
-                <nav class="flex gap-4">
-                    <button onclick="switchPassTab('tiers')" id="pass-tab-tiers" class="pass-tab-btn px-4 py-3 font-semibold border-b-4" style="border-color: #016e8f; color: #016e8f;">
-                        <i class="fas fa-layer-group mr-2"></i>Tier Management
-                    </button>
-                    <button onclick="switchPassTab('passes')" id="pass-tab-passes" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-id-card mr-2"></i>Digital Passes
-                    </button>
-                    <button onclick="switchPassTab('locations')" id="pass-tab-locations" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-map-marker-alt mr-2"></i>Verification Locations
-                    </button>
-                    <button onclick="switchPassTab('analytics')" id="pass-tab-analytics" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-chart-bar mr-2"></i>Analytics
-                    </button>
-                    <button onclick="switchPassTab('consents')" id="pass-tab-consents" class="pass-tab-btn px-4 py-3 font-semibold border-b-4 border-transparent text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-file-signature mr-2"></i>Consent Signatures
-                    </button>
-                </nav>
-            </div>
-
-            <!-- Tier Management Tab -->
-            <div id="pass-content-tiers" class="pass-tab-content">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold">Tier Configuration</h3>
-                    <button onclick="openCreateTierModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
-                        <i class="fas fa-plus mr-2"></i>Create New Tier
-                    </button>
-                </div>
-
-                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-4">
-                    <p class="text-sm text-gray-700">
-                        <strong>Tiers</strong> define guest access levels (e.g., Standard, Premium, VIP, Diamond). Each tier can have different privileges: restaurant access, drink quality, spa access, etc.
-                    </p>
-                </div>
-
-                <div id="tiers-list" class="space-y-4">
-                    <!-- Tiers will be loaded here -->
-                    <div class="text-center py-12 text-gray-500">
-                        <i class="fas fa-layer-group text-4xl mb-3"></i>
-                        <p>Loading tiers...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Digital Passes Tab -->
-            <div id="pass-content-passes" class="pass-tab-content hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold">Digital Passes</h3>
-                    <div class="flex gap-3">
-                        <select id="pass-status-filter" onchange="loadPasses()" class="border border-gray-300 rounded-lg px-3 py-2">
-                            <option value="all">All Passes</option>
-                            <option value="active">Active</option>
-                            <option value="expired">Expired</option>
-                            <option value="deactivated">Deactivated</option>
-                        </select>
-                        <button onclick="openCreatePassModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
-                            <i class="fas fa-plus mr-2"></i>Issue New Pass
-                        </button>
-                    </div>
-                </div>
-
-                <div id="passes-list" class="space-y-4">
-                    <!-- Passes will be loaded here -->
-                    <div class="text-center py-12 text-gray-500">
-                        <i class="fas fa-id-card text-4xl mb-3"></i>
-                        <p>Loading passes...</p>
-                    </div>
-                </div>
-
-                <!-- Pagination -->
-                <div id="passes-pagination" class="mt-6 flex justify-center gap-2">
-                    <!-- Pagination buttons will be here -->
-                </div>
-            </div>
-
-            <!-- Verification Locations Tab -->
-            <div id="pass-content-locations" class="pass-tab-content hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold">Verification Locations</h3>
-                    <button onclick="openCreateLocationModal()" class="text-white px-4 py-2 rounded-lg font-semibold hover:opacity-90 transition" style="background-color: #016e8f;">
-                        <i class="fas fa-plus mr-2"></i>Add Location
-                    </button>
-                </div>
-
-                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-4">
-                    <p class="text-sm text-gray-700">
-                        <strong>Verification Locations</strong> are checkpoints where staff scan guest passes (e.g., VIP Restaurant Entry, Rooftop Bar, Adults Pool, Premium Spa).
-                    </p>
-                </div>
-
-                <div id="locations-list" class="grid md:grid-cols-2 gap-4">
-                    <!-- Locations will be loaded here -->
-                    <div class="text-center py-12 text-gray-500 col-span-2">
-                        <i class="fas fa-map-marker-alt text-4xl mb-3"></i>
-                        <p>Loading locations...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Analytics Tab -->
-            <div id="pass-content-analytics" class="pass-tab-content hidden">
-                <h3 class="text-xl font-bold mb-4">Pass Analytics</h3>
-                
-                <div class="grid md:grid-cols-2 gap-6">
-                    <!-- Verifications by Tier -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-6">
-                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
-                            <i class="fas fa-chart-pie text-purple-600"></i>
-                            Verifications by Tier
-                        </h4>
-                        <div id="chart-tier-verifications" class="h-64">
-                            <canvas id="tier-verifications-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Verifications by Location -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-6">
-                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
-                            <i class="fas fa-chart-bar text-blue-600"></i>
-                            Verifications by Location
-                        </h4>
-                        <div id="chart-location-verifications" class="h-64">
-                            <canvas id="location-verifications-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Recent Fraud Alerts -->
-                    <div class="bg-white border border-gray-200 rounded-xl p-6 md:col-span-2">
-                        <h4 class="font-bold text-lg mb-4 flex items-center gap-2">
-                            <i class="fas fa-exclamation-triangle text-red-600"></i>
-                            Recent Fraud Alerts
-                        </h4>
-                        <div id="fraud-alerts-list">
-                            <p class="text-gray-500 text-center py-4">No fraud alerts</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="mt-8 grid md:grid-cols-4 gap-4">
-                <a href="/frontdesk-face-enrollment.html" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #00d4aa, #00a589);">
-                    <i class="fas fa-user-check text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">Face Enrollment</h4>
-                    <p class="opacity-90 text-sm">Enroll guests with digital consent signature</p>
-                </a>
-
-                <a href="/staff/verify-pass" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
-                    <i class="fas fa-qrcode text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">QR & Face Verification</h4>
-                    <p class="opacity-90 text-sm">Unified QR + Face recognition scanner</p>
-                </a>
-
-                <a href="/staff-unified-scanner.html" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #10b981, #059669);">
-                    <i class="fas fa-shield-alt text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">🆕 Unified Scanner</h4>
-                    <p class="opacity-90 text-sm">Face • QR • NFC - All in One</p>
-                </a>
-
-                <a href="/staff/nfc-scanner" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #7c3aed, #5b21b6);">
-                    <i class="fas fa-wifi text-3xl mb-3" style="transform: rotate(-45deg);"></i>
-                    <h4 class="font-bold text-lg mb-1">NFC Scanner</h4>
-                    <p class="opacity-90 text-sm">Tap NFC cards to verify digital passes</p>
-                </a>
-
-                <a href="/admin/all-inclusive/reports" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
-                    <i class="fas fa-file-download text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">Export Reports</h4>
-                    <p class="opacity-90 text-sm">Download pass usage and verification reports</p>
-                </a>
-
-                <a href="/admin/all-inclusive/fraud-prevention" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #016e8f, #014a5e);">
-                    <i class="fas fa-shield-alt text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">Fraud Prevention</h4>
-                    <p class="opacity-90 text-sm">View fraud alerts and suspicious activity</p>
-                </a>
-            </div>
-            
-            <!-- Second Row: NFC Encoding Station (NEW) -->
-            <div class="mt-4 grid md:grid-cols-4 gap-4">
-                <a href="/staff/nfc-encoder" target="_blank" class="block text-white p-6 rounded-xl hover:opacity-90 transition-all shadow-lg" style="background: linear-gradient(to right, #ec4899, #be185d);">
-                    <i class="fas fa-pen-nib text-3xl mb-3"></i>
-                    <h4 class="font-bold text-lg mb-1">🆕 NFC Encoding Station</h4>
-                    <p class="opacity-90 text-sm">Write digital passes to NFC wristbands</p>
-                </a>
-                
-                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
-                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
-                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
-                    <p class="opacity-50 text-sm">Additional features coming soon</p>
-                </div>
-                
-                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
-                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
-                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
-                    <p class="opacity-50 text-sm">Additional features coming soon</p>
-                </div>
-                
-                <div class="block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-600 p-6 rounded-xl border-2 border-dashed border-gray-300">
-                    <i class="fas fa-plus text-3xl mb-3 opacity-30"></i>
-                    <h4 class="font-bold text-lg mb-1">More Tools</h4>
-                    <p class="opacity-50 text-sm">Additional features coming soon</p>
-                </div>
-            </div>
-            
-            <!-- Consent Signatures Tab -->
-            <div id="pass-content-consents" class="pass-tab-content hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold">Biometric Consent Signatures</h3>
-                        <p class="text-gray-600 text-sm mt-1">View and export digital consent signatures for GDPR/BIPA compliance</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="exportConsentsCSV()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
-                            <i class="fas fa-file-csv mr-2"></i>Export CSV
-                        </button>
-                        <button onclick="loadConsents()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
-                            <i class="fas fa-sync mr-2"></i>Refresh
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded-lg mb-6">
-                    <p class="text-sm text-gray-700">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        <strong>Legal Compliance:</strong> All biometric consent signatures are stored for audit purposes. Guests signed these digitally before face enrollment. Keep these records for compliance with GDPR Article 7 and BIPA Section 15.
-                    </p>
-                </div>
-                
-                <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    <div id="consents-list-container">
-                        <div class="text-center py-12 text-gray-500">
-                            <i class="fas fa-file-signature text-4xl mb-3"></i>
-                            <p>Loading consent signatures...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <p class="text-gray-600">Place and edit the spots guests see on the live map — reception, restaurants, the dive centre, anything. Guests see changes immediately, with walking distances from where they stand.</p>
         </div>
+        <iframe id="resortmapFrame" data-src="/admin/map-editor?embed=1"
+                style="width:100%;height:calc(100vh - 190px);min-height:640px;border:0;border-radius:14px;background:#fff;"></iframe>
     </div>
 
     <!-- Feedback Management Tab -->
@@ -56175,13 +55933,17 @@ app.get('/admin/dashboard', (c) => {
         if (clickedButton) {
           clickedButton.classList.add('tab-active');
         }
-        
+
+
         if (tab === 'frontdesk') {
           loadFrontDeskData();
           startFrontDeskAutoRefresh();
         } else {
           stopFrontDeskAutoRefresh();
         }
+        // Embedded tools load their iframe only when first opened
+        if (tab === 'resortmap') lazyFrame('resortmapFrame');
+        if (tab === 'chatbot') chatbotSub(window.__cbSub || 'kb');
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
@@ -56227,6 +55989,34 @@ app.get('/admin/dashboard', (c) => {
       }
       
       // Add event listeners to sidebar buttons
+      // Load an embedded tool's iframe on first open, so the dashboard stays fast
+      window.lazyFrame = function(id) {
+        const f = document.getElementById(id);
+        if (f && !f.src && f.dataset.src) f.src = f.dataset.src;
+      };
+
+      // AI Chatbot tab: switch between the knowledge base and WhatsApp escalation
+      window.chatbotSub = function(which) {
+        window.__cbSub = which;
+        const kb = document.getElementById('cbKbPane');
+        const esc = document.getElementById('cbEscPane');
+        const kbBtn = document.getElementById('cbSubKb');
+        const escBtn = document.getElementById('cbSubEsc');
+        if (!kb || !esc) return;
+        const showEsc = which === 'esc';
+        kb.classList.toggle('hidden', showEsc);
+        esc.classList.toggle('hidden', !showEsc);
+        if (kbBtn) {
+          kbBtn.className = 'px-5 py-3 font-bold text-sm border-b-2 ' +
+            (showEsc ? 'border-transparent text-gray-500 hover:text-gray-800' : 'border-purple-600 text-purple-700');
+        }
+        if (escBtn) {
+          escBtn.className = 'px-5 py-3 font-bold text-sm border-b-2 ' +
+            (showEsc ? 'border-green-500 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-800');
+        }
+        if (showEsc) lazyFrame('escalationFrame');
+      };
+
       document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
         btn.addEventListener('click', function() {
           const tab = this.getAttribute('data-tab');
