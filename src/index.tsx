@@ -47835,6 +47835,156 @@ app.get('/staff/app', (c) => {
   `)
 })
 
+// ADMIN: WhatsApp escalation — who gets called in when nobody answers a guest
+app.get('/admin/escalation', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Escalation</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Montserrat,system-ui,sans-serif;background:#120a0e;color:#f6f0e3;min-height:100vh}
+header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(212,175,55,.25)}
+header h1{font-family:'Cormorant Garamond',serif;font-size:1.4rem}
+header h1 i{color:#25D366;margin-right:8px}
+header a{color:#f0d98c;text-decoration:none;font-size:.85rem}
+.wrap{max-width:820px;margin:0 auto;padding:18px}
+.card{background:linear-gradient(160deg,rgba(52,29,39,.72),rgba(26,14,19,.92));border:1px solid rgba(212,175,55,.28);border-radius:14px;padding:16px;margin-bottom:16px}
+.card h2{font-family:'Cormorant Garamond',serif;font-size:1.2rem;margin-bottom:12px}
+label{display:block;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;color:rgba(246,240,227,.55);margin:10px 0 4px}
+input{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.35);border-radius:8px;padding:10px;color:#f6f0e3;font-size:.9rem}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>div{flex:1;min-width:120px}
+.btn{border:none;border-radius:999px;padding:11px 20px;font-weight:700;font-size:.8rem;cursor:pointer;margin-top:14px}
+.btn-gold{background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307}
+.btn-wa{background:#25D366;color:#04310f}
+.btn-ghost{background:rgba(250,246,236,.08);color:#f6f0e3;border:1px solid rgba(212,175,55,.35)}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.85rem}
+th,td{text-align:left;padding:9px 6px;border-bottom:1px solid rgba(212,175,55,.15)}
+th{font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:rgba(246,240,227,.5)}
+td button{border:1px solid rgba(244,63,94,.5);background:rgba(244,63,94,.12);color:#fda4af;border-radius:8px;padding:5px 9px;font-size:.7rem;cursor:pointer}
+.pill{display:inline-block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid rgba(212,175,55,.4);color:#f0d98c}
+.pill.ok{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.5);color:#6ee7b7}
+.pill.warn{background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.5);color:#fcd34d}
+.muted{color:rgba(246,240,227,.6);font-size:.78rem;line-height:1.6}
+.log{font-size:.72rem;color:rgba(246,240,227,.6);max-height:220px;overflow:auto}
+.log div{padding:5px 0;border-bottom:1px solid rgba(212,175,55,.1)}
+.ok{color:#6ee7b7}.bad{color:#fda4af}
+code{background:rgba(250,246,236,.08);padding:2px 6px;border-radius:5px;font-size:.75rem}
+</style>
+</head>
+<body>
+<header>
+  <h1><i class="fab fa-whatsapp"></i>WhatsApp Escalation</h1>
+  <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Dashboard</a>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>When nobody answers</h2>
+    <p class="muted">If a guest message is not acknowledged in the Ops app within the time below, these numbers get a WhatsApp alert.</p>
+    <div class="row">
+      <div><label>Alert after (minutes)</label><input id="delay" type="number" min="1" value="5"></div>
+      <div><label>Repeat every (minutes)</label><input id="repeat" type="number" min="1" value="10"></div>
+      <div><label>Max alerts per guest</label><input id="maxa" type="number" min="1" value="3"></div>
+    </div>
+    <label style="margin-top:14px"><input type="checkbox" id="enabled" style="width:auto;margin-right:8px">Escalation enabled</label>
+    <button class="btn btn-gold" onclick="saveSettings()">Save</button>
+    <span id="chan" style="margin-left:12px"></span>
+  </div>
+
+  <div class="card">
+    <h2>Who gets alerted</h2>
+    <div class="row">
+      <div><label>Name</label><input id="cname" placeholder="Duty Manager"></div>
+      <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567"></div>
+      <div><label>CallMeBot key (optional)</label><input id="ckey" placeholder="free fallback"></div>
+    </div>
+    <button class="btn btn-gold" onclick="addContact()">Add number</button>
+    <button class="btn btn-wa" onclick="testSend()"><i class="fab fa-whatsapp"></i> Send test now</button>
+    <table><thead><tr><th>Name</th><th>Number</th><th>Channel</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Recent alerts</h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cost &amp; setup</h2>
+    <p class="muted">
+      Alerts go straight through Meta's WhatsApp Cloud API — no reseller in the middle.
+      Egypt utility templates cost about <strong>$0.0073 per message</strong>, so even 200 alerts a month is well under a dollar.<br><br>
+      To switch it on, add three secrets to the Pages project: <code>WHATSAPP_TOKEN</code>,
+      <code>WHATSAPP_PHONE_ID</code>, and optionally <code>WHATSAPP_TEMPLATE</code>
+      (default <code>guest_waiting_alert</code>, three body variables: guest, minutes, message).<br><br>
+      No Meta account yet? Add a free <strong>CallMeBot key</strong> per number instead — that person sends one
+      WhatsApp message to +34 644 51 95 23 saying <em>"I allow callmebot to send me messages"</em> and pastes back the key.
+      Zero cost, good for testing today.
+    </p>
+  </div>
+</div>
+
+<script>
+if(!localStorage.getItem('admin_token')) window.location.href='/admin/login';
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+async function load(){
+  var d = await fetch('/api/staff/escalation/config',{cache:'no-store'}).then(function(r){return r.json()});
+  var s = d.settings||{};
+  document.getElementById('delay').value = s.delay_minutes||5;
+  document.getElementById('repeat').value = s.repeat_minutes||10;
+  document.getElementById('maxa').value = s.max_alerts||3;
+  document.getElementById('enabled').checked = s.enabled===1;
+  document.getElementById('chan').innerHTML = d.whatsapp_ready
+    ? '<span class="pill ok">Cloud API connected</span>'
+    : '<span class="pill warn">Cloud API not configured — using CallMeBot keys</span>';
+  document.getElementById('rows').innerHTML = (d.contacts||[]).map(function(c){
+    return '<tr><td>'+esc(c.name||'—')+'</td><td>+'+esc(c.phone)+'</td><td>'+
+      (d.whatsapp_ready?'Cloud API':(c.callmebot_key?'CallMeBot':'<span class="bad">none</span>'))+
+      '</td><td><button onclick="del('+c.contact_id+')">Remove</button></td></tr>';
+  }).join('') || '<tr><td colspan="4" class="muted">No numbers yet.</td></tr>';
+  document.getElementById('log').innerHTML = (d.log||[]).map(function(l){
+    return '<div><span class="'+(l.status==='sent'?'ok':'bad')+'">'+esc(l.status)+'</span> · +'+esc(l.contact_phone)+
+      ' · '+esc(l.channel)+' · '+esc(l.sent_at)+(l.status!=='sent'?'<br>'+esc((l.detail||'').slice(0,160)):'')+'</div>';
+  }).join('') || '<div class="muted">Nothing sent yet.</div>';
+}
+async function saveSettings(){
+  await fetch('/api/staff/escalation/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    enabled:document.getElementById('enabled').checked,
+    delay_minutes:parseInt(document.getElementById('delay').value)||5,
+    repeat_minutes:parseInt(document.getElementById('repeat').value)||10,
+    max_alerts:parseInt(document.getElementById('maxa').value)||3
+  })});
+  alert('Saved'); load();
+}
+async function addContact(){
+  var phone=document.getElementById('cphone').value.trim();
+  if(!phone){ alert('Enter a WhatsApp number'); return; }
+  await fetch('/api/staff/escalation/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    name:document.getElementById('cname').value.trim(), phone:phone, callmebot_key:document.getElementById('ckey').value.trim()
+  })});
+  document.getElementById('cname').value=''; document.getElementById('cphone').value=''; document.getElementById('ckey').value='';
+  load();
+}
+async function del(id){ if(!confirm('Remove this number?'))return; await fetch('/api/staff/escalation/contacts/'+id,{method:'DELETE'}); load(); }
+async function testSend(){
+  var d = await fetch('/api/staff/escalation/test',{method:'POST'}).then(function(r){return r.json()});
+  if(!d.success){ alert(d.error||'Test failed'); }
+  else { alert(d.results.map(function(r){return '+'+r.phone+': '+(r.ok?'sent via '+r.channel:'FAILED — '+r.detail);}).join('\\n')); }
+  load();
+}
+load();
+</script>
+</body>
+</html>
+  `)
+})
+
 // ADMIN: Resort Map editor — manage the live map's annotated spots
 app.get('/admin/map-editor', (c) => {
   return c.html(`
@@ -84794,6 +84944,8 @@ app.post('/api/staff/ring-check', async (c) => {
     if (pending > 0) {
       c.executionCtx.waitUntil(ringStaff(c.env, DB, 2, 5000))
     }
+    // Nobody picked up in time? Escalate to management on WhatsApp.
+    c.executionCtx.waitUntil(runEscalations(c.env, DB).catch(() => {}))
     return c.json({ success: true, pending })
   } catch (e) {
     console.error('ring-check', e)
@@ -84906,6 +85058,202 @@ app.post('/api/staff/translate', async (c) => {
   } catch (error) {
     console.error('translate endpoint error', error)
     return c.json({ success: false, error: 'translation failed' }, 500)
+  }
+})
+
+// ── WhatsApp escalation: nobody answered the guest, so wake a manager ──
+//
+// Sent through Meta's WhatsApp Cloud API directly (no reseller markup): Egypt
+// utility templates are ~$0.0073 per message, so a busy month costs cents.
+// A free CallMeBot key per contact is supported as a no-setup fallback.
+async function sendWhatsApp(env: any, contact: any, text: string, templateParams: string[]) {
+  const token = env.WHATSAPP_TOKEN
+  const phoneId = env.WHATSAPP_PHONE_ID
+
+  if (token && phoneId) {
+    const template = env.WHATSAPP_TEMPLATE || 'guest_waiting_alert'
+    const lang = env.WHATSAPP_TEMPLATE_LANG || 'en'
+    const r = await fetch('https://graph.facebook.com/v21.0/' + phoneId + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: contact.phone,
+        type: 'template',
+        template: {
+          name: template,
+          language: { code: lang },
+          components: [{ type: 'body', parameters: templateParams.map(p => ({ type: 'text', text: p })) }]
+        }
+      })
+    })
+    const body = await r.text()
+    return { channel: 'cloud-api', ok: r.ok, detail: body.slice(0, 300) }
+  }
+
+  if (contact.callmebot_key) {
+    const url = 'https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent('+' + contact.phone) +
+                '&text=' + encodeURIComponent(text) + '&apikey=' + encodeURIComponent(contact.callmebot_key)
+    const r = await fetch(url)
+    const body = await r.text()
+    return { channel: 'callmebot', ok: r.ok, detail: body.slice(0, 300) }
+  }
+
+  return { channel: 'none', ok: false, detail: 'No WhatsApp channel configured' }
+}
+
+async function runEscalations(env: any, DB: any) {
+  const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
+  if (!s || s.enabled !== 1) return
+  const delay = s.delay_minutes || 5
+  const repeat = s.repeat_minutes || 10
+  const maxAlerts = s.max_alerts || 3
+
+  const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND is_active = 1').all()
+  const list = contacts.results || []
+  if (!list.length) return
+
+  const stale = await DB.prepare(`
+    SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number,
+      (SELECT MAX(m.created_at) FROM chatbot_messages m
+        WHERE m.conversation_id = c.conversation_id AND m.role = 'user') as last_user_at,
+      (SELECT m.content FROM chatbot_messages m
+        WHERE m.conversation_id = c.conversation_id AND m.role = 'user'
+        ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) as last_text
+    FROM chatbot_conversations c
+    WHERE c.property_id = 1
+      AND EXISTS (
+        SELECT 1 FROM chatbot_messages m
+        WHERE m.conversation_id = c.conversation_id
+          AND m.role = 'user'
+          AND m.created_at > datetime('now', '-6 hours')
+          AND m.created_at <= datetime('now', '-' || ? || ' minutes')
+          AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
+      )
+    LIMIT 5
+  `).bind(delay).all()
+
+  for (const conv of (stale.results || [])) {
+    // Count every attempt, not just successes: a failing channel must not be
+    // retried in a loop (that would spam recipients and the bill once fixed).
+    const prior = await DB.prepare(`
+      SELECT COUNT(*) as n, MAX(sent_at) as last_at FROM escalation_log
+      WHERE session_id = ? AND sent_at > ?
+    `).bind(conv.session_id, conv.last_user_at).first()
+
+    const sentCount = (prior && prior.n) || 0
+    if (sentCount >= maxAlerts) continue
+    if (prior && prior.last_at) {
+      const recent = await DB.prepare(`SELECT 1 AS active WHERE datetime(?) > datetime('now', '-' || ? || ' minutes')`)
+        .bind(prior.last_at, repeat).first()
+      if (recent) continue
+    }
+
+    const who = conv.guest_name || 'A guest'
+    const room = conv.room_number ? 'Room ' + conv.room_number : 'room not linked'
+    const waited = await DB.prepare(`
+      SELECT CAST((julianday('now') - julianday(?)) * 1440 AS INTEGER) as mins
+    `).bind(conv.last_user_at).first()
+    const mins = String((waited && waited.mins) || delay)
+    const msg = String(conv.last_text || '').slice(0, 120)
+    const text = '🔔 Old Palace — guest waiting ' + mins + ' min with no reply\n' +
+                 who + ' (' + room + ')\n"' + msg + '"\nOpen the Ops app to answer.'
+
+    for (const contact of list) {
+      try {
+        const res = await sendWhatsApp(env, contact, text, [who + ' (' + room + ')', mins, msg])
+        await DB.prepare(`
+          INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+          VALUES (1, ?, ?, ?, ?, ?)
+        `).bind(conv.session_id, contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail).run()
+      } catch (e: any) {
+        await DB.prepare(`
+          INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+          VALUES (1, ?, ?, 'error', 'failed', ?)
+        `).bind(conv.session_id, contact.phone, String(e).slice(0, 200)).run()
+      }
+    }
+  }
+}
+
+app.get('/api/staff/escalation/config', async (c) => {
+  const { DB } = c.env
+  try {
+    const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
+    const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 ORDER BY contact_id').all()
+    const log = await DB.prepare(`
+      SELECT session_id, contact_phone, channel, status, detail, sent_at
+      FROM escalation_log ORDER BY log_id DESC LIMIT 20
+    `).all()
+    return c.json({
+      success: true,
+      settings: s || {},
+      contacts: contacts.results || [],
+      log: log.results || [],
+      whatsapp_ready: !!(c.env.WHATSAPP_TOKEN && c.env.WHATSAPP_PHONE_ID)
+    })
+  } catch (e) {
+    return c.json({ success: false, error: 'failed' }, 500)
+  }
+})
+
+app.post('/api/staff/escalation/settings', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    await DB.prepare(`
+      INSERT INTO escalation_settings (property_id, enabled, delay_minutes, repeat_minutes, max_alerts)
+      VALUES (1, ?, ?, ?, ?)
+      ON CONFLICT(property_id) DO UPDATE SET
+        enabled = excluded.enabled, delay_minutes = excluded.delay_minutes,
+        repeat_minutes = excluded.repeat_minutes, max_alerts = excluded.max_alerts
+    `).bind(b.enabled ? 1 : 0, b.delay_minutes || 5, b.repeat_minutes || 10, b.max_alerts || 3).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.post('/api/staff/escalation/contacts', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    const phone = String(b.phone || '').replace(/[^0-9]/g, '')
+    if (!phone) return c.json({ success: false, error: 'phone required' }, 400)
+    await DB.prepare(`
+      INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active)
+      VALUES (1, ?, ?, ?, 1)
+    `).bind(b.name || '', phone, b.callmebot_key || null).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.delete('/api/staff/escalation/contacts/:id', async (c) => {
+  const { DB } = c.env
+  try {
+    await DB.prepare('DELETE FROM escalation_contacts WHERE contact_id = ?').bind(c.req.param('id')).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.post('/api/staff/escalation/test', async (c) => {
+  const { DB } = c.env
+  try {
+    const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND is_active = 1').all()
+    const list = contacts.results || []
+    if (!list.length) return c.json({ success: false, error: 'No escalation numbers saved yet' }, 400)
+    const results: any[] = []
+    for (const contact of list) {
+      const res = await sendWhatsApp(c.env, contact,
+        '🔔 Old Palace test alert — WhatsApp escalation is working. No action needed.',
+        ['Test Guest (Room 000)', '5', 'This is a test of the escalation alert'])
+      await DB.prepare(`
+        INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+        VALUES (1, 'test', ?, ?, ?, ?)
+      `).bind(contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail).run()
+      results.push({ phone: contact.phone, ok: res.ok, channel: res.channel, detail: res.detail })
+    }
+    return c.json({ success: true, results })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e).slice(0, 200) }, 500)
   }
 })
 
