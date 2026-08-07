@@ -85464,6 +85464,45 @@ app.get('/api/staff/escalation/config', async (c) => {
   }
 })
 
+// WaSender webhook: a manager replying on WhatsApp closes the loop.
+// If the reply comes from a number we escalate to, treat it as an
+// acknowledgement — the phone stops ringing and repeat alerts stop.
+app.post('/api/staff/wasender-webhook', async (c) => {
+  const { DB } = c.env
+  try {
+    const payload = await c.req.json().catch(() => ({}))
+    const flat = JSON.stringify(payload)
+
+    // Ignore our own outgoing messages
+    if (/"fromMe"\s*:\s*true/.test(flat)) return c.json({ success: true, ignored: 'outgoing' })
+
+    // Pull the sender's number out of whatever shape the event arrives in
+    const jid = (flat.match(/"(?:remoteJid|from|jid|sender)"\s*:\s*"(\d{6,})@/) || [])[1] || ''
+    if (!jid) return c.json({ success: true, ignored: 'no sender' })
+
+    const contact = await DB.prepare(
+      'SELECT contact_id, name, phone FROM escalation_contacts WHERE property_id = 1 AND is_active = 1 AND phone = ?'
+    ).bind(jid).first()
+    if (!contact) return c.json({ success: true, ignored: 'not an escalation contact' })
+
+    const text = (flat.match(/"(?:conversation|text|body)"\s*:\s*"([^"]{1,200})"/) || [])[1] || ''
+
+    // Acknowledge everything outstanding, exactly like tapping Acknowledge
+    await DB.prepare("UPDATE chatbot_conversations SET staff_ack_at = datetime('now') WHERE property_id = 1").run()
+    await DB.prepare('UPDATE feedback_submissions SET is_read = 1 WHERE property_id = 1 AND is_read = 0').run()
+    await DB.prepare("UPDATE staff_test_ring SET until = datetime('now', '-1 second') WHERE id = 1").run()
+    await DB.prepare(`
+      INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
+      VALUES (1, 'whatsapp-reply', ?, 'wasender', 'acknowledged', ?)
+    `).bind(contact.phone, ((contact.name || 'Manager') + ' replied: ' + text).slice(0, 200)).run()
+
+    return c.json({ success: true, acknowledged_by: contact.name || contact.phone })
+  } catch (e) {
+    // Always 200 quickly: a webhook that errors gets disabled by the provider
+    return c.json({ success: true })
+  }
+})
+
 app.post('/api/staff/escalation/settings', async (c) => {
   const { DB } = c.env
   try {
