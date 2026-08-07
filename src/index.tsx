@@ -48266,9 +48266,6 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 async function load(){
   var d = await fetch('/api/staff/escalation/config',{cache:'no-store'}).then(function(r){return r.json()});
   var s = d.settings||{};
-  document.getElementById('delay').value = s.delay_minutes||5;
-  document.getElementById('repeat').value = s.repeat_minutes||10;
-  document.getElementById('maxa').value = s.max_alerts||3;
   document.getElementById('enabled').checked = s.enabled===1;
   document.getElementById('chan').innerHTML = d.whatsapp_ready
     ? '<span class="pill ok"><i class="fas fa-check"></i> ' + (d.channel||'WhatsApp') + ' connected</span>'
