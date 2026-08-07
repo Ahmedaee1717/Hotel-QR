@@ -48240,14 +48240,15 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
   <div class="card">
     <h2>Cost &amp; setup</h2>
     <p class="muted">
-      Alerts go straight through Meta's WhatsApp Cloud API — no reseller in the middle.
-      Egypt utility templates cost about <strong>$0.0073 per message</strong>, so even 200 alerts a month is well under a dollar.<br><br>
-      To switch it on, add three secrets to the Pages project: <code>WHATSAPP_TOKEN</code>,
-      <code>WHATSAPP_PHONE_ID</code>, and optionally <code>WHATSAPP_TEMPLATE</code>
-      (default <code>guest_waiting_alert</code>, three body variables: guest, minutes, message).<br><br>
-      No Meta account yet? Add a free <strong>CallMeBot key</strong> per number instead — that person sends one
-      WhatsApp message to +34 644 51 95 23 saying <em>"I allow callmebot to send me messages"</em> and pastes back the key.
-      Zero cost, good for testing today.
+      Alerts are sent through <strong>WaSender</strong>, using the hotel's own WhatsApp number. Because it sends
+      normal text rather than a pre-approved template, alerts carry the guest's real message and need no
+      Meta template approval — the cost is WaSender's flat monthly plan rather than per message.<br><br>
+      <strong>Keep the WhatsApp session connected</strong> in your WaSender dashboard. If that number is ever
+      logged out or blocked, alerts stop — the delivery log above will show the failures.<br><br>
+      Two alternatives stay wired up as fallbacks. Add <code>WHATSAPP_TOKEN</code> and <code>WHATSAPP_PHONE_ID</code>
+      to switch to Meta's official Cloud API (about $0.0073 per message in Egypt, needs an approved template
+      named <code>guest_waiting_alert</code>). Or give a number a free <strong>CallMeBot key</strong> — that person
+      sends one WhatsApp to +34 644 51 95 23 saying <em>"I allow callmebot to send me messages"</em> and pastes back the key.
     </p>
   </div>
 </div>
@@ -48265,11 +48266,13 @@ async function load(){
   document.getElementById('maxa').value = s.max_alerts||3;
   document.getElementById('enabled').checked = s.enabled===1;
   document.getElementById('chan').innerHTML = d.whatsapp_ready
-    ? '<span class="pill ok">Cloud API connected</span>'
-    : '<span class="pill warn">Cloud API not configured — using CallMeBot keys</span>';
+    ? '<span class="pill ok"><i class="fas fa-check"></i> ' + (d.channel||'WhatsApp') + ' connected</span>'
+    : '<span class="pill warn"><i class="fas fa-triangle-exclamation"></i> ' +
+      (d.channel ? d.channel + ' not sending yet' : 'No WhatsApp channel yet') + '</span>' +
+      (d.channel_note ? '<div class="muted" style="margin-top:10px">' + esc(d.channel_note) + '</div>' : '');
   document.getElementById('rows').innerHTML = (d.contacts||[]).map(function(c){
     return '<tr><td>'+esc(c.name||'—')+'</td><td>+'+esc(c.phone)+'</td><td>'+
-      (d.whatsapp_ready?'Cloud API':(c.callmebot_key?'CallMeBot':'<span class="bad">none</span>'))+
+      (d.whatsapp_ready?(d.channel||'WhatsApp'):(c.callmebot_key?'CallMeBot':'<span class="bad">none</span>'))+
       '</td><td><button onclick="del('+c.contact_id+')">Remove</button></td></tr>';
   }).join('') || '<tr><td colspan="4" class="muted">No numbers yet.</td></tr>';
   document.getElementById('log').innerHTML = (d.log||[]).map(function(l){
@@ -85285,6 +85288,24 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
   const token = env.WHATSAPP_TOKEN
   const phoneId = env.WHATSAPP_PHONE_ID
 
+  // WaSender: sends free-form text from the hotel's own WhatsApp number, so
+  // alerts need no template approval and read like a normal message.
+  if (env.WASENDER_TOKEN) {
+    try {
+      const r = await fetch('https://www.wasenderapi.com/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + env.WASENDER_TOKEN },
+        body: JSON.stringify({ to: '+' + String(contact.phone).replace(/[^0-9]/g, ''), text })
+      })
+      const body = await r.text()
+      let ok = r.ok
+      try { ok = ok && JSON.parse(body).success !== false } catch (e) { /* keep HTTP verdict */ }
+      return { channel: 'wasender', ok, detail: body.slice(0, 300) }
+    } catch (e: any) {
+      return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
+    }
+  }
+
   if (token && phoneId) {
     const template = env.WHATSAPP_TEMPLATE || 'guest_waiting_alert'
     const lang = env.WHATSAPP_TEMPLATE_LANG || 'en'
@@ -85391,9 +85412,37 @@ async function runEscalations(env: any, DB: any) {
   }
 }
 
+// Is the WhatsApp channel genuinely able to send right now? A saved token is
+// not enough — WaSender also needs a linked WhatsApp session behind it.
+async function whatsappHealth(env: any) {
+  if (env.WASENDER_TOKEN) {
+    try {
+      const r = await fetch('https://www.wasenderapi.com/api/status', {
+        headers: { 'Authorization': 'Bearer ' + env.WASENDER_TOKEN }
+      })
+      const body = await r.text()
+      if (r.ok) return { channel: 'WaSender', state: 'ready', note: '' }
+      if (/session not found/i.test(body)) {
+        return { channel: 'WaSender', state: 'no_session', note: 'No WhatsApp number is linked in WaSender yet — scan the QR in your WaSender dashboard, then paste that session\'s API key here.' }
+      }
+      if (/invalid api key/i.test(body)) {
+        return { channel: 'WaSender', state: 'bad_key', note: 'WaSender rejected this key. Use the key from the WhatsApp session page (the key icon), not the account token.' }
+      }
+      return { channel: 'WaSender', state: 'error', note: body.slice(0, 160) }
+    } catch (e) {
+      return { channel: 'WaSender', state: 'error', note: 'Could not reach WaSender' }
+    }
+  }
+  if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_ID) {
+    return { channel: 'Meta Cloud API', state: 'ready', note: '' }
+  }
+  return { channel: '', state: 'none', note: '' }
+}
+
 app.get('/api/staff/escalation/config', async (c) => {
   const { DB } = c.env
   try {
+    const health = await whatsappHealth(c.env)
     const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
     const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 ORDER BY contact_id').all()
     const log = await DB.prepare(`
@@ -85405,7 +85454,10 @@ app.get('/api/staff/escalation/config', async (c) => {
       settings: s || {},
       contacts: contacts.results || [],
       log: log.results || [],
-      whatsapp_ready: !!(c.env.WHATSAPP_TOKEN && c.env.WHATSAPP_PHONE_ID)
+      whatsapp_ready: health.state === 'ready',
+      channel: health.channel,
+      channel_state: health.state,
+      channel_note: health.note
     })
   } catch (e) {
     return c.json({ success: false, error: 'failed' }, 500)
