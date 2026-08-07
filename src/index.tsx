@@ -84798,10 +84798,14 @@ app.post('/api/staff/translate', async (c) => {
       if (!apiKey) {
         todo.forEach(t => results.push({ id: t.id, lang: 'unknown', text: t.text }))
       } else {
-        const payload = todo.map((t, i) => ({ i: i, text: String(t.text).slice(0, 1500) }))
-        const prompt = 'You are a hotel front-desk translator. For EACH item, detect the source language and translate the text into ' + targetName + '.\n' +
-          'Reply with ONLY a JSON array, no markdown: [{"i":0,"lang":"<ISO 639-1 code of the SOURCE language>","text":"<translation into ' + targetName + '>"}]\n' +
-          'If an item is already in ' + targetName + ', copy the text unchanged and still report its language code. Preserve meaning, tone and any room numbers or times exactly.\n\n' +
+        // Each item carries an echo of its own opening characters; a result is
+        // only accepted (and cached) when the echo matches its claimed index —
+        // this makes batch-index mixups impossible to poison the cache with.
+        const payload = todo.map((t, i) => ({ i: i, src: String(t.text).slice(0, 12), text: String(t.text).slice(0, 1500) }))
+        const prompt = 'You are a hotel front-desk translator. For EACH item, detect the source language and translate "text" into ' + targetName + '.\n' +
+          'Reply with ONLY a JSON array, no markdown. For each item copy "i" and "src" UNCHANGED from the input and add your output:\n' +
+          '[{"i":0,"src":"<copied verbatim>","lang":"<ISO 639-1 code of the SOURCE language>","text":"<translation into ' + targetName + '>"}]\n' +
+          'If an item is already in ' + targetName + ', copy its text unchanged and still report its language code. Preserve meaning, tone and any room numbers or times exactly.\n\n' +
           JSON.stringify(payload)
         try {
           const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -84810,8 +84814,8 @@ app.post('/api/staff/translate', async (c) => {
             body: JSON.stringify({
               model: 'deepseek-chat',
               messages: [{ role: 'user', content: prompt }],
-              temperature: 0.1,
-              max_tokens: 2000
+              temperature: 0,
+              max_tokens: 2400
             })
           })
           const d: any = await r.json()
@@ -84821,6 +84825,8 @@ app.post('/api/staff/translate', async (c) => {
           for (const out of arr) {
             const src = todo[out.i]
             if (!src) continue
+            // Reject misaligned results instead of caching a wrong translation
+            if (String(out.src || '') !== String(src.text).slice(0, 12)) continue
             results.push({ id: src.id, lang: out.lang || 'unknown', text: out.text || src.text })
             try {
               await DB.prepare(`
