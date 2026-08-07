@@ -48208,15 +48208,14 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
 <div class="wrap">
 
   <div class="card">
-    <h2>When nobody answers</h2>
-    <p class="muted">If a guest message is not acknowledged in the Ops app within the time below, these numbers get a WhatsApp alert.</p>
-    <div class="row">
-      <div><label>Alert after (minutes)</label><input id="delay" type="number" min="1" value="5"></div>
-      <div><label>Repeat every (minutes)</label><input id="repeat" type="number" min="1" value="10"></div>
-      <div><label>Max alerts per guest</label><input id="maxa" type="number" min="1" value="3"></div>
-    </div>
-    <label style="margin-top:14px"><input type="checkbox" id="enabled" style="width:auto;margin-right:8px">Escalation enabled</label>
-    <button class="btn btn-gold" onclick="saveSettings()">Save</button>
+    <h2>Escalation ladder</h2>
+    <p class="muted">When a guest is not acknowledged in the Ops app, alerts climb this ladder. Each level starts after the guest has waited its "starts after" time, and keeps repeating on its own rhythm until its cap — or until anyone acknowledges.</p>
+    <table>
+      <thead><tr><th>Level</th><th>Starts after (min)</th><th>Repeat every (min)</th><th>Max alerts</th><th>People</th></tr></thead>
+      <tbody id="lvlRows"></tbody>
+    </table>
+    <label style="margin-top:14px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="enabled" style="width:auto">Escalation enabled</label>
+    <button class="btn btn-gold" onclick="saveSettings()">Save ladder</button>
     <span id="chan" style="margin-left:12px"></span>
   </div>
 
@@ -48225,11 +48224,17 @@ code{background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:.8rem;color:
     <div class="row">
       <div><label>Name</label><input id="cname" placeholder="Duty Manager"></div>
       <div><label>WhatsApp number (with country code)</label><input id="cphone" placeholder="201001234567"></div>
+      <div><label>Level</label><select id="clevel" style="width:100%;background:#fff;border:1px solid #d1d5db;border-radius:9px;padding:10px 12px;color:#111827;font-size:.92rem">
+        <option value="1">Level 1 — first response</option>
+        <option value="2">Level 2</option>
+        <option value="3">Level 3</option>
+        <option value="4">Level 4 — last resort</option>
+      </select></div>
       <div><label>CallMeBot key (optional)</label><input id="ckey" placeholder="free fallback"></div>
     </div>
     <button class="btn btn-gold" onclick="addContact()">Add number</button>
     <button class="btn btn-wa" onclick="testSend()"><i class="fab fa-whatsapp"></i> Send test now</button>
-    <table><thead><tr><th>Name</th><th>Number</th><th>Channel</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+    <table><thead><tr><th>Level</th><th>Name</th><th>Number</th><th>Channel</th><th></th></tr></thead><tbody id="rows"></tbody></table>
   </div>
 
   <div class="card">
@@ -48270,30 +48275,60 @@ async function load(){
     : '<span class="pill warn"><i class="fas fa-triangle-exclamation"></i> ' +
       (d.channel ? d.channel + ' not sending yet' : 'No WhatsApp channel yet') + '</span>' +
       (d.channel_note ? '<div class="muted" style="margin-top:10px">' + esc(d.channel_note) + '</div>' : '');
+  var LVL_NAMES = {1:'Level 1 — first response',2:'Level 2',3:'Level 3',4:'Level 4 — last resort'};
+  var contactsByLevel = {};
+  (d.contacts||[]).forEach(function(c){ var L=c.level||1; (contactsByLevel[L]=contactsByLevel[L]||[]).push(c); });
+  var lvls = (d.levels && d.levels.length) ? d.levels : [
+    {level:1,start_after_minutes:5,repeat_minutes:10,max_alerts:3},
+    {level:2,start_after_minutes:10,repeat_minutes:1,max_alerts:10},
+    {level:3,start_after_minutes:20,repeat_minutes:1,max_alerts:15},
+    {level:4,start_after_minutes:30,repeat_minutes:2,max_alerts:20}
+  ];
+  document.getElementById('lvlRows').innerHTML = lvls.map(function(l){
+    var people = (contactsByLevel[l.level]||[]).map(function(c){return esc(c.name||('+'+c.phone));}).join(', ');
+    return '<tr>'+
+      '<td><b>'+esc(LVL_NAMES[l.level]||('Level '+l.level))+'</b></td>'+
+      '<td><input type="number" min="0" style="width:90px" id="lvS'+l.level+'" value="'+l.start_after_minutes+'"></td>'+
+      '<td><input type="number" min="1" style="width:90px" id="lvR'+l.level+'" value="'+l.repeat_minutes+'"></td>'+
+      '<td><input type="number" min="1" style="width:90px" id="lvM'+l.level+'" value="'+l.max_alerts+'"></td>'+
+      '<td class="muted">'+(people||'<span class="bad">nobody — level inactive</span>')+'</td>'+
+    '</tr>';
+  }).join('');
   document.getElementById('rows').innerHTML = (d.contacts||[]).map(function(c){
-    return '<tr><td>'+esc(c.name||'—')+'</td><td>+'+esc(c.phone)+'</td><td>'+
+    return '<tr><td><span class="pill">L'+(c.level||1)+'</span></td><td>'+esc(c.name||'—')+'</td><td>+'+esc(c.phone)+'</td><td>'+
       (d.whatsapp_ready?(d.channel||'WhatsApp'):(c.callmebot_key?'CallMeBot':'<span class="bad">none</span>'))+
       '</td><td><button onclick="del('+c.contact_id+')">Remove</button></td></tr>';
-  }).join('') || '<tr><td colspan="4" class="muted">No numbers yet.</td></tr>';
+  }).join('') || '<tr><td colspan="5" class="muted">No numbers yet.</td></tr>';
   document.getElementById('log').innerHTML = (d.log||[]).map(function(l){
-    return '<div><span class="'+(l.status==='sent'?'ok':'bad')+'">'+esc(l.status)+'</span> · +'+esc(l.contact_phone)+
-      ' · '+esc(l.channel)+' · '+esc(l.sent_at)+(l.status!=='sent'?'<br>'+esc((l.detail||'').slice(0,160)):'')+'</div>';
+    return '<div><span class="pill">L'+(l.level||1)+'</span> <span class="'+(l.status==='sent'?'ok':(l.status==='acknowledged'?'ok':'bad'))+'">'+esc(l.status)+'</span> · +'+esc(l.contact_phone)+
+      ' · '+esc(l.channel)+' · '+esc(l.sent_at)+(l.status==='failed'?'<br>'+esc((l.detail||'').slice(0,160)):'')+'</div>';
   }).join('') || '<div class="muted">Nothing sent yet.</div>';
 }
 async function saveSettings(){
+  var levels=[1,2,3,4].map(function(L){
+    return {
+      level:L,
+      start_after_minutes:parseInt((document.getElementById('lvS'+L)||{}).value)||0,
+      repeat_minutes:parseInt((document.getElementById('lvR'+L)||{}).value)||1,
+      max_alerts:parseInt((document.getElementById('lvM'+L)||{}).value)||1
+    };
+  });
   await fetch('/api/staff/escalation/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     enabled:document.getElementById('enabled').checked,
-    delay_minutes:parseInt(document.getElementById('delay').value)||5,
-    repeat_minutes:parseInt(document.getElementById('repeat').value)||10,
-    max_alerts:parseInt(document.getElementById('maxa').value)||3
+    delay_minutes:levels[0].start_after_minutes||5,
+    repeat_minutes:levels[0].repeat_minutes||10,
+    max_alerts:levels[0].max_alerts||3,
+    levels:levels
   })});
-  alert('Saved'); load();
+  alert('Ladder saved'); load();
 }
 async function addContact(){
   var phone=document.getElementById('cphone').value.trim();
   if(!phone){ alert('Enter a WhatsApp number'); return; }
   await fetch('/api/staff/escalation/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    name:document.getElementById('cname').value.trim(), phone:phone, callmebot_key:document.getElementById('ckey').value.trim()
+    name:document.getElementById('cname').value.trim(), phone:phone,
+    level:parseInt(document.getElementById('clevel').value)||1,
+    callmebot_key:document.getElementById('ckey').value.trim()
   })});
   document.getElementById('cname').value=''; document.getElementById('cphone').value=''; document.getElementById('ckey').value='';
   load();
@@ -85293,8 +85328,11 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
   // The free plan allows 1 request/minute, so a 429 is retried briefly rather
   // than being written off as a failed alert.
   if (env.WASENDER_TOKEN) {
+    // No long retry sleeps here: the escalation cron returns every minute, so a
+    // rate-limited send is logged as such and simply takes the next minute's
+    // quota. Long waits inside waitUntil get the worker killed mid-flight.
     const to = '+' + String(contact.phone).replace(/[^0-9]/g, '')
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const r = await fetch('https://www.wasenderapi.com/api/send-message', {
           method: 'POST',
@@ -85302,19 +85340,21 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
           body: JSON.stringify({ to, text })
         })
         const body = await r.text()
-        if (r.status === 429 && attempt < 2) {
-          const wait = Number(r.headers.get('retry-after') || 0) * 1000 || 21000
-          await new Promise(res => setTimeout(res, Math.min(wait, 25000)))
+        if (r.status === 429 && attempt === 0) {
+          await new Promise(res => setTimeout(res, 3000))
           continue
+        }
+        if (r.status === 429) {
+          return { channel: 'wasender', ok: false, detail: 'rate limited (free plan allows 1 message/minute) — retries on the next cycle' }
         }
         let ok = r.ok
         try { ok = ok && JSON.parse(body).success !== false } catch (e) { /* keep HTTP verdict */ }
-        return { channel: 'wasender', ok, detail: (r.status === 429 ? 'rate limited: ' : '') + body.slice(0, 260) }
+        return { channel: 'wasender', ok, detail: body.slice(0, 260) }
       } catch (e: any) {
-        if (attempt === 2) return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
+        if (attempt === 1) return { channel: 'wasender', ok: false, detail: String(e).slice(0, 200) }
       }
     }
-    return { channel: 'wasender', ok: false, detail: 'Rate limited — upgrade the WaSender plan or alert a WhatsApp group instead of several numbers' }
+    return { channel: 'wasender', ok: false, detail: 'send failed' }
   }
 
   if (token && phoneId) {
@@ -85349,16 +85389,38 @@ async function sendWhatsApp(env: any, contact: any, text: string, templateParams
   return { channel: 'none', ok: false, detail: 'No WhatsApp channel configured' }
 }
 
+// Escalation ladder: up to four levels, each with its own start time, its own
+// rhythm and its own people. Level 1 is the duty phone; if nobody answers,
+// level 2 starts hammering another number every minute, then 3, then 4.
+const LEVEL_TONE: Record<number, string> = {
+  1: '🔔 Old Palace — guest waiting',
+  2: '⚠️ LEVEL 2 — still no reply to a guest',
+  3: '🚨 LEVEL 3 — URGENT: guest ignored',
+  4: '🆘 FINAL ESCALATION — guest ignored'
+}
+
 async function runEscalations(env: any, DB: any) {
   const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
   if (!s || s.enabled !== 1) return
-  const delay = s.delay_minutes || 5
-  const repeat = s.repeat_minutes || 10
-  const maxAlerts = s.max_alerts || 3
 
-  const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 AND is_active = 1').all()
-  const list = contacts.results || []
-  if (!list.length) return
+  const levelRows = await DB.prepare(
+    'SELECT level, start_after_minutes, repeat_minutes, max_alerts FROM escalation_levels WHERE property_id = 1 ORDER BY level'
+  ).all()
+  const levels = (levelRows.results || []).filter((l: any) => l.level >= 1 && l.level <= 4)
+  if (!levels.length) return
+
+  const contacts = await DB.prepare(
+    'SELECT * FROM escalation_contacts WHERE property_id = 1 AND is_active = 1'
+  ).all()
+  const byLevel: Record<number, any[]> = {}
+  for (const ct of (contacts.results || [])) {
+    const lv = ct.level || 1
+    if (!byLevel[lv]) byLevel[lv] = []
+    byLevel[lv].push(ct)
+  }
+  if (!Object.keys(byLevel).length) return
+
+  const firstStart = Math.min(...levels.map((l: any) => l.start_after_minutes || 5))
 
   const stale = await DB.prepare(`
     SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number,
@@ -85378,46 +85440,55 @@ async function runEscalations(env: any, DB: any) {
           AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
       )
     LIMIT 5
-  `).bind(delay).all()
+  `).bind(firstStart).all()
 
   for (const conv of (stale.results || [])) {
-    // Count every attempt, not just successes: a failing channel must not be
-    // retried in a loop (that would spam recipients and the bill once fixed).
-    const prior = await DB.prepare(`
-      SELECT COUNT(*) as n, MAX(sent_at) as last_at FROM escalation_log
-      WHERE session_id = ? AND sent_at > ?
-    `).bind(conv.session_id, conv.last_user_at).first()
-
-    const sentCount = (prior && prior.n) || 0
-    if (sentCount >= maxAlerts) continue
-    if (prior && prior.last_at) {
-      const recent = await DB.prepare(`SELECT 1 AS active WHERE datetime(?) > datetime('now', '-' || ? || ' minutes')`)
-        .bind(prior.last_at, repeat).first()
-      if (recent) continue
-    }
+    const waitedRow = await DB.prepare(
+      `SELECT CAST((julianday('now') - julianday(?)) * 1440 AS INTEGER) as mins`
+    ).bind(conv.last_user_at).first()
+    const waited = (waitedRow && waitedRow.mins) || 0
 
     const who = conv.guest_name || 'A guest'
     const room = conv.room_number ? 'Room ' + conv.room_number : 'room not linked'
-    const waited = await DB.prepare(`
-      SELECT CAST((julianday('now') - julianday(?)) * 1440 AS INTEGER) as mins
-    `).bind(conv.last_user_at).first()
-    const mins = String((waited && waited.mins) || delay)
     const msg = String(conv.last_text || '').slice(0, 120)
-    const text = '🔔 Old Palace — guest waiting ' + mins + ' min with no reply\n' +
-                 who + ' (' + room + ')\n"' + msg + '"\nOpen the Ops app to answer.'
 
-    for (const contact of list) {
-      try {
-        const res = await sendWhatsApp(env, contact, text, [who + ' (' + room + ')', mins, msg])
-        await DB.prepare(`
-          INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
-          VALUES (1, ?, ?, ?, ?, ?)
-        `).bind(conv.session_id, contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail).run()
-      } catch (e: any) {
-        await DB.prepare(`
-          INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail)
-          VALUES (1, ?, ?, 'error', 'failed', ?)
-        `).bind(conv.session_id, contact.phone, String(e).slice(0, 200)).run()
+    for (const lvl of levels) {
+      const L = lvl.level
+      const recipients = byLevel[L]
+      if (!recipients || !recipients.length) continue
+      if (waited < (lvl.start_after_minutes || 5)) continue
+
+      // Per-level throttle. Counting every attempt (not just successes) so a
+      // broken channel can never loop-spam once it comes back.
+      const prior = await DB.prepare(`
+        SELECT COUNT(*) as n, MAX(sent_at) as last_at FROM escalation_log
+        WHERE session_id = ? AND level = ? AND sent_at > ?
+      `).bind(conv.session_id, L, conv.last_user_at).first()
+
+      if (((prior && prior.n) || 0) >= (lvl.max_alerts || 3)) continue
+      if (prior && prior.last_at) {
+        const recent = await DB.prepare(
+          `SELECT 1 AS active WHERE datetime(?) > datetime('now', '-' || ? || ' minutes')`
+        ).bind(prior.last_at, lvl.repeat_minutes || 10).first()
+        if (recent) continue
+      }
+
+      const text = (LEVEL_TONE[L] || LEVEL_TONE[1]) + ' ' + waited + ' min with no reply\n' +
+                   who + ' (' + room + ')\n"' + msg + '"\nOpen the Ops app to answer.'
+
+      for (const contact of recipients) {
+        try {
+          const res = await sendWhatsApp(env, contact, text, [who + ' (' + room + ')', String(waited), msg])
+          await DB.prepare(`
+            INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail, level)
+            VALUES (1, ?, ?, ?, ?, ?, ?)
+          `).bind(conv.session_id, contact.phone, res.channel, res.ok ? 'sent' : 'failed', res.detail, L).run()
+        } catch (e: any) {
+          await DB.prepare(`
+            INSERT INTO escalation_log (property_id, session_id, contact_phone, channel, status, detail, level)
+            VALUES (1, ?, ?, 'error', 'failed', ?, ?)
+          `).bind(conv.session_id, contact.phone, String(e).slice(0, 200), L).run()
+        }
       }
     }
   }
@@ -85482,14 +85553,16 @@ app.get('/api/staff/escalation/config', async (c) => {
     const health = await whatsappHealth(c.env, DB)
     const s = await DB.prepare('SELECT * FROM escalation_settings WHERE property_id = 1').first()
     const contacts = await DB.prepare('SELECT * FROM escalation_contacts WHERE property_id = 1 ORDER BY contact_id').all()
+    const levels = await DB.prepare('SELECT level, start_after_minutes, repeat_minutes, max_alerts FROM escalation_levels WHERE property_id = 1 ORDER BY level').all()
     const log = await DB.prepare(`
-      SELECT session_id, contact_phone, channel, status, detail, sent_at
-      FROM escalation_log ORDER BY log_id DESC LIMIT 20
+      SELECT session_id, contact_phone, channel, status, detail, sent_at, level
+      FROM escalation_log ORDER BY log_id DESC LIMIT 25
     `).all()
     return c.json({
       success: true,
       settings: s || {},
       contacts: contacts.results || [],
+      levels: levels.results || [],
       log: log.results || [],
       whatsapp_ready: health.state === 'ready',
       channel: health.channel,
@@ -85558,6 +85631,24 @@ app.post('/api/staff/escalation/settings', async (c) => {
         enabled = excluded.enabled, delay_minutes = excluded.delay_minutes,
         repeat_minutes = excluded.repeat_minutes, max_alerts = excluded.max_alerts
     `).bind(b.enabled ? 1 : 0, b.delay_minutes || 5, b.repeat_minutes || 10, b.max_alerts || 3).run()
+    // Ladder tuning: each level's start / rhythm / cap
+    for (const lv of (Array.isArray(b.levels) ? b.levels : [])) {
+      const L = Math.min(4, Math.max(1, parseInt(lv.level, 10) || 0))
+      if (!L) continue
+      await DB.prepare(`
+        INSERT INTO escalation_levels (property_id, level, start_after_minutes, repeat_minutes, max_alerts)
+        VALUES (1, ?, ?, ?, ?)
+        ON CONFLICT(property_id, level) DO UPDATE SET
+          start_after_minutes = excluded.start_after_minutes,
+          repeat_minutes = excluded.repeat_minutes,
+          max_alerts = excluded.max_alerts
+      `).bind(
+        L,
+        Math.max(0, parseInt(lv.start_after_minutes, 10) || 0),
+        Math.max(1, parseInt(lv.repeat_minutes, 10) || 1),
+        Math.max(1, parseInt(lv.max_alerts, 10) || 1)
+      ).run()
+    }
     return c.json({ success: true })
   } catch (e) { return c.json({ success: false }, 500) }
 })
@@ -85568,10 +85659,11 @@ app.post('/api/staff/escalation/contacts', async (c) => {
     const b = await c.req.json()
     const phone = String(b.phone || '').replace(/[^0-9]/g, '')
     if (!phone) return c.json({ success: false, error: 'phone required' }, 400)
+    const level = Math.min(4, Math.max(1, parseInt(b.level, 10) || 1))
     await DB.prepare(`
-      INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active)
-      VALUES (1, ?, ?, ?, 1)
-    `).bind(b.name || '', phone, b.callmebot_key || null).run()
+      INSERT INTO escalation_contacts (property_id, name, phone, callmebot_key, is_active, level)
+      VALUES (1, ?, ?, ?, 1, ?)
+    `).bind(b.name || '', phone, b.callmebot_key || null, level).run()
     return c.json({ success: true })
   } catch (e) { return c.json({ success: false }, 500) }
 })
