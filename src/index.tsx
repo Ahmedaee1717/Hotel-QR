@@ -55418,6 +55418,13 @@ app.get('/admin/dashboard', (c) => {
                 </div>
                 <p id="surveyMsg" class="text-sm mt-3"></p>
             </div>
+        </div>
+    </div>
+    <!-- Legacy feedback UI retired (kept in the DOM but hidden so existing
+         scripts that populate these elements never error). The Feedback tab
+         now shows only the GuestLens survey picker above. -->
+    <div id="feedbackHiddenWrap" style="display:none">
+        <div>
 
             <!-- Daily Mood Check Stats (NEW!) -->
             <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-purple-200" id="moodCheckSection">
@@ -65201,149 +65208,9 @@ app.get('/admin/dashboard', (c) => {
       };
 
       async function loadFeedbackTab() {
-        try {
-          loadSurveyPicker();
-          // Load daily mood check statistics (NEW!)
-          await loadMoodStats();
-          await loadMoodChecks(); // Load mood checks list
-          
-          // Load analytics
-          const analyticsRes = await fetch('/api/admin/feedback/analytics/' + propertyId);
-          const analyticsData = await analyticsRes.json();
-          
-          if (analyticsData.success) {
-            document.getElementById('totalResponses').textContent = analyticsData.stats.total_submissions || 0;
-            document.getElementById('positiveCount').textContent = analyticsData.stats.positive_count || 0;
-            document.getElementById('urgentCount').textContent = analyticsData.stats.urgent_count || 0;
-            document.getElementById('avgSentiment').textContent = (analyticsData.stats.avg_sentiment || 0).toFixed(1);
-            
-            // Show urgent alerts if any
-            if (analyticsData.insights && analyticsData.insights.length > 0) {
-              const urgentSection = document.getElementById('urgentAlertsSection');
-              const alertsList = document.getElementById('urgentAlertsList');
-              urgentSection.style.display = 'block';
-              
-              alertsList.innerHTML = analyticsData.insights.map(insight => \`
-                <div class="bg-white p-4 rounded-lg border-l-4 border-red-500 shadow">
-                  <div class="flex justify-between items-start">
-                    <div class="flex-1">
-                      <h4 class="font-bold text-red-900">\${insight.title}</h4>
-                      <p class="text-gray-700 mt-1">\${insight.description}</p>
-                      <p class="text-sm text-gray-600 mt-2"><strong>Suggested Action:</strong> \${insight.action_suggested}</p>
-                      <span class="inline-block mt-2 px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
-                        \${insight.priority.toUpperCase()}
-                      </span>
-                    </div>
-                    <button onclick="resolveInsight(\${insight.insight_id})" class="ml-4 px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">
-                      <i class="fas fa-check mr-1"></i>Resolve
-                    </button>
-                  </div>
-                </div>
-              \`).join('');
-            }
-            
-            // Show recent submissions
-            if (analyticsData.recent_submissions && analyticsData.recent_submissions.length > 0) {
-              const recentList = document.getElementById('recentSubmissions');
-              recentList.innerHTML = analyticsData.recent_submissions.map(sub => \`
-                <div class="bg-gray-50 p-4 rounded-lg border hover:shadow-md transition-all cursor-pointer" onclick="viewSubmission(\${sub.submission_id})">
-                  <div class="flex justify-between items-start">
-                    <div>
-                      <h4 class="font-semibold">\${sub.form_name}</h4>
-                      <p class="text-sm text-gray-600 mt-1">
-                        \${sub.guest_name || 'Anonymous'} \${sub.room_number ? '• Room ' + sub.room_number : ''}
-                      </p>
-                      <span class="inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-full \${
-                        sub.sentiment_label === 'positive' ? 'bg-green-100 text-green-800' :
-                        sub.sentiment_label === 'negative' ? 'bg-red-100 text-red-800' :
-                        sub.sentiment_label === 'urgent' ? 'bg-red-200 text-red-900' :
-                        'bg-gray-100 text-gray-800'
-                      }">
-                        \${sub.sentiment_label.toUpperCase()}
-                      </span>
-                    </div>
-                    <span class="text-sm text-gray-500">\${new Date(sub.submitted_at).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              \`).join('');
-            }
-          }
-          
-          // Load forms
-          const formsRes = await fetch('/api/admin/feedback/forms/' + propertyId);
-          const formsData = await formsRes.json();
-          
-          console.log('📋 DEBUG: Forms data:', formsData);
-          console.log('📋 DEBUG: First form type:', formsData.forms[0]?.form_type);
-          
-          if (formsData.success && formsData.forms.length > 0) {
-            const formsList = document.getElementById('formsList');
-            formsList.innerHTML = formsData.forms.map(form => {
-              console.log('🔍 Processing form:', form.form_name, 'Type:', form.form_type, 'Show delete?', form.form_type !== 'mood_check');
-              return \`
-              <div class="bg-white p-4 rounded-lg border hover:shadow-md transition-all">
-                <div class="flex justify-between items-start">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-3">
-                      <h4 class="font-bold text-lg">\${form.form_name}</h4>
-                      <span class="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">
-                        \${form.form_type.toUpperCase()}
-                      </span>
-                      \${form.is_active ? '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">ACTIVE</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">INACTIVE</span>'}
-                    </div>
-                    <p class="text-gray-600 text-sm mt-1">\${form.form_description || 'No description'}</p>
-                    <div class="flex gap-4 mt-3 text-sm text-gray-600">
-                      <span><i class="fas fa-inbox mr-1"></i>\${form.total_submissions || 0} responses</span>
-                      <span><i class="fas fa-exclamation-triangle mr-1 text-red-600"></i>\${form.urgent_count || 0} urgent</span>
-                      <span><i class="fas fa-smile mr-1 text-green-600"></i>Sentiment: \${(form.avg_sentiment || 0).toFixed(1)}</span>
-                    </div>
-                    <div class="mt-3 flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <input 
-                        type="radio" 
-                        name="homepageForm" 
-                        id="homepage_\${form.form_id}" 
-                        value="\${form.form_id}"
-                        \${form.show_on_homepage === 1 ? 'checked' : ''}
-                        onchange="setHomepageForm(\${form.form_id})"
-                        class="w-4 h-4 text-black border-gray-300 focus:ring-black"
-                      />
-                      <label for="homepage_\${form.form_id}" class="font-medium text-sm cursor-pointer">
-                        <i class="fas fa-home mr-1 text-gray-600"></i>
-                        Show on Homepage
-                        \${form.show_on_homepage === 1 ? '<span class="ml-2 px-2 py-1 bg-black text-white text-xs rounded">ACTIVE</span>' : ''}
-                      </label>
-                    </div>
-                  </div>
-                  <div class="flex flex-col gap-2">
-                    <button onclick="generateQR(\${form.form_id}, '\${form.form_name}')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 whitespace-nowrap">
-                      <i class="fas fa-qrcode mr-1"></i>QR Code
-                    </button>
-                    <button onclick="viewFormSubmissions(\${form.form_id}, '\${form.form_name.replace(/'/g, "\\\\'")}')" class="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 whitespace-nowrap">
-                      <i class="fas fa-eye mr-1"></i>View Responses
-                    </button>
-                    <button onclick="copyFormLink(\${form.form_id})" class="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 whitespace-nowrap">
-                      <i class="fas fa-link mr-1"></i>Copy Link
-                    </button>
-                    <button onclick="editForm(\${form.form_id})" class="px-4 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 whitespace-nowrap">
-                      <i class="fas fa-edit mr-1"></i>Edit
-                    </button>
-                    \${form.form_type !== 'mood_check' ? 
-                      '<button onclick="deleteForm(' + form.form_id + ', \\'' + form.form_name.replace(/'/g, "\\\\'") + '\\')" class="px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 whitespace-nowrap"><i class="fas fa-trash mr-1"></i>Delete</button>' 
-                      : ''
-                    }
-                  </div>
-                </div>
-              </div>
-            \`;
-            }).join('');
-          }
-        } catch (error) {
-          console.error('Load feedback error:', error);
-          alert('Failed to load feedback data');
-        }
-        
-        // Load AI Chat Feedback
-        await loadChatFeedback();
+        // Feedback now lives entirely in GuestLens. The tab shows only the
+        // survey picker; legacy mood/analytics/forms UI is retired (hidden).
+        try { loadSurveyPicker(); } catch (e) { console.error(e); }
       }
       
       // Load AI-detected chat feedback
