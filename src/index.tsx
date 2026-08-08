@@ -11453,6 +11453,71 @@ app.post('/api/admin/chatbot/documents', async (c) => {
   }
 })
 
+// Smart ingest — the "knowledge bin": throw in ANY messy text and the AI
+// cleans it into clear facts, titles it and files it. Nothing is ever lost:
+// if the AI is unavailable the raw text is stored verbatim.
+app.post('/api/admin/chatbot/smart-ingest', async (c) => {
+  const { DB } = c.env
+  try {
+    const body = await c.req.json()
+    const property_id = body.property_id || 1
+    const raw = String(body.content || '').trim()
+    if (!raw) return c.json({ success: false, error: 'Nothing to add' }, 400)
+
+    const apiKey = c.env.DEEPSEEK_API_KEY || c.env.OPENAI_API_KEY
+    const baseURL = c.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com/v1' : 'https://api.openai.com/v1'
+    const model = c.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o-mini'
+
+    let title = ''
+    let category = 'general'
+    let cleaned = raw
+
+    if (apiKey && raw.length > 3) {
+      try {
+        const prompt = 'You organise raw notes into clean knowledge for a hotel AI concierge. Given the messy text below, return STRICT JSON only:\n' +
+          '{"title":"<a short 3-7 word title>","category":"<one of: dining, rooms, spa, beach, activities, policy, facilities, contact, general>","facts":"<the SAME information rewritten as clear, complete, factual sentences a concierge can rely on. Keep every specific detail: times, prices, names, numbers, locations, rules. Do NOT invent anything not present. Do NOT summarise away details. Use plain sentences or short bullet lines.>"}\n\n' +
+          'MESSY TEXT:\n' + raw.slice(0, 6000)
+        const r = await fetch(baseURL + '/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 1500 })
+        })
+        const d: any = await r.json()
+        let txt = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || ''
+        txt = txt.replace(/```json/gi, '').replace(/```/g, '').trim()
+        const parsed = JSON.parse(txt)
+        if (parsed.title) title = String(parsed.title).slice(0, 100)
+        if (parsed.category) category = String(parsed.category).slice(0, 30)
+        if (parsed.facts && String(parsed.facts).trim().length > 10) cleaned = String(parsed.facts).trim()
+      } catch (e) {
+        console.error('smart-ingest AI', e)
+      }
+    }
+
+    if (!title) title = raw.replace(/\s+/g, ' ').slice(0, 60) + (raw.length > 60 ? '…' : '')
+
+    // Store both the tidy version (used by the AI) and keep the raw for reference
+    const docResult = await DB.prepare(`
+      INSERT INTO chatbot_documents (property_id, title, content, document_type)
+      VALUES (?, ?, ?, ?)
+    `).bind(property_id, title, cleaned, category).run()
+    const documentId = docResult.meta.last_row_id
+
+    const chunks = chunkText(cleaned)
+    for (let i = 0; i < chunks.length; i++) {
+      await DB.prepare(`
+        INSERT INTO chatbot_chunks (document_id, property_id, chunk_text, chunk_index, embedding_text, token_count)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(documentId, property_id, chunks[i], i, chunks[i].toLowerCase(), chunks[i].split(/\s+/).length).run()
+    }
+
+    return c.json({ success: true, document_id: documentId, title, category, cleaned, chunks: chunks.length, ai_processed: cleaned !== raw })
+  } catch (error) {
+    console.error('smart ingest error', error)
+    return c.json({ success: false, error: 'Failed to add knowledge' }, 500)
+  }
+})
+
 // API: Get all documents for a property
 app.get('/api/admin/chatbot/documents', async (c) => {
   const { DB } = c.env
@@ -54333,173 +54398,50 @@ app.get('/admin/dashboard', (c) => {
             </div>
 
             <div id="cbKbPane" class="hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">
-                    <i class="fas fa-robot mr-2 text-purple-600"></i>
-                    AI Chatbot - Knowledge Base Management
-                </h2>
-                <p class="text-gray-600 mb-6">
-                    Create a smart AI assistant that answers guest questions using your hotel's information. Upload FAQs, policies, and amenities details.
-                </p>
-                
-                <!-- Analytics Section -->
-                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6 mb-6 border-2 border-indigo-200">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xl font-bold">
-                            <i class="fas fa-chart-line mr-2 text-indigo-600"></i>Chatbot Analytics
-                        </h3>
-                        <button onclick="toggleAnalytics()" id="analyticsToggleBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
-                            <i class="fas fa-chart-bar mr-2"></i>View Analytics
+                <!-- The Knowledge Bin -->
+                <div class="mb-5">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-1"><i class="fas fa-inbox mr-2 text-indigo-600"></i>Knowledge Bin</h2>
+                    <p class="text-gray-600">Throw anything in — messy notes, an email, a price list, house rules, whatever. The AI reads it, tidies it into clear facts, titles it and remembers it. No formatting needed.</p>
+                </div>
+
+                <div class="rounded-2xl p-6 mb-6 border-2 border-dashed border-indigo-300" style="background:linear-gradient(135deg,#eef2ff,#faf5ff)">
+                    <textarea id="kbDump" rows="7" placeholder="Paste or type anything here…&#10;&#10;e.g.  breakfast 7-10:30 at el kasr, à la carte dinner needs booking. pool towels from the hut by the big pool, deposit 100le. wifi password OldPalace2026. checkout 12 noon, late checkout till 3 free for suites otherwise 50% night." class="w-full px-4 py-3 border border-indigo-200 rounded-xl text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none resize-y" style="font-size:.95rem;line-height:1.6"></textarea>
+                    <div class="flex items-center gap-3 mt-3 flex-wrap">
+                        <button onclick="kbIngest()" id="kbIngestBtn" class="px-6 py-3 rounded-xl font-semibold text-white shadow-lg" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                            <i class="fas fa-wand-magic-sparkles mr-2"></i>Add to the AI's brain
                         </button>
-                    </div>
-                    
-                    <div id="analyticsSection" class="hidden">
-                        <!-- Stats Overview -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div class="bg-white rounded-lg p-4 shadow">
-                                <div class="text-sm text-gray-600 mb-1">Total Conversations</div>
-                                <div class="text-2xl font-bold text-indigo-600" id="statTotalConversations">0</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4 shadow">
-                                <div class="text-sm text-gray-600 mb-1">Total Messages</div>
-                                <div class="text-2xl font-bold text-purple-600" id="statTotalMessages">0</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4 shadow">
-                                <div class="text-sm text-gray-600 mb-1">Avg Response Time</div>
-                                <div class="text-2xl font-bold text-blue-600" id="statAvgResponseTime">0s</div>
-                            </div>
-                            <div class="bg-white rounded-lg p-4 shadow">
-                                <div class="text-sm text-gray-600 mb-1">Today's Chats</div>
-                                <div class="text-2xl font-bold text-green-600" id="statTodayChats">0</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Most Asked Questions -->
-                        <div class="bg-white rounded-lg p-6 shadow mb-6">
-                            <h4 class="text-lg font-bold mb-4">
-                                <i class="fas fa-fire mr-2 text-orange-500"></i>Most Asked Questions (Top 10)
-                            </h4>
-                            <div id="topQuestionsList" class="space-y-2">
-                                <p class="text-gray-500">Loading...</p>
-                            </div>
-                        </div>
-                        
-                        <!-- Chat History -->
-                        <div class="bg-white rounded-lg p-6 shadow">
-                            <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-lg font-bold">
-                                    <i class="fas fa-history mr-2 text-blue-600"></i>Recent Chat History
-                                </h4>
-                                <div class="flex gap-2">
-                                    <input type="date" id="filterDate" class="px-3 py-2 border rounded-lg text-sm" onchange="loadChatHistory()">
-                                    <input type="text" id="searchQuery" placeholder="Search messages..." class="px-3 py-2 border rounded-lg text-sm w-64" onkeyup="if(event.key==='Enter') loadChatHistory()">
-                                    <button onclick="loadChatHistory()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                                        <i class="fas fa-search"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="chatHistoryList" class="space-y-4 max-h-96 overflow-y-auto">
-                                <p class="text-gray-500">Loading...</p>
-                            </div>
-                        </div>
+                        <span id="kbIngestMsg" class="text-sm text-gray-600"></span>
                     </div>
                 </div>
 
-                <!-- Chatbot Settings -->
-                <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
-                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-cog mr-2"></i>Chatbot Settings</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="flex items-center space-x-3 cursor-pointer">
-                                <input type="checkbox" id="chatbotEnabled" class="w-5 h-5 rounded">
-                                <span class="font-medium">Enable AI Chatbot</span>
-                            </label>
-                            <p class="text-sm text-gray-600 ml-8 mt-1">Show chat widget on guest page</p>
-                        </div>
-                        <div>
-                            <label class="block font-medium mb-2">Chatbot Name</label>
-                            <input type="text" id="chatbotName" placeholder="e.g., Paradise Assistant" class="w-full px-4 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block font-medium mb-2">Chat Widget Color</label>
-                            <div class="flex gap-2">
-                                <input type="color" id="chatbotPrimaryColor" value="#667eea" class="w-16 h-10 border rounded cursor-pointer">
-                                <input type="text" id="chatbotPrimaryColorText" value="#667eea" placeholder="#667eea" class="flex-1 px-4 py-2 border rounded-lg font-mono text-sm">
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1">Color for chat button and message bubbles</p>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block font-medium mb-2">Greeting Message</label>
-                            <textarea id="chatbotGreeting" rows="2" placeholder="Welcome message for guests..." class="w-full px-4 py-2 border rounded-lg"></textarea>
-                        </div>
+                <!-- Essential settings only -->
+                <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-wrap items-center gap-6">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="chatbotEnabled" class="w-5 h-5 rounded">
+                        <span class="font-semibold text-gray-800">AI concierge is live</span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-gray-700 text-sm">Name</span>
+                        <input type="text" id="chatbotName" placeholder="Hotel Assistant" class="px-3 py-2 border rounded-lg text-sm w-48">
                     </div>
-                    <button onclick="saveChatbotSettings()" class="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                        <i class="fas fa-save mr-2"></i>Save Settings
+                    <button onclick="saveChatbotSettings()" class="ml-auto px-5 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
+                        <i class="fas fa-save mr-2"></i>Save
                     </button>
+                    <!-- Kept for compatibility with existing save logic; not shown -->
+                    <input type="hidden" id="chatbotPrimaryColor" value="#D4AF37">
+                    <input type="hidden" id="chatbotPrimaryColorText" value="#D4AF37">
+                    <textarea id="chatbotGreeting" class="hidden"></textarea>
                 </div>
 
-                <!-- Auto-Sync Knowledge Base -->
-                <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
-                    <div class="flex items-start justify-between">
-                        <div class="flex-1">
-                            <h3 class="text-xl font-bold mb-2">
-                                <i class="fas fa-sync-alt mr-2 text-blue-600"></i>Auto-Sync Hotel Data
-                            </h3>
-                            <p class="text-gray-700 mb-4">
-                                Automatically import all your hotel's offerings (restaurants, spa, events) and activities into the AI chatbot's knowledge base. 
-                                This ensures guests can ask about everything you offer!
-                            </p>
-                            <button onclick="syncKnowledgeBase()" id="syncBtn" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition font-semibold shadow-lg">
-                                <i class="fas fa-sync-alt mr-2"></i>Sync All Hotel Data Now
-                            </button>
-                            <p class="text-sm text-gray-500 mt-3">
-                                <i class="fas fa-info-circle mr-1"></i>
-                                This will sync: Restaurants, Spa Services, Events, Activities, and more. Run this whenever you add new offerings.
-                            </p>
-                        </div>
+                <!-- What the AI knows -->
+                <div class="bg-white rounded-xl border border-gray-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-brain mr-2 text-indigo-600"></i>What the AI knows</h3>
+                        <span id="kbCount" class="text-sm text-gray-500"></span>
                     </div>
-                </div>
-
-                <!-- Add New Document -->
-                <div class="bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
-                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-file-upload mr-2 text-green-600"></i>Add Knowledge Document</h3>
-                    <form id="addDocumentForm" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block font-medium mb-2">Document Title *</label>
-                                <input type="text" id="docTitle" required placeholder="e.g., Check-in & Check-out Policy" class="w-full px-4 py-2 border rounded-lg">
-                            </div>
-                            <div>
-                                <label class="block font-medium mb-2">Category</label>
-                                <select id="docType" class="w-full px-4 py-2 border rounded-lg">
-                                    <option value="faq">FAQ</option>
-                                    <option value="policy">Policy</option>
-                                    <option value="amenity">Amenity Info</option>
-                                    <option value="general">General Info</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block font-medium mb-2">Content *</label>
-                            <textarea id="docContent" required rows="6" placeholder="Enter detailed information that guests might ask about..." class="w-full px-4 py-2 border rounded-lg"></textarea>
-                            <p class="text-sm text-gray-500 mt-2">
-                                <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
-                                Tip: Be specific and detailed. Include times, prices, locations, and procedures. The AI will use this to answer questions accurately.
-                            </p>
-                        </div>
-                        <button type="submit" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold">
-                            <i class="fas fa-plus mr-2"></i>Add Document & Create Chunks
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Documents List -->
-                <div class="bg-white rounded-lg border p-6">
-                    <h3 class="text-xl font-bold mb-4"><i class="fas fa-database mr-2 text-blue-600"></i>Knowledge Base Documents</h3>
+                    <p class="text-xs text-gray-500 mb-4"><i class="fas fa-circle-check text-green-500 mr-1"></i>Your restaurants, spa, activities, info pages and beach status are read live automatically — you don't need to add those here. This bin is for everything else.</p>
                     <div id="documentsList" class="space-y-3">
-                        <p class="text-gray-500 text-center py-8">
-                            <i class="fas fa-spinner fa-spin mr-2"></i>Loading documents...
-                        </p>
+                        <p class="text-gray-400 text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Loading…</p>
                     </div>
                 </div>
             </div>
@@ -62562,49 +62504,74 @@ app.get('/admin/dashboard', (c) => {
         }
       }
       
+      // The Knowledge Bin: dump anything, the AI tidies and files it
+      window.kbIngest = async function() {
+        const box = document.getElementById('kbDump');
+        const btn = document.getElementById('kbIngestBtn');
+        const msg = document.getElementById('kbIngestMsg');
+        const text = (box.value || '').trim();
+        if (!text) { msg.textContent = 'Type or paste something first.'; return; }
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Reading & filing…';
+        msg.textContent = '';
+        try {
+          const r = await fetch('/api/admin/chatbot/smart-ingest', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: 1, content: text })
+          });
+          const d = await r.json();
+          if (d.success) {
+            box.value = '';
+            msg.innerHTML = '<span class="text-green-600 font-medium"><i class="fas fa-check mr-1"></i>Filed as "' + (d.title||'') + '"' + (d.ai_processed ? ' — tidied by AI' : '') + '</span>';
+            if (typeof loadChatbotDocuments === 'function') await loadChatbotDocuments();
+          } else {
+            msg.innerHTML = '<span class="text-red-600">' + (d.error || 'Could not add') + '</span>';
+          }
+        } catch (e) {
+          msg.innerHTML = '<span class="text-red-600">Something went wrong — try again.</span>';
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-2"></i>Add to the AI\\'s brain';
+      };
+
       async function loadChatbotDocuments() {
         try {
           const response = await fetch('/api/admin/chatbot/documents?property_id=' + propertyId);
           const data = await response.json();
-          
           const container = document.getElementById('documentsList');
-          
-          if (!data.success || !data.documents || data.documents.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8"><i class="fas fa-folder-open mr-2"></i>No documents yet. Add your first knowledge document above!</p>';
+          const countEl = document.getElementById('kbCount');
+          const docs = (data.documents || []);
+          if (countEl) countEl.textContent = docs.length + (docs.length === 1 ? ' note' : ' notes');
+
+          if (!data.success || docs.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-inbox mr-2"></i>Nothing added yet. Drop your first note in the bin above.</p>';
             return;
           }
-          
-          container.innerHTML = data.documents.map(doc => {
-            const typeClass = doc.document_type === 'faq' ? 'bg-blue-100 text-blue-800' : doc.document_type === 'policy' ? 'bg-purple-100 text-purple-800' : doc.document_type === 'amenity' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
-            return '<div class="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition">' +
-              '<div class="flex justify-between items-start">' +
-                '<div class="flex-1">' +
-                  '<div class="flex items-center mb-2">' +
-                    '<span class="px-3 py-1 text-xs font-semibold rounded-full ' + typeClass + ' mr-2">' +
-                      doc.document_type.toUpperCase() +
-                    '</span>' +
-                    '<h4 class="text-lg font-bold">' + doc.title + '</h4>' +
+
+          const catColor = { dining:'bg-orange-100 text-orange-700', rooms:'bg-blue-100 text-blue-700', spa:'bg-pink-100 text-pink-700', beach:'bg-cyan-100 text-cyan-700', activities:'bg-amber-100 text-amber-700', policy:'bg-purple-100 text-purple-700', facilities:'bg-teal-100 text-teal-700', contact:'bg-green-100 text-green-700' };
+          container.innerHTML = docs.map(doc => {
+            const cls = catColor[doc.document_type] || 'bg-gray-100 text-gray-700';
+            const body = (doc.content || '').replace(/</g,'&lt;');
+            return '<div class="rounded-xl p-4 border border-gray-200 hover:border-indigo-300 hover:shadow-sm transition group">' +
+              '<div class="flex justify-between items-start gap-3">' +
+                '<div class="flex-1 min-w-0">' +
+                  '<div class="flex items-center gap-2 mb-1.5 flex-wrap">' +
+                    '<span class="px-2.5 py-0.5 text-xs font-semibold rounded-full ' + cls + '">' + (doc.document_type||'general') + '</span>' +
+                    '<h4 class="font-bold text-gray-800">' + (doc.title||'') + '</h4>' +
                   '</div>' +
-                  '<p class="text-gray-600 text-sm mb-2 line-clamp-2">' + doc.content.substring(0, 150) + '...</p>' +
-                  '<div class="flex items-center text-xs text-gray-500 space-x-4">' +
-                    '<span><i class="fas fa-cube mr-1"></i>' + doc.chunk_count + ' chunks</span>' +
-                    '<span><i class="fas fa-calendar mr-1"></i>' + new Date(doc.created_at).toLocaleDateString() + '</span>' +
-                  '</div>' +
+                  '<p class="text-gray-600 text-sm mb-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + body.substring(0, 220) + '</p>' +
+                  '<span class="text-xs text-gray-400"><i class="fas fa-cube mr-1"></i>' + (doc.chunk_count||0) + ' searchable pieces · ' + new Date(doc.created_at).toLocaleDateString() + '</span>' +
                 '</div>' +
-                '<div class="ml-4 flex gap-2">' +
-                  '<button onclick="editChatbotDocument(' + doc.document_id + ')" class="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition" title="Edit document">' +
-                    '<i class="fas fa-edit"></i>' +
-                  '</button>' +
-                  '<button onclick="deleteChatbotDocument(' + doc.document_id + ')" class="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition" title="Delete document">' +
-                    '<i class="fas fa-trash"></i>' +
-                  '</button>' +
+                '<div class="flex gap-2 flex-shrink-0">' +
+                  '<button onclick="editChatbotDocument(' + doc.document_id + ')" class="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-indigo-100 hover:text-indigo-600 transition" title="Edit"><i class="fas fa-pen text-sm"></i></button>' +
+                  '<button onclick="deleteChatbotDocument(' + doc.document_id + ')" class="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-red-100 hover:text-red-600 transition" title="Remove"><i class="fas fa-trash text-sm"></i></button>' +
                 '</div>' +
               '</div>' +
             '</div>';
           }).join('');
         } catch (error) {
           console.error('Load documents error:', error);
-          document.getElementById('documentsList').innerHTML = '<p class="text-red-500 text-center py-8"><i class="fas fa-exclamation-circle mr-2"></i>Error loading documents</p>';
+          document.getElementById('documentsList').innerHTML = '<p class="text-red-500 text-center py-8"><i class="fas fa-exclamation-circle mr-2"></i>Error loading</p>';
         }
       }
       
