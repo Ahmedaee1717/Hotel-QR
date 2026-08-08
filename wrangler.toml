@@ -7,3 +7,10 @@ pages_build_output_dir = "dist"
 binding = "DB"
 database_name = "webapp-production"
 database_id = "a0237b95-a68c-46c3-a9b8-0d21bd181fac"
+
+# GuestLens survey DB (read-only) — lets the admin pick which GuestLens
+# survey powers the guest Feedback button, from a dropdown.
+[[d1_databases]]
+binding = "GXI_DB"
+database_name = "gxi-production"
+database_id = "22601bff-95b2-4490-b673-5ce102b9758c"

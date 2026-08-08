@@ -11453,6 +11453,55 @@ app.post('/api/admin/chatbot/documents', async (c) => {
   }
 })
 
+// ── Feedback surveys: list the property's GuestLens surveys and pick one ──
+// The Old Palace worker has a read binding (GXI_DB) to GuestLens's database,
+// so the admin can swap surveys from a dropdown with no cross-app login.
+const GXI_HOTEL_ID = 'a2db600d-e579-42fe-878b-2d701c6dd4aa'  // Old Palace in GuestLens
+const GXI_SURVEY_BASE = 'https://guestlens.guestconnect.uk/s/'
+
+app.get('/api/admin/feedback/surveys', async (c) => {
+  const gxi = (c.env as any).GXI_DB
+  const property_id = c.req.query('property_id') || '1'
+  try {
+    let surveys: any[] = []
+    if (gxi) {
+      const rows = await gxi.prepare(`
+        SELECT s.id, s.title, s.status,
+               (SELECT COUNT(*) FROM survey_responses r WHERE r.survey_id = s.id) AS responses
+        FROM surveys s
+        WHERE s.hotel_id = ?
+        ORDER BY (s.status='active') DESC, s.updated_at DESC
+      `).bind(GXI_HOTEL_ID).all()
+      surveys = (rows.results || []).map((s: any) => ({
+        id: s.id, title: s.title, status: s.status, responses: s.responses,
+        url: GXI_SURVEY_BASE + s.id
+      }))
+    }
+    const prop = await c.env.DB.prepare('SELECT feedback_survey_url FROM properties WHERE property_id = ?').bind(property_id).first()
+    return c.json({ success: true, surveys, current: (prop && prop.feedback_survey_url) || '', connected: !!gxi })
+  } catch (e) {
+    console.error('list surveys error', e)
+    return c.json({ success: false, error: 'Could not load surveys', surveys: [] }, 500)
+  }
+})
+
+app.post('/api/admin/feedback/survey-select', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    const url = String(b.url || '').trim()
+    // Only allow a blank (revert to legacy) or a valid GuestLens survey URL
+    if (url && url.indexOf(GXI_SURVEY_BASE) !== 0) {
+      return c.json({ success: false, error: 'Not a valid survey link' }, 400)
+    }
+    await DB.prepare('UPDATE properties SET feedback_survey_url = ? WHERE property_id = ?')
+      .bind(url || null, b.property_id || 1).run()
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ success: false }, 500)
+  }
+})
+
 // Smart ingest — the "knowledge bin": throw in ANY messy text and the AI
 // cleans it into clear facts, titles it and files it. Nothing is ever lost:
 // if the AI is unavailable the raw text is stored verbatim.
@@ -55348,9 +55397,28 @@ app.get('/admin/dashboard', (c) => {
                 Feedback & Survey Management
             </h2>
             <p class="text-gray-600 mb-6">
-                Create dynamic feedback forms, generate QR codes, analyze guest sentiment, and get AI-powered insights on urgent issues.
+                Guest feedback runs on your GuestLens survey system. Choose which survey the Feedback button and QR code use — swap it anytime.
             </p>
-            
+
+            <!-- GuestLens survey picker -->
+            <div class="rounded-xl p-6 mb-6 border-2 border-indigo-200" style="background:linear-gradient(135deg,#eef2ff,#faf5ff)">
+                <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-square-poll-vertical mr-2 text-indigo-600"></i>Active feedback survey</h3>
+                    <span id="surveyConn" class="text-xs font-semibold"></span>
+                </div>
+                <p class="text-sm text-gray-600 mb-3">This is what guests see when they tap <strong>Feedback</strong> or scan the feedback QR. Surveys are managed in GuestLens.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                    <select id="surveySelect" class="flex-1 min-w-[240px] px-4 py-3 border border-indigo-200 rounded-xl bg-white text-gray-800 focus:ring-2 focus:ring-indigo-400 outline-none">
+                        <option value="">Loading surveys…</option>
+                    </select>
+                    <button onclick="saveSurveySelection()" class="px-6 py-3 rounded-xl font-semibold text-white shadow-lg" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">
+                        <i class="fas fa-check mr-2"></i>Use this survey
+                    </button>
+                    <a id="surveyPreview" href="#" target="_blank" class="px-4 py-3 rounded-xl font-semibold text-indigo-700 bg-white border border-indigo-200 hidden"><i class="fas fa-external-link-alt mr-2"></i>Preview</a>
+                </div>
+                <p id="surveyMsg" class="text-sm mt-3"></p>
+            </div>
+
             <!-- Daily Mood Check Stats (NEW!) -->
             <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl shadow-lg p-6 mb-6 border-2 border-purple-200" id="moodCheckSection">
                 <div class="flex items-center justify-between mb-4">
@@ -65082,8 +65150,59 @@ app.get('/admin/dashboard', (c) => {
       setInterval(loadMoodStats, 60000);
 
       // Load feedback stats and forms
+      // GuestLens survey picker
+      async function loadSurveyPicker() {
+        try {
+          const r = await fetch('/api/admin/feedback/surveys?property_id=' + propertyId);
+          const d = await r.json();
+          const sel = document.getElementById('surveySelect');
+          const conn = document.getElementById('surveyConn');
+          if (!sel) return;
+          const surveys = d.surveys || [];
+          if (conn) conn.innerHTML = d.connected
+            ? '<span class="text-green-600"><i class="fas fa-link mr-1"></i>Connected to GuestLens</span>'
+            : '<span class="text-amber-600"><i class="fas fa-triangle-exclamation mr-1"></i>Not connected</span>';
+          let opts = '<option value="">— Legacy in-app form (no GuestLens survey) —</option>';
+          opts += surveys.map(function(s){
+            var badge = s.status === 'active' ? '' : ' (' + s.status + ')';
+            return '<option value="' + s.url + '"' + (s.url === d.current ? ' selected' : '') + '>' +
+              (s.title || 'Untitled') + badge + ' · ' + (s.responses||0) + ' responses</option>';
+          }).join('');
+          sel.innerHTML = opts;
+          if (!surveys.length) sel.innerHTML = '<option value="">No surveys found in GuestLens for this property</option>';
+          updateSurveyPreview();
+          sel.onchange = updateSurveyPreview;
+        } catch (e) { console.error('survey picker', e); }
+      }
+      function updateSurveyPreview() {
+        var sel = document.getElementById('surveySelect');
+        var prev = document.getElementById('surveyPreview');
+        if (!sel || !prev) return;
+        if (sel.value) { prev.href = sel.value; prev.classList.remove('hidden'); }
+        else prev.classList.add('hidden');
+      }
+      window.saveSurveySelection = async function() {
+        var sel = document.getElementById('surveySelect');
+        var msg = document.getElementById('surveyMsg');
+        try {
+          var r = await fetch('/api/admin/feedback/survey-select', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ property_id: propertyId, url: sel.value })
+          });
+          var d = await r.json();
+          if (d.success) {
+            msg.innerHTML = sel.value
+              ? '<span class="text-green-600 font-medium"><i class="fas fa-check mr-1"></i>Saved — guests now go to this survey.</span>'
+              : '<span class="text-gray-600"><i class="fas fa-check mr-1"></i>Reverted to the legacy in-app form.</span>';
+          } else {
+            msg.innerHTML = '<span class="text-red-600">' + (d.error || 'Could not save') + '</span>';
+          }
+        } catch (e) { msg.innerHTML = '<span class="text-red-600">Something went wrong.</span>'; }
+      };
+
       async function loadFeedbackTab() {
         try {
+          loadSurveyPicker();
           // Load daily mood check statistics (NEW!)
           await loadMoodStats();
           await loadMoodChecks(); // Load mood checks list
