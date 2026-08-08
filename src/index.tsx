@@ -48242,6 +48242,220 @@ app.get('/staff/app', (c) => {
   `)
 })
 
+// ADMIN: AI Agent Portal — the concierge's brain: live conversations + coaching
+app.get('/admin/ai-agent', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concierge Intelligence</title>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Space Grotesk',system-ui,sans-serif;background:#070b16;color:#e6ecff;min-height:100vh}
+body.embed{background:transparent}
+body.embed .topbar{display:none}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(900px 500px at 80% -10%,rgba(99,132,255,.14),transparent 60%),radial-gradient(700px 500px at 0% 20%,rgba(45,212,191,.10),transparent 60%)}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:20px}
+body.embed .wrap{padding:4px 0}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid rgba(99,132,255,.18)}
+.topbar h1{font-size:1.2rem;font-weight:700}
+.topbar h1 i{color:#6384ff;margin-right:8px}
+.topbar a{color:#8ea2ff;text-decoration:none;font-size:.85rem}
+/* stat strip */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+.stat{background:linear-gradient(160deg,rgba(21,29,54,.9),rgba(11,16,32,.9));border:1px solid rgba(99,132,255,.2);border-radius:14px;padding:14px}
+.stat b{display:block;font-size:1.7rem;font-weight:700;font-family:'JetBrains Mono',monospace;background:linear-gradient(90deg,#8ea2ff,#5eead4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.stat span{font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#7f8db5}
+@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}}
+/* layout */
+.grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:900px){.grid{grid-template-columns:340px 1fr}}
+.panel{background:linear-gradient(160deg,rgba(18,25,46,.85),rgba(10,14,28,.9));border:1px solid rgba(99,132,255,.18);border-radius:16px;overflow:hidden}
+.panel h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:#8ea2ff;padding:14px 16px;border-bottom:1px solid rgba(99,132,255,.14);display:flex;align-items:center;gap:8px}
+.panel h2 .live{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.convlist{max-height:560px;overflow:auto}
+.conv{padding:12px 16px;border-bottom:1px solid rgba(99,132,255,.08);cursor:pointer;transition:background .15s}
+.conv:hover{background:rgba(99,132,255,.07)}
+.conv.on{background:rgba(99,132,255,.12);border-left:3px solid #6384ff}
+.conv .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.conv .who{font-weight:600;font-size:.92rem}
+.conv .when{font-size:.64rem;color:#6b779e;white-space:nowrap}
+.conv .last{font-size:.76rem;color:#9aa6cc;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv .tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.tg{font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding:2px 7px;border-radius:999px;background:rgba(99,132,255,.14);color:#8ea2ff}
+.tg.human{background:rgba(52,211,153,.16);color:#5eead4}
+.tg.coached{background:rgba(250,204,21,.14);color:#fcd34d}
+/* transcript */
+.tbody{padding:16px;max-height:560px;overflow:auto}
+.msg{max-width:82%;padding:9px 13px;border-radius:13px;font-size:.86rem;line-height:1.5;margin-bottom:9px}
+.msg.user{background:rgba(99,132,255,.12);border:1px solid rgba(99,132,255,.2);border-top-left-radius:4px;margin-right:auto}
+.msg.assistant{background:rgba(45,212,191,.10);border:1px solid rgba(45,212,191,.22);border-top-right-radius:4px;margin-left:auto}
+.msg.admin{background:linear-gradient(135deg,#6384ff,#8b5cf6);border-top-right-radius:4px;margin-left:auto;color:#fff}
+.msg .rl{font-size:.54rem;letter-spacing:.14em;text-transform:uppercase;opacity:.6;display:block;margin-bottom:3px}
+.coachbar{padding:14px 16px;border-top:1px solid rgba(99,132,255,.16);background:rgba(10,14,28,.6)}
+.coachbar textarea{width:100%;background:rgba(99,132,255,.06);border:1px solid rgba(99,132,255,.22);border-radius:10px;padding:10px 12px;color:#e6ecff;font-size:.85rem;font-family:inherit;resize:vertical;min-height:60px}
+.coachbar textarea:focus{outline:none;border-color:#6384ff}
+.brow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{border:none;border-radius:9px;padding:10px 16px;font-weight:600;font-size:.8rem;cursor:pointer;font-family:inherit}
+.btn-ai{background:linear-gradient(135deg,#6384ff,#8b5cf6);color:#fff}
+.btn-save{background:linear-gradient(135deg,#2dd4bf,#14b8a6);color:#042f2a}
+.btn-ghost{background:rgba(99,132,255,.1);color:#8ea2ff;border:1px solid rgba(99,132,255,.25)}
+.empty{padding:44px 20px;text-align:center;color:#6b779e;font-size:.86rem}
+/* lessons */
+.lessonwrap{margin-top:16px}
+.lesson{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid rgba(99,132,255,.1)}
+.lesson .vd{font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:3px 8px;border-radius:6px;flex-shrink:0;background:rgba(99,132,255,.14);color:#8ea2ff}
+.lesson .vd.good{background:rgba(52,211,153,.16);color:#5eead4}.lesson .vd.poor{background:rgba(244,63,94,.16);color:#fda4af}
+.lesson .gd{flex:1;font-size:.86rem;line-height:1.5}
+.lesson .rm{background:none;border:none;color:#6b779e;cursor:pointer;font-size:.9rem}
+.lesson .rm:hover{color:#fda4af}
+.addlesson{display:flex;gap:8px;padding:14px 16px}
+.addlesson input{flex:1;background:rgba(99,132,255,.06);border:1px solid rgba(99,132,255,.22);border-radius:10px;padding:10px 12px;color:#e6ecff;font-size:.85rem;font-family:inherit}
+.addlesson input:focus{outline:none;border-color:#6384ff}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#151d36;border:1px solid rgba(99,132,255,.4);padding:12px 22px;border-radius:12px;z-index:900;display:none;font-size:.85rem}
+.toast.show{display:block}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><i class="fas fa-brain"></i>Concierge Intelligence</h1>
+  <a href="/admin/dashboard"><i class="fas fa-arrow-left"></i> Dashboard</a>
+</div>
+<div class="wrap">
+  <div class="stats" id="stats"></div>
+  <div class="grid">
+    <div class="panel">
+      <h2><span class="live"></span> Live conversations</h2>
+      <div class="convlist" id="convlist"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="panel">
+      <h2 id="tHead"><i class="fas fa-comments"></i> Select a conversation</h2>
+      <div class="tbody" id="transcript"><div class="empty">Pick a guest conversation on the left to review how the AI handled it — then teach it to do better.</div></div>
+      <div class="coachbar" id="coachbar" style="display:none">
+        <textarea id="coachText" placeholder="What should the AI learn from this? e.g. 'When a guest asks about late checkout, offer it free for members and explain the standard 12:00 time.'"></textarea>
+        <div class="brow">
+          <button class="btn btn-ai" onclick="aiDraft()"><i class="fas fa-wand-magic-sparkles"></i> AI: review &amp; suggest</button>
+          <button class="btn btn-save" onclick="saveLesson()"><i class="fas fa-graduation-cap"></i> Teach the agent</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel lessonwrap">
+    <h2><i class="fas fa-book"></i> Standing orders — what the agent has learned</h2>
+    <div class="addlesson">
+      <input id="newLesson" placeholder="Add a rule the AI must always follow…">
+      <button class="btn btn-save" onclick="addLesson()">Add</button>
+    </div>
+    <div id="lessons"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var EMBED = new URLSearchParams(location.search).has('embed');
+if(EMBED) document.body.classList.add('embed');
+if(!EMBED && !localStorage.getItem('admin_token')) window.location.href='/admin/login';
+var PID='1', curConv=null;
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2600)}
+function ago(s){if(!s)return'';var t=Date.parse(s.replace(' ','T')+'Z');if(isNaN(t))return'';var d=(Date.now()-t)/1000;if(d<60)return'now';if(d<3600)return Math.floor(d/60)+'m';if(d<86400)return Math.floor(d/3600)+'h';return Math.floor(d/86400)+'d'}
+
+async function loadOverview(){
+  try{
+    var d=await fetch('/api/admin/agent/overview?property_id='+PID,{cache:'no-store'}).then(function(r){return r.json()});
+    var s=d.stats||{};
+    document.getElementById('stats').innerHTML=[
+      ['convos24','Chats · 24h'],['msgs24','Messages · 24h'],['offerings','Venues known'],
+      ['pages','Info pages'],['chunks','Knowledge chunks'],['lessons','Standing orders']
+    ].map(function(x){return '<div class="stat"><b>'+(s[x[0]]||0)+'</b><span>'+x[1]+'</span></div>'}).join('');
+    var html=(d.conversations||[]).map(function(c){
+      return '<div class="conv" data-id="'+c.conversation_id+'" onclick="openConv('+c.conversation_id+',this)">'+
+        '<div class="r1"><span class="who">'+esc(c.guest_name||'Guest')+(c.room_number?' · '+esc(c.room_number):'')+'</span><span class="when">'+ago(c.last_at)+'</span></div>'+
+        '<div class="last">'+esc(c.last_user||'—')+'</div>'+
+        '<div class="tags"><span class="tg">'+(c.msgs||0)+' msgs</span>'+
+        (c.is_ai_paused?'<span class="tg human">human</span>':'')+
+        (c.lessons>0?'<span class="tg coached">coached</span>':'')+'</div></div>';
+    }).join('');
+    document.getElementById('convlist').innerHTML=html||'<div class="empty">No conversations yet.</div>';
+  }catch(e){}
+}
+
+window.openConv=async function(id,el){
+  curConv=id;
+  document.querySelectorAll('.conv').forEach(function(c){c.classList.remove('on')});
+  if(el)el.classList.add('on');
+  document.getElementById('coachbar').style.display='block';
+  document.getElementById('coachText').value='';
+  document.getElementById('tHead').innerHTML='<i class="fas fa-comments"></i> Conversation #'+id;
+  var box=document.getElementById('transcript');
+  box.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    var d=await fetch('/api/admin/agent/conversation/'+id,{cache:'no-store'}).then(function(r){return r.json()});
+    box.innerHTML=(d.messages||[]).map(function(m){
+      var role=m.role==='admin'?'admin':(m.role==='user'?'user':'assistant');
+      var lbl=role==='admin'?'Staff':(role==='user'?'Guest':'AI');
+      return '<div class="msg '+role+'"><span class="rl">'+lbl+'</span>'+esc(m.content)+'</div>';
+    }).join('')||'<div class="empty">No messages.</div>';
+    box.scrollTop=box.scrollHeight;
+  }catch(e){}
+};
+
+window.aiDraft=async function(){
+  if(!curConv)return;
+  toast('AI is reviewing the conversation…');
+  try{
+    var d=await fetch('/api/admin/agent/coach-draft',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({conversation_id:curConv,note:document.getElementById('coachText').value.trim()})}).then(function(r){return r.json()});
+    if(d.success&&d.guidance){
+      document.getElementById('coachText').value=d.guidance;
+      toast('Verdict: '+(d.verdict||'—')+(d.summary?' — '+d.summary:''));
+    }else toast(d.error||'Could not draft');
+  }catch(e){toast('Failed')}
+};
+window.saveLesson=async function(){
+  var g=document.getElementById('coachText').value.trim();
+  if(!g){toast('Write what the AI should learn');return}
+  await fetch('/api/admin/agent/lessons',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({conversation_id:curConv,guidance:g,verdict:'coaching',created_by:'manager'})});
+  document.getElementById('coachText').value='';
+  toast('The agent has learned this'); loadLessons(); loadOverview();
+};
+window.addLesson=async function(){
+  var g=document.getElementById('newLesson').value.trim();
+  if(!g)return;
+  await fetch('/api/admin/agent/lessons',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({guidance:g,verdict:'manual',created_by:'manager'})});
+  document.getElementById('newLesson').value=''; toast('Rule added'); loadLessons(); loadOverview();
+};
+window.delLesson=async function(id){
+  if(!confirm('Remove this standing order?'))return;
+  await fetch('/api/admin/agent/lessons/'+id,{method:'DELETE'}); loadLessons(); loadOverview();
+};
+async function loadLessons(){
+  try{
+    var d=await fetch('/api/admin/agent/lessons',{cache:'no-store'}).then(function(r){return r.json()});
+    document.getElementById('lessons').innerHTML=(d.lessons||[]).map(function(l){
+      var v=(l.verdict==='good'||l.verdict==='poor')?l.verdict:'';
+      return '<div class="lesson"><span class="vd '+v+'">'+esc(l.verdict||'rule')+'</span>'+
+        '<span class="gd">'+esc(l.guidance)+'</span>'+
+        '<button class="rm" onclick="delLesson('+l.lesson_id+')"><i class="fas fa-trash"></i></button></div>';
+    }).join('')||'<div class="empty">No standing orders yet. Review a conversation and teach the agent, or add a rule above.</div>';
+  }catch(e){}
+}
+loadOverview(); loadLessons();
+setInterval(loadOverview, 20000);
+</script>
+</body>
+</html>
+  `)
+})
+
 app.get('/admin/escalation', (c) => {
   return c.html(`
 <!DOCTYPE html>
@@ -54084,16 +54298,26 @@ app.get('/admin/dashboard', (c) => {
 
         <!-- AI Chatbot Tab -->
         <div id="chatbotTab" class="tab-content hidden">
-            <!-- Sub-navigation: knowledge base vs. human escalation -->
-            <div class="flex gap-2 mb-6 border-b border-gray-200">
+            <!-- Sub-navigation: agent portal, knowledge base, escalation -->
+            <div class="flex gap-2 mb-6 border-b border-gray-200 flex-wrap">
+                <button id="cbSubAgent" onclick="chatbotSub('agent')"
+                        class="px-5 py-3 font-bold text-sm border-b-2 border-indigo-600 text-indigo-700">
+                    <i class="fas fa-brain mr-2"></i>Agent Intelligence
+                </button>
                 <button id="cbSubKb" onclick="chatbotSub('kb')"
-                        class="px-5 py-3 font-bold text-sm border-b-2 border-purple-600 text-purple-700">
-                    <i class="fas fa-robot mr-2"></i>Knowledge Base
+                        class="px-5 py-3 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-800">
+                    <i class="fas fa-book mr-2"></i>Knowledge Base
                 </button>
                 <button id="cbSubEsc" onclick="chatbotSub('esc')"
                         class="px-5 py-3 font-bold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-800">
                     <i class="fab fa-whatsapp mr-2" style="color:#25D366;"></i>WhatsApp Escalation
                 </button>
+            </div>
+
+            <!-- Agent portal sub-tab: live conversations + coaching -->
+            <div id="cbAgentPane">
+                <iframe id="agentFrame" data-src="/admin/ai-agent?embed=1"
+                        style="width:100%;height:calc(100vh - 210px);min-height:700px;border:0;border-radius:14px;background:transparent;"></iframe>
             </div>
 
             <!-- Escalation sub-tab -->
@@ -54108,7 +54332,7 @@ app.get('/admin/dashboard', (c) => {
                         style="width:100%;height:calc(100vh - 250px);min-height:620px;border:0;border-radius:14px;background:transparent;"></iframe>
             </div>
 
-            <div id="cbKbPane">
+            <div id="cbKbPane" class="hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
                 <h2 class="text-2xl font-bold mb-4">
                     <i class="fas fa-robot mr-2 text-purple-600"></i>
@@ -56384,7 +56608,7 @@ app.get('/admin/dashboard', (c) => {
         }
         // Embedded tools load their iframe only when first opened
         if (tab === 'resortmap') lazyFrame('resortmapFrame');
-        if (tab === 'chatbot') chatbotSub(window.__cbSub || 'kb');
+        if (tab === 'chatbot') chatbotSub(window.__cbSub || 'agent');
         if (tab === 'users') loadUsersManagement();
         if (tab === 'qrcode') loadQRCode();
         if (tab === 'analytics') {
@@ -56436,26 +56660,21 @@ app.get('/admin/dashboard', (c) => {
         if (f && !f.src && f.dataset.src) f.src = f.dataset.src;
       };
 
-      // AI Chatbot tab: switch between the knowledge base and WhatsApp escalation
+      // AI Chatbot tab: switch between Agent Intelligence, Knowledge Base and Escalation
       window.chatbotSub = function(which) {
         window.__cbSub = which;
-        const kb = document.getElementById('cbKbPane');
-        const esc = document.getElementById('cbEscPane');
-        const kbBtn = document.getElementById('cbSubKb');
-        const escBtn = document.getElementById('cbSubEsc');
-        if (!kb || !esc) return;
-        const showEsc = which === 'esc';
-        kb.classList.toggle('hidden', showEsc);
-        esc.classList.toggle('hidden', !showEsc);
-        if (kbBtn) {
-          kbBtn.className = 'px-5 py-3 font-bold text-sm border-b-2 ' +
-            (showEsc ? 'border-transparent text-gray-500 hover:text-gray-800' : 'border-purple-600 text-purple-700');
-        }
-        if (escBtn) {
-          escBtn.className = 'px-5 py-3 font-bold text-sm border-b-2 ' +
-            (showEsc ? 'border-green-500 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-800');
-        }
-        if (showEsc) lazyFrame('escalationFrame');
+        const panes = { agent:'cbAgentPane', kb:'cbKbPane', esc:'cbEscPane' };
+        const active = { agent:'border-indigo-600 text-indigo-700', kb:'border-purple-600 text-purple-700', esc:'border-green-500 text-green-700' };
+        const btnId = { agent:'cbSubAgent', kb:'cbSubKb', esc:'cbSubEsc' };
+        Object.keys(panes).forEach(function(k){
+          const el = document.getElementById(panes[k]);
+          if (el) el.classList.toggle('hidden', k !== which);
+          const b = document.getElementById(btnId[k]);
+          if (b) b.className = 'px-5 py-3 font-bold text-sm border-b-2 ' +
+            (k === which ? active[k] : 'border-transparent text-gray-500 hover:text-gray-800');
+        });
+        if (which === 'agent') lazyFrame('agentFrame');
+        if (which === 'esc') lazyFrame('escalationFrame');
       };
 
       document.querySelectorAll('.tab-btn, .sidebar-btn').forEach(btn => {
