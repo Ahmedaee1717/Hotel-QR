@@ -12428,10 +12428,12 @@ app.post('/api/chatbot/chat', async (c) => {
         LIMIT 1
       `).bind(property_id).all()
       
-      if (activeForms.results && activeForms.results.length > 0) {
-        const form = activeForms.results[0]
-        const formUrl = '/feedback/' + form.form_id
-        
+      // Prefer the GuestLens survey; fall back to a legacy in-app form
+      const propSurvey = await DB.prepare('SELECT feedback_survey_url FROM properties WHERE property_id = ?').bind(property_id).first()
+      const activeForm = (activeForms.results && activeForms.results[0]) || null
+      if ((propSurvey && propSurvey.feedback_survey_url) || activeForm) {
+        const formUrl = (propSurvey && propSurvey.feedback_survey_url) ? propSurvey.feedback_survey_url : '/feedback/' + activeForm.form_id
+
         // Multi-language feedback invitation - Default to English
         const feedbackResponse = 'Thank you for wanting to share your feedback with us!' + String.fromCharCode(10) + String.fromCharCode(10) + 'We would love to hear from you. You can [submit your feedback here](' + formUrl + ') - it will only take a few minutes.' + String.fromCharCode(10) + String.fromCharCode(10) + 'Is there anything else I can help you with?';
         
@@ -30908,19 +30910,25 @@ window.luxTogglePassForm = function() {
 
         async function loadHomepageFeedbackForm() {
           try {
+            // New: feedback now runs on the GuestLens survey system. If a survey
+            // URL is configured for this property, always show the Feedback button
+            // and it points there. Falls back to the legacy in-app form otherwise.
+            if (propertyData && propertyData.feedback_survey_url) {
+              const feedbackBtn = document.getElementById('feedbackButton');
+              if (feedbackBtn) feedbackBtn.classList.remove('hidden');
+              return;
+            }
+
             const response = await fetch('/api/admin/feedback/forms/' + propertyData.property_id);
             const data = await response.json();
-            
+
             if (data.success && data.forms) {
               // Find the first active form with show_on_homepage = 1
               activeFeedbackForm = data.forms.find(form => form.is_active === 1 && form.show_on_homepage === 1);
-              
+
               if (activeFeedbackForm) {
-                // Show feedback button
                 const feedbackBtn = document.getElementById('feedbackButton');
-                if (feedbackBtn) {
-                  feedbackBtn.classList.remove('hidden');
-                }
+                if (feedbackBtn) feedbackBtn.classList.remove('hidden');
               }
             }
           } catch (error) {
@@ -30929,12 +30937,16 @@ window.luxTogglePassForm = function() {
         }
 
         window.openFeedbackForm = function() {
+          // Prefer the GuestLens survey (public, branded, mobile-friendly)
+          if (propertyData && propertyData.feedback_survey_url) {
+            window.location.href = propertyData.feedback_survey_url;
+            return;
+          }
           if (!activeFeedbackForm) {
             alert('No feedback form available');
             return;
           }
-          
-          // Redirect to feedback form page
+          // Legacy in-app form fallback
           window.location.href = '/feedback/' + activeFeedbackForm.form_id;
         }
         
@@ -65706,9 +65718,21 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
         }
       }
 
+      // Where feedback lives now: the GuestLens survey (swappable via the
+      // property's feedback_survey_url), falling back to the legacy in-app form.
+      async function getFeedbackDestination(formId) {
+        try {
+          const r = await fetch('/api/properties?property_id=' + propertyId);
+          const d = await r.json();
+          const p = (d.properties && d.properties[0]) || {};
+          if (p.feedback_survey_url) return p.feedback_survey_url;
+        } catch (e) {}
+        return window.location.origin + '/feedback/' + formId;
+      }
+
       // Generate QR Code
       async function generateQR(formId, formName) {
-        const formUrl = window.location.origin + '/feedback/' + formId;
+        const formUrl = await getFeedbackDestination(formId);
         const qrApiUrl = \`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=\${encodeURIComponent(formUrl)}\`;
         
         // Create modal to show QR code
@@ -65743,8 +65767,8 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       }
 
       // Copy form link
-      function copyFormLink(formId) {
-        const formUrl = window.location.origin + '/feedback/' + formId;
+      async function copyFormLink(formId) {
+        const formUrl = await getFeedbackDestination(formId);
         navigator.clipboard.writeText(formUrl).then(() => {
           alert('✅ Link copied to clipboard!\\n' + formUrl);
         }).catch(() => {
