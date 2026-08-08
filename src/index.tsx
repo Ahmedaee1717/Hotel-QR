@@ -11936,9 +11936,99 @@ app.get('/api/chatbot/messages', async (c) => {
   }
 })
 
+// ── The concierge's live knowledge: read the REAL app state at answer time ──
+// Nothing here is baked or stale: restaurants, hours, info pages, beach status
+// and admin coaching lessons come straight from D1 on every question.
+async function buildLiveKnowledge(DB: any, property_id: any) {
+  const parts: string[] = []
+  try {
+    const offerings = await DB.prepare(`
+      SELECT offering_type, title_en, location, short_description_en, cuisine_type, meal_type,
+             event_date, event_start_time, event_end_time, duration_minutes, dress_code,
+             price, currency, includes,
+             CASE WHEN offering_type = 'restaurant' THEN enable_booking ELSE requires_booking END as bookable
+      FROM hotel_offerings
+      WHERE property_id = ? AND (status = 'active' OR status IS NULL)
+      ORDER BY offering_type, display_order
+      LIMIT 60
+    `).bind(property_id).all()
+    const offs = offerings.results || []
+    if (offs.length) {
+      parts.push('VENUES & SERVICES (live from the resort system — these are the ONLY venues that exist):\n' + offs.map((o: any) => {
+        const bits: string[] = []
+        if (o.cuisine_type) bits.push(String(o.cuisine_type) + ' cuisine')
+        if (o.meal_type) bits.push(String(o.meal_type))
+        if (o.location) bits.push('at ' + o.location)
+        if (o.event_start_time) bits.push('time: ' + o.event_start_time + (o.event_end_time ? '–' + o.event_end_time : ''))
+        if (o.event_date) bits.push('date: ' + o.event_date)
+        if (o.duration_minutes) bits.push(o.duration_minutes + ' min')
+        if (o.dress_code) bits.push('dress: ' + o.dress_code)
+        if (o.price && Number(o.price) > 0) bits.push('price: ' + (o.currency || '') + ' ' + o.price)
+        if (o.short_description_en) bits.push(String(o.short_description_en).slice(0, 140))
+        if (o.includes) bits.push('includes: ' + String(o.includes).slice(0, 120))
+        return '- ' + (o.title_en || '') + ' [' + o.offering_type + ']' +
+               (bits.length ? ': ' + bits.join('; ') : '') +
+               (o.bookable === 1 ? ' (bookable in the app)' : '')
+      }).join('\n'))
+    }
+  } catch (e) { parts.push('(venue list unavailable right now)') }
+  try {
+    const pages = await DB.prepare(`
+      SELECT title_en, content_en FROM info_pages
+      WHERE property_id = ? AND (is_published = 1 OR is_published IS NULL)
+      LIMIT 10
+    `).bind(property_id).all()
+    for (const p of (pages.results || [])) {
+      const text = String(p.content_en || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      if (text && text.length < 1200) {
+        parts.push('INFO — ' + (p.title_en || '') + ':\n' + text.slice(0, 700))
+      } else if (p.title_en) {
+        parts.push('INFO — ' + p.title_en + ': full details are in the "' + p.title_en + '" section of this app.')
+      }
+    }
+  } catch (e) {}
+  try {
+    const beach = await DB.prepare(
+      'SELECT beach_booking_enabled, booking_button_override_enabled, booking_button_override_message FROM beach_settings WHERE property_id = ?'
+    ).bind(property_id).first()
+    if (beach) {
+      parts.push('BEACH: ' + (beach.booking_button_override_enabled === 1
+        ? 'Beach spots are arranged on the beach — ' + (beach.booking_button_override_message || 'please see the beach team.')
+        : (beach.beach_booking_enabled === 1 ? 'Front-row beach spots can be booked in this app (Beach section).' : 'Beach booking is currently unavailable.')))
+    }
+  } catch (e) {}
+  return parts.join('\n\n')
+}
+
+async function getCoachingLessons(DB: any, property_id: any) {
+  try {
+    const rows = await DB.prepare(`
+      SELECT guidance FROM chatbot_lessons
+      WHERE property_id = ? AND is_active = 1
+      ORDER BY lesson_id DESC LIMIT 30
+    `).bind(property_id).all()
+    const list = (rows.results || []).map((r: any, i: number) => (i + 1) + '. ' + r.guidance)
+    return list.length ? list.join('\n') : ''
+  } catch (e) { return '' }
+}
+
+async function getConversationHistory(DB: any, conversation_id: any, limit: number = 12) {
+  try {
+    const rows = await DB.prepare(`
+      SELECT role, content FROM chatbot_messages
+      WHERE conversation_id = ?
+      ORDER BY created_at DESC, rowid DESC LIMIT ?
+    `).bind(conversation_id, limit).all()
+    return (rows.results || []).reverse().map((m: any) => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: String(m.content || '').slice(0, 600)
+    }))
+  } catch (e) { return [] }
+}
+
 app.post('/api/chatbot/chat', async (c) => {
   const { DB } = c.env
-  
+
   try {
     const body = await c.req.json()
     const { property_id, session_id, message, conversation_id, guest_context } = body
@@ -12570,8 +12660,9 @@ app.post('/api/chatbot/chat', async (c) => {
     // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
     
-    // Call AI if we have API key AND (context OR relevant links OR guest context)
-    if (apiKey && (context.length > 0 || topLinks.length > 0 || guest_context)) {
+    // Always let the AI answer when a key exists: its live resort knowledge is
+    // built fresh every time, so keyword-chunk misses must not mute it.
+    if (apiKey) {
       try {
         console.log('🤖 Using AI with API key:', apiKey ? 'SET' : 'NOT SET')
         console.log('📚 Context length:', context.length)
@@ -12594,65 +12685,46 @@ ${guest_context.benefits_summary || 'Standard benefits'}
 When guest asks "my tier", "my benefits", "what's included", "what do I have", or "my package", refer to THEIR specific tier information above.`
         }
         
-        const systemPrompt = `You are ${chatbotName}, the AI Concierge Manager at ${hotelName}. ${guestGreeting}You have the expertise of a 5-star hotel manager with deep knowledge of hospitality, guest service excellence, and property operations.
+        // Identity known from the linked pass OR captured earlier in this conversation
+        const convIdentity = await DB.prepare(
+          'SELECT guest_name, room_number FROM chatbot_conversations WHERE conversation_id = ?'
+        ).bind(convId).first()
+        const knownName = (guest_context && guest_context.guest_name) || (convIdentity && convIdentity.guest_name) || ''
+        const knownRoom = (guest_context && guest_context.room_number) || (convIdentity && convIdentity.room_number) || ''
 
-🏨 CRITICAL CONTEXT - READ THIS CAREFULLY:
-- You are INSIDE a hotel (${hotelName}) as the concierge
-- The guest is CURRENTLY STAYING in room ${guest_context ? guest_context.room_number : '[room number]'}
-- You ONLY handle IN-HOTEL requests: room issues, dining, spa, activities, housekeeping
-- You do NOT arrange external services, car repairs, home appliances, or anything outside the hotel
-${guest_context ? `\n👤 GUEST IDENTITY - ALREADY IN YOUR SYSTEM:\n- Name: ${guest_context.guest_name}\n- Room: ${guest_context.room_number}\n- Tier: ${guest_context.tier_name}\n- NEVER ask for their name, room number, or location - you already have this information` : ''}
+        // Everything the model is allowed to state, fetched live
+        const liveKnowledge = await buildLiveKnowledge(DB, property_id)
+        const lessons = await getCoachingLessons(DB, property_id)
+        const history = await getConversationHistory(DB, convId, 12)
 
-🚨 CRITICAL RULES - NO EXCEPTIONS:
-1. **Maintenance = Hotel Room Maintenance ONLY**
-   - Guest says "maintenance" or "repair" → They mean THEIR HOTEL ROOM
-   - Examples: AC not working, TV broken, lights flickering, toilet issue
-   - Response: "I'll send maintenance to room ${guest_context ? guest_context.room_number : '[room]'} right away. What's the issue?"
-   - NEVER ask: "Is it for a car?" "Home appliance?" "What location?" "ZIP code?"
+        const systemPrompt = `You are ${chatbotName}, the AI concierge of ${hotelName} — a luxury Red Sea resort in Sahl Hasheesh, Egypt. You speak with the polish, warmth and competence of the best concierge the guest has ever met. Reply in the guest's language, always.
 
-2. **You Already Know Their Location**
-   - They are in room ${guest_context ? guest_context.room_number : '[room]'} at ${hotelName}
-   - NEVER ask: "What's your location?" "ZIP code?" "Address?"
-   - You know exactly where they are
+════════ IDENTITY PROTOCOL (highest priority) ════════
+${knownName && knownRoom
+  ? `The guest is ${knownName}, room ${knownRoom}. Never ask for their name or room again; use their name naturally.`
+  : `You do NOT yet know this guest. Before helping with ANY request, warmly ask for their NAME and ROOM NUMBER in your first reply (briefly acknowledge their question so they feel heard). Once they provide either, begin your NEXT reply with this exact hidden tag on its own line, then continue normally:
+[[REGISTER name="<their name or ->" room="<their room or ->"]]
+Use "-" for whichever part is still missing and keep politely asking for it. The tag is invisible to the guest — never mention it.`}
 
-3. **Service Requests - Take Immediate Action**
-   - Guest: "I need maintenance" → You: "I'll send someone to room ${guest_context ? guest_context.room_number : '[room]'}. What needs fixing?"
-   - Guest: "TV is broken" → You: "I'll dispatch maintenance to fix your TV in room ${guest_context ? guest_context.room_number : '[room]'} right away."
-   - Guest: "AC not working" → You: "I'll send maintenance immediately to room ${guest_context ? guest_context.room_number : '[room]'} to fix the AC."
-   - NEVER say: "I'll find a service for you" "Let me search for technicians"
+════════ TRUTH PROTOCOL (never break these) ════════
+1. You may ONLY state facts that appear in RESORT KNOWLEDGE below or in this conversation. No exceptions.
+2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
+3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
+4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app). You cannot make reservations yourself — direct guests to the app section or the front desk.
+5. Service dispatch (maintenance, housekeeping, amenities to the room): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number.
+6. If the guest disputes something you said, do not double down — offer the front desk.
 
-4. **What You CAN and CANNOT Do**
-   ✅ CAN: Room service, housekeeping, maintenance, dining reservations, spa bookings, activity recommendations
-   ❌ CANNOT: External repairs, car services, home services, anything outside the hotel property
+════════ RESORT KNOWLEDGE (your ONLY source of facts) ════════
+${liveKnowledge || '(knowledge temporarily unavailable — be honest about not having details and offer the front desk)'}
 
-PERSONALITY & STYLE:
-- Confident and immediate action-oriented
-- Professional but warm
-- Solve problems instantly, don't ask unnecessary questions
-- Use guest name naturally: "${guest_context ? guest_context.guest_name : 'Guest'}"
+${context ? '════════ KNOWLEDGE BASE EXTRACTS ════════\n' + context : ''}${linkContext}${guestContextStr}
+${lessons ? '\n════════ MANAGEMENT COACHING (standing orders from your managers — follow them) ════════\n' + lessons : ''}
 
-RESPONSE GUIDELINES:
-1. **Language Matching**: ALWAYS respond in the SAME language as the guest's question
-
-2. **Be Direct and Action-Oriented**: 
-   - Don't ask clarifying questions about general topics (car vs. appliance)
-   - Assume hotel context always
-   - Take immediate action
-
-3. **Example Conversations**:
-   Guest: "I need maintenance"
-   You: "I'll send maintenance to room ${guest_context ? guest_context.room_number : '[room]'} right away. What needs attention?"
-   
-   Guest: "TV not working"
-   You: "I'll dispatch our maintenance team to room ${guest_context ? guest_context.room_number : '[room]'} immediately to fix your TV, ${guest_context ? guest_context.guest_name : 'Guest'}."
-   
-   Guest: "Need room service"
-   You: "Absolutely! What would you like to order for room ${guest_context ? guest_context.room_number : '[room]'}?"
-
-HOTEL INFORMATION & CONTEXT:
-${context}${linkContext}${guestContextStr}
-
-Remember: You are a hotel concierge. The guest is IN THE HOTEL. You already know their room number. Take immediate action. Never ask for location, ZIP code, or whether it's a car/home appliance. Focus on hotel services only.`
+════════ STYLE ════════
+- Concise and elegant: 2-5 sentences unless the guest asks for detail. No walls of text.
+- Warm, personal, five-star: use the guest's name when known, mirror their tone, one tasteful emoji at most.
+- In-hotel context always: "maintenance" means their hotel room, never cars or homes. You know where they are.
+- End with a helpful next step when natural (a section of this app, a venue, or the front desk).`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
@@ -12664,10 +12736,11 @@ Remember: You are a hotel concierge. The guest is IN THE HOTEL. You already know
             model: chatModel,
             messages: [
               { role: 'system', content: systemPrompt },
+              ...history,
               { role: 'user', content: message }
             ],
-            temperature: 0.5, // Lower = faster, more focused (was 0.7)
-            max_tokens: 200 // Shorter responses = faster (was 300)
+            temperature: 0.3,
+            max_tokens: 500
           })
         })
         
@@ -12677,6 +12750,25 @@ Remember: You are a hotel concierge. The guest is IN THE HOTEL. You already know
           const data = await response.json()
           console.log('✅ AI Response received:', data.choices[0].message.content.substring(0, 100))
           aiResponse = data.choices[0].message.content
+
+          // Identity capture: the model tags name/room when the guest provides
+          // them — store to the conversation, strip the tag from the reply
+          try {
+            const reg = aiResponse.match(/\[\[REGISTER\s+name="([^"]*)"\s+room="([^"]*)"\]\]/)
+            if (reg) {
+              const capName = (reg[1] || '').trim()
+              const capRoom = (reg[2] || '').trim()
+              if (capName && capName !== '-') {
+                await DB.prepare('UPDATE chatbot_conversations SET guest_name = ? WHERE conversation_id = ?')
+                  .bind(capName.slice(0, 80), convId).run()
+              }
+              if (capRoom && capRoom !== '-') {
+                await DB.prepare('UPDATE chatbot_conversations SET room_number = ? WHERE conversation_id = ?')
+                  .bind(capRoom.slice(0, 20), convId).run()
+              }
+              aiResponse = aiResponse.replace(/\[\[REGISTER[^\]]*\]\]\s*/g, '').trim()
+            }
+          } catch (e) { console.error('register parse', e) }
         } else {
           const errorText = await response.text()
           console.error('❌ API Error:', response.status, errorText)
@@ -48150,7 +48242,6 @@ app.get('/staff/app', (c) => {
   `)
 })
 
-// ADMIN: WhatsApp escalation — who gets called in when nobody answers a guest
 app.get('/admin/escalation', (c) => {
   return c.html(`
 <!DOCTYPE html>
@@ -85198,6 +85289,127 @@ app.post('/api/staff/translate', async (c) => {
   } catch (error) {
     console.error('translate endpoint error', error)
     return c.json({ success: false, error: 'translation failed' }, 500)
+  }
+})
+
+// ── Agent coaching: admins grade real conversations; verdicts become standing
+// orders injected into every future system prompt ──
+app.get('/api/admin/agent/overview', async (c) => {
+  const { DB } = c.env
+  const pid = c.req.query('property_id') || '1'
+  try {
+    const conv = await DB.prepare(`
+      SELECT c.conversation_id, c.session_id, c.guest_name, c.room_number, c.is_ai_paused, c.started_at,
+        (SELECT COUNT(*) FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id) as msgs,
+        (SELECT content FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id AND m.role='user' ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) as last_user,
+        (SELECT MAX(m.created_at) FROM chatbot_messages m WHERE m.conversation_id = c.conversation_id) as last_at,
+        (SELECT COUNT(*) FROM chatbot_lessons l WHERE l.conversation_id = c.conversation_id) as lessons
+      FROM chatbot_conversations c
+      WHERE c.property_id = ?
+      ORDER BY last_at DESC
+      LIMIT 40
+    `).bind(pid).all()
+
+    const stats = await DB.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM chatbot_conversations WHERE property_id = ?1 AND started_at > datetime('now','-24 hours')) as convos24,
+        (SELECT COUNT(*) FROM chatbot_messages m JOIN chatbot_conversations cc ON m.conversation_id = cc.conversation_id WHERE cc.property_id = ?1 AND m.created_at > datetime('now','-24 hours')) as msgs24,
+        (SELECT COUNT(*) FROM chatbot_chunks WHERE property_id = ?1) as chunks,
+        (SELECT COUNT(*) FROM chatbot_lessons WHERE property_id = ?1 AND is_active = 1) as lessons,
+        (SELECT COUNT(*) FROM hotel_offerings WHERE property_id = ?1) as offerings,
+        (SELECT COUNT(*) FROM info_pages WHERE property_id = ?1) as pages
+    `).bind(pid).first()
+
+    return c.json({ success: true, conversations: conv.results || [], stats: stats || {} })
+  } catch (e) {
+    console.error('agent overview', e)
+    return c.json({ success: false, error: 'failed' }, 500)
+  }
+})
+
+app.get('/api/admin/agent/lessons', async (c) => {
+  const { DB } = c.env
+  try {
+    const rows = await DB.prepare(`
+      SELECT lesson_id, conversation_id, verdict, guidance, created_by, is_active, created_at
+      FROM chatbot_lessons WHERE property_id = 1 ORDER BY lesson_id DESC LIMIT 60
+    `).all()
+    return c.json({ success: true, lessons: rows.results || [] })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.post('/api/admin/agent/lessons', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    const guidance = String(b.guidance || '').trim()
+    if (!guidance) return c.json({ success: false, error: 'guidance required' }, 400)
+    await DB.prepare(`
+      INSERT INTO chatbot_lessons (property_id, conversation_id, verdict, guidance, created_by)
+      VALUES (1, ?, ?, ?, ?)
+    `).bind(b.conversation_id || null, b.verdict || 'coaching', guidance.slice(0, 600), b.created_by || 'admin').run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+app.delete('/api/admin/agent/lessons/:id', async (c) => {
+  const { DB } = c.env
+  try {
+    await DB.prepare('DELETE FROM chatbot_lessons WHERE lesson_id = ?').bind(c.req.param('id')).run()
+    return c.json({ success: true })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// Full transcript for the coaching view
+app.get('/api/admin/agent/conversation/:id', async (c) => {
+  const { DB } = c.env
+  try {
+    const msgs = await DB.prepare(`
+      SELECT role, content, created_at FROM chatbot_messages
+      WHERE conversation_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 100
+    `).bind(c.req.param('id')).all()
+    return c.json({ success: true, messages: msgs.results || [] })
+  } catch (e) { return c.json({ success: false }, 500) }
+})
+
+// The AI reviews a real conversation and drafts a coaching note the admin can
+// tweak and save — "what went well / what to say next time" becomes a rule.
+app.post('/api/admin/agent/coach-draft', async (c) => {
+  const { DB } = c.env
+  try {
+    const b = await c.req.json()
+    const apiKey = c.env.DEEPSEEK_API_KEY || c.env.OPENAI_API_KEY
+    const baseURL = c.env.DEEPSEEK_API_KEY ? 'https://api.deepseek.com/v1' : 'https://api.openai.com/v1'
+    const model = c.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : 'gpt-4o-mini'
+    if (!apiKey) return c.json({ success: false, error: 'AI not configured' }, 400)
+
+    const msgs = await DB.prepare(`
+      SELECT role, content FROM chatbot_messages
+      WHERE conversation_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 60
+    `).bind(b.conversation_id).all()
+    const transcript = (msgs.results || []).map((m: any) =>
+      (m.role === 'user' ? 'GUEST' : m.role === 'admin' ? 'STAFF' : 'AI') + ': ' + String(m.content || '')
+    ).join('\n')
+    if (!transcript) return c.json({ success: false, error: 'empty conversation' }, 400)
+
+    const prompt = 'You are the training manager for a luxury hotel AI concierge. Review this real conversation. ' +
+      (b.note ? 'The human manager notes: "' + String(b.note).slice(0, 300) + '". ' : '') +
+      'Judge whether the AI handled it well. Then write ONE concise standing instruction (max 2 sentences, imperative, general enough to apply to future guests, not specific to this one) that would make the AI better. ' +
+      'Reply as strict JSON only: {"verdict":"good|mixed|poor","summary":"<one line on what happened>","guidance":"<the standing instruction>"}\n\nCONVERSATION:\n' + transcript.slice(0, 4000)
+
+    const r = await fetch(baseURL + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 400 })
+    })
+    const d: any = await r.json()
+    let raw = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '{}'
+    raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim()
+    let parsed: any = {}
+    try { parsed = JSON.parse(raw) } catch (e) { parsed = { verdict: 'mixed', summary: '', guidance: raw.slice(0, 300) } }
+    return c.json({ success: true, ...parsed })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e).slice(0, 160) }, 500)
   }
 })
 
