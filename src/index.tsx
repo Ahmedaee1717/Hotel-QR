@@ -54615,7 +54615,6 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </form>
         </div>
-            </div><!-- /cbKbPane -->
     </div>
 
     <!-- Restaurants Management Tab -->
