@@ -31626,23 +31626,22 @@ window.luxTogglePassForm = function() {
           }
         }
         
-        // Open chatbot and optionally ask about benefits
+        // Open chatbot and optionally ask about benefits.
+        // Goes through the chat button so the scroll-lock / viewport-fit /
+        // greeting logic all run — opening the window directly used to let the
+        // iOS keyboard shove the overlay off-screen.
         window.openChatbotWithBenefitsPrompt = function() {
-          // Open chatbot window
           const chatWindow = document.getElementById('chatWindow');
-          if (chatWindow) {
-            chatWindow.classList.remove('hidden');
-            
-            // Focus on input
-            setTimeout(() => {
-              const chatInput = document.getElementById('chatInput');
-              if (chatInput) {
-                chatInput.focus();
-                // Optionally pre-fill a helpful prompt
-                chatInput.placeholder = "Try asking: 'What can I eat with my tier?' or 'Where can I dine?'";
-              }
-            }, 100);
-          }
+          const chatBtn = document.getElementById('chatbotButton');
+          if (chatWindow && chatWindow.classList.contains('hidden') && chatBtn) chatBtn.click();
+          setTimeout(() => {
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+              // Don't pop the keyboard on phones — guests tap the field themselves
+              if (window.innerWidth >= 768) chatInput.focus();
+              chatInput.placeholder = "Try asking: 'What can I eat with my tier?' or 'Where can I dine?'";
+            }
+          }, 100);
         }
         
         </script>
@@ -31797,7 +31796,7 @@ window.luxTogglePassForm = function() {
             <!-- Input Area -->
             <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
               <div class="flex gap-2">
-                <input type="text" id="chatInput" placeholder="Ask me anything..." class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <input type="text" id="chatInput" placeholder="Ask me anything..." style="font-size: 16px;" class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <button id="callServiceBtn" class="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center hover:scale-105 transition shadow-lg" title="Call Service">
                   <i class="fas fa-phone text-lg"></i>
                 </button>
@@ -31834,14 +31833,47 @@ window.luxTogglePassForm = function() {
             if (el && labels[lang]) el.textContent = labels[lang];
           })();
 
-          // Keep the chat sized to the visible area on phones (URL bar + keyboard)
+          // Keep the chat pinned to the visible area on phones (URL bar + keyboard).
+          // iOS pushes fixed overlays around when the keyboard opens, so we track
+          // the visual viewport's offset AND height, not just the height.
+          function fitChatToViewport() {
+            if (window.innerWidth < 768 && chatWindow && !chatWindow.classList.contains('hidden')) {
+              const vv = window.visualViewport;
+              chatWindow.style.top = (vv ? vv.offsetTop : 0) + 'px';
+              chatWindow.style.height = (vv ? vv.height : window.innerHeight) + 'px';
+              if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+          }
           if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', function() {
-              if (window.innerWidth < 768 && chatWindow && !chatWindow.classList.contains('hidden')) {
-                chatWindow.style.height = window.visualViewport.height + 'px';
-                if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
-              }
-            });
+            window.visualViewport.addEventListener('resize', fitChatToViewport);
+            window.visualViewport.addEventListener('scroll', fitChatToViewport);
+          }
+          // Re-fit after the keyboard finishes animating in
+          if (chatInput) chatInput.addEventListener('focus', function() { setTimeout(fitChatToViewport, 300); });
+
+          // Freeze the page behind the chat so the iOS keyboard can't scroll it
+          // and shove the overlay off-screen (the input used to end up at the top
+          // of the screen with the homepage showing through underneath).
+          let chatScrollLockY = 0, chatPageLocked = false;
+          function lockPageScroll() {
+            if (chatPageLocked) return;
+            chatPageLocked = true;
+            chatScrollLockY = window.scrollY || 0;
+            document.body.style.position = 'fixed';
+            document.body.style.top = (-chatScrollLockY) + 'px';
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+          }
+          function unlockPageScroll() {
+            if (!chatPageLocked) return;
+            chatPageLocked = false;
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            window.scrollTo(0, chatScrollLockY);
           }
           
           let chatConversationId = null;
@@ -32226,13 +32258,16 @@ window.luxTogglePassForm = function() {
                 }
                 if (window.innerWidth < 768) {
                   // Fit the visible screen; don't pop the keyboard until the guest taps the field
-                  if (window.visualViewport) chatWindow.style.height = window.visualViewport.height + 'px';
+                  lockPageScroll();
+                  fitChatToViewport();
                 } else {
                   chatInput.focus();
                 }
                 startMessagePolling(); // Start polling when chat opens
               } else {
                 chatWindow.style.height = '';
+                chatWindow.style.top = '';
+                unlockPageScroll();
                 stopMessagePolling(); // Stop polling when chat closes
               }
             });
@@ -32240,6 +32275,8 @@ window.luxTogglePassForm = function() {
             closeChatBtn.addEventListener('click', () => {
               chatWindow.classList.add('hidden');
               chatWindow.style.height = '';
+              chatWindow.style.top = '';
+              unlockPageScroll();
               stopMessagePolling(); // Stop polling when chat closes
             });
             
