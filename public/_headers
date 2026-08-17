@@ -1,2 +1,5 @@
 /static/oldpalace-ops.apk
   Cache-Control: no-store
+
+/static/oldpalace-guest.apk
+  Cache-Control: no-store
