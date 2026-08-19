@@ -6347,110 +6347,50 @@ app.get('/api/custom-sections/:property_id', async (c) => {
       return c.json({ success: true, sections: [] })
     }
     
-    // If language is English or one of the built-in columns, use existing data
+    // Resolution order per section: saved translation → built-in column → DeepSeek (cached)
+    const langN = normLang(language)
     const builtInLanguages = ['en', 'ar', 'de', 'ru', 'pl', 'it', 'fr', 'cs', 'uk']
-    
-    // For each section, get or create translation
+    const pending: any[] = []
+
     for (const section of sections.results) {
-      // Skip translation if already in English
-      if (language === 'en') {
+      if (langN === 'en') {
         section.translated_name = section.section_name_en
         continue
       }
-      
-      // Check if translation exists in database
       const translation = await DB.prepare(`
         SELECT section_name FROM custom_section_translations
         WHERE section_id = ? AND language_code = ?
-      `).bind(section.section_id, language).first()
-      
+      `).bind(section.section_id, langN).first()
       if (translation) {
-        // Use existing translation from database
         section.translated_name = translation.section_name
-      } else if (builtInLanguages.includes(language)) {
-        // Check if built-in column has value
-        const columnName = `section_name_${language}`
-        const columnValue = section[columnName]
-        
-        if (columnValue && columnValue.trim() !== '') {
-          // Use built-in column value
+        continue
+      }
+      if (builtInLanguages.includes(langN)) {
+        const columnValue = section[`section_name_${langN}`]
+        if (columnValue && String(columnValue).trim() !== '') {
           section.translated_name = columnValue
-        } else {
-          // Column is NULL or empty - do AI translation
-          try {
-            const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [{
-                role: 'system',
-                content: `You are a professional translator. Translate the following hotel section name to ${language}. Keep it concise (1-3 words). Return ONLY the translation, nothing else.`
-              }, {
-                role: 'user',
-                content: section.section_name_en
-              }],
-              temperature: 0.3
-            })
-          })
-          
-          const result = await translationResult.json()
-          const translatedName = result.choices[0].message.content.trim()
-          
-          // Store translation for future use
-          await DB.prepare(`
-            INSERT OR REPLACE INTO custom_section_translations (section_id, language_code, section_name)
-            VALUES (?, ?, ?)
-          `).bind(section.section_id, language, translatedName).run()
-          
-            section.translated_name = translatedName
-          } catch (translateError) {
-            console.error('Translation error for section:', translateError)
-            section.translated_name = section.section_name_en // Fallback to English
-          }
+          continue
         }
-      } else {
-        // Not a built-in language - do AI translation
-        try {
-          const translationResult = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [{
-                role: 'system',
-                content: `You are a professional translator. Translate the following hotel section name to ${language}. Keep it concise (1-3 words). Return ONLY the translation, nothing else.`
-              }, {
-                role: 'user',
-                content: section.section_name_en
-              }],
-              temperature: 0.3
-            })
-          })
-          
-          const result = await translationResult.json()
-          const translatedName = result.choices[0].message.content.trim()
-          
-          // Store translation for future use
-          await DB.prepare(`
-            INSERT OR REPLACE INTO custom_section_translations (section_id, language_code, section_name)
-            VALUES (?, ?, ?)
-          `).bind(section.section_id, language, translatedName).run()
-          
-          section.translated_name = translatedName
-        } catch (translateError) {
-          console.error('Translation error for section:', translateError)
-          section.translated_name = section.section_name_en // Fallback to English
+      }
+      pending.push(section)
+    }
+
+    if (pending.length) {
+      const tr = await dsTranslateBatch(c.env, langN, pending.map((s: any) => s.section_name_en))
+      for (let i = 0; i < pending.length; i++) {
+        const name = tr[i] || pending[i].section_name_en
+        pending[i].translated_name = name
+        if (name && name !== pending[i].section_name_en) {
+          try {
+            await DB.prepare(`
+              INSERT OR REPLACE INTO custom_section_translations (section_id, language_code, section_name)
+              VALUES (?, ?, ?)
+            `).bind(pending[i].section_id, langN, name).run()
+          } catch (e) {}
         }
       }
     }
-    
+
     return c.json({ success: true, sections: sections.results })
   } catch (error) {
     console.error('Get custom sections error:', error)
@@ -6717,17 +6657,32 @@ app.delete('/api/admin/info-pages/:page_id', async (c) => {
 app.get('/api/info-pages/:property_id', async (c) => {
   const { DB } = c.env
   const { property_id } = c.req.param()
-  
+  const lang = c.req.query('lang') || 'en'
+
   try {
     const pages = await DB.prepare(`
-      SELECT page_id, page_key, title_en, title_ar, title_de, title_ru, 
+      SELECT page_id, page_key, title_en, title_ar, title_de, title_ru,
              title_pl, title_it, title_fr, title_cs, title_uk, title_zh,
              icon_class, color_theme, display_order
       FROM info_pages
       WHERE property_id = ? AND is_published = 1 AND show_in_menu = 1
       ORDER BY display_order ASC, page_id ASC
     `).bind(property_id).all()
-    
+
+    // Make title_<lang> exist for ANY language: use the stored column when
+    // present, otherwise machine-translate the English title (cached).
+    const langN = normLang(lang)
+    if (langN !== 'en' && pages.results.length) {
+      const rows: any[] = pages.results
+      const missing = rows.filter(p => !(p['title_' + langN] && String(p['title_' + langN]).trim()))
+      if (missing.length) {
+        try {
+          const tr = await dsTranslateBatch(c.env, langN, missing.map(p => p.title_en))
+          missing.forEach((p, i) => { p['title_' + langN] = tr[i] || p.title_en })
+        } catch (e) {}
+      }
+    }
+
     return c.json({ success: true, pages: pages.results })
   } catch (error) {
     console.error('Get info pages error:', error)
@@ -6739,17 +6694,50 @@ app.get('/api/info-pages/:property_id', async (c) => {
 app.get('/api/info-page/:property_id/:page_key', async (c) => {
   const { DB } = c.env
   const { property_id, page_key } = c.req.param()
-  
+  const lang = c.req.query('lang') || 'en'
+
   try {
-    const page = await DB.prepare(`
+    const page: any = await DB.prepare(`
       SELECT * FROM info_pages
       WHERE property_id = ? AND page_key = ? AND is_published = 1
     `).bind(property_id, page_key).first()
-    
+
     if (!page) {
       return c.json({ error: 'Info page not found' }, 404)
     }
-    
+
+    // Fill title_<lang>/content_<lang> for any language that has no stored
+    // column. Very long content (e.g. TV channel tables) stays English rather
+    // than risking a truncated machine translation; its title still translates.
+    const langN = normLang(lang)
+    if (langN !== 'en') {
+      try {
+        const wantTitle = !(page['title_' + langN] && String(page['title_' + langN]).trim())
+        const contentEn = String(page.content_en || '')
+        const wantContent = !(page['content_' + langN] && String(page['content_' + langN]).trim()) && contentEn.trim() && contentEn.length <= 8000
+        if (wantTitle || wantContent) {
+          // Chunk content on paragraph-ish boundaries so nothing gets cut off
+          const chunks: string[] = []
+          if (wantContent) {
+            let rest = contentEn
+            while (rest.length > 3000) {
+              let cut = Math.max(rest.lastIndexOf('</p>', 3000), rest.lastIndexOf('\n', 3000), rest.lastIndexOf('. ', 3000))
+              if (cut < 500) cut = 3000
+              else if (rest.slice(cut, cut + 4) === '</p>') cut += 4
+              chunks.push(rest.slice(0, cut))
+              rest = rest.slice(cut)
+            }
+            if (rest) chunks.push(rest)
+          }
+          const items = (wantTitle ? [String(page.title_en || '')] : []).concat(chunks)
+          const tr = await dsTranslateBatch(c.env, langN, items)
+          let idx = 0
+          if (wantTitle) page['title_' + langN] = tr[idx++] || page.title_en
+          if (wantContent) page['content_' + langN] = tr.slice(idx).join('') || page.content_en
+        }
+      } catch (e) {}
+    }
+
     return c.json({ success: true, page })
   } catch (error) {
     console.error('Get info page error:', error)
@@ -7438,52 +7426,59 @@ app.post('/api/translate', async (c) => {
     }
     
     // For English, return as-is
-    if (targetLang === 'en' || targetLang === 'English') {
+    const lang = normLang(targetLang)
+    if (lang === 'en') {
       return c.json({ translation: text, translated_text: text })
     }
-    
-    // Get OpenAI API key from environment variable
-    const apiKey = c.env.OPENAI_API_KEY
-    
-    if (!apiKey) {
-      console.log('⚠️ No OpenAI API key, returning original text')
-      return c.json({ translation: text, translated_text: text })
-    }
-    
-    // Use target language name if it looks like a full name (e.g., "Arabic", "Spanish")
-    // Otherwise treat it as a language code (e.g., "ar", "es")
-    const languageTarget = targetLang.length > 3 ? targetLang : targetLang
-    
-    const systemPrompt = `You are a professional translator. Translate the given text to ${languageTarget}. Return ONLY the translation, no explanations or additional text.`
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const DB = c.env.DB
+
+    // Cache first (shared with the staff translator — same table, same keying)
+    const key = await cacheKey(String(text), lang)
+    try {
+      const hit = await DB.prepare('SELECT translated FROM staff_translations WHERE cache_key = ?').bind(key).first()
+      if (hit && hit.translated) {
+        return c.json({ translation: hit.translated, translated_text: hit.translated })
+      }
+    } catch (e) {}
+
+    const apiKey = c.env.DEEPSEEK_API_KEY
+    if (!apiKey) {
+      return c.json({ translation: text, translated_text: text })
+    }
+
+    const targetName = LANG_NAMES[lang] || lang
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'deepseek-chat',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: text }
+          { role: 'system', content: `You are a professional hotel translator. Translate the given text to ${targetName}. Return ONLY the translation, no explanations or additional text. Preserve numbers, times, prices and proper names exactly.` },
+          { role: 'user', content: String(text).slice(0, 6000) }
         ],
         temperature: 0.3,
-        max_tokens: 4000  // Increased from 500 to handle large menu translations
+        max_tokens: 4000
       })
     })
-    
+
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ OpenAI API error:', errorText)
       return c.json({ translation: text, translated_text: text })
     }
-    
+
     const data: any = await response.json()
     const translatedText = data.choices?.[0]?.message?.content?.trim() || text
-    
-    console.log('✅ Translated:', text.substring(0, 30), '→', translatedText.substring(0, 30))
-    
+
+    if (translatedText && translatedText !== text) {
+      try {
+        await DB.prepare('INSERT OR REPLACE INTO staff_translations (cache_key, src_lang, target_lang, translated) VALUES (?, ?, ?, ?)')
+          .bind(key, 'auto', lang, translatedText).run()
+      } catch (e) {}
+    }
+
     // Return both formats for compatibility
     return c.json({ translation: translatedText, translated_text: translatedText })
   } catch (error) {
@@ -11001,8 +10996,27 @@ app.get('/api/hotel-offerings/:property_id', async (c) => {
     }
     
     const offerings = await DB.prepare(query).bind(...params).all()
-    
-    return c.json({ 
+
+    // Machine-translate the visible fields server-side for ANY non-English
+    // language (cached in D1, so only the first guest per language waits).
+    // Arabic included: the ar columns exist but are empty for many rows, and
+    // translating already-Arabic text to Arabic is a harmless no-op.
+    const langN = normLang(lang)
+    if (langN !== 'en' && offerings.results.length) {
+      try {
+        const rows: any[] = offerings.results
+        const texts: string[] = []
+        rows.forEach(o => { texts.push(o.title_en || '', o.short_description_en || '', o.location || '') })
+        const tr = await dsTranslateBatch(c.env, langN, texts)
+        rows.forEach((o, i) => {
+          o.title_en = tr[i * 3] || o.title_en
+          o.short_description_en = tr[i * 3 + 1] || o.short_description_en
+          o.location = tr[i * 3 + 2] || o.location
+        })
+      } catch (e) {}
+    }
+
+    return c.json({
       success: true,
       offerings: offerings.results.map(o => {
         let images = [];
@@ -12481,7 +12495,15 @@ app.post('/api/chatbot/chat', async (c) => {
       const propSurvey = await DB.prepare('SELECT feedback_survey_url FROM properties WHERE property_id = ?').bind(property_id).first()
       const activeForm = (activeForms.results && activeForms.results[0]) || null
       if ((propSurvey && propSurvey.feedback_survey_url) || activeForm) {
-        const formUrl = (propSurvey && propSurvey.feedback_survey_url) ? propSurvey.feedback_survey_url : '/feedback/' + activeForm.form_id
+        let formUrl = (propSurvey && propSurvey.feedback_survey_url) ? propSurvey.feedback_survey_url : '/feedback/' + activeForm.form_id
+
+        // Open the survey in the guest's own language
+        try {
+          const gc: any = await DB.prepare('SELECT guest_lang FROM chatbot_conversations WHERE conversation_id = ?').bind(convId).first()
+          if (gc && gc.guest_lang && normLang(gc.guest_lang) !== 'en') {
+            formUrl += (formUrl.indexOf('?') >= 0 ? '&' : '?') + 'lang=' + normLang(gc.guest_lang)
+          }
+        } catch (e) {}
 
         // Multi-language feedback invitation - Default to English
         const feedbackResponse = 'Thank you for wanting to share your feedback with us!' + String.fromCharCode(10) + String.fromCharCode(10) + 'We would love to hear from you. You can [submit your feedback here](' + formUrl + ') - it will only take a few minutes.' + String.fromCharCode(10) + String.fromCharCode(10) + 'Is there anything else I can help you with?';
@@ -29450,7 +29472,7 @@ window.luxTogglePassForm = function() {
 
             if (propertyData.show_restaurants === 1) {
                 const name = propertyData['section_restaurants_' + lang] || 'Dining';
-                html += luxTile('fas fa-utensils', name, 'Restaurants & Bars', "luxOpenCategory('restaurant')", true, luxCatImg('restaurant'));
+                html += luxTile('fas fa-utensils', name, luxT('Restaurants & Bars'), "luxOpenCategory('restaurant')", true, luxCatImg('restaurant'));
             }
             if (propertyData.show_events === 1) {
                 html += luxTile('fas fa-calendar-days', propertyData['section_events_' + lang] || 'Events', '', "luxOpenCategory('event')", false, luxCatImg('event'));
@@ -29469,7 +29491,7 @@ window.luxTogglePassForm = function() {
                 if (cs.is_visible === 1) {
                     const name = (cs.translated_name || cs.section_name_en || '').replace(/</g, '&lt;');
                     if (cs.section_key === 'room-service') {
-                        html += luxTile(cs.icon_class || 'fas fa-utensils', name, 'Served to your room', 'luxOpenRoomService()', false, luxCatImg('room_service'));
+                        html += luxTile(cs.icon_class || 'fas fa-utensils', name, luxT('Served to your room'), 'luxOpenRoomService()', false, luxCatImg('room_service'));
                     } else {
                         html += luxTile(cs.icon_class || 'fas fa-star', name, '', "luxOpenCategory('" + cs.section_key + "')", false, luxCatImg(null, cs.section_key));
                     }
@@ -29478,7 +29500,7 @@ window.luxTogglePassForm = function() {
             const beachEl = document.getElementById('beach-booking-section');
             if (beachEl && (beachEl.dataset.luxEnabled === '1' || !beachEl.classList.contains('hidden'))) {
                 beachEl.dataset.luxEnabled = '1';
-                html += luxTile('fas fa-umbrella-beach', 'Beach', 'Reserve your spot', 'luxOpenBeach()');
+                html += luxTile('fas fa-umbrella-beach', luxT('Beach'), luxT('Reserve your spot'), 'luxOpenBeach()');
             }
             (infoPages || []).forEach(p => {
                 const t = (p['title_' + lang] || p.title_en || '').replace(/</g, '&lt;');
@@ -29486,13 +29508,31 @@ window.luxTogglePassForm = function() {
             });
             const fb = document.getElementById('feedbackButton');
             if (fb && !fb.classList.contains('hidden')) {
-                html += luxTile('fas fa-comment-dots', 'Feedback', 'Share your thoughts', 'openFeedbackForm()');
+                html += luxTile('fas fa-comment-dots', luxT('Feedback'), luxT('Share your thoughts'), 'openFeedbackForm()');
             }
             if (propertyData.show_hotel_map === 1) {
-                html += luxTile('fas fa-map-location-dot', 'Resort Map', 'Live · Find your way', 'luxOpenLiveMap()');
+                html += luxTile('fas fa-map-location-dot', luxT('Resort Map'), luxT('Live · Find your way'), 'luxOpenLiveMap()');
             }
             grid.innerHTML = html;
         }
+
+        // Machine-translated labels for the hardcoded home tiles. Prefetched
+        // once per language (server caches in D1); home re-renders when ready.
+        window.LUX_I18N = {};
+        function luxT(s) { return window.LUX_I18N[s] || s; }
+        (async function () {
+            try {
+                var gl = window.currentLanguage || 'en';
+                if (gl === 'en') return;
+                var strs = ['Beach', 'Reserve your spot', 'Feedback', 'Share your thoughts', 'Resort Map', 'Live · Find your way', 'Restaurants & Bars', 'Served to your room'];
+                var d = await fetch('/api/staff/translate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target: gl, items: strs.map(function (s, i) { return { id: i, text: s }; }) })
+                }).then(function (r) { return r.json(); });
+                (d.results || []).forEach(function (r) { if (r && r.text) window.LUX_I18N[strs[r.id]] = r.text; });
+                if (window.luxBuildHomeSafe) window.luxBuildHomeSafe();
+            } catch (e) {}
+        })();
 
         window.luxBuildHomeSafe = function() {
             const content = document.getElementById('content');
@@ -30840,7 +30880,7 @@ window.luxTogglePassForm = function() {
               console.log('⏳ Property data not loaded yet, skipping info pages load');
               return;
             }
-            const response = await fetch('/api/info-pages/' + propertyData.property_id);
+            const response = await fetch('/api/info-pages/' + propertyData.property_id + '?lang=' + (window.currentLanguage || 'en'));
             const data = await response.json();
             if (data.success) {
               infoPages = data.pages;
@@ -30888,7 +30928,7 @@ window.luxTogglePassForm = function() {
 
         window.openInfoPage = async function(pageKey) {
           try {
-            const response = await fetch('/api/info-page/' + propertyData.property_id + '/' + pageKey);
+            const response = await fetch('/api/info-page/' + propertyData.property_id + '/' + pageKey + '?lang=' + (window.currentLanguage || 'en'));
             const data = await response.json();
 
             if (data.success) {
@@ -30986,9 +31026,13 @@ window.luxTogglePassForm = function() {
         }
 
         window.openFeedbackForm = function() {
-          // Prefer the GuestLens survey (public, branded, mobile-friendly)
+          // Prefer the GuestLens survey (public, branded, mobile-friendly),
+          // opened in the guest's chosen language.
           if (propertyData && propertyData.feedback_survey_url) {
-            window.location.href = propertyData.feedback_survey_url;
+            var su = propertyData.feedback_survey_url;
+            var gl = window.currentLanguage || 'en';
+            if (gl !== 'en') su += (su.indexOf('?') >= 0 ? '&' : '?') + 'lang=' + encodeURIComponent(gl);
+            window.location.href = su;
             return;
           }
           if (!activeFeedbackForm) {
@@ -85490,7 +85534,78 @@ const LANG_NAMES: Record<string, string> = {
   en: 'English', ar: 'Arabic', ru: 'Russian', de: 'German', fr: 'French', it: 'Italian',
   es: 'Spanish', pl: 'Polish', cs: 'Czech', uk: 'Ukrainian', tr: 'Turkish', nl: 'Dutch',
   ro: 'Romanian', hu: 'Hungarian', sv: 'Swedish', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
-  pt: 'Portuguese', he: 'Hebrew', fa: 'Persian', hi: 'Hindi', sk: 'Slovak', bg: 'Bulgarian', sr: 'Serbian'
+  pt: 'Portuguese', he: 'Hebrew', fa: 'Persian', hi: 'Hindi', sk: 'Slovak', bg: 'Bulgarian', sr: 'Serbian',
+  el: 'Greek', no: 'Norwegian', da: 'Danish', fi: 'Finnish'
+}
+
+// The guest UI historically uses country-style codes in places; normalize to ISO 639-1.
+function normLang(raw: string): string {
+  const l = String(raw || 'en').toLowerCase().trim()
+  const alias: Record<string, string> = { cz: 'cs', ua: 'uk', cn: 'zh', jp: 'ja', kr: 'ko', gr: 'el', se: 'sv', dk: 'da', in: 'hi', gb: 'en', sa: 'ar' }
+  if (alias[l]) return alias[l]
+  if (LANG_NAMES[l]) return l
+  // Full names ("Arabic", "German") → code
+  const byName = Object.entries(LANG_NAMES).find(([, n]) => n.toLowerCase() === l)
+  return byName ? byName[0] : l.slice(0, 2)
+}
+
+// Server-side batch translate with the shared D1 cache. Returns the input
+// array with every non-empty string replaced by its translation; on any
+// failure the original strings pass through untouched (English fallback).
+async function dsTranslateBatch(env: any, target: string, texts: (string | null | undefined)[]): Promise<string[]> {
+  const lang = normLang(target)
+  const out = texts.map(t => t == null ? '' : String(t))
+  if (lang === 'en' || !out.some(t => t.trim())) return out
+  const DB = env.DB
+  const todo: { idx: number; key: string; text: string }[] = []
+  for (let i = 0; i < out.length; i++) {
+    const t = out[i]
+    if (!t || !t.trim()) continue
+    const key = await cacheKey(t, lang)
+    try {
+      const hit = await DB.prepare('SELECT translated FROM staff_translations WHERE cache_key = ?').bind(key).first()
+      if (hit && hit.translated) { out[i] = hit.translated as string; continue }
+    } catch (e) {}
+    todo.push({ idx: i, key, text: t })
+  }
+  if (!todo.length) return out
+  const apiKey = env.DEEPSEEK_API_KEY
+  if (!apiKey) return out
+  const payload = todo.map((t, i) => ({ i, src: t.text.slice(0, 12), text: t.text.slice(0, 4000) }))
+  const targetName = LANG_NAMES[lang] || lang
+  const prompt = 'You are a luxury-hotel content translator. Translate each item\'s "text" into ' + targetName + '.\n' +
+    'Reply with ONLY a JSON array, no markdown. Copy "i" and "src" UNCHANGED from the input and add "text" = the translation. ' +
+    'Preserve any HTML tags, emoji, numbers, prices and times exactly.\n' +
+    '[{"i":0,"src":"<copied>","text":"<translation>"}]\n\n' + JSON.stringify(payload)
+  try {
+    const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 8000
+      }),
+      signal: AbortSignal.timeout(60000)
+    })
+    if (!r.ok) return out
+    const data: any = await r.json()
+    let raw = (data.choices?.[0]?.message?.content || '').trim()
+    raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return out
+    for (const res of arr) {
+      const t = todo[res?.i]
+      if (!t || String(res.src) !== t.text.slice(0, 12) || !res.text) continue
+      out[t.idx] = String(res.text)
+      try {
+        await DB.prepare('INSERT OR REPLACE INTO staff_translations (cache_key, src_lang, target_lang, translated) VALUES (?, ?, ?, ?)')
+          .bind(t.key, 'en', lang, String(res.text)).run()
+      } catch (e) {}
+    }
+  } catch (e) {}
+  return out
 }
 
 async function cacheKey(text: string, target: string): Promise<string> {
@@ -85502,7 +85617,7 @@ app.post('/api/staff/translate', async (c) => {
   const { DB } = c.env
   try {
     const body = await c.req.json()
-    const target = (body.target || 'en').toLowerCase()
+    const target = normLang(body.target || 'en')
     const items: any[] = (body.items || []).filter((i: any) => i && i.text && String(i.text).trim())
     if (!items.length) return c.json({ success: true, results: [] })
 
