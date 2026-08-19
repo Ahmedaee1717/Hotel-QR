@@ -48461,6 +48461,12 @@ body.embed .topbar{display:none}
 .msg.assistant{background:#eef2ff;border:1px solid #e0e7ff;border-top-right-radius:4px;margin-left:auto}
 .msg.admin{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-top-right-radius:4px;margin-left:auto}
 .msg .rl{font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;opacity:.65;display:block;margin-bottom:3px;font-weight:700}
+.msg .tr{margin-top:7px;padding-top:6px;border-top:1px dashed rgba(100,100,140,.3);font-size:.83rem;opacity:.85;font-style:italic}
+.msg .tr .trl{font-style:normal;font-size:.54rem;letter-spacing:.08em;font-weight:700;background:rgba(99,102,241,.14);color:#4f46e5;border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:1px}
+.msg.admin .tr{border-top-color:rgba(255,255,255,.35)}
+.msg.admin .tr .trl{background:rgba(255,255,255,.22);color:#fff}
+.conv .lastEn{font-size:.76rem;color:#4f46e5;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
+.conv .lastEn b{font-style:normal;font-size:.6rem;letter-spacing:.05em;color:#818cf8;font-weight:700}
 .coachbar{padding:14px 16px;border-top:1px solid #f0f1f3;background:#fff}
 .coachbar .lbl{font-size:.78rem;font-weight:700;color:#4338ca;margin-bottom:8px;display:flex;align-items:center;gap:7px}
 .coachbar textarea{width:100%;background:#fff;border:1px solid #d1d5db;border-radius:11px;padding:11px 13px;color:#1f2937;font-size:.88rem;font-family:inherit;resize:vertical;min-height:64px}
@@ -48542,6 +48548,22 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2800)}
 function ago(s){if(!s)return'';var t=Date.parse(s.replace(' ','T')+'Z');if(isNaN(t))return'';var d=(Date.now()-t)/1000;if(d<60)return'now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago'}
 
+// Batch-translate to English via the cached staff translator.
+// Returns a map id -> {lang, text}; only entries in a foreign language come back useful.
+async function trBatch(items){
+  var out={};
+  items=items.filter(function(i){return i&&i.text&&String(i.text).trim()});
+  if(!items.length)return out;
+  try{
+    var d=await fetch('/api/staff/translate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({target:'en',items:items.map(function(i){return{id:i.id,text:String(i.text).slice(0,1500)}})})}).then(function(r){return r.json()});
+    (d.results||[]).forEach(function(r){
+      if(r&&r.lang&&r.lang!=='en'&&r.lang!=='unknown'&&r.text)out[r.id]={lang:r.lang,text:r.text};
+    });
+  }catch(e){}
+  return out;
+}
+
 async function loadOverview(){
   try{
     var d=await fetch('/api/admin/agent/overview?property_id='+PID,{cache:'no-store'}).then(function(r){return r.json()});
@@ -48560,6 +48582,17 @@ async function loadOverview(){
         (c.is_ai_paused?'<span class="tg human">staff took over</span>':'')+
         (c.lessons>0?'<span class="tg coached">coached</span>':'')+'</div></div>';
     }).join('')||'<div class="empty"><i class="fas fa-comments"></i>No guest conversations yet.</div>';
+    // Show an English line under foreign-language previews
+    trBatch(convs.map(function(c){return{id:c.conversation_id,text:c.last_user}})).then(function(tr){
+      Object.keys(tr).forEach(function(id){
+        var row=document.querySelector('.conv[data-id="'+id+'"] .last');
+        if(row&&!(row.nextElementSibling&&row.nextElementSibling.classList.contains('lastEn'))){
+          var el=document.createElement('div');el.className='lastEn';
+          el.innerHTML='<b>'+esc(tr[id].lang.toUpperCase())+'→EN</b> '+esc(tr[id].text);
+          row.parentNode.insertBefore(el,row.nextSibling);
+        }
+      });
+    });
   }catch(e){}
 }
 
@@ -48575,12 +48608,26 @@ window.openConv=async function(id,el){
     var d=await fetch('/api/admin/agent/conversation/'+id,{cache:'no-store'}).then(function(r){return r.json()});
     var name='Conversation';
     document.getElementById('tHead').innerHTML='<i class="fas fa-comments"></i> Reviewing conversation';
-    box.innerHTML=(d.messages||[]).map(function(m){
+    var msgs=d.messages||[];
+    box.innerHTML=msgs.map(function(m,i){
       var role=m.role==='admin'?'admin':(m.role==='user'?'user':'assistant');
       var lbl=role==='admin'?'Staff':(role==='user'?'Guest':'AI concierge');
-      return '<div class="msg '+role+'"><span class="rl">'+lbl+'</span>'+esc(m.content)+'</div>';
+      return '<div class="msg '+role+'" id="am-'+id+'-'+i+'"><span class="rl">'+lbl+'</span>'+esc(m.content)+'</div>';
     }).join('')||'<div class="empty">No messages.</div>';
     box.scrollTop=box.scrollHeight;
+    // English translations under every foreign-language message
+    trBatch(msgs.map(function(m,i){return{id:i,text:m.content}})).then(function(tr){
+      if(curConv!==id)return; // admin already opened another conversation
+      Object.keys(tr).forEach(function(i){
+        var el=document.getElementById('am-'+id+'-'+i);
+        if(el&&!el.querySelector('.tr')){
+          var t=document.createElement('div');t.className='tr';
+          t.innerHTML='<span class="trl">'+esc(tr[i].lang.toUpperCase())+'→EN</span>'+esc(tr[i].text);
+          el.appendChild(t);
+        }
+      });
+      box.scrollTop=box.scrollHeight;
+    });
   }catch(e){}
 };
 
