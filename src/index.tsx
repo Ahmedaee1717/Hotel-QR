@@ -47842,11 +47842,9 @@ app.get('/staff/app', (c) => {
     <div class="wrap">
         <div class="tabs">
             <button class="tab on" data-tab="chats"><i class="fas fa-comments"></i> Chats <span class="dot" id="dotChats"></span></button>
-            <button class="tab" data-tab="feedback"><i class="fas fa-star"></i> Feedback <span class="dot" id="dotFb"></span></button>
             <button class="tab" data-tab="beach"><i class="fas fa-umbrella-beach"></i> Beach</button>
         </div>
         <div id="listChats"><div class="empty">Loading…</div></div>
-        <div id="listFb" style="display:none"><div class="empty">Loading…</div></div>
 
         <!-- BEACH: live map + bookings, built for phone and tablet -->
         <div id="listBeach" style="display:none">
@@ -47924,7 +47922,7 @@ app.get('/staff/app', (c) => {
     <script>
     var PROPERTY_ID = '1';
     var VAPID_PUBLIC = '${VAPID_PUBLIC_KEY}';
-    var cur = null, chats = [], feedback = [], lastSeenChat = localStorage.getItem('seenChat') || '', lastSeenFb = localStorage.getItem('seenFb') || '';
+    var cur = null, chats = [], lastSeenChat = localStorage.getItem('seenChat') || '';
 
     function toast(t){var e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2600)}
 
@@ -48046,11 +48044,6 @@ app.get('/staff/app', (c) => {
             chats = (r1&&r1.conversations)||[];
             renderChats();
         }catch(e){}
-        try{
-            var r2 = await fetch('/api/staff/feedback/'+PROPERTY_ID,{cache:'no-store'}).then(function(r){return r.json()});
-            feedback = (r2&&r2.feedback)||[];
-            renderFb();
-        }catch(e){}
     }
     function renderChats(){
         var el=document.getElementById('listChats');
@@ -48073,36 +48066,14 @@ app.get('/staff/app', (c) => {
         var newest = chats[0] && chats[0].last_at;
         document.getElementById('dotChats').classList.toggle('show', !!(newest && newest !== lastSeenChat));
     }
-    function renderFb(){
-        var el=document.getElementById('listFb');
-        if(!feedback.length){ el.innerHTML='<div class="empty">No feedback submitted yet.</div>'; return; }
-        var html='';
-        feedback.forEach(function(f){
-            var who=f.guest_name||'Guest';
-            html += '<div class="card">'+
-                '<div class="top"><div class="who">'+esc(who)+'</div><div class="when">'+ago(f.submitted_at)+'</div></div>'+
-                '<div class="chips">'+
-                    (f.is_urgent?'<span class="chip urgent">Urgent</span>':'')+
-                    (f.sentiment_label?'<span class="chip">'+esc(f.sentiment_label)+'</span>':'')+
-                    (f.room_number?'<span class="chip">Room '+esc(f.room_number)+'</span>':'')+
-                    (f.submission_source?'<span class="chip">'+esc(f.submission_source)+'</span>':'')+
-                '</div></div>';
-        });
-        el.innerHTML=html;
-        var newest = feedback[0] && feedback[0].submitted_at;
-        document.getElementById('dotFb').classList.toggle('show', !!(newest && newest !== lastSeenFb));
-    }
-
     document.querySelectorAll('.tab').forEach(function(t){
         t.onclick=function(){
             document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
             t.classList.add('on');
             var which = t.dataset.tab;
             document.getElementById('listChats').style.display = which==='chats'?'':'none';
-            document.getElementById('listFb').style.display    = which==='feedback'?'':'none';
             document.getElementById('listBeach').style.display = which==='beach'?'':'none';
             if(which==='chats' && chats[0]){ lastSeenChat=chats[0].last_at||''; localStorage.setItem('seenChat',lastSeenChat); document.getElementById('dotChats').classList.remove('show'); }
-            if(which==='feedback' && feedback[0]){ lastSeenFb=feedback[0].submitted_at||''; localStorage.setItem('seenFb',lastSeenFb); document.getElementById('dotFb').classList.remove('show'); stopRing(); }
             if(which==='beach') loadBeach();
         };
     });
@@ -85509,12 +85480,8 @@ app.post('/api/staff/ring-check', async (c) => {
             AND (c.staff_ack_at IS NULL OR m.created_at > c.staff_ack_at)
         )
     `).first()
-    const unreadFb = await DB.prepare(`
-      SELECT COUNT(*) as n FROM feedback_submissions
-      WHERE property_id = 1 AND is_read = 0
-        AND submitted_at > datetime('now', '-20 minutes')
-    `).first()
-    const pending = ((unackedChats && unackedChats.n) || 0) + ((unreadFb && unreadFb.n) || 0)
+    // Feedback no longer alerts (moved to GuestLens surveys; ops tab removed)
+    const pending = (unackedChats && unackedChats.n) || 0
     if (pending > 0) {
       c.executionCtx.waitUntil(ringStaff(c.env, DB, 2, 5000))
     }
@@ -86409,15 +86376,6 @@ app.get('/api/staff/ring-state', async (c) => {
       LIMIT 1
     `).bind(pid).first()
 
-    const fb = await DB.prepare(`
-      SELECT submission_id, guest_name, room_number, is_urgent, sentiment_label
-      FROM feedback_submissions
-      WHERE property_id = ? AND is_read = 0
-        AND submitted_at > datetime('now', '-20 minutes')
-      ORDER BY submitted_at DESC
-      LIMIT 1
-    `).bind(pid).first()
-
     if (chat) {
       const who = chat.guest_name || 'Guest'
       const room = chat.room_number ? ' · Room ' + chat.room_number : ''
@@ -86428,16 +86386,8 @@ app.get('/api/staff/ring-state', async (c) => {
         session_id: chat.session_id
       })
     }
-    if (fb) {
-      const who = fb.guest_name || 'A guest'
-      const room = fb.room_number ? ' · Room ' + fb.room_number : ''
-      return c.json({
-        ringing: true, kind: 'feedback',
-        title: (fb.is_urgent ? '🚨 Urgent feedback' : '📝 New feedback'),
-        body: who + room + (fb.sentiment_label ? ' · ' + fb.sentiment_label : ''),
-        session_id: ''
-      })
-    }
+    // Feedback no longer rings: guest feedback moved to GuestLens surveys and
+    // the ops app's Feedback tab was removed — only live chats alert staff.
     return c.json({ ringing: false })
   } catch (e) {
     console.error('ring-state', e)
