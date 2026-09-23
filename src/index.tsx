@@ -12745,6 +12745,15 @@ When guest asks "my tier", "my benefits", "what's included", "what do I have", o
         const lessons = await getCoachingLessons(DB, property_id)
         const history = await getConversationHistory(DB, convId, 12)
 
+        // The model has no clock: give it the resort's local date and time so
+        // "tonight" and weekday schedules are answered, not guessed.
+        const nowCairo = new Intl.DateTimeFormat('en-GB', {
+          timeZone: 'Africa/Cairo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date())
+        const tomorrowCairo = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'long' })
+          .format(new Date(Date.now() + 24 * 60 * 60 * 1000))
+
         const systemPrompt = `You are ${chatbotName}, the AI concierge of ${hotelName} — a luxury Red Sea resort in Sahl Hasheesh, Egypt. You speak with the polish, warmth and competence of the best concierge the guest has ever met. Reply in the guest's language, always.
 
 ════════ IDENTITY PROTOCOL (highest priority) ════════
@@ -12772,7 +12781,11 @@ ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders fro
 - Concise and elegant: 2-5 sentences unless the guest asks for detail. No walls of text.
 - Warm, personal, five-star: use the guest's name when known, mirror their tone, one tasteful emoji at most.
 - In-hotel context always: "maintenance" means their hotel room, never cars or homes. You know where they are.
-- End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).`
+- End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).
+
+════════ NOW (resort local time, Egypt) ════════
+It is ${nowCairo}. Tomorrow is ${tomorrowCairo}.
+Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekday-based schedule (e.g. which restaurants are open tonight) — work out the weekday yourself for other dates.`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
