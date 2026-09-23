@@ -12101,6 +12101,111 @@ async function buildLiveKnowledge(DB: any, property_id: any) {
   return parts.join('\n\n')
 }
 
+// Where the chatbot may SEND a guest inside this app. Names and keys only —
+// deliberately no descriptions, prices or hours (those come from the
+// Knowledge Base). The model links with markdown [label](app://target); the
+// guest page turns app:// links into the real in-app sheets and sections.
+// Mirrors the homepage's own visibility flags so it never points at a
+// section the guest can't see.
+async function buildNavigationCatalog(DB: any, property_id: any): Promise<{ text: string; valid: Set<string> }> {
+  const valid = new Set<string>()
+  const lines: string[] = []
+  const add = (target: string, label: string, hint?: string) => {
+    const url = 'app://' + target
+    if (valid.has(url)) return
+    valid.add(url)
+    lines.push('- [' + String(label).replace(/[\[\]]/g, '') + '](' + url + ')' + (hint ? ' — ' + hint : ''))
+  }
+  try {
+    const prop: any = await DB.prepare(`
+      SELECT show_restaurants, show_events, show_spa, show_service, show_activities, show_hotel_map, feedback_survey_url
+      FROM properties WHERE property_id = ?
+    `).bind(property_id).first()
+    if (!prop) return { text: '', valid }
+
+    add('home', 'Home', 'the app start screen')
+
+    // Room service: its menu sheet opens in-app whenever a room_service venue exists
+    const rs: any = await DB.prepare(`
+      SELECT offering_id FROM hotel_offerings
+      WHERE property_id = ? AND offering_type = 'room_service' AND (status = 'active' OR status IS NULL) LIMIT 1
+    `).bind(property_id).first()
+    if (rs) add('room-service', 'Room Service menu', 'in-room dining menu the guest can browse and order from')
+
+    // Built-in categories — only those the property shows on its homepage.
+    // Offering ids are prefixed "H" because that is how the guest page keys them.
+    const cats: [string, string, string, number][] = [
+      ['restaurant', 'Restaurants & Bars', 'restaurant', prop.show_restaurants],
+      ['event', 'Events', 'event', prop.show_events],
+      ['spa', 'Spa & Wellness', 'spa', prop.show_spa],
+      ['service', 'Services', 'service', prop.show_service],
+    ]
+    for (const [key, label, type, shown] of cats) {
+      if (shown !== 1) continue
+      add('section/' + key, label, 'the ' + label + ' section of the app')
+      const rows = await DB.prepare(`
+        SELECT offering_id, title_en,
+               CASE WHEN offering_type = 'restaurant' THEN enable_booking ELSE requires_booking END AS bookable
+        FROM hotel_offerings
+        WHERE property_id = ? AND offering_type = ? AND (status = 'active' OR status IS NULL)
+        ORDER BY display_order LIMIT 40
+      `).bind(property_id, type).all()
+      for (const o of (rows.results || [])) {
+        if (!o.title_en) continue
+        add('offering/H' + o.offering_id, String(o.title_en),
+          'its page in ' + label + (o.bookable === 1 ? '; has a booking form (bookable in the app)' : ''))
+      }
+    }
+
+    // Custom homepage sections and the venues filed under them
+    const secs = await DB.prepare(`
+      SELECT section_key, section_name_en FROM custom_sections
+      WHERE property_id = ? AND is_visible = 1 ORDER BY display_order
+    `).bind(property_id).all()
+    for (const s of (secs.results || [])) {
+      const key = String(s.section_key || '')
+      if (!key || key === 'room-service') continue
+      const name = String(s.section_name_en || key)
+      add('section/' + key, name, 'the ' + name + ' section of the app')
+      const rows = await DB.prepare(`
+        SELECT offering_id, title_en FROM hotel_offerings
+        WHERE property_id = ? AND custom_section_key = ? AND (status = 'active' OR status IS NULL)
+        ORDER BY display_order LIMIT 40
+      `).bind(property_id, key).all()
+      for (const o of (rows.results || [])) {
+        if (o.title_en) add('offering/H' + o.offering_id, String(o.title_en), 'its page in ' + name)
+      }
+    }
+
+    // Partner activities, only when the property shows them
+    if (prop.show_activities === 1) {
+      add('section/activities', 'Activities & Experiences', 'the activities section of the app')
+      const acts = await DB.prepare(`
+        SELECT a.activity_id, a.title_en FROM activities a
+        JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
+        WHERE vp.property_id = ? AND a.status = 'active' AND vp.status = 'active' LIMIT 40
+      `).bind(property_id).all()
+      for (const a of (acts.results || [])) {
+        if (a.title_en) add('activity/' + a.activity_id, String(a.title_en), 'its activity page')
+      }
+    }
+
+    // Beach, map, information pages, feedback
+    const beach: any = await DB.prepare('SELECT beach_booking_enabled FROM beach_settings WHERE property_id = ?').bind(property_id).first()
+    if (beach && beach.beach_booking_enabled === 1) add('beach', 'Beach', 'the beach section (how booking works is stated in RESORT STATUS)')
+    if (prop.show_hotel_map === 1) add('map', 'Resort Map', 'live map to find any place in the resort')
+    const pages = await DB.prepare(`
+      SELECT page_key, title_en FROM info_pages
+      WHERE property_id = ? AND is_published = 1 ORDER BY display_order
+    `).bind(property_id).all()
+    for (const p of (pages.results || [])) {
+      if (p.page_key && p.title_en) add('info/' + p.page_key, String(p.title_en), 'an information page')
+    }
+    if (prop.feedback_survey_url) add('feedback', 'Share feedback', 'the guest feedback survey')
+  } catch (e) {}
+  return { text: lines.join('\n'), valid }
+}
+
 async function getCoachingLessons(DB: any, property_id: any) {
   try {
     const rows = await DB.prepare(`
@@ -12492,141 +12597,7 @@ app.post('/api/chatbot/chat', async (c) => {
       }
     }
     
-    // 🏖️ BOOKING INTENT DETECTION - Beach & Restaurant Reservations (Multilingual)
-    const bookingKeywords = {
-      beach: ['beach', 'umbrella', 'cabana', 'lounger', 'daybed', 'spot', 'sunbed',
-              'بحر', 'شاطئ', 'مظلة', 'كابانا', 'كرسي', 'سرير'], // Arabic
-      restaurant: ['restaurant', 'table', 'dinner', 'lunch', 'breakfast', 'dine', 'eat', 'reserve',
-                   'مطعم', 'طاولة', 'عشاء', 'غداء', 'فطور', 'طرابيزة', 'أكل'], // Arabic
-      booking: ['book', 'reserve', 'reservation', 'make a booking', 'i want to', 'can i', 'want', 'need',
-                'احجز', 'حجز', 'عايز', 'محتاج', 'اريد', 'ممكن', 'نفسي'] // Arabic
-    };
-    
-    const messageLowerBooking = message.toLowerCase();
-    const hasBeachKeyword = bookingKeywords.beach.some(kw => messageLowerBooking.includes(kw));
-    const hasRestaurantKeyword = bookingKeywords.restaurant.some(kw => messageLowerBooking.includes(kw));
-    const hasBookingIntent = bookingKeywords.booking.some(kw => messageLowerBooking.includes(kw));
-    
-    // Detect if user wants to make a reservation
-    if (hasBookingIntent && (hasBeachKeyword || hasRestaurantKeyword)) {
-      let bookingType = hasBeachKeyword ? 'beach' : 'restaurant';
-      
-      // Create a friendly booking invitation with direct link
-      let bookingResponse = '';
-      
-      if (bookingType === 'beach') {
-        const beachSettings = await DB.prepare(`
-          SELECT beach_booking_enabled FROM beach_settings WHERE property_id = ?
-        `).bind(property_id).first();
-        
-        if (beachSettings?.beach_booking_enabled === 1) {
-          // Detect language from message
-          const isArabic = /[\u0600-\u06FF]/.test(message);
-          
-          if (isArabic) {
-            // Arabic response
-            bookingResponse = `🏖️ **يسعدني مساعدتك في حجز مكانك على الشاطئ!**\n\n`;
-            bookingResponse += `نوفر لك:\n`;
-            bookingResponse += `🔵 **مظلات** - تجربة شاطئية كلاسيكية\n`;
-            bookingResponse += `🟢 **كابانات** - خصوصية وراحة\n`;
-            bookingResponse += `🟡 **كراسي استرخاء** - استرخاء بأناقة\n`;
-            bookingResponse += `🟣 **أسرّة مريحة** - راحة قصوى\n\n`;
-            bookingResponse += `**[اضغط هنا لاختيار مكانك وإتمام حجز الشاطئ](/beach-booking/${property_id})**\n\n`;
-            bookingResponse += `يمكنك:\n`;
-            bookingResponse += `✅ اختيار التاريخ والوقت المفضل\n`;
-            bookingResponse += `✅ رؤية الأماكن المتاحة على خريطة تفاعلية\n`;
-            bookingResponse += `✅ اختيار نوع المكان المثالي\n`;
-            bookingResponse += `✅ الحصول على تأكيد فوري مع رمز QR\n\n`;
-            bookingResponse += `الحجز يستغرق دقيقتين فقط! 🌊`;
-          } else {
-            // English response
-            bookingResponse = `🏖️ **I'd be delighted to help you reserve a beach spot!**\n\n`;
-            bookingResponse += `We offer:\n`;
-            bookingResponse += `🔵 **Umbrellas** - Classic beach experience\n`;
-            bookingResponse += `🟢 **Cabanas** - Private & cozy\n`;
-            bookingResponse += `🟡 **Loungers** - Relax in style\n`;
-            bookingResponse += `🟣 **Daybeds** - Ultimate comfort\n\n`;
-            bookingResponse += `**[Click here to select your spot and complete your beach reservation](/beach-booking/${property_id})**\n\n`;
-            bookingResponse += `You'll be able to:\n`;
-            bookingResponse += `✅ Choose your preferred date and time slot\n`;
-            bookingResponse += `✅ See available spots on our interactive beach map\n`;
-            bookingResponse += `✅ Select your ideal spot type\n`;
-            bookingResponse += `✅ Receive instant confirmation with QR code\n\n`;
-            bookingResponse += `The booking takes just 2 minutes! 🌊`;
-          }
-        } else {
-          const isArabic = /[\u0600-\u06FF]/.test(message);
-          bookingResponse = isArabic 
-            ? `عذراً، حجز الشاطئ غير متاح حالياً. يرجى التواصل مع مكتب الاستقبال.`
-            : `I apologize, but beach bookings are currently not available. Please contact our front desk for assistance.`;
-        }
-      } else if (bookingType === 'restaurant') {
-        // Get active restaurants
-        const restaurants = await DB.prepare(`
-          SELECT offering_id, title_en, short_description_en
-          FROM hotel_offerings
-          WHERE property_id = ? AND offering_type = 'restaurant' AND status = 'active'
-          ORDER BY offering_id
-          LIMIT 5
-        `).bind(property_id).all();
-        
-        if (restaurants.results && restaurants.results.length > 0) {
-          const isArabic = /[\u0600-\u06FF]/.test(message);
-          
-          if (isArabic) {
-            bookingResponse = `🍽️ **يسعدني مساعدتك في حجز طاولة بالمطعم!**\n\n`;
-            bookingResponse += `لدينا ${restaurants.results.length} خيارات طعام متاحة:\n\n`;
-          } else {
-            bookingResponse = `🍽️ **I'd be happy to help you make a restaurant reservation!**\n\n`;
-            bookingResponse += `We have ${restaurants.results.length} dining options available:\n\n`;
-          }
-          
-          restaurants.results.forEach((restaurant: any, index: number) => {
-            const emoji = index === 0 ? '☀️' : index === 1 ? '🏖️' : index === 2 ? '🌿' : '🍴';
-            bookingResponse += `${emoji} **[${restaurant.title_en}](/hotel/paradise-resort/restaurant/${restaurant.offering_id}/book)**\n`;
-            if (restaurant.short_description_en) {
-              bookingResponse += `   ${restaurant.short_description_en}\n`;
-            }
-            bookingResponse += `\n`;
-          });
-          
-          if (isArabic) {
-            bookingResponse += `**اضغط على أي مطعم أعلاه من أجل:**\n`;
-            bookingResponse += `✅ عرض القائمة الكاملة\n`;
-            bookingResponse += `✅ اختيار التاريخ والوقت المفضل\n`;
-            bookingResponse += `✅ تحديد عدد الأشخاص\n`;
-            bookingResponse += `✅ الحصول على تأكيد فوري\n\n`;
-            bookingResponse += `نتطلع لخدمتك! 🎉`;
-          } else {
-            bookingResponse += `**Simply click on any restaurant above to:**\n`;
-            bookingResponse += `✅ View the full menu\n`;
-            bookingResponse += `✅ Select your preferred date and time\n`;
-            bookingResponse += `✅ Choose party size\n`;
-            bookingResponse += `✅ Get instant confirmation\n\n`;
-            bookingResponse += `Looking forward to serving you! 🎉`;
-          }
-        } else {
-          const isArabic = /[\u0600-\u06FF]/.test(message);
-          bookingResponse = isArabic
-            ? `عذراً، لم أتمكن من العثور على مطاعم متاحة حالياً. يرجى التواصل مع خدمة الكونسيرج.`
-            : `I apologize, but I couldn't find available restaurants at the moment. Please contact our concierge for assistance.`;
-        }
-      }
-      
-      await DB.prepare(`
-        INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
-        VALUES (?, 'assistant', ?, '[]')
-      `).bind(convId, bookingResponse).run();
-      
-      return c.json({ 
-        success: true,
-        response: bookingResponse,
-        conversation_id: convId,
-        chunks_used: 0,
-        booking_intent: true,
-        booking_type: bookingType
-      });
-    }
+    // (by request) The keyword booking shortcut is gone: it bypassed the AI and printed offering descriptions. Booking questions now flow through the AI with Knowledge Base facts + APP NAVIGATION links.
     
     // 🌐 MULTILINGUAL QUERY TRANSLATION: Translate non-English queries to English for chunk search
     let searchQuery = message
@@ -12715,10 +12686,24 @@ app.post('/api/chatbot/chat', async (c) => {
     } catch (e) {}
     const kbSection = kbFull || context
 
-    // (by request) The smart-link search over activities/hotel_offerings is
-    // gone: the chatbot must not source anything from the guest app's
-    // offerings. Deep links can return later driven by the Knowledge Base.
-    const linkContext = ''
+    // App navigation: the bot may not source FACTS from the offerings, but it
+    // can send the guest to the right place in the app. The catalog is
+    // names + app:// targets only; every link in the reply is validated
+    // against it before the reply is stored (see below).
+    let navValid = new Set<string>()
+    let linkContext = ''
+    try {
+      const nav = await buildNavigationCatalog(DB, property_id)
+      navValid = nav.valid
+      if (nav.text) {
+        linkContext = '\n\n════════ APP NAVIGATION (places you can open for the guest) ════════\n' +
+          'Each line below is a markdown link you may include VERBATIM in a reply, e.g. [Room Service menu](app://room-service). Tapping it opens that part of the app for the guest.\n' +
+          'RULES: use ONLY links from this list, copied exactly — never invent app:// links. These are navigation targets: their names are NOT facts, so describe a place only with Knowledge Base facts. ' +
+          'Whenever the guest wants to DO something the app covers (see or order from the room service menu, view a restaurant, book a table, book the beach, find their way, read an information page, give feedback), include the matching link so they can tap straight through. ' +
+          'When you lack facts about something but a link exists, say so honestly and still give the link. Weave the link into the sentence where it helps ("You can browse and order from the [Room Service menu](app://room-service)").\n' +
+          nav.text
+      }
+    } catch (e) {}
     
     // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
@@ -12773,7 +12758,7 @@ Use "-" for whichever part is still missing and keep politely asking for it. The
 1. You may ONLY state facts that appear in the KNOWLEDGE BASE or RESORT STATUS below, or in this conversation. No exceptions. The Knowledge Base is long — read ALL of it carefully before saying you don't know; when a guest asks for "the restaurants", "the bars", "activities" etc., list every one the Knowledge Base mentions.
 2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
 3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
-4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app). You cannot make reservations yourself — direct guests to the app section or the front desk.
+4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app) in APP NAVIGATION. You cannot make reservations yourself — send the guest to the matching app link or the front desk.
 5. Service dispatch (maintenance, housekeeping, amenities to the room): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number.
 6. If the guest disputes something you said, do not double down — offer the front desk.
 
@@ -12787,7 +12772,7 @@ ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders fro
 - Concise and elegant: 2-5 sentences unless the guest asks for detail. No walls of text.
 - Warm, personal, five-star: use the guest's name when known, mirror their tone, one tasteful emoji at most.
 - In-hotel context always: "maintenance" means their hotel room, never cars or homes. You know where they are.
-- End with a helpful next step when natural (a section of this app, a venue, or the front desk).`
+- End with a helpful next step when natural (an app link from APP NAVIGATION, a venue, or the front desk).`
         
         const response = await fetch(`${baseURL}/chat/completions`, {
           method: 'POST',
@@ -13020,6 +13005,15 @@ ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders fro
       aiResponse = (confirmations[lang] || confirmations.en).replace('{category}', feedbackAnalysis.complaintCategory || 'General')
     }
     
+    // App links: keep only navigation targets that really exist in the
+    // catalog; an invented link degrades to its plain label, and any bare
+    // app:// scrap is dropped.
+    if (typeof aiResponse === 'string' && aiResponse.includes('app://')) {
+      aiResponse = aiResponse.replace(/\[([^\]]+)\]\((app:\/\/[^)\s]+)\)/g, (m: string, label: string, url: string) =>
+        navValid.has(url) ? m : label)
+      aiResponse = aiResponse.replace(/(?<!\]\()app:\/\/[A-Za-z0-9\/_\-:.]+/g, '')
+    }
+
     // Store AI response (potentially modified with guest info request)
     await DB.prepare(`
       INSERT INTO chatbot_messages (conversation_id, role, content, chunks_used)
@@ -29527,8 +29521,13 @@ window.luxTogglePassForm = function() {
         };
         window.luxOrderViaConcierge = function() {
             luxCloseSheet();
+            // The chat may already be open underneath (the menu can be opened
+            // from a chat link) — the button toggles, so only click when hidden.
             const b = document.getElementById('chatbotButton');
-            if (b) b.click();
+            const w = document.getElementById('chatWindow');
+            if (b && (!w || w.classList.contains('hidden'))) b.click();
+            const inp = document.getElementById('chatInput');
+            if (inp) inp.focus();
         };
 
         window.luxOpenOffering = async function(offeringId) {
@@ -32250,11 +32249,51 @@ window.luxTogglePassForm = function() {
             });
             
             // Add message to chat
-            // Helper: Convert markdown links to HTML
+            // Helper: Convert markdown links to HTML. app:// links are in-app
+            // navigation (handled by navigateFromChat below); http(s) and
+            // site-relative links open in a new tab; anything else is shown
+            // as plain text.
             function parseMarkdownLinks(text) {
-              // Convert [text](url) to <a> tags
-              return text.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank">$1</a>');
+              return text.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, function(m, label, url) {
+                if (/^app:\\/\\//i.test(url)) {
+                  var target = url.slice(6).replace(/[^A-Za-z0-9\\/_\\-:.]/g, '');
+                  return '<a href="#" data-app="' + target + '" class="chat-app-link inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 underline font-semibold">' + label + ' <i class="fas fa-arrow-up-right-from-square text-xs"></i></a>';
+                }
+                if (/^(https?:\\/\\/|\\/)/i.test(url)) {
+                  return '<a href="' + url + '" class="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank" rel="noopener">' + label + '</a>';
+                }
+                return label;
+              });
             }
+
+            // In-app navigation from a chat link. Sheets (room service menu,
+            // venue page, beach, map, info page) open ABOVE the chat so the
+            // guest lands back in the conversation when they close them;
+            // page-level moves close the chat first.
+            function navigateFromChat(target) {
+              var parts = String(target || '').split('/');
+              var kind = parts[0], arg = parts.slice(1).join('/');
+              var closeChat = function() { if (!chatWindow.classList.contains('hidden')) closeChatBtn.click(); };
+              try {
+                if (kind === 'room-service' && window.luxOpenRoomService) return window.luxOpenRoomService();
+                if (kind === 'section' && arg === 'room-service' && window.luxOpenRoomService) return window.luxOpenRoomService();
+                if (kind === 'offering' && window.viewOffering) return window.viewOffering(arg);
+                if (kind === 'beach' && window.luxOpenBeach) return window.luxOpenBeach();
+                if (kind === 'map' && window.luxOpenLiveMap) return window.luxOpenLiveMap();
+                if (kind === 'info' && window.openInfoPage) return window.openInfoPage(arg);
+                if (kind === 'feedback' && window.openFeedbackForm) { closeChat(); return window.openFeedbackForm(); }
+                if (kind === 'activity' && window.viewActivity) { closeChat(); return window.viewActivity(arg); }
+                if (kind === 'section' && window.luxOpenCategory) { closeChat(); return window.luxOpenCategory(arg); }
+                if (kind === 'home' && window.luxGoHome) { closeChat(); return window.luxGoHome(); }
+              } catch (e) { console.error('chat navigation', e); }
+              closeChat();
+            }
+            chatMessages.addEventListener('click', function(e) {
+              var a = e.target.closest('a[data-app]');
+              if (!a) return;
+              e.preventDefault();
+              navigateFromChat(a.getAttribute('data-app') || '');
+            });
             
             function addMessage(text, role, autoSpeak = false, language = 'en', messageId = null) {
               const messageDiv = document.createElement('div');
