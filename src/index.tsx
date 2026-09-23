@@ -12689,7 +12689,32 @@ app.post('/api/chatbot/chat', async (c) => {
     // Build context from chunks
     const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
-    
+
+    // Whole-knowledge mode: the Knowledge Base is the bot's only source of
+    // venue facts, so it gets ALL of it — grouped by document, in a stable
+    // order so the model's prompt cache keeps repeat calls cheap. Keyword
+    // extracts remain the fallback for an oversized base and the no-API path.
+    let kbFull = ''
+    try {
+      const kbRows = await DB.prepare(`
+        SELECT d.title, c.chunk_text
+        FROM chatbot_chunks c
+        JOIN chatbot_documents d ON d.document_id = c.document_id
+        WHERE c.property_id = ? AND (d.is_active = 1 OR d.is_active IS NULL)
+        ORDER BY c.document_id, c.chunk_index
+      `).bind(property_id).all()
+      let lastTitle = ''
+      const lines: string[] = []
+      for (const r of (kbRows.results || [])) {
+        const title = String(r.title || '')
+        if (title !== lastTitle) { lines.push('\n## ' + title); lastTitle = title }
+        lines.push(String(r.chunk_text || '').trim())
+      }
+      const full = lines.join('\n').trim()
+      if (full.length && full.length <= 60000) kbFull = full
+    } catch (e) {}
+    const kbSection = kbFull || context
+
     // (by request) The smart-link search over activities/hotel_offerings is
     // gone: the chatbot must not source anything from the guest app's
     // offerings. Deep links can return later driven by the Knowledge Base.
@@ -12745,17 +12770,17 @@ ${knownName && knownRoom
 Use "-" for whichever part is still missing and keep politely asking for it. The tag is invisible to the guest — never mention it.`}
 
 ════════ TRUTH PROTOCOL (never break these) ════════
-1. You may ONLY state facts that appear in RESORT KNOWLEDGE below or in this conversation. No exceptions.
+1. You may ONLY state facts that appear in the KNOWLEDGE BASE or RESORT STATUS below, or in this conversation. No exceptions. The Knowledge Base is long — read ALL of it carefully before saying you don't know; when a guest asks for "the restaurants", "the bars", "activities" etc., list every one the Knowledge Base mentions.
 2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
 3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
 4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app). You cannot make reservations yourself — direct guests to the app section or the front desk.
 5. Service dispatch (maintenance, housekeeping, amenities to the room): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number.
 6. If the guest disputes something you said, do not double down — offer the front desk.
 
-════════ RESORT KNOWLEDGE (your ONLY source of facts) ════════
+════════ RESORT STATUS (live: information pages & beach) ════════
 ${liveKnowledge || '(knowledge temporarily unavailable — be honest about not having details and offer the front desk)'}
 
-${context ? '════════ KNOWLEDGE BASE EXTRACTS ════════\n' + context : ''}${linkContext}${guestContextStr}
+${kbSection ? '════════ KNOWLEDGE BASE (everything your managers have written — your primary source of facts) ════════\n' + kbSection : ''}${linkContext}${guestContextStr}
 ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders from your managers — follow them) ════════\n' + lessons : ''}
 
 ════════ STYLE ════════
