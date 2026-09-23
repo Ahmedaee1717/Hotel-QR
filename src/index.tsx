@@ -12069,37 +12069,10 @@ app.get('/api/chatbot/messages', async (c) => {
 // and admin coaching lessons come straight from D1 on every question.
 async function buildLiveKnowledge(DB: any, property_id: any) {
   const parts: string[] = []
-  try {
-    const offerings = await DB.prepare(`
-      SELECT offering_type, title_en, location, short_description_en, cuisine_type, meal_type,
-             event_date, event_start_time, event_end_time, duration_minutes, dress_code,
-             price, currency, includes,
-             CASE WHEN offering_type = 'restaurant' THEN enable_booking ELSE requires_booking END as bookable
-      FROM hotel_offerings
-      WHERE property_id = ? AND (status = 'active' OR status IS NULL)
-      ORDER BY offering_type, display_order
-      LIMIT 60
-    `).bind(property_id).all()
-    const offs = offerings.results || []
-    if (offs.length) {
-      parts.push('VENUES & SERVICES (live from the resort system — these are the ONLY venues that exist):\n' + offs.map((o: any) => {
-        const bits: string[] = []
-        if (o.cuisine_type) bits.push(String(o.cuisine_type) + ' cuisine')
-        if (o.meal_type) bits.push(String(o.meal_type))
-        if (o.location) bits.push('at ' + o.location)
-        if (o.event_start_time) bits.push('time: ' + o.event_start_time + (o.event_end_time ? '–' + o.event_end_time : ''))
-        if (o.event_date) bits.push('date: ' + o.event_date)
-        if (o.duration_minutes) bits.push(o.duration_minutes + ' min')
-        if (o.dress_code) bits.push('dress: ' + o.dress_code)
-        if (o.price && Number(o.price) > 0) bits.push('price: ' + (o.currency || '') + ' ' + o.price)
-        if (o.short_description_en) bits.push(String(o.short_description_en).slice(0, 140))
-        if (o.includes) bits.push('includes: ' + String(o.includes).slice(0, 120))
-        return '- ' + (o.title_en || '') + ' [' + o.offering_type + ']' +
-               (bits.length ? ': ' + bits.join('; ') : '') +
-               (o.bookable === 1 ? ' (bookable in the app)' : '')
-      }).join('\n'))
-    }
-  } catch (e) { parts.push('(venue list unavailable right now)') }
+  // NOTE (by request): the chatbot no longer reads the guest app's offerings
+  // (hotel_offerings/activities). Venue facts must come from the admin
+  // Knowledge Base, which the team curates — only info pages and beach
+  // status are still pulled live.
   try {
     const pages = await DB.prepare(`
       SELECT title_en, content_en FROM info_pages
@@ -12717,83 +12690,10 @@ app.post('/api/chatbot/chat', async (c) => {
     const context = scoredChunks.map((chunk: any) => chunk.chunk_text).join('\n\n')
     const chunkIds = scoredChunks.map((chunk: any) => chunk.chunk_id)
     
-    // 🔗 SMART LINK SEARCH: Find relevant activities, restaurants, spa, events
-    // Use translated query for better multilingual search
-    const searchMessageLower = searchQuery.toLowerCase()
-    const relevantLinks: any[] = []
-    
-    // Search keywords from translated query for better multilingual matching
-    const searchTerms = searchMessageLower.split(/\s+/).filter(w => w.length > 3)
-    
-    try {
-      // Search Activities
-      const activities = await DB.prepare(`
-        SELECT activity_id, title_en, short_description_en, vendor_id
-        FROM activities a
-        JOIN vendor_properties vp ON a.vendor_id = vp.vendor_id
-        WHERE vp.property_id = ? AND a.status = 'active' AND vp.status = 'active'
-        LIMIT 50
-      `).bind(property_id).all()
-      
-      for (const activity of (activities.results || [])) {
-        const titleLower = activity.title_en.toLowerCase()
-        const descLower = (activity.short_description_en || '').toLowerCase()
-        const matchScore = searchTerms.filter(term => 
-          titleLower.includes(term) || descLower.includes(term)
-        ).length
-        
-        if (matchScore > 0) {
-          relevantLinks.push({
-            type: 'activity',
-            id: activity.activity_id,
-            title: activity.title_en,
-            url: `/activity?id=${activity.activity_id}&property=${property_id}&lang=en`,
-            score: matchScore
-          })
-        }
-      }
-      
-      // Search Hotel Offerings (Restaurants, Spa, Events)
-      const offerings = await DB.prepare(`
-        SELECT offering_id, title_en, short_description_en, offering_type
-        FROM hotel_offerings
-        WHERE property_id = ? AND status = 'active'
-        LIMIT 50
-      `).bind(property_id).all()
-      
-      for (const offering of (offerings.results || [])) {
-        const titleLower = offering.title_en.toLowerCase()
-        const descLower = (offering.short_description_en || '').toLowerCase()
-        const matchScore = searchTerms.filter(term => 
-          titleLower.includes(term) || descLower.includes(term)
-        ).length
-        
-        if (matchScore > 0) {
-          relevantLinks.push({
-            type: offering.offering_type,
-            id: offering.offering_id,
-            title: offering.title_en,
-            url: `/offering?id=${offering.offering_id}&property=${property_id}&lang=en`,
-            score: matchScore
-          })
-        }
-      }
-    } catch (linkError) {
-      console.error('Link search error:', linkError)
-    }
-    
-    // Sort by relevance and take top 3
-    relevantLinks.sort((a, b) => b.score - a.score)
-    const topLinks = relevantLinks.slice(0, 3)
-    
-    // Build link context for AI
-    let linkContext = ''
-    if (topLinks.length > 0) {
-      linkContext = '\n\n📎 RELEVANT LINKS (Include these in your response):\n'
-      topLinks.forEach(link => {
-        linkContext += `- ${link.title}: ${link.url}\n`
-      })
-    }
+    // (by request) The smart-link search over activities/hotel_offerings is
+    // gone: the chatbot must not source anything from the guest app's
+    // offerings. Deep links can return later driven by the Knowledge Base.
+    const linkContext = ''
     
     // Generate AI response (apiKey and baseURL already declared above for translation)
     let aiResponse = 'I apologize, but I am unable to answer your question at the moment. Please contact the hotel staff for assistance.'
@@ -12921,7 +12821,7 @@ ${lessons ? '\n════════ MANAGEMENT COACHING (standing orders fro
     }
     
     // Smart fallback if API didn't work or no API key
-    if (!aiResponse && (context.length > 0 || topLinks.length > 0)) {
+    if (!aiResponse && context.length > 0) {
       // Fallback: Intelligent text summarization without AI API
       const messageLower = message.toLowerCase()
       
@@ -48585,7 +48485,7 @@ async function loadOverview(){
     var s=d.stats||{};
     document.getElementById('stats').innerHTML=[
       ['convos24','Chats · 24h',0],['msgs24','Messages · 24h',0],['lessons','Rules learned',1],
-      ['offerings','Venues known',0],['pages','Info pages',0],['chunks','Knowledge notes',0]
+      ['pages','Info pages',0],['chunks','Knowledge notes',0]
     ].map(function(x){return '<div class="stat'+(x[2]?' accent':'')+'"><b>'+(s[x[0]]||0)+'</b><span>'+x[1]+'</span></div>'}).join('');
     var convs=d.conversations||[];
     document.getElementById('convCount').textContent=convs.length?convs.length+' total':'';
