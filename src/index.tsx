@@ -89028,14 +89028,16 @@ function rstFutureHolds(rows: any[], s: any, now: any, key: string) {
   return out
 }
 
-function rstFutureStmt(DB: any, col: 'table_id' | 'slot_id', ids: number[], now: any) {
-  const list = ids.length ? ids : [-1]
+// D1 allows 100 bound parameters per statement: long id lists read the whole offering instead.
+function rstFutureStmt(DB: any, oid: number, col: 'table_id' | 'slot_id', ids: number[], now: any) {
+  const list = ids.length && ids.length <= 50 ? ids : []
   return DB.prepare(`
     SELECT b.booking_id, b.booking_reference, b.booking_date, b.start_time, b.end_time, b.buffer_minutes, b.party_size,
            b.guest_name, b.room_number, b.status, b.table_id, b.slot_id, b.offering_id
     FROM restaurant_bookings b
-    WHERE b.${col} IN (${list.map(() => '?').join(', ')}) AND b.booking_date >= ? AND b.status IN ('confirmed', 'checked_in')
-  `).bind(...list, now.date)
+    WHERE b.offering_id = ? ${list.length ? `AND b.${col} IN (${list.map(() => '?').join(', ')})` : ''}
+      AND b.booking_date >= ? AND b.status IN ('confirmed', 'checked_in')
+  `).bind(oid, ...list, now.date)
 }
 
 // Table-number clash check on the resulting set: exact duplicates anywhere
@@ -89321,7 +89323,7 @@ async function rstApplyTableUpdates(c: any, oid: number, pid: string, list: { ta
     rstOwnStmt(DB, oid, pid),
     DB.prepare('SELECT zone_id FROM restaurant_zones WHERE offering_id = ?').bind(oid),
     DB.prepare('SELECT table_id, table_number, is_active, capacity FROM restaurant_tables WHERE offering_id = ?').bind(oid),
-    rstFutureStmt(DB, 'table_id', ids, now),
+    rstFutureStmt(DB, oid, 'table_id', ids, now),
     DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid)
   ])
   if (!rstRows(res[0])[0]) return rstNotOwned(c)
@@ -89376,9 +89378,13 @@ async function rstApplyTableUpdates(c: any, oid: number, pid: string, list: { ta
       .bind(...keys.map((k) => u.fields[k]), u.table_id, oid))
   }
   const writes = stmts.length
-  stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE table_id IN (${ids.map(() => '?').join(', ')})`).bind(...ids), ...rstTotalsStmts(DB, oid))
+  stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ?`).bind(oid), ...rstTotalsStmts(DB, oid))
   const w = await DB.batch(stmts)
-  return c.json({ success: true, updated: list.filter((u) => Object.keys(u.fields).length).length, tables: rstRows(w[writes]), totals: rstTotalsFrom(w, writes + 1), writes })
+  const want = new Set(ids)
+  return c.json({
+    success: true, updated: list.filter((u) => Object.keys(u.fields).length).length,
+    tables: rstRows(w[writes]).filter((t: any) => want.has(Number(t.table_id))), totals: rstTotalsFrom(w, writes + 1)
+  })
 }
 
 app.put('/api/admin/restaurant-module/:offering_id/tables/:table_id', requirePermission('restaurant_tables'), async (c) => {
@@ -89431,7 +89437,7 @@ app.post('/api/admin/restaurant-module/:offering_id/tables/bulk', requirePermiss
     const updates = body.updates
     if (!Array.isArray(updates)) return c.json({ success: false, error: 'invalid', message: 'updates must be a list' }, 400)
     if (!updates.length) return c.json({ success: true, updated: 0, tables: [] })
-    if (updates.length > 500) return c.json({ success: false, error: 'invalid', message: 'Too many updates (max 500)' }, 400)
+    if (updates.length > 300) return c.json({ success: false, error: 'invalid', message: 'Too many updates (max 300)' }, 400)
     const list: { table_id: number, fields: any }[] = []
     const seen = new Set<number>()
     for (let i = 0; i < updates.length; i++) {
@@ -89503,9 +89509,11 @@ app.post('/api/admin/restaurant-module/:offering_id/tables/generate', requirePer
       INSERT INTO restaurant_tables (offering_id, table_number, capacity, position_x, position_y, width, height, shape, rotation, table_type, zone_id, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'standard', ?, 1)
     `).bind(oid, num, cap, cells[i].x, cells[i].y, cells[i].w, cells[i].h, shape, zid))
-    stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND table_number IN (${numbers.map(() => '?').join(', ')})`).bind(oid, ...numbers), ...rstTotalsStmts(DB, oid))
+    stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND zone_id = ? AND is_active = 1`).bind(oid, zid), ...rstTotalsStmts(DB, oid))
     const w = await DB.batch(stmts)
-    const created = rstRows(w[numbers.length]).sort((a: any, b: any) => rstNumCmp(a.table_number, b.table_number))
+    const made = new Set(numbers)
+    const created = rstRows(w[numbers.length]).filter((t: any) => made.has(String(t.table_number)))
+      .sort((a: any, b: any) => rstNumCmp(a.table_number, b.table_number))
     return c.json({ success: true, created, totals: rstTotalsFrom(w, numbers.length + 1) })
   } catch (e) {
     console.error('restaurant-module tables generate', e)
@@ -89629,7 +89637,7 @@ async function rstApplySlotUpdate(c: any, oid: number, pid: string, sid: number,
   const res = await DB.batch([
     rstOwnStmt(DB, oid, pid),
     DB.prepare('SELECT * FROM restaurant_slots WHERE slot_id = ? AND offering_id = ?').bind(sid, oid),
-    rstFutureStmt(DB, 'slot_id', [sid], now),
+    rstFutureStmt(DB, oid, 'slot_id', [sid], now),
     DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid)
   ])
   if (!rstRows(res[0])[0]) return rstNotOwned(c)
