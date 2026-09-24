@@ -65753,16 +65753,7 @@ app.get('/admin/dashboard', (c) => {
         let startTime = '08:00';
         let endTime = '18:00';
         
-        if (slotType === 'half_day_am') {
-          slotType = 'morning';
-          startTime = '08:00';
-          endTime = '13:00';
-        } else if (slotType === 'half_day_pm') {
-          slotType = 'afternoon';
-          startTime = '13:00';
-          endTime = '18:00';
-        }
-        
+        // Slot times are resolved server-side (sunrise/sunset); send the slot id only.
         // Create booking
         try {
           const response = await fetch('/api/beach/bookings', {
@@ -65776,9 +65767,8 @@ app.get('/admin/dashboard', (c) => {
               guest_phone: phone,
               booking_date: dateStr,
               slot_type: slotType,
-              start_time: startTime,
-              end_time: endTime,
               num_guests: 2,
+              booking_source: 'admin',
               special_requests: 'Walk-in booking'
             })
           });
