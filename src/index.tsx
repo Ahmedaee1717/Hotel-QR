@@ -49616,6 +49616,12 @@ tr.ns td.st{color:var(--bad);font-weight:700}
   if (bk) bk.addEventListener('click', function(e){
     try { if (document.referrer && document.referrer.indexOf('/staff/app') >= 0 && history.length > 1) { e.preventDefault(); history.back(); } } catch (err) {}
   });
+  // "Open Ops" answers a guest alert: land on Chats, not back on the Beach tab
+  var ringLink = document.querySelector('#arrRing a');
+  if (ringLink) {
+    try { if (ret && typeof ret.back === 'string' && ret.back.indexOf('/staff/app') === 0) ringLink.setAttribute('href', ret.back); } catch (err) {}
+    ringLink.addEventListener('click', function(){ try { sessionStorage.removeItem('opsBeachReturn'); } catch (err) {} });
+  }
   // The front-desk ring only plays on the Ops console: point staff back to it
   try {
     if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function(ev){
@@ -50585,7 +50591,7 @@ app.get('/staff/app', (c) => {
         bchWithName(function(name){
             bchRun(ref, async function(){
                 var j=await bchPost('/api/staff/beach/confirm',{code:ref, property_id:parseInt(PROPERTY_ID,10), staff_name:name, date:bchDateStr});
-                if(!j.success){ toast(j.error||'Could not check in'); return; }
+                if(!j.success){ toast(j.message||j.error||'Could not check in'); return; }
                 var b=j.booking||{};
                 bchPatch(ref,{booking_status:'checked_in', checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||bchCairoHM()});
                 toast(j.already ? (b.guest_name||'Guest')+' was already checked in' : '✅ '+(b.guest_name||'Guest')+' checked in · '+bchKind(b).toLowerCase()+' '+(b.spot_number||''));
@@ -50597,7 +50603,7 @@ app.get('/staff/app', (c) => {
         bchWithName(function(name){
             bchRun(ref, async function(){
                 var j=await bchPost('/api/staff/beach/no-show',{booking_reference:ref, property_id:parseInt(PROPERTY_ID,10), staff_name:name, date:bchDateStr});
-                if(!j.success){ toast(j.error||'Could not mark the no-show'); return; }
+                if(!j.success){ toast(j.message||j.error||'Could not mark the no-show'); return; }
                 bchPatch(ref,{booking_status:'no_show', checked_in_by:name, checked_in_time:''});
                 toast(((j.booking||{}).guest_name||'Guest')+' marked as no-show · Undo is on the row');
             });
@@ -50606,7 +50612,7 @@ app.get('/staff/app', (c) => {
     function bchUndo(ref){
         bchRun(ref, async function(){
             var j=await bchPost('/api/staff/beach/undo',{booking_reference:ref, property_id:parseInt(PROPERTY_ID,10)});
-            if(!j.success){ toast('Could not undo'); return; }
+            if(!j.success){ toast(j.message||'Could not undo'); return; }
             if(j.changed!==0) bchPatch(ref,{booking_status:'confirmed', checked_in_by:null, checked_in_time:''});
             toast(j.changed===0 ? 'Nothing to undo' : 'Undone — back to waiting');
         });
@@ -50620,7 +50626,7 @@ app.get('/staff/app', (c) => {
         bchWithName(async function(name){
             try{
                 var j=await bchPost('/api/staff/beach/confirm',{code:raw, property_id:parseInt(PROPERTY_ID,10), staff_name:name});
-                if(!j.success){ toast(j.error||'No booking found for that code'); bchScanResume(); return; }
+                if(!j.success){ toast(j.message||j.error||'No booking found for that code'); bchScanResume(); return; }
                 var b=j.booking||{};
                 toast(j.already ? (b.guest_name||'Guest')+' was already checked in' : '✅ '+(b.guest_name||'Guest')+' — '+bchKind(b).toLowerCase()+' '+(b.spot_number||''));
                 closeSheet(); closeScanner();
@@ -88406,6 +88412,18 @@ app.get('/api/staff/beach/day', async (c) => {
 
 // Confirm a guest's arrival — from a QR scan, a typed code, or a tap on the list/map.
 // `date` (the day on screen) is optional; without it the booking must be for today.
+// A no-show frees its spot, so the desk may re-let it. Reviving the no-show
+// (late arrival or undo) is only allowed while no other active booking holds
+// that spot for an overlapping slot — else it would double-book the umbrella.
+const ATT_SPOT_FREE_AGAIN = `NOT EXISTS (
+  SELECT 1 FROM beach_bookings o
+  WHERE o.spot_id = beach_bookings.spot_id AND o.booking_date = beach_bookings.booking_date
+    AND o.beach_booking_id != beach_bookings.beach_booking_id
+    AND o.booking_status IN ('confirmed', 'checked_in')
+    AND (CASE o.slot_type WHEN 'morning' THEN 'half_day_am' WHEN 'afternoon' THEN 'half_day_pm' ELSE o.slot_type END
+           = CASE beach_bookings.slot_type WHEN 'morning' THEN 'half_day_am' WHEN 'afternoon' THEN 'half_day_pm' ELSE beach_bookings.slot_type END
+         OR o.slot_type = 'full_day' OR beach_bookings.slot_type = 'full_day'))`
+
 app.post('/api/staff/beach/confirm', async (c) => {
   const { DB } = c.env
   try {
@@ -88447,13 +88465,16 @@ app.post('/api/staff/beach/confirm', async (c) => {
     const res: any = await DB.prepare(`
       UPDATE beach_bookings
       SET booking_status = 'checked_in', checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE beach_booking_id = ? AND booking_status IN ('confirmed', 'no_show')
+      WHERE beach_booking_id = ? AND (booking_status = 'confirmed' OR (booking_status = 'no_show' AND ${ATT_SPOT_FREE_AGAIN}))
     `).bind(staff, booking.beach_booking_id).run()
 
     if (!res || !res.meta || !res.meta.changes) {
       const now: any = await DB.prepare(`SELECT booking_status, checked_in_at, checked_in_by FROM beach_bookings WHERE beach_booking_id = ?`).bind(booking.beach_booking_id).first()
       if (now && now.booking_status === 'checked_in') {
         return c.json({ success: true, already: true, booking: { ...booking, ...now, checked_in_time: attCairoTime(now.checked_in_at) } })
+      }
+      if (now && now.booking_status === 'no_show') {
+        return c.json({ success: false, error: 'spot_relet', message: 'Spot ' + (booking.spot_number || '') + ' was given to another guest after the no-show — move them to a free spot' }, 409)
       }
       return c.json({ success: false, error: 'This booking can no longer be checked in' }, 409)
     }
@@ -88524,12 +88545,25 @@ app.post('/api/staff/beach/undo', async (c) => {
   const { DB } = c.env
   try {
     const b = await c.req.json()
+    const ref = String(b.booking_reference || '')
+    const pid = b.property_id || 1
     const res: any = await DB.prepare(`
       UPDATE beach_bookings
       SET booking_status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, updated_at = CURRENT_TIMESTAMP
-      WHERE booking_reference = ? AND property_id = ? AND booking_status IN ('checked_in', 'no_show')
-    `).bind(String(b.booking_reference || ''), b.property_id || 1).run()
-    return c.json({ success: true, changed: (res && res.meta && res.meta.changes) || 0 })
+      WHERE booking_reference = ? AND property_id = ?
+        AND (booking_status = 'checked_in' OR (booking_status = 'no_show' AND ${ATT_SPOT_FREE_AGAIN}))
+    `).bind(ref, pid).run()
+    const changed = (res && res.meta && res.meta.changes) || 0
+    if (!changed) {
+      const now: any = await DB.prepare(`
+        SELECT b.booking_status, s.spot_number FROM beach_bookings b LEFT JOIN beach_spots s ON s.spot_id = b.spot_id
+        WHERE b.booking_reference = ? AND b.property_id = ?
+      `).bind(ref, pid).first()
+      if (now && now.booking_status === 'no_show') {
+        return c.json({ success: false, error: 'spot_relet', message: 'Spot ' + (now.spot_number || '') + ' was given to another guest after the no-show — move them to a free spot' }, 409)
+      }
+    }
+    return c.json({ success: true, changed })
   } catch (e) {
     return c.json({ success: false }, 500)
   }
