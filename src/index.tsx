@@ -40871,7 +40871,7 @@ body.embed .savebar{background:none}
       <p class="muted xs" style="margin-top:0">When this is off, guests only see the restaurant hours. Staff can always book, and seat walk-ins, from the Ops app.</p>
       <div class="rgrid">
         <div class="field"><label class="lb" for="rWindow">Guests can book up to (days ahead)</label><div class="inl"><input type="number" id="rWindow" min="0" max="30" step="1"><span class="muted">days</span></div><p class="muted xs" style="margin-top:4px">0 = today only.</p></div>
-        <div class="field"><label class="lb" for="rParty">Largest party per booking</label><div class="inl"><input type="number" id="rParty" min="1" max="50" step="1"><span class="muted">guests</span></div></div>
+        <div class="field"><label class="lb" for="rParty">Largest party per booking</label><div class="inl"><input type="number" id="rParty" min="1" max="30" step="1"><span class="muted">guests</span></div></div>
       </div>
       <div class="warn" id="rPartyWarn"></div>
       <label class="chk"><input type="checkbox" id="rWalk"> Staff can seat walk-ins</label>
@@ -40880,8 +40880,8 @@ body.embed .savebar{background:none}
       <h2><i class="fas fa-bullseye"></i>Seat targets</h2>
       <p class="muted sm">The seats you plan to have. They drive the progress meters on the Floor plan tab and never limit bookings.</p>
       <div class="rgrid">
-        <div class="field"><label class="lb" for="rIndoor">Indoor seats target</label><input type="number" id="rIndoor" min="0" max="5000" step="1"></div>
-        <div class="field"><label class="lb" for="rOutdoor">Outdoor seats target</label><input type="number" id="rOutdoor" min="0" max="5000" step="1"></div>
+        <div class="field"><label class="lb" for="rIndoor">Indoor seats target</label><input type="number" id="rIndoor" min="0" max="2000" step="1"></div>
+        <div class="field"><label class="lb" for="rOutdoor">Outdoor seats target</label><input type="number" id="rOutdoor" min="0" max="2000" step="1"></div>
       </div>
     </div>
     <div class="savebar">
@@ -40922,13 +40922,15 @@ var RULES = [
   { k: 'auto_release', id: 'rAuto', bool: true },
   { k: 'guest_booking_enabled', id: 'rGuest', bool: true },
   { k: 'booking_window_days', id: 'rWindow', min: 0, max: 30, name: 'Days ahead' },
-  { k: 'max_party_size', id: 'rParty', min: 1, max: 50, name: 'Largest party' },
+  { k: 'max_party_size', id: 'rParty', min: 1, max: 30, name: 'Largest party' },
   { k: 'allow_walk_ins', id: 'rWalk', bool: true },
-  { k: 'indoor_seat_target', id: 'rIndoor', min: 0, max: 5000, name: 'Indoor seats target' },
-  { k: 'outdoor_seat_target', id: 'rOutdoor', min: 0, max: 5000, name: 'Outdoor seats target' }
+  { k: 'indoor_seat_target', id: 'rIndoor', min: 0, max: 2000, name: 'Indoor seats target' },
+  { k: 'outdoor_seat_target', id: 'rOutdoor', min: 0, max: 2000, name: 'Outdoor seats target' }
 ];
+// Server limits (rstTableFields / rstSlotFields): table numbers 1-20 chars, labels up to 40, no < or >
+var BAD_CHARS = /[<>]/;
 
-var D = { loaded: false, name: '', settings: null, zones: [], tables: [], slots: [], byId: {} };
+var D = { loaded: false, enabled: true, name: '', settings: null, zones: [], tables: [], slots: [], byId: {} };
 // dirty: unsaved geometry per table_id; draft: unsaved details of the selected table
 var FP = { zone: null, sel: null, draft: null, dirty: {}, mode: 'select', zoomIx: 0, busy: false, add: null, addCap: 4, lastAdded: null };
 var ZE = {};
@@ -41009,13 +41011,14 @@ function normShape(s) {
   if (s === 'square') return 'square';
   return 'rectangle';
 }
-// Default footprint in % of the 16:10 canvas: h% = w% x 1.6 keeps round and square tables true
+// Default footprint in % of the 16:10 canvas, same as the server's rstDefaultSize (quick fill uses it):
+// h% = w% x 1.6 keeps round and square tables true
 function defSize(shape, cap) {
   cap = Math.max(1, Number(cap) || 2);
-  if (shape === 'circle') { var w = cap <= 2 ? 8 : cap <= 4 ? 9.5 : cap <= 6 ? 11 : cap <= 8 ? 12.5 : 14; return { w: w, h: r2(w * 1.6) }; }
-  if (shape === 'square') { var s = cap <= 4 ? 8.5 : cap <= 8 ? 11 : 13; return { w: s, h: r2(s * 1.6) }; }
-  var side = cap >= 8 ? Math.ceil((cap - 2) / 2) : Math.ceil(cap / 2);
-  return { w: r2(Math.min(40, 4 + 4.5 * side)), h: 12.8 };
+  var base = cap <= 2 ? 6 : cap <= 4 ? 7.5 : cap <= 6 ? 9 : cap <= 8 ? 10.5 : 12;
+  function r1(n) { return Math.round(n * 10) / 10; }
+  if (shape === 'rectangle') return { w: r1(base * 1.5), h: r1(base * 1.6 * 0.8) };
+  return { w: base, h: r1(base * 1.6) };
 }
 function autoShape(cap) { return cap <= 2 ? 'circle' : 'rectangle'; }
 function shapeLabel(s) { for (var i = 0; i < SHAPES.length; i++) if (SHAPES[i].k === s) return SHAPES[i].label; return s; }
@@ -41048,7 +41051,7 @@ async function loadAll() {
   var r = await api('GET', BASE);
   var d = r.data || {};
   if (!r.ok || !Array.isArray(d.zones) || !Array.isArray(d.tables)) {
-    var msg = r.status === 404 ? 'Table booking is not set up for this restaurant yet.' : errText(r, 'Could not load the restaurant setup');
+    var msg = r.status === 404 ? ((typeof d.message === 'string' && d.message) || 'This restaurant was not found for your property.') : errText(r, 'Could not load the restaurant setup');
     if (!D.loaded) {
       el('mapMsg').innerHTML = '<span><i class="fas fa-triangle-exclamation"></i> ' + esc(msg) + '</span> <button class="btn" onclick="retryLoad()">Retry</button>';
       el('mapMsg').classList.remove('hidden');
@@ -41076,7 +41079,12 @@ async function loadAll() {
   D.loaded = true;
   el('mapMsg').classList.add('hidden');
   renderAll();
-  if (d.enabled === false) toast('Table booking is switched off for this restaurant.', 'err');
+  D.enabled = d.enabled !== false;
+  if (!D.enabled) {
+    el('loadErr').innerHTML = '<i class="fas fa-circle-info"></i> Table booking is not switched on for this restaurant yet. Check the Rules tab and press Save rules to switch it on.';
+    el('loadErr').classList.remove('hidden');
+    rulesInput();
+  }
   return true;
 }
 function retryLoad() { el('mapMsg').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading the floor plan…'; loadAll(); }
@@ -41139,7 +41147,7 @@ function renderZoneBar() {
   }
   var e = ZE[z.zone_id] || { name: z.name, color: z.color, guest_bookable: z.guest_bookable };
   el('zoneBar').innerHTML = '<span class="zcode" id="zCode" style="--zc:' + zoneColor(z) + '">' + esc(z.code) + '</span>' +
-    '<div class="field zf"><label class="lb" for="zName">Zone name</label><input type="text" id="zName" maxlength="40" autocomplete="off" value="' + esc(e.name) + '" oninput="zoneInput()"></div>' +
+    '<div class="field zf"><label class="lb" for="zName">Zone name</label><input type="text" id="zName" maxlength="60" autocomplete="off" value="' + esc(e.name) + '" oninput="zoneInput()"></div>' +
     '<div class="field"><label class="lb" for="zColor">Colour</label><input type="color" id="zColor" value="' + (validColor(e.color) || z.color) + '" oninput="zoneInput()"></div>' +
     '<label class="chk"><input type="checkbox" id="zBook"' + (e.guest_bookable ? ' checked' : '') + ' onchange="zoneInput()"> Guests can book this zone in the app</label>' +
     '<span class="pill">' + (z.is_outdoor ? '<i class="fas fa-tree"></i>Outdoor' : '<i class="fas fa-house"></i>Indoor') + '</span>' +
@@ -41159,7 +41167,7 @@ async function saveZone() {
   if (!z) return;
   var ch = zoneChanges(z);
   if (!Object.keys(ch).length) return;
-  if ('name' in ch && !ch.name) { toast('Give the zone a name', 'err'); return; }
+  if ('name' in ch && (!ch.name || BAD_CHARS.test(ch.name))) { toast('Give the zone a name (no < or >)', 'err'); return; }
   if (ch.guest_bookable === 0 && !confirm('Stop offering Zone ' + z.code + ' to guests in the app? Existing bookings stay; staff can still seat people there.')) return;
   el('zSave').disabled = true;
   var r = await api('PUT', BASE + '/zones/' + z.zone_id, ch);
@@ -41175,8 +41183,8 @@ function openAddZone() {
   for (var i = 0; i < 26 && !code; i++) { var ch = String.fromCharCode(65 + i); if (!used[ch]) code = ch; }
   NZ = { code: code };
   showDlg('<h3><i class="fas fa-layer-group"></i>New zone</h3>' +
-    '<div class="grid2">' + fld('Code', '<input type="text" id="nzCode" maxlength="3" autocomplete="off" value="' + esc(code) + '">', 'nzCode') +
-    fld('Name', '<input type="text" id="nzName" maxlength="40" autocomplete="off" placeholder="e.g. Terrace">', 'nzName') + '</div>' +
+    '<div class="grid2">' + fld('Code', '<input type="text" id="nzCode" maxlength="4" autocomplete="off" value="' + esc(code) + '">', 'nzCode') +
+    fld('Name', '<input type="text" id="nzName" maxlength="60" autocomplete="off" placeholder="e.g. Terrace">', 'nzName') + '</div>' +
     fld('Colour', '<input type="color" id="nzColor" value="#7c3aed" style="width:64px;height:38px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff">', 'nzColor') +
     '<label class="chk"><input type="checkbox" id="nzOut"> Outdoor (counts towards the outdoor seat target)</label>' +
     '<div class="err" id="nzErr"></div>' +
@@ -41185,9 +41193,9 @@ function openAddZone() {
 async function createZone() {
   var code = el('nzCode').value.trim().toUpperCase(), name = el('nzName').value.trim(), err = el('nzErr');
   err.textContent = '';
-  if (!code) { err.textContent = 'Enter a short code, such as D.'; return; }
+  if (!/^[A-Z0-9]{1,4}$/.test(code)) { err.textContent = 'The code is 1 to 4 letters or digits, such as D.'; return; }
   if (D.zones.some(function (z) { return z.code.toUpperCase() === code; })) { err.textContent = 'Zone ' + code + ' already exists.'; return; }
-  if (!name) { err.textContent = 'Enter a zone name.'; return; }
+  if (!name || BAD_CHARS.test(name)) { err.textContent = 'Enter a zone name (no < or >).'; return; }
   var order = 0;
   D.zones.forEach(function (z) { if (z.display_order > order) order = z.display_order; });
   el('nzGo').disabled = true;
@@ -41210,7 +41218,7 @@ function seatStats() {
     s.seats += t.capacity;
     s.tables++;
     seats += t.capacity;
-    if (z) { if (z.is_outdoor) outdoor += t.capacity; else indoor += t.capacity; }
+    if (z && z.is_active) { if (z.is_outdoor) outdoor += t.capacity; else indoor += t.capacity; }
   });
   return { per: per, un: un, indoor: indoor, outdoor: outdoor, seats: seats, tables: D.tables.length };
 }
@@ -41399,7 +41407,7 @@ function editorPanel(t) {
   return '<div class="card">' +
     '<div class="edhead"><span class="badge" style="--zc:' + zoneColor(z) + '">' + esc(dr.table_number || '?') + '</span><div><b>Table ' + esc(t.table_number) + '</b>' +
       '<div class="muted sm">' + (z ? 'Zone ' + esc(z.code) + ' · ' + esc(z.name) : 'No zone') + ' · ' + plural(t.capacity, 'seat') + '</div></div></div>' +
-    '<div class="grid2">' + fld('Table number', '<input type="text" id="edNum" maxlength="12" autocomplete="off" value="' + esc(dr.table_number) + '" oninput="draftInput()">', 'edNum') +
+    '<div class="grid2">' + fld('Table number', '<input type="text" id="edNum" maxlength="20" autocomplete="off" value="' + esc(dr.table_number) + '" oninput="draftInput()">', 'edNum') +
       fld('Zone', '<select id="edZone" onchange="draftInput()">' + zoneOptions(dr.zone_id) + '</select>', 'edZone') + '</div>' +
     '<span class="lb">Seats</span><div class="chips" id="edSeats">' + seatChips(dr.capacity, 'setSeats', 'edCap', 'draftCap') + '</div>' +
     '<span class="lb" style="margin-top:12px">Shape</span><div class="chips">' + shapeChips(dr.shape, 'setShape') + '</div>' +
@@ -41517,13 +41525,18 @@ function numberClash(num, exceptId) {
   var k = numKey(num);
   return D.tables.filter(function (o) { return o.table_id !== exceptId && numKey(o.table_number) === k; })[0] || null;
 }
+function numberProblem(num) {
+  if (!num) return 'Enter a table number.';
+  if (num.length > 20 || BAD_CHARS.test(num) || num.indexOf('__') === 0) return 'Table numbers are 1 to 20 characters, without < or > and not starting with __.';
+  return '';
+}
 function clashText(num, o) {
   var z = o && zoneById(o.zone_id);
   return 'Number ' + num + ' is already used by another table' + (z ? ' in Zone ' + z.code : '') + '.';
 }
 function conflictHtml(r, fallback, cap) {
   var d = r.data || {};
-  if (r.status === 409 && /duplicate/i.test(String(d.error || ''))) return esc('That table number is already used in this restaurant.');
+  if (r.status === 409 && /duplicate/i.test(String(d.error || ''))) return esc((typeof d.message === 'string' && d.message) || 'That table number is already used in this restaurant.');
   var list = Array.isArray(d.conflicts) ? d.conflicts : (Array.isArray(d.bookings) ? d.bookings : []);
   var msg = (typeof d.message === 'string' && d.message) ? d.message
     : (r.status === 409 && list.length && cap ? 'Some upcoming bookings on this table have more guests than ' + cap + ' seats. Move those bookings first, or keep more seats.' : errText(r, fallback));
@@ -41541,8 +41554,8 @@ async function saveTable() {
   if (!t || !dr || FP.busy) return;
   var err = el('edErr');
   err.textContent = '';
-  var num = String(dr.table_number || '').trim();
-  if (!num) { err.textContent = 'Enter a table number.'; return; }
+  var num = String(dr.table_number || '').trim(), np = numberProblem(num);
+  if (np) { err.textContent = np; return; }
   var clash = numberClash(num, t.table_id);
   if (clash) { err.textContent = clashText(num, clash); return; }
   if (!(Number.isInteger(dr.capacity) && dr.capacity >= 1 && dr.capacity <= 30)) { err.textContent = 'Seats must be a whole number from 1 to 30.'; return; }
@@ -41758,7 +41771,7 @@ function openAdd(p) {
 function addDlgHtml() {
   var A = FP.add, z = zoneById(A.zone_id);
   return '<h3><i class="fas fa-plus"></i>New table · Zone ' + esc(z ? z.code : '') + '</h3>' +
-    fld('Table number', '<input type="text" id="aNum" maxlength="12" autocomplete="off" value="' + esc(A.num) + '" oninput="addInput()">', 'aNum') +
+    fld('Table number', '<input type="text" id="aNum" maxlength="20" autocomplete="off" value="' + esc(A.num) + '" oninput="addInput()">', 'aNum') +
     '<span class="lb">Seats</span><div class="chips" id="aSeats">' + seatChips(A.cap, 'addSeats', 'aCap', 'addCapInput') + '</div>' +
     '<span class="lb" style="margin-top:12px">Shape</span><div class="chips">' + shapeChips(A.shape, 'addShape') + '</div>' +
     '<p class="muted xs">Tap the floor again to move it. You can fine-tune the position afterwards by dragging.</p>' +
@@ -41795,9 +41808,9 @@ async function createTable() {
   var A = FP.add;
   if (!A || FP.busy) return;
   addInput();
-  var err = el('aErr'), num = String(A.num || '').trim();
+  var err = el('aErr'), num = String(A.num || '').trim(), np = numberProblem(num);
   err.textContent = '';
-  if (!num) { err.textContent = 'Enter a table number.'; return; }
+  if (np) { err.textContent = np; return; }
   var clash = numberClash(num, null);
   if (clash) { err.textContent = clashText(num, clash); return; }
   if (!(Number.isInteger(A.cap) && A.cap >= 1 && A.cap <= 30)) { err.textContent = 'Seats must be a whole number from 1 to 30.'; return; }
@@ -41833,13 +41846,13 @@ function qfHtml() {
   var z = zoneById(QF.zone_id);
   return '<h3><i class="fas fa-wand-magic-sparkles"></i>Quick fill · Zone ' + esc(z.code) + ' · ' + esc(z.name) + '</h3>' +
     '<p class="muted sm" style="margin-bottom:10px">Creates identical tables in a neat grid on this zone’s floor. Drag them into their real places afterwards.</p>' +
-    '<div class="grid2">' + fld('How many tables', '<input type="number" id="qCount" min="1" max="100" step="1" value="' + QF.count + '" oninput="qfInput()">', 'qCount') +
+    '<div class="grid2">' + fld('How many tables', '<input type="number" id="qCount" min="1" max="200" step="1" value="' + QF.count + '" oninput="qfInput()">', 'qCount') +
       fld('Seats per table', '<input type="number" id="qCap" min="1" max="30" step="1" value="' + QF.cap + '" oninput="qfInput()">', 'qCap') + '</div>' +
     '<div class="chips" id="qSeats" style="margin:-2px 0 10px">' + SEAT_QUICK.map(function (n) { return '<button type="button" class="chip' + (QF.cap === n ? ' on' : '') + '" data-n="' + n + '" onclick="qfSeats(' + n + ')">' + n + ' seats</button>'; }).join('') + '</div>' +
     fld('Shape', '<select id="qShape" onchange="qfInput()"><option value="auto">Automatic: round for 2 seats, rectangle for more</option>' +
       SHAPES.map(function (s) { return '<option value="' + s.k + '"' + (QF.shape === s.k ? ' selected' : '') + '>' + s.label + '</option>'; }).join('') + '</select>', 'qShape') +
-    '<div class="grid2">' + fld('Number prefix', '<input type="text" id="qPrefix" maxlength="6" autocomplete="off" value="' + esc(QF.prefix) + '" oninput="qfInput()">', 'qPrefix') +
-      fld('First number', '<input type="number" id="qStart" min="0" step="1" value="' + QF.start + '" oninput="qfInput()">', 'qStart') + '</div>' +
+    '<div class="grid2">' + fld('Number prefix', '<input type="text" id="qPrefix" maxlength="10" autocomplete="off" value="' + esc(QF.prefix) + '" oninput="qfInput()">', 'qPrefix') +
+      fld('First number', '<input type="number" id="qStart" min="0" max="9999" step="1" value="' + QF.start + '" oninput="qfInput()">', 'qStart') + '</div>' +
     '<div id="qPrev"></div><div class="err" id="qErr"></div>' +
     '<div class="btns"><button class="btn pri" id="qGo" onclick="runQuickFill()"><i class="fas fa-check"></i>Create tables</button><button class="btn" onclick="closeDlg()">Cancel</button></div>';
 }
@@ -41856,9 +41869,10 @@ function qfInput() {
 function qfSeats(n) { if (!QF) return; el('qCap').value = n; qfInput(); }
 function qfPlan() {
   var count = Number(QF.count), cap = Number(QF.cap), start = Number(QF.start), prefix = String(QF.prefix || '').trim();
-  if (!(Number.isInteger(count) && count >= 1 && count <= 100)) return { err: 'How many tables: a whole number from 1 to 100.' };
+  if (!(Number.isInteger(count) && count >= 1 && count <= 200)) return { err: 'How many tables: a whole number from 1 to 200.' };
   if (!(Number.isInteger(cap) && cap >= 1 && cap <= 30)) return { err: 'Seats per table: a whole number from 1 to 30.' };
-  if (!(Number.isInteger(start) && start >= 0)) return { err: 'First number: a whole number, 0 or more.' };
+  if (!/^[A-Za-z0-9 _-]{0,10}$/.test(prefix)) return { err: 'Prefix: up to 10 letters, digits, spaces, _ or -.' };
+  if (!(Number.isInteger(start) && start >= 0 && start <= 9999)) return { err: 'First number: a whole number from 0 to 9999.' };
   var taken = {}, nums = [], skipped = [], n = start;
   D.tables.forEach(function (t) { taken[numKey(t.table_number)] = 1; });
   while (nums.length < count && n < start + 2000) {
@@ -41889,7 +41903,7 @@ async function runQuickFill() {
   FP.busy = false;
   if (!r.ok) { if (el('qGo')) el('qGo').disabled = false; if (el('qErr')) el('qErr').innerHTML = conflictHtml(r, 'Could not create the tables'); return; }
   closeDlg(true);
-  var made = Number(r.data.created || r.data.count) || (Array.isArray(r.data.tables) ? r.data.tables.length : p.count);
+  var made = Array.isArray(r.data.created) ? r.data.created.length : (Number(r.data.created) || p.count);
   await loadAll();
   toast(plural(made, 'table') + ' added to Zone ' + z.code + '. Drag them into place, then press Save layout.', 'ok');
 }
@@ -41921,9 +41935,10 @@ function slotChanges(id) {
 function slotIssues(v) {
   var out = [], a = mins(v.start_time), b = mins(v.end_time), buf = Number(v.buffer_minutes);
   if (!String(v.label || '').trim()) out.push('Give the slot a label.');
+  else if (BAD_CHARS.test(v.label)) out.push('The label cannot contain < or >.');
   if (isNaN(a) || isNaN(b)) out.push('Enter a start and an end time.');
   else if (b <= a) out.push('The slot must end after it starts.');
-  if (v.buffer_minutes === '' || !(Number.isInteger(buf) && buf >= 0 && buf <= 180)) out.push('Clearance must be a whole number from 0 to 180 minutes.');
+  if (v.buffer_minutes === '' || !(Number.isInteger(buf) && buf >= 0 && buf <= 120)) out.push('Clearance must be a whole number from 0 to 120 minutes.');
   if (!(v.days_mask & 127)) out.push('Pick at least one day.');
   return out;
 }
@@ -41948,7 +41963,7 @@ function slotRow(v) {
     '<td><input type="text" data-sid="' + id + '" data-k="label" maxlength="40" value="' + esc(v.label) + '" aria-label="Label"></td>' +
     '<td><input type="time" data-sid="' + id + '" data-k="start_time" value="' + esc(v.start_time) + '" aria-label="Starts"></td>' +
     '<td><input type="time" data-sid="' + id + '" data-k="end_time" value="' + esc(v.end_time) + '" aria-label="Ends"></td>' +
-    '<td><div class="bufw"><input type="number" data-sid="' + id + '" data-k="buffer_minutes" min="0" max="180" step="5" value="' + esc(v.buffer_minutes) + '" aria-label="Clearance minutes"><span class="muted">min</span></div></td>' +
+    '<td><div class="bufw"><input type="number" data-sid="' + id + '" data-k="buffer_minutes" min="0" max="120" step="5" value="' + esc(v.buffer_minutes) + '" aria-label="Clearance minutes"><span class="muted">min</span></div></td>' +
     '<td><div class="days">' + days + '</div></td>' +
     '<td><label class="chk"><input type="checkbox" data-sid="' + id + '" data-k="is_active"' + (v.is_active ? ' checked' : '') + ' aria-label="Active"></label></td>' +
     '<td class="held" id="sh-' + id + '"></td>' +
@@ -42136,17 +42151,18 @@ async function deleteSlot(id) {
 }
 function genDefaults(m) {
   var act = D.slots.filter(function (s) { return s.meal === m.k && s.is_active; }).sort(slotCmp);
-  if (!act.length) return { ws: m.win[0], we: m.win[1], len: 50, buf: 10, prefix: m.label + ' Slot', replace: false };
+  if (!act.length) return { ws: m.win[0], we: m.win[1], len: 50, buf: 10, prefix: m.label, replace: false };
   var last = -1;
   act.forEach(function (s) { var e = mins(s.end_time) + (Number(s.buffer_minutes) || 0); if (e > last) last = e; });
-  return { ws: act[0].start_time, we: hm(last), len: typicalLen(act), buf: Number(act[0].buffer_minutes) || 0, prefix: m.label + ' Slot', replace: true };
+  return { ws: act[0].start_time, we: hm(last), len: typicalLen(act), buf: Number(act[0].buffer_minutes) || 0, prefix: m.label, replace: true };
 }
 function genPlan(g) {
   var a = mins(g.ws), b = mins(g.we), len = Number(g.len), buf = Number(g.buf);
   if (isNaN(a) || isNaN(b)) return { err: 'Enter when the service opens and closes.' };
   if (b <= a) return { err: 'The service must close after it opens.' };
   if (!(Number.isInteger(len) && len >= 10 && len <= 480)) return { err: 'Slot length: a whole number from 10 to 480 minutes.' };
-  if (!(Number.isInteger(buf) && buf >= 0 && buf <= 180)) return { err: 'Clearance: a whole number from 0 to 180 minutes.' };
+  if (!(Number.isInteger(buf) && buf >= 0 && buf <= 120)) return { err: 'Clearance: a whole number from 0 to 120 minutes.' };
+  if (BAD_CHARS.test(String(g.prefix || ''))) return { err: 'The label cannot contain < or >.' };
   var out = [], t = a;
   while (t + len <= b && out.length < 48) { out.push({ start: t, end: t + len }); t += len + buf; }
   if (!out.length) return { err: 'The service window is shorter than one slot.' };
@@ -42160,8 +42176,8 @@ function genPanel(m) {
   var cur = D.slots.filter(function (s) { return s.meal === m.k && s.is_active; }).length;
   return '<div class="gen"><h3><i class="fas fa-wand-magic-sparkles"></i>Generate ' + m.label.toLowerCase() + ' slots</h3>' +
     '<div class="gengrid">' + gfld(m.k, 'ws', 'Service opens', 'time', g.ws) + gfld(m.k, 'we', 'Service closes', 'time', g.we) +
-      gfld(m.k, 'len', 'Slot length (min)', 'number', g.len, 'min="10" max="480" step="5"') + gfld(m.k, 'buf', 'Clearance after each (min)', 'number', g.buf, 'min="0" max="180" step="5"') +
-      gfld(m.k, 'prefix', 'Label prefix', 'text', g.prefix, 'maxlength="30"') + '</div>' +
+      gfld(m.k, 'len', 'Slot length (min)', 'number', g.len, 'min="10" max="480" step="5"') + gfld(m.k, 'buf', 'Clearance after each (min)', 'number', g.buf, 'min="0" max="120" step="5"') +
+      gfld(m.k, 'prefix', 'Label (+ Slot 1, Slot 2…)', 'text', g.prefix, 'maxlength="30"') + '</div>' +
     (cur ? '<label class="chk"><input type="checkbox" data-gen="' + m.k + '" data-gk="replace"' + (g.replace ? ' checked' : '') + '> Replace the ' + plural(cur, 'current ' + m.label.toLowerCase() + ' slot') + ' (their bookings are kept)</label>' : '') +
     '<div id="gp-' + m.k + '"></div>' +
     '<div class="btns"><button type="button" class="btn pri" data-act="gen-apply" data-meal="' + m.k + '" id="ga-' + m.k + '"><i class="fas fa-check"></i>Create these slots</button><button type="button" class="btn" data-act="gen" data-meal="' + m.k + '">Close</button></div></div>';
@@ -42172,9 +42188,9 @@ function renderGenPreview(meal) {
   var p = genPlan(g);
   if (p.err) { box.innerHTML = '<div class="err">' + esc(p.err) + '</div>'; if (btn) btn.disabled = true; return; }
   var cur = D.slots.filter(function (s) { return s.meal === meal && s.is_active; });
-  var replace = !!g.replace && cur.length > 0, prefix = String(g.prefix || '').trim() || mealLabel(meal) + ' Slot';
-  var first = replace ? 1 : cur.length + 1, h = '<div class="pvlist">';
-  p.list.forEach(function (s, i) { h += '<span><b>' + esc(prefix + ' ' + (first + i)) + '</b> · ' + hm(s.start) + '–' + hm(s.end) + ' · held until ' + hm(s.end + p.buf) + '</span>'; });
+  // The server names generated slots "<label> Slot 1", "<label> Slot 2"… from 1 every time
+  var replace = !!g.replace && cur.length > 0, prefix = String(g.prefix || '').trim() || mealLabel(meal), h = '<div class="pvlist">';
+  p.list.forEach(function (s, i) { h += '<span><b>' + esc(prefix + ' Slot ' + (i + 1)) + '</b> · ' + hm(s.start) + '–' + hm(s.end) + ' · held until ' + hm(s.end + p.buf) + '</span>'; });
   h += '</div>';
   var lastEnd = p.list[p.list.length - 1].end, spare = p.b - (lastEnd + p.buf);
   h += '<p class="sm"><b>' + plural(p.list.length, 'slot') + '</b> of ' + p.len + ' min with ' + p.buf + ' min clearance' +
@@ -42185,6 +42201,7 @@ function renderGenPreview(meal) {
     others.forEach(function (o) { if (overlaps(gv, o) && hits.indexOf(o.label) < 0) hits.push(o.label); });
   });
   if (hits.length) h += '<div class="warn">These new slots overlap ' + hits.map(esc).join(', ') + '. ' + (replace ? '' : 'Tick "Replace" to swap the current slots out, or change the times.') + '</div>';
+  else if (!replace && cur.length) h += '<p class="muted sm">The current slots stay, and the new labels start again at Slot 1. Rename them afterwards if that is confusing.</p>';
   box.innerHTML = h;
   if (btn) btn.disabled = false;
 }
@@ -42195,7 +42212,7 @@ async function applyGen(meal) {
   if (p.err) { toast(p.err, 'err'); return; }
   var cur = D.slots.filter(function (s) { return s.meal === meal && s.is_active; }).length, replace = !!g.replace && cur > 0;
   if (!confirm('Create ' + plural(p.list.length, m.label.toLowerCase() + ' slot') + (replace ? ' and switch off the ' + cur + ' current one' + (cur === 1 ? '' : 's') : '') + '? Existing bookings are kept.')) return;
-  var body = { meal: meal, window_start: g.ws, window_end: g.we, slot_minutes: p.len, buffer_minutes: p.buf, label_prefix: String(g.prefix || '').trim() || m.label + ' Slot', replace: replace };
+  var body = { meal: meal, window_start: g.ws, window_end: g.we, slot_minutes: p.len, buffer_minutes: p.buf, label_prefix: String(g.prefix || '').trim() || m.label, replace: replace };
   var btn = el('ga-' + meal);
   if (btn) btn.disabled = true;
   var r = await api('POST', BASE + '/slots/generate', body);
@@ -42246,8 +42263,8 @@ function renderRules() {
 function largestTable() { var m = 0; D.tables.forEach(function (t) { if (t.capacity > m) m = t.capacity; }); return m; }
 function rulesInput() {
   if (!D.settings) return;
-  var v = readRules(), ch = rulesChanges(), n = Object.keys(ch).length, prob = rulesProblem(ch);
-  el('rSave').disabled = !n || !!prob;
+  var v = readRules(), ch = rulesChanges(), n = Object.keys(ch).length, prob = rulesProblem(D.enabled ? ch : v);
+  el('rSave').disabled = (!n && D.enabled) || !!prob;
   el('rUndo').disabled = !n;
   el('rState').innerHTML = prob ? '<span class="e">' + esc(prob) + '</span>' : (n ? '<span class="unsaved"><i class="dot"></i>' + plural(n, 'unsaved change') + '</span>' : '');
   var g = v.grace_minutes;
@@ -42266,7 +42283,8 @@ function undoRules() {
   rulesInput();
 }
 async function saveRules() {
-  var ch = rulesChanges(), prob = rulesProblem(ch);
+  // The first save creates the settings row, which is what switches the module on
+  var ch = D.enabled ? rulesChanges() : readRules(), prob = rulesProblem(ch);
   if (!Object.keys(ch).length) return;
   if (prob) { toast(prob, 'err'); return; }
   if (ch.guest_booking_enabled === 1) {
