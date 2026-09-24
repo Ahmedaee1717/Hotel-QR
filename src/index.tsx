@@ -25914,6 +25914,10 @@ window.luxTogglePassForm = function() {
           .lux-rst-meal.dim { opacity: 0.5; }
           .lux-rst-meal.on { background: var(--lux-gold-grad); color: #231307; opacity: 1; box-shadow: 0 8px 18px -10px rgba(212, 175, 55, 0.7); }
           .lux-rst-meal.on i { color: #231307; }
+          @media (max-width: 360px) {
+            .lux-rst-meal { font-size: 0.64rem; letter-spacing: 0.03em; gap: 0.3rem; }
+            .lux-rst-meal i { display: none; }
+          }
           .lux-rst-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 0.5rem; transition: opacity 0.2s; }
           .lux-rst-slots.loading { opacity: 0.5; pointer-events: none; }
           .lux-rst-slot {
@@ -29314,7 +29318,7 @@ window.luxTogglePassForm = function() {
                     console.log('Checking beach booking after content is visible');
                     checkBeachBookingEnabled();
                 }
-
+                
                 try { luxRstOpenFromUrl(); } catch (e) { console.error('open param', e); }
 
                 // Initialize chatbot after all data is loaded
@@ -77978,7 +77982,7 @@ app.get('/hotel/:slug/restaurant/:offering_id/menu', async (c) => {
 app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
   const { DB } = c.env
   const { slug, offering_id } = c.req.param()
-
+  
   // Restaurants with the table-booking module book inside the guest app's offering sheet
   if (/^\d+$/.test(offering_id)) {
     try {
@@ -77994,11 +77998,11 @@ app.get('/hotel/:slug/restaurant/:offering_id/book', async (c) => {
     const property = await DB.prepare(`
       SELECT * FROM properties WHERE slug = ?
     `).bind(slug).first()
-
+    
     if (!property) {
       return c.text('Property not found', 404)
     }
-
+    
     // Get restaurant details
     const restaurant = await DB.prepare(`
       SELECT * FROM hotel_offerings WHERE offering_id = ?
