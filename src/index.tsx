@@ -41652,6 +41652,9 @@ body.embed .savebar{background:none}
 /* dialog */
 .modal{position:fixed;inset:0;z-index:80;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px;overflow:auto}
 .dlgbox{background:#fff;border-radius:14px;max-width:540px;width:100%;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+/* add-table form: non-blocking, the floor behind stays tappable to move the new table */
+.modal.pass{background:transparent;pointer-events:none;align-items:flex-end;padding:0 14px 14px;overflow:visible}
+.modal.pass .dlgbox{pointer-events:auto;max-height:58vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 .dlgbox h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
 .dlgbox h3 i{color:#2563eb;margin-right:6px}
 .dlgbox .lb{margin-top:8px}
@@ -41944,6 +41947,8 @@ async function loadAll() {
   D.tables = d.tables.filter(function (t) { return t && t.table_id && (t.is_active == null || Number(t.is_active)); }).map(normTable);
   D.byId = {};
   D.tables.forEach(function (t) { D.byId[t.table_id] = t; });
+  // Numbers of removed tables stay reserved on the server: Quick fill and suggestions skip them
+  D.removed = (Array.isArray(d.removed_numbers) ? d.removed_numbers : []).map(function (x) { return String(x == null ? '' : x); });
   D.slots = (Array.isArray(d.slots) ? d.slots : []).map(normSlot).filter(function (s) { return s.slot_id; });
   Object.keys(FP.dirty).forEach(function (id) { if (!D.byId[id]) delete FP.dirty[id]; else setDirty(Number(id), {}); });
   if (FP.sel != null && !D.byId[FP.sel]) { FP.sel = null; FP.draft = null; }
@@ -42441,6 +42446,8 @@ async function saveTable() {
   var dd = FP.dirty[t.table_id];
   if (dd) for (var k in dd) body[k] = dd[k];
   if (!Object.keys(body).length) { toast('Nothing to save'); return; }
+  // Snapshot what is sent: a nudge or draft edit made while the request is in flight stays unsaved
+  var sentGeo = JSON.stringify(FP.dirty[t.table_id]), sentDraft = JSON.stringify(dr);
   FP.busy = true;
   el('edSave').disabled = true;
   var r = await api('PUT', BASE + '/tables/' + t.table_id, body);
@@ -42452,8 +42459,8 @@ async function saveTable() {
     if (el('edErr')) el('edErr').innerHTML = h; else toast(errText(r, 'Could not save the table'), 'err');
     return;
   }
-  delete FP.dirty[t.table_id];
-  FP.draft = null;
+  if (JSON.stringify(FP.dirty[t.table_id]) === sentGeo) delete FP.dirty[t.table_id];
+  if (FP.draft === dr && JSON.stringify(dr) === sentDraft) FP.draft = null;
   if (body.zone_id != null) FP.zone = body.zone_id;
   await loadAll();
   toast('Table ' + num + ' saved' + (body.capacity ? ' · ' + plural(body.capacity, 'seat') : ''), 'ok');
@@ -42586,6 +42593,9 @@ async function saveLayout() {
   var ids = Object.keys(FP.dirty);
   if (!ids.length || FP.busy) return;
   var updates = ids.map(function (id) { var u = { table_id: Number(id) }, d = FP.dirty[id]; for (var k in d) u[k] = d[k]; return u; });
+  // Snapshot what is sent: a table moved again while the request is in flight stays unsaved
+  var sent = {};
+  ids.forEach(function (id) { sent[id] = JSON.stringify(FP.dirty[id]); });
   FP.busy = true;
   renderLayoutBar();
   var r = await api('POST', BASE + '/tables/bulk', { updates: updates });
@@ -42596,9 +42606,10 @@ async function saveLayout() {
     toast(errText(r, 'Could not save the layout') + (bt ? ' (table ' + bt.table_number + ')' : ''), 'err');
     return;
   }
-  FP.dirty = {};
+  Object.keys(sent).forEach(function (id) { if (JSON.stringify(FP.dirty[id]) === sent[id]) delete FP.dirty[id]; });
   await loadAll();
-  toast('Layout saved: ' + plural(updates.length, 'table') + ' updated', 'ok');
+  var left = dirtyCount();
+  toast('Layout saved: ' + plural(updates.length, 'table') + ' updated' + (left ? ' · ' + plural(left, 'table') + ' moved since, still unsaved' : ''), 'ok');
 }
 function discardLayout() {
   var n = dirtyCount();
@@ -42610,13 +42621,15 @@ function discardLayout() {
 }
 
 // ---------- dialogs: add table, quick fill ----------
-function showDlg(html, focusId) {
+function showDlg(html, focusId, pass) {
   el('dlgBox').innerHTML = html;
+  el('dlg').classList.toggle('pass', !!pass);
   el('dlg').classList.remove('hidden');
   setTimeout(function () { var f = focusId && el(focusId); if (f) { f.focus(); if (f.select) f.select(); } }, 40);
 }
 function closeDlg(silent) {
   el('dlg').classList.add('hidden');
+  el('dlg').classList.remove('pass');
   el('dlgBox').innerHTML = '';
   QF = null;
   if (FP.add) { FP.add = null; if (!silent) renderFloor(); }
@@ -42624,8 +42637,8 @@ function closeDlg(silent) {
 el('dlg').addEventListener('click', function (ev) { if (ev.target === el('dlg')) closeDlg(); });
 function nextNumber(prefix) {
   var p = String(prefix || '').toLowerCase(), max = 0;
-  D.tables.forEach(function (t) {
-    var k = numKey(t.table_number);
+  D.tables.map(function (t) { return t.table_number; }).concat(D.removed || []).forEach(function (num) {
+    var k = numKey(num);
     if (k.indexOf(p) !== 0) return;
     var rest = k.slice(p.length);
     if (/^[0-9]+$/.test(rest)) max = Math.max(max, parseInt(rest, 10));
@@ -42639,7 +42652,8 @@ function openAdd(p) {
   var cap = FP.addCap;
   FP.add = { cx: p.x, cy: p.y, cap: cap, shape: autoShape(cap), shapeAuto: true, num: z.code + nextNumber(z.code), zone_id: z.zone_id };
   renderFloor();
-  showDlg(addDlgHtml(), 'aNum');
+  // Non-blocking: taps on the floor still reach the stage and move the new table (typed values stay)
+  showDlg(addDlgHtml(), 'aNum', true);
 }
 function addDlgHtml() {
   var A = FP.add, z = zoneById(A.zone_id);
@@ -42748,6 +42762,7 @@ function qfPlan() {
   if (!(Number.isInteger(start) && start >= 0 && start <= 9999)) return { err: 'First number: a whole number from 0 to 9999.' };
   var taken = {}, nums = [], skipped = [], n = start;
   D.tables.forEach(function (t) { taken[numKey(t.table_number)] = 1; });
+  (D.removed || []).forEach(function (x) { taken[numKey(x)] = 1; });
   while (nums.length < count && n < start + 2000) {
     var num = prefix + n;
     if (taken[numKey(num)]) skipped.push(num); else nums.push(num);
@@ -42981,7 +42996,19 @@ async function saveSlot(id) {
   refreshSlotDerived();
   var r = { ok: true, data: {} };
   if (draft) r = await api('POST', BASE + '/slots', body);
-  else if (Object.keys(body).length) r = await api('PUT', BASE + '/slots/' + id, body);
+  else if (Object.keys(body).length) {
+    r = await api('PUT', BASE + '/slots/' + id, body);
+    // Removing a weekday that still has upcoming bookings: confirm, then force
+    if (r.status === 409 && r.data && r.data.error === 'has_bookings') {
+      var hb = r.data.bookings || [], hn = Number(r.data.count) || hb.length;
+      var hd = [];
+      hb.forEach(function (b) { if (b && b.booking_date && hd.indexOf(b.booking_date) < 0) hd.push(b.booking_date); });
+      if (!confirm(String(v.label).trim() + ' has ' + plural(hn, 'upcoming booking') + (hd.length ? ' on ' + hd.slice(0, 6).join(', ') + (hd.length > 6 ? '…' : '') : '') + ' — on day(s) you are removing. Save anyway? Those bookings are kept, but the slot will no longer show on those days in the staff app.')) {
+        delete SL.busy[id]; refreshSlotDerived(); return;
+      }
+      r = await api('PUT', BASE + '/slots/' + id + '?force=1', body);
+    }
+  }
   if (r.ok && deactivate) {
     r = await deactivateSlot(id, v);
     if (r === null) { delete SL.busy[id]; if (Object.keys(body).length) { SL.edits[id] = { is_active: 0 }; await loadAll(); } else refreshSlotDerived(); return; }
@@ -43184,6 +43211,8 @@ window.addEventListener('beforeunload', function (e) {
 function showTab(t, fromHash) {
   if (['floor', 'slots', 'rules'].indexOf(t) < 0) t = 'floor';
   curTab = t;
+  // The add-table form does not block the page: leave add mode when the floor is hidden
+  if (t !== 'floor' && FP.add) modeSelect();
   document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === t); });
   document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('hidden', p.id !== 'pane-' + t); });
   if (!fromHash) { try { history.replaceState(null, '', location.pathname + location.search + '#' + t); } catch (e) {} }
@@ -91866,6 +91895,12 @@ function rstKey(v: any): string {
   return String(v == null ? '' : v).trim().toLowerCase()
 }
 
+// Room-number match key — identical to the Ops client's rstRoomNorm: 'Room 204', '#204' and '204' all match.
+// room_number is stored as the guest typed it; every comparison goes through this on both sides.
+function rstRoomNorm(v: any): string {
+  return String(v == null ? '' : v).toLowerCase().replace(/room/g, '').replace(/[^0-9a-z]/g, '')
+}
+
 function rstNumCmp(a: any, b: any): number {
   return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), 'en', { numeric: true, sensitivity: 'base' })
 }
@@ -91959,13 +91994,16 @@ function rstFreeSql(tableExpr: string): string {
       AND ${rstHoldSql('o')})`
 }
 
+// Bounded to the last 7 days so each run reads only recent rows (older confirmed rows are
+// already treated as expired by the lazy rstExpired on every read).
 function rstSweepStmt(DB: any, now: any, offering_id?: number) {
+  const floor = addDaysYmd(now.date, -7)
   return DB.prepare(`
     UPDATE restaurant_bookings
     SET status = 'no_show', auto_released = 1, released_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-    WHERE status = 'confirmed' AND booking_date <= ? ${offering_id ? 'AND offering_id = ?' : ''}
+    WHERE status = 'confirmed' AND booking_date <= ? AND booking_date >= ? ${offering_id ? 'AND offering_id = ?' : ''}
       AND ${rstExpiredSql('restaurant_bookings')}
-  `).bind(...(offering_id ? [now.date, offering_id, now.stamp] : [now.date, now.stamp]))
+  `).bind(...(offering_id ? [now.date, floor, offering_id, now.stamp] : [now.date, floor, now.stamp]))
 }
 
 // Durable auto-release: expired confirmed → no_show. Idempotent, one UPDATE.
@@ -92213,6 +92251,24 @@ function rstRef(): string {
   return 'RST-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, 'X')
 }
 
+// Idempotency: a client request_id (one per user action, reused only when retrying that
+// same attempt) maps deterministically to the booking reference, so a retry after a network
+// error finds the booking it already made. Returns null when no usable request_id was sent.
+async function rstRefFromRequest(v: any): Promise<string | null> {
+  const id = typeof v === 'string' ? v.trim() : ''
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) return null
+  const buf = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('rst-request:' + id)))
+  let hex = ''
+  for (let i = 0; i < 10; i++) hex += buf[i].toString(16).padStart(2, '0')
+  // 80 bits as 16 base-32 characters (0-9 A-V): RST-XXXXXXXX-XXXXXXXX (never the shape rstRef makes).
+  let bits = ''
+  for (const ch of hex) bits += parseInt(ch, 16).toString(2).padStart(4, '0')
+  let out = ''
+  for (let i = 0; i < 80; i += 5) out += parseInt(bits.slice(i, i + 5), 2).toString(32)
+  out = out.toUpperCase()
+  return 'RST-' + out.slice(0, 8) + '-' + out.slice(8, 16)
+}
+
 function rstCode(): string {
   return 'R' + Math.floor(10000 + Math.random() * 90000)
 }
@@ -92243,13 +92299,39 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
   const staff = src === 'guest' ? null : rstStaffName(input.staff_name)
   const codes = [rstCode(), rstCode(), rstCode(), rstCode(), rstCode(), rstCode()]
   const codeFloor = addDaysYmd(now.date, -30)
+  // Walk-ins never dedupe (the Ops UI's busy flag blocks double taps).
+  const reqRef = src === 'walk_in' ? null : await rstRefFromRequest(input.request_id)
   const ctx = await rstLoad(DB, oid, date, now, [
     DB.prepare('SELECT offering_id, property_id, title_en FROM hotel_offerings WHERE offering_id = ?').bind(oid),
-    DB.prepare(`SELECT booking_code FROM restaurant_bookings WHERE booking_code IN (?, ?, ?, ?, ?, ?) AND booking_date >= ?`).bind(...codes, codeFloor)
+    DB.prepare(`SELECT booking_code FROM restaurant_bookings WHERE booking_code IN (?, ?, ?, ?, ?, ?) AND booking_date >= ?`).bind(...codes, codeFloor),
+    DB.prepare('SELECT * FROM restaurant_bookings WHERE booking_reference = ?').bind(reqRef || '~')
   ])
   const s = ctx.settings
   const off: any = rstRows(ctx.extra[0])[0]
   if (!s || !off) return rstErr(404, 'not_enabled', 'Table booking is not available for this restaurant')
+  // The same request already went through (retry after a lost response): answer with that booking.
+  const dupOf = (row: any) => {
+    if (!row || Number(row.offering_id) !== oid) {
+      return rstErr(409, 'duplicate_request', 'This request was already used — please try again')
+    }
+    const t2 = ctx.tablesById[Number(row.table_id)] || {}
+    const sl2 = ctx.slotsById[Number(row.slot_id)] || {}
+    return {
+      status: 200,
+      body: {
+        success: true, duplicate: true,
+        booking: {
+          ...rstBookingView({ ...row, booking_id: Number(row.booking_id), party_size: Number(row.party_size) || 0, table_number: t2.table_number || null }, s, now),
+          restaurant_name: off.title_en || null, meal: sl2.meal || null, label: sl2.label || null,
+          table_name: t2.table_name || null, capacity: t2.capacity || null, zone_code: t2.zone_code || null,
+          zone_name: t2.zone_name || null, is_outdoor: t2.is_outdoor || 0,
+          grace_minutes: s.grace_minutes, auto_release: s.auto_release
+        }
+      }
+    }
+  }
+  const prior: any = reqRef ? rstRows(ctx.extra[2])[0] : null
+  if (prior) return dupOf(prior)
   if (guestSrc && s.guest_booking_enabled !== 1) {
     return rstErr(403, 'booking_disabled', 'Online table booking is not open yet — please contact the restaurant or reception')
   }
@@ -92264,6 +92346,10 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
   if (!rstSlotRuns(slot, date)) return rstErr(400, 'slot_not_running', (slot.label || 'This slot') + ' does not run on that day')
   if (date < now.date) return rstErr(400, 'invalid_date', 'That date has passed')
   if (src === 'walk_in' && date !== now.date) return rstErr(400, 'invalid_date', 'Walk-ins can only be seated today')
+  // A walk-in sits down now: only the current slot or a later one of today (an ended slot would not hold the table).
+  if (src === 'walk_in' && now.min >= rstMinutes(slot.end_time)) {
+    return rstErr(400, 'slot_ended', (slot.label || 'That slot') + ' has already ended — seat the walk-in in the current slot', { current_slot_id: rstCurrentSlotId(ctx.slots, date, now) })
+  }
   if (guestSrc) {
     const win = Math.max(0, s.booking_window_days)
     if (date > addDaysYmd(now.date, win)) {
@@ -92303,12 +92389,6 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
   const freeCodes = codes.filter((x) => !takenCodes.has(x))
   const status = src === 'walk_in' ? 'checked_in' : 'confirmed'
   const gname = name || (src === 'walk_in' ? 'Walk-in' : (room ? 'Room ' + room : 'Guest'))
-  // Double-tap / resubmit of the same request inside a minute returns the first booking.
-  const dupSql = `SELECT d.* FROM restaurant_bookings d
-    WHERE d.offering_id = ? AND d.booking_date = ? AND d.slot_id = ? AND LOWER(TRIM(COALESCE(d.room_number, ''))) = LOWER(?)
-      AND d.party_size = ? AND COALESCE(d.guest_name, '') = ? AND d.status IN ('confirmed', 'checked_in')
-      AND d.created_at >= datetime('now', '-60 seconds')`
-  const dupBinds = [oid, date, slot.slot_id, room, party, gname]
   // Binds: table, date, new end + buffer, new start, now stamp.
   const conflictSql = `SELECT 1 FROM restaurant_bookings o
     WHERE o.table_id = ? AND o.booking_date = ? AND o.status IN ('confirmed', 'checked_in')
@@ -92318,7 +92398,7 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
   const tries = Math.min(2, cands.length)
   for (let i = 0; i < tries; i++) {
     const t = cands[i]
-    const ref = rstRef()
+    const ref = reqRef || rstRef()
     const code = freeCodes[i] || rstCode()
     const r: any = await DB.prepare(`
       INSERT INTO restaurant_bookings (
@@ -92330,7 +92410,7 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
       WHERE EXISTS (SELECT 1 FROM restaurant_tables t WHERE t.table_id = ? AND t.offering_id = ? AND t.is_active = 1 AND t.capacity >= ?)
         AND NOT EXISTS (${conflictSql})
         AND NOT EXISTS (SELECT 1 FROM restaurant_bookings k WHERE k.booking_code = ? AND k.booking_date >= ?)
-        ${room ? `AND NOT EXISTS (${dupSql})` : ''}
+        AND NOT EXISTS (SELECT 1 FROM restaurant_bookings WHERE booking_reference = ?)
     `).bind(
       ref, code, oid, off.property_id, slot.slot_id, date, win.start_time, win.end_time,
       win.buffer_minutes, t.table_id, t.zone_id, party, gname, room || null, phone || null, requests || null,
@@ -92338,7 +92418,7 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
       t.table_id, oid, party,
       t.table_id, date, aEndBuf, aStart, now.stamp,
       code, codeFloor,
-      ...(room ? dupBinds : [])
+      ref
     ).run()
     if (r && r.meta && r.meta.changes) {
       const st = rstMinutes(win.start_time)
@@ -92358,24 +92438,10 @@ async function rstCreate(env: any, oid: number, input: any): Promise<{ status: n
         }
       }
     }
-    if (room) {
-      const dup: any = await DB.prepare(dupSql + ' ORDER BY d.booking_id LIMIT 1').bind(...dupBinds).first()
-      if (dup) {
-        const t2 = ctx.tablesById[Number(dup.table_id)] || {}
-        return {
-          status: 200,
-          body: {
-            success: true, duplicate: true,
-            booking: {
-              ...rstBookingView({ ...dup, table_number: t2.table_number || null }, s, now),
-              restaurant_name: off.title_en || null, meal: slot.meal, label: slot.label,
-              table_name: t2.table_name || null, capacity: t2.capacity || null, zone_code: t2.zone_code || null,
-              zone_name: t2.zone_name || null, is_outdoor: t2.is_outdoor || 0,
-              grace_minutes: s.grace_minutes, auto_release: s.auto_release
-            }
-          }
-        }
-      }
+    if (reqRef) {
+      // A concurrent copy of this request won the insert: return that booking.
+      const dup: any = await DB.prepare('SELECT * FROM restaurant_bookings WHERE booking_reference = ?').bind(reqRef).first()
+      if (dup) return dupOf(dup)
     }
     if (explicit) break
   }
@@ -92394,8 +92460,10 @@ function rstChoice(b: any, s: any, now: any) {
 }
 
 // Check a loaded booking in (optionally onto another table). Guarded: the
-// target table must be free of other holding bookings for its time.
-async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo: number) {
+// target table must be big enough and free of other holding bookings for its time.
+// slotTo: seat a booking from another slot of today NOW — it is moved into that slot
+// (slot_id/start/end/buffer re-snapshotted) so its table is held in the slot being served.
+async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo: number, slotTo?: any) {
   const s = ctx.settings, now = ctx.now
   if (booking.status === 'checked_in' || booking.status === 'completed') {
     return { status: 200, body: { success: true, already: true, booking: rstBookingView(booking, s, now) } }
@@ -92403,31 +92471,55 @@ async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo
   if (booking.status !== 'confirmed' && booking.status !== 'no_show') {
     return rstErr(409, 'not_checkable', 'This booking can no longer be checked in')
   }
-  const suggest = () => {
-    const alt = rstCandidates(ctx, booking, booking.party_size, booking.zone_code, false, booking.booking_id)
-      .filter((t: any) => t.table_id !== booking.table_id)
-    return { suggest_table_id: alt[0] ? alt[0].table_id : null, suggest_table_number: alt[0] ? alt[0].table_number : null }
-  }
+  const reslot = !!slotTo && slotTo.slot_id !== booking.slot_id
+  const win = reslot
+    ? { start_time: slotTo.start_time, end_time: slotTo.end_time, buffer_minutes: Number(slotTo.buffer_minutes) || 0 }
+    : { start_time: booking.start_time, end_time: booking.end_time, buffer_minutes: Number(booking.buffer_minutes) || 0 }
+  const party = Number(booking.party_size) || 1
   const targetId = moveTo || booking.table_id || 0
   const target = targetId ? ctx.tables.find((t: any) => t.table_id === targetId) : null
   if (moveTo && !target) return rstErr(400, 'invalid_table', 'That table does not exist or is not in use')
-  if (moveTo && target.capacity < booking.party_size) {
-    return rstErr(400, 'table_too_small', 'Table ' + target.table_number + ' seats ' + target.capacity + ' — too small for ' + booking.party_size)
+  if (moveTo && target.capacity < party) {
+    return rstErr(400, 'table_too_small', 'Table ' + target.table_number + ' seats ' + target.capacity + ' — too small for ' + party)
   }
-  const free = !!target && rstCandidates(ctx, booking, 1, null, false, booking.booking_id).some((t: any) => t.table_id === target.table_id)
+  const suggest = () => {
+    const alt = rstCandidates(ctx, win, party, booking.zone_code, false, booking.booking_id)
+      .filter((t: any) => t.table_id !== targetId)
+    return { suggest_table_id: alt[0] ? alt[0].table_id : null, suggest_table_number: alt[0] ? alt[0].table_number : null }
+  }
+  // The table may have been made smaller since (e.g. after the booking was auto-released).
+  const tooSmall = !!target && target.capacity < party
+  const free = !!target && !tooSmall && rstCandidates(ctx, win, 1, null, false, booking.booking_id).some((t: any) => t.table_id === target.table_id)
   const takenMsg = () => {
     const sg = suggest()
     const tn = target ? target.table_number : booking.table_number
-    return rstErr(409, 'table_taken', (tn ? 'Table ' + tn : 'Their table') + ' has been given to another guest' +
-      (sg.suggest_table_number ? ' — seat them at table ' + sg.suggest_table_number : ' and no other table for ' + booking.party_size + ' is free right now'), sg)
+    const why = tooSmall
+      ? 'Table ' + tn + ' now seats only ' + target.capacity
+      : (tn ? 'Table ' + tn : 'Their table') + ' has been given to another guest' + (reslot ? ' in ' + (slotTo.label || 'this slot') : '')
+    return rstErr(409, 'table_taken', why +
+      (sg.suggest_table_number ? ' — seat them at table ' + sg.suggest_table_number : ' and no other table for ' + party + ' is free right now'),
+      { ...sg, booking_reference: booking.booking_reference, booking: rstChoice(booking, s, now) })
   }
   if (!free) return takenMsg()
+  const aStart = rstMinutes(win.start_time), aEndBuf = rstMinutes(win.end_time) + win.buffer_minutes
+  // Same guard as rstFreeSql but against the (possibly new) window, plus the table's current capacity.
   const r: any = await DB.prepare(`
     UPDATE restaurant_bookings
     SET status = 'checked_in', table_id = ?, zone_id = ?, checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?,
-        auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP
-    WHERE booking_id = ? AND status IN ('confirmed', 'no_show') AND ${rstFreeSql('?')}
-  `).bind(target.table_id, target.zone_id, staff, booking.booking_id, target.table_id, now.stamp).run()
+        auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP,
+        slot_id = ?, start_time = ?, end_time = ?, buffer_minutes = ?
+    WHERE booking_id = ? AND status IN ('confirmed', 'no_show')
+      AND party_size <= (SELECT t.capacity FROM restaurant_tables t WHERE t.table_id = ? AND t.is_active = 1)
+      AND NOT EXISTS (SELECT 1 FROM restaurant_bookings o
+        WHERE o.table_id = ? AND o.booking_date = restaurant_bookings.booking_date
+          AND o.booking_id != restaurant_bookings.booking_id AND o.status IN ('confirmed', 'checked_in')
+          AND ${RST_MIN('o.start_time')} < ? AND ? < ${RST_MIN('o.end_time')} + COALESCE(o.buffer_minutes, 0)
+          AND ${rstHoldSql('o')})
+  `).bind(
+    target.table_id, target.zone_id, staff,
+    reslot ? slotTo.slot_id : booking.slot_id, win.start_time, win.end_time, win.buffer_minutes,
+    booking.booking_id, target.table_id, target.table_id, aEndBuf, aStart, now.stamp
+  ).run()
   if (!r || !r.meta || !r.meta.changes) {
     const cur: any = await DB.prepare('SELECT status, checked_in_at, checked_in_by FROM restaurant_bookings WHERE booking_id = ?').bind(booking.booking_id).first()
     if (cur && cur.status === 'checked_in') {
@@ -92440,9 +92532,20 @@ async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo
   const updated = {
     ...booking, status: 'checked_in', table_id: target.table_id, table_number: target.table_number, zone_id: target.zone_id,
     zone_code: target.zone_code, zone_name: target.zone_name, capacity: target.capacity,
-    checked_in_at: nowUtc, checked_in_by: staff, auto_released: 0, released_at: null
+    checked_in_at: nowUtc, checked_in_by: staff, auto_released: 0, released_at: null,
+    ...(reslot ? {
+      slot_id: slotTo.slot_id, start_time: win.start_time, end_time: win.end_time, buffer_minutes: win.buffer_minutes,
+      meal: slotTo.meal || null, slot_label: slotTo.label || null
+    } : {})
   }
-  return { status: 200, body: { success: true, revived, moved: target.table_id !== booking.table_id, booking: rstBookingView(updated, s, now) } }
+  return {
+    status: 200,
+    body: {
+      success: true, revived, moved: target.table_id !== booking.table_id, reslotted: reslot,
+      from_slot_label: reslot ? (booking.slot_label || booking.start_time) : undefined,
+      booking: rstBookingView(updated, s, now)
+    }
+  }
 }
 
 // ── Public (guest) API ──
@@ -92477,19 +92580,23 @@ app.post('/api/restaurant-module/booking/:reference/cancel', async (c) => {
     const ref = String(c.req.param('reference') || '').trim()
     const b: any = await c.req.json().catch(() => ({}))
     const room = rstText(b && b.room_number, 20)
-    const res = await DB.batch([
+    // Room check uses the same key as the Ops app (rstRoomNorm), so compare in JS: read, then a guarded UPDATE.
+    const cur: any = await DB.prepare('SELECT booking_reference, status, room_number FROM restaurant_bookings WHERE booking_reference = ?').bind(ref).first()
+    if (!cur) return c.json({ success: false, error: 'not_found', message: 'Booking not found' }, 404)
+    if (cur.status === 'confirmed' && room && rstRoomNorm(cur.room_number) !== rstRoomNorm(room)) {
+      return c.json({ success: false, error: 'room_mismatch', message: 'The room number does not match this booking' }, 403)
+    }
+    const res = cur.status !== 'confirmed' ? null : await DB.batch([
       DB.prepare(`
         UPDATE restaurant_bookings SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-        WHERE booking_reference = ? AND status = 'confirmed' AND (? = '' OR LOWER(TRIM(COALESCE(room_number, ''))) = LOWER(?))
-      `).bind(ref, room, room),
+        WHERE booking_reference = ? AND status = 'confirmed'
+      `).bind(ref),
       DB.prepare('SELECT booking_reference, status, room_number FROM restaurant_bookings WHERE booking_reference = ?').bind(ref)
     ])
-    const changed = (res[0] && res[0].meta && res[0].meta.changes) || 0
-    const row: any = rstRows(res[1])[0]
-    if (!row) return c.json({ success: false, error: 'not_found', message: 'Booking not found' }, 404)
+    const changed = (res && res[0] && res[0].meta && res[0].meta.changes) || 0
+    const row: any = (res && rstRows(res[1])[0]) || cur
     if (changed) return c.json({ success: true, booking_reference: ref, status: 'cancelled' })
     if (row.status === 'cancelled') return c.json({ success: true, already: true, booking_reference: ref, status: 'cancelled' })
-    if (row.status === 'confirmed') return c.json({ success: false, error: 'room_mismatch', message: 'The room number does not match this booking' }, 403)
     const msg = row.status === 'checked_in' || row.status === 'completed' ? 'This booking has already been seated' : 'This booking was released after the grace period and can no longer be cancelled'
     return c.json({ success: false, error: 'not_cancellable', status: row.status, message: msg }, 409)
   } catch (e) {
@@ -92933,7 +93040,7 @@ app.get('/api/admin/restaurant-module/:offering_id', requirePermission('restaura
     const res = await DB.batch([
       rstOwnStmt(DB, oid, pid),
       ...rstTotalsStmts(DB, oid),
-      DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND is_active = 1`).bind(oid),
+      DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ?`).bind(oid),
       DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY meal, start_time, display_order, slot_id').bind(oid)
     ])
     const own: any = rstRows(res[0])[0]
@@ -92943,7 +93050,10 @@ app.get('/api/admin/restaurant-module/:offering_id', requirePermission('restaura
     const zById: any = {}
     for (const z of zones) zById[Number(z.zone_id)] = z
     const totals = rstTotalsFrom(res, 1)
-    const tables = rstRows(res[4]).map((t: any) => {
+    const allTableRows = rstRows(res[4])
+    // Removed (soft-deleted) tables keep their numbers reserved (UNIQUE index): Quick fill skips them.
+    const removedNumbers = allTableRows.filter((t: any) => Number(t.is_active) !== 1).map((t: any) => String(t.table_number))
+    const tables = allTableRows.filter((t: any) => Number(t.is_active) === 1).map((t: any) => {
       const z = t.zone_id != null ? zById[Number(t.zone_id)] : null
       return { ...t, zone_code: z ? z.code : null }
     }).sort((a: any, b: any) => rstNumCmp(a.zone_code || '~', b.zone_code || '~') || rstNumCmp(a.table_number, b.table_number))
@@ -92956,6 +93066,7 @@ app.get('/api/admin/restaurant-module/:offering_id', requirePermission('restaura
       settings: rstNormSettings(settingsRow) || { ...RST_DEFAULTS, offering_id: oid },
       zones: zones.map((z: any) => ({ ...z, tables: (totals.by_zone[z.code] || {}).tables || 0, seats: (totals.by_zone[z.code] || {}).seats || 0 })),
       tables,
+      removed_numbers: removedNumbers,
       slots,
       totals,
       slot_warnings: rstSlotWarnings(slots)
@@ -93464,6 +93575,19 @@ async function rstApplySlotUpdate(c: any, oid: number, pid: string, sid: number,
     const h = rstFutureHolds(rstRows(res[2]), s, now, 'slot_id')[sid] || []
     if (h.length) return c.json({ success: false, error: 'has_bookings', count: h.length, bookings: h, message: (slot.label || 'This slot') + ' has ' + h.length + ' upcoming booking(s)' }, 409)
   }
+  // Unticking a weekday hides the slot on that day: guard the upcoming bookings it still has there.
+  if (f.days_mask !== undefined && f.is_active !== 0 && !force) {
+    const mask = Number(f.days_mask)
+    const s = rstNormSettings(rstRows(res[3])[0]) || { ...RST_DEFAULTS }
+    const h = (rstFutureHolds(rstRows(res[2]), s, now, 'slot_id')[sid] || [])
+      .filter((b: any) => (mask & (1 << new Date(b.booking_date + 'T12:00:00Z').getUTCDay())) === 0)
+    if (h.length) {
+      return c.json({
+        success: false, error: 'has_bookings', days_mask: true, count: h.length, bookings: h,
+        message: (slot.label || 'This slot') + ' has ' + h.length + ' upcoming booking(s) on the day(s) you removed'
+      }, 409)
+    }
+  }
   const keys = Object.keys(f)
   const stmts: any[] = []
   if (keys.length) {
@@ -93567,8 +93691,9 @@ app.post('/api/staff/restaurant/arrive', async (c) => {
       booking = ctx.bookings.find((x: any) => x.booking_id === targetId)
       if (!booking) return c.json({ success: false, error: 'not_found', message: 'No booking found for that code' }, 404)
     } else {
-      const key = rstKey(room)
-      const mine = ctx.bookings.filter((x: any) => rstKey(x.room_number) === key)
+      const key = rstRoomNorm(room)
+      if (!key) return c.json({ success: false, error: 'missing', message: 'Enter a room number' }, 400)
+      const mine = ctx.bookings.filter((x: any) => rstRoomNorm(x.room_number) === key)
       if (!mine.length) return c.json({ success: false, error: 'not_found', message: 'No booking for room ' + room + ' on ' + attNiceDate(date) }, 404)
       const slotId = rstId(b.slot_id) || rstCurrentSlotId(ctx.slots, date, now)
       const inSlot = mine.filter((x: any) => x.slot_id === slotId)
@@ -93599,7 +93724,19 @@ app.post('/api/staff/restaurant/arrive', async (c) => {
       }
       booking = pick[0]
     }
-    const r = await rstCheckIn(DB, ctx, booking, staff, rstId(b.table_id))
+    // Seating a booking of another slot of today now (late, or early outside its own grace
+    // window): move it into the slot being served so its table is held there.
+    let slotTo: any = null
+    if (date === now.date) {
+      const curId = rstCurrentSlotId(ctx.slots, date, now)
+      const cur = curId ? ctx.slots.find((x: any) => x.slot_id === curId) : null
+      if (cur && cur.slot_id !== booking.slot_id && now.min < rstMinutes(cur.end_time)) {
+        const bStart = rstMinutes(booking.start_time)
+        const earlyForOwn = !isNaN(bStart) && now.min < bStart && bStart - now.min <= Math.max(10, Number(ctx.settings.grace_minutes) || 0)
+        if (!earlyForOwn) slotTo = cur
+      }
+    }
+    const r = await rstCheckIn(DB, ctx, booking, staff, rstId(b.table_id), slotTo)
     return c.json(r.body, r.status as any)
   } catch (e) {
     console.error('restaurant arrive', e)
