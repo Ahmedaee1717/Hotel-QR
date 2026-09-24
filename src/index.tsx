@@ -52638,6 +52638,150 @@ app.get('/staff/app', (c) => {
         .bch-dlg input:focus{outline:none;border-color:var(--gold)}
         .bch-dlg .row{display:flex;gap:8px;margin-top:14px}
         .bch-dlg .row button{flex:1;margin-top:0}
+
+        /* ── Restaurant ── */
+        .rst-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+        .rst-walk{flex-shrink:0;border:none;border-radius:999px;padding:11px 16px;font-weight:800;font-size:.78rem;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer;font-family:inherit;white-space:nowrap}
+        .rst-walk.off{opacity:.45}
+        .rst-slots{position:relative;display:flex;gap:12px;margin-bottom:12px;padding-top:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .rst-slots::-webkit-scrollbar{display:none}
+        .rst-meal{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+        .rst-meal > small{font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold2);font-weight:800;padding-left:4px}
+        .rst-meal > div{display:flex;gap:6px}
+        .rst-slot{position:relative;min-width:96px;min-height:54px;padding:7px 12px;border-radius:14px;border:1px solid rgba(212,175,55,.3);background:rgba(250,246,236,.05);color:var(--dim);font-weight:700;font-size:.8rem;cursor:pointer;line-height:1.15;text-align:left;font-family:inherit}
+        .rst-slot small{display:block;font-size:.64rem;font-weight:600;opacity:.9;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+        .rst-slot small.fr{color:#6ee7b7}
+        .rst-slot small.full{color:#fda4af}
+        .rst-slot.on{background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold2)}
+        .rst-slot.past{opacity:.55}
+        .rst-now{position:absolute;top:-8px;right:6px;font-style:normal;font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;background:#34d399;color:#04310f;border-radius:999px;padding:2px 7px}
+        .rst-now.next{background:var(--gold2);color:#231307}
+        .rst-none{font-size:.78rem;color:var(--dim);padding:10px 4px}
+        .rst-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:12px}
+        .rst-st{grid-column:span 2;background:rgba(250,246,236,.05);border:1px solid rgba(212,175,55,.22);border-radius:14px;padding:10px 4px 9px;text-align:center;min-width:0}
+        .rst-st.big{grid-column:span 3}
+        .rst-st b{display:block;font-size:1.9rem;line-height:1.05;font-weight:800;font-variant-numeric:tabular-nums;color:var(--txt)}
+        .rst-st.big b{font-size:2.6rem}
+        .rst-st span{display:block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .rst-st em{display:block;font-style:normal;font-size:.62rem;color:var(--dim);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:1em}
+        .rst-st.free b{color:#6ee7b7}
+        .rst-st.bk b{color:var(--gold2)}
+        .rst-st.seat b{color:#5eead4}
+        .rst-st.rel b{color:#cbd5e1}
+        .rst-stats.stale b{opacity:.35}
+        .rst-meta{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+        .rst-zones{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+        .rst-zones::-webkit-scrollbar{display:none}
+        .rst-z{flex-shrink:0;display:flex;align-items:center;gap:7px;min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid rgba(212,175,55,.3);background:rgba(250,246,236,.05);color:var(--dim);font-weight:700;font-size:.76rem;cursor:pointer;font-family:inherit;white-space:nowrap}
+        .rst-z i{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+        .rst-z em{font-style:normal;font-weight:600;font-size:.64rem;color:#6ee7b7}
+        .rst-z.on{background:rgba(212,175,55,.18);border-color:var(--gold);color:var(--gold2)}
+        .rst-split{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"room" "map" "list";gap:14px}
+        .rst-roomwrap{grid-area:room;min-width:0}
+        .rst-mapwrap{grid-area:map;background:rgba(250,246,236,.04);border:1px solid rgba(212,175,55,.25);border-radius:16px;padding:12px;min-width:0;scroll-margin-top:76px}
+        .rst-listwrap{grid-area:list;min-width:0}
+        .rst-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:8px;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+        .rst-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+        .rst-legend .free{background:rgba(52,211,153,.22);box-shadow:inset 0 0 0 2px #34d399}
+        .rst-legend .booked{background:#D4AF37}
+        .rst-legend .seated{background:#14b8a6}
+        .rst-legend .released{background:rgba(156,163,175,.25);box-shadow:inset 0 0 0 1.5px #9ca3af}
+        .rst-zhead{display:flex;align-items:center;gap:8px;margin:14px 2px 6px;font-size:.74rem;font-weight:800;letter-spacing:.04em;color:var(--txt)}
+        .rst-zhead:first-child{margin-top:0}
+        .rst-zhead i{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+        .rst-zhead span{font-weight:600;color:var(--dim);margin-left:auto;font-size:.66rem;text-align:right}
+        .rst-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+        .rst-canvas{position:relative;width:100%;aspect-ratio:16/10;border-radius:12px;border:1px solid rgba(212,175,55,.3);background:repeating-linear-gradient(0deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),repeating-linear-gradient(90deg,rgba(250,246,236,.035) 0 1px,transparent 1px 28px),#1b1015;container-type:inline-size;overflow:hidden}
+        @supports not (aspect-ratio:16/10){ .rst-canvas{padding-top:62.5%} }
+        .rst-layer{position:absolute;inset:0}
+        /* Phones: tables keep a tappable size and the floor swipes sideways instead of shrinking */
+        @media(max-width:819px){ .rst-canvas{min-width:560px} }
+        .rst-t{position:absolute;padding:0;margin:0;border:none;background:none;cursor:pointer;font-family:inherit;color:#d1fae5;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+        .rst-t .sh{position:absolute;inset:0;border-radius:9px;background:rgba(52,211,153,.2);border:2px solid #34d399;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+        .rst-t.circle .sh{border-radius:50%}
+        .rst-t .lb{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;line-height:1.05;pointer-events:none}
+        .rst-t .lb b{font-size:11px;font-size:clamp(9px,2.3cqw,20px);font-weight:800}
+        .rst-t .lb small{font-size:9px;font-size:clamp(8px,1.6cqw,14px);font-weight:700;opacity:.9}
+        .rst-t .lb small i{font-size:.8em;margin-right:2px}
+        .rst-t.booked{color:#231307}
+        .rst-t.booked .sh{background:linear-gradient(135deg,#f0d98c,#D4AF37);border-color:#f6e7ae}
+        .rst-t.seated{color:#042f2e}
+        .rst-t.seated .sh{background:#14b8a6;border-color:#5eead4}
+        .rst-t.released{color:#d1d5db}
+        .rst-t.released .sh{background:rgba(156,163,175,.2);border:2px dashed #9ca3af}
+        .rst-t.released .lb b{text-decoration:line-through}
+        .rst-t.hit .sh{box-shadow:0 0 0 3px #60a5fa,0 0 16px rgba(96,165,250,.85)}
+        .rst-t.nofit{opacity:.22}
+        .rst-t.fit .sh{animation:rstPulse 1.2s ease-in-out infinite}
+        @keyframes rstPulse{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.75)}50%{box-shadow:0 0 0 7px rgba(52,211,153,0)}}
+        .rst-gr{position:absolute;transform:translateX(-50%);margin-top:3px;white-space:nowrap;font-size:8px;font-size:clamp(7px,1.3cqw,12px);font-weight:700;color:var(--gold2);background:rgba(18,10,14,.85);border-radius:6px;padding:1px 5px;pointer-events:none}
+        .rst-canvas.stale .rst-t{opacity:.35;pointer-events:none}
+        .rst-canvas.stale .rst-gr{display:none}
+        .rst-pick{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:10px 12px;border-radius:12px;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.45);color:#a7f3d0;font-size:.8rem;font-weight:700}
+        .rst-pick button{margin-left:auto;flex-shrink:0}
+        .rst-room{background:linear-gradient(160deg,rgba(52,29,39,.72),rgba(26,14,19,.92));border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:12px}
+        .rst-rhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);font-weight:800}
+        .rst-rline{display:flex;gap:8px}
+        .rst-rin{flex:1;min-width:0;height:62px;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.4);border-radius:14px;padding:0 14px;color:var(--txt);font-size:2rem;font-weight:800;letter-spacing:.08em;font-family:inherit;font-variant-numeric:tabular-nums}
+        .rst-rin:focus{outline:none;border-color:var(--gold)}
+        .rst-rin::placeholder{color:rgba(246,240,227,.3);font-size:1.1rem;letter-spacing:0;font-weight:600}
+        .rst-arr{flex-shrink:0;min-width:116px;height:62px;border:none;border-radius:14px;font-weight:800;font-size:1rem;background:linear-gradient(135deg,#e9cd76,#D4AF37 45%,#b08c2c);color:#231307;cursor:pointer;font-family:inherit}
+        .rst-arr:disabled{opacity:.5;cursor:default}
+        .rst-rhint{font-size:.74rem;color:var(--dim);margin:8px 2px 0;min-height:1.1em}
+        .rst-rhint b{color:var(--txt)}
+        .rst-pad{display:none;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+        .rst-pad.open{display:grid}
+        .rst-pad button{height:58px;border-radius:14px;border:1px solid rgba(212,175,55,.3);background:rgba(250,246,236,.06);color:var(--txt);font-size:1.55rem;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+        .rst-pad button:active{background:rgba(212,175,55,.28)}
+        .rst-pad button.fn{font-size:.95rem;color:var(--gold2)}
+        .rst-padtog{border:1px solid rgba(212,175,55,.4);background:rgba(212,175,55,.1);color:var(--gold2);border-radius:999px;padding:6px 12px;font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;font-family:inherit}
+        .rst-count{font-size:.66rem;color:var(--dim);margin:0 4px 8px;min-height:1px}
+        .rst-row{display:grid;grid-template-columns:58px minmax(0,1fr);gap:6px 12px;padding:12px;border:1px solid rgba(212,175,55,.2);border-radius:14px;margin-bottom:8px;background:rgba(250,246,236,.03);cursor:pointer}
+        .rst-row .tb{width:58px;min-height:50px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:1rem;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.45);color:var(--gold2);text-align:center;line-height:1.1;padding:4px 2px;word-break:break-all}
+        .rst-row .tb em{font-style:normal;font-size:.5rem;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;color:var(--txt);opacity:.8}
+        .rst-row.seated .tb{background:rgba(45,212,191,.16);border-color:rgba(45,212,191,.55);color:#5eead4}
+        .rst-row.released .tb,.rst-row.noshow .tb,.rst-row.left .tb{background:rgba(156,163,175,.12);border-color:rgba(156,163,175,.45);color:#cbd5e1}
+        .rst-row.released .tb b{text-decoration:line-through}
+        .rst-row.hit{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.35) inset;background:rgba(212,175,55,.08)}
+        .rst-row .who{min-width:0}
+        .rst-row .who b{display:block;font-size:1rem;font-weight:700;overflow-wrap:anywhere}
+        .rst-row .who span{display:block;font-size:.72rem;color:var(--dim);margin-top:2px}
+        .rst-row .acts{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+        .bb.rst-rel{background:none;color:#5eead4;border:1px solid rgba(45,212,191,.45)}
+        .stt.seat{color:#5eead4!important}
+        .stt.rel{color:#cbd5e1!important}
+        .rst-upd{font-size:.6rem;color:var(--dim);text-align:center;margin-top:10px;letter-spacing:.04em}
+        #rstSheet{position:fixed;inset:0;z-index:480;background:rgba(8,4,6,.72);display:none;align-items:flex-end}
+        #rstSheet.open{display:flex}
+        .rst-tstate{display:inline-block;font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;margin-bottom:14px;background:rgba(52,211,153,.14);color:#6ee7b7;border:1px solid rgba(52,211,153,.4)}
+        .rst-tstate.booked{background:rgba(212,175,55,.16);color:var(--gold2);border-color:rgba(212,175,55,.5)}
+        .rst-tstate.seated{background:rgba(45,212,191,.14);color:#5eead4;border-color:rgba(45,212,191,.45)}
+        .rst-tstate.released{background:rgba(156,163,175,.14);color:#cbd5e1;border-color:rgba(156,163,175,.45)}
+        .rst-step{display:flex;align-items:center;justify-content:center;gap:18px;margin:4px 0 16px}
+        .rst-step button{width:64px;height:64px;border-radius:50%;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.1);color:var(--gold2);font-size:1.7rem;font-weight:800;cursor:pointer;font-family:inherit;touch-action:manipulation}
+        .rst-step button:disabled{opacity:.35}
+        .rst-step div{min-width:86px;text-align:center}
+        .rst-step b{display:block;font-size:3rem;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+        .rst-step small{display:block;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-top:4px}
+        .rst-fld{display:block;margin-bottom:10px}
+        .rst-fld small{display:block;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+        .rst-fld input{width:100%;background:rgba(250,246,236,.07);border:1px solid rgba(212,175,55,.35);border-radius:12px;padding:13px 14px;color:var(--txt);font-size:1rem;font-family:inherit}
+        .rst-fld input:focus{outline:none;border-color:var(--gold)}
+        .rst-fit{font-size:.8rem;color:var(--dim);text-align:center;margin:4px 0 12px}
+        .rst-fit.bad{color:#fda4af}
+        #rstPanel .bk-cta + .bk-cta{margin-top:10px}
+        @media(min-width:820px){
+          .rst-stats{grid-template-columns:repeat(5,minmax(0,1fr))}
+          .rst-st,.rst-st.big{grid-column:auto}
+          .rst-st b,.rst-st.big b{font-size:3rem}
+          .rst-st span{font-size:.68rem}
+          .rst-split{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"map room" "map list";grid-template-rows:auto 1fr;align-items:start}
+          .rst-mapwrap{position:sticky;top:76px}
+          .rst-pad{display:grid}
+          .rst-padtog{display:none}
+          .rst-pad button{height:62px}
+          #rstSheet{align-items:center;justify-content:center}
+        }
         /* incoming-call ring bar */
         #ringBar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:none;align-items:center;gap:10px;padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(135deg,#b3122f,#7d0a20);box-shadow:0 -10px 30px rgba(0,0,0,.6);animation:ringPulse 1s ease-in-out infinite}
         #ringBar.show{display:flex}
@@ -52661,6 +52805,7 @@ app.get('/staff/app', (c) => {
         <div class="tabs">
             <button class="tab on" data-tab="chats"><i class="fas fa-comments"></i> Chats <span class="dot" id="dotChats"></span></button>
             <button class="tab" data-tab="beach"><i class="fas fa-umbrella-beach"></i> Beach</button>
+            <button class="tab" data-tab="rest"><i class="fas fa-utensils"></i> Restaurant</button>
         </div>
         <div id="listChats"><div class="empty">Loading…</div></div>
 
@@ -52710,6 +52855,77 @@ app.get('/staff/app', (c) => {
                     <div class="bch-upd" id="bchUpd"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- RESTAURANT: El Kasr live floor, arrivals by room number and walk-ins (phone + tablet) -->
+        <div id="listRest" style="display:none">
+            <div class="rst-bar">
+                <button type="button" class="bch-nav" data-ract="day" data-d="-1" aria-label="Previous day"><i class="fas fa-chevron-left"></i></button>
+                <div class="bch-date"><span id="rstDateLabel">Today</span><small id="rstDateSub"></small></div>
+                <button type="button" class="bch-nav" data-ract="day" data-d="1" aria-label="Next day"><i class="fas fa-chevron-right"></i></button>
+                <button type="button" class="rst-walk" id="rstWalkBtn" data-ract="walkin"><i class="fas fa-person-walking"></i> Walk-in</button>
+            </div>
+
+            <div class="rst-slots" id="rstSlots" aria-label="Time slot"></div>
+
+            <div class="rst-stats" id="rstStats">
+                <div class="rst-st big free"><b id="rstFreeChairs">–</b><span>Free chairs</span><em id="rstFreeChairsSub"></em></div>
+                <div class="rst-st big free"><b id="rstFreeTables">–</b><span>Free tables</span><em id="rstFreeTablesSub"></em></div>
+                <div class="rst-st bk"><b id="rstBooked">–</b><span>Booked</span><em id="rstBookedSub"></em></div>
+                <div class="rst-st seat"><b id="rstSeated">–</b><span>Seated</span><em id="rstSeatedSub"></em></div>
+                <div class="rst-st rel"><b id="rstReleased">–</b><span>Released</span><em id="rstReleasedSub"></em></div>
+            </div>
+
+            <div class="rst-meta">
+                <button type="button" class="bch-who" data-ract="who"><i class="fas fa-user-check"></i><span id="rstWhoTxt">Set your name</span><em>Change</em></button>
+            </div>
+
+            <div class="rst-zones" id="rstZones"></div>
+
+            <div class="rst-split">
+                <div class="rst-roomwrap">
+                    <div class="rst-room">
+                        <div class="rst-rhead"><span><i class="fas fa-door-open"></i> Arrival by room number</span><button type="button" class="rst-padtog" id="rstPadTog" data-ract="pad">Keypad</button></div>
+                        <div class="rst-rline">
+                            <input id="rstRoom" class="rst-rin" type="text" inputmode="none" autocomplete="off" maxlength="8" placeholder="Room no." aria-label="Room number" enterkeyhint="go">
+                            <button type="button" class="rst-arr" id="rstArriveBtn" data-ract="arrive-room"><i class="fas fa-check"></i> Arrive</button>
+                        </div>
+                        <div class="rst-rhint" id="rstRoomHint"></div>
+                        <div class="rst-pad" id="rstPad">
+                            <button type="button" data-ract="key" data-k="1">1</button>
+                            <button type="button" data-ract="key" data-k="2">2</button>
+                            <button type="button" data-ract="key" data-k="3">3</button>
+                            <button type="button" data-ract="key" data-k="4">4</button>
+                            <button type="button" data-ract="key" data-k="5">5</button>
+                            <button type="button" data-ract="key" data-k="6">6</button>
+                            <button type="button" data-ract="key" data-k="7">7</button>
+                            <button type="button" data-ract="key" data-k="8">8</button>
+                            <button type="button" data-ract="key" data-k="9">9</button>
+                            <button type="button" class="fn" data-ract="key" data-k="clr">Clear</button>
+                            <button type="button" data-ract="key" data-k="0">0</button>
+                            <button type="button" class="fn" data-ract="key" data-k="del" aria-label="Delete"><i class="fas fa-delete-left"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="rst-mapwrap">
+                    <div class="rst-legend">
+                        <span><i class="free"></i>Free</span>
+                        <span><i class="booked"></i>Booked</span>
+                        <span><i class="seated"></i>Seated</span>
+                        <span><i class="released"></i>Released</span>
+                    </div>
+                    <div id="rstPickBar"></div>
+                    <div id="rstMap" class="rst-map"></div>
+                    <p class="bch-hint"><span class="only-phone">Swipe the map sideways · </span>Tap a table to see its booking</p>
+                </div>
+                <div class="rst-listwrap">
+                    <div class="rst-count" id="rstCount"></div>
+                    <div id="rstList"></div>
+                    <div class="rst-upd" id="rstUpd"></div>
+                </div>
+            </div>
+            <!-- Restaurant sheet: z 480 keeps it under the toast (500), the name dialog (895) and the ring bar (900) -->
+            <div id="rstSheet"><div class="bk-panel" id="rstPanel"></div></div>
         </div>
     </div>
 
@@ -52918,8 +53134,10 @@ app.get('/staff/app', (c) => {
             var which = t.dataset.tab;
             document.getElementById('listChats').style.display = which==='chats'?'':'none';
             document.getElementById('listBeach').style.display = which==='beach'?'':'none';
+            var lr=document.getElementById('listRest'); if(lr) lr.style.display = which==='rest'?'':'none';
             if(which==='chats' && chats[0]){ lastSeenChat=chats[0].last_at||''; localStorage.setItem('seenChat',lastSeenChat); document.getElementById('dotChats').classList.remove('show'); }
             if(which==='beach') loadBeach();
+            try{ if(typeof rstTab==='function') rstTab(which==='rest'); }catch(e){}
         };
     });
 
@@ -53596,6 +53814,934 @@ app.get('/staff/app', (c) => {
         scanDet=null;
         var m=document.getElementById('scanManual'); if(m) m.value='';
     };
+
+    // ── Restaurant (El Kasr buffet): live floor, arrivals by room number, walk-ins ──
+    // Self-contained: rst* names, its own [data-ract] listener and its own sheet. This
+    // script also runs the Chats tab and the guest-alert ring, so every entry point is
+    // guarded and a restaurant error must never escape.
+    var RST_OFFERING = (function(){ try{ var v=parseInt(new URLSearchParams(location.search).get('rst')||'',10); return v>0 ? v : 3; }catch(e){ return 3; } })();
+    var RST_MEAL = {breakfast:'Breakfast', lunch:'Lunch', dinner:'Dinner'};
+    var RST_STATES = {free:1, booked:1, seated:1, released:1};
+    var RST_STATE_TXT = {free:'Free', booked:'Booked — waiting for the guests', seated:'Seated', released:'Released — free again'};
+    var rstDateStr = rstToday();
+    var rstLastToday = rstDateStr;
+    var rstData = { slots:[], tables:[], bookings:[], zones:[], settings:{}, current_slot_id:null };
+    var rstSlot = null;          // selected slot_id
+    var rstSlotAuto = true;      // follow the slot in progress until the waiter picks another
+    var rstZone = 'all';
+    var rstSeq = 0, rstBusy = {}, rstLoading = true, rstStale = false, rstLoadedAt = '', rstLoadErr = '';
+    var rstTimer = null;
+    var rstOverride = {};        // table_id -> state after a local action, until the next load
+    var rstSheetKind = '', rstSheetTable = null, rstWalk = null, rstPick = null, rstChoices = null, rstTaken = null;
+    var rstCfg = null, rstCfgTried = false;
+    var rstWhoOrig = null, rstWhoObs = null;
+    var rstArmed = {};
+    var rstSlotsShownFor = null;
+    try{ var rz0=localStorage.getItem('rstZone'); if(rz0) rstZone=rz0; }catch(e){}
+
+    function rstCairo(){
+        var g={};
+        try{
+            new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
+                .formatToParts(new Date()).forEach(function(x){ g[x.type]=x.value; });
+        }catch(e){}
+        if(!g.year || !g.hour){
+            var d=new Date();
+            g={year:String(d.getFullYear()), month:String(d.getMonth()+1).padStart(2,'0'), day:String(d.getDate()).padStart(2,'0'), hour:String(d.getHours()).padStart(2,'0'), minute:String(d.getMinutes()).padStart(2,'0')};
+        }
+        var h = g.hour==='24' ? '00' : g.hour;
+        return { date: g.year+'-'+g.month+'-'+g.day, hm: h+':'+g.minute, min: (+h)*60+(+g.minute) };
+    }
+    function rstToday(){ return rstCairo().date; }
+    function rstNoon(s){ var p=String(s).split('-'); return new Date(Date.UTC(+p[0], +p[1]-1, +p[2], 12)); }
+    function rstShift(s, n){ var d=rstNoon(s); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
+    function rstE(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function rstColor(c){ return /^#[0-9a-fA-F]{3,8}$/.test(String(c||'')) ? String(c) : '#D4AF37'; }
+    function rstMin(t){ var m=/^([0-9]{1,2}):([0-9]{2})/.exec(String(t||'')); return m ? (+m[1])*60+(+m[2]) : null; }
+    function rstHM(n){ n=((n%1440)+1440)%1440; return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0'); }
+    function rstNum(v, d){ var n=parseFloat(v); return isFinite(n) ? n : d; }
+    function rstId(v){ var n=parseInt(v,10); return (v!=null && String(n)===String(v).trim()) ? n : v; }
+    // D1 CURRENT_TIMESTAMP is UTC 'YYYY-MM-DD HH:MM:SS' → Cairo HH:MM
+    function rstUtcHM(s){
+        if(!s) return '';
+        var str=String(s), t=Date.parse(str.replace(' ','T')+(/[zZ]$|[+-][0-9]{2}:?[0-9]{2}$/.test(str) ? '' : 'Z'));
+        if(isNaN(t)) return '';
+        try{ return new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Cairo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(t)); }catch(e){ return ''; }
+    }
+    function rstErr(j, fb){
+        if(j && j.message) return String(j.message);
+        var e = j && j.error ? String(j.error) : '';
+        if(e.indexOf(' ')>=0) return e;
+        var m = {full:'No free table fits that party in this slot', table_taken:'That table is taken for this time', not_found:'No booking found', walk_ins_disabled:'Walk-ins are switched off for this restaurant'};
+        return m[e] || fb;
+    }
+
+    // ── Waiter name: the same once-per-device name and dialog as the Beach tab ──
+    function rstGetName(){
+        try{ if(typeof bchGetName==='function') return String(bchGetName()||'').trim(); }catch(e){}
+        try{ return String(localStorage.getItem('beachStaffName')||'').trim(); }catch(e){ return ''; }
+    }
+    function rstWhoRestore(){
+        try{
+            if(!rstWhoOrig) return;
+            var d=document.getElementById('bchWho'), h=document.getElementById('bchWhoTitle'), p=d ? d.querySelector('p') : null;
+            if(h) h.textContent=rstWhoOrig.h;
+            if(p) p.textContent=rstWhoOrig.p;
+        }catch(e){}
+    }
+    function rstAskName(then){
+        var done=function(n){ rstWhoRestore(); rstWhoLabel(); if(typeof then==='function') then(n); };
+        try{
+            var d=document.getElementById('bchWho'), h=document.getElementById('bchWhoTitle'), p=d ? d.querySelector('p') : null;
+            if(!d || typeof bchAskName!=='function'){ done(rstGetName() || 'Restaurant staff'); return; }
+            if(h && !rstWhoOrig) rstWhoOrig={h:h.textContent, p:p ? p.textContent : ''};
+            if(h) h.textContent='Who is on the restaurant floor?';
+            if(p) p.textContent='Your name is saved on this device and recorded with every arrival, walk-in and no-show.';
+            // The dialog belongs to the Beach tab: put its wording back however it closes
+            if(!rstWhoObs && window.MutationObserver){
+                rstWhoObs=new MutationObserver(function(){ try{ if(!d.classList.contains('open')) rstWhoRestore(); }catch(e){} });
+                rstWhoObs.observe(d, {attributes:true, attributeFilter:['class']});
+            }
+            bchAskName(done);
+        }catch(e){ console.error('restaurant name', e); rstWhoRestore(); }
+    }
+    function rstWithName(fn){ var n=rstGetName(); if(n) fn(n); else rstAskName(fn); }
+    function rstWhoLabel(){
+        var t=document.getElementById('rstWhoTxt'); if(!t) return;
+        var n=rstGetName();
+        t.textContent = n ? n : 'Tap to set your name';
+        var em=t.parentNode ? t.parentNode.querySelector('em') : null;
+        if(em) em.style.display = n ? '' : 'none';
+    }
+
+    // ── Data helpers ──
+    function rstSlotObj(id){ if(id==null) return null; var s=rstData.slots||[]; for(var i=0;i<s.length;i++){ if(String(s[i].slot_id)===String(id)) return s[i]; } return null; }
+    function rstTableById(id){ if(id==null) return null; var t=rstData.tables||[]; for(var i=0;i<t.length;i++){ if(String(t[i].table_id)===String(id)) return t[i]; } return null; }
+    function rstFindBk(ref){ if(!ref) return null; var b=rstData.bookings||[]; for(var i=0;i<b.length;i++){ if(b[i].booking_reference===ref) return b[i]; } return null; }
+    function rstPatch(ref, f){ var b=rstFindBk(ref); if(b){ for(var k in f) b[k]=f[k]; } return b; }
+    function rstZoneSrc(){ return (rstData.zones && rstData.zones.length) ? rstData.zones : ((rstCfg && rstCfg.zones) || []); }
+    function rstTZone(t){
+        if(!t) return '';
+        if(t.zone_code!=null && t.zone_code!=='') return String(t.zone_code);
+        if(t.zone_id!=null){ var zs=rstZoneSrc(); for(var i=0;i<zs.length;i++){ if(String(zs[i].zone_id)===String(t.zone_id) && zs[i].code!=null) return String(zs[i].code); } }
+        return '';
+    }
+    function rstBZone(b){ return (b && b.zone_code) ? String(b.zone_code) : rstTZone(rstTableById(b && b.table_id)); }
+    function rstZoneList(){
+        var out=[], seen={};
+        rstZoneSrc().forEach(function(z){
+            if(!z || z.code==null || seen[z.code] || z.is_active===0 || z.is_active==='0') return;
+            seen[z.code]=1;
+            out.push({code:String(z.code), name:z.name||('Zone '+z.code), color:z.color, order:rstNum(z.display_order,0)});
+        });
+        (rstData.tables||[]).forEach(function(t){
+            var c=rstTZone(t);
+            if(seen[c]) return;
+            seen[c]=1;
+            out.push({code:c, name:c ? (t.zone_name||('Zone '+c)) : 'No zone', color:c ? t.zone_color : '#9ca3af', order:c ? 50 : 99});
+        });
+        out.sort(function(a,b){ return (a.order-b.order) || String(a.code).localeCompare(String(b.code)); });
+        return out;
+    }
+    function rstZoneByCode(c){ var zs=rstZoneList(); for(var i=0;i<zs.length;i++){ if(zs[i].code===c) return zs[i]; } return null; }
+    function rstGrace(){ var g=parseInt((rstData.settings||{}).grace_minutes,10); return (isFinite(g) && g>=0) ? g : 15; }
+    function rstAutoRelease(){ var s=rstData.settings||{}; return !(s.auto_release===0 || s.auto_release==='0' || s.auto_release===false); }
+    function rstWalkOk(){ var s=rstData.settings||{}; return !(s.allow_walk_ins===0 || s.allow_walk_ins==='0' || s.allow_walk_ins===false); }
+    // Walk-ins are limited by the largest table (max_party_size only limits guest bookings)
+    function rstMaxParty(){
+        var mx=0; (rstData.tables||[]).forEach(function(t){ mx=Math.max(mx, +t.capacity||0); });
+        return mx || parseInt((rstData.settings||{}).max_party_size, 10) || 10;
+    }
+    function rstGraceEnd(b){ if(b && b.grace_ends) return String(b.grace_ends); var m=rstMin(b && b.start_time); return m==null ? '' : rstHM(m+rstGrace()); }
+    // Mirrors the server rule so an overdue booking shows as released before the sweep runs
+    function rstExpired(b){
+        if(!rstAutoRelease()) return false;
+        var day=String(b.booking_date||rstDateStr), now=rstCairo();
+        if(day<now.date) return true;
+        if(day>now.date) return false;
+        var m=rstMin(b.start_time);
+        return m!=null && now.min > m+rstGrace();
+    }
+    function rstBkState(b){
+        var s=b.status||b.booking_status;
+        if(s==='checked_in') return 'seated';
+        if(s==='completed') return 'left';
+        if(s==='cancelled') return 'cancelled';
+        if(s==='no_show') return (+b.auto_released===1) ? 'released' : 'noshow';
+        return (b.expired===true || b.expired===1 || +b.auto_released===1 || rstExpired(b)) ? 'released' : 'waiting';
+    }
+    function rstConflict(a, b){
+        var as=rstMin(a.start_time), ae=rstMin(a.end_time), bs=rstMin(b.start_time), be=rstMin(b.end_time);
+        if(as==null || bs==null) return false;
+        if(ae==null) ae=as;
+        if(be==null) be=bs;
+        return as < be+(+b.buffer_minutes||0) && bs < ae+(+a.buffer_minutes||0);
+    }
+    function rstForSlot(b, sl){ return !!sl && (String(b.slot_id)===String(sl.slot_id) || rstConflict(b, sl)); }
+    function rstCalcState(t){
+        var sl=rstSlotObj(rstSlot), st='free';
+        if(!sl) return st;
+        (rstData.bookings||[]).forEach(function(b){
+            if(String(b.table_id)!==String(t.table_id) || !rstForSlot(b, sl)) return;
+            var k=rstBkState(b);
+            if(k==='seated') st='seated';
+            else if(k==='waiting'){ if(st!=='seated') st='booked'; }
+            else if(k==='released' || k==='noshow'){ if(st==='free') st='released'; }
+        });
+        return st;
+    }
+    function rstState(t){
+        var o=rstOverride[String(t.table_id)];
+        if(o) return o;
+        if(t.state && RST_STATES[t.state]) return t.state;
+        return rstCalcState(t);
+    }
+    function rstIsFree(st){ return st==='free' || st==='released'; }
+    function rstHolding(t){
+        if(t.booking && typeof t.booking==='object' && t.booking.start_time) return t.booking;
+        var sl=rstSlotObj(rstSlot), best=null;
+        (rstData.bookings||[]).forEach(function(b){
+            if(String(b.table_id)!==String(t.table_id) || (sl && !rstForSlot(b, sl))) return;
+            var k=rstBkState(b);
+            if(k==='seated' || (k==='waiting' && !best)) best=b;
+        });
+        return best;
+    }
+    function rstSlotBookings(){
+        var s=rstSlot;
+        return (rstData.bookings||[]).filter(function(b){ return String(b.slot_id)===String(s) && rstBkState(b)!=='cancelled'; });
+    }
+    function rstCounts(list){
+        var c={freeT:0, freeC:0, booked:0, seated:0, released:0, totalT:0, totalC:0, gExp:0, gSeat:0}, ids={};
+        list.forEach(function(t){
+            var st=rstState(t), cap=+t.capacity||0;
+            ids[String(t.table_id)]=1;
+            c.totalT++; c.totalC+=cap;
+            if(rstIsFree(st)){ c.freeT++; c.freeC+=cap; if(st==='released') c.released++; }
+            else if(st==='booked') c.booked++;
+            else if(st==='seated') c.seated++;
+        });
+        rstSlotBookings().forEach(function(b){
+            if(!ids[String(b.table_id)]) return;
+            var k=rstBkState(b), p=+b.party_size||0;
+            if(k==='waiting') c.gExp+=p; else if(k==='seated') c.gSeat+=p;
+        });
+        return c;
+    }
+    function rstZoneTables(){ var z=rstZone; return (rstData.tables||[]).filter(function(t){ return z==='all' || rstTZone(t)===z; }); }
+    function rstRoomNorm(s){ return String(s==null?'':s).toLowerCase().replace(/room/g,'').replace(/[^0-9a-z]/g,''); }
+    function rstRoomQ(){ var el=document.getElementById('rstRoom'); return rstRoomNorm(el && el.value); }
+    function rstSlotShort(s){
+        var l=String(s.label||''), m=RST_MEAL[s.meal]||'';
+        if(m && l.toLowerCase().indexOf(m.toLowerCase())===0) l=l.slice(m.length).trim();
+        return l || 'Slot';
+    }
+    function rstSlotTimes(s){ return s ? (s.start_time||'')+(s.end_time ? '–'+s.end_time : '') : ''; }
+    function rstStatus(b){
+        var k=rstBkState(b), by=b.checked_in_by ? ' · '+b.checked_in_by : '';
+        if(k==='seated'){ var tm=b.checked_in_time || rstUtcHM(b.checked_in_at); return {k:k, cls:'seat', txt:'Seated'+(tm?' '+tm:'')+by}; }
+        if(k==='left'){ var lt=b.released_time || rstUtcHM(b.released_at || b.updated_at); return {k:k, cls:'rel', txt:'Left'+(lt?' '+lt:'')+' · table freed'}; }
+        if(k==='released'){ var rt=b.released_time || rstUtcHM(b.released_at) || rstGraceEnd(b); return {k:k, cls:'rel', txt:'Released'+(rt?' '+rt:'')+' · did not arrive'}; }
+        if(k==='noshow') return {k:k, cls:'bad', txt:'No-show'+by};
+        if(k==='cancelled') return {k:k, cls:'bad', txt:'Cancelled'};
+        var ge=rstGraceEnd(b);
+        return {k:k, cls:'wait', txt:'Expected'+(ge?' · grace ends '+ge:'')};
+    }
+
+    // ── Loading ──
+    function rstVisible(){ var el=document.getElementById('listRest'); return !!el && el.style.display!=='none' && document.visibilityState==='visible'; }
+    function rstTab(on){
+        try{
+            if(rstTimer){ clearInterval(rstTimer); rstTimer=null; }
+            if(!on){ rstPick=null; rstCloseSheet(); return; }
+            rstRenderAll();
+            rstLoad();
+            rstLoadConfig();
+            rstTimer=setInterval(rstTick, 15000);
+        }catch(e){ console.error('restaurant tab', e); }
+    }
+    function rstTick(){
+        try{
+            var t=rstToday();
+            if(t!==rstLastToday){ if(rstDateStr===rstLastToday){ rstDateStr=t; rstSlotAuto=true; } rstLastToday=t; }
+            if(rstVisible() && !Object.keys(rstBusy).length) rstLoad(true);
+            else if(rstVisible()){ rstRenderSlots(); }
+        }catch(e){}
+    }
+    async function rstLoad(quiet){
+        var d=rstDateStr, s=rstSlotAuto ? null : rstSlot, seq=++rstSeq;
+        try{
+            var r=await fetch('/api/staff/restaurant/day?offering_id='+RST_OFFERING+'&date='+encodeURIComponent(d)+(s!=null ? '&slot_id='+encodeURIComponent(s) : ''),{cache:'no-store'});
+            var j=null;
+            try{ j=await r.json(); }catch(x){}
+            if(seq!==rstSeq || d!==rstDateStr) return;
+            rstLoading=false;
+            if(!j || j.success===false || !Array.isArray(j.tables)){
+                rstStale=false; rstLoadErr=rstErr(j, 'Could not load the restaurant');
+                rstRenderAll();
+                if(!quiet) toast(rstLoadErr);
+                return;
+            }
+            rstLoadErr='';
+            rstData={ slots:j.slots||[], tables:j.tables||[], bookings:j.bookings||[], zones:j.zones||[], settings:j.settings||{}, current_slot_id:j.current_slot_id, date:j.date||d };
+            var pick = j.slot_id!=null ? j.slot_id : (s!=null ? s : j.current_slot_id);
+            if(pick==null && rstData.slots.length) pick=rstData.slots[0].slot_id;
+            rstSlot = pick==null ? null : pick;
+            rstOverride={}; rstStale=false;
+            rstLoadedAt=rstCairo().hm;
+            rstRenderAll();
+            if(rstSheetKind==='table' && rstSheetTable!=null) rstOpenTable(rstSheetTable, true);
+        }catch(e){
+            if(seq===rstSeq){ rstLoading=false; rstStale=false; rstLoadErr='No connection'; rstRenderAll(); if(!quiet) toast('No connection — the restaurant retries every 15 s'); }
+        }
+    }
+    // Zone names/colours when the day view does not carry them
+    async function rstLoadConfig(){
+        if(rstCfgTried) return;
+        rstCfgTried=true;
+        try{
+            var r=await fetch('/api/restaurant-module/'+RST_OFFERING+'/config',{cache:'no-store'});
+            var j=await r.json();
+            if(j && Array.isArray(j.zones)){ rstCfg=j; rstRenderAll(); }
+        }catch(e){ rstCfgTried=false; }
+    }
+    async function rstPost(path, body){
+        var r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        var j=null;
+        try{ j=await r.json(); }catch(e){}
+        if(!j || typeof j!=='object') j={success:false};
+        j._status=r.status;
+        if(j.success==null) j.success = r.ok && !j.error;
+        return j;
+    }
+
+    // ── Rendering ──
+    function rstRenderAll(){
+        [rstDateHeader, rstRenderSlots, rstRenderStats, rstRenderZones, rstRenderPickBar, rstRenderMap, rstRenderList, rstRenderRoom, rstRenderUpdated, rstWhoLabel, rstRenderWalkBtn].forEach(function(f){
+            try{ f(); }catch(e){ console.error('restaurant render', e); }
+        });
+    }
+    function rstDateHeader(){
+        var lbl=document.getElementById('rstDateLabel'), sub=document.getElementById('rstDateSub');
+        if(!lbl || !sub) return;
+        var today=rstToday(), dt=rstNoon(rstDateStr);
+        var rel = rstDateStr===today ? 'Today' : (rstDateStr===rstShift(today,1) ? 'Tomorrow' : (rstDateStr===rstShift(today,-1) ? 'Yesterday' : ''));
+        try{
+            lbl.textContent = rel || dt.toLocaleDateString(undefined,{weekday:'long',timeZone:'UTC'});
+            sub.textContent = dt.toLocaleDateString(undefined, rel ? {weekday:'short',day:'numeric',month:'long',timeZone:'UTC'} : {day:'numeric',month:'long',timeZone:'UTC'});
+        }catch(e){ lbl.textContent = rel || rstDateStr; sub.textContent = rel ? rstDateStr : ''; }
+    }
+    function rstRenderSlots(){
+        var host=document.getElementById('rstSlots'); if(!host) return;
+        var sl=rstData.slots||[];
+        if(!sl.length){ host.innerHTML = (rstLoading || rstLoadErr) ? '' : '<div class="rst-none">No time slots on this day — set them up in Admin › Restaurant setup.</div>'; return; }
+        var groups=[], by={}, nowId=null, nextId=null;
+        sl.forEach(function(s){ var m=s.meal||'other'; if(!by[m]){ by[m]=[]; groups.push(m); } by[m].push(s); });
+        if(rstDateStr===rstToday()){
+            var n=rstCairo().min;
+            sl.forEach(function(s){ var a=rstMin(s.start_time), e=rstMin(s.end_time); if(nowId==null && a!=null && n>=a && n<(e==null ? a+1 : e)) nowId=s.slot_id; });
+            if(nowId==null) sl.forEach(function(s){ var a=rstMin(s.start_time); if(nextId==null && a!=null && a>n) nextId=s.slot_id; });
+        }
+        var keep=host.scrollLeft;
+        host.innerHTML = groups.map(function(m){
+            return '<div class="rst-meal"><small>'+rstE(RST_MEAL[m]||m)+'</small><div>'+by[m].map(function(s){
+                var on=String(s.slot_id)===String(rstSlot), e=rstMin(s.end_time);
+                var past=rstDateStr<rstToday() || (rstDateStr===rstToday() && e!=null && rstCairo().min>=e);
+                var fc = s.free_chairs!=null ? s.free_chairs : (s.stock && s.stock.free_chairs!=null ? s.stock.free_chairs : null);
+                var badge = String(s.slot_id)===String(nowId) ? '<i class="rst-now">now</i>' : (String(s.slot_id)===String(nextId) ? '<i class="rst-now next">next</i>' : '');
+                return '<button type="button" class="rst-slot'+(on?' on':'')+(past && !on?' past':'')+'" data-ract="slot" data-sid="'+rstE(s.slot_id)+'" aria-pressed="'+on+'">'+badge+
+                    rstE(rstSlotShort(s))+'<small>'+rstE(rstSlotTimes(s))+'</small>'+
+                    (fc!=null ? '<small class="'+(+fc>0 ? 'fr' : 'full')+'">'+(+fc>0 ? rstE(fc)+' chairs free' : 'Full')+'</small>' : '')+
+                '</button>';
+            }).join('')+'</div></div>';
+        }).join('');
+        host.scrollLeft=keep;
+        // Bring the selected slot into view once per selection (not on every refresh)
+        var key=rstDateStr+'|'+rstSlot;
+        if(rstSlotsShownFor!==key){
+            rstSlotsShownFor=key;
+            var b=host.querySelector('.rst-slot.on');
+            if(b && (b.offsetLeft < host.scrollLeft || b.offsetLeft+b.offsetWidth > host.scrollLeft+host.clientWidth)) host.scrollLeft=Math.max(0, b.offsetLeft-60);
+        }
+    }
+    function rstRenderStats(){
+        var list=rstZoneTables(), c=rstCounts(list), pending=((rstLoading || !!rstLoadErr) && !(rstData.tables||[]).length);
+        var set=function(id, v){ var el=document.getElementById(id); if(el) el.textContent = pending ? '–' : String(v); };
+        set('rstFreeChairs', c.freeC); set('rstFreeTables', c.freeT); set('rstBooked', c.booked); set('rstSeated', c.seated); set('rstReleased', c.released);
+        set('rstFreeChairsSub', 'of '+c.totalC+' seats');
+        set('rstFreeTablesSub', 'of '+c.totalT+' tables');
+        set('rstBookedSub', c.gExp+' guest'+(c.gExp===1?'':'s')+' expected');
+        set('rstSeatedSub', c.gSeat+' guest'+(c.gSeat===1?'':'s')+' dining');
+        set('rstReleasedSub', 'back in stock');
+        var box=document.getElementById('rstStats'); if(box) box.classList.toggle('stale', !!rstStale);
+    }
+    function rstRenderZones(){
+        var host=document.getElementById('rstZones'); if(!host) return;
+        var zs=rstZoneList(), known={all:1};
+        zs.forEach(function(z){ known[z.code]=1; });
+        if(!known[rstZone] && (rstData.tables||[]).length) rstZone='all';
+        if(!zs.length){ host.innerHTML=''; return; }
+        var all=rstCounts(rstData.tables||[]);
+        var h='<button type="button" class="rst-z'+(rstZone==='all'?' on':'')+'" data-ract="zone" data-z="all">All zones <em>'+all.freeC+' seats free</em></button>';
+        zs.forEach(function(z){
+            var c=rstCounts((rstData.tables||[]).filter(function(t){ return rstTZone(t)===z.code; }));
+            h+='<button type="button" class="rst-z'+(rstZone===z.code?' on':'')+'" data-ract="zone" data-z="'+rstE(z.code)+'"><i style="background:'+rstColor(z.color)+'"></i>'+
+                rstE((z.code ? z.code+' · ' : '')+z.name)+' <em>'+c.freeC+' seats free</em></button>';
+        });
+        host.innerHTML=h;
+    }
+    function rstRenderPickBar(){
+        var host=document.getElementById('rstPickBar'); if(!host) return;
+        host.innerHTML = rstPick ? '<div class="rst-pick"><i class="fas fa-hand-pointer"></i><span>Tap a pulsing table for '+rstE(rstPick.party)+' guest'+(rstPick.party===1?'':'s')+'</span><button type="button" class="bb undo" data-ract="pick-cancel">Cancel</button></div>' : '';
+    }
+    function rstHitTables(){
+        var q=rstRoomQ(); if(!q) return null;
+        var h={};
+        rstSlotBookings().forEach(function(b){ if(rstRoomNorm(b.room_number).indexOf(q)===0) h[String(b.table_id)]=1; });
+        return h;
+    }
+    function rstTableHtml(t, hits){
+        var st=rstState(t), cap=+t.capacity||0;
+        var w=Math.max(2, Math.min(100, rstNum(t.width, 8))), hh=Math.max(2, Math.min(100, rstNum(t.height, 12.8)));
+        var x=Math.max(0, Math.min(100-w, rstNum(t.position_x, 0))), y=Math.max(0, Math.min(100-hh, rstNum(t.position_y, 0)));
+        var rot=rstNum(t.rotation, 0);
+        var cls='rst-t '+st+(String(t.shape||'').toLowerCase()==='circle' ? ' circle' : '');
+        if(hits && hits[String(t.table_id)]) cls+=' hit';
+        if(rstPick) cls += (rstIsFree(st) && cap>=rstPick.party) ? ' fit' : ' nofit';
+        var out='<button type="button" class="'+cls+'" data-ract="table" data-tid="'+rstE(t.table_id)+'" style="left:'+x+'%;top:'+y+'%;width:'+w+'%;height:'+hh+'%" aria-label="'+rstE('Table '+(t.table_number||'')+', '+cap+' seats, '+st)+'">'+
+            '<i class="sh"'+(rot ? ' style="transform:rotate('+rot+'deg)"' : '')+'></i>'+
+            '<span class="lb"><b>'+rstE(t.table_number)+'</b><small><i class="fas fa-user"></i>'+cap+'</small></span></button>';
+        if(st==='booked'){
+            var ge=rstGraceEnd(rstHolding(t));
+            if(ge) out+='<span class="rst-gr" style="left:'+(x+w/2)+'%;top:'+(y+hh)+'%">grace ends '+rstE(ge)+'</span>';
+        }
+        return out;
+    }
+    function rstRenderMap(){
+        var host=document.getElementById('rstMap'); if(!host) return;
+        var tables=rstData.tables||[];
+        if(!tables.length){
+            host.innerHTML='<div class="empty" style="padding:26px 12px">'+(rstLoading ? 'Loading…' : (rstLoadErr ? rstE(rstLoadErr)+' — retrying every 15 s' : 'No tables yet — add them in Admin › Restaurant setup.'))+'</div>';
+            return;
+        }
+        // keep each zone's sideways scroll across the 15 s refresh
+        var keep={};
+        try{ Array.prototype.forEach.call(host.querySelectorAll('.rst-scroll[data-z]'), function(el){ keep[el.getAttribute('data-z')]=el.scrollLeft; }); }catch(e){}
+        var hits=rstHitTables(), h='';
+        rstZoneList().forEach(function(z){
+            if(rstZone!=='all' && z.code!==rstZone) return;
+            var list=tables.filter(function(t){ return rstTZone(t)===z.code; });
+            if(!list.length && rstZone==='all') return;
+            var c=rstCounts(list);
+            h+='<div class="rst-zhead"><i style="background:'+rstColor(z.color)+'"></i>'+rstE((z.code ? 'Zone '+z.code+' · ' : '')+z.name)+
+               '<span>'+c.freeT+'/'+c.totalT+' tables · '+c.freeC+' seats free</span></div>';
+            if(!list.length){ h+='<div class="empty" style="padding:22px 12px">No tables in this zone yet.</div>'; return; }
+            h+='<div class="rst-scroll" data-z="'+rstE(z.code)+'"><div class="rst-canvas'+(rstStale?' stale':'')+'"><div class="rst-layer">';
+            list.forEach(function(t){ h+=rstTableHtml(t, hits); });
+            h+='</div></div></div>';
+        });
+        host.innerHTML = h || '<div class="empty" style="padding:22px 12px">No tables in this zone.</div>';
+        try{ Array.prototype.forEach.call(host.querySelectorAll('.rst-scroll[data-z]'), function(el){ var v=keep[el.getAttribute('data-z')]; if(v) el.scrollLeft=v; }); }catch(e){}
+    }
+    function rstActs(b, big){
+        var ref=rstE(b.booking_reference), dis=rstBusy[b.booking_reference] ? ' disabled' : '';
+        var k=rstBkState(b);
+        var day=String(b.booking_date||rstDateStr), today=rstToday();
+        if(day > today) return big ? '<p class="bk-note">Arrival opens on the day.</p>' : '';
+        if(day < today) return big ? '<p class="bk-note">Past day — view only.</p>' : '';
+        var A=function(act, cls, html){ return '<button type="button" class="'+cls+'" data-ract="'+act+'" data-ref="'+ref+'"'+dis+'>'+html+'</button>'; };
+        if(big){
+            if(k==='waiting') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived — seat them')+A('noshow','bk-sec bad','Mark no-show');
+            if(k==='seated') return A('release','bk-sec','<i class="fas fa-door-open"></i> Left early — free the table')+A('undo','bk-sec','Undo arrival');
+            if(k==='released') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived late — seat them');
+            if(k==='noshow') return A('arrive','bk-cta','<i class="fas fa-check"></i> Arrived late — seat them')+A('undo','bk-sec','Undo no-show');
+            if(k==='left') return A('undo','bk-sec','Undo — they are still seated');
+            return '';
+        }
+        if(k==='waiting') return A('noshow','bb ns','No-show')+A('arrive','bb in','<i class="fas fa-check"></i> Arrive');
+        if(k==='seated') return A('undo','bb undo','Undo')+A('release','bb rst-rel','Left early');
+        if(k==='released') return A('arrive','bb in','Arrived late');
+        if(k==='noshow') return A('undo','bb undo','Undo')+A('arrive','bb in','Arrived late');
+        if(k==='left') return A('undo','bb undo','Undo');
+        return '';
+    }
+    function rstRowHtml(b, q){
+        var st=rstStatus(b), exact=!!q && rstRoomNorm(b.room_number)===q;
+        var t=rstTableById(b.table_id), tn=b.table_number || (t && t.table_number) || '?', zc=rstBZone(b), p=+b.party_size||0;
+        var acts=rstActs(b, false);
+        return '<div class="rst-row '+st.k+(exact?' hit':'')+'" data-ract="row" data-tid="'+rstE(b.table_id)+'">'+
+            '<div class="tb"><b>'+rstE(tn)+'</b>'+(zc ? '<em>Zone '+rstE(zc)+'</em>' : '')+'</div>'+
+            '<div class="who"><b>'+rstE(b.guest_name||'Guest')+'</b>'+
+                '<span>'+(b.room_number ? 'Room '+rstE(b.room_number)+' · ' : '')+p+' guest'+(p===1?'':'s')+(t && t.capacity ? ' · '+rstE(t.capacity)+'-seat table' : '')+(b.source==='walk_in' ? ' · walk-in' : '')+'</span>'+
+                '<span class="stt '+st.cls+'">'+rstE(st.txt)+'</span>'+
+            '</div>'+
+            (acts ? '<div class="acts">'+acts+'</div>' : '')+
+        '</div>';
+    }
+    function rstRenderList(){
+        var host=document.getElementById('rstList'); if(!host) return;
+        var q=rstRoomQ(), z=rstZone, sl=rstSlotObj(rstSlot);
+        var rank={waiting:0, seated:1, released:2, noshow:2, left:3};
+        var rows=rstSlotBookings().filter(function(b){ return z==='all' || rstBZone(b)===z; });
+        if(q) rows=rows.filter(function(b){ return rstRoomNorm(b.room_number).indexOf(q)===0; });
+        rows.sort(function(a, b){
+            var ea=(q && rstRoomNorm(a.room_number)===q) ? 0 : 1, eb=(q && rstRoomNorm(b.room_number)===q) ? 0 : 1;
+            var ta=String(a.table_number || (rstTableById(a.table_id)||{}).table_number || ''), tb=String(b.table_number || (rstTableById(b.table_id)||{}).table_number || '');
+            return (ea-eb) || ((rank[rstBkState(a)]||0)-(rank[rstBkState(b)]||0)) || ta.localeCompare(tb, undefined, {numeric:true});
+        });
+        var cnt=document.getElementById('rstCount');
+        if(cnt) cnt.textContent = q ? rows.length+' match'+(rows.length===1?'':'es')+' for room '+q : (rows.length ? rows.length+' booking'+(rows.length===1?'':'s')+(sl ? ' · '+sl.label+' '+rstSlotTimes(sl) : '') : '');
+        if(!rows.length){
+            var msg;
+            if(rstLoading) msg='Loading…';
+            else if(rstLoadErr && !(rstData.tables||[]).length){ host.innerHTML=''; return; }
+            else if(!sl) msg='Pick a time slot above.';
+            else if(q) msg='No booking for room '+rstE(q)+' in this slot.'+rstOtherSlotsHtml(q);
+            else msg='No bookings in '+rstE(sl.label||'this slot')+' yet.';
+            host.innerHTML='<div class="empty">'+msg+'</div>';
+            return;
+        }
+        host.innerHTML=rows.map(function(b){ return rstRowHtml(b, q); }).join('');
+    }
+    // A room typed in the box may be booked in another slot of the day
+    function rstOtherSlots(q){
+        return (rstData.bookings||[]).filter(function(b){ return String(b.slot_id)!==String(rstSlot) && rstRoomNorm(b.room_number)===q && rstBkState(b)!=='cancelled'; });
+    }
+    function rstOtherSlotsHtml(q){
+        var o=rstOtherSlots(q); if(!o.length) return '';
+        return '<br>'+o.map(function(b){ var s=rstSlotObj(b.slot_id); return 'Booked in '+rstE(s ? s.label+' '+rstSlotTimes(s) : (b.start_time||'another slot')); }).join('<br>');
+    }
+    function rstRenderRoom(){
+        var el=document.getElementById('rstRoom'), hint=document.getElementById('rstRoomHint'), btn=document.getElementById('rstArriveBtn');
+        var raw=String((el && el.value)||'').trim(), q=rstRoomNorm(raw);
+        if(btn){ var busy=Object.keys(rstBusy).some(function(k){ return k.indexOf('room:')===0; }); btn.disabled=busy; }
+        if(!hint) return;
+        if(!q){ hint.textContent = rstDateStr===rstToday() ? 'Type the room number and tap Arrive to seat the family' : 'Arrivals are for today — this is another day'; return; }
+        var ex=rstSlotBookings().filter(function(b){ return rstRoomNorm(b.room_number)===q; });
+        if(ex.length===1){
+            var b=ex[0], t=rstTableById(b.table_id);
+            hint.innerHTML='<b>'+rstE(b.guest_name||'Guest')+'</b> · table '+rstE(b.table_number || (t && t.table_number) || '?')+' · '+rstE(+b.party_size||0)+' guests · '+rstE(rstStatus(b).txt);
+        } else if(ex.length>1) hint.innerHTML='<b>'+ex.length+' bookings</b> for this room in this slot';
+        else {
+            var o=rstOtherSlots(q);
+            hint.textContent = o.length ? 'Not in this slot — booked in '+o.map(function(b){ var s=rstSlotObj(b.slot_id); return s ? s.label : (b.start_time||''); }).join(', ') : 'No booking found yet in this slot';
+        }
+    }
+    function rstRenderUpdated(){
+        var el=document.getElementById('rstUpd'); if(!el) return;
+        el.textContent = rstLoadedAt ? 'Updated '+rstLoadedAt+' · refreshes every 15 s' : '';
+    }
+    function rstRenderWalkBtn(){
+        var b=document.getElementById('rstWalkBtn'); if(!b) return;
+        b.classList.toggle('off', !(rstWalkOk() && rstDateStr===rstToday()));
+    }
+
+    // ── Sheets ──
+    function rstSheetOpen(){ var s=document.getElementById('rstSheet'); return !!s && s.classList.contains('open'); }
+    function rstShowSheet(){ var s=document.getElementById('rstSheet'); if(s) s.classList.add('open'); }
+    function rstCloseSheet(keepWalk){
+        var s=document.getElementById('rstSheet'); if(s) s.classList.remove('open');
+        rstSheetKind=''; rstSheetTable=null; rstChoices=null; rstTaken=null;
+        if(!keepWalk && !rstPick) rstWalk=null;
+    }
+    function rstBookHtml(b, dim){
+        var st=rstStatus(b), s=rstSlotObj(b.slot_id), t=rstTableById(b.table_id);
+        return '<div class="bk-book'+(dim?' dim':'')+'">'+
+            '<div class="bk-bh"><b>'+rstE(b.guest_name||'Guest')+'</b><span class="stt '+st.cls+'">'+rstE(st.txt)+'</span></div>'+
+            '<div class="bk-facts">'+
+              '<div><small>Room</small><b>'+rstE(b.room_number||'—')+'</b></div>'+
+              '<div><small>Guests</small><b>'+rstE(b.party_size||'—')+'</b></div>'+
+              '<div><small>'+rstE(s ? s.label : 'Time')+'</small><b>'+rstE(b.start_time ? b.start_time+(b.end_time ? '–'+b.end_time : '') : rstSlotTimes(s))+'</b></div>'+
+              '<div><small>Table</small><b>'+rstE((b.table_number || (t && t.table_number) || '—')+(rstBZone(b) ? ' · Zone '+rstBZone(b) : ''))+'</b></div>'+
+              '<div><small>Code</small><b>'+rstE(b.booking_code||b.booking_reference||'—')+'</b></div>'+
+              '<div><small>Phone</small><b>'+rstE(b.guest_phone||'—')+'</b></div>'+
+            '</div>'+
+            (b.special_requests ? '<p class="bk-note">“'+rstE(b.special_requests)+'”</p>' : '')+
+            rstActs(b, true)+
+        '</div>';
+    }
+    function rstOpenTable(tid, refresh){
+        try{
+            if(refresh && rstSheetKind!=='table') return;
+            var t=rstTableById(tid), panel=document.getElementById('rstPanel');
+            if(!t || !panel){ if(refresh) rstCloseSheet(); return; }
+            rstSheetKind='table'; rstSheetTable=t.table_id;
+            var st=rstState(t), z=rstZoneByCode(rstTZone(t)), sl=rstSlotObj(rstSlot), bits=[];
+            if(z) bits.push((z.code ? 'Zone '+z.code+' · ' : '')+z.name);
+            bits.push((+t.capacity||0)+' seats');
+            if(t.table_name && t.table_name!==t.table_number) bits.push(t.table_name);
+            var list=(rstData.bookings||[]).filter(function(b){ return String(b.table_id)===String(t.table_id) && rstBkState(b)!=='cancelled'; });
+            list.sort(function(a, b){ return (rstMin(a.start_time)||0)-(rstMin(b.start_time)||0); });
+            var mine=list.filter(function(b){ return rstForSlot(b, sl); }), other=list.filter(function(b){ return !rstForSlot(b, sl); });
+            var hold=st==='booked' ? rstHolding(t) : null, ge=hold ? rstGraceEnd(hold) : '';
+            var h='<h3>Table '+rstE(t.table_number)+'</h3><div class="sub">'+rstE(bits.join(' · '))+'</div>'+
+                  '<div class="rst-tstate '+st+'">'+rstE(RST_STATE_TXT[st]||st)+(ge ? ' · grace ends '+rstE(ge) : '')+(sl ? ' · '+rstE(rstSlotShort(sl)+' '+rstSlotTimes(sl)) : '')+'</div>';
+            if(!mine.length) h+='<p class="bk-free">No booking in this slot.</p>';
+            mine.forEach(function(b){ h+=rstBookHtml(b, false); });
+            if(rstIsFree(st) && rstWalkOk() && rstDateStr===rstToday()) h+='<button type="button" class="bk-cta" data-ract="walkin" data-tid="'+rstE(t.table_id)+'"><i class="fas fa-person-walking"></i> Seat a walk-in here</button>';
+            other.forEach(function(b){ h+=rstBookHtml(b, true); });
+            panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Close</button>';
+            rstShowSheet();
+        }catch(e){ console.error('restaurant table sheet', e); }
+    }
+    function rstShowChoices(ch, ctx, msg){
+        var panel=document.getElementById('rstPanel'); if(!panel) return;
+        rstSheetKind='choices'; rstSheetTable=null; rstChoices=ch; rstTaken=null;
+        var h='<h3>'+(ctx && ctx.room ? 'Room '+rstE(ctx.room) : 'Which booking?')+'</h3>'+
+              '<div class="sub">'+(ch.length>1 ? ch.length+' bookings — who has arrived?' : 'Is this the booking?')+'</div>'+
+              (msg ? '<p class="bk-note">'+rstE(msg)+'</p>' : '');
+        ch.forEach(function(b){
+            var t=rstTableById(b.table_id), s=rstSlotObj(b.slot_id), zc=b.zone_code || rstTZone(t), st=rstStatus(b);
+            h+='<div class="bk-book"><div class="bk-bh"><b>'+rstE(b.guest_name||'Guest')+'</b><span class="stt '+st.cls+'">'+rstE((b.party_size||'?')+' guests · '+st.txt)+'</span></div>'+
+               '<div class="bk-facts">'+
+                 '<div><small>Table</small><b>'+rstE((b.table_number || (t && t.table_number) || '?')+(zc ? ' · Zone '+zc : ''))+'</b></div>'+
+                 '<div><small>'+rstE(s ? s.label : (b.slot_label || 'Time'))+'</small><b>'+rstE(b.start_time ? b.start_time+(b.end_time ? '–'+b.end_time : '') : rstSlotTimes(s))+'</b></div>'+
+               '</div>'+
+               '<button type="button" class="bk-cta" data-ract="choice" data-ref="'+rstE(b.booking_reference)+'"><i class="fas fa-check"></i> Seat this booking</button></div>';
+        });
+        if(ch.length>1) h+='<button type="button" class="bk-sec" data-ract="choice-all">Seat all '+ch.length+' bookings</button>';
+        panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Cancel</button>';
+        rstShowSheet();
+    }
+    function rstShowTaken(j, ctx){
+        var panel=document.getElementById('rstPanel'); if(!panel) return;
+        var ref=j.booking_reference || (j.booking && j.booking.booking_reference) || (ctx && ctx.ref) || '';
+        var bk=rstFindBk(ref) || j.booking || {};
+        var sid=j.suggest_table_id, sug=sid!=null ? rstTableById(sid) : null;
+        rstSheetKind='taken'; rstSheetTable=null; rstChoices=null; rstTaken={ref:ref, bk:bk, room:ctx && ctx.room};
+        var h='<h3>Table taken</h3><div class="sub">'+rstE((bk.guest_name||'Guest')+(bk.room_number ? ' · Room '+bk.room_number : ''))+'</div>'+
+              '<p class="bk-note">'+rstE(j.message || 'Their table was given to someone else after the booking was released.')+'</p>';
+        if(sid!=null && ref) h+='<button type="button" class="bk-cta" data-ract="suggest" data-ref="'+rstE(ref)+'" data-tid="'+rstE(sid)+'"><i class="fas fa-chair"></i> Seat at table '+rstE(sug ? sug.table_number : sid)+(sug ? ' ('+(+sug.capacity||0)+' seats)' : '')+'</button>';
+        h+='<button type="button" class="bk-sec" data-ract="walkin" data-room="'+rstE(bk.room_number||(ctx && ctx.room)||'')+'" data-party="'+rstE(+bk.party_size||'')+'" data-name="'+rstE(bk.guest_name||'')+'">Choose another table (walk-in)</button>';
+        panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Close</button>';
+        rstShowSheet();
+    }
+    function rstShowNoBooking(room, j){
+        var panel=document.getElementById('rstPanel'); if(!panel) return;
+        rstSheetKind='none'; rstSheetTable=null;
+        var o=rstOtherSlots(rstRoomNorm(room)), sl=rstSlotObj(rstSlot);
+        var h='<h3>Room '+rstE(room)+'</h3><div class="sub">'+rstE(sl ? sl.label+' · '+rstSlotTimes(sl) : '')+'</div>'+
+              '<p class="bk-note">'+rstE(rstErr(j, 'No booking for this room in this slot.'))+'</p>';
+        o.forEach(function(b){ h+=rstBookHtml(b, false); });
+        if(rstWalkOk()) h+='<button type="button" class="bk-cta" data-ract="walkin" data-room="'+rstE(room)+'"><i class="fas fa-person-walking"></i> Seat as a walk-in</button>';
+        panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Close</button>';
+        rstShowSheet();
+    }
+
+    // ── Walk-ins: party size, optional room, auto-assign or a table tapped on the map ──
+    function rstOpenWalk(o){
+        o=o||{};
+        if(!rstWalkOk()){ toast('Walk-ins are switched off for this restaurant'); return; }
+        if(rstDateStr!==rstToday()){ toast('Walk-ins are for today — go back to today first'); return; }
+        if(!rstSlotObj(rstSlot)){ toast('Pick a time slot first'); return; }
+        var mx=rstMaxParty(), p=parseInt(o.party,10);
+        rstPick=null;
+        rstWalk={ party: Math.max(1, Math.min(mx, p>0 ? p : 2)), room: o.room||'', name: o.name||'', table_id: (o.tid!=null && o.tid!=='') ? o.tid : null };
+        rstRenderWalk();
+        rstRenderAll();
+    }
+    function rstWalkSync(){
+        if(!rstWalk) return;
+        var r=document.getElementById('rstWiRoom'), n=document.getElementById('rstWiName');
+        if(r) rstWalk.room=String(r.value||'').trim().slice(0,8);
+        if(n) rstWalk.name=String(n.value||'').trim().slice(0,60);
+    }
+    function rstRenderWalk(){
+        var panel=document.getElementById('rstPanel'), w=rstWalk; if(!panel || !w) return;
+        rstSheetKind='walk'; rstSheetTable=null;
+        var sl=rstSlotObj(rstSlot), mx=rstMaxParty(), t=w.table_id!=null ? rstTableById(w.table_id) : null, busy=!!rstBusy.walkin;
+        var fits=(rstData.tables||[]).filter(function(x){ return rstIsFree(rstState(x)) && (+x.capacity||0)>=w.party; });
+        var inZone=rstZone==='all' ? fits : fits.filter(function(x){ return rstTZone(x)===rstZone; });
+        var h='<h3>Walk-in</h3><div class="sub">'+rstE(sl ? sl.label+' · '+rstSlotTimes(sl) : '')+'</div>'+
+              '<div class="rst-step"><button type="button" data-ract="wi-minus" aria-label="Fewer guests"'+(w.party<=1?' disabled':'')+'>−</button>'+
+              '<div><b>'+w.party+'</b><small>guest'+(w.party===1?'':'s')+'</small></div>'+
+              '<button type="button" data-ract="wi-plus" aria-label="More guests"'+(w.party>=mx?' disabled':'')+'>+</button></div>'+
+              '<label class="rst-fld"><small>Room number (optional)</small><input id="rstWiRoom" type="text" inputmode="numeric" maxlength="8" autocomplete="off" value="'+rstE(w.room)+'"></label>'+
+              '<label class="rst-fld"><small>Guest name (optional)</small><input id="rstWiName" type="text" maxlength="60" autocomplete="off" value="'+rstE(w.name)+'"></label>';
+        if(t){
+            var ok=rstIsFree(rstState(t)) && (+t.capacity||0)>=w.party;
+            h+='<p class="rst-fit'+(ok?'':' bad')+'">'+(ok ? 'Table '+rstE(t.table_number)+' · '+(+t.capacity||0)+' seats' : 'Table '+rstE(t.table_number)+(rstIsFree(rstState(t)) ? ' seats only '+(+t.capacity||0) : ' is not free in this slot'))+'</p>'+
+               '<button type="button" class="bk-cta" data-ract="wi-go" data-tid="'+rstE(t.table_id)+'"'+(ok && !busy?'':' disabled')+'><i class="fas fa-check"></i> Seat at table '+rstE(t.table_number)+'</button>'+
+               '<button type="button" class="bk-sec" data-ract="wi-any">Choose another table</button>';
+        } else {
+            h+='<p class="rst-fit'+(fits.length?'':' bad')+'">'+(fits.length ? fits.length+' free table'+(fits.length===1?'':'s')+' fit '+w.party+(rstZone!=='all' ? ' · '+inZone.length+' in Zone '+rstE(rstZone) : '') : 'No free table fits '+w.party+' in this slot')+'</p>'+
+               '<button type="button" class="bk-cta" data-ract="wi-go"'+(fits.length && !busy?'':' disabled')+'><i class="fas fa-wand-magic-sparkles"></i> Auto-assign &amp; seat</button>'+
+               '<button type="button" class="bk-sec" data-ract="wi-pick"'+(fits.length?'':' disabled')+'><i class="fas fa-hand-pointer"></i> Pick a table on the map</button>';
+        }
+        panel.innerHTML=h+'<button type="button" class="bk-sec" data-ract="close">Cancel</button>';
+        rstShowSheet();
+    }
+    function rstWalkGo(tid){
+        rstWalkSync();
+        var w=rstWalk;
+        if(!w || rstBusy.walkin) return;
+        rstWithName(function(name){
+            rstRun('walkin', async function(){
+                var body={offering_id:RST_OFFERING, slot_id:rstId(rstSlot), date:rstDateStr, party_size:w.party, room_number:w.room||null, guest_name:w.name||null, staff_name:name};
+                if(tid!=null && tid!=='') body.table_id=rstId(tid);
+                else if(rstZone!=='all' && rstZone) body.zone_pref=rstZone;
+                var j=await rstPost('/api/staff/restaurant/walk-in', body);
+                if(!j.success){ toast(rstErr(j, 'Could not seat the walk-in')); if(rstSheetKind==='walk'){ rstRenderWalk(); return 'keep'; } return; }
+                var b=j.booking||{}, tt=b.table_id!=null ? b.table_id : tid;
+                if(b.booking_reference && !rstFindBk(b.booking_reference)){
+                    rstData.bookings.push(Object.assign({status:'checked_in', slot_id:rstSlot, booking_date:rstDateStr, party_size:w.party, room_number:w.room, guest_name:w.name, source:'walk_in', checked_in_by:name, checked_in_time:rstCairo().hm, table_id:tt}, b));
+                }
+                if(tt!=null) rstOverride[String(tt)]='seated';
+                rstWalk=null; rstPick=null;
+                if(w.room && rstRoomNorm(w.room)===rstRoomQ()) rstRoomClear();
+                toast('✅ Walk-in of '+w.party+' seated at table '+(b.table_number || (rstTableById(tt)||{}).table_number || ''));
+            });
+        });
+    }
+    function rstStartPick(){
+        rstWalkSync();
+        if(!rstWalk) return;
+        rstPick={party:rstWalk.party};
+        rstCloseSheet(true);
+        rstRenderAll();
+        try{ var m=document.querySelector('#listRest .rst-mapwrap'); if(m && m.scrollIntoView) m.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){}
+    }
+
+    // ── Actions ──
+    function rstRun(key, work){
+        if(!key || rstBusy[key]) return;
+        rstBusy[key]=1;
+        rstRenderAll();
+        Promise.resolve().then(work).catch(function(e){ console.error('restaurant action', e); toast('No connection — try again'); }).then(function(res){
+            delete rstBusy[key];
+            if(res!=='keep') rstCloseSheet();
+            rstRenderAll();
+            rstLoad(true);
+        });
+    }
+    // Seat a booking; ctx.room = typed room number, ctx.table_id = seat at another table
+    function rstAfterArrive(j, name, ctx){
+        j=j||{}; ctx=ctx||{};
+        if(Array.isArray(j.choices) && j.choices.length){ rstShowChoices(j.choices, ctx, j.message); return 'keep'; }
+        if(!j.success && (j.error==='table_taken' || j.suggest_table_id!=null)){ rstShowTaken(j, ctx); return 'keep'; }
+        if(!j.success){
+            if(ctx.room && (j._status===404 || j.error==='not_found' || j.error==='no_booking')){ rstShowNoBooking(ctx.room, j); return 'keep'; }
+            toast(rstErr(j, 'Could not seat them'));
+            return rstSheetKind ? 'keep' : undefined;
+        }
+        var list=Array.isArray(j.bookings) && j.bookings.length ? j.bookings : (j.booking ? [j.booking] : []);
+        if(!list.length && ctx.ref) list=[{booking_reference:ctx.ref}];
+        var tm=rstCairo().hm;
+        list.forEach(function(b){
+            var ref=b.booking_reference || ctx.ref, loc=rstFindBk(ref);
+            var f={status:'checked_in', auto_released:0, checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||tm};
+            var tid=b.table_id!=null ? b.table_id : (ctx.table_id!=null ? ctx.table_id : (loc && loc.table_id));
+            if(tid!=null){ f.table_id=tid; if(b.table_number) f.table_number=b.table_number; else if(ctx.table_id!=null) f.table_number=(rstTableById(tid)||{}).table_number; }
+            rstPatch(ref, f);
+            if(tid!=null) rstOverride[String(tid)]='seated';
+        });
+        var b0=rstFindBk((list[0]||{}).booking_reference || ctx.ref) || list[0] || {};
+        var tn=b0.table_number || (rstTableById(b0.table_id)||{}).table_number || '';
+        toast(j.already ? (b0.guest_name||'Guest')+' is already seated' : '✅ '+(b0.guest_name||'Guest')+(b0.room_number ? ' · room '+b0.room_number : '')+(tn ? ' → table '+tn : '')+(list.length>1 ? ' (+'+(list.length-1)+' more)' : ''));
+        if(ctx.room || (b0.room_number && rstRoomNorm(b0.room_number)===rstRoomQ())) rstRoomClear();
+    }
+    function rstArrive(ref){
+        if(!ref || rstBusy[ref]) return;
+        rstWithName(function(name){
+            rstRun(ref, async function(){
+                var j=await rstPost('/api/staff/restaurant/arrive', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:name});
+                return rstAfterArrive(j, name, {ref:ref});
+            });
+        });
+    }
+    function rstArriveRoom(){
+        var el=document.getElementById('rstRoom'), room=String((el && el.value)||'').trim();
+        if(!room){ toast('Type the room number first'); rstPadOpen(true); return; }
+        if(rstDateStr!==rstToday()){ toast(rstDateStr>rstToday() ? 'Arrivals open on the day' : 'Arrivals are for today — go back to today first'); return; }
+        var key='room:'+room;
+        if(rstBusy[key]) return;
+        rstWithName(function(name){
+            rstRun(key, async function(){
+                var j=await rstPost('/api/staff/restaurant/arrive', {offering_id:RST_OFFERING, room_number:room, date:rstDateStr, slot_id:rstId(rstSlot), staff_name:name});
+                return rstAfterArrive(j, name, {room:room});
+            });
+        });
+    }
+    function rstArriveAll(){
+        var ch=(rstChoices||[]).slice(); if(!ch.length) return;
+        rstWithName(function(name){
+            rstRun('all', async function(){
+                var ok=0, fail='';
+                for(var i=0;i<ch.length;i++){
+                    var ref=ch[i].booking_reference;
+                    var j=await rstPost('/api/staff/restaurant/arrive', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:name});
+                    if(j.success && !(j.choices && j.choices.length)){
+                        ok++;
+                        var b=j.booking||{}, loc=rstFindBk(ref), tid=b.table_id!=null ? b.table_id : (loc && loc.table_id);
+                        rstPatch(ref, {status:'checked_in', auto_released:0, checked_in_by:b.checked_in_by||name, checked_in_time:b.checked_in_time||rstCairo().hm});
+                        if(tid!=null) rstOverride[String(tid)]='seated';
+                    } else if(!fail) fail=rstErr(j, 'one booking could not be seated');
+                }
+                toast(ok ? '✅ '+ok+' of '+ch.length+' bookings seated'+(fail ? ' · '+fail : '') : (fail || 'Could not seat them'));
+                if(ok) rstRoomClear();
+            });
+        });
+    }
+    // Their table was re-let after the release: seat them at the suggested table instead
+    function rstSeatSuggested(ref, tid){
+        var bk=rstFindBk(ref) || (rstTaken && rstTaken.bk) || {};
+        rstWithName(function(name){
+            rstRun('sug:'+ref, async function(){
+                var sid=rstId(bk.slot_id!=null ? bk.slot_id : rstSlot);
+                tid=rstId(tid);
+                var j=await rstPost('/api/staff/restaurant/arrive', {offering_id:RST_OFFERING, booking_reference:ref, table_id:tid, date:rstDateStr, slot_id:sid, staff_name:name});
+                if(j.success) return rstAfterArrive(j, name, {ref:ref, table_id:tid});
+                // Same suggestion again = this server cannot move a booking: seat them as a walk-in there
+                if(j.error==='table_taken' && String(j.suggest_table_id)===String(tid)){
+                    var w=await rstPost('/api/staff/restaurant/walk-in', {offering_id:RST_OFFERING, slot_id:sid, date:rstDateStr, party_size:+bk.party_size||1, room_number:bk.room_number||null, guest_name:bk.guest_name||null, table_id:tid, staff_name:name});
+                    if(!w.success){ toast(rstErr(w, 'Could not seat them')); return 'keep'; }
+                    rstOverride[String(tid)]='seated';
+                    toast('✅ '+(bk.guest_name||'Guest')+' seated at table '+((w.booking && w.booking.table_number) || (rstTableById(tid)||{}).table_number || ''));
+                    if(bk.room_number && rstRoomNorm(bk.room_number)===rstRoomQ()) rstRoomClear();
+                    return;
+                }
+                return rstAfterArrive(j, name, {ref:ref, room:rstTaken && rstTaken.room});
+            });
+        });
+    }
+    function rstNoShow(ref){
+        if(!ref || rstBusy[ref]) return;
+        rstWithName(function(name){
+            rstRun(ref, async function(){
+                var j=await rstPost('/api/staff/restaurant/no-show', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:name});
+                if(!j.success){ toast(rstErr(j, 'Could not mark the no-show')); return; }
+                var b=rstPatch(ref, {status:'no_show', auto_released:0, checked_in_by:name});
+                if(b && b.table_id!=null) rstOverride[String(b.table_id)]='released';
+                toast((b && b.guest_name ? b.guest_name : 'Guest')+' marked as no-show · table back in stock · Undo is on the row');
+            });
+        });
+    }
+    function rstUndo(ref){
+        if(!ref || rstBusy[ref]) return;
+        rstRun(ref, async function(){
+            var j=await rstPost('/api/staff/restaurant/undo', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:rstGetName()});
+            if(!j.success){ toast(rstErr(j, 'Could not undo')); return; }
+            if(j.changed===0){ toast('Nothing to undo'); return; }
+            var prev=rstFindBk(ref), wasLeft=!!prev && rstBkState(prev)==='left';
+            // A freed table goes back to seated; an arrival or no-show goes back to expected
+            var nb=(j.booking && j.booking.status) ? j.booking : {status: wasLeft ? 'checked_in' : 'confirmed', auto_released:0, expired:false, released_at:null, released_time:''};
+            if(nb.status==='confirmed' && !j.booking){ nb.checked_in_by=null; nb.checked_in_at=null; nb.checked_in_time=''; }
+            var b=rstPatch(ref, nb);
+            if(b && b.table_id!=null){ var k=rstBkState(b); rstOverride[String(b.table_id)] = k==='seated' ? 'seated' : (k==='waiting' ? 'booked' : 'released'); }
+            toast(j.message || (b && rstBkState(b)==='seated' ? 'Undone — still seated' : 'Undone — back to expected'));
+        });
+    }
+    function rstRelease(ref){
+        if(!ref || rstBusy[ref]) return;
+        var b0=rstFindBk(ref)||{}, tn=b0.table_number || (rstTableById(b0.table_id)||{}).table_number || '';
+        // Freeing a table has no undo: ask for a second tap
+        var now=Date.now();
+        if(!(rstArmed[ref] && now-rstArmed[ref]<4000)){ rstArmed[ref]=now; toast('Tap “Left early” again to free table '+tn); return; }
+        delete rstArmed[ref];
+        rstWithName(function(name){
+            rstRun(ref, async function(){
+                var j=await rstPost('/api/staff/restaurant/release', {offering_id:RST_OFFERING, booking_reference:ref, date:rstDateStr, staff_name:name});
+                if(!j.success){ toast(rstErr(j, 'Could not free the table')); return; }
+                var b=rstPatch(ref, {status:'completed', released_at:new Date().toISOString().replace('T',' ').slice(0,19)});
+                if(b && b.table_id!=null) rstOverride[String(b.table_id)]='free';
+                toast('Table '+tn+' is free again');
+            });
+        });
+    }
+
+    // ── Room keypad ──
+    function rstPadOpen(on){
+        var p=document.getElementById('rstPad'), t=document.getElementById('rstPadTog');
+        if(p) p.classList.toggle('open', !!on);
+        if(t) t.textContent = on ? 'Hide keypad' : 'Keypad';
+    }
+    function rstRoomChanged(){ rstRenderList(); rstRenderMap(); rstRenderRoom(); }
+    function rstRoomClear(){ var el=document.getElementById('rstRoom'); if(el) el.value=''; rstRoomChanged(); }
+    function rstKey(k){
+        var el=document.getElementById('rstRoom'); if(!el) return;
+        var v=String(el.value||'');
+        if(k==='del') v=v.slice(0,-1);
+        else if(k==='clr') v='';
+        else if(v.length<8) v+=k;
+        el.value=v;
+        rstRoomChanged();
+    }
+
+    function rstDay(delta){
+        rstDateStr=rstShift(rstDateStr, delta);
+        rstSlotAuto=true; rstPick=null; rstOverride={};
+        rstData={ slots:rstData.slots||[], tables:rstData.tables||[], bookings:[], zones:rstData.zones||[], settings:rstData.settings||{}, current_slot_id:null };
+        rstStale=true; rstLoading=true;
+        rstCloseSheet();
+        rstRenderAll();
+        rstLoad();
+    }
+    function rstPickSlot(sid){
+        if(sid==null || String(sid)===String(rstSlot)) return;
+        rstSlot=sid;
+        rstSlotAuto = rstDateStr===rstToday() && String(sid)===String(rstData.current_slot_id);
+        rstPick=null; rstOverride={}; rstStale=true;
+        rstRenderAll();
+        rstLoad();
+    }
+    function rstTapTable(tid){
+        if(rstPick){
+            var t=rstTableById(tid);
+            if(t && rstIsFree(rstState(t)) && (+t.capacity||0)>=rstPick.party){ rstWalkGo(t.table_id); return; }
+            toast('Table '+(t ? t.table_number : '')+' is '+(t && rstIsFree(rstState(t)) ? 'too small for '+rstPick.party : 'not free in this slot'));
+            return;
+        }
+        rstOpenTable(tid);
+    }
+
+    document.addEventListener('click', function(e){
+        var t=null;
+        try{ t=(e.target && e.target.closest) ? e.target.closest('[data-ract]') : null; }catch(x){}
+        if(!t) return;
+        try{
+            if(t.disabled) return;
+            var a=t.getAttribute('data-ract'), ref=t.getAttribute('data-ref'), tid=t.getAttribute('data-tid');
+            if(a==='day') rstDay(parseInt(t.getAttribute('data-d'),10)||0);
+            else if(a==='slot') rstPickSlot(t.getAttribute('data-sid'));
+            else if(a==='zone'){ rstZone=t.getAttribute('data-z')||'all'; try{ localStorage.setItem('rstZone', rstZone); }catch(x){} rstRenderAll(); }
+            else if(a==='table') rstTapTable(tid);
+            else if(a==='row') rstOpenTable(tid);
+            else if(a==='key') rstKey(t.getAttribute('data-k'));
+            else if(a==='pad'){ var p=document.getElementById('rstPad'); rstPadOpen(!(p && p.classList.contains('open'))); }
+            else if(a==='arrive-room') rstArriveRoom();
+            else if(a==='arrive' || a==='choice') rstArrive(ref);
+            else if(a==='choice-all') rstArriveAll();
+            else if(a==='suggest') rstSeatSuggested(ref, tid);
+            else if(a==='noshow') rstNoShow(ref);
+            else if(a==='undo') rstUndo(ref);
+            else if(a==='release') rstRelease(ref);
+            else if(a==='walkin') rstOpenWalk({tid:tid, room:t.getAttribute('data-room')||'', party:t.getAttribute('data-party'), name:t.getAttribute('data-name')||''});
+            else if(a==='wi-minus' || a==='wi-plus'){ if(rstWalk){ rstWalkSync(); rstWalk.party=Math.max(1, Math.min(rstMaxParty(), rstWalk.party+(a==='wi-plus'?1:-1))); rstRenderWalk(); } }
+            else if(a==='wi-go') rstWalkGo(tid);
+            else if(a==='wi-any'){ if(rstWalk){ rstWalkSync(); rstWalk.table_id=null; rstRenderWalk(); } }
+            else if(a==='wi-pick') rstStartPick();
+            else if(a==='pick-cancel'){ rstPick=null; rstWalk=null; rstRenderAll(); }
+            else if(a==='close'){ rstPick=null; rstCloseSheet(); rstRenderAll(); }
+            else if(a==='who') rstAskName(null);
+        }catch(err){ console.error('restaurant action', err); }
+    });
+
+    (function(){
+        try{
+            var ri=document.getElementById('rstRoom');
+            if(ri){
+                ri.addEventListener('input', function(){ try{ rstRoomChanged(); }catch(e){} });
+                ri.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); try{ rstArriveRoom(); }catch(x){} } });
+                ri.addEventListener('focus', function(){ try{ rstPadOpen(true); }catch(e){} });
+            }
+            var sh=document.getElementById('rstSheet');
+            if(sh) sh.addEventListener('click', function(e){ if(e.target===sh){ try{ rstPick=null; rstCloseSheet(); rstRenderAll(); }catch(x){} } });
+            document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ try{ if(rstSheetOpen()) rstCloseSheet(); }catch(x){} } });
+            document.addEventListener('visibilitychange', function(){ try{ if(rstVisible()) rstLoad(true); }catch(e){} });
+            window.addEventListener('pageshow', function(ev){ try{ if(ev.persisted && rstVisible()) rstLoad(true); }catch(e){} });
+            rstRenderAll();
+        }catch(e){ console.error('restaurant init', e); }
+    })();
 
     // ── Translation: guests write in any language, staff read EN or AR ──
     var STAFF_LANG = localStorage.getItem('staffLang') || 'en';
