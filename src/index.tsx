@@ -87990,6 +87990,1941 @@ app.post('/api/staff/ack-feedback', async (c) => {
   } catch (e) { return c.json({ success: false }, 500) }
 })
 
+// ════════════════════════════════════════════════════════════════════════════
+// Main restaurant booking module (El Kasr): zones, tables, slots, bookings.
+// Switched on per offering by a restaurant_settings row; the legacy
+// /api/restaurant/* flows keep serving the other restaurants.
+// Live stock is computed on every read, never stored. A booking holds its
+// table while checked in, or while confirmed and not yet past slot start +
+// grace. rstSweepNoShows makes that release durable (every day read + the
+// ring-check cron), but reads never depend on it having run.
+// ════════════════════════════════════════════════════════════════════════════
+
+const RST_MEALS = ['breakfast', 'lunch', 'dinner']
+const RST_SHAPES = ['rectangle', 'circle', 'square']
+const RST_SOURCES = ['guest', 'staff', 'admin', 'walk_in']
+const RST_DEFAULTS: any = {
+  grace_minutes: 15, auto_release: 1, guest_booking_enabled: 0, booking_window_days: 3, max_party_size: 10,
+  indoor_seat_target: 230, outdoor_seat_target: 60, allow_walk_ins: 1
+}
+// El Kasr: the Ops app may omit offering_id while it is the only module restaurant.
+const RST_DEFAULT_OFFERING = 3
+
+function rstMinutes(hm: any): number {
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(hm == null ? '' : hm).trim())
+  if (!m) return NaN
+  const h = Number(m[1]), mi = Number(m[2])
+  if (h > 23 || mi > 59) return NaN
+  return h * 60 + mi
+}
+
+function rstHM(min: number): string {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440
+  const p = (n: number) => (n < 10 ? '0' : '') + n
+  return p(Math.floor(m / 60)) + ':' + p(m % 60)
+}
+
+function rstIsHM(v: any): boolean {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v)
+}
+
+function rstId(v: any): number {
+  const n = Number(v)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
+function rstFlag(v: any): number | null {
+  if (v === true || v === 1 || v === '1' || v === 'true') return 1
+  if (v === false || v === 0 || v === '0' || v === 'false') return 0
+  return null
+}
+
+function rstInt(v: any, lo: number, hi: number): number | null {
+  if (v === '' || v === null || v === undefined || typeof v === 'boolean') return null
+  const n = Number(v)
+  return Number.isInteger(n) && n >= lo && n <= hi ? n : null
+}
+
+function rstText(v: any, max: number): string {
+  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function rstKey(v: any): string {
+  return String(v == null ? '' : v).trim().toLowerCase()
+}
+
+function rstNumCmp(a: any, b: any): number {
+  return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), 'en', { numeric: true, sensitivity: 'base' })
+}
+
+function rstRound(n: number, d: number = 2): number {
+  const f = Math.pow(10, d)
+  return Math.round(n * f) / f
+}
+
+function rstRows(r: any): any[] {
+  return (r && r.results) || []
+}
+
+function rstStaffName(v: any): string {
+  return rstText(v, 40) || 'Restaurant staff'
+}
+
+// Cairo wall clock, minute precision (matches the sweep's datetime() compare).
+function rstNow(d: Date = new Date()) {
+  const date = attCairoDate(d)
+  const hm = attCairoTime(d.toISOString()) || '00:00'
+  return { date, hm, min: rstMinutes(hm), stamp: date + ' ' + hm + ':00' }
+}
+
+function rstDayIdx(date: string): number {
+  return Math.round(Date.parse(date + 'T00:00:00Z') / 86400000)
+}
+
+// days_mask: bit0 = Sunday … bit6 = Saturday.
+function rstSlotRuns(slot: any, date: string): boolean {
+  const mask = slot && slot.days_mask != null ? Number(slot.days_mask) : 127
+  const dow = new Date(date + 'T12:00:00Z').getUTCDay()
+  return (mask & (1 << dow)) !== 0
+}
+
+function rstNormSettings(row: any): any {
+  if (!row) return null
+  const s: any = { ...RST_DEFAULTS, offering_id: Number(row.offering_id), updated_at: row.updated_at || null }
+  for (const k of Object.keys(RST_DEFAULTS)) if (row[k] !== null && row[k] !== undefined && row[k] !== '') s[k] = Number(row[k])
+  return s
+}
+
+async function rstSettings(DB: any, offering_id: any): Promise<any> {
+  const row = await DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(Number(offering_id)).first()
+  return rstNormSettings(row)
+}
+
+function rstExpired(b: any, s: any, now: any): boolean {
+  if (!b || b.status !== 'confirmed' || !s || Number(s.auto_release) !== 1) return false
+  const st = rstMinutes(b.start_time)
+  if (isNaN(st) || !b.booking_date) return false
+  return rstDayIdx(now.date) * 1440 + now.min > rstDayIdx(b.booking_date) * 1440 + st + (Number(s.grace_minutes) || 0)
+}
+
+function rstHolds(b: any, s: any, now: any): boolean {
+  return !!b && (b.status === 'checked_in' || (b.status === 'confirmed' && !rstExpired(b, s, now)))
+}
+
+// A conflicts with B when A.start < B.end + B.buffer AND B.start < A.end + A.buffer.
+function rstOverlaps(a: any, b: any): boolean {
+  const as = rstMinutes(a.start_time), ae = rstMinutes(a.end_time)
+  const bs = rstMinutes(b.start_time), be = rstMinutes(b.end_time)
+  if (isNaN(as) || isNaN(ae) || isNaN(bs) || isNaN(be)) return false
+  return as < be + (Number(b.buffer_minutes) || 0) && bs < ae + (Number(a.buffer_minutes) || 0)
+}
+
+// Not yet over (end + buffer still ahead): what admin guards protect.
+function rstUpcoming(b: any, now: any): boolean {
+  if (b.booking_date > now.date) return true
+  if (b.booking_date < now.date) return false
+  return rstMinutes(b.end_time) + (Number(b.buffer_minutes) || 0) > now.min
+}
+
+// SQL twins of rstExpired / rstHolds (each carries one ? = rstNow().stamp).
+const RST_MIN = (col: string) => `(CAST(substr(${col}, 1, 2) AS INTEGER) * 60 + CAST(substr(${col}, 4, 2) AS INTEGER))`
+function rstExpiredSql(a: string): string {
+  return `(${a}.status = 'confirmed' AND EXISTS (SELECT 1 FROM restaurant_settings rs WHERE rs.offering_id = ${a}.offering_id AND rs.auto_release = 1
+    AND datetime(${a}.booking_date || ' ' || ${a}.start_time, '+' || COALESCE(rs.grace_minutes, 15) || ' minutes') < ?))`
+}
+function rstHoldSql(a: string): string {
+  return `(${a}.status = 'checked_in' OR (${a}.status = 'confirmed' AND NOT ${rstExpiredSql(a)}))`
+}
+// Inside an UPDATE of restaurant_bookings: no other holding booking overlaps
+// this booking's time on table `tableExpr`. Binds: [tableExpr's ? if any], now stamp.
+function rstFreeSql(tableExpr: string): string {
+  return `NOT EXISTS (SELECT 1 FROM restaurant_bookings o
+    WHERE o.table_id = ${tableExpr} AND o.booking_date = restaurant_bookings.booking_date
+      AND o.booking_id != restaurant_bookings.booking_id AND o.status IN ('confirmed', 'checked_in')
+      AND ${RST_MIN('o.start_time')} < ${RST_MIN('restaurant_bookings.end_time')} + COALESCE(restaurant_bookings.buffer_minutes, 0)
+      AND ${RST_MIN('restaurant_bookings.start_time')} < ${RST_MIN('o.end_time')} + COALESCE(o.buffer_minutes, 0)
+      AND ${rstHoldSql('o')})`
+}
+
+function rstSweepStmt(DB: any, now: any, offering_id?: number) {
+  return DB.prepare(`
+    UPDATE restaurant_bookings
+    SET status = 'no_show', auto_released = 1, released_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE status = 'confirmed' AND booking_date <= ? ${offering_id ? 'AND offering_id = ?' : ''}
+      AND ${rstExpiredSql('restaurant_bookings')}
+  `).bind(...(offering_id ? [now.date, offering_id, now.stamp] : [now.date, now.stamp]))
+}
+
+// Durable auto-release: expired confirmed → no_show. Idempotent, one UPDATE.
+async function rstSweepNoShows(env: any, DB: any, offering_id?: number): Promise<number> {
+  const db = DB || (env && env.DB)
+  const r: any = await rstSweepStmt(db, rstNow(), offering_id).run()
+  return (r && r.meta && r.meta.changes) || 0
+}
+
+// One D1 round trip: sweep, then everything a day needs (+ caller extras).
+async function rstLoad(DB: any, oid: number, date: string, now: any, extra: any[] = []) {
+  const res = await DB.batch([
+    rstSweepStmt(DB, now, oid),
+    DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid),
+    DB.prepare('SELECT * FROM restaurant_zones WHERE offering_id = ? ORDER BY display_order, code').bind(oid),
+    DB.prepare(`
+      SELECT table_id, table_number, table_name, capacity, position_x, position_y, width, height, shape, rotation,
+             table_type, features, zone_id, is_active
+      FROM restaurant_tables WHERE offering_id = ?
+    `).bind(oid),
+    DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY start_time, display_order, slot_id').bind(oid),
+    DB.prepare(`
+      SELECT * FROM restaurant_bookings
+      WHERE offering_id = ? AND booking_date = ? AND status != 'cancelled'
+      ORDER BY start_time, booking_id
+    `).bind(oid, date),
+    ...extra
+  ])
+  const settings = rstNormSettings(rstRows(res[1])[0])
+  const zones = rstRows(res[2]).map((z: any) => ({
+    ...z, zone_id: Number(z.zone_id), is_outdoor: Number(z.is_outdoor) || 0,
+    guest_bookable: Number(z.guest_bookable ?? 1), is_active: Number(z.is_active ?? 1), display_order: Number(z.display_order) || 0
+  }))
+  const zonesById: any = {}
+  for (const z of zones) zonesById[z.zone_id] = z
+  const allTables = rstRows(res[3]).map((t: any) => {
+    const z = t.zone_id != null ? zonesById[Number(t.zone_id)] : null
+    return {
+      ...t, table_id: Number(t.table_id), capacity: Number(t.capacity) || 0,
+      zone_id: t.zone_id == null ? null : Number(t.zone_id),
+      zone_code: z ? z.code : null, zone_name: z ? z.name : null, is_outdoor: z ? z.is_outdoor : 0
+    }
+  })
+  const zoneOrder = (t: any) => (t.zone_id != null && zonesById[t.zone_id] ? zonesById[t.zone_id].display_order : 9999)
+  const tables = allTables.filter((t: any) => Number(t.is_active) === 1)
+    .sort((a: any, b: any) => zoneOrder(a) - zoneOrder(b) || rstNumCmp(a.table_number, b.table_number))
+  const tablesById: any = {}
+  for (const t of allTables) tablesById[t.table_id] = t
+  const allSlots = rstRows(res[4]).map((s: any) => ({ ...s, slot_id: Number(s.slot_id), buffer_minutes: Number(s.buffer_minutes) || 0 }))
+  const slotsById: any = {}
+  for (const s of allSlots) slotsById[s.slot_id] = s
+  const slots = allSlots.filter((s: any) => Number(s.is_active) === 1 && rstSlotRuns(s, date))
+  const bookings = rstRows(res[5]).map((b: any) => {
+    const t = b.table_id != null ? tablesById[Number(b.table_id)] : null
+    const z = b.zone_id != null ? zonesById[Number(b.zone_id)] : null
+    const sl = b.slot_id != null ? slotsById[Number(b.slot_id)] : null
+    return {
+      ...b, booking_id: Number(b.booking_id), party_size: Number(b.party_size) || 0,
+      table_id: b.table_id == null ? null : Number(b.table_id), slot_id: b.slot_id == null ? null : Number(b.slot_id),
+      buffer_minutes: Number(b.buffer_minutes) || 0,
+      table_number: t ? t.table_number : null, capacity: t ? t.capacity : null,
+      zone_code: z ? z.code : null, zone_name: z ? z.name : null,
+      meal: sl ? sl.meal : null, slot_label: sl ? sl.label : null
+    }
+  })
+  const byTable: any = {}
+  for (const b of bookings) if (b.table_id != null) (byTable[b.table_id] = byTable[b.table_id] || []).push(b)
+  return { oid, date, now, settings, zones, zonesById, allTables, tables, tablesById, allSlots, slots, slotsById, bookings, byTable, extra: res.slice(6), swept: (res[0] && res[0].meta && res[0].meta.changes) || 0 }
+}
+
+function rstBookingView(b: any, s: any, now: any) {
+  const expired = rstExpired(b, s, now)
+  const st = rstMinutes(b.start_time)
+  return {
+    ...b,
+    expired,
+    effective_status: expired ? 'no_show' : b.status,
+    auto_released: expired ? 1 : (Number(b.auto_released) || 0),
+    grace_ends: isNaN(st) ? null : rstHM(st + (Number(s && s.grace_minutes) || 0)),
+    checked_in_time: attCairoTime(b.checked_in_at),
+    released_time: attCairoTime(b.released_at)
+  }
+}
+
+function rstZoneOk(t: any, zonesById: any, guestOnly: boolean): boolean {
+  const z = t.zone_id != null ? zonesById[t.zone_id] : null
+  if (guestOnly) return !!z && z.is_active === 1 && z.guest_bookable === 1
+  return !z || z.is_active === 1
+}
+
+function rstPrefMatch(t: any, z: any, pref: string): boolean {
+  if (!pref) return false
+  if (pref === 'indoor') return !!z && !z.is_outdoor
+  if (pref === 'outdoor') return !!z && !!z.is_outdoor
+  return !!z && String(z.code).toLowerCase() === pref
+}
+
+// Free tables that fit the party for a time window, best first: preferred
+// zone (or indoor/outdoor), then the smallest capacity, then zone order + number.
+function rstCandidates(ctx: any, win: any, party: number, pref: any, guestOnly: boolean, excludeBookingId?: number): any[] {
+  const busy = new Set<number>()
+  for (const b of ctx.bookings) {
+    if (b.table_id == null || b.booking_id === excludeBookingId) continue
+    if (!rstHolds(b, ctx.settings, ctx.now) || !rstOverlaps(win, b)) continue
+    busy.add(b.table_id)
+  }
+  const p = rstKey(pref)
+  const zo = (t: any) => (t.zone_id != null && ctx.zonesById[t.zone_id] ? ctx.zonesById[t.zone_id].display_order : 9999)
+  return ctx.tables
+    .filter((t: any) => t.capacity >= party && !busy.has(t.table_id) && rstZoneOk(t, ctx.zonesById, guestOnly))
+    .map((t: any) => ({ t, pm: rstPrefMatch(t, t.zone_id != null ? ctx.zonesById[t.zone_id] : null, p) ? 0 : 1 }))
+    .sort((a: any, b: any) => a.pm - b.pm || a.t.capacity - b.t.capacity || zo(a.t) - zo(b.t) || rstNumCmp(a.t.table_number, b.t.table_number))
+    .map((x: any) => x.t)
+}
+
+function rstEmptyStock() {
+  return {
+    tables_total: 0, seats_total: 0, free_tables: 0, free_chairs: 0, booked_tables: 0, seated_tables: 0,
+    released_tables: 0, guests_expected: 0, guests_seated: 0, guests_awaiting: 0, max_party_fit: 0
+  }
+}
+
+// Live stock of one slot window: per-table state + totals (overall and per zone code).
+function rstStockFor(ctx: any, slot: any, guestOnly: boolean) {
+  const win = { start_time: slot.start_time, end_time: slot.end_time, buffer_minutes: Number(slot.buffer_minutes) || 0 }
+  const total: any = rstEmptyStock()
+  const by_zone: any = {}
+  for (const z of ctx.zones) if (z.is_active === 1 && (!guestOnly || z.guest_bookable === 1)) by_zone[z.code] = rstEmptyStock()
+  const states: any = {}
+  for (const t of ctx.tables) {
+    if (!rstZoneOk(t, ctx.zonesById, guestOnly)) continue
+    let seated: any = null, booked: any = null, released: any = null
+    for (const b of ctx.byTable[t.table_id] || []) {
+      if (!rstOverlaps(win, b)) continue
+      if (b.status === 'checked_in') seated = seated || b
+      else if (b.status === 'confirmed' && !rstExpired(b, ctx.settings, ctx.now)) booked = booked || b
+      else if (b.status === 'no_show' || b.status === 'confirmed') released = released || b
+    }
+    const state = seated ? 'seated' : booked ? 'booked' : released ? 'released' : 'free'
+    const holder = seated || booked || released
+    states[t.table_id] = { state, booking: holder }
+    const key = t.zone_code || '-'
+    const zs = by_zone[key] || (by_zone[key] = rstEmptyStock())
+    for (const agg of [total, zs]) {
+      agg.tables_total++
+      agg.seats_total += t.capacity
+      if (state === 'free' || state === 'released') {
+        agg.free_tables++
+        agg.free_chairs += t.capacity
+        if (t.capacity > agg.max_party_fit) agg.max_party_fit = t.capacity
+        if (state === 'released') agg.released_tables++
+      } else if (state === 'booked') {
+        agg.booked_tables++
+        agg.guests_expected += booked.party_size
+        agg.guests_awaiting += booked.party_size
+      } else {
+        agg.seated_tables++
+        agg.guests_expected += seated.party_size
+        agg.guests_seated += seated.party_size
+      }
+    }
+  }
+  return { stock: { ...total, by_zone }, states }
+}
+
+// "Now" slot for a day: in progress or next; other days: the first one.
+function rstCurrentSlotId(slots: any[], date: string, now: any): number | null {
+  if (!slots.length) return null
+  if (date !== now.date) return slots[0].slot_id
+  for (const s of slots) if (now.min < rstMinutes(s.end_time)) return s.slot_id
+  return slots[slots.length - 1].slot_id
+}
+
+function rstSlotOut(s: any) {
+  return {
+    slot_id: s.slot_id, meal: s.meal, label: s.label, start_time: s.start_time, end_time: s.end_time,
+    buffer_minutes: Number(s.buffer_minutes) || 0, days_mask: Number(s.days_mask ?? 127),
+    display_order: Number(s.display_order) || 0, is_active: Number(s.is_active ?? 1)
+  }
+}
+
+function rstZoneSeats(ctx: any) {
+  return ctx.zones.map((z: any) => {
+    const ts = ctx.tables.filter((t: any) => t.zone_id === z.zone_id)
+    return { ...z, tables: ts.length, seats: ts.reduce((n: number, t: any) => n + t.capacity, 0) }
+  })
+}
+
+function rstDayView(ctx: any, slotId?: any, opts: any = {}) {
+  const guestOnly = !!opts.guestOnly
+  const now = ctx.now
+  const current = rstCurrentSlotId(ctx.slots, ctx.date, now)
+  const slots = ctx.slots.map((s: any) => {
+    const st = rstStockFor(ctx, s, guestOnly).stock
+    const start = rstMinutes(s.start_time), end = rstMinutes(s.end_time)
+    return {
+      ...rstSlotOut(s), ...st,
+      started: ctx.date < now.date || (ctx.date === now.date && now.min >= start),
+      in_progress: ctx.date === now.date && now.min >= start && now.min < end,
+      is_current: s.slot_id === current
+    }
+  })
+  const want = rstId(slotId)
+  const sel = (want && (ctx.slots.find((s: any) => s.slot_id === want) || ctx.allSlots.find((s: any) => s.slot_id === want))) ||
+    ctx.slots.find((s: any) => s.slot_id === current) || null
+  const selStock = sel ? rstStockFor(ctx, sel, guestOnly) : null
+  const tables = ctx.tables.filter((t: any) => rstZoneOk(t, ctx.zonesById, guestOnly)).map((t: any) => {
+    const st = selStock ? selStock.states[t.table_id] : null
+    return {
+      table_id: t.table_id, table_number: t.table_number, table_name: t.table_name, capacity: t.capacity,
+      zone_id: t.zone_id, zone_code: t.zone_code, zone_name: t.zone_name, is_outdoor: t.is_outdoor,
+      shape: t.shape, position_x: t.position_x, position_y: t.position_y, width: t.width, height: t.height,
+      rotation: t.rotation, table_type: t.table_type,
+      state: st ? st.state : 'free',
+      booking: st && st.booking ? rstBookingView(st.booking, ctx.settings, now) : null
+    }
+  })
+  return {
+    enabled: !!ctx.settings,
+    settings: ctx.settings,
+    date: ctx.date,
+    today: now.date,
+    now: now.hm,
+    slots,
+    current_slot_id: current,
+    slot_id: sel ? sel.slot_id : null,
+    slot: sel ? rstSlotOut(sel) : null,
+    tables,
+    bookings: ctx.bookings.map((b: any) => rstBookingView(b, ctx.settings, now)),
+    stock: selStock ? selStock.stock : { ...rstEmptyStock(), by_zone: {} },
+    zones: rstZoneSeats(ctx),
+    swept: ctx.swept
+  }
+}
+
+// Shared day/stock reader (staff day view, availability, other builders).
+async function rstDayStock(env: any, offering_id: any, date: string, slot_id?: any, opts: any = {}) {
+  const now = rstNow()
+  const d = isBeachYmd(date) ? date : now.date
+  const ctx = await rstLoad(env.DB, Number(offering_id), d, now)
+  return rstDayView(ctx, slot_id, opts)
+}
+
+function rstRef(): string {
+  return 'RST-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, 'X')
+}
+
+function rstCode(): string {
+  return 'R' + Math.floor(10000 + Math.random() * 90000)
+}
+
+function rstErr(status: number, error: string, message: string, extra: any = {}) {
+  return { status, body: { success: false, error, message, ...extra } }
+}
+
+// Create a booking (guest / staff / admin / walk_in). Validation, auto table
+// assignment, then an atomic INSERT…SELECT…WHERE NOT EXISTS (table overlap
+// incl. buffers against holding bookings) with one retry on the next table.
+async function rstCreate(env: any, oid: number, input: any): Promise<{ status: number, body: any }> {
+  const DB = env.DB
+  const now = rstNow()
+  const src = RST_SOURCES.includes(input.source) ? input.source : 'guest'
+  const guestSrc = src === 'guest'
+  const date = String(input.booking_date || '')
+  if (!oid) return rstErr(400, 'invalid_offering', 'Unknown restaurant')
+  if (!isBeachYmd(date)) return rstErr(400, 'invalid_date', 'Please choose a valid date')
+  const party = Number(input.party_size)
+  if (!Number.isInteger(party) || party < 1) return rstErr(400, 'invalid_party', 'Please choose how many guests (at least 1)')
+  const name = rstText(input.guest_name, 80)
+  const room = rstText(input.room_number, 20)
+  const phone = rstText(input.guest_phone, 40)
+  const requests = String(input.special_requests == null ? '' : input.special_requests).trim().slice(0, 500)
+  if (guestSrc && !room) return rstErr(400, 'room_required', 'Please enter your room number')
+  if (guestSrc && !name) return rstErr(400, 'name_required', 'Please enter your name')
+  const staff = src === 'guest' ? null : rstStaffName(input.staff_name)
+  const codes = [rstCode(), rstCode(), rstCode(), rstCode(), rstCode(), rstCode()]
+  const codeFloor = addDaysYmd(now.date, -30)
+  const ctx = await rstLoad(DB, oid, date, now, [
+    DB.prepare('SELECT offering_id, property_id, title_en FROM hotel_offerings WHERE offering_id = ?').bind(oid),
+    DB.prepare(`SELECT booking_code FROM restaurant_bookings WHERE booking_code IN (?, ?, ?, ?, ?, ?) AND booking_date >= ?`).bind(...codes, codeFloor)
+  ])
+  const s = ctx.settings
+  const off: any = rstRows(ctx.extra[0])[0]
+  if (!s || !off) return rstErr(404, 'not_enabled', 'Table booking is not available for this restaurant')
+  if (guestSrc && s.guest_booking_enabled !== 1) {
+    return rstErr(403, 'booking_disabled', 'Online table booking is not open yet — please contact the restaurant or reception')
+  }
+  if (src === 'walk_in' && s.allow_walk_ins !== 1) return rstErr(403, 'walk_ins_disabled', 'Walk-ins are switched off for this restaurant')
+  const wantSlot = rstId(input.slot_id)
+  let slot: any = wantSlot ? ctx.allSlots.find((x: any) => x.slot_id === wantSlot && Number(x.is_active) === 1) : null
+  if (!slot && !wantSlot && input.use_current_slot) {
+    const cur = rstCurrentSlotId(ctx.slots, date, now)
+    slot = ctx.slots.find((x: any) => x.slot_id === cur) || null
+  }
+  if (!slot) return rstErr(400, 'invalid_slot', 'Please choose a valid time slot')
+  if (!rstSlotRuns(slot, date)) return rstErr(400, 'slot_not_running', (slot.label || 'This slot') + ' does not run on that day')
+  if (date < now.date) return rstErr(400, 'invalid_date', 'That date has passed')
+  if (src === 'walk_in' && date !== now.date) return rstErr(400, 'invalid_date', 'Walk-ins can only be seated today')
+  if (guestSrc) {
+    const win = Math.max(0, s.booking_window_days)
+    if (date > addDaysYmd(now.date, win)) {
+      return rstErr(400, 'outside_window', win === 0 ? 'Bookings are open for today only' : 'Bookings open ' + win + ' day' + (win === 1 ? '' : 's') + ' ahead')
+    }
+    if (date === now.date && now.min >= rstMinutes(slot.start_time)) {
+      return rstErr(400, 'slot_started', (slot.label || 'This slot') + ' has already started — please choose a later time')
+    }
+    if (party > s.max_party_size) {
+      return rstErr(400, 'party_too_large', 'Online bookings are for up to ' + s.max_party_size + ' guests — for larger groups please contact the restaurant', { max_party_size: s.max_party_size })
+    }
+  }
+  const pool = ctx.tables.filter((t: any) => rstZoneOk(t, ctx.zonesById, guestSrc))
+  const maxCap = pool.reduce((m: number, t: any) => Math.max(m, t.capacity), 0)
+  if (party > maxCap) {
+    return rstErr(400, 'party_too_large', maxCap
+      ? 'Our largest table seats ' + maxCap + ' — please book separate tables for a group of ' + party
+      : 'No tables are set up for booking yet', { max_table_capacity: maxCap })
+  }
+  const win = { start_time: slot.start_time, end_time: slot.end_time, buffer_minutes: Number(slot.buffer_minutes) || 0 }
+  const explicit = guestSrc ? 0 : rstId(input.table_id)
+  let cands: any[]
+  if (explicit) {
+    const t = ctx.tables.find((x: any) => x.table_id === explicit)
+    if (!t) return rstErr(400, 'invalid_table', 'That table does not exist or is not in use')
+    if (t.capacity < party) return rstErr(400, 'table_too_small', 'Table ' + t.table_number + ' seats ' + t.capacity + ' — too small for ' + party)
+    const free = rstCandidates(ctx, win, party, t.zone_code, false)
+    if (!free.some((x: any) => x.table_id === explicit)) {
+      return rstErr(409, 'table_taken', 'Table ' + t.table_number + ' is already booked for this time', { suggest_table_id: free[0] ? free[0].table_id : null, suggest_table_number: free[0] ? free[0].table_number : null })
+    }
+    cands = [t]
+  } else {
+    cands = rstCandidates(ctx, win, party, input.zone_pref, guestSrc)
+    if (!cands.length) return rstErr(409, 'full', 'Sorry — no table for ' + party + ' is free in ' + (slot.label || 'this slot') + '. Please try another time.')
+  }
+  const takenCodes = new Set(rstRows(ctx.extra[1]).map((r: any) => String(r.booking_code)))
+  const freeCodes = codes.filter((x) => !takenCodes.has(x))
+  const status = src === 'walk_in' ? 'checked_in' : 'confirmed'
+  const gname = name || (src === 'walk_in' ? 'Walk-in' : (room ? 'Room ' + room : 'Guest'))
+  // Double-tap / resubmit of the same request inside a minute returns the first booking.
+  const dupSql = `SELECT d.* FROM restaurant_bookings d
+    WHERE d.offering_id = ? AND d.booking_date = ? AND d.slot_id = ? AND LOWER(TRIM(COALESCE(d.room_number, ''))) = LOWER(?)
+      AND d.party_size = ? AND COALESCE(d.guest_name, '') = ? AND d.status IN ('confirmed', 'checked_in')
+      AND d.created_at >= datetime('now', '-60 seconds')`
+  const dupBinds = [oid, date, slot.slot_id, room, party, gname]
+  // Binds: table, date, new end + buffer, new start, now stamp.
+  const conflictSql = `SELECT 1 FROM restaurant_bookings o
+    WHERE o.table_id = ? AND o.booking_date = ? AND o.status IN ('confirmed', 'checked_in')
+      AND ${RST_MIN('o.start_time')} < ? AND ? < ${RST_MIN('o.end_time')} + COALESCE(o.buffer_minutes, 0)
+      AND ${rstHoldSql('o')}`
+  const aStart = rstMinutes(win.start_time), aEndBuf = rstMinutes(win.end_time) + win.buffer_minutes
+  const tries = Math.min(2, cands.length)
+  for (let i = 0; i < tries; i++) {
+    const t = cands[i]
+    const ref = rstRef()
+    const code = freeCodes[i] || rstCode()
+    const r: any = await DB.prepare(`
+      INSERT INTO restaurant_bookings (
+        booking_reference, booking_code, offering_id, property_id, slot_id, booking_date, start_time, end_time,
+        buffer_minutes, table_id, zone_id, party_size, guest_name, room_number, guest_phone, special_requests,
+        status, source, checked_in_at, checked_in_by
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'checked_in' THEN CURRENT_TIMESTAMP ELSE NULL END, ?
+      WHERE EXISTS (SELECT 1 FROM restaurant_tables t WHERE t.table_id = ? AND t.offering_id = ? AND t.is_active = 1 AND t.capacity >= ?)
+        AND NOT EXISTS (${conflictSql})
+        AND NOT EXISTS (SELECT 1 FROM restaurant_bookings k WHERE k.booking_code = ? AND k.booking_date >= ?)
+        ${room ? `AND NOT EXISTS (${dupSql})` : ''}
+    `).bind(
+      ref, code, oid, off.property_id, slot.slot_id, date, win.start_time, win.end_time,
+      win.buffer_minutes, t.table_id, t.zone_id, party, gname, room || null, phone || null, requests || null,
+      status, src, status, status === 'checked_in' ? staff : null,
+      t.table_id, oid, party,
+      t.table_id, date, aEndBuf, aStart, now.stamp,
+      code, codeFloor,
+      ...(room ? dupBinds : [])
+    ).run()
+    if (r && r.meta && r.meta.changes) {
+      const st = rstMinutes(win.start_time)
+      return {
+        status: 200,
+        body: {
+          success: true,
+          booking: {
+            booking_id: r.meta.last_row_id, booking_reference: ref, booking_code: code, offering_id: oid,
+            restaurant_name: off.title_en || null, booking_date: date, slot_id: slot.slot_id, meal: slot.meal,
+            label: slot.label, start_time: win.start_time, end_time: win.end_time, buffer_minutes: win.buffer_minutes,
+            party_size: party, table_id: t.table_id, table_number: t.table_number, table_name: t.table_name || null,
+            capacity: t.capacity, zone_id: t.zone_id, zone_code: t.zone_code, zone_name: t.zone_name, is_outdoor: t.is_outdoor,
+            guest_name: gname, room_number: room || null, status, source: src, checked_in_by: status === 'checked_in' ? staff : null,
+            grace_minutes: s.grace_minutes, auto_release: s.auto_release, grace_ends: rstHM(st + s.grace_minutes)
+          }
+        }
+      }
+    }
+    if (room) {
+      const dup: any = await DB.prepare(dupSql + ' ORDER BY d.booking_id LIMIT 1').bind(...dupBinds).first()
+      if (dup) {
+        const t2 = ctx.tablesById[Number(dup.table_id)] || {}
+        return {
+          status: 200,
+          body: {
+            success: true, duplicate: true,
+            booking: {
+              ...rstBookingView({ ...dup, table_number: t2.table_number || null }, s, now),
+              restaurant_name: off.title_en || null, meal: slot.meal, label: slot.label,
+              table_name: t2.table_name || null, capacity: t2.capacity || null, zone_code: t2.zone_code || null,
+              zone_name: t2.zone_name || null, is_outdoor: t2.is_outdoor || 0,
+              grace_minutes: s.grace_minutes, auto_release: s.auto_release
+            }
+          }
+        }
+      }
+    }
+    if (explicit) break
+  }
+  if (explicit) return rstErr(409, 'table_taken', 'That table was just taken — pick another one')
+  return rstErr(409, 'full', 'Sorry — that time just filled up. Please choose another slot.')
+}
+
+function rstChoice(b: any, s: any, now: any) {
+  const v = rstBookingView(b, s, now)
+  return {
+    booking_id: v.booking_id, booking_reference: v.booking_reference, booking_code: v.booking_code, guest_name: v.guest_name,
+    room_number: v.room_number, party_size: v.party_size, table_id: v.table_id, table_number: v.table_number,
+    zone_code: v.zone_code, slot_id: v.slot_id, slot_label: v.slot_label, meal: v.meal, start_time: v.start_time,
+    end_time: v.end_time, status: v.status, effective_status: v.effective_status, auto_released: v.auto_released
+  }
+}
+
+// Check a loaded booking in (optionally onto another table). Guarded: the
+// target table must be free of other holding bookings for its time.
+async function rstCheckIn(DB: any, ctx: any, booking: any, staff: string, moveTo: number) {
+  const s = ctx.settings, now = ctx.now
+  if (booking.status === 'checked_in' || booking.status === 'completed') {
+    return { status: 200, body: { success: true, already: true, booking: rstBookingView(booking, s, now) } }
+  }
+  if (booking.status !== 'confirmed' && booking.status !== 'no_show') {
+    return rstErr(409, 'not_checkable', 'This booking can no longer be checked in')
+  }
+  const suggest = () => {
+    const alt = rstCandidates(ctx, booking, booking.party_size, booking.zone_code, false, booking.booking_id)
+      .filter((t: any) => t.table_id !== booking.table_id)
+    return { suggest_table_id: alt[0] ? alt[0].table_id : null, suggest_table_number: alt[0] ? alt[0].table_number : null }
+  }
+  const targetId = moveTo || booking.table_id || 0
+  const target = targetId ? ctx.tables.find((t: any) => t.table_id === targetId) : null
+  if (moveTo && !target) return rstErr(400, 'invalid_table', 'That table does not exist or is not in use')
+  if (moveTo && target.capacity < booking.party_size) {
+    return rstErr(400, 'table_too_small', 'Table ' + target.table_number + ' seats ' + target.capacity + ' — too small for ' + booking.party_size)
+  }
+  const free = !!target && rstCandidates(ctx, booking, 1, null, false, booking.booking_id).some((t: any) => t.table_id === target.table_id)
+  const takenMsg = () => {
+    const sg = suggest()
+    const tn = target ? target.table_number : booking.table_number
+    return rstErr(409, 'table_taken', (tn ? 'Table ' + tn : 'Their table') + ' has been given to another guest' +
+      (sg.suggest_table_number ? ' — seat them at table ' + sg.suggest_table_number : ' and no other table for ' + booking.party_size + ' is free right now'), sg)
+  }
+  if (!free) return takenMsg()
+  const r: any = await DB.prepare(`
+    UPDATE restaurant_bookings
+    SET status = 'checked_in', table_id = ?, zone_id = ?, checked_in_at = CURRENT_TIMESTAMP, checked_in_by = ?,
+        auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP
+    WHERE booking_id = ? AND status IN ('confirmed', 'no_show') AND ${rstFreeSql('?')}
+  `).bind(target.table_id, target.zone_id, staff, booking.booking_id, target.table_id, now.stamp).run()
+  if (!r || !r.meta || !r.meta.changes) {
+    const cur: any = await DB.prepare('SELECT status, checked_in_at, checked_in_by FROM restaurant_bookings WHERE booking_id = ?').bind(booking.booking_id).first()
+    if (cur && cur.status === 'checked_in') {
+      return { status: 200, body: { success: true, already: true, booking: rstBookingView({ ...booking, ...cur }, s, now) } }
+    }
+    return takenMsg()
+  }
+  const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const revived = booking.status === 'no_show' || rstExpired(booking, s, now)
+  const updated = {
+    ...booking, status: 'checked_in', table_id: target.table_id, table_number: target.table_number, zone_id: target.zone_id,
+    zone_code: target.zone_code, zone_name: target.zone_name, capacity: target.capacity,
+    checked_in_at: nowUtc, checked_in_by: staff, auto_released: 0, released_at: null
+  }
+  return { status: 200, body: { success: true, revived, moved: target.table_id !== booking.table_id, booking: rstBookingView(updated, s, now) } }
+}
+
+// ── Public (guest) API ──
+app.get('/api/restaurant-module/booking/:reference', async (c) => {
+  const DB = c.env.DB
+  try {
+    const ref = String(c.req.param('reference') || '').trim()
+    const row: any = await DB.prepare(`
+      SELECT b.*, t.table_number, t.table_name, t.capacity, z.code AS zone_code, z.name AS zone_name, z.is_outdoor,
+             s.meal, s.label AS slot_label, o.title_en AS restaurant_name, rs.grace_minutes, rs.auto_release
+      FROM restaurant_bookings b
+      LEFT JOIN restaurant_tables t ON t.table_id = b.table_id
+      LEFT JOIN restaurant_zones z ON z.zone_id = b.zone_id
+      LEFT JOIN restaurant_slots s ON s.slot_id = b.slot_id
+      LEFT JOIN hotel_offerings o ON o.offering_id = b.offering_id
+      LEFT JOIN restaurant_settings rs ON rs.offering_id = b.offering_id
+      WHERE b.booking_reference = ?
+    `).bind(ref).first()
+    if (!row) return c.json({ success: false, error: 'not_found', message: 'Booking not found' }, 404)
+    const s = rstNormSettings({ offering_id: row.offering_id, grace_minutes: row.grace_minutes, auto_release: row.auto_release })
+    const { guest_phone, ...pub } = row
+    return c.json({ success: true, booking: { ...rstBookingView(pub, s, rstNow()), grace_minutes: s.grace_minutes } })
+  } catch (e) {
+    console.error('restaurant-module booking get', e)
+    return c.json({ success: false, error: 'Failed to load booking' }, 500)
+  }
+})
+
+app.post('/api/restaurant-module/booking/:reference/cancel', async (c) => {
+  const DB = c.env.DB
+  try {
+    const ref = String(c.req.param('reference') || '').trim()
+    const b: any = await c.req.json().catch(() => ({}))
+    const room = rstText(b && b.room_number, 20)
+    const res = await DB.batch([
+      DB.prepare(`
+        UPDATE restaurant_bookings SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE booking_reference = ? AND status = 'confirmed' AND (? = '' OR LOWER(TRIM(COALESCE(room_number, ''))) = LOWER(?))
+      `).bind(ref, room, room),
+      DB.prepare('SELECT booking_reference, status, room_number FROM restaurant_bookings WHERE booking_reference = ?').bind(ref)
+    ])
+    const changed = (res[0] && res[0].meta && res[0].meta.changes) || 0
+    const row: any = rstRows(res[1])[0]
+    if (!row) return c.json({ success: false, error: 'not_found', message: 'Booking not found' }, 404)
+    if (changed) return c.json({ success: true, booking_reference: ref, status: 'cancelled' })
+    if (row.status === 'cancelled') return c.json({ success: true, already: true, booking_reference: ref, status: 'cancelled' })
+    if (row.status === 'confirmed') return c.json({ success: false, error: 'room_mismatch', message: 'The room number does not match this booking' }, 403)
+    const msg = row.status === 'checked_in' || row.status === 'completed' ? 'This booking has already been seated' : 'This booking was released after the grace period and can no longer be cancelled'
+    return c.json({ success: false, error: 'not_cancellable', status: row.status, message: msg }, 409)
+  } catch (e) {
+    console.error('restaurant-module cancel', e)
+    return c.json({ success: false, error: 'Failed to cancel booking' }, 500)
+  }
+})
+
+app.get('/api/restaurant-module/:offering_id/config', async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+  try {
+    const now = rstNow()
+    const res = await DB.batch([
+      DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid),
+      DB.prepare('SELECT zone_id, code, name, is_outdoor, color, display_order, guest_bookable FROM restaurant_zones WHERE offering_id = ? AND is_active = 1 ORDER BY display_order, code').bind(oid),
+      DB.prepare('SELECT zone_id, COUNT(*) AS tables, SUM(capacity) AS seats, MAX(capacity) AS max_cap FROM restaurant_tables WHERE offering_id = ? AND is_active = 1 GROUP BY zone_id').bind(oid),
+      DB.prepare('SELECT slot_id, meal, label, start_time, end_time, buffer_minutes, days_mask, display_order FROM restaurant_slots WHERE offering_id = ? AND is_active = 1 ORDER BY start_time, display_order, slot_id').bind(oid),
+      DB.prepare('SELECT title_en FROM hotel_offerings WHERE offering_id = ?').bind(oid)
+    ])
+    const s = rstNormSettings(rstRows(res[0])[0])
+    if (!s) return c.json({ success: true, enabled: false })
+    const agg: any = {}
+    for (const r of rstRows(res[2])) agg[r.zone_id == null ? '-' : Number(r.zone_id)] = r
+    let maxCap = 0
+    const zones = rstRows(res[1]).map((z: any) => {
+      const a = agg[Number(z.zone_id)] || {}
+      if (Number(z.guest_bookable) === 1) maxCap = Math.max(maxCap, Number(a.max_cap) || 0)
+      return { ...z, is_outdoor: Number(z.is_outdoor) || 0, guest_bookable: Number(z.guest_bookable ?? 1), tables: Number(a.tables) || 0, seats: Number(a.seats) || 0 }
+    })
+    const off: any = rstRows(res[4])[0] || {}
+    return c.json({
+      success: true,
+      enabled: true,
+      offering_id: oid,
+      restaurant_name: off.title_en || null,
+      today: now.date,
+      now: now.hm,
+      settings: {
+        grace_minutes: s.grace_minutes, auto_release: s.auto_release, guest_booking_enabled: s.guest_booking_enabled,
+        booking_window_days: s.booking_window_days, max_party_size: s.max_party_size, allow_walk_ins: s.allow_walk_ins
+      },
+      zones,
+      slots: rstRows(res[3]).map(rstSlotOut),
+      max_table_capacity: maxCap
+    })
+  } catch (e) {
+    console.error('restaurant-module config', e)
+    return c.json({ success: false, error: 'Failed to load restaurant' }, 500)
+  }
+})
+
+app.get('/api/restaurant-module/:offering_id/availability', async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+  try {
+    const q = String(c.req.query('date') || '')
+    const day = await rstDayStock(c.env, oid, q, null, { guestOnly: true })
+    if (!day.enabled) return c.json({ success: true, enabled: false, date: day.date, slots: [] })
+    const s = day.settings
+    const inWindow = day.date >= day.today && day.date <= addDaysYmd(day.today, s.booking_window_days)
+    const open = s.guest_booking_enabled === 1
+    return c.json({
+      success: true,
+      enabled: true,
+      guest_booking_enabled: s.guest_booking_enabled,
+      date: day.date,
+      today: day.today,
+      now: day.now,
+      in_window: inWindow,
+      max_party_size: s.max_party_size,
+      slots: day.slots.map((x: any) => ({
+        slot_id: x.slot_id, meal: x.meal, label: x.label, start_time: x.start_time, end_time: x.end_time,
+        buffer_minutes: x.buffer_minutes, free_tables: x.free_tables, free_chairs: x.free_chairs,
+        max_party_fit: x.max_party_fit, tables_total: x.tables_total, seats_total: x.seats_total,
+        by_zone: Object.fromEntries(Object.entries(x.by_zone).map(([k, v]: any) => [k, { free_tables: v.free_tables, free_chairs: v.free_chairs, max_party_fit: v.max_party_fit }])),
+        started: x.started,
+        bookable: open && inWindow && !x.started && x.free_tables > 0
+      }))
+    })
+  } catch (e) {
+    console.error('restaurant-module availability', e)
+    return c.json({ success: false, error: 'Failed to load availability' }, 500)
+  }
+})
+
+app.post('/api/restaurant-module/:offering_id/bookings', async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body', message: 'Invalid request' }, 400)
+    const source = b.source === 'staff' || b.source === 'admin' ? b.source : 'guest'
+    const r = await rstCreate(c.env, oid, { ...b, source, use_current_slot: false })
+    return c.json(r.body, r.status as any)
+  } catch (e) {
+    console.error('restaurant-module booking create', e)
+    return c.json({ success: false, error: 'server_error', message: 'Could not create the booking — please try again' }, 500)
+  }
+})
+
+// ── Admin API (setup page) ──
+function rstAdminPid(c: any, body?: any): string | null {
+  const v = c.req.header('X-Property-ID') || (body && body.property_id) || c.req.query('property_id')
+  return v == null || v === '' ? null : String(v)
+}
+
+function rstOwnStmt(DB: any, oid: number, pid: string) {
+  return DB.prepare('SELECT offering_id, title_en FROM hotel_offerings WHERE offering_id = ? AND property_id = ?').bind(oid, pid)
+}
+
+function rstNotOwned(c: any) {
+  return c.json({ success: false, error: 'not_found', message: 'Restaurant not found for this property' }, 404)
+}
+
+function rstTotalsStmts(DB: any, oid: number) {
+  return [
+    DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid),
+    DB.prepare('SELECT * FROM restaurant_zones WHERE offering_id = ? ORDER BY display_order, code').bind(oid),
+    DB.prepare('SELECT table_id, capacity, zone_id FROM restaurant_tables WHERE offering_id = ? AND is_active = 1').bind(oid)
+  ]
+}
+
+// Seats configured per zone and indoor/outdoor vs the targets (inactive zones excluded from indoor/outdoor).
+function rstTotals(settingsRow: any, zones: any[], tables: any[]) {
+  const s = rstNormSettings(settingsRow) || { ...RST_DEFAULTS }
+  const byId: any = {}
+  const by_zone: any = {}
+  for (const z of zones) {
+    byId[Number(z.zone_id)] = z
+    by_zone[z.code] = { zone_id: Number(z.zone_id), code: z.code, name: z.name, is_outdoor: Number(z.is_outdoor) || 0, is_active: Number(z.is_active ?? 1), tables: 0, seats: 0 }
+  }
+  const t: any = { indoor_seats: 0, outdoor_seats: 0, indoor_tables: 0, outdoor_tables: 0, unassigned_seats: 0, unassigned_tables: 0, total_seats: 0, total_tables: 0 }
+  for (const row of tables) {
+    const cap = Number(row.capacity) || 0
+    t.total_seats += cap
+    t.total_tables++
+    const z = row.zone_id != null ? byId[Number(row.zone_id)] : null
+    if (!z) { t.unassigned_seats += cap; t.unassigned_tables++; continue }
+    by_zone[z.code].tables++
+    by_zone[z.code].seats += cap
+    if (Number(z.is_active ?? 1) !== 1) continue
+    if (Number(z.is_outdoor) === 1) { t.outdoor_seats += cap; t.outdoor_tables++ } else { t.indoor_seats += cap; t.indoor_tables++ }
+  }
+  return { ...t, indoor_target: s.indoor_seat_target, outdoor_target: s.outdoor_seat_target, by_zone }
+}
+
+function rstTotalsFrom(res: any[], at: number) {
+  return rstTotals(rstRows(res[at])[0], rstRows(res[at + 1]), rstRows(res[at + 2]))
+}
+
+function rstSlotWarnings(slots: any[]) {
+  const act = slots.filter((s: any) => Number(s.is_active ?? 1) === 1)
+  const out: any[] = []
+  for (let i = 0; i < act.length; i++) {
+    for (let j = i + 1; j < act.length; j++) {
+      const a = act[i], b = act[j]
+      if ((Number(a.days_mask ?? 127) & Number(b.days_mask ?? 127)) === 0) continue
+      if (!rstOverlaps(a, b)) continue
+      out.push({
+        slot_ids: [Number(a.slot_id), Number(b.slot_id)],
+        message: (a.label || a.start_time) + ' (' + a.start_time + '–' + a.end_time + ' +' + (Number(a.buffer_minutes) || 0) + ' min) overlaps ' +
+          (b.label || b.start_time) + ' (' + b.start_time + '–' + b.end_time + ' +' + (Number(b.buffer_minutes) || 0) + ' min)'
+      })
+    }
+  }
+  return out
+}
+
+function rstSettingsFields(body: any): { fields?: any, error?: string } {
+  const f: any = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  const ranges: [string, number, number, string][] = [
+    ['grace_minutes', 0, 120, 'Grace period must be 0–120 minutes'],
+    ['booking_window_days', 0, 30, 'Booking window must be 0–30 days'],
+    ['max_party_size', 1, 30, 'Max party size must be 1–30'],
+    ['indoor_seat_target', 0, 2000, 'Indoor seat target must be 0–2000'],
+    ['outdoor_seat_target', 0, 2000, 'Outdoor seat target must be 0–2000']
+  ]
+  for (const [k, lo, hi, msg] of ranges) {
+    if (!has(k)) continue
+    const n = rstInt(body[k], lo, hi)
+    if (n === null) return { error: msg }
+    f[k] = n
+  }
+  for (const k of ['auto_release', 'guest_booking_enabled', 'allow_walk_ins']) {
+    if (!has(k)) continue
+    const v = rstFlag(body[k])
+    if (v === null) return { error: k + ' must be on or off' }
+    f[k] = v
+  }
+  return { fields: f }
+}
+
+function rstZoneFields(body: any): { fields?: any, error?: string } {
+  const f: any = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  if (has('code')) {
+    const v = String(body.code == null ? '' : body.code).trim().toUpperCase()
+    if (!/^[A-Z0-9]{1,4}$/.test(v)) return { error: 'Zone code must be 1–4 letters or digits' }
+    f.code = v
+  }
+  if (has('name')) {
+    const v = rstText(body.name, 61)
+    if (!v || v.length > 60 || /[<>]/.test(v)) return { error: 'Zone name must be 1–60 characters (no < or >)' }
+    f.name = v
+  }
+  if (has('color')) {
+    if (body.color === null || body.color === '') f.color = null
+    else {
+      const v = String(body.color).trim()
+      if (!/^#[0-9a-fA-F]{3,8}$/.test(v)) return { error: 'Colour must be a hex value like #3b82f6' }
+      f.color = v
+    }
+  }
+  if (has('display_order')) {
+    const n = rstInt(body.display_order, -1000, 1000)
+    if (n === null) return { error: 'display_order must be a whole number' }
+    f.display_order = n
+  }
+  for (const k of ['is_outdoor', 'guest_bookable', 'is_active']) {
+    if (!has(k)) continue
+    const v = rstFlag(body[k])
+    if (v === null) return { error: k + ' must be on or off' }
+    f[k] = v
+  }
+  return { fields: f }
+}
+
+function rstTableFields(body: any): { fields?: any, error?: string } {
+  const f: any = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  if (has('table_number')) {
+    const v = String(body.table_number == null ? '' : body.table_number).trim()
+    if (!v || v.length > 20 || /[<>]/.test(v)) return { error: 'Table number must be 1–20 characters (no < or >)' }
+    if (v.startsWith('__')) return { error: 'Table number cannot start with __' }
+    f.table_number = v
+  }
+  if (has('table_name')) {
+    const v = rstText(body.table_name, 61)
+    if (v.length > 60 || /[<>]/.test(v)) return { error: 'Table name must be up to 60 characters (no < or >)' }
+    f.table_name = v || null
+  }
+  if (has('capacity')) {
+    const n = rstInt(body.capacity, 1, 30)
+    if (n === null) return { error: 'Seats must be a whole number 1–30' }
+    f.capacity = n
+  }
+  for (const [k, lo, hi] of [['position_x', 0, 100], ['position_y', 0, 100], ['width', 0.5, 100], ['height', 0.5, 100]] as [string, number, number][]) {
+    if (!has(k)) continue
+    const n = Number(body[k])
+    if (body[k] === null || body[k] === '' || !isFinite(n) || n < lo || n > hi) return { error: k + ' must be a percentage ' + lo + '–' + hi }
+    f[k] = rstRound(n)
+  }
+  if (has('shape')) {
+    const v = String(body.shape || '').trim().toLowerCase()
+    if (!RST_SHAPES.includes(v)) return { error: 'Shape must be rectangle, circle or square' }
+    f.shape = v
+  }
+  if (has('rotation')) {
+    const n = Number(body.rotation)
+    if (body.rotation === null || body.rotation === '' || !isFinite(n)) return { error: 'rotation must be a number of degrees' }
+    f.rotation = rstRound(((n % 360) + 360) % 360, 1)
+  }
+  if (has('table_type')) {
+    const v = String(body.table_type == null ? '' : body.table_type).trim().toLowerCase() || 'standard'
+    if (!/^[a-z_]{1,20}$/.test(v)) return { error: 'Invalid table_type' }
+    f.table_type = v
+  }
+  if (has('features')) {
+    let v: any = body.features
+    if (typeof v === 'string' && v.trim()) { try { v = JSON.parse(v) } catch (e) { return { error: 'features must be a list' } } }
+    if (v === null || v === '' || v === undefined) f.features = null
+    else if (Array.isArray(v) && v.every((x: any) => typeof x === 'string' && x.length <= 40) && v.length <= 20) f.features = JSON.stringify(v)
+    else return { error: 'features must be a list of short labels' }
+  }
+  if (has('zone_id')) {
+    if (body.zone_id === null || body.zone_id === '') f.zone_id = null
+    else {
+      const n = rstId(body.zone_id)
+      if (!n) return { error: 'Invalid zone_id' }
+      f.zone_id = n
+    }
+  }
+  if (has('is_active')) {
+    const v = rstFlag(body.is_active)
+    if (v === null) return { error: 'is_active must be on or off' }
+    f.is_active = v
+  }
+  return { fields: f }
+}
+
+function rstSlotFields(body: any): { fields?: any, error?: string } {
+  const f: any = {}
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body || {}, k)
+  if (has('meal')) {
+    const v = String(body.meal || '').trim().toLowerCase()
+    if (!RST_MEALS.includes(v)) return { error: 'Meal must be breakfast, lunch or dinner' }
+    f.meal = v
+  }
+  if (has('label')) {
+    const v = rstText(body.label, 41)
+    if (v.length > 40 || /[<>]/.test(v)) return { error: 'Label must be up to 40 characters (no < or >)' }
+    f.label = v || null
+  }
+  for (const k of ['start_time', 'end_time']) {
+    if (!has(k)) continue
+    if (!rstIsHM(body[k])) return { error: k + ' must be HH:MM (24h)' }
+    f[k] = body[k]
+  }
+  if (has('buffer_minutes')) {
+    const n = rstInt(body.buffer_minutes, 0, 120)
+    if (n === null) return { error: 'Clearance buffer must be 0–120 minutes' }
+    f.buffer_minutes = n
+  }
+  if (has('days_mask')) {
+    const n = rstInt(body.days_mask, 1, 127)
+    if (n === null) return { error: 'Pick at least one day' }
+    f.days_mask = n
+  }
+  if (has('display_order')) {
+    const n = rstInt(body.display_order, -1000, 1000)
+    if (n === null) return { error: 'display_order must be a whole number' }
+    f.display_order = n
+  }
+  if (has('is_active')) {
+    const v = rstFlag(body.is_active)
+    if (v === null) return { error: 'is_active must be on or off' }
+    f.is_active = v
+  }
+  return { fields: f }
+}
+
+function rstMealName(meal: string): string {
+  return meal ? meal.charAt(0).toUpperCase() + meal.slice(1) : 'Slot'
+}
+
+// Future (not yet over) holding bookings among `rows`, grouped by `key`.
+function rstFutureHolds(rows: any[], s: any, now: any, key: string) {
+  const out: any = {}
+  for (const b of rows) {
+    if (!rstHolds(b, s, now) || !rstUpcoming(b, now)) continue
+    const k = Number(b[key])
+    ;(out[k] = out[k] || []).push({
+      booking_reference: b.booking_reference, booking_date: b.booking_date, start_time: b.start_time,
+      party_size: Number(b.party_size) || 0, guest_name: b.guest_name, room_number: b.room_number, status: b.status, table_id: b.table_id, slot_id: b.slot_id
+    })
+  }
+  return out
+}
+
+function rstFutureStmt(DB: any, col: 'table_id' | 'slot_id', ids: number[], now: any) {
+  const list = ids.length ? ids : [-1]
+  return DB.prepare(`
+    SELECT b.booking_id, b.booking_reference, b.booking_date, b.start_time, b.end_time, b.buffer_minutes, b.party_size,
+           b.guest_name, b.room_number, b.status, b.table_id, b.slot_id, b.offering_id
+    FROM restaurant_bookings b
+    WHERE b.${col} IN (${list.map(() => '?').join(', ')}) AND b.booking_date >= ? AND b.status IN ('confirmed', 'checked_in')
+  `).bind(...list, now.date)
+}
+
+// Table-number clash check on the resulting set: exact duplicates anywhere
+// (the UNIQUE index includes removed tables) and case-insensitive among active tables.
+function rstNumberClash(rows: any[], changes: Map<number, any>): any {
+  const final = new Map<number, { number: string, active: number }>()
+  for (const r of rows) final.set(Number(r.table_id), { number: String(r.table_number), active: Number(r.is_active) === 1 ? 1 : 0 })
+  for (const [id, ch] of changes) {
+    const cur = final.get(id) || { number: '', active: 1 }
+    final.set(id, { number: ch.table_number !== undefined ? ch.table_number : cur.number, active: ch.is_active !== undefined ? ch.is_active : cur.active })
+  }
+  const exact = new Map<string, number[]>(), ci = new Map<string, number[]>()
+  for (const [id, v] of final) {
+    ;(exact.get(v.number) || exact.set(v.number, []).get(v.number)!).push(id)
+    if (v.active) { const k = rstKey(v.number); (ci.get(k) || ci.set(k, []).get(k)!).push(id) }
+  }
+  for (const [num, ids] of ci) {
+    if (ids.length > 1 && ids.some((id) => changes.has(id))) return { table_number: num, table_ids: ids, removed: false }
+  }
+  for (const [num, ids] of exact) {
+    if (ids.length > 1 && ids.some((id) => changes.has(id))) return { table_number: num, table_ids: ids, removed: true }
+  }
+  return null
+}
+
+function rstClashResponse(c: any, clash: any) {
+  return c.json({
+    success: false, error: 'duplicate_number',
+    message: clash.removed
+      ? 'Table number ' + clash.table_number + ' belongs to a removed table — re-add it with Add table or pick another number'
+      : 'Table number ' + clash.table_number + ' is already in use',
+    table_number: clash.table_number, table_ids: clash.table_ids.filter((id: number) => id > 0)
+  }, 409)
+}
+
+function rstDefaultSize(cap: number, shape: string) {
+  const base = cap <= 2 ? 6 : cap <= 4 ? 7.5 : cap <= 6 ? 9 : cap <= 8 ? 10.5 : 12
+  if (shape === 'rectangle') return { w: rstRound(base * 1.5, 1), h: rstRound(base * 1.6 * 0.8, 1) }
+  // Canvas is 16:10, so a visually square/round table needs height% = width% × 1.6.
+  return { w: base, h: rstRound(base * 1.6, 1) }
+}
+
+// Free grid cells (percent rects) in a zone canvas, shrinking the tables until `count` fit.
+function rstGridCells(count: number, cap: number, shape: string, occupied: any[]): any[] | null {
+  const size = rstDefaultSize(cap, shape)
+  const hit = (a: any, b: any) => a.x < b.x + b.w + 0.5 && b.x < a.x + a.w + 0.5 && a.y < b.y + b.h + 0.8 && b.y < a.y + a.h + 0.8
+  for (let scale = 1; scale >= 0.3; scale *= 0.85) {
+    const w = size.w * scale, h = size.h * scale
+    const gx = Math.max(1.5, w * 0.5), gy = Math.max(2.4, h * 0.5)
+    const cells: any[] = []
+    for (let y = 4; y + h <= 96.0001 && cells.length < count; y += h + gy) {
+      for (let x = 4; x + w <= 96.0001 && cells.length < count; x += w + gx) {
+        const r = { x, y, w, h }
+        if (occupied.some((o) => hit(r, o))) continue
+        cells.push(r)
+      }
+    }
+    if (cells.length >= count) return cells.map((r) => ({ x: rstRound(r.x), y: rstRound(r.y), w: rstRound(r.w), h: rstRound(r.h) }))
+  }
+  return null
+}
+
+function rstRect(t: any) {
+  const x = Number(t.position_x), y = Number(t.position_y), w = Number(t.width), h = Number(t.height)
+  if (![x, y, w, h].every((n) => isFinite(n)) || x > 100 || y > 100 || w > 100 || h > 100) return null
+  return { x, y, w, h }
+}
+
+const RST_TABLE_COLS = `table_id, offering_id, table_number, table_name, capacity, position_x, position_y, width, height,
+  shape, rotation, table_type, features, zone_id, is_active, updated_at`
+
+app.get('/api/admin/restaurant-module/:offering_id', requirePermission('restaurant_tables'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  const pid = rstAdminPid(c)
+  if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+  if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+  try {
+    const now = rstNow()
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      ...rstTotalsStmts(DB, oid),
+      DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND is_active = 1`).bind(oid),
+      DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY meal, start_time, display_order, slot_id').bind(oid)
+    ])
+    const own: any = rstRows(res[0])[0]
+    if (!own) return rstNotOwned(c)
+    const settingsRow = rstRows(res[1])[0]
+    const zones = rstRows(res[2])
+    const zById: any = {}
+    for (const z of zones) zById[Number(z.zone_id)] = z
+    const totals = rstTotalsFrom(res, 1)
+    const tables = rstRows(res[4]).map((t: any) => {
+      const z = t.zone_id != null ? zById[Number(t.zone_id)] : null
+      return { ...t, zone_code: z ? z.code : null }
+    }).sort((a: any, b: any) => rstNumCmp(a.zone_code || '~', b.zone_code || '~') || rstNumCmp(a.table_number, b.table_number))
+    const slots = rstRows(res[5])
+    return c.json({
+      success: true,
+      enabled: !!settingsRow,
+      offering: { offering_id: oid, title: own.title_en || null },
+      today: now.date,
+      settings: rstNormSettings(settingsRow) || { ...RST_DEFAULTS, offering_id: oid },
+      zones: zones.map((z: any) => ({ ...z, tables: (totals.by_zone[z.code] || {}).tables || 0, seats: (totals.by_zone[z.code] || {}).seats || 0 })),
+      tables,
+      slots,
+      totals,
+      slot_warnings: rstSlotWarnings(slots)
+    })
+  } catch (e) {
+    console.error('restaurant-module admin get', e)
+    return c.json({ success: false, error: 'Failed to load restaurant setup' }, 500)
+  }
+})
+
+app.put('/api/admin/restaurant-module/:offering_id/settings', requirePermission('restaurant_manage'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstSettingsFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const f = v.fields
+    const own: any = await rstOwnStmt(DB, oid, pid).first()
+    if (!own) return rstNotOwned(c)
+    const keys = Object.keys(f)
+    const stmts: any[] = [DB.prepare('INSERT OR IGNORE INTO restaurant_settings (offering_id) VALUES (?)').bind(oid)]
+    if (keys.length) {
+      stmts.push(DB.prepare(`UPDATE restaurant_settings SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE offering_id = ?`)
+        .bind(...keys.map((k) => f[k]), oid))
+    }
+    stmts.push(DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid))
+    const res = await DB.batch(stmts)
+    return c.json({ success: true, updated: keys, settings: rstNormSettings(rstRows(res[res.length - 1])[0]) })
+  } catch (e) {
+    console.error('restaurant-module settings', e)
+    return c.json({ success: false, error: 'Failed to save settings' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/zones', requirePermission('restaurant_tables'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstZoneFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const f = v.fields
+    if (!f.code || !f.name) return c.json({ success: false, error: 'invalid', message: 'Zone code and name are required' }, 400)
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      DB.prepare('SELECT zone_id, code FROM restaurant_zones WHERE offering_id = ?').bind(oid)
+    ])
+    if (!rstRows(res[0])[0]) return rstNotOwned(c)
+    if (rstRows(res[1]).some((z: any) => String(z.code).toUpperCase() === f.code)) {
+      return c.json({ success: false, error: 'duplicate_code', message: 'Zone ' + f.code + ' already exists' }, 409)
+    }
+    const keys = Object.keys(f)
+    const w = await DB.batch([
+      DB.prepare(`INSERT INTO restaurant_zones (offering_id, ${keys.join(', ')}) VALUES (?, ${keys.map(() => '?').join(', ')})`).bind(oid, ...keys.map((k) => f[k])),
+      DB.prepare('SELECT * FROM restaurant_zones WHERE offering_id = ? AND code = ?').bind(oid, f.code)
+    ])
+    return c.json({ success: true, zone: rstRows(w[1])[0] || null })
+  } catch (e) {
+    console.error('restaurant-module zone create', e)
+    return c.json({ success: false, error: 'Failed to create zone' }, 500)
+  }
+})
+
+app.put('/api/admin/restaurant-module/:offering_id/zones/:zone_id', requirePermission('restaurant_tables'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  const zid = rstId(c.req.param('zone_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid || !zid) return c.json({ success: false, error: 'invalid_id' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstZoneFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const f = v.fields
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      DB.prepare('SELECT zone_id, code FROM restaurant_zones WHERE offering_id = ?').bind(oid)
+    ])
+    if (!rstRows(res[0])[0]) return rstNotOwned(c)
+    const zones = rstRows(res[1])
+    if (!zones.some((z: any) => Number(z.zone_id) === zid)) return c.json({ success: false, error: 'not_found', message: 'Zone not found' }, 404)
+    if (f.code && zones.some((z: any) => Number(z.zone_id) !== zid && String(z.code).toUpperCase() === f.code)) {
+      return c.json({ success: false, error: 'duplicate_code', message: 'Zone ' + f.code + ' already exists' }, 409)
+    }
+    const keys = Object.keys(f)
+    const stmts: any[] = []
+    if (keys.length) {
+      stmts.push(DB.prepare(`UPDATE restaurant_zones SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE zone_id = ? AND offering_id = ?`)
+        .bind(...keys.map((k) => f[k]), zid, oid))
+    }
+    stmts.push(DB.prepare('SELECT * FROM restaurant_zones WHERE zone_id = ?').bind(zid), ...rstTotalsStmts(DB, oid))
+    const w = await DB.batch(stmts)
+    const at = keys.length ? 1 : 0
+    return c.json({ success: true, zone: rstRows(w[at])[0] || null, totals: rstTotalsFrom(w, at + 1) })
+  } catch (e) {
+    console.error('restaurant-module zone update', e)
+    return c.json({ success: false, error: 'Failed to update zone' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/tables', requirePermission('restaurant_tables'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstTableFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const f = v.fields
+    if (!f.zone_id) return c.json({ success: false, error: 'invalid', message: 'Choose a zone for the table' }, 400)
+    if (!f.table_number) return c.json({ success: false, error: 'invalid', message: 'Table number is required' }, 400)
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      DB.prepare('SELECT zone_id FROM restaurant_zones WHERE offering_id = ?').bind(oid),
+      DB.prepare('SELECT table_id, table_number, is_active, zone_id, position_x, position_y, width, height FROM restaurant_tables WHERE offering_id = ?').bind(oid)
+    ])
+    if (!rstRows(res[0])[0]) return rstNotOwned(c)
+    if (!rstRows(res[1]).some((z: any) => Number(z.zone_id) === f.zone_id)) return c.json({ success: false, error: 'invalid', message: 'Zone not found for this restaurant' }, 400)
+    const rows = rstRows(res[2])
+    const revive = rows.find((r: any) => String(r.table_number) === f.table_number && Number(r.is_active) !== 1)
+    const clash = rstNumberClash(rows, new Map([[revive ? Number(revive.table_id) : -1, { table_number: f.table_number, is_active: 1 }]]))
+    if (clash) return rstClashResponse(c, clash)
+    if (f.capacity === undefined) f.capacity = 4
+    if (f.shape === undefined) f.shape = f.capacity <= 2 ? 'circle' : 'rectangle'
+    if (f.width === undefined || f.height === undefined) {
+      const sz = rstDefaultSize(f.capacity, f.shape)
+      if (f.width === undefined) f.width = sz.w
+      if (f.height === undefined) f.height = sz.h
+    }
+    if (f.position_x === undefined || f.position_y === undefined) {
+      const occ = rows.filter((r: any) => Number(r.is_active) === 1 && Number(r.zone_id) === f.zone_id).map(rstRect).filter(Boolean)
+      const cell = (rstGridCells(1, f.capacity, f.shape, occ) || [{ x: 5, y: 5 }])[0]
+      if (f.position_x === undefined) f.position_x = cell.x
+      if (f.position_y === undefined) f.position_y = cell.y
+    }
+    const full: any = {
+      table_name: null, rotation: 0, table_type: 'standard', features: null, ...f, is_active: 1
+    }
+    const keys = Object.keys(full)
+    const write = revive
+      ? DB.prepare(`UPDATE restaurant_tables SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE table_id = ? AND offering_id = ?`)
+          .bind(...keys.map((k) => full[k]), Number(revive.table_id), oid)
+      : DB.prepare(`INSERT INTO restaurant_tables (offering_id, ${keys.join(', ')}) VALUES (?, ${keys.map(() => '?').join(', ')})`)
+          .bind(oid, ...keys.map((k) => full[k]))
+    const w = await DB.batch([
+      write,
+      DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND table_number = ?`).bind(oid, f.table_number),
+      ...rstTotalsStmts(DB, oid)
+    ])
+    return c.json({ success: true, reactivated: !!revive, table: rstRows(w[1])[0] || null, totals: rstTotalsFrom(w, 2) })
+  } catch (e) {
+    console.error('restaurant-module table create', e)
+    return c.json({ success: false, error: 'Failed to create table' }, 500)
+  }
+})
+
+// Shared by PUT one table and the bulk save: validate every change against
+// the whole resulting set, then write it all in one batch (all-or-nothing).
+async function rstApplyTableUpdates(c: any, oid: number, pid: string, list: { table_id: number, fields: any }[], force: boolean) {
+  const DB = c.env.DB
+  const now = rstNow()
+  const ids = list.map((u) => u.table_id)
+  const res = await DB.batch([
+    rstOwnStmt(DB, oid, pid),
+    DB.prepare('SELECT zone_id FROM restaurant_zones WHERE offering_id = ?').bind(oid),
+    DB.prepare('SELECT table_id, table_number, is_active, capacity FROM restaurant_tables WHERE offering_id = ?').bind(oid),
+    rstFutureStmt(DB, 'table_id', ids, now),
+    DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid)
+  ])
+  if (!rstRows(res[0])[0]) return rstNotOwned(c)
+  const zoneIds = new Set(rstRows(res[1]).map((z: any) => Number(z.zone_id)))
+  const rows = rstRows(res[2])
+  const byId = new Map<number, any>()
+  for (const r of rows) byId.set(Number(r.table_id), r)
+  for (const u of list) {
+    if (!byId.has(u.table_id)) return c.json({ success: false, error: 'not_found', message: 'Table not found', table_id: u.table_id }, 404)
+    if (u.fields.zone_id != null && !zoneIds.has(u.fields.zone_id)) {
+      return c.json({ success: false, error: 'invalid', message: 'Zone not found for this restaurant', table_id: u.table_id }, 400)
+    }
+  }
+  const changes = new Map<number, any>()
+  for (const u of list) if (u.fields.table_number !== undefined || u.fields.is_active !== undefined) changes.set(u.table_id, u.fields)
+  const clash = changes.size ? rstNumberClash(rows, changes) : null
+  if (clash) return rstClashResponse(c, clash)
+  const s = rstNormSettings(rstRows(res[4])[0]) || { ...RST_DEFAULTS }
+  const holds = rstFutureHolds(rstRows(res[3]), s, now, 'table_id')
+  const conflicts: any[] = []
+  const blocked: any[] = []
+  for (const u of list) {
+    const h = holds[u.table_id] || []
+    const row = byId.get(u.table_id)
+    if (u.fields.capacity !== undefined) {
+      for (const b of h) if (b.party_size > u.fields.capacity) conflicts.push({ ...b, table_number: row.table_number, new_capacity: u.fields.capacity })
+    }
+    if (u.fields.is_active === 0 && Number(row.is_active) === 1 && h.length) blocked.push({ table_id: u.table_id, table_number: row.table_number, count: h.length })
+  }
+  if (conflicts.length) {
+    const c0 = conflicts[0]
+    return c.json({
+      success: false, error: 'capacity_conflict', conflicts,
+      message: 'Table ' + c0.table_number + ' has an upcoming booking for ' + c0.party_size + ' (' + c0.booking_date + ' ' + c0.start_time +
+        (c0.room_number ? ', room ' + c0.room_number : '') + ') — it cannot go down to ' + c0.new_capacity + ' seats'
+    }, 409)
+  }
+  if (blocked.length && !force) {
+    const count = blocked.reduce((n, b) => n + b.count, 0)
+    return c.json({ success: false, error: 'has_bookings', count, tables: blocked, message: 'Table ' + blocked[0].table_number + ' has ' + blocked[0].count + ' upcoming booking(s)' }, 409)
+  }
+  const stmts: any[] = []
+  // Two-phase renames so swaps (A↔B) never trip UNIQUE(offering_id, table_number) mid-batch.
+  const renamed = list.filter((u) => u.fields.table_number !== undefined && u.fields.table_number !== String(byId.get(u.table_id).table_number))
+  for (const u of renamed) {
+    stmts.push(DB.prepare('UPDATE restaurant_tables SET table_number = ? WHERE table_id = ? AND offering_id = ?').bind('__tmp_' + u.table_id, u.table_id, oid))
+  }
+  for (const u of list) {
+    const keys = Object.keys(u.fields)
+    if (!keys.length) continue
+    stmts.push(DB.prepare(`UPDATE restaurant_tables SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE table_id = ? AND offering_id = ?`)
+      .bind(...keys.map((k) => u.fields[k]), u.table_id, oid))
+  }
+  const writes = stmts.length
+  stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE table_id IN (${ids.map(() => '?').join(', ')})`).bind(...ids), ...rstTotalsStmts(DB, oid))
+  const w = await DB.batch(stmts)
+  return c.json({ success: true, updated: list.filter((u) => Object.keys(u.fields).length).length, tables: rstRows(w[writes]), totals: rstTotalsFrom(w, writes + 1), writes })
+}
+
+app.put('/api/admin/restaurant-module/:offering_id/tables/:table_id', requirePermission('restaurant_tables'), async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  const tid = rstId(c.req.param('table_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid || !tid) return c.json({ success: false, error: 'invalid_id' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstTableFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const force = c.req.query('force') === '1' || body.force === true
+    const r: any = await rstApplyTableUpdates(c, oid, pid, [{ table_id: tid, fields: v.fields }], force)
+    if (r.status !== 200) return r
+    const j: any = await r.clone().json()
+    return c.json({ success: true, table: (j.tables || [])[0] || null, totals: j.totals })
+  } catch (e) {
+    console.error('restaurant-module table update', e)
+    return c.json({ success: false, error: 'Failed to update table' }, 500)
+  }
+})
+
+app.delete('/api/admin/restaurant-module/:offering_id/tables/:table_id', requirePermission('restaurant_tables'), async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  const tid = rstId(c.req.param('table_id'))
+  try {
+    const pid = rstAdminPid(c)
+    if (!oid || !tid) return c.json({ success: false, error: 'invalid_id' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const r: any = await rstApplyTableUpdates(c, oid, pid, [{ table_id: tid, fields: { is_active: 0 } }], c.req.query('force') === '1')
+    if (r.status !== 200) return r
+    const j: any = await r.clone().json()
+    return c.json({ success: true, table_id: tid, totals: j.totals })
+  } catch (e) {
+    console.error('restaurant-module table delete', e)
+    return c.json({ success: false, error: 'Failed to remove table' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/tables/bulk', requirePermission('restaurant_tables'), async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const updates = body.updates
+    if (!Array.isArray(updates)) return c.json({ success: false, error: 'invalid', message: 'updates must be a list' }, 400)
+    if (!updates.length) return c.json({ success: true, updated: 0, tables: [] })
+    if (updates.length > 500) return c.json({ success: false, error: 'invalid', message: 'Too many updates (max 500)' }, 400)
+    const list: { table_id: number, fields: any }[] = []
+    const seen = new Set<number>()
+    for (let i = 0; i < updates.length; i++) {
+      const u = updates[i] || {}
+      const tid = rstId(u.table_id)
+      if (!tid) return c.json({ success: false, error: 'invalid', message: 'Invalid table_id', index: i }, 400)
+      if (seen.has(tid)) return c.json({ success: false, error: 'invalid', message: 'Table listed twice', index: i, table_id: tid }, 400)
+      seen.add(tid)
+      const { table_id, ...rest } = u
+      const v = rstTableFields(rest)
+      if (v.error) return c.json({ success: false, error: 'invalid', message: v.error, index: i, table_id: tid }, 400)
+      list.push({ table_id: tid, fields: v.fields })
+    }
+    const force = c.req.query('force') === '1' || body.force === true
+    const r: any = await rstApplyTableUpdates(c, oid, pid, list, force)
+    if (r.status !== 200) return r
+    const j: any = await r.clone().json()
+    return c.json({ success: true, updated: j.updated, tables: j.tables, totals: j.totals })
+  } catch (e) {
+    console.error('restaurant-module tables bulk', e)
+    return c.json({ success: false, error: 'Failed to save tables' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/tables/generate', requirePermission('restaurant_tables'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const zid = rstId(body.zone_id)
+    const count = rstInt(body.count, 1, 200)
+    const cap = rstInt(body.capacity == null || body.capacity === '' ? 4 : body.capacity, 1, 30)
+    const start = rstInt(body.start_number == null || body.start_number === '' ? 1 : body.start_number, 0, 9999)
+    const shapeIn = String(body.shape || '').trim().toLowerCase()
+    if (!zid) return c.json({ success: false, error: 'invalid', message: 'Choose a zone' }, 400)
+    if (count === null) return c.json({ success: false, error: 'invalid', message: 'Count must be 1–200' }, 400)
+    if (cap === null) return c.json({ success: false, error: 'invalid', message: 'Seats must be 1–30' }, 400)
+    if (start === null) return c.json({ success: false, error: 'invalid', message: 'Start number must be 0–9999' }, 400)
+    if (shapeIn && !RST_SHAPES.includes(shapeIn)) return c.json({ success: false, error: 'invalid', message: 'Shape must be rectangle, circle or square' }, 400)
+    const shape = shapeIn || (cap <= 2 ? 'circle' : 'rectangle')
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      DB.prepare('SELECT zone_id, code FROM restaurant_zones WHERE offering_id = ?').bind(oid),
+      DB.prepare('SELECT table_id, table_number, is_active, zone_id, position_x, position_y, width, height FROM restaurant_tables WHERE offering_id = ?').bind(oid)
+    ])
+    if (!rstRows(res[0])[0]) return rstNotOwned(c)
+    const zone: any = rstRows(res[1]).find((z: any) => Number(z.zone_id) === zid)
+    if (!zone) return c.json({ success: false, error: 'invalid', message: 'Zone not found for this restaurant' }, 400)
+    const prefix = body.prefix == null ? String(zone.code) : String(body.prefix).trim()
+    if (prefix.length > 10 || !/^[A-Za-z0-9 _-]*$/.test(prefix)) return c.json({ success: false, error: 'invalid', message: 'Prefix must be up to 10 letters, digits, space, _ or -' }, 400)
+    const rows = rstRows(res[2])
+    const taken = new Set(rows.map((r: any) => rstKey(r.table_number)))
+    const numbers: string[] = []
+    for (let n = start; numbers.length < count && n < start + 10000; n++) {
+      const num = prefix + n
+      if (num.length > 20 || num.startsWith('__')) break
+      if (taken.has(rstKey(num))) continue
+      numbers.push(num)
+    }
+    if (numbers.length < count) return c.json({ success: false, error: 'invalid', message: 'Could not find ' + count + ' free table numbers with that prefix' }, 400)
+    const occ = rows.filter((r: any) => Number(r.is_active) === 1 && Number(r.zone_id) === zid).map(rstRect).filter(Boolean)
+    const cells = rstGridCells(count, cap, shape, occ)
+    if (!cells) return c.json({ success: false, error: 'no_room', message: 'Not enough free floor space in zone ' + zone.code + ' — move or remove tables first' }, 400)
+    const stmts: any[] = numbers.map((num, i) => DB.prepare(`
+      INSERT INTO restaurant_tables (offering_id, table_number, capacity, position_x, position_y, width, height, shape, rotation, table_type, zone_id, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'standard', ?, 1)
+    `).bind(oid, num, cap, cells[i].x, cells[i].y, cells[i].w, cells[i].h, shape, zid))
+    stmts.push(DB.prepare(`SELECT ${RST_TABLE_COLS} FROM restaurant_tables WHERE offering_id = ? AND table_number IN (${numbers.map(() => '?').join(', ')})`).bind(oid, ...numbers), ...rstTotalsStmts(DB, oid))
+    const w = await DB.batch(stmts)
+    const created = rstRows(w[numbers.length]).sort((a: any, b: any) => rstNumCmp(a.table_number, b.table_number))
+    return c.json({ success: true, created, totals: rstTotalsFrom(w, numbers.length + 1) })
+  } catch (e) {
+    console.error('restaurant-module tables generate', e)
+    return c.json({ success: false, error: 'Failed to generate tables' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/slots', requirePermission('restaurant_sessions'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstSlotFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    const f = v.fields
+    if (!f.meal || !f.start_time || !f.end_time) return c.json({ success: false, error: 'invalid', message: 'Meal, start and end time are required' }, 400)
+    if (rstMinutes(f.end_time) <= rstMinutes(f.start_time)) return c.json({ success: false, error: 'invalid', message: 'End time must be after the start time' }, 400)
+    const full: any = { label: rstMealName(f.meal) + ' ' + f.start_time, buffer_minutes: 10, days_mask: 127, display_order: 0, is_active: 1, ...f }
+    const own: any = await rstOwnStmt(DB, oid, pid).first()
+    if (!own) return rstNotOwned(c)
+    const keys = Object.keys(full)
+    const w = await DB.batch([
+      DB.prepare(`INSERT INTO restaurant_slots (offering_id, ${keys.join(', ')}) VALUES (?, ${keys.map(() => '?').join(', ')})`).bind(oid, ...keys.map((k) => full[k])),
+      DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY meal, start_time, display_order, slot_id').bind(oid)
+    ])
+    const newId = Number(w[0].meta && w[0].meta.last_row_id)
+    const slots = rstRows(w[1])
+    return c.json({ success: true, slot: slots.find((s: any) => Number(s.slot_id) === newId) || null, slots, warnings: rstSlotWarnings(slots) })
+  } catch (e) {
+    console.error('restaurant-module slot create', e)
+    return c.json({ success: false, error: 'Failed to create slot' }, 500)
+  }
+})
+
+app.post('/api/admin/restaurant-module/:offering_id/slots/generate', requirePermission('restaurant_sessions'), async (c) => {
+  const DB = c.env.DB
+  const oid = rstId(c.req.param('offering_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid) return c.json({ success: false, error: 'invalid_offering' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const meal = String(body.meal || '').trim().toLowerCase()
+    if (!RST_MEALS.includes(meal)) return c.json({ success: false, error: 'invalid', message: 'Meal must be breakfast, lunch or dinner' }, 400)
+    if (!rstIsHM(body.window_start) || !rstIsHM(body.window_end)) return c.json({ success: false, error: 'invalid', message: 'Window start and end must be HH:MM (24h)' }, 400)
+    const ws = rstMinutes(body.window_start), we = rstMinutes(body.window_end)
+    if (we <= ws) return c.json({ success: false, error: 'invalid', message: 'The window must end after it starts' }, 400)
+    const len = rstInt(body.slot_minutes, 10, 600)
+    if (len === null) return c.json({ success: false, error: 'invalid', message: 'Slot length must be 10–600 minutes' }, 400)
+    const buf = rstInt(body.buffer_minutes == null || body.buffer_minutes === '' ? 10 : body.buffer_minutes, 0, 120)
+    if (buf === null) return c.json({ success: false, error: 'invalid', message: 'Clearance buffer must be 0–120 minutes' }, 400)
+    const days = rstInt(body.days_mask == null || body.days_mask === '' ? 127 : body.days_mask, 1, 127)
+    if (days === null) return c.json({ success: false, error: 'invalid', message: 'Pick at least one day' }, 400)
+    const prefix = body.label_prefix == null || String(body.label_prefix).trim() === '' ? rstMealName(meal) : rstText(body.label_prefix, 30)
+    if (/[<>]/.test(prefix)) return c.json({ success: false, error: 'invalid', message: 'Label prefix cannot contain < or >' }, 400)
+    const gen: any[] = []
+    for (let st = ws; st + len <= we && gen.length < 48; st += len + buf) {
+      gen.push({ label: prefix + ' Slot ' + (gen.length + 1), start_time: rstHM(st), end_time: rstHM(st + len) })
+    }
+    if (!gen.length) return c.json({ success: false, error: 'invalid', message: 'No slot fits inside that window' }, 400)
+    const replace = body.replace === true || body.replace === 1 || body.replace === '1'
+    const force = c.req.query('force') === '1' || body.force === true
+    const now = rstNow()
+    const res = await DB.batch([
+      rstOwnStmt(DB, oid, pid),
+      DB.prepare('SELECT slot_id FROM restaurant_slots WHERE offering_id = ? AND meal = ? AND is_active = 1').bind(oid, meal),
+      DB.prepare(`
+        SELECT b.booking_id, b.booking_reference, b.booking_date, b.start_time, b.end_time, b.buffer_minutes, b.party_size,
+               b.guest_name, b.room_number, b.status, b.table_id, b.slot_id, b.offering_id
+        FROM restaurant_bookings b
+        WHERE b.slot_id IN (SELECT slot_id FROM restaurant_slots WHERE offering_id = ? AND meal = ? AND is_active = 1)
+          AND b.booking_date >= ? AND b.status IN ('confirmed', 'checked_in')
+      `).bind(oid, meal, now.date),
+      DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid)
+    ])
+    if (!rstRows(res[0])[0]) return rstNotOwned(c)
+    const oldIds = rstRows(res[1]).map((r: any) => Number(r.slot_id))
+    if (replace && oldIds.length) {
+      const s = rstNormSettings(rstRows(res[3])[0]) || { ...RST_DEFAULTS }
+      const holds = rstFutureHolds(rstRows(res[2]), s, now, 'slot_id')
+      const count = Object.values(holds).reduce((n: number, l: any) => n + l.length, 0)
+      if (count && !force) {
+        return c.json({ success: false, error: 'has_bookings', count, message: 'The current ' + meal + ' slots have ' + count + ' upcoming booking(s) — they cannot be replaced' }, 409)
+      }
+    }
+    const stmts: any[] = []
+    if (replace && oldIds.length) {
+      stmts.push(DB.prepare(`UPDATE restaurant_slots SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE offering_id = ? AND meal = ? AND is_active = 1`).bind(oid, meal))
+    }
+    const base = stmts.length
+    gen.forEach((g, i) => stmts.push(DB.prepare(`
+      INSERT INTO restaurant_slots (offering_id, meal, label, start_time, end_time, buffer_minutes, days_mask, display_order, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).bind(oid, meal, g.label, g.start_time, g.end_time, buf, days, i + 1)))
+    stmts.push(DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY meal, start_time, display_order, slot_id').bind(oid))
+    const w = await DB.batch(stmts)
+    const newIds = new Set(gen.map((_, i) => Number(w[base + i].meta && w[base + i].meta.last_row_id)))
+    const slots = rstRows(w[w.length - 1])
+    return c.json({
+      success: true,
+      created: slots.filter((s: any) => newIds.has(Number(s.slot_id))),
+      replaced: replace ? oldIds.length : 0,
+      slots,
+      warnings: rstSlotWarnings(slots)
+    })
+  } catch (e) {
+    console.error('restaurant-module slots generate', e)
+    return c.json({ success: false, error: 'Failed to generate slots' }, 500)
+  }
+})
+
+// Edit or soft-delete a slot. Bookings keep their own time snapshot, so edits never move them.
+async function rstApplySlotUpdate(c: any, oid: number, pid: string, sid: number, f: any, force: boolean) {
+  const DB = c.env.DB
+  const now = rstNow()
+  const res = await DB.batch([
+    rstOwnStmt(DB, oid, pid),
+    DB.prepare('SELECT * FROM restaurant_slots WHERE slot_id = ? AND offering_id = ?').bind(sid, oid),
+    rstFutureStmt(DB, 'slot_id', [sid], now),
+    DB.prepare('SELECT * FROM restaurant_settings WHERE offering_id = ?').bind(oid)
+  ])
+  if (!rstRows(res[0])[0]) return rstNotOwned(c)
+  const slot: any = rstRows(res[1])[0]
+  if (!slot) return c.json({ success: false, error: 'not_found', message: 'Slot not found' }, 404)
+  const st = f.start_time !== undefined ? f.start_time : slot.start_time
+  const en = f.end_time !== undefined ? f.end_time : slot.end_time
+  if (rstMinutes(en) <= rstMinutes(st)) return c.json({ success: false, error: 'invalid', message: 'End time must be after the start time' }, 400)
+  if (f.is_active === 0 && Number(slot.is_active) === 1 && !force) {
+    const s = rstNormSettings(rstRows(res[3])[0]) || { ...RST_DEFAULTS }
+    const h = rstFutureHolds(rstRows(res[2]), s, now, 'slot_id')[sid] || []
+    if (h.length) return c.json({ success: false, error: 'has_bookings', count: h.length, bookings: h, message: (slot.label || 'This slot') + ' has ' + h.length + ' upcoming booking(s)' }, 409)
+  }
+  const keys = Object.keys(f)
+  const stmts: any[] = []
+  if (keys.length) {
+    stmts.push(DB.prepare(`UPDATE restaurant_slots SET ${keys.map((k) => k + ' = ?').join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE slot_id = ? AND offering_id = ?`)
+      .bind(...keys.map((k) => f[k]), sid, oid))
+  }
+  stmts.push(DB.prepare('SELECT * FROM restaurant_slots WHERE offering_id = ? ORDER BY meal, start_time, display_order, slot_id').bind(oid))
+  const w = await DB.batch(stmts)
+  const slots = rstRows(w[w.length - 1])
+  return c.json({ success: true, slot: slots.find((x: any) => Number(x.slot_id) === sid) || null, slots, warnings: rstSlotWarnings(slots) })
+}
+
+app.put('/api/admin/restaurant-module/:offering_id/slots/:slot_id', requirePermission('restaurant_sessions'), async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  const sid = rstId(c.req.param('slot_id'))
+  try {
+    const body = await c.req.json().catch(() => null)
+    if (!body || typeof body !== 'object') return c.json({ success: false, error: 'Invalid request body' }, 400)
+    const pid = rstAdminPid(c, body)
+    if (!oid || !sid) return c.json({ success: false, error: 'invalid_id' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    const v = rstSlotFields(body)
+    if (v.error) return c.json({ success: false, error: 'invalid', message: v.error }, 400)
+    return await rstApplySlotUpdate(c, oid, pid, sid, v.fields, c.req.query('force') === '1' || body.force === true)
+  } catch (e) {
+    console.error('restaurant-module slot update', e)
+    return c.json({ success: false, error: 'Failed to update slot' }, 500)
+  }
+})
+
+app.delete('/api/admin/restaurant-module/:offering_id/slots/:slot_id', requirePermission('restaurant_sessions'), async (c) => {
+  const oid = rstId(c.req.param('offering_id'))
+  const sid = rstId(c.req.param('slot_id'))
+  try {
+    const pid = rstAdminPid(c)
+    if (!oid || !sid) return c.json({ success: false, error: 'invalid_id' }, 400)
+    if (!pid) return c.json({ success: false, error: 'property_id is required' }, 400)
+    return await rstApplySlotUpdate(c, oid, pid, sid, { is_active: 0 }, c.req.query('force') === '1')
+  } catch (e) {
+    console.error('restaurant-module slot delete', e)
+    return c.json({ success: false, error: 'Failed to delete slot' }, 500)
+  }
+})
+
+// ── Staff API (Ops app Restaurant tab) ──
+// Unauthenticated by design, like /api/staff/beach/*: the Ops TWA has no login.
+app.get('/api/staff/restaurant/day', async (c) => {
+  try {
+    const oid = rstId(c.req.query('offering_id')) || RST_DEFAULT_OFFERING
+    const day = await rstDayStock(c.env, oid, String(c.req.query('date') || ''), c.req.query('slot_id'))
+    if (!day.enabled) return c.json({ success: false, error: 'not_enabled', message: 'This restaurant does not use table booking' }, 404)
+    const s = day.settings
+    return c.json({
+      success: true,
+      offering_id: oid,
+      ...day,
+      settings: { grace_minutes: s.grace_minutes, auto_release: s.auto_release, allow_walk_ins: s.allow_walk_ins, max_party_size: s.max_party_size }
+    })
+  } catch (e) {
+    console.error('restaurant day', e)
+    return c.json({ success: false, error: 'Failed to load the restaurant day' }, 500)
+  }
+})
+
+app.post('/api/staff/restaurant/arrive', async (c) => {
+  const DB = c.env.DB
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body' }, 400)
+    const now = rstNow()
+    const staff = rstStaffName(b.staff_name)
+    const ref = rstText(b.booking_reference, 60)
+    const code = rstText(b.booking_code, 12).toUpperCase()
+    const room = rstText(b.room_number, 20)
+    let oid = rstId(b.offering_id) || RST_DEFAULT_OFFERING
+    const date = isBeachYmd(b.date) ? String(b.date) : now.date
+    if (!ref && !code && !room) return c.json({ success: false, error: 'missing', message: 'Enter a room number' }, 400)
+    let targetId = 0
+    if (ref || code) {
+      const found: any = await DB.prepare(`
+        SELECT booking_id, offering_id, booking_date, guest_name, booking_reference
+        FROM restaurant_bookings
+        WHERE (booking_reference = ? OR booking_code = ?) AND status != 'cancelled'
+        ORDER BY (booking_date = ?) DESC, booking_id DESC LIMIT 1
+      `).bind(ref || '~', code || ref.toUpperCase() || '~', date).first()
+      if (!found) return c.json({ success: false, error: 'not_found', message: 'No booking found for that code' }, 404)
+      if (found.booking_date !== date) {
+        return c.json({
+          success: false, error: 'wrong_day', wrong_day: true, booking_date: found.booking_date,
+          message: (found.guest_name || 'This booking') + ' is booked for ' + attNiceDate(found.booking_date) + ', not ' + (b.date ? 'the day on screen' : 'today')
+        }, 409)
+      }
+      oid = Number(found.offering_id)
+      targetId = Number(found.booking_id)
+    }
+    if (date > now.date) return c.json({ success: false, error: 'future', message: 'Check-in opens on ' + attNiceDate(date) }, 409)
+    const ctx = await rstLoad(DB, oid, date, now)
+    if (!ctx.settings) return c.json({ success: false, error: 'not_enabled', message: 'This restaurant does not use table booking' }, 404)
+    let booking: any = null
+    if (targetId) {
+      booking = ctx.bookings.find((x: any) => x.booking_id === targetId)
+      if (!booking) return c.json({ success: false, error: 'not_found', message: 'No booking found for that code' }, 404)
+    } else {
+      const key = rstKey(room)
+      const mine = ctx.bookings.filter((x: any) => rstKey(x.room_number) === key)
+      if (!mine.length) return c.json({ success: false, error: 'not_found', message: 'No booking for room ' + room + ' on ' + attNiceDate(date) }, 404)
+      const slotId = rstId(b.slot_id) || rstCurrentSlotId(ctx.slots, date, now)
+      const inSlot = mine.filter((x: any) => x.slot_id === slotId)
+      const actionable = (l: any[]) => l.filter((x: any) => x.status === 'confirmed' || x.status === 'no_show')
+      const pick = actionable(inSlot)
+      if (!pick.length) {
+        const seated = inSlot.find((x: any) => x.status === 'checked_in')
+        if (seated) return c.json({ success: true, already: true, booking: rstBookingView(seated, ctx.settings, now) })
+        const other = actionable(mine)
+        if (!other.length) {
+          const any = mine.find((x: any) => x.status === 'checked_in')
+          if (any) return c.json({ success: true, already: true, booking: rstBookingView(any, ctx.settings, now) })
+          return c.json({ success: false, error: 'not_found', message: 'Room ' + room + ' has no open booking on ' + attNiceDate(date) }, 404)
+        }
+        const o0 = other[0]
+        return c.json({
+          success: true, needs_choice: true, other_slot: true,
+          message: 'Room ' + room + ' is booked for ' + (o0.slot_label || o0.start_time) + (other.length > 1 ? ' and other times' : '') + ', not this slot',
+          choices: other.map((x: any) => rstChoice(x, ctx.settings, now))
+        })
+      }
+      if (pick.length > 1) {
+        return c.json({
+          success: true, needs_choice: true,
+          message: 'Room ' + room + ' has ' + pick.length + ' bookings in this slot — choose one',
+          choices: pick.map((x: any) => rstChoice(x, ctx.settings, now))
+        })
+      }
+      booking = pick[0]
+    }
+    const r = await rstCheckIn(DB, ctx, booking, staff, rstId(b.table_id))
+    return c.json(r.body, r.status as any)
+  } catch (e) {
+    console.error('restaurant arrive', e)
+    return c.json({ success: false, error: 'Could not check the guest in' }, 500)
+  }
+})
+
+app.post('/api/staff/restaurant/walk-in', async (c) => {
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body' }, 400)
+    const oid = rstId(b.offering_id) || RST_DEFAULT_OFFERING
+    const r = await rstCreate(c.env, oid, {
+      source: 'walk_in', use_current_slot: true, slot_id: b.slot_id, booking_date: isBeachYmd(b.date) ? b.date : rstNow().date,
+      party_size: b.party_size, room_number: b.room_number, guest_name: b.guest_name, guest_phone: b.guest_phone,
+      special_requests: b.special_requests, table_id: b.table_id, zone_pref: b.zone_pref, staff_name: b.staff_name
+    })
+    return c.json(r.body, r.status as any)
+  } catch (e) {
+    console.error('restaurant walk-in', e)
+    return c.json({ success: false, error: 'Could not seat the walk-in' }, 500)
+  }
+})
+
+function rstRefBinds(b: any): [string, number] {
+  return [rstText(b && b.booking_reference, 60) || '~', rstId(b && b.booking_id) || -1]
+}
+
+const RST_REF_WHERE = `(booking_reference = ? OR booking_id = ?)`
+
+function rstRowSelect(DB: any, ref: [string, number]) {
+  return DB.prepare(`
+    SELECT b.*, t.table_number, rs.grace_minutes, rs.auto_release
+    FROM restaurant_bookings b
+    LEFT JOIN restaurant_tables t ON t.table_id = b.table_id
+    LEFT JOIN restaurant_settings rs ON rs.offering_id = b.offering_id
+    WHERE (b.booking_reference = ? OR b.booking_id = ?)
+  `).bind(...ref)
+}
+
+function rstRowView(row: any, now: any) {
+  const s = rstNormSettings({ offering_id: row.offering_id, grace_minutes: row.grace_minutes, auto_release: row.auto_release })
+  return rstBookingView(row, s, now)
+}
+
+// The guest never came (manual release before or after the grace period).
+app.post('/api/staff/restaurant/no-show', async (c) => {
+  const DB = c.env.DB
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body' }, 400)
+    const now = rstNow()
+    const ref = rstRefBinds(b)
+    const staff = rstStaffName(b.staff_name)
+    const res = await DB.batch([
+      DB.prepare(`
+        UPDATE restaurant_bookings
+        SET status = 'no_show', auto_released = 0, released_at = CURRENT_TIMESTAMP, checked_in_by = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE ${RST_REF_WHERE} AND status = 'confirmed' AND booking_date <= ?
+      `).bind(staff, ...ref, now.date),
+      rstRowSelect(DB, ref)
+    ])
+    const row: any = rstRows(res[1])[0]
+    if (!row) return c.json({ success: false, error: 'not_found', message: 'No booking found' }, 404)
+    if ((res[0].meta && res[0].meta.changes) || 0) return c.json({ success: true, booking: rstRowView(row, now) })
+    if (row.status === 'no_show') return c.json({ success: true, already: true, booking: rstRowView(row, now) })
+    if (row.status === 'confirmed' && row.booking_date > now.date) {
+      return c.json({ success: false, error: 'future', message: 'That booking is for ' + attNiceDate(row.booking_date) + ' — it can only be a no-show on the day' }, 409)
+    }
+    return c.json({
+      success: false, error: 'not_allowed',
+      message: row.status === 'checked_in' ? 'Already seated — undo the arrival first' : 'This booking cannot be marked as a no-show'
+    }, 409)
+  } catch (e) {
+    console.error('restaurant no-show', e)
+    return c.json({ success: false, error: 'Could not mark the no-show' }, 500)
+  }
+})
+
+// Undo: checked_in / no_show → confirmed, completed → checked_in. Guarded so a
+// released table that was re-let is never double-booked.
+app.post('/api/staff/restaurant/undo', async (c) => {
+  const DB = c.env.DB
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body' }, 400)
+    const now = rstNow()
+    const ref = rstRefBinds(b)
+    const res = await DB.batch([
+      DB.prepare(`
+        UPDATE restaurant_bookings
+        SET status = 'confirmed', checked_in_at = NULL, checked_in_by = NULL, auto_released = 0, released_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE ${RST_REF_WHERE} AND (status = 'checked_in' OR (status = 'no_show' AND ${rstFreeSql('restaurant_bookings.table_id')}))
+      `).bind(...ref, now.stamp),
+      DB.prepare(`
+        UPDATE restaurant_bookings SET status = 'checked_in', released_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE ${RST_REF_WHERE} AND status = 'completed' AND ${rstFreeSql('restaurant_bookings.table_id')}
+      `).bind(...ref, now.stamp),
+      rstRowSelect(DB, ref)
+    ])
+    const row: any = rstRows(res[2])[0]
+    if (!row) return c.json({ success: false, error: 'not_found', message: 'No booking found' }, 404)
+    const changed = ((res[0].meta && res[0].meta.changes) || 0) + ((res[1].meta && res[1].meta.changes) || 0)
+    const view = rstRowView(row, now)
+    if (changed) {
+      return c.json({
+        success: true, changed, booking: view,
+        message: view.expired ? 'Back to booked — but the grace period has passed, so it will be released again unless the guest is checked in' : undefined
+      })
+    }
+    if (row.status === 'no_show' || row.status === 'completed') {
+      return c.json({ success: false, error: 'table_taken', message: 'Table ' + (row.table_number || '') + ' has been given to another guest — use Arrive to seat them at a free table' }, 409)
+    }
+    return c.json({ success: true, changed: 0, booking: view })
+  } catch (e) {
+    console.error('restaurant undo', e)
+    return c.json({ success: false, error: 'Could not undo' }, 500)
+  }
+})
+
+// The family left early: checked_in → completed, the table is free again.
+app.post('/api/staff/restaurant/release', async (c) => {
+  const DB = c.env.DB
+  try {
+    const b = await c.req.json().catch(() => null)
+    if (!b || typeof b !== 'object') return c.json({ success: false, error: 'invalid_body' }, 400)
+    const now = rstNow()
+    const ref = rstRefBinds(b)
+    const res = await DB.batch([
+      DB.prepare(`
+        UPDATE restaurant_bookings SET status = 'completed', released_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE ${RST_REF_WHERE} AND status = 'checked_in'
+      `).bind(...ref),
+      rstRowSelect(DB, ref)
+    ])
+    const row: any = rstRows(res[1])[0]
+    if (!row) return c.json({ success: false, error: 'not_found', message: 'No booking found' }, 404)
+    if ((res[0].meta && res[0].meta.changes) || 0) return c.json({ success: true, booking: rstRowView(row, now) })
+    if (row.status === 'completed') return c.json({ success: true, already: true, booking: rstRowView(row, now) })
+    return c.json({ success: false, error: 'not_seated', message: 'Only a seated table can be released' }, 409)
+  } catch (e) {
+    console.error('restaurant release', e)
+    return c.json({ success: false, error: 'Could not release the table' }, 500)
+  }
+})
+
 // Called by the op-ring cron every minute: keep ringing while anything is
 // unacknowledged (recent guest activity with no staff ack), cutoff 20 min
 app.post('/api/staff/ring-check', async (c) => {
@@ -88013,6 +89948,7 @@ app.post('/api/staff/ring-check', async (c) => {
     }
     // Nobody picked up in time? Escalate to management on WhatsApp.
     c.executionCtx.waitUntil(runEscalations(c.env, DB).catch(() => {}))
+    c.executionCtx.waitUntil(rstSweepNoShows(c.env, DB).catch(() => {}))
     return c.json({ success: true, pending })
   } catch (e) {
     console.error('ring-check', e)
