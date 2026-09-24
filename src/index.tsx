@@ -31760,7 +31760,7 @@ window.luxTogglePassForm = function() {
                 </div>
                 <div>
                   <h3 id="chatbotName" class="font-bold">Hotel Assistant</h3>
-                  <p class="text-xs opacity-90">At your service, always</p>
+                  <p id="chatTagline" class="text-xs opacity-90">At your service · 35+ languages</p>
                 </div>
               </div>
               <button id="closeChatBtn" class="bg-white/20 hover:bg-white/30 text-white font-bold py-2 px-4 rounded-lg transition-all border border-white/40 flex items-center gap-2">
@@ -31777,7 +31777,7 @@ window.luxTogglePassForm = function() {
             <!-- Input Area -->
             <div class="p-4 border-t border-gray-200 bg-white rounded-b-2xl">
               <div class="flex gap-2">
-                <input type="text" id="chatInput" placeholder="Ask me anything..." style="font-size: 16px;" class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <input type="text" id="chatInput" placeholder="Ask me anything, in any language…" style="font-size: 16px;" class="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500">
                 <button id="callServiceBtn" class="w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center hover:scale-105 transition shadow-lg" title="Call Service">
                   <i class="fas fa-phone text-lg"></i>
                 </button>
@@ -31786,7 +31786,7 @@ window.luxTogglePassForm = function() {
                 </button>
               </div>
               <p class="text-xs text-gray-500 mt-2 text-center">
-                <span id="chatUsageInfo">AI-powered by hotel knowledge base</span>
+                <span id="chatUsageInfo">🌐 I understand 35+ languages — write in yours</span>
               </p>
             </div>
           </div>
@@ -32027,7 +32027,7 @@ window.luxTogglePassForm = function() {
             voiceInputBtn.title = 'Voice Input';
             voiceInputBtn.disabled = false;
             voiceInputBtn.style.background = 'linear-gradient(135deg, ' + primaryColor + ' 0%, ' + adjustColor(primaryColor, -20) + ' 100%)';
-            chatInput.placeholder = 'Ask me anything...';
+            chatInput.placeholder = window.chatPlaceholder || 'Ask me anything, in any language…';
           }
           
           // Transcribe audio using OpenAI Whisper
@@ -32174,6 +32174,34 @@ window.luxTogglePassForm = function() {
             }
           }
           
+          // Chat chrome in the guest's chosen language: greeting, placeholder,
+          // tagline and footer. English is used as-is; other languages go
+          // through the cached translator once, then are instant.
+          window.chatPlaceholder = 'Ask me anything, in any language…';
+          async function localizeChatChrome(greetingEn) {
+            var lang = window.currentLanguage || 'en';
+            var strs = [greetingEn, 'Ask me anything, in any language…', 'At your service · 35+ languages', 'I understand 35+ languages — write in yours'];
+            var out = strs.slice();
+            if (lang !== 'en') {
+              try {
+                var d = await fetch('/api/staff/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ target: lang, items: strs.map(function (s, i) { return { id: i, text: s }; }) }) }).then(function (r) { return r.json(); });
+                (d.results || []).forEach(function (r) { if (r && r.text && out[r.id] !== undefined) out[r.id] = r.text; });
+              } catch (e) {}
+            }
+            window.chatbotGreetingText = out[0];
+            // The guest may have opened the chat before the translation
+            // arrived — swap the greeting in place while it's the only message.
+            if (chatMessages.children.length === 1) {
+              var g = chatMessages.querySelector('[data-message-id="greeting"]');
+              if (g) { g.remove(); addMessage(out[0], 'assistant', false, 'en', 'greeting'); }
+            }
+            window.chatPlaceholder = out[1];
+            if (chatInput) chatInput.placeholder = out[1];
+            var tag = document.getElementById('chatTagline'); if (tag) tag.textContent = out[2];
+            var foot = document.getElementById('chatUsageInfo'); if (foot) foot.textContent = '🌐 ' + out[3];
+          }
+
           // Load chatbot settings and show if enabled
           window.initChatbot = async function() {
               try {
@@ -32204,11 +32232,12 @@ window.luxTogglePassForm = function() {
                   // Store color for message bubbles
                   window.chatbotPrimaryColor = primaryColor;
                   
-                  // Add welcome message
+                  // Add welcome message, in the guest's language
                   const greeting = data.settings.chatbot_greeting_en || 'Hi! How can I help you today?';
                   window.chatbotGreetingText = greeting;
+                  await localizeChatChrome(greeting);
                   if (chatMessages.children.length === 0) {
-                    addMessage(greeting, 'assistant');
+                    addMessage(window.chatbotGreetingText || greeting, 'assistant', false, 'en', 'greeting');
                   }
                 }
               } catch (error) {
@@ -32235,7 +32264,7 @@ window.luxTogglePassForm = function() {
               if (!chatWindow.classList.contains('hidden')) {
                 // Never show an empty chat — greet if nothing is there yet
                 if (chatMessages.children.length === 0) {
-                  addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant');
+                  addMessage(window.chatbotGreetingText || 'Hi! How can I help you today?', 'assistant', false, 'en', 'greeting');
                 }
                 if (window.innerWidth < 768) {
                   // Fit the visible screen; don't pop the keyboard until the guest taps the field
@@ -32437,7 +32466,7 @@ window.luxTogglePassForm = function() {
               // Add user message
               addMessage(message, 'user');
               chatInput.value = '';
-              chatInput.placeholder = 'Ask me anything...';
+              chatInput.placeholder = window.chatPlaceholder || 'Ask me anything, in any language…';
               
               // Show typing indicator
               const typingDiv = document.createElement('div');
@@ -85501,16 +85530,17 @@ async function dsTranslateBatch(env: any, target: string, texts: (string | null 
   const out = texts.map(t => t == null ? '' : String(t))
   if (lang === 'en' || !out.some(t => t.trim())) return out
   const DB = env.DB
-  const todo: { idx: number; key: string; text: string }[] = []
+  const pending: { idx: number; key: string; text: string }[] = []
   for (let i = 0; i < out.length; i++) {
     const t = out[i]
-    if (!t || !t.trim()) continue
-    const key = await cacheKey(t, lang)
-    try {
-      const hit = await DB.prepare('SELECT translated FROM staff_translations WHERE cache_key = ?').bind(key).first()
-      if (hit && hit.translated) { out[i] = hit.translated as string; continue }
-    } catch (e) {}
-    todo.push({ idx: i, key, text: t })
+    if (t && t.trim()) pending.push({ idx: i, key: await cacheKey(t, lang), text: t })
+  }
+  const hits = await translationCacheLookup(DB, pending.map(p => p.key))
+  const todo: { idx: number; key: string; text: string }[] = []
+  for (const p of pending) {
+    const hit = hits.get(p.key)
+    if (hit && hit.translated) out[p.idx] = hit.translated
+    else todo.push(p)
   }
   if (!todo.length) return out
   const apiKey = env.DEEPSEEK_API_KEY
@@ -85539,17 +85569,34 @@ async function dsTranslateBatch(env: any, target: string, texts: (string | null 
     raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
     const arr = JSON.parse(raw)
     if (!Array.isArray(arr)) return out
+    const writes: any[] = []
     for (const res of arr) {
       const t = todo[res?.i]
       if (!t || String(res.src) !== t.text.slice(0, 12) || !res.text) continue
       out[t.idx] = String(res.text)
-      try {
-        await DB.prepare('INSERT OR REPLACE INTO staff_translations (cache_key, src_lang, target_lang, translated) VALUES (?, ?, ?, ?)')
-          .bind(t.key, 'en', lang, String(res.text)).run()
-      } catch (e) {}
+      writes.push(DB.prepare('INSERT OR REPLACE INTO staff_translations (cache_key, src_lang, target_lang, translated) VALUES (?, ?, ?, ?)')
+        .bind(t.key, 'en', lang, String(res.text)))
     }
+    if (writes.length) { try { await DB.batch(writes) } catch (e) {} }
   } catch (e) {}
   return out
+}
+
+// One round trip per 90 keys instead of one per string: D1 sits in the US
+// while guests are in Egypt, so per-string lookups cost ~100 ms each.
+async function translationCacheLookup(DB: any, keys: string[]): Promise<Map<string, { src_lang: string; translated: string }>> {
+  const map = new Map<string, { src_lang: string; translated: string }>()
+  const uniq = Array.from(new Set(keys))
+  for (let i = 0; i < uniq.length; i += 90) {
+    const chunk = uniq.slice(i, i + 90)
+    try {
+      const rows = await DB.prepare(
+        'SELECT cache_key, src_lang, translated FROM staff_translations WHERE cache_key IN (' + chunk.map(() => '?').join(',') + ')'
+      ).bind(...chunk).all()
+      for (const r of (rows.results || [])) map.set(String(r.cache_key), { src_lang: r.src_lang, translated: r.translated })
+    } catch (e) {}
+  }
+  return map
 }
 
 async function cacheKey(text: string, target: string): Promise<string> {
@@ -85567,14 +85614,13 @@ app.post('/api/staff/translate', async (c) => {
 
     const results: any[] = []
     const todo: any[] = []
-    for (const it of items) {
-      const key = await cacheKey(String(it.text), target)
-      const hit = await DB.prepare('SELECT src_lang, translated FROM staff_translations WHERE cache_key = ?').bind(key).first()
-      if (hit) {
-        results.push({ id: it.id, lang: hit.src_lang, text: hit.translated })
-      } else {
-        todo.push({ ...it, _key: key })
-      }
+    const keyed: any[] = []
+    for (const it of items) keyed.push({ ...it, _key: await cacheKey(String(it.text), target) })
+    const hits = await translationCacheLookup(DB, keyed.map(k => k._key))
+    for (const it of keyed) {
+      const hit = hits.get(it._key)
+      if (hit) results.push({ id: it.id, lang: hit.src_lang, text: hit.translated })
+      else todo.push(it)
     }
 
     if (todo.length) {
@@ -85607,20 +85653,20 @@ app.post('/api/staff/translate', async (c) => {
           let raw = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '[]'
           raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim()
           const arr = JSON.parse(raw)
+          const writes: any[] = []
           for (const out of arr) {
             const src = todo[out.i]
             if (!src) continue
             // Reject misaligned results instead of caching a wrong translation
             if (String(out.src || '') !== String(src.text).slice(0, 12)) continue
             results.push({ id: src.id, lang: out.lang || 'unknown', text: out.text || src.text })
-            try {
-              await DB.prepare(`
+            writes.push(DB.prepare(`
                 INSERT INTO staff_translations (cache_key, src_lang, target_lang, translated)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(cache_key) DO UPDATE SET translated = excluded.translated, src_lang = excluded.src_lang
-              `).bind(src._key, out.lang || 'unknown', target, out.text || src.text).run()
-            } catch (e) {}
+              `).bind(src._key, out.lang || 'unknown', target, out.text || src.text))
           }
+          if (writes.length) { try { await DB.batch(writes) } catch (e) {} }
           // anything the model skipped falls back to the original
           todo.forEach(t => {
             if (!results.find(r2 => r2.id === t.id)) results.push({ id: t.id, lang: 'unknown', text: t.text })
