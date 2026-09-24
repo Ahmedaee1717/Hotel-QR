@@ -40715,6 +40715,7 @@ input:disabled{background:#f3f4f6;color:#6b7280}
     <button class="tab" data-tab="layout" onclick="showTab('layout')"><i class="fas fa-map"></i>Layout</button>
     <button class="tab" data-tab="zones" onclick="showTab('zones')"><i class="fas fa-layer-group"></i>Zones &amp; capacity</button>
     <button class="tab" data-tab="slots" onclick="showTab('slots')"><i class="fas fa-clock"></i>Time slots</button>
+    <button class="tab" data-tab="booking" onclick="showTab('booking')"><i class="fas fa-toggle-on"></i>Guest booking</button>
   </nav>
 
   <section id="pane-layout" class="pane">
@@ -40809,6 +40810,24 @@ input:disabled{background:#f3f4f6;color:#6b7280}
       <h2><i class="fas fa-calendar-week"></i>Next 7 days</h2>
       <p class="muted sm" id="pvNote"></p>
       <div class="tscroll"><table class="tbl"><thead id="pvHead"></thead><tbody id="pvRows"><tr><td class="muted">Loading…</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="pane-booking" class="pane hidden">
+    <div class="card">
+      <h2><i class="fas fa-toggle-on"></i>Guest booking</h2>
+      <p class="muted sm">Controls what guests see in the app. Staff can always book any spot from the Ops app, whatever you choose here.</p>
+      <div class="field"><label class="chk"><input type="checkbox" id="bkShow" onchange="bookingChanged()"> Show the Beach in the guest app</label></div>
+      <div class="field"><span class="lb">Online booking for guests</span>
+        <label class="chk"><input type="radio" name="bkMode" id="bkOn" value="on" onchange="bookingChanged()"> On — guests book spots marked "Guests can book it" in the app</label>
+        <label class="chk"><input type="radio" name="bkMode" id="bkOff" value="off" onchange="bookingChanged()"> Off — show a message instead</label>
+      </div>
+      <div class="field" id="bkMsgField"><label class="lb" for="bkMsg">Message guests see while online booking is off</label>
+        <textarea id="bkMsg" rows="2" maxlength="300" oninput="bookingChanged()" style="width:100%"></textarea></div>
+      <div class="field"><label class="lb" for="bkDays">Guests can book up to (days ahead)</label>
+        <input type="number" id="bkDays" min="1" max="60" step="1" oninput="bookingChanged()" style="max-width:120px"></div>
+      <div class="field"><label class="chk"><input type="checkbox" id="bkSameDay" onchange="bookingChanged()"> Allow booking for today</label></div>
+      <div class="btns"><button class="btn pri" id="bkSave" onclick="saveBooking()"><i class="fas fa-floppy-disk"></i>Save</button><span class="muted sm" id="bkState" style="align-self:center"></span></div>
     </div>
   </section>
 </div>
@@ -41908,13 +41927,69 @@ function renderPreview() {
 }
 
 // ---------- tabs & start-up ----------
+// ---------- guest booking switches ----------
+var BK = { loaded: false, saved: null };
+function bookingForm() {
+  var d = parseInt(el('bkDays').value, 10);
+  return {
+    show: el('bkShow').checked ? 1 : 0,
+    online: el('bkOn').checked ? 1 : 0,
+    msg: el('bkMsg').value.trim(),
+    days: isNaN(d) ? 0 : d,
+    sameDay: el('bkSameDay').checked ? 1 : 0
+  };
+}
+function bookingChanged() {
+  var v = bookingForm();
+  el('bkMsgField').style.display = v.online ? 'none' : '';
+  var dirty = !!BK.saved && JSON.stringify(v) !== JSON.stringify(BK.saved);
+  el('bkState').textContent = dirty ? 'Unsaved changes' : '';
+}
+async function loadBooking() {
+  BK.loaded = true;
+  var r = await api('GET', '/api/admin/beach/settings/' + encodeURIComponent(PID));
+  var s = r.ok && r.data.settings;
+  if (!s) { BK.loaded = false; el('bkState').textContent = errText(r, 'Could not load the booking settings'); return; }
+  BK.saved = {
+    show: Number(s.beach_booking_enabled) ? 1 : 0,
+    online: Number(s.booking_button_override_enabled) ? 0 : 1,
+    msg: String(s.booking_button_override_message || '').trim(),
+    days: Number(s.advance_booking_days) || 7,
+    sameDay: s.allow_same_day_booking == null || Number(s.allow_same_day_booking) ? 1 : 0
+  };
+  el('bkShow').checked = !!BK.saved.show;
+  el('bkOn').checked = !!BK.saved.online;
+  el('bkOff').checked = !BK.saved.online;
+  el('bkMsg').value = BK.saved.msg;
+  el('bkDays').value = BK.saved.days;
+  el('bkSameDay').checked = !!BK.saved.sameDay;
+  bookingChanged();
+}
+async function saveBooking() {
+  var v = bookingForm();
+  if (v.days < 1 || v.days > 60) { toast('Days ahead must be between 1 and 60', 'err'); return; }
+  if (!v.online && !v.msg) { toast('Write the message guests see while online booking is off', 'err'); return; }
+  if (v.online && BK.saved && !BK.saved.online &&
+      !confirm('Turn ON online booking? Guests can then book every spot marked "Guests can book it" straight away.')) return;
+  el('bkSave').disabled = true;
+  var body = { beach_booking_enabled: v.show, booking_button_override_enabled: v.online ? 0 : 1, advance_booking_days: v.days, allow_same_day_booking: v.sameDay };
+  if (v.msg) body.booking_button_override_message = v.msg;
+  var r = await api('POST', '/api/admin/beach/settings', body);
+  el('bkSave').disabled = false;
+  if (!r.ok) { toast(errText(r, 'Could not save the booking settings'), 'err'); return; }
+  BK.saved = v;
+  bookingChanged();
+  toast(v.online ? 'Saved — guests can book online' : 'Saved — guests see your message instead of booking', 'ok');
+}
+
 function showTab(t, fromHash) {
-  if (['layout', 'zones', 'slots'].indexOf(t) < 0) t = 'layout';
+  if (['layout', 'zones', 'slots', 'booking'].indexOf(t) < 0) t = 'layout';
   curTab = t;
   document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === t); });
   document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('hidden', p.id !== 'pane-' + t); });
   if (!fromHash) { try { history.replaceState(null, '', location.pathname + location.search + '#' + t); } catch (e) {} }
   if (t === 'slots' && !SL.loaded) loadSlots();
+  if (t === 'booking' && !BK.loaded) loadBooking();
 }
 window.addEventListener('hashchange', function () { showTab(location.hash.slice(1), true); });
 showTab(location.hash.slice(1), true);
@@ -57499,6 +57574,24 @@ app.get('/admin/dashboard', (c) => {
 
     <!-- Beach Management Tab -->
     <div id="beachTab" class="tab-content hidden">
+            <!-- Beach setup: layout builder, zones & capacity, time slots (embedded page) -->
+            <div id="beachSetupCard" class="bg-white border-2 border-cyan-200 rounded-lg p-4 mb-6">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h3 class="text-xl font-bold">
+                            <i class="fas fa-map-marked-alt mr-2 text-cyan-600"></i>Beach setup
+                        </h3>
+                        <p class="text-sm text-gray-600">Place and number spots on the beach photo guests see, set booking limits per zone, and set the time slots.</p>
+                    </div>
+                    <a href="/admin/beach-setup" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
+                        <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
+                    </a>
+                </div>
+                <iframe id="beachSetupFrame" data-src="/admin/beach-setup?embed=1" title="Beach setup"
+                        style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
+            </div>
+        <!-- Legacy beach tools, hidden: their scripts still reference these elements -->
+        <div id="beachLegacyWrap" style="display:none">
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-2xl font-bold">
@@ -57960,22 +58053,6 @@ app.get('/admin/dashboard', (c) => {
                 </button>
             </div>
 
-            <!-- Beach setup: layout builder, zones & capacity, time slots (embedded page) -->
-            <div id="beachSetupCard" class="bg-white border-2 border-cyan-200 rounded-lg p-4 mb-6">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <div>
-                        <h3 class="text-xl font-bold">
-                            <i class="fas fa-map-marked-alt mr-2 text-cyan-600"></i>Beach setup
-                        </h3>
-                        <p class="text-sm text-gray-600">Place and number spots on the beach photo guests see, set booking limits per zone, and set the time slots.</p>
-                    </div>
-                    <a href="/admin/beach-setup" target="_blank" rel="noopener" class="text-sm font-semibold text-blue-600 hover:underline whitespace-nowrap">
-                        <i class="fas fa-up-right-from-square mr-1"></i>Open full screen
-                    </a>
-                </div>
-                <iframe id="beachSetupFrame" data-src="/admin/beach-setup?embed=1" title="Beach setup"
-                        style="width:100%;height:calc(100vh - 140px);min-height:720px;border:0;border-radius:12px;background:transparent;"></iframe>
-            </div>
 
             <!-- Beach Spots List -->
             <div class="bg-white rounded-lg border p-6 mb-6">
@@ -58010,6 +58087,7 @@ app.get('/admin/dashboard', (c) => {
                 </div>
             </div>
         </div>
+        </div><!-- /beachLegacyWrap -->
     </div>
 
     <!-- OnePass - Digital Pass + Face Recognition Tab -->
