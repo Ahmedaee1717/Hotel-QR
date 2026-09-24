@@ -40935,7 +40935,7 @@ var D = { loaded: false, enabled: true, name: '', settings: null, zones: [], tab
 var FP = { zone: null, sel: null, draft: null, dirty: {}, mode: 'select', zoomIx: 0, busy: false, add: null, addCap: 4, lastAdded: null };
 var ZE = {};
 var SL = { edits: {}, drafts: [], seq: 0, showOff: {}, genOpen: {}, gen: {}, busy: {} };
-var QF = null, NZ = null, DLG = null;
+var QF = null;
 var curTab = 'floor';
 
 function el(id) { return document.getElementById(id); }
@@ -41181,7 +41181,6 @@ function openAddZone() {
   D.zones.forEach(function (z) { used[z.code.toUpperCase()] = 1; });
   var code = '';
   for (var i = 0; i < 26 && !code; i++) { var ch = String.fromCharCode(65 + i); if (!used[ch]) code = ch; }
-  NZ = { code: code };
   showDlg('<h3><i class="fas fa-layer-group"></i>New zone</h3>' +
     '<div class="grid2">' + fld('Code', '<input type="text" id="nzCode" maxlength="4" autocomplete="off" value="' + esc(code) + '">', 'nzCode') +
     fld('Name', '<input type="text" id="nzName" maxlength="60" autocomplete="off" placeholder="e.g. Terrace">', 'nzName') + '</div>' +
@@ -41745,7 +41744,6 @@ function closeDlg(silent) {
   el('dlg').classList.add('hidden');
   el('dlgBox').innerHTML = '';
   QF = null;
-  NZ = null;
   if (FP.add) { FP.add = null; if (!silent) renderFloor(); }
 }
 el('dlg').addEventListener('click', function (ev) { if (ev.target === el('dlg')) closeDlg(); });
@@ -41948,11 +41946,6 @@ function overlaps(a, b) {
   var as = mins(a.start_time), ae = mins(a.end_time), bs = mins(b.start_time), be = mins(b.end_time);
   if (isNaN(as) || isNaN(ae) || isNaN(bs) || isNaN(be)) return false;
   return as < be + (Number(b.buffer_minutes) || 0) && bs < ae + (Number(a.buffer_minutes) || 0);
-}
-function daysText(mask) {
-  mask = mask & 127;
-  if (mask === 127) return 'every day';
-  return DAYS.filter(function (d, i) { return (mask >> i) & 1; }).join(', ') || 'no days';
 }
 function slotRow(v) {
   var id = v.id, draft = !!v.draft;
@@ -71044,7 +71037,7 @@ Detected: \${new Date(feedback.detected_at).toLocaleString()}
       // RESTAURANTS MANAGEMENT
       // ========================================
       let selectedRestaurantId = null;
-
+      
       // Main restaurant booking setup (El Kasr) is an embedded page, loaded on first open
       function loadRestaurantSetupFrame() {
         const f = document.getElementById('restaurantSetupFrame');
