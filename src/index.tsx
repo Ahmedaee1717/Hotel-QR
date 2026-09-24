@@ -47894,6 +47894,11 @@ tr.ns td.st{color:var(--bad);font-weight:700}
   var p = document.getElementById('arrPrint');
   if (p) p.addEventListener('click', function(){ window.print(); });
   var bk = document.getElementById('arrBack');
+  // Back to the Ops console: keep its original URL (?app=<version>) when we know it
+  try {
+    var ret = JSON.parse(sessionStorage.getItem('opsBeachReturn') || 'null');
+    if (bk && ret && typeof ret.back === 'string' && ret.back.indexOf('/staff/app') === 0) bk.setAttribute('href', ret.back);
+  } catch (err) {}
   if (bk) bk.addEventListener('click', function(e){
     try { if (document.referrer && document.referrer.indexOf('/staff/app') >= 0 && history.length > 1) { e.preventDefault(); history.back(); } } catch (err) {}
   });
@@ -48643,12 +48648,29 @@ app.get('/staff/app', (c) => {
     function drawBeachMap(){
         var host = document.getElementById('bchMap');
         if(!host) return;
-        var spots = (bchData.spots||[]).filter(function(s){ return s.position_x!=null && s.position_y!=null && isFinite(+s.position_x) && isFinite(+s.position_y); });
-        if(!spots.length){ host.innerHTML = bchLoading ? '' : '<div class="empty" style="padding:26px 12px">No spots on the map yet.</div>'; return; }
-        var xs = spots.map(function(s){return +s.position_x;}), ys = spots.map(function(s){return +s.position_y;});
-        var pad = 34;
-        var minX = Math.min.apply(null,xs)-pad, maxX = Math.max.apply(null,xs)+pad;
-        var minY = Math.min.apply(null,ys)-pad, maxY = Math.max.apply(null,ys)+pad;
+        var all = bchData.spots||[];
+        if(!all.length){ host.innerHTML = bchLoading ? '' : '<div class="empty" style="padding:26px 12px">No spots on the map yet.</div>'; return; }
+        // Spots without a real position (NULL, or the 0,0 an API-created spot gets)
+        // go in a tray under the sand so every spot stays tappable.
+        var pos = {}, placed = [], tray = [];
+        all.forEach(function(s){
+            var px=+s.position_x, py=+s.position_y;
+            if(s.position_x!=null && s.position_y!=null && isFinite(px) && isFinite(py) && !(px===0 && py===0)){ pos[s.spot_id]={x:px,y:py}; placed.push(s); }
+            else tray.push(s);
+        });
+        var pad = 34, minX, maxX, minY, maxY;
+        if(placed.length){
+            var xs = placed.map(function(s){return pos[s.spot_id].x;}), ys = placed.map(function(s){return pos[s.spot_id].y;});
+            minX = Math.min.apply(null,xs)-pad; maxX = Math.max.apply(null,xs)+pad;
+            minY = Math.min.apply(null,ys)-pad; maxY = Math.max.apply(null,ys)+pad;
+        } else { minX = 0; maxX = 780; minY = 0; maxY = 40; }
+        var trayTop = maxY;
+        if(tray.length){
+            var perRow = Math.max(1, Math.floor((maxX-minX-2*pad)/46)+1);
+            tray.forEach(function(s,i){ pos[s.spot_id]={x:minX+pad+(i%perRow)*46, y:trayTop+34+Math.floor(i/perRow)*46}; });
+            maxY = trayTop+34+Math.floor((tray.length-1)/perRow)*46+pad;
+        }
+        var spots = placed.concat(tray);
         var w = maxX-minX, h = maxY-minY;
         // A strip of sea above the umbrellas keeps the map readable at a glance
         var seaH = h*0.42;
@@ -48661,12 +48683,16 @@ app.get('/staff/app', (c) => {
         svg += '<rect x="'+minX+'" y="'+(minY-seaH*0.10)+'" width="'+w+'" height="'+(seaH*0.10)+'" fill="#ffffff" opacity="0.55"/>';
         svg += '<rect x="'+minX+'" y="'+minY+'" width="'+w+'" height="'+h+'" fill="url(#sand)"/>';
         svg += '<text x="'+(minX+w/2)+'" y="'+(minY-seaH*0.55)+'" text-anchor="middle" font-size="'+(w*0.035)+'" fill="#ffffff" opacity="0.65" font-family="system-ui">RED SEA</text>';
+        if(tray.length){
+            svg += '<line x1="'+minX+'" y1="'+trayTop+'" x2="'+maxX+'" y2="'+trayTop+'" stroke="#8a6d1f" stroke-width="1" stroke-dasharray="6 5" opacity="0.6"/>';
+            svg += '<text x="'+(minX+8)+'" y="'+(trayTop+11)+'" font-size="9" font-weight="700" fill="#6b5a3a" font-family="system-ui" letter-spacing="1">NOT PLACED ON THE MAP</text>';
+        }
 
         var bySpot = {};
         (bchData.bookings||[]).forEach(function(b){ (bySpot[b.spot_id]=bySpot[b.spot_id]||[]).push(b); });
         var hits = bchHitSpots();
         spots.forEach(function(s){
-            var x=+s.position_x, y=+s.position_y, r=15, list=bySpot[s.spot_id]||[];
+            var x=pos[s.spot_id].x, y=pos[s.spot_id].y, r=15, list=bySpot[s.spot_id]||[];
             var cab = s.tier==='cabana' || s.spot_type==='cabana';
             var vip = s.tier==='vip' || Number(s.is_premium)===1;
             var lab = String(s.spot_number==null?'':s.spot_number);
@@ -48694,7 +48720,7 @@ app.get('/staff/app', (c) => {
         var keep = host.scrollLeft;
         host.innerHTML = svg;
         host.scrollLeft = keep;
-        bchMapBox = { minX: minX, w: w };
+        bchMapBox = { minX: minX, w: w, pos: pos };
     }
     // On phones the map scrolls sideways: bring the first search result into view
     function bchScrollToHit(){
@@ -48703,10 +48729,10 @@ app.get('/staff/app', (c) => {
         var q=bchQuery(); if(!q.name && !q.room) return;
         var first=document.querySelector('#bchList .bch-row[data-spot]'); if(!first) return;
         var sid=+first.getAttribute('data-spot');
-        var s=(bchData.spots||[]).find(function(x){ return +x.spot_id===sid; });
+        var p=bchMapBox.pos && bchMapBox.pos[sid];
         var svg=host.querySelector('svg');
-        if(!s || s.position_x==null || !svg) return;
-        var px=(+s.position_x - bchMapBox.minX) * (svg.getBoundingClientRect().width / bchMapBox.w);
+        if(!p || !svg) return;
+        var px=(p.x - bchMapBox.minX) * (svg.getBoundingClientRect().width / bchMapBox.w);
         host.scrollLeft = Math.max(0, px - host.clientWidth/2);
     }
 
@@ -48899,7 +48925,11 @@ app.get('/staff/app', (c) => {
         var inApp=false;
         try{ inApp = (typeof IN_APP!=='undefined' && !!IN_APP) || window.matchMedia('(display-mode: standalone)').matches; }catch(e){}
         // Inside the Ops app a new window would leave the /staff/ scope, so stay in place
-        if(inApp){ location.href=url; return; }
+        // and remember where to come back to (the Beach tab, same day and slot)
+        if(inApp){
+            try{ sessionStorage.setItem('opsBeachReturn', JSON.stringify({back: location.pathname+location.search, date: bchDateStr, slot: bchSlot, at: Date.now()})); }catch(e){}
+            location.href=url; return;
+        }
         var w=null;
         try{ w=window.open(url,'_blank'); }catch(e){}
         if(!w) location.href=url;
@@ -48938,6 +48968,26 @@ app.get('/staff/app', (c) => {
             if(sm) sm.addEventListener('keydown', function(e){ if(e.key==='Enter') confirmCode(sm.value); });
             bchRenderAll();
         }catch(e){ console.error('beach init', e); }
+        // Back from the printable arrivals list: reopen the Beach tab on the same day and slot.
+        // The tab's handler is called directly (no synthetic click) so the first real tap
+        // still unlocks the ring audio.
+        try{
+            var ret=null;
+            try{ ret=JSON.parse(sessionStorage.getItem('opsBeachReturn')||'null'); sessionStorage.removeItem('opsBeachReturn'); }catch(e){}
+            if(ret && ret.at && Date.now()-ret.at < 6*3600*1000){
+                if(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(ret.date||''))) bchDateStr=String(ret.date);
+                if(ret.slot==='all' || ret.slot==='half_day_am' || ret.slot==='half_day_pm') bchSlot=ret.slot;
+                var bt=document.querySelector('.tab[data-tab="beach"]');
+                if(bt && typeof bt.onclick==='function') bt.onclick();
+            }
+        }catch(e){ console.error('beach return', e); }
+        window.addEventListener('pageshow', function(ev){
+            try{
+                if(!ev.persisted) return;
+                try{ sessionStorage.removeItem('opsBeachReturn'); }catch(x){}
+                if(bchVisible()) loadBeach(true);
+            }catch(e){}
+        });
         // Other attendants' check-ins show up without a tap; the day rolls over at Cairo midnight
         setInterval(function(){
             try{
@@ -86599,12 +86649,17 @@ function attParseCode(raw: string): { reference: string, code: string } {
 // the slot resolver (sunrise/sunset). Shared by the Ops API and the print page.
 async function attBeachDay(env: any, pid: string, date: string) {
   const DB = env.DB
+  const hasResolver = typeof resolveBeachSlots === 'function'
   const resolvedP = (async () => {
     try {
-      if (typeof resolveBeachSlots === 'function') return await (resolveBeachSlots as any)(env, pid, date)
+      if (hasResolver) return await (resolveBeachSlots as any)(env, pid, date)
     } catch (e) { console.error('beach slot resolve failed', e) }
     return null
   })()
+  // Fallback only (no resolver in this build): cached sun times, fetched alongside the batch.
+  const sunP: Promise<any> = hasResolver
+    ? Promise.resolve(null)
+    : DB.prepare(`SELECT sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date = ?`).bind(pid, date).first().catch(() => null)
   const batchP = DB.batch([
     DB.prepare(`
       SELECT s.spot_id, s.spot_number, s.spot_type, s.tier, s.row_no, s.zone_id, z.zone_name,
@@ -86629,17 +86684,20 @@ async function attBeachDay(env: any, pid: string, date: string) {
     `).bind(pid, date),
     DB.prepare(`SELECT * FROM beach_settings WHERE property_id = ? LIMIT 1`).bind(pid)
   ])
-  const [batch, resolved]: any = await Promise.all([batchP, resolvedP])
+  const [batch, resolved, sunPre]: any = await Promise.all([batchP, resolvedP, sunP])
   const settings: any = ((batch[2] && batch[2].results) || [])[0] || {}
 
   let slots: any[] = Array.isArray(resolved) ? resolved : (resolved && Array.isArray(resolved.slots) ? resolved.slots : [])
   let sunrise: string | null = resolved && !Array.isArray(resolved) ? (resolved.sunrise || null) : null
   let sunset: string | null = resolved && !Array.isArray(resolved) ? (resolved.sunset || null) : null
   if (!slots.length) {
-    let sun: any = null
-    try {
-      sun = await DB.prepare(`SELECT sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date = ?`).bind(pid, date).first()
-    } catch (e) { /* cache table optional here */ }
+    let sun: any = sunPre
+    if (hasResolver) {
+      // The resolver failed: one more lookup on this rare path only
+      try {
+        sun = await DB.prepare(`SELECT sunrise, sunset FROM beach_sun_times WHERE property_id = ? AND date = ?`).bind(pid, date).first()
+      } catch (e) { /* cache table optional here */ }
+    }
     let legacy: any[] = []
     try { legacy = JSON.parse(settings.time_slots || '[]') } catch (e) { legacy = [] }
     if (!Array.isArray(legacy)) legacy = []
