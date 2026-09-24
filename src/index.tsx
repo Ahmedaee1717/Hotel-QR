@@ -12110,8 +12110,11 @@ async function buildLiveKnowledge(DB: any, property_id: any) {
 async function buildNavigationCatalog(DB: any, property_id: any): Promise<{ text: string; valid: Set<string> }> {
   const valid = new Set<string>()
   const lines: string[] = []
+  // Admin-typed keys may hold spaces or other characters ("Kids Club"): encode
+  // each path segment so every target is a single token the server validator
+  // and the chat widget can round-trip (the widget decodes it back).
   const add = (target: string, label: string, hint?: string) => {
-    const url = 'app://' + target
+    const url = 'app://' + target.split('/').map(encodeURIComponent).join('/')
     if (valid.has(url)) return
     valid.add(url)
     lines.push('- [' + String(label).replace(/[\[\]]/g, '') + '](' + url + ')' + (hint ? ' — ' + hint : ''))
@@ -12130,7 +12133,11 @@ async function buildNavigationCatalog(DB: any, property_id: any): Promise<{ text
       SELECT offering_id FROM hotel_offerings
       WHERE property_id = ? AND offering_type = 'room_service' AND (status = 'active' OR status IS NULL) LIMIT 1
     `).bind(property_id).first()
-    if (rs) add('room-service', 'Room Service menu', 'in-room dining menu the guest can browse and order from')
+    // ...but only while its homepage card is switched on, exactly like the homepage
+    const rsCard: any = rs ? await DB.prepare(`
+      SELECT 1 AS ok FROM custom_sections WHERE property_id = ? AND section_key = 'room-service' AND is_visible = 1 LIMIT 1
+    `).bind(property_id).first() : null
+    if (rs && rsCard) add('room-service', 'Room Service menu', 'the in-room dining menu with dishes and prices; its "Order via Concierge" button brings the guest back to this chat to place the order')
 
     // Built-in categories — only those the property shows on its homepage.
     // Offering ids are prefixed "H" because that is how the guest page keys them.
@@ -12168,12 +12175,13 @@ async function buildNavigationCatalog(DB: any, property_id: any): Promise<{ text
       const name = String(s.section_name_en || key)
       add('section/' + key, name, 'the ' + name + ' section of the app')
       const rows = await DB.prepare(`
-        SELECT offering_id, title_en FROM hotel_offerings
+        SELECT offering_id, title_en, requires_booking FROM hotel_offerings
         WHERE property_id = ? AND custom_section_key = ? AND (status = 'active' OR status IS NULL)
         ORDER BY display_order LIMIT 40
       `).bind(property_id, key).all()
       for (const o of (rows.results || [])) {
-        if (o.title_en) add('offering/H' + o.offering_id, String(o.title_en), 'its page in ' + name)
+        if (o.title_en) add('offering/H' + o.offering_id, String(o.title_en),
+          'its page in ' + name + (o.requires_booking === 1 ? '; has a booking form (bookable in the app)' : ''))
       }
     }
 
@@ -12191,8 +12199,12 @@ async function buildNavigationCatalog(DB: any, property_id: any): Promise<{ text
     }
 
     // Beach, map, information pages, feedback
-    const beach: any = await DB.prepare('SELECT beach_booking_enabled FROM beach_settings WHERE property_id = ?').bind(property_id).first()
-    if (beach && beach.beach_booking_enabled === 1) add('beach', 'Beach', 'the beach section (how booking works is stated in RESORT STATUS)')
+    const beach: any = await DB.prepare('SELECT beach_booking_enabled, booking_button_override_enabled FROM beach_settings WHERE property_id = ?').bind(property_id).first()
+    if (beach && beach.beach_booking_enabled === 1) {
+      add('beach', 'Beach', beach.booking_button_override_enabled === 1
+        ? 'the beach section (spots are arranged on the beach itself — see RESORT STATUS; NOT bookable in the app)'
+        : 'the beach section with its spot map; front-row spots can be reserved there (bookable in the app)')
+    }
     if (prop.show_hotel_map === 1) add('map', 'Resort Map', 'live map to find any place in the resort')
     const pages = await DB.prepare(`
       SELECT page_key, title_en FROM info_pages
@@ -12698,7 +12710,7 @@ app.post('/api/chatbot/chat', async (c) => {
       if (nav.text) {
         linkContext = '\n\n════════ APP NAVIGATION (places you can open for the guest) ════════\n' +
           'Each line below is a markdown link you may include VERBATIM in a reply, e.g. [Room Service menu](app://room-service). Tapping it opens that part of the app for the guest.\n' +
-          'RULES: use ONLY links from this list, copied exactly — never invent app:// links. These are navigation targets: their names are NOT facts, so describe a place only with Knowledge Base facts. ' +
+          'RULES: use ONLY links from this list — copy the app:// target exactly and never invent one; write the link LABEL in the guest\'s language (e.g. [قائمة خدمة الغرف](app://room-service)). These are navigation targets: their names are NOT facts, so describe a place only with Knowledge Base facts. ' +
           'Whenever the guest wants to DO something the app covers (see or order from the room service menu, view a restaurant, book a table, book the beach, find their way, read an information page, give feedback), include the matching link so they can tap straight through. ' +
           'When you lack facts about something but a link exists, say so honestly and still give the link. Weave the link into the sentence where it helps ("You can browse and order from the [Room Service menu](app://room-service)").\n' +
           nav.text
@@ -12768,7 +12780,7 @@ Use "-" for whichever part is still missing and keep politely asking for it. The
 2. If the answer is not in your knowledge: say so honestly, offer to connect the front desk ("I'll ask our team to confirm — or dial 0 from your room phone"), and never guess.
 3. NEVER invent: prices, opening hours, menus, phone numbers, distances, availability, policies. If a time or price is not written below, you do not know it.
 4. Booking promises: you may only say something can be booked in the app if it is marked (bookable in the app) in APP NAVIGATION. You cannot make reservations yourself — send the guest to the matching app link or the front desk.
-5. Service dispatch (maintenance, housekeeping, amenities to the room): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number.
+5. Service dispatch (maintenance, housekeeping, amenities to the room, and ROOM SERVICE ORDERS): respond as the concierge — confirm you are passing it to the team now (the front desk sees this chat live), and include their room number. When a guest names dishes or drinks to be brought to their room, TAKE THE ORDER: repeat the items back with their room number and confirm it is on its way to the team — do not send them back to the menu. You need no menu facts for this; the team confirms availability and price.
 6. If the guest disputes something you said, do not double down — offer the front desk.
 
 ════════ RESORT STATUS (live: information pages & beach) ════════
@@ -13024,7 +13036,7 @@ Use this for "today", "tonight", "tomorrow", "now", "still open?" and any weekda
     if (typeof aiResponse === 'string' && aiResponse.includes('app://')) {
       aiResponse = aiResponse.replace(/\[([^\]]+)\]\((app:\/\/[^)\s]+)\)/g, (m: string, label: string, url: string) =>
         navValid.has(url) ? m : label)
-      aiResponse = aiResponse.replace(/(?<!\]\()app:\/\/[A-Za-z0-9\/_\-:.]+/g, '')
+      aiResponse = aiResponse.replace(/(?<!\]\()app:\/\/[A-Za-z0-9\/_\-:.%]+/g, '')
     }
 
     // Store AI response (potentially modified with guest info request)
@@ -32298,7 +32310,7 @@ window.luxTogglePassForm = function() {
             function parseMarkdownLinks(text) {
               return text.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, function(m, label, url) {
                 if (/^app:\\/\\//i.test(url)) {
-                  var target = url.slice(6).replace(/[^A-Za-z0-9\\/_\\-:.]/g, '');
+                  var target = url.slice(6).replace(/[^A-Za-z0-9\\/_\\-:.%]/g, '');
                   return '<a href="#" data-app="' + target + '" class="chat-app-link inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 underline font-semibold">' + label + ' <i class="fas fa-arrow-up-right-from-square text-xs"></i></a>';
                 }
                 if (/^(https?:\\/\\/|\\/)/i.test(url)) {
@@ -32313,7 +32325,7 @@ window.luxTogglePassForm = function() {
             // guest lands back in the conversation when they close them;
             // page-level moves close the chat first.
             function navigateFromChat(target) {
-              var parts = String(target || '').split('/');
+              var parts = String(target || '').split('/').map(function(s) { try { return decodeURIComponent(s); } catch (e) { return s; } });
               var kind = parts[0], arg = parts.slice(1).join('/');
               var closeChat = function() { if (!chatWindow.classList.contains('hidden')) closeChatBtn.click(); };
               try {
